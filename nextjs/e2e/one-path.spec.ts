@@ -15,12 +15,15 @@ for (const width of widths) {
     const film = page.getByTestId("one-path-hero-film");
     await expect(film).toBeVisible();
     const bounds = await film.boundingBox();
-    expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 380);
+    // D3 put the title above the film. The film still has to start in the upper half of the
+    // 900px desktop fold (measured 347 / 367 / 381 at 1024 / 1280 / 1440+); 380 was the two-column
+    // layout's number.
+    expect(bounds!.y).toBeLessThan(width < 768 ? 500 : 450);
     expect(bounds!.width).toBeGreaterThan(width < 768 ? width - 60 : width * .4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await expect(page.locator("#s1 .one-path-source-proof")).toHaveCount(0);
-    await expect(page.locator("#proof .one-path-source-proof")).toHaveCount(1);
-    await expect(page.locator(".one-path-film-note")).toContainText("approved source film is preserved");
+    await expect(page.locator("#s1 [data-proof-variant]")).toHaveCount(0);
+    await expect(page.locator('#proof [data-proof-variant="canonical"]')).toHaveCount(1);
+    await expect(page.locator(".one-path-film-note")).toContainText("not a screen recording");
     const sectionOrder = await page.locator("main > section[data-scene]").evaluateAll(nodes => nodes.map(node => node.id));
     expect(sectionOrder).toEqual(["s1", "how-it-works", "connect", "proof", "stays-current", "ready-for-ai"]);
     const desktop = page.locator(".one-path-primary-nav");
@@ -57,7 +60,7 @@ test("hero is the accelerated V2 presentation and Works uses the supporting lock
 
   const film = page.getByTestId("one-path-works-film");
   await film.scrollIntoViewIfNeeded();
-  const pairs = [["ORGANIZE", "compile-cut-2.mp4"], ["UPDATES", "compile-cut-3.mp4"]];
+  const pairs = [["Organize", "compile-cut-2.mp4"], ["Updates", "compile-cut-3.mp4"]];
   for (const [label, name] of pairs) {
     await film.getByRole("tab", { name: label, exact: true }).click();
     await expect(film.getByRole("tab", { name: label, exact: true })).toHaveAttribute("aria-selected", "true");
@@ -94,10 +97,11 @@ test("failed video keeps a usable poster instead of a blank hero", async ({ page
 test("Korean entry keeps film first and the live example distinct", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ko");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 쓰는 지식으로.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI가 사용하는 지식으로 만듭니다.");
   await expect(page.locator(".one-path-hero-film")).toBeVisible();
   await expect(page.locator(".one-path-film-note")).toContainText("실제 서비스 화면 녹화가 아닙니다");
-  await expect(page.getByRole("heading", { level: 2, name: /어려운 처리는 TAVONEL이 맡습니다/ })).toBeVisible();
+  // G1-043: the "TAVONEL handles the hard part" promise moved from a section heading into the lede.
+  await expect(page.locator(".one-path-lede")).toContainText("TAVONEL이 맡습니다");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: resolve(output, "ko-390.png") });
 });
@@ -119,7 +123,14 @@ async function localWorkspace(page: Page, baseURL: string | undefined, source: "
 test("empty workspace has four primary choices and optional tools remain reachable", async ({ page, baseURL }) => {
   await localWorkspace(page, baseURL);
   await page.goto("/workspace");
-  await expect(page.locator("#workspace-state-title")).toHaveText("Add your knowledge.");
+  /*
+    `31cb972` -- "the hero belongs to Home, the drop box is always a box" -- stops drawing the
+    state hero on a brand-new workspace, so `#workspace-state-title` and its "Add your knowledge."
+    no longer exist there: the drop box is the page's own heading. Same precondition, read off the
+    heading that is actually on screen.
+  */
+  await expect(page.locator("#workspace-state-title")).toHaveCount(0);
+  await expect(page.locator("#workspace-intake-title")).toHaveText("Drop files, folders or ZIP here");
   const rail = page.getByRole("complementary", { name: "Workspace navigation" });
   await expect(rail.locator("nav > div")).toHaveCount(4);
   for (const label of ["Home", "Knowledge", "Use with AI"]) await expect(rail.getByRole("button", { name: label, exact: true })).toBeVisible();
@@ -147,7 +158,8 @@ test("trial tools stay restricted inside the simplified More menu", async ({ pag
 test("AI destination setup is reachable without claiming a verified connection", async ({ page, baseURL }) => {
   await localWorkspace(page, baseURL);
   await page.goto("/workspace");
-  await expect(page.locator("#workspace-state-title")).toHaveText("Add your knowledge.");
+  // `31cb972` again: the empty workspace's heading is the drop box, not a state hero above it.
+  await expect(page.locator("#workspace-intake-title")).toHaveText("Drop files, folders or ZIP here");
   await page.getByRole("complementary", { name: "Workspace navigation" }).getByRole("button", { name: "Use with AI", exact: true }).click();
   const guide = page.locator("#workspace-ask").getByTestId("workspace-ai-use-guide");
   await expect(guide).toBeVisible();

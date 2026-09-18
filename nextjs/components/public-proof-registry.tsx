@@ -74,8 +74,19 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
     links?: Array<{ href: Route; label: string }>;
     /** BA-019: references under the actions, as a list rather than as more buttons. */
     readNext?: Array<{ href: Route; label: string }>;
-    /** BA-020: reference material, behind a disclosure rather than in the reading path. */
-    collapsed?: boolean;
+    /**
+     * Reference material, in a disclosure rather than in the reading path.
+     *
+     * BA-020 put three sections behind one, and G1-018 found the cost: /knowledge-compiler ended
+     * on three headings with nothing under them, which reads as three unfinished sections rather
+     * than as three folded ones. A glossary genuinely is consulted; "when it is not the right
+     * tool" and the FAQ are read, and they are the two a buyer weighs the category on.
+     *
+     * So the field carries three states rather than two: absent is a plain section, `true` is a
+     * closed disclosure, and `"open"` is the same disclosure rendered open -- still skippable,
+     * still one click to fold, but not a heading over an empty space.
+     */
+    collapsed?: boolean | "open";
   }>;
   /*
     One next step under the body, for a page that is a step in a sequence rather than a terminus.
@@ -91,7 +102,7 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
         placeholder-then-replace client fallback that used to supply it is gone. */}
     <PublicSiteHeader cta={primaryCallToAction()} />
     <main id="main">
-      <section className={styles.hero}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
+      <section className={styles.hero}><div className={styles.heroLead}><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div><aside>{state ? <span className={styles.status}>{state}</span> : null}<p>{summary}</p></aside></section>
       <div className={styles.body}>
         {index ? (
           <nav className={styles.index} aria-label="On this page">
@@ -109,14 +120,22 @@ export default function PublicProofRegistry({ title, eyebrow, summary, state, in
             {section.figure ? <figure className={styles.figure}>{section.figure}</figure> : null}
             {section.rows ? <ol className={styles.protocol}>{section.rows.map((row) => <li key={row.key}><b>{row.key}</b><span>{row.description}</span><em>{row.state}</em></li>)}</ol> : null}
             {section.faq ? <dl className={styles.faq}>{section.faq.map((entry) => <div key={entry.question}><dt>{entry.question}</dt><dd>{entry.answer}</dd></div>)}</dl> : null}
-            {section.links ? <p className={styles.links}>{section.links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}
+            {/* pages-16: the contract's secondary button, not a bespoke bordered box drawn here. */}
+            {section.links ? <p className={styles.links}>{section.links.map((link) => <Link className="btn btn-secondary" key={link.href} href={link.href}>{link.label}</Link>)}</p> : null}
             {section.readNext ? <div className={styles.readNext}><p>Read next</p><ul>{section.readNext.map((link) => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}</ul></div> : null}
-            {section.download ? <a className={styles.download} href={section.download.href} download>{section.download.label}</a> : null}
+            {/* Same shape as `.links` on the same component: a download is a control, so it takes
+                a contract variant. Ghost, not secondary -- the row above it is the louder pair. */}
+            {section.download ? <a className={`btn btn-ghost ${styles.download}`} href={section.download.href} download>{section.download.label}</a> : null}
           </div>;
           return <section className={styles.row} id={sectionId(section.title)} key={section.title}>
             <h2>{section.title}</h2>
             {section.collapsed
-              ? <details className={styles.disclosure}><summary>Open {section.title.toLowerCase()}</summary>{body}</details>
+              ? (
+                <details className={styles.disclosure} open={section.collapsed === "open"}>
+                  <summary>{section.collapsed === "open" ? "Hide" : "Open"} {section.title.toLowerCase()}</summary>
+                  {body}
+                </details>
+              )
               : body}
           </section>;
         })}

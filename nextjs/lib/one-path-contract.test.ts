@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { COMPILE_STAGES } from "./compile-stages";
 import { CUSTOMER_NAV, customerNavOwns } from "./site-navigation";
 import films from "./locked-film-assets.json";
 
@@ -44,16 +45,89 @@ describe("approved one-path experience", () => {
     expect(proof).toBeLessThan(current);
     expect(current).toBeLessThan(ready);
     expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(proof);
-    expect(page).toContain("approved source film is preserved");
+    /*
+      G1-003 / G1-004. The note this used to pin -- "the approved source film is preserved and
+      presented at a faster 12-second pace" -- disclosed the *edit* and not the thing a visitor
+      could mistake the film for. The cuts draw an extracted table as a ruled grid, a
+      section-and-line locator and `.csv` sources, none of which this deployment produces, and the
+      bytes are locked, so the note names the recreation and says what a compile emits instead.
+      The guard follows the fact rather than the sentence: a landing page that stops separating
+      the film from the product still fails here.
+    */
+    expect(page).toContain("A directed film, not a screen recording");
+    expect(page).toContain("the page it was read from");
     expect(page).toContain("/explore?act=source");
+  });
+  /*
+    BQ-013. The locale thread reached the chrome and stopped at the film.
+
+    /ko reused `COMPILE_STAGES[1]` and `[2]` verbatim, so the Korean page rendered English tab
+    labels and an English caption, and the player kept the tablist name, the three control names
+    and the decoder-failure sentence in English whatever page it was on. None of that is visible
+    marketing copy, which is why it survived every copy pass; all of it is the accessible name of
+    a control. The guard follows the prop rather than the strings: a film that stops taking the
+    locale fails here.
+  */
+  it("names the film and its controls in the language of the page they are on", () => {
+    const ko = text("app/ko/page.tsx");
+    expect(ko.match(/<CompileStagePlayer[^>]*korean/g)).toHaveLength(2);
+    expect(ko, "the Korean works film may not reuse the English stage labels verbatim")
+      .not.toContain("const KO_WORK_STAGES = [COMPILE_STAGES[1]!, COMPILE_STAGES[2]!]");
+    const player = text("components/compile-stage-player.tsx");
+    for (const wired of ["aria-label={text.stages}", "FILM_CONTROL_LABEL_KO[control]", "{text.error}", "text.errorLong"]) {
+      expect(player, `${wired} must read the locale, not a literal`).toContain(wired);
+    }
+    expect(text("app/one-path.css"), "and the swipe caption is overridden on both Korean films")
+      .toContain(".one-path-ko .one-path-works-film::after");
+  });
+  /*
+    landing-01 / regressions-01. A film stage that reaches a server component as a client
+    reference paints nothing.
+
+    /ko built its works stages by spreading COMPILE_STAGES out of the "use client" player
+    module. Every export of a client module arrives in a server component as a reference, not a
+    value, so id/src/poster came through undefined and the second Korean film rendered as a blank
+    panel with a src-less <img> and no <video> -- a silent fallback on a locked asset. The list is
+    a plain module now. Two halves to the guard: the values themselves are complete, and neither
+    page reads them back out of the player.
+  */
+  it("gives every film stage a real asset, from a module a server component can read", () => {
+    expect(COMPILE_STAGES.length).toBeGreaterThan(0);
+    for (const stage of COMPILE_STAGES) {
+      for (const field of ["id", "src", "poster"] as const) {
+        expect(stage[field], `stage ${stage.id || "?"} has no ${field}`).toBeTruthy();
+      }
+      expect(stage.src).toMatch(/^\/film\/.+\.mp4$/);
+      expect(stage.poster).toMatch(/^\/film\/.+\.webp$/);
+    }
+    expect(text("components/compile-stage-player.tsx"), "the strip may not live in the client module again")
+      .not.toContain("export const COMPILE_STAGES");
+    for (const page of ["app/ko/page.tsx", "components/home-page-client.tsx"]) {
+      expect(text(page), `${page} must read the stages from the plain module`)
+        .toContain('import { COMPILE_STAGES } from "@/lib/compile-stages"');
+    }
   });
   it("preserves state-controlled entry and actual public proof", () => {
     expect(text("components/home-page-client.tsx")).toContain("liveCommerce ? SELF_SERVE_CTA : ACCESS_CTA");
     expect(text("app/page.tsx")).toContain("isLiveCommerce()");
     expect(text("app/page.tsx")).toContain("<SolutionProofSample");
     expect(text("app/ko/page.tsx")).toContain("playbackRate={1.5} compact");
-    expect(text("app/ko/page.tsx")).toContain("01 / TAVONEL WORKS");
-    expect(text("app/ko/page.tsx")).toContain('canonical: "/ko"');
+    /*
+      BQ-056. This pinned "01 / TAVONEL WORKS" -- one of five numbered section kickers that made a
+      third ordinal system on a page which already numbers a six-step grid inside one of those
+      sections. They are deleted, so the guard follows what it was there for: /ko runs the same
+      sections in the same order as `/`, identified by their headings rather than by a count.
+    */
+    const korean = text("app/ko/page.tsx");
+    // Comments stripped: the rationale for deleting them names the strings it deleted.
+    expect(korean.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
+      .not.toMatch(/0\d \/ /);
+    for (const heading of ["ko-works-title", "ko-intake-title", "ko-proof-title", "ko-current-title", "ko-use-title"]) {
+      expect(korean).toContain(`id="${heading}"`);
+    }
+    expect(korean.indexOf("ko-works-title")).toBeLessThan(korean.indexOf("ko-proof-title"));
+    expect(korean.indexOf("ko-proof-title")).toBeLessThan(korean.indexOf("ko-use-title"));
+    expect(korean).toContain('canonical: "/ko"');
   });
   it("keeps low-motion, Save-Data and hidden-tab playback protections", () => {
     const player = text("components/compile-stage-player.tsx");

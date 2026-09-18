@@ -78,8 +78,25 @@ describe("what 13.11 asked to be added", () => {
       expect(page).toContain(`/docs/${target}`);
     }
     expect(page).toContain("/explore");
-    expect(page).toContain("/login");
-    expect(page).toContain("START WITH YOUR FILES");
+    /*
+      G1-010. The way onward is still asserted; which way it is stopped being written here.
+
+      This page carried both of the site's access actions at once -- "Start with your files" in the
+      header and again in the closing row, while /product and /solutions offered "Request access"
+      -- so pinning the /login literal held one half of that contradiction in place. What it pins
+      now is that the closing row renders the one resolved action rather than a label of its own,
+      which is the same rule `lib/brand-copy.test.ts` applies to the header.
+    */
+    expect(page, "the closing row reads the resolved access action").toContain("ACCESS.href");
+    /*
+      BQ-111 took the upper-casing off it. The rule this line holds is that the label is read
+      from the resolved action rather than typed on the page, and `.toUpperCase()` was the
+      shouting, not the reading -- 10px tracked mono capitals on the two controls that matter
+      most here. What is asserted is the read; the casing is the stylesheet's business.
+    */
+    expect(page, "and its label, rather than writing one").toContain("label: ACCESS.label }");
+    expect(page, "and does not shout it").not.toContain("toUpperCase()");
+    expect(page).toContain("const ACCESS = primaryCallToAction();");
   });
 });
 
@@ -209,9 +226,26 @@ describe("the brand fix's structure", () => {
       reach a screen reader twice.
     */
     expect(diagramCss).toContain(".stack { display: none; }");
-    expect(diagramCss).toMatch(/@media \(max-width: 640px\) \{\s*\.diagram \{ display: none; \}/);
+    /*
+      Hidden at the scroller, not at the `<svg>` inside it. The drawing is pinned to its authored
+      viewBox width and pans in a `tabIndex` group, so hiding only the drawing would leave a
+      focusable empty box on a phone -- a tab stop that lands on nothing.
+    */
+    expect(diagramCss).toMatch(/@media \(max-width: 640px\) \{[^}]*\.scroller \{ display: none; \}/);
     expect(diagramCss, "a hidden-but-rendered list would double-announce the stages")
       .not.toMatch(/\.stack \{[^}]*clip-path/);
+  });
+
+  /*
+    WCAG 2.1.1, and the reason it is asserted on both drawings at once: the pan is only reachable
+    if something in it can take focus. `.figure` on this page is `overflow-x: auto` and nothing
+    else, so the group lives in the component, as it does on /product/continuous-knowledge.
+  */
+  it("makes the drawing's horizontal pan reachable from a keyboard", () => {
+    for (const component of ["knowledge-compiler-diagram", "compiler-contract-diagram"]) {
+      const source = readFileSync(resolve(import.meta.dirname, `../components/${component}.tsx`), "utf8");
+      expect(source, component).toMatch(/className=\{styles\.scroller\} tabIndex=\{0\} role="group" aria-label=/);
+    }
   });
 
   it("keeps the section index, one comparison and the reference sections collapsed", () => {
@@ -223,7 +257,17 @@ describe("the brand fix's structure", () => {
     expect(page).toContain('title: "Compared with RAG, graphs and search"');
     expect(rendered(page), "the three separate comparisons must not come back")
       .not.toContain('title: "Compared with RAG"');
-    expect((page.match(/collapsed: true/g) ?? []).length).toBe(3);
+    /*
+      G1-018. Three folded sections became one folded and two open.
+
+      The page ended on three headings with nothing under them, which reads as three unfinished
+      sections rather than three folded ones -- and two of the three, "when it is not the right
+      tool" and the FAQ, are what a buyer weighs the category on rather than reference they
+      consult. The glossary genuinely is consulted, so it stays closed. All three are still
+      disclosures, so the skipping BA-020 bought is intact.
+    */
+    expect((page.match(/collapsed: true/g) ?? []).length, "the glossary").toBe(1);
+    expect((page.match(/collapsed: "open"/g) ?? []).length, "not-the-right-tool and the FAQ").toBe(2);
     for (const key of ["RAG", "KNOWLEDGE GRAPH", "ENTERPRISE SEARCH"]) {
       expect(page, key).toContain(`key: "${key}"`);
     }
@@ -232,7 +276,15 @@ describe("the brand fix's structure", () => {
   it("ends on one primary and one secondary, with the references as a list", () => {
     const closing = page.slice(page.indexOf('title: "The package is the contract"'));
     expect(closing).toContain("readNext: [");
-    expect((closing.match(/label: "/g) ?? []).length).toBe(6);
+    /*
+      Four written labels, one read from `EXPLORE_CTA` and one from `ACCESS`; see the G1-010
+      note above. It was five written labels until BQ-111: "OPEN A COMPILED WORLD" was a fifth
+      spelling of the Explore action, typed here, while every other surface reads the one in
+      `lib/site-navigation.ts`. One name per action means this row reads it too.
+    */
+    expect((closing.match(/label: "/g) ?? []).length).toBe(4);
+    expect(closing).toContain("label: EXPLORE_CTA.label }");
+    expect((closing.match(/label: ACCESS.label/g) ?? []).length).toBe(1);
     // BA-016: the door describes the protocol behind it rather than announcing an absence.
     expect(rendered(page)).not.toContain("WHAT WOULD BE MEASURED");
     expect(closing).toContain('label: "How results are measured"');

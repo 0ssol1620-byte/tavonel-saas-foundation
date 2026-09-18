@@ -65,15 +65,22 @@
   `margin-top: auto` pushes the strip to the foot of the tile, so the two tiles in a row line
   their rules up with each other however long their definitions run.
 */
+/*
+  BQ-112: a list, in sans, at the type floor. Five names in 10px tracked mono joined by middots
+  read as one machine identifier, and `--text-xlo` is deleted by the token contract. The
+  `margin-top: auto` above still does its job.
+*/
 .taxonomy {
   margin: auto 0 0;
-  padding-top: 11px;
+  padding: 11px 0 0;
   border-top: 1px solid var(--hairline);
-  font-family: var(--f-mono);
-  font-size: 10px;
-  line-height: 1.75;
-  letter-spacing: 0.04em;
-  color: var(--text-xlo);
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-lo);
 }
 
 /* ---------------------------------------------------------------- receipt */
@@ -85,7 +92,7 @@
   padding: 0;
   background: var(--hairline);
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
   overflow: hidden;
 }
 .receiptRow {
@@ -103,17 +110,21 @@
   gap: 7px;
   min-width: 0;
   font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-lo);
 }
-/* What the field has to be, beside the field's name. Not decoration: it is the check. */
+/*
+  What the field has to be, beside the field's name. Not decoration: it is the check -- which is
+  why it is not painted in `--decor`, a 2.2:1 surface tone that is never a text colour. A step
+  up from the `--text-lo` of the name it qualifies, not a step down into the background.
+*/
 .receiptRow dt em {
   font-style: normal;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.1em;
-  color: var(--decor);
+  color: var(--text-mid);
 }
 .receiptRow dd {
   margin: 0;
@@ -139,27 +150,38 @@
   padding: 18px 20px;
   border: 1px solid var(--hairline-hi);
   background: var(--g1);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
 }
 .north h3 {
   font-size: 21px;
   letter-spacing: -0.018em;
   font-variation-settings: "wght" 580;
 }
-.north p {
+/*
+  type-05: `.north p` at (0,1,1) outranked `.northMark` at (0,1,0) in the same unlayered sheet, so
+  the mark class never got its own size or colour, and what rendered was the section body's 13.5px
+  -- a step that is not on the 12/13/14/16/18/20/24/32 scale. Excluding the mark makes the
+  component a component; the body moves onto the scale.
+*/
+.north > p:not(.northMark) {
   margin: 0;
   max-width: 68ch;
-  font-size: 13.5px;
+  font-size: var(--t-3);
   line-height: 1.66;
   color: var(--text-mid);
 }
+/*
+  type-02 / type-03: the one kicker face -- sans at the floor, sentence case, --text-mid.
+  "Definition" names a section; it is not a hash, a path, an id or a code, so it is not set in the
+  typeface this system reserves for those.
+*/
 .northMark {
   margin: 0;
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-xlo);
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 .supporting {
   display: flex;
@@ -169,14 +191,18 @@
   padding: 0;
   list-style: none;
 }
+/*
+  type-03: a metric name is spaced title-case English. "95th-percentile time from source change to
+  Active World" is 55 characters of a sentence and wraps like one, so it reads as prose in the
+  identifier typeface. Sans, sentence case, no caps tracking.
+*/
 .supporting li {
   padding: 4px 9px;
   border: 1px solid var(--hairline-hi);
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-xlo);
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  letter-spacing: 0;
+  color: var(--text-mid);
 }
 
 /* ---------------------------------------------------------------- results */
@@ -192,7 +218,7 @@
   min-width: 0;
   overflow-x: auto;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
 }
 .results {
   width: 100%;
@@ -203,10 +229,10 @@
   padding: 12px 16px;
   text-align: left;
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-xlo);
+  color: var(--text-lo);
   border-bottom: 1px solid var(--hairline);
 }
 .results th,
@@ -219,11 +245,11 @@
 }
 .results thead th {
   font-family: var(--f-mono);
-  font-size: 9.5px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 400;
-  color: var(--text-xlo);
+  color: var(--text-lo);
 }
 .results tbody th {
   font-weight: 500;

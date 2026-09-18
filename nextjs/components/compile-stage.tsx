@@ -1,15 +1,70 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PipelineRow } from "@/lib/pipeline";
 import type { OcrProgress } from "@/lib/ocr-progress";
 import { displayName, type DocumentNames } from "@/lib/document-names";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import type { CompileState } from "@/lib/compile-job-store";
+import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 
-const AREA_RGB: [number, number, number][] = [
-  [242, 166, 90], [80, 210, 170], [90, 170, 230], [180, 130, 255], [255, 120, 170], [120, 220, 110],
-];
+/*
+  The compile, played as chapters.
+
+  What this stopped doing on 2026-09-17:
+
+  - BQ-021. It painted its own palette (`#101214`, `#2e353b`, `#7be0be`, six hard-coded area
+    RGBs) and derived both the position and the colour of every World object from an FNV hash
+    of its id. A hue that comes from a filename encodes nothing, and two runs over the same
+    corpus drew two different pictures of the same knowledge. Every colour now comes from the
+    token system, read off the element itself; position comes from the object's index in a
+    stable order. Shape encodes what kind of object it is, colour encodes its state, and
+    nothing encodes a hash.
+  - BQ-022. READ and STRUCTURE printed WAITING after they had finished, because the label came
+    from "is the job in this state right now" rather than from how far the job has got. Stage
+    status is derived from the job record's position in the sequence, so a stage that has been
+    passed reads as passed and never goes backwards.
+  - BQ-083. Four panes at once meant four reserved columns with three of them empty for most
+    of a run, and a fixed 328px black square on a phone. One chapter plays at a time at every
+    width, the strip above it says which, and the frame reserves its space by aspect-ratio.
+  - BQ-133. A canvas with no 2D context returned silently and left a black rectangle. It says
+    so now, and the status line that was screen-reader-only becomes the visible one.
+*/
+
+const STAGE_OF_STATE: Record<CompileState, number> = {
+  draft: 0,
+  preflight: 0,
+  awaiting_confirmation: 0,
+  uploading: 0,
+  sanitizing: 0,
+  reading: 1,
+  structuring: 2,
+  resolving: 2,
+  building_world: 3,
+  review_required: 3,
+  ready: 3,
+  failed: 0,
+  cancelled: 0,
+};
+
+const STOPPED: readonly CompileState[] = ["failed", "cancelled"];
+/* A run that has started but has not yet produced a page. The frame is reserved for these too, so
+   the panel does not resize under the reader one beat after they press compile. */
+const STARTING: readonly CompileState[] = ["uploading", "sanitizing"];
+
+/** Token names read off the mounted element, so the canvas cannot hold a second palette. */
+const TOKENS = ["--ground", "--g1", "--g2", "--g3", "--hairline", "--hairline-hi", "--text-hi", "--text-mid", "--text-lo", "--verified", "--changed", "--failed", "--paper"] as const;
+/* Type comes off the element too, or the canvas paints in a different family from the panel it
+   sits in. A font token's fallback is a stack, not a colour, so it carries its own. */
+const FONT_TOKENS = {
+  "--f-sans": "ui-sans-serif, system-ui, sans-serif",
+  "--f-mono": "ui-monospace, Menlo, monospace",
+} as const;
+
+type Palette = Record<(typeof TOKENS)[number] | keyof typeof FONT_TOKENS, string>;
+
+/* Only reached when a token is not defined yet; a readable neutral beats an invisible one. */
+const FALLBACK = "#78828a";
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -35,12 +90,17 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string
   return out;
 }
 
-function place(id: string): { x: number; y: number; area: number } {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i += 1) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
-  const a = (h % 997) / 997;
-  const b = ((h >>> 10) % 991) / 991;
-  return { x: 0.16 + a * 0.68, y: 0.16 + b * 0.68, area: h % AREA_RGB.length };
+/*
+  A stable point for the object at `index` of `total`, on a phyllotactic spiral.
+
+  Deterministic in the object's ordinal position rather than in its identity: the same World
+  draws the same picture every time, and renaming a file moves nothing. `place` used to hash
+  the id into both the position and the colour.
+*/
+function place(index: number, total: number): { x: number; y: number } {
+  const radius = Math.sqrt((index + 0.5) / Math.max(1, total));
+  const angle = (index + 1) * 2.399963; // golden angle, radians
+  return { x: 0.5 + radius * 0.46 * Math.cos(angle), y: 0.5 + radius * 0.46 * Math.sin(angle) };
 }
 
 export default function CompileStage({ rows, reading = {}, names = {}, world = null, state = null }: {
@@ -51,15 +111,59 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
   state?: CompileState | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
+  /* No silent fallback: a browser that cannot give us a 2D context gets the words instead. */
+  const [drawable, setDrawable] = useState(true);
   const stateRef = useRef({ rows, reading, names, world, state });
   stateRef.current = { rows, reading, names, world, state };
 
+  /*
+    How far the run has got, and therefore which chapter is playing.
+
+    Evidence already on screen counts as well as the durable state: after a reload the pipeline
+    rows are at rest while the job record is the only thing that still knows where the run is,
+    and during a local run the reverse is true. Taking the maximum of the two is what keeps a
+    finished stage finished.
+  */
+  const hasPage = Object.values(reading).some((item) => (item.pages?.length ?? 0) > 0);
+  const hasStructure = Object.values(reading).some((item) => (item.regionsFound ?? 0) > 0 || item.pages.some((page) => page.boxes.some((box) => Boolean(box.text))));
+  const hasWorld = Boolean(world && world.objects.length > 0);
+  const observed = hasWorld ? 3 : hasStructure ? 2 : hasPage ? 1 : 0;
+  const stopped = state !== null && STOPPED.includes(state);
+  const reached = stopped ? observed : Math.max(observed, state ? STAGE_OF_STATE[state] : 0);
+  const settled = state === "ready";
+  /*
+    D39. The 16:9 frame is space reserved for a picture: a page raster, the extracted text, the
+    World. Before any of that exists the pane draws a tab strip and one line per source, and the
+    reserved frame left 490px of black under it at 1440 (workspace-01). Reserve the frame while a
+    run is playing; idle, take the height of what is actually drawn.
+
+    The geometry below is `draw()`'s: 12px pad, the 46px strip, a 10px gap, the pane's 52px header,
+    22px a row and a 14px tail. Capped so a long list does not grow without end -- past the cap the
+    pane scrolls its own window, as it already does inside the reserved frame.
+  */
+  const framed = reached > 0 || (state !== null && STARTING.includes(state));
+  const idleHeight = 132 + Math.min(Math.max(rows.length, 1), 8) * 22;
+
   useEffect(() => {
     const canvas = canvasRef.current;
+    const section = sectionRef.current;
     const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
+    if (!canvas || !section || !context) { setDrawable(false); return; }
+    setDrawable(true);
     let width = 0;
     let height = 0;
+
+    const readPalette = (): Palette => {
+      const computed = window.getComputedStyle(section);
+      const palette = {} as Palette;
+      for (const token of TOKENS) palette[token] = computed.getPropertyValue(token).trim() || FALLBACK;
+      for (const [token, stack] of Object.entries(FONT_TOKENS)) {
+        palette[token as keyof typeof FONT_TOKENS] = computed.getPropertyValue(token).trim() || stack;
+      }
+      return palette;
+    };
+    let colour = readPalette();
 
     const layout = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -70,26 +174,33 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
     };
 
+    const sans = (size: number, weight = 400) => `${weight} ${size}px ${colour["--f-sans"]}`;
+    const mono = (size: number, weight = 400) => `${weight} ${size}px ${colour["--f-mono"]}`;
+
     const pane = (x: number, y: number, w: number, h: number, title: string, live: string) => {
-      roundRect(context, x, y, w, h, 6);
-      context.fillStyle = "#101214";
+      roundRect(context, x, y, w, h, 8);
+      context.fillStyle = colour["--g1"];
       context.fill();
-      context.strokeStyle = "#2e353b";
+      context.strokeStyle = colour["--hairline-hi"];
       context.lineWidth = 1;
       context.stroke();
-      context.fillStyle = "#16191c";
-      context.fillRect(x, y, w, 26);
-      context.fillStyle = "#edeae4";
-      context.font = "500 10px ui-monospace, Menlo, monospace";
-      context.fillText(title, x + 10, y + 17);
-      context.fillStyle = "rgba(123,224,190,0.9)";
+      context.fillStyle = colour["--text-hi"];
+      context.font = sans(13, 500);
+      context.fillText(title, x + 12, y + 20);
+      context.fillStyle = colour["--text-lo"];
+      context.font = mono(12);
       context.textAlign = "right";
-      context.fillText(live, x + w - 10, y + 17);
+      context.fillText(live, x + w - 12, y + 20);
       context.textAlign = "left";
+      context.strokeStyle = colour["--hairline"];
+      context.beginPath();
+      context.moveTo(x, y + 32);
+      context.lineTo(x + w, y + 32);
+      context.stroke();
     };
 
-    const focusOf = (list: PipelineRow[], read: Record<string, OcrProgress>): PipelineRow | null => {
-      return list.find((row) => read[row.id] && row.stages[2].state === "active")
+    const focusOf = (list: PipelineRow[], readMap: Record<string, OcrProgress>): PipelineRow | null => {
+      return list.find((row) => readMap[row.id] && row.stages[2].state === "active")
         ?? list.find((row) => row.transfer)
         ?? list.find((row) => row.stages.some((stage) => stage.state === "active"))
         ?? list[list.length - 1]
@@ -97,25 +208,25 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     };
 
     const drawSources = (x: number, y: number, w: number, h: number, list: PipelineRow[], focus: PipelineRow | null, nameMap: DocumentNames) => {
-      pane(x, y, w, h, "SOURCES", `${list.length}`);
-      const rowH = 20;
-      const slots = Math.max(5, Math.floor((h - 44) / rowH));
+      pane(x, y, w, h, PIPELINE_STAGES[0].label, `${list.length}`);
+      const rowH = 22;
+      const slots = Math.max(5, Math.floor((h - 50) / rowH));
       const focusI = focus ? list.indexOf(focus) : 0;
       const start = Math.min(Math.max(0, focusI - 2), Math.max(0, list.length - slots));
       list.slice(start, start + slots).forEach((row, i) => {
-        const yy = y + 42 + i * rowH;
+        const yy = y + 52 + i * rowH;
         const on = focus !== null && row.id === focus.id;
-        if (on) { context.fillStyle = "rgba(123,224,190,0.10)"; context.fillRect(x + 5, yy - 13, w - 10, rowH); }
-        context.fillStyle = row.needsPerson ? "#e0c07a" : on ? "#7be0be" : "#78828a";
-        roundRect(context, x + 11, yy - 9, 6, 8, 1.5); context.fill();
-        context.fillStyle = on ? "#edeae4" : "#c8ced2";
-        context.font = `${on ? "600" : "400"} 10px ui-monospace, Menlo, monospace`;
+        if (on) { context.fillStyle = colour["--g3"]; context.fillRect(x + 5, yy - 14, w - 10, rowH); }
+        context.fillStyle = row.needsPerson ? colour["--changed"] : on ? colour["--verified"] : colour["--text-lo"];
+        roundRect(context, x + 12, yy - 10, 6, 8, 2); context.fill();
+        context.fillStyle = on ? colour["--text-hi"] : colour["--text-mid"];
+        context.font = sans(13, on ? 600 : 400);
         const label = displayName(row.id, nameMap, row.filename);
-        const maxChars = Math.max(14, Math.floor(w / 10) - 9);
-        context.fillText(label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label, x + 24, yy);
+        const maxChars = Math.max(14, Math.floor(w / 8) - 9);
+        context.fillText(label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label, x + 26, yy);
         if (row.needsPerson) {
-          context.fillStyle = "#e0c07a"; context.font = "600 8px ui-monospace, Menlo, monospace"; context.textAlign = "right";
-          context.fillText("REVIEW", x + w - 10, yy); context.textAlign = "left";
+          context.fillStyle = colour["--changed"]; context.font = mono(12, 500); context.textAlign = "right";
+          context.fillText("REVIEW", x + w - 12, yy); context.textAlign = "left";
         }
       });
     };
@@ -123,176 +234,141 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     const drawPage = (x: number, y: number, w: number, h: number, progress: OcrProgress) => {
       const page = progress.pages[progress.pages.length - 1];
       if (!page) return;
-      pane(x, y, w, h, "READ", `p.${page.pageNumber1}/${page.pageCount}`);
-      const px = x + 18; const py = y + 38; const pw = w - 36; const ph = h - 52;
-      context.fillStyle = "#e8e4dc"; context.fillRect(px, py, pw, ph);
+      pane(x, y, w, h, PIPELINE_STAGES[1].label, `p.${page.pageNumber1}/${page.pageCount}`);
+      const px = x + 18; const py = y + 44; const pw = w - 36; const ph = h - 58;
+      /* The only light surface in this product is a page, and --paper is that surface. */
+      context.fillStyle = colour["--paper"];
+      context.fillRect(px, py, pw, ph);
       page.boxes.forEach((box) => {
         const [x0, y0, x1, y1] = box.bbox1000;
         const bx = px + (x0 / 1000) * pw; const by = py + (y0 / 1000) * ph;
         const bw = ((x1 - x0) / 1000) * pw; const bh = ((y1 - y0) / 1000) * ph;
         const sure = box.confidence >= 0.75;
-        context.fillStyle = sure ? "rgba(40,140,110,0.12)" : "rgba(224,122,95,0.16)";
-        context.fillRect(bx, by, bw, bh);
-        context.strokeStyle = sure ? "rgba(40,140,110,0.75)" : "rgba(224,122,95,0.85)";
+        context.strokeStyle = sure ? colour["--verified"] : colour["--changed"];
+        context.lineWidth = 1.5;
         context.strokeRect(bx, by, bw, bh);
       });
     };
 
     const drawExtract = (x: number, y: number, w: number, h: number, progress: OcrProgress) => {
       const found = progress.regionsFound ?? 0;
-      pane(x, y, w, h, "STRUCTURE", `${found} regions`);
+      pane(x, y, w, h, PIPELINE_STAGES[2].label, `${found} regions`);
       const lines: { text: string; sure: boolean }[] = [];
       progress.pages.forEach((page) => page.boxes.forEach((box) => { if (box.text) lines.push({ text: box.text, sure: box.confidence >= 0.75 }); }));
-      context.font = "400 9px ui-monospace, Menlo, monospace";
+      context.font = sans(13);
       const packed: { text: string; sure: boolean }[] = [];
       lines.forEach((line) => wrap(context, line.text, w - 38).forEach((part) => packed.push({ text: part, sure: line.sure })));
-      const maxRows = Math.max(6, Math.floor((h - 48) / 14));
+      const maxRows = Math.max(6, Math.floor((h - 56) / 18));
       packed.slice(Math.max(0, packed.length - maxRows)).forEach((line, i, tail) => {
-        const yy = y + h - 18 - (tail.length - 1 - i) * 14;
-        context.fillStyle = line.sure ? "#c8ced2" : "#e0c07a";
-        context.fillText(line.text, x + 14, yy);
+        const yy = y + h - 20 - (tail.length - 1 - i) * 18;
+        context.fillStyle = line.sure ? colour["--text-mid"] : colour["--changed"];
+        context.fillText(line.text, x + 16, yy);
       });
     };
 
     const drawWorld = (x: number, y: number, w: number, h: number, model: WorldReadModel) => {
-      pane(x, y, w, h, "WORLD", `${model.objects.length} objects`);
-      const ox = x + 12; const oy = y + 36; const gw = w - 24; const gh = h - 50;
-      const points = model.objects.map((object) => ({ object, at: place(object.id) }));
+      pane(x, y, w, h, PIPELINE_STAGES[3].label, `${model.objects.length} objects`);
+      const ox = x + 14; const oy = y + 44; const gw = w - 28; const gh = h - 58;
+      const total = model.objects.length;
+      const points = model.objects.map((object, index) => ({ object, at: place(index, total) }));
       const pointById = new Map(points.map((point) => [point.object.id, point]));
+      context.strokeStyle = colour["--hairline-hi"];
+      context.lineWidth = 1;
       model.relations.forEach((relation) => {
         const a = pointById.get(relation.subject); const b = pointById.get(relation.object); if (!a || !b) return;
-        const rgb = AREA_RGB[a.at.area]; context.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.42)`; context.lineWidth = 1;
         context.beginPath(); context.moveTo(ox + a.at.x * gw, oy + a.at.y * gh); context.lineTo(ox + b.at.x * gw, oy + b.at.y * gh); context.stroke();
       });
       points.forEach(({ object, at }) => {
-        const rgb = AREA_RGB[at.area];
-        context.fillStyle = object.status === "candidate" || object.readState === "not_yet" ? "rgb(224,192,122)" : `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-        context.beginPath(); context.arc(ox + at.x * gw, oy + at.y * gh, object.type === "Document" ? 4.6 : 3, 0, Math.PI * 2); context.fill();
+        /* Colour is state, and only state. Shape is what kind of thing it is. */
+        const held = object.status === "candidate" || object.readState === "not_yet";
+        context.fillStyle = held ? colour["--changed"] : colour["--verified"];
+        const cx = ox + at.x * gw; const cy = oy + at.y * gh;
+        if (object.type === "Document") { roundRect(context, cx - 4, cy - 5, 8, 10, 1.5); context.fill(); }
+        else { context.beginPath(); context.arc(cx, cy, 3.4, 0, Math.PI * 2); context.fill(); }
       });
     };
 
-    const draw = () => {
-      const { rows: list, reading: read, names: nameMap, world: model, state: jobState } = stateRef.current;
-      context.fillStyle = "#08090a"; context.fillRect(0, 0, width, height);
-      const focus = focusOf(list, read);
-      const progress = focus ? read[focus.id] : undefined;
-      const hasPage = Boolean(progress?.pages?.length);
-      const hasStructure = Boolean(progress && ((progress.regionsFound ?? 0) > 0 || progress.pages.some((page) => page.boxes.some((box) => Boolean(box.text)))));
-      const hasWorld = Boolean(model && model.objects.length > 0);
-      const panes: Array<"sources" | "read" | "structure" | "world"> = ["sources", "read", "structure", "world"];
-      const activeFor = (kind: "read" | "structure" | "world") => {
-        if (!jobState) return "WAITING";
-        if (kind === "read" && ["uploading", "sanitizing", "reading"].includes(jobState)) return jobState === "reading" ? "ACTIVE" : "QUEUED";
-        if (kind === "structure" && ["structuring", "resolving"].includes(jobState)) return "ACTIVE";
-        if (kind === "world" && ["building_world", "review_required", "ready"].includes(jobState)) return jobState === "building_world" ? "ACTIVE" : jobState === "ready" ? "READY" : "REVIEW";
-        return "WAITING";
-      };
-
-      const pad = 10;
-
-      /*
-        Four simultaneous panes are useful on a desktop, but on a phone each pane becomes too
-        narrow to carry a title, live state and real document content. Mobile therefore behaves
-        like an execution film: the whole SOURCES → READ → STRUCTURE → WORLD progression stays
-        visible in a compact rail while the current observed stage gets the full canvas width.
-        Advancement is driven only by durable job state and evidence already present in the run.
-      */
-      if (width < 640) {
-        const stageIndex = hasWorld || ["building_world", "review_required", "ready"].includes(jobState ?? "")
-          ? 3
-          : hasStructure || ["structuring", "resolving"].includes(jobState ?? "")
-            ? 2
-            : hasPage || jobState === "reading"
-              ? 1
-              : 0;
-        const current = panes[stageIndex];
-        const railH = 46;
-        const railY = pad;
-        const railW = width - pad * 2;
-        const stepW = railW / panes.length;
-
-        roundRect(context, pad, railY, railW, railH, 6);
-        context.fillStyle = "#0d0f11";
+    /*
+      The chapter strip: four beats in the shared pipeline vocabulary, each carrying a state
+      read off how far the run has got rather than off what it happens to be doing this second.
+      That is the whole of BQ-022.
+    */
+    const drawStrip = (x: number, y: number, w: number, current: number) => {
+      const stepW = w / PIPELINE_STAGES.length;
+      PIPELINE_STAGES.forEach((stage, i) => {
+        const done = settled || i < current;
+        const active = !settled && i === current;
+        const cx = x + stepW * i + stepW / 2;
+        context.fillStyle = stopped && i === current ? colour["--failed"] : active ? colour["--verified"] : done ? colour["--text-mid"] : colour["--text-lo"];
+        context.beginPath();
+        context.arc(cx, y + 11, active ? 4 : 3, 0, Math.PI * 2);
         context.fill();
-        context.strokeStyle = "#2e353b";
-        context.lineWidth = 1;
-        context.stroke();
-
-        const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"];
-        panes.forEach((kind, i) => {
-          const cx = pad + stepW * i + stepW / 2;
-          const reached = i <= stageIndex;
-          const active = kind === current;
-          context.fillStyle = active ? "#7be0be" : reached ? "#c8ced2" : "#667078";
-          context.beginPath();
-          context.arc(cx, railY + 12, active ? 3.5 : 2.5, 0, Math.PI * 2);
-          context.fill();
-          context.fillStyle = active ? "#edeae4" : reached ? "#aeb6bb" : "#667078";
-          context.font = `${active ? "600" : "500"} 8px ui-monospace, Menlo, monospace`;
-          context.textAlign = "center";
-          context.fillText(labels[i], cx, railY + 31);
-          if (active) {
-            context.fillStyle = "#7be0be";
-            context.fillRect(pad + stepW * i + 8, railY + railH - 3, Math.max(10, stepW - 16), 2);
-          }
-        });
-        context.textAlign = "left";
-
-        const paneY = railY + railH + 10;
-        const paneW = railW;
-        const paneH = height - paneY - pad;
-        if (current === "sources") drawSources(pad, paneY, paneW, paneH, list, focus, nameMap);
-        if (current === "read") {
-          if (hasPage && progress) drawPage(pad, paneY, paneW, paneH, progress);
-          else pane(pad, paneY, paneW, paneH, "READ", activeFor("read"));
-        }
-        if (current === "structure") {
-          if (hasStructure && progress) drawExtract(pad, paneY, paneW, paneH, progress);
-          else pane(pad, paneY, paneW, paneH, "STRUCTURE", activeFor("structure"));
-        }
-        if (current === "world") {
-          if (hasWorld && model) drawWorld(pad, paneY, paneW, paneH, model);
-          else pane(pad, paneY, paneW, paneH, "WORLD", activeFor("world"));
-        }
-        return;
-      }
-
-      const gap = 10; const colH = height - pad * 2;
-      const colW = (width - pad * 2 - gap * (panes.length - 1)) / panes.length;
-      panes.forEach((kind, i) => {
-        const x = pad + i * (colW + gap);
-        if (kind === "sources") drawSources(x, pad, colW, colH, list, focus, nameMap);
-        if (kind === "read") {
-          if (hasPage && progress) drawPage(x, pad, colW, colH, progress);
-          else pane(x, pad, colW, colH, "READ", activeFor("read"));
-        }
-        if (kind === "structure") {
-          if (hasStructure && progress) drawExtract(x, pad, colW, colH, progress);
-          else pane(x, pad, colW, colH, "STRUCTURE", activeFor("structure"));
-        }
-        if (kind === "world") {
-          if (hasWorld && model) drawWorld(x, pad, colW, colH, model);
-          else pane(x, pad, colW, colH, "WORLD", activeFor("world"));
+        context.font = sans(12, active ? 600 : 500);
+        context.fillStyle = active ? colour["--text-hi"] : done ? colour["--text-mid"] : colour["--text-lo"];
+        context.textAlign = "center";
+        context.fillText(stage.label, cx, y + 31);
+        if (active) {
+          context.fillStyle = colour["--verified"];
+          context.fillRect(x + stepW * i + 8, y + 40, Math.max(10, stepW - 16), 2);
         }
       });
+      context.textAlign = "left";
+    };
+
+    const draw = () => {
+      const { rows: list, reading: readMap, names: nameMap, world: model } = stateRef.current;
+      colour = readPalette();
+      context.fillStyle = colour["--ground"];
+      context.fillRect(0, 0, width, height);
+      const focus = focusOf(list, readMap);
+      const progress = focus ? readMap[focus.id] : undefined;
+      const pad = 12;
+      const stripH = 46;
+
+      roundRect(context, pad, pad, width - pad * 2, stripH, 8);
+      context.fillStyle = colour["--g1"];
+      context.fill();
+      context.strokeStyle = colour["--hairline-hi"];
+      context.lineWidth = 1;
+      context.stroke();
+      drawStrip(pad, pad, width - pad * 2, reached);
+
+      /* One pane. Not four, and not four with three of them empty. */
+      const paneY = pad + stripH + 10;
+      const paneW = width - pad * 2;
+      const paneH = height - paneY - pad;
+      if (paneH < 40) return;
+      const waiting = (label: string) => pane(pad, paneY, paneW, paneH, label, stopped ? "STOPPED" : "WAITING");
+      if (reached === 0) drawSources(pad, paneY, paneW, paneH, list, focus, nameMap);
+      else if (reached === 1) {
+        if (progress?.pages?.length) drawPage(pad, paneY, paneW, paneH, progress);
+        else waiting(PIPELINE_STAGES[1].label);
+      } else if (reached === 2) {
+        const structured = progress && ((progress.regionsFound ?? 0) > 0 || progress.pages.some((page) => page.boxes.some((box) => Boolean(box.text))));
+        if (structured && progress) drawExtract(pad, paneY, paneW, paneH, progress);
+        else waiting(PIPELINE_STAGES[2].label);
+      } else if (model && model.objects.length > 0) drawWorld(pad, paneY, paneW, paneH, model);
+      else waiting(PIPELINE_STAGES[3].label);
     };
 
     layout(); draw();
     const onResize = () => { layout(); draw(); };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [names, reading, rows, state, world]);
+  }, [names, reading, rows, state, world, reached, settled, stopped]);
 
   const observedPages = Object.values(reading).reduce((sum, item) => sum + (item.pages?.length ?? 0), 0);
   const observedRegions = Object.values(reading).reduce((sum, item) => sum + (item.regionsFound ?? 0), 0);
 
   return (
-    <section className="compile-stage" aria-label="Live compilation view">
-      <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" />
-      <p className="sr-only" role="status">
+    <section className="compile-stage" aria-label="Live compilation view" ref={sectionRef} data-stage={PIPELINE_STAGES[reached].key}
+      data-framed={framed ? "true" : "false"} style={framed || !drawable ? undefined : { height: idleHeight }}>
+      <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable} />
+      <p className={drawable ? "sr-only" : "compile-stage-text"} role="status">
         {world
           ? `${rows.length} sources, ${observedPages} observed pages, ${observedRegions} observed regions, ${world.objects.length} compiled objects, and ${world.relations.length} persisted relations.`
           : `${rows.length} sources. ${observedPages > 0 ? `${observedPages} pages have been read.` : "Reading has not produced a page yet."}${state ? ` Durable compile state: ${state}.` : ""}`}
+        {drawable ? "" : " This browser did not give the compile view a drawing surface, so the run is reported in text only."}
       </p>
     </section>
   );

@@ -46,11 +46,20 @@ export default function ContactForm() {
 
   return (
     <form className="contact-form" onSubmit={(event) => void submit(event)}>
+      {/*
+        G2-034. Which fields are required, before the submit rather than after it.
+
+        Three fields are required and none of them said so, so a visitor discovered it from a
+        browser validation bubble on whichever one the browser reached first. The mark is rendered
+        inside the label beside the field name, and the word is spelled out for a screen reader
+        rather than left as a bare asterisk.
+      */}
+      <p className="fine">Three fields are needed for a reply. They are marked Required.</p>
       <div className="contact-pair">
         <Field label="Name" name="name" autoComplete="name" minLength={2} maxLength={80} required />
         <Field label="Work email" name="email" type="email" autoComplete="email" maxLength={254} required />
       </div>
-      <Field label="Company or organisation" name="company" autoComplete="organization" maxLength={120} />
+      <Field label="Company or organization" name="company" autoComplete="organization" maxLength={120} />
       <label className="contact-field">
         <span>Inquiry type</span>
         <select name="topic" defaultValue="sales">
@@ -98,13 +107,22 @@ export default function ContactForm() {
       </details>
       <label className="contact-field">
         {/* BA-141. The abstract question asked for an essay; the concrete one gets an answer. */}
-        <span>What are you trying to do?</span>
+        <span>What are you trying to do? <RequiredMark /></span>
+        {/*
+          BQ-113. The one rule about this field, said once and kept on screen.
+
+          It was in the placeholder and again in the page lede above the form. A placeholder is
+          gone as soon as there is a character in the box, so the copy that mattered most was the
+          copy that vanished first. The description is tied to the field for a screen reader.
+        */}
+        <small className="fine" id="contact-message-rule">Do not attach or paste customer documents here.</small>
         <textarea
           name="message"
           rows={8}
           minLength={20}
           maxLength={5000}
-          placeholder="What the material is, who needs to answer from it, and anything the questions above did not cover. Do not paste customer documents."
+          aria-describedby="contact-message-rule"
+          placeholder="What the material is, who needs to answer from it, and anything the questions above did not cover."
           required
         />
       </label>
@@ -136,10 +154,23 @@ function collect(data: FormData) {
   return body;
 }
 
+/*
+  Announced as a word, not as an asterisk a screen reader may skip or read as "star".
+
+  pages-11: the word was set in the label's own face, size, weight and colour, so "Name Required"
+  read as one string and the field looked as if it were called that. The marker carries its own
+  class now -- a separator and the eyebrow tone, sentence case against the label's caps -- so it
+  is visibly a qualifier. It stays a word inside the label element, which is what keeps it in the
+  accessible name and what the sentence above the form promises ("They are marked Required").
+*/
+function RequiredMark() {
+  return <small className="contact-required">Required</small>;
+}
+
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
     <label className="contact-field">
-      <span>{label}</span>
+      <span>{label}{props.required ? <> <RequiredMark /></> : null}</span>
       <input {...props} />
     </label>
   );

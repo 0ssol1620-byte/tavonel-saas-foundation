@@ -140,7 +140,8 @@ test.describe("workspace first use — desktop", () => {
     // at five. The count is incidental to what these three tests hold -- that the guide's open
     // state follows inventory truth, never a "seen it" flag -- but it has to name the real list.
     await expect(page.getByRole("button", { name: /Getting started 1 of 6 complete/ })).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
+    // §13.2 "what did I get": one counted line under the state sentence; activation history lives on Changes.
+    await expect(page.getByText(/\d+ ready · \d+ being read · \d+ need review/)).toBeVisible();
 
     const intakeBox = await intake.boundingBox();
     expect(intakeBox).not.toBeNull();
@@ -162,7 +163,14 @@ test.describe("workspace first use — desktop", () => {
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toBeVisible();
+    /*
+      `31cb972` -- "the hero belongs to Home, the drop box is always a box" -- stopped drawing the
+      state hero on a brand-new workspace (`stateHero={workspaceState.mode !== "new"}`), so its
+      "Add your knowledge." heading is no longer a second heading above the drop box saying the
+      same thing. The empty state is the drop box asserted on the line above; the guard here is
+      that nothing restates it.
+    */
+    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toHaveCount(0);
     const guide = page.getByRole("button", { name: /Getting started 0 of 6 complete/ });
     await expect(guide).toHaveAttribute("aria-expanded", "false");
     await guide.click();
@@ -252,7 +260,8 @@ test.describe("workspace first use — mobile", () => {
     await expect(page.getByRole("button", { name: "Review & activate" })).toBeVisible();
     await expect(page.locator(".workspace-attention")).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
+    // §13.2 "what did I get": one counted line under the state sentence; activation history lives on Changes.
+    await expect(page.getByText(/\d+ ready · \d+ being read · \d+ need review/)).toBeVisible();
 
     // One-Path rail: Home, Knowledge, Use with AI and More stay one tap away.
     for (const label of ["Home", "Knowledge", "Use with AI"]) {

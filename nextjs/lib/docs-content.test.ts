@@ -122,14 +122,27 @@ describe("the information architecture", () => {
     The two sections under four blocks are the ones BA-187 says should be merged into a
     neighbour. Headings would not fix a 44-word page, so they are not required to carry three.
   */
-  it("divides every substantial section into three to six subheadings", () => {
+  it("divides every substantial section into subheadings that each carry something", () => {
     for (const section of DOCS_SECTIONS) {
       const headings = section.blocks.filter((block) => block.kind === "heading");
       const texts = headings.map((block) => (block.kind === "heading" ? block.text : ""));
       expect(new Set(texts).size, `${section.slug}: two subheadings with the same text collide on one anchor`)
         .toBe(texts.length);
-      expect(headings.length, `${section.slug}: more than six subheadings is an outline, not a page`)
-        .toBeLessThanOrEqual(6);
+      /*
+        Was a flat ceiling of six, which is the right idea measured against the wrong thing.
+
+        The defect it was written for is a page that is all headings -- an outline someone
+        stopped writing. Six was a good proxy while every section was prose. It stopped being
+        one when the G3 remediation turned Errors into eleven grouped tables, Connections into
+        seven documented operations and Concepts into ten defined terms: those pages are longer
+        because they answer more, not because they were left as a skeleton.
+
+        So the rule is the property rather than the proxy. Every heading has to carry at least
+        one block on average; a page whose headings outnumber its content is still an outline
+        and still fails.
+      */
+      expect(headings.length * 2, `${section.slug}: more headings than content is an outline, not a page`)
+        .toBeLessThanOrEqual(section.blocks.length);
       expect(section.blocks.at(-1)?.kind, `${section.slug}: a heading with nothing under it`).not.toBe("heading");
       if (section.blocks.length - headings.length < 4) continue;
       expect(headings.length, `${section.slug}: a section this long needs at least three subheadings`)
@@ -225,7 +238,7 @@ describe("every endpoint block resolves to a published operation", () => {
     // `true`, `null` and the trailing shape are all syntax errors.
     const listed: DocsEndpointLike = {
       operationId: "example", method: "POST", path: "/example", server: "https://tavonel.com/api",
-      scope: null, description: "",
+      scope: null, auth: "key", description: "",
       requestExample: JSON.stringify({ ids: ["<ids>"], strict: true, cursor: null, limit: 12 }, null, 2),
       responses: [],
     };
@@ -347,13 +360,50 @@ describe("the pages that render it", () => {
   });
 });
 
+/**
+ * Everything one section is matchable by, lower-cased.
+ *
+ * BQ-105 split the flat `text` field the index used to carry: `chunks` is what a reader is shown
+ * and `code` is what is matched and never shown. This is the join of the two, which is exactly
+ * what that field held, so the assertions below still ask the question they were asking.
+ */
+const searchText = (entry: ReturnType<typeof docsSearchIndex>[number]) =>
+  [...entry.chunks.map((chunk) => chunk.display), entry.code].join(" ").toLowerCase();
+
 describe("search", () => {
   it("indexes the body, not only the titles", () => {
     const index = docsSearchIndex();
     const runEvents = index.find((entry) => entry.slug === "run-events")!;
     // Somebody searching for this is looking for the paragraph that mentions it.
-    expect(runEvents.text).toContain("last-event-id");
+    expect(searchText(runEvents)).toContain("last-event-id");
     expect(index).toHaveLength(DOCS_SECTIONS.length);
+  });
+
+  /*
+    BQ-105. What a reader is shown is not what the matcher reads, and that is the point: an
+    excerpt is prose in its own case with the marks taken out, and a snippet body is matchable
+    and never excerpted.
+  */
+  it("shows prose in its own case, with no marks and no snippet bodies in it", () => {
+    for (const entry of docsSearchIndex()) {
+      for (const chunk of entry.chunks) {
+        expect(chunk.display, `${entry.slug}: a bold mark reached the excerpt`).not.toMatch(/\*\*/);
+        expect(chunk.display, `${entry.slug}: a backtick reached the excerpt`).not.toContain("`");
+      }
+    }
+    const quickstart = docsSearchIndex().find((entry) => entry.slug === "quickstart")!;
+    const prose = quickstart.chunks.map((chunk) => chunk.display).join(" ");
+    expect(prose, "the prose keeps its capitals").toMatch(/[A-Z]/);
+    expect(prose, "a curl invocation is not an excerpt").not.toContain("curl -s");
+    expect(quickstart.code, "and it is still matchable").toContain("curl");
+  });
+
+  it("points a result at the heading its passage sits under", () => {
+    const errors = docsSearchIndex().find((entry) => entry.slug === "errors")!;
+    // Every chunk after the first opens with a heading and carries that heading's own id.
+    expect(errors.chunks.length).toBeGreaterThan(1);
+    expect(errors.chunks[0]!.anchor).toBeNull();
+    expect(errors.chunks[1]!.anchor).toBe("branch-on-the-code-not-the-status");
   });
 });
 
@@ -416,7 +466,7 @@ describe("founder-locked copy on the docs surfaces", () => {
 
   it("keeps them out of the rendered body of every section, not only the source text", () => {
     const offenders = docsSearchIndex()
-      .map((entry) => ({ slug: entry.slug, hits: scan(entry.text) }))
+      .map((entry) => ({ slug: entry.slug, hits: scan(searchText(entry)) }))
       .filter((entry) => entry.hits.length > 0);
     expect(offenders).toEqual([]);
   });

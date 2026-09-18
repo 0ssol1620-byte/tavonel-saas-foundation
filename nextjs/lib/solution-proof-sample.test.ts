@@ -42,10 +42,11 @@ describe("solution proof sample", () => {
     expect(preview.trim().length).toBeGreaterThan(80);
     expect(preview.replace(/\s+/g, " ").slice(0, 80))
       .toBe(region!.excerpt.replace(/\s+/g, " ").slice(0, 80));
-    expect(source).toContain("excerptPreview(region.excerpt, 180).text");
+    expect(source).toContain("excerptPreview(region.excerpt, 180)");
     expect(source).toContain('data-proof-kind="source-passage"');
     expect(source).toContain('data-evidence-id={region.id}');
-    expect(source).toContain("Source passage · excerpt");
+    /* BQ-072: a cut excerpt says so, with a real ellipsis rather than a bare stop mid-sentence. */
+    expect(source).toContain('{preview.truncated ? "…" : ""}');
     // A matching evidenceRefs ID did not establish that the old document-heading Claim
     // was supported by this business-description passage. Do not restore that shortcut.
     expect(source).not.toContain("excerptPreview(claim.label");
@@ -86,9 +87,54 @@ describe("solution proof sample", () => {
     expect(source).toContain('from "@/components/world-visual/source-sheet"');
   });
 
+  /*
+    BQ-076. The block's styling moved out of two global polish sheets into its own module, which
+    is what ended the card-inside-a-card-inside-a-card with three different radii. The guard moves
+    with it: it is the same rule, read where the rule now lives.
+  */
   it("keeps the one link a thumb has to hit at the 44px floor", () => {
-    const css = readFileSync(join(process.cwd(), "app/ux-polish.css"), "utf8");
-    const rule = css.slice(css.indexOf(".solution-proof-sample-head a {"));
-    expect(rule.slice(0, rule.indexOf("}"))).toContain("min-height: 44px");
+    const css = readFileSync(join(process.cwd(), "components/solution-proof-sample.module.css"), "utf8");
+    for (const selector of [".head a {", ".excerptFoot a {"]) {
+      const rule = css.slice(css.indexOf(selector));
+      expect(rule.slice(0, rule.indexOf("}")), selector).toContain("min-height: 44px");
+    }
+  });
+
+  /*
+    BQ-014. The proof is staged in handoff §4.4 order: the page first and largest, then the region
+    cut out of it, then the passage read from that region, then what it supports, then the way
+    through to the World. The order is the argument -- a version that opens on extracted text has
+    not made the claim it exists to make -- so it is guarded as an order, not as a set of parts.
+  */
+  it("stages the five beats in §4.4 order, page first", () => {
+    const canonical = source.slice(source.indexOf('data-proof-variant="canonical"'));
+    const beats = [
+      "<SourceSheet regions={onPage}",
+      // n34: the beat is the same beat; its words come from lib/proof-copy.ts now, because /ko
+      // rendered this block entirely in English.
+      "copy.linkedObjects",
+      "styles.counts",
+    ].map((beat) => canonical.indexOf(beat));
+    expect(beats.every((at) => at > -1), "a beat of the canonical staging is missing").toBe(true);
+    expect([...beats].sort((a, b) => a - b)).toEqual(beats);
+    // The page is never a tab peer of the text extracted from it again.
+    expect(readFileSync(join(process.cwd(), "components/world-visual/source-sheet.tsx"), "utf8"))
+      .not.toContain('role="tablist"');
+  });
+
+  /*
+    BQ-019 / D4. One canonical staging, on the landing. Every other route names its own filing and
+    links to the region instead of repeating the whole block, which is what made eight routes read
+    as one template with different hero copy.
+  */
+  it("gives the repeating routes a variant that links rather than restages", () => {
+    expect(source).toContain('data-proof-variant="excerpt"');
+    expect(source).toContain('data-proof-variant="crop"');
+    const solutions = readFileSync(join(process.cwd(), "app/solutions/[slug]/page.tsx"), "utf8");
+    expect(solutions).toContain('<SolutionProofSample pick={solution.proof} variant="excerpt" />');
+    const read = readFileSync(join(process.cwd(), "app/product/document-understanding/page.tsx"), "utf8");
+    expect(read).toContain('variant="crop"');
+    // BQ-077: and at the content width, not inside the 420px title rail.
+    expect(read).toContain("proofStyles.fullWidth");
   });
 });

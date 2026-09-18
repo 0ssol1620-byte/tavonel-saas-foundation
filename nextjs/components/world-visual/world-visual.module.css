@@ -1,5 +1,5 @@
 /*
-  The visual grammar shared by every act: node, line, sheet, tether, region.
+  The visual grammar shared by every act: node, line, sheet, region.
 
   Colour is state and nothing else, and the mapping is written down once here so that a reader
   who learns it in the World act can still read it in the Change act:
@@ -24,7 +24,7 @@
   The ratio is the composition baseline the landing film shares, so it is held rather than
   clamped: instead of letting a short viewport squash the frame, the frame gives up width until
   its own height fits. The subtracted constant is the stage chrome around it -- header, rail,
-  caption, Ask bar -- so "SELECT AN OBJECT" stays on screen with the world it is about.
+  caption, Ask bar -- so "Select an object" stays on screen with the world it is about.
 */
 .field {
   position: relative;
@@ -67,12 +67,11 @@
 .edge[data-edge-state="affected"],
 .edge[data-edge-state="changed"] { stroke: var(--changed-dim); }
 .edge[data-lit="1"] { stroke: var(--verified-dim); }
-.edges g[data-focus-dimmed="1"] { opacity: 0.18; }
+.edges g[data-focus-dimmed="1"] { opacity: 0.5; }
 .edgeLabel {
   fill: var(--verified);
-  font: 8px var(--f-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 12px var(--f-sans);
+  letter-spacing: 0.06em;
   paint-order: stroke;
   stroke: var(--ground);
   stroke-width: 4px;
@@ -131,8 +130,6 @@
   border-color: var(--hairline-hi);
 }
 
-.node:hover { color: var(--text-hi); }
-.node:focus-visible { outline: 2px solid var(--verified); outline-offset: 2px; }
 
 .node[data-selected="1"] {
   color: var(--text-hi);
@@ -140,7 +137,8 @@
   box-shadow: inset 2px 0 var(--verified);
 }
 .node[data-related="1"] { border-color: var(--verified-dim); color: var(--text-hi); }
-.node[data-focus-dimmed="1"] { opacity: 0.2; }
+/* BQ-132: 0.2 put an unselected node under 1.6:1 against the ground -- dimmed, not deleted. */
+.node[data-focus-dimmed="1"] { opacity: 0.55; }
 
 .node[data-node-state="dim"] { opacity: 0.36; }
 
@@ -169,9 +167,9 @@
 }
 
 .nodeKind {
-  color: var(--text-xlo);
-  font: 8px var(--f-mono);
-  letter-spacing: 0.13em;
+  color: var(--text-lo);
+  font: 12px var(--f-sans);
+  letter-spacing: 0.06em;
 }
 
 .node[data-node-state="affected"] .nodeKind,
@@ -183,30 +181,33 @@
   -webkit-line-clamp: 3;
   line-clamp: 3;
   overflow: hidden;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.36;
 }
 
 .nodeMeta {
-  color: var(--text-xlo);
-  font: 8px var(--f-mono);
+  color: var(--text-lo);
+  font: 12px var(--f-sans);
   letter-spacing: 0.1em;
 }
 
 /* ------------------------------------------------------------------ the sheet */
 
+/*
+  The source sheet, staged in the order the handoff asks for: the page, then the region cut out
+  of it, then the passage the compiler read from that region, then the ledger that lets a reader
+  check all three.
+
+  It used to be a tab bar with the parsed text selected. That put the extracted text and the page
+  it was extracted from on the same footing and opened on the text, so the block whose whole claim
+  is "this is the real source" never showed the real source until you clicked. The tabs are gone;
+  the page is the largest thing here and it is the first thing here.
+*/
 .sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  /* header · representation tabs · active representation · provenance · footer.
-
-     Keep the tablist in its own intrinsic row. The active representation is the only flexible
-     row; otherwise the original PDF panel can auto-size underneath the tablist and physically
-     cover the Parsed text control, which makes a visible tab impossible to click. */
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  /* The growing child of a bounded pane: the sheet takes the room that is left and the active
-     representation inside it scrolls, so provenance/footer remain reachable without allowing
-     the PDF canvas or its toolbar to overlap the representation tabs. */
+  /* header · the three beats · ledger · footer. The beats are the one flexible row. */
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   flex: 1 1 auto;
   width: 100%;
   max-width: 100%;
@@ -215,45 +216,224 @@
   min-height: 0;
   background: var(--g1);
   border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst-lg, 8px);
 }
 
-.sheet > [role="tabpanel"] {
-  grid-row: 3;
+/*
+  BQ-073. The copy promised the region appeared beside the page while the layout stacked them, so
+  the layout keeps the promise: page left, region and passage right, from the width where both
+  are still readable. Below it they stack in the same order they are read in.
+*/
+.sheetBody {
+  display: grid;
+  gap: clamp(14px, 1.8vw, 22px);
   min-width: 0;
-  max-width: 100%;
   min-height: 0;
-  overflow: auto;
+  padding: clamp(14px, 1.8vw, 22px);
+}
+
+@media (min-width: 1100px) {
+  /*
+    landing-05: `align-items: start` left the aside at its content height, so the passage's 522px
+    box sat in a 930px row with ~310px of empty ground under it beside a full-height page. The
+    aside takes the row; the region keeps its own height and the passage takes what is left, so
+    the two columns end together and the passage's end is the page's end.
+  */
+  .sheetBody { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: stretch; }
+  /*
+    The row is the page column tall, and the aside fills it.
+
+    `height: 0` keeps the aside from sizing the row -- otherwise the passage, which is 1,800px of
+    text, would size the row and leave the same hole under the PAGE instead -- and `min-height:
+    100%` then stretches it to the height the page column resolved to.
+  */
+  .sheetAside {
+    height: 0;
+    min-height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
+  }
+  .passage {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text-lo) 60%, transparent) transparent;
+    scrollbar-gutter: stable;
+  }
+  /*
+    And it says it scrolls. A permanent thin bar plus a fade on the bottom edge: the cut-off line
+    that made this read as clipped text is now a soft edge with a scrollbar beside it. Where the
+    browser can drive an animation from the scroller itself the fade lifts at the end, so the last
+    line of the passage is never under it; where it cannot, the fade is simply always there.
+  */
+  .passage::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    display: block;
+    height: 56px;
+    margin-top: -56px;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--g2) 34%, transparent);
+  }
+  @supports (animation-timeline: scroll(self block)) {
+    .passage::after {
+      animation: passageEnd linear both;
+      animation-timeline: scroll(self block);
+    }
+  }
+}
+
+.sheetPage { min-width: 0; }
+.sheetAside { display: grid; gap: 16px; align-content: start; min-width: 0; }
+
+/*
+  The region, cut from the same render as the page above it at twice the scale.
+
+  It was an outlined rectangle with a highlight box in it -- a drawing of where a region sits,
+  standing in for the region. Where the crop is not committed there is no drawing at all: the
+  highlight on the real page above says the same thing and says it truthfully.
+*/
+.regionCrop {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+.regionCrop img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--paper, #f4f1ea);
+  border: 1px solid var(--verified-dim);
+  border-radius: var(--r-paper-lg, 4px);
+}
+
+.regionCrop figcaption {
+  color: var(--text-mid);
+  font: 12px/1.5 var(--f-sans);
+}
+
+/*
+  The extracted passage. Not a page: the page is above it.
+
+  This surface was cream with a Georgia stack -- a third typeface typesetting extracted text to
+  look like a typeset document, which is the one thing a source-proof block must never do. It is
+  text the compiler read, so it is set in the interface face on the interface ground, and the only
+  page-like surface on screen is the actual rendered page.
+*/
+/*
+  landing-05 / regressions-09: it had no end a reader could see.
+
+  `max-height: min(58svh, 620px)` with `overflow-y: auto` and an overlay scrollbar made a 520px
+  window onto 1,738px of text -- about 70% of the passage hidden, cut mid-sentence, with no
+  scrollbar, fade or more-affordance to say so, on the block captioned "What the compiler read
+  from this page". Under a page scroll on a phone it was also a touch trap.
+
+  Below the two-column break the passage simply flows: nothing is hidden and there is no nested
+  scroller. Beside the page it is bounded by the page's own height (see the 1100px block below),
+  which is what the row is for, and its scrollbar is a permanent thin one rather than an overlay
+  that appears only once you have already guessed.
+*/
+.passage {
+  position: relative;
+  min-height: 0;
+  padding: 14px 16px;
+  color: var(--text-mid);
+  background: var(--g2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-inst, 6px);
+}
+
+@keyframes passageEnd { 0%, 88% { opacity: 1; } 100% { opacity: 0; } }
+
+.passageLabel {
+  margin: 0 0 10px;
+  color: var(--text-mid);
+  font: 500 12px/1.4 var(--f-sans);
+  letter-spacing: 0.06em;
+}
+
+.line {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* The measure the proof is read at; longer lines than this stop being a quotation. */
+  max-width: 680px;
+  margin: 0 0 14px;
+  padding: 4px 8px;
+  color: inherit;
+  font: 14px/1.7 var(--f-sans);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--r-paper, 2px);
+  transition: background-color var(--dur-2, 140ms) var(--ease-out, ease);
+}
+
+.line:last-child { margin-bottom: 0; }
+
+
+.line[data-active="1"] {
+  color: var(--text-hi);
+  background: var(--verified-deep);
+  outline: 1px solid var(--verified-dim);
+}
+
+.regionPin {
+  position: absolute;
+  top: 12px;
+  left: -1px;
+  width: 3px;
+  height: calc(100% - 24px);
+  background: var(--verified);
 }
 
 /*
   Source and representation, printed rather than implied (§11.3, §11.6).
 
-  Two digests sit on the default surface here, which is the one place on this stage they belong.
-  Everywhere else a raw hash goes in the technical drawer; here it is the only thing that tells
-  a reader whether the page above is the acquired original or a deterministic render of it, and
-  nobody should have to open a drawer to find out which document they are looking at.
+  Two digests belong on this surface: they are the only thing that says whether the page above is
+  the acquired original or a deterministic render of it. BQ-070: on a marketing route they are a
+  disclosure rather than six mono rows nobody will verify from a landing page, and on /explore and
+  in the workspace -- where verifying is the point of the screen -- they stay open.
 */
+.ledger {
+  border-top: 1px solid var(--hairline);
+  color: var(--text-lo);
+}
+
+.ledger > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--text-mid);
+  font: 500 13px/1.4 var(--f-sans);
+  list-style: none;
+}
+
+.ledger > summary::-webkit-details-marker { display: none; }
+.ledger > summary::after { content: "+"; margin-left: 8px; color: var(--text-lo); }
+.ledger[open] > summary::after { content: "−"; }
+
 .provenance {
   display: grid;
   gap: 8px 16px;
   margin: 0;
-  padding: 12px 14px;
-  border-top: 1px solid var(--hairline);
-  font: 9px/1.5 var(--f-mono);
-  letter-spacing: 0.05em;
+  padding: 4px 14px 14px;
+  font: 12px/1.5 var(--f-sans);
 }
 
 .provenance > div {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   gap: 10px;
   align-items: start;
 }
 
-.provenance dt {
-  color: var(--text-xlo);
-  text-transform: uppercase;
-}
+.provenance dt { color: var(--text-lo); }
 
 .provenance dd {
   min-width: 0;
@@ -271,6 +451,7 @@
   display: block;
   min-width: 0;
   color: var(--text-lo);
+  font: 12px/1.5 var(--f-mono);
   word-break: break-all;
 }
 
@@ -278,17 +459,17 @@
 .sheet > footer {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 14px;
-  font: 9px var(--f-mono);
-  letter-spacing: 0.08em;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font: 13px/1.5 var(--f-sans);
 }
 
 .sheet > header { border-bottom: 1px solid var(--hairline); }
 .sheet > footer {
   justify-content: space-between;
-  color: var(--text-xlo);
+  color: var(--text-lo);
   border-top: 1px solid var(--hairline);
 }
 
@@ -297,6 +478,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-hi);
+  font: 12px/1.5 var(--f-sans);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -305,14 +487,10 @@
   display: block;
   margin-top: 4px;
   overflow: hidden;
-  color: var(--verified);
-  font: 8px/1.4 var(--f-mono);
-  letter-spacing: .06em;
+  color: var(--text-mid);
+  font: 12px/1.4 var(--f-sans);
   text-overflow: ellipsis;
-  text-transform: uppercase;
 }
-
-.sheet > header b { color: var(--verified); }
 
 .sourceLink {
   display: inline-flex;
@@ -321,129 +499,6 @@
   padding-inline: 4px;
   color: var(--verified);
 }
-
-.paper {
-  /* `position: relative` makes this the offset parent the active region is scrolled against in
-     `source-sheet.tsx`, which keeps that scroll inside the page instead of moving the window. */
-  position: relative;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  margin: clamp(14px, 2.4vw, 30px);
-  padding: clamp(20px, 3vw, 40px);
-  color: #272825;
-  background: #e8e5dc;
-  /* Depth is luminance and a hairline everywhere else on this instrument; a soft drop shadow
-     under the page was the one exception, and it was not worth being the exception. */
-  border: 1px solid var(--hairline-hi);
-  font-family: Georgia, "Times New Roman", serif;
-}
-
-.sheet[data-compact="1"] .paper {
-  margin: 14px;
-  padding: 18px 20px;
-}
-
-.line {
-  position: relative;
-  display: block;
-  width: 100%;
-  margin: 0 0 18px;
-  padding: 4px 6px;
-  color: inherit;
-  font: inherit;
-  font-size: clamp(12px, 0.95vw, 15px);
-  line-height: 1.75;
-  text-align: left;
-  background: none;
-  border: 0;
-  transition: background 300ms var(--ease);
-}
-
-.line:last-child { margin-bottom: 0; }
-.line:first-child { font-weight: 700; }
-
-button.line { cursor: pointer; }
-button.line:focus-visible { outline: 2px solid #597768; outline-offset: 1px; }
-
-.line[data-active="1"] {
-  background: rgb(155 184 169 / 0.34);
-  outline: 1px solid #597768;
-}
-
-.regionPin {
-  position: absolute;
-  top: 50%;
-  left: -7px;
-  width: 6px;
-  height: 6px;
-  background: #597768;
-  border-radius: 50%;
-  transform: translateY(-50%);
-}
-
-/* ------------------------------------------------------------------ the region map */
-
-.pageMap {
-  position: relative;
-  margin: 0 clamp(14px, 2.4vw, 30px) 30px;
-  aspect-ratio: 595 / 842;
-  max-height: 128px;
-  background: var(--g2);
-  border: 1px solid var(--hairline-hi);
-}
-
-/*
-  The caption sits under the page, not on it.
-
-  `bottom: -16px` anchored the caption's *bottom* edge below the frame, so as soon as the label
-  wrapped -- which it does at this width -- the second line grew upward and printed over the
-  drawn region. Anchoring the top below the frame and refusing the wrap keeps the two apart at
-  every width.
-*/
-.pageMap small {
-  position: absolute;
-  top: calc(100% + 7px);
-  left: 0;
-  color: var(--text-xlo);
-  font: 8px var(--f-mono);
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-}
-
-.pageBox {
-  position: absolute;
-  background: rgb(123 224 190 / 0.16);
-  border: 1px solid var(--verified);
-}
-
-.pageMap[data-tone="changed"] .pageBox {
-  background: rgb(242 166 90 / 0.16);
-  border-color: var(--changed);
-}
-
-/* ------------------------------------------------------------------ the tether */
-
-.tether {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.tether path {
-  fill: none;
-  stroke: var(--verified);
-  stroke-width: 1;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  transition-property: stroke-dashoffset;
-  transition-timing-function: var(--ease);
-}
-
-.tether[data-drawn="1"] path { stroke-dashoffset: 0; }
 
 /* ------------------------------------------------------------------ narrow */
 
@@ -464,11 +519,6 @@ button.line:focus-visible { outline: 2px solid #597768; outline-offset: 1px; }
   }
 
   .edges { display: none; }
-  /* The provenance tether is useful when source and object are side-by-side. In the narrow
-     stacked composition it becomes a long vertical accent with no readable endpoints, which
-     looks like a broken guide line. The selected source text and region map carry the same
-     provenance on phones without drawing through the page. */
-  .tether { display: none; }
   .node[data-focus-dimmed="1"] { display: none; }
 
   /* In the flow there is nothing to centre, so the offsets go to zero and the press detent
@@ -501,9 +551,13 @@ button.line:focus-visible { outline: 2px solid #597768; outline-offset: 1px; }
   .field *,
   .node,
   .edge,
-  .line,
-  .tether path {
+  .line {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* The token contract: every :hover is gated, so a touch device never keeps a hover state. */
+@media (hover: hover) and (pointer: fine) {
+  .node:hover { color: var(--text-hi); }
 }

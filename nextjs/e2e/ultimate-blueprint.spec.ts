@@ -16,7 +16,7 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 */
 test("homepage Proof opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
   await page.goto("/");
-  const cta = page.locator("#proof .solution-proof-sample").getByRole("link", { name: "Inspect the evidence" });
+  const cta = page.locator('#proof [data-proof-variant="canonical"]').getByRole("link", { name: "Inspect the evidence" });
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();
@@ -67,11 +67,10 @@ test("the sample opens onto real provenance and claims nothing it has not compil
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-[\w-]+\.pdf$/i).first()).toBeVisible();
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
-  await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
-  // The footer names the bytes it opens: the committed PDF of the annual filing, or the
+  await expect(sheet.locator("[data-parsed-source-page]")).toBeVisible();
+  // The footer names the bytes it opens: the original PDF of the annual filing, or the
   // reference render of a 2026 filing. It may never offer one under the other's name.
-  await expect(page.getByRole("link", { name: /Open (committed PDF|reference render)/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the (original PDF|reference render)/ })).toBeVisible();
   // A RESEARCH FRONTIER card whose every field read `not_yet` used to stand here, and then the
   // `PAGE + BBOX BOUND` tile that replaced it. Both were a page claiming provenance in words.
   // What must still hold is that no placeholder renders as a fact.
@@ -88,6 +87,8 @@ test("Security record exposes fail-closed controls without certification claims"
   await page.goto("/security");
   await expect(page.getByRole("heading", { name: /Where your documents go/ })).toBeVisible();
   await expect(page.getByText(/Every external operation fails closed/)).toBeVisible();
-  await expect(page.getByText("CURRENT DEPLOYMENT CONTROLS")).toBeVisible();
+  // The tracked mono-caps label became the section's own heading in sentence case (the 12px
+  // floor and the "mono only for machine identifiers" rule). Same section, same claim.
+  await expect(page.getByRole("heading", { name: "Current deployment controls" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SOC 2 certified|ISO 27001 certified/i);
 });

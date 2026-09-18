@@ -24,7 +24,6 @@ export default function WorldAct({
   onOpen,
   reduced,
   settled,
-  dimmed = false,
 }: {
   model: VisualWorldModel;
   layout: VisualLayout;
@@ -34,7 +33,6 @@ export default function WorldAct({
   onOpen: (id: string) => void;
   reduced: boolean;
   settled: boolean;
-  dimmed?: boolean;
 }) {
   const selected = selectedId ? model.nodes.find((node) => node.id === selectedId) ?? null : null;
   const relations = selectedId
@@ -47,7 +45,7 @@ export default function WorldAct({
       })
     : [];
   return (
-    <div className={styles.worldAct} data-dimmed={dimmed ? "1" : "0"}>
+    <div className={styles.worldAct}>
       <WorldCanvas
         model={model}
         layout={layout}
@@ -61,7 +59,7 @@ export default function WorldAct({
       />
       <div className={styles.worldFoot}>
         <div className={styles.worldFocus}>
-          <p className={styles.hint}>{selected ? "DIRECTLY CONNECTED" : EXPLORE_COPY.worldHint}</p>
+          <p className={styles.hint}>{selected ? "Directly connected" : EXPLORE_COPY.worldHint}</p>
           {selected ? (
             <>
               <strong>{selected.label}</strong>
@@ -80,7 +78,7 @@ export default function WorldAct({
         </div>
         {/* `totals`, not `nodes.length`: the payload is bounded, the published number is not. */}
         <p className={styles.worldScope} title="Includes documents, extracted knowledge and evidence nodes.">
-          SHOWING {layout.placements.length} OF {model.totals.objects} GRAPH NODES
+          Showing {layout.placements.length} of {model.totals.objects} graph nodes
         </p>
       </div>
 

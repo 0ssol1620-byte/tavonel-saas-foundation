@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
 import { RecipePreflight } from "@/components/recipe-preflight";
@@ -27,6 +28,7 @@ import {
   type RecipeIntent,
 } from "@/lib/recipe-intent";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 type AuthState = "checking" | "ready" | "unconfigured";
 
@@ -162,11 +164,19 @@ export default function LoginPage() {
 
       <div className="auth-body">
         <div className="auth-card">
-          {intent || recipe ? <p className="eyebrow">SIGN IN TO CONTINUE</p> : null}
+          {/*
+            BQ-113. One claim per heading.
+
+            The default read "Open your workspace." -- and on a deployment where customer file
+            processing is closed, the notice directly under it read "Customer file processing is
+            not open yet." The heading and the first paragraph contradicted each other on the
+            surface that converts. The heading now says what the page does, which is true in
+            every deployment state; what is and is not open is the notice’s job.
+          */}
           <h1>
             {intent ? "One step before checkout."
               : recipe ? "One step before you run this."
-                : "Open your workspace."}
+                : "Sign in to TAVONEL."}
           </h1>
           <p className="lead">
             TAVONEL turns your documents and connected sources into a structured, source-grounded
@@ -203,15 +213,33 @@ export default function LoginPage() {
           ) : null}
 
           <div className="auth-actions">
-            <button className="btn" type="button" onClick={() => void signIn()} disabled={busy || authState !== "ready"}>
-              {authState === "checking" ? "Checking this deployment…" :
-                authState === "unconfigured" ? "Sign-in unavailable" :
+            {/*
+              G2-031. The control a visitor came for, present from the first paint.
+
+              While `/api/status` was in flight the button's label was replaced by "Checking this
+              deployment…", so one cold load in three at 412px showed no sign-in control at 300ms
+              and settled well inside 1.5s. Nothing wrong was claimed; the page simply looked like
+              it had nothing to offer for a third of a second on the surface that converts.
+
+              The button is the button the whole time. It is disabled and `aria-busy` while the
+              deployment answers -- so a click cannot start a flow the page has not confirmed is
+              configured -- and it says "Sign-in unavailable" only once the answer is in. That is
+              the same fail-closed behaviour with the label held still.
+            */}
+            <button
+              className="btn"
+              type="button"
+              onClick={() => void signIn()}
+              disabled={busy || authState !== "ready"}
+              aria-busy={authState === "checking" || busy}
+              data-loading={authState === "checking" || busy ? "1" : undefined}
+            >
+              {authState === "unconfigured" ? "Sign-in unavailable" :
                 busy ? "Opening Google…" : "Continue with Google"}
             </button>
             {authState === "ready" && !customerProcessingEnabled ? (
-              <Link className="btn ghost" href="/explore">Explore the public World</Link>
+              <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
             ) : null}
-            <Link className="btn ghost" href="/">Back to the site</Link>
           </div>
 
           {authState === "unconfigured" ? (
@@ -229,7 +257,16 @@ export default function LoginPage() {
             {selfService && customerProcessingEnabled ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
           </ul>
         </div>
+        {/*
+          The way back, after BQ-113 cut the action row to one primary and one ghost.
+
+          The ghost that went was "Back to the site", and the sign-in shell has no site header --
+          only the wordmark, which does link home but says so to nobody who has not learned that a
+          wordmark is a link. It belongs in this row rather than back in the action row: these are
+          the onward links, and the row above is the one decision the page is asking for.
+        */}
         <p className="fine auth-legal">
+          <Link href="/">Back to the site</Link> ·{" "}
           <Link href="/privacy">Privacy notice</Link> · <Link href="/terms">Terms</Link> ·{" "}
           <Link href="/security">Security</Link> · <Link href="/contact">Contact</Link>
         </p>

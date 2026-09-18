@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import Logomark from "@/components/logomark";
 import ContactForm from "@/components/contact-form";
-import MobilePrimaryNav from "@/components/mobile-primary-nav";
-import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
+import { PublicSitePage } from "@/components/public-site-chrome";
+import { readLegalOperator } from "@/lib/legal-operator";
 import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 
 export const metadata: Metadata = {
@@ -12,27 +10,28 @@ export const metadata: Metadata = {
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/contact" },
   openGraph: { url: "/contact" },
-  title: "Talk to TAVONEL",
+  title: "Contact — TAVONEL",
   description: "Tell us what your documents need to become, without sending the documents themselves.",
 };
 
-export default function ContactPage() {
-  return (
-    <div className="page">
-      <header className="nav" data-stuck={1}>
-        <Link href="/" className="wordmark" aria-label="TAVONEL home">
-          <Logomark />
-          <b>TAVONEL</b>
-        </Link>
-        <DesktopPrimaryNav />
-        <MobilePrimaryNav />
-        <span className="nav-actions">
-          <Link className="nav-signin" href="/login">Sign in</Link>
-        </span>
-      </header>
+/*
+  BQ-012 / n32. The shared chrome, not a third copy of it.
 
-      <main id="main" tabIndex={-1}>
-        <section className="scene doc contact-page">
+  This page hand-rolled a header with no action in it and a footer with neither the navigation
+  groups nor the legal row -- so the one route the whole site's "Request access" button points at
+  was the route where a visitor could not get back to pricing, the Korean entry, the security
+  inbox or the consent withdrawal. Nothing in `PublicSitePage` had to change to take it: the
+  header resolves its own commercial action, and the `<main id="main">` the skip link targets is
+  the one this page used to declare itself.
+
+  The footer sentence this page did own -- what happens to an inquiry after it is sent -- is not
+  chrome, so it moves up beside the addresses it is about rather than going with the shell.
+*/
+export default function ContactPage() {
+  const operator = readLegalOperator();
+  return (
+    <PublicSitePage>
+      <section className="scene doc contact-page">
           <div className="shell">
             <div className="body">
               <div className="stack">
@@ -44,44 +43,68 @@ export default function ContactPage() {
                 */}
                 <div className="contact-address">
                   <span>General inquiries</span>
-                  <a href="mailto:hello@tavonel.com">hello@tavonel.com</a>
+                  <a className="link" href="mailto:hello@tavonel.com">hello@tavonel.com</a>
                 </div>
                 <div className="contact-address">
                   <span>Product support</span>
-                  <a href="mailto:support@tavonel.com">support@tavonel.com</a>
+                  <a className="link" href="mailto:support@tavonel.com">support@tavonel.com</a>
                 </div>
                 <div className="contact-address">
                   <span>Vulnerability reports</span>
-                  <a href="mailto:security@tavonel.com">security@tavonel.com</a>
+                  <a className="link" href="mailto:security@tavonel.com">security@tavonel.com</a>
                 </div>
+                {/*
+                  G2-034. The telephone number, on the page whose job is to be reachable.
+
+                  It was published in the footer of every legal page and on none of the contact
+                  routes, so the one visitor who wants to speak to somebody was the visitor who
+                  could not find it. `readLegalOperator` is the source those footers read, so
+                  this renders only where the operator record exists and can never become a
+                  second, stale copy of the number.
+                */}
+                {operator ? (
+                  <div className="contact-address">
+                    <span>Telephone</span>
+                    <a className="link" href={`tel:${operator.phone}`}>{operator.phone}</a>
+                  </div>
+                ) : null}
                 {/* One constant, printed here and on /status. See lib/support-targets.ts. */}
                 <p className="fine">{SUPPORT_ACKNOWLEDGEMENT}</p>
+                {/*
+                  G2-034. `hello@` carried no expectation at all, which left the address most
+                  visitors use as the one with no answer to "when will I hear back". Same target
+                  as support, said for this inbox; still no resolution time, because there is not
+                  one to commit.
+                */}
+                <p className="fine">
+                  General inquiries to hello@tavonel.com are read by a person and carry the same
+                  one business day (KST) acknowledgement target.
+                  {operator ? " The telephone is answered during Korean business hours; outside them, email reaches us sooner." : null}
+                </p>
+                {/*
+                  This read "Personal mailbox addresses are never published", which 13.4 asks to
+                  delete: it is a sentence about our internal address policy on a page whose reader
+                  wants to know what happens to their inquiry. What replaces it is that. It sat in
+                  this page's own footer until n32 gave the page the site's footer instead.
+                */}
+                <p className="fine">Every inquiry is read by a person, and the reply comes from an address on this domain.</p>
               </div>
               <div className="stack">
+                {/*
+                  BQ-113. The warning that governs the message box was printed here and again
+                  inside the box as placeholder text, and the placeholder is the copy that
+                  disappears the moment somebody starts typing. It is said once now, beside the
+                  field it governs, where it stays legible while the field is being filled in.
+                */}
                 <p className="lede">
-                  Open <b>Help us prepare a better reply</b> and the first answer comes back with
-                  specifics rather than a request for more detail. Every question in it is
-                  optional.
-                  <b> Do not attach or paste customer documents here.</b>
+                  The optional questions above the message box are what let the first reply come
+                  back with specifics rather than a request for more detail.
                 </p>
                 <ContactForm />
               </div>
             </div>
           </div>
-        </section>
-      </main>
-
-      <footer className="site">
-        <div className="shell">
-          <span className="wordmark"><Logomark /><b>TAVONEL</b></span>
-          {/*
-            This read "Personal mailbox addresses are never published", which 13.4 asks to
-            delete: it is a sentence about our internal address policy on a page whose reader
-            wants to know what happens to their inquiry. What replaces it is that.
-          */}
-          <p className="fine">Every inquiry is read by a person, and the reply comes from an address on this domain.</p>
-        </div>
-      </footer>
-    </div>
+      </section>
+    </PublicSitePage>
   );
 }

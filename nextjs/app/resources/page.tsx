@@ -3,13 +3,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import {
-  RESOURCE_LINKS,
-  RESOURCE_PURPOSES,
-  RESOURCE_TAG_LABELS,
-  RESOURCE_WORKFLOWS,
-  type ResourceTag,
-} from "@/lib/site-navigation";
+import { EXPLORE_CTA, RESOURCE_LINKS, RESOURCE_PURPOSES, RESOURCE_TAG_LABELS, RESOURCE_WORKFLOWS, type ResourceTag } from "@/lib/site-navigation";
 import styles from "./resources.module.css";
 
 export const metadata: Metadata = {
@@ -17,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/resources" },
   title: "Resources — TAVONEL",
   description:
-    "Explore a compiled world, read the documentation and API, and inspect the research and evidence behind the compiler.",
+    "Explore a Compiled World, read the documentation and API, and inspect the research and evidence behind the compiler.",
 };
 
 /*
@@ -31,7 +25,7 @@ export const metadata: Metadata = {
 
 const DESCRIPTIONS: Record<string, string> = {
   "/explore": "Follow a result from an answer back to the exact source location it came from, without signing in.",
-  "/knowledge-compiler": "What a knowledge compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
+  "/knowledge-compiler": "What a Knowledge Compiler is, and how it differs from a parser, a RAG pipeline and a graph database.",
   "/docs": "Quickstart, concepts, supported files, compiling, review, and using a world through Ask, the API and MCP.",
   "/api": "Endpoints, authentication, errors and limits, with the machine-readable OpenAPI document alongside.",
   "/changelog": "What changed, in the order it changed, written for the people using it.",
@@ -49,10 +43,22 @@ const DESCRIPTIONS: Record<string, string> = {
   filter state (WG-074). Nothing here links to a page that does not exist: `/cookbooks/*` is a
   proposal, and a draft cookbook is not linked from this hub as a representative case.
 */
+/*
+  pages-17: "Everything" is the clear-all, not a filter group of one.
+
+  It sat under a label reading SHOW, above BY PURPOSE (four chips) and BY WORKFLOW (three) -- a
+  group whose other options look as though they failed to render, over a control that cannot
+  change anything by itself. The chip is what it always was; the label over it is gone, so it
+  reads as the reset at the head of the row that it is.
+*/
 const FILTERS: readonly { tag: ResourceTag | null; group: string | null }[] = [
-  { tag: null, group: "SHOW" },
-  ...RESOURCE_PURPOSES.map((tag, index) => ({ tag, group: index === 0 ? "BY PURPOSE" : null })),
-  ...RESOURCE_WORKFLOWS.map((tag, index) => ({ tag, group: index === 0 ? "BY WORKFLOW" : null })),
+  // type-02: the group labels are kickers, and a kicker is sentence case. `.groupLabel` already
+  // draws the canonical face (sans 12px / 500 / .06em / --text-mid, `text-transform: none`), so
+  // the shouting was never in the CSS -- it was in the string literals. Fixed where it lived.
+  // pages-17: "Everything" is the clear-all chip, not a filter group of one -- it carries no label.
+  { tag: null, group: null },
+  ...RESOURCE_PURPOSES.map((tag, index) => ({ tag, group: index === 0 ? "By purpose" : null })),
+  ...RESOURCE_WORKFLOWS.map((tag, index) => ({ tag, group: index === 0 ? "By workflow" : null })),
 ];
 
 export default function ResourcesPage() {
@@ -62,14 +68,20 @@ export default function ResourcesPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>RESOURCES</b><span />TAVONEL</p>
-              <h1 className="document-title">Everything that explains<br />how this works.</h1>
+              <h1 className="document-title">Everything that explains how this works.</h1>
             </div>
             <div className="stack">
               <p className="lede">
                 A sample world you can take apart, the documentation and API you build against,
                 and the research and evidence behind the compiler.
               </p>
+              {/*
+                pages-22: the page had no second-level heading at all, so the hierarchy went from
+                the 56px H1 straight to 20px card titles with three 12px filter labels as the only
+                thing in between -- the flat hierarchy the design direction names as the tell. One
+                real h2 over the grid is the middle step; the filter row narrows what is under it.
+              */}
+              <h2>All resources</h2>
               <div className={styles.hub}>
                 {/*
                   One selection at a time, and never an empty result: every control names a tag
@@ -107,12 +119,15 @@ export default function ResourcesPage() {
                           look like the tiles' words.
 
                           The filter already encodes what these said, so they are gone rather
-                          than restyled, and the space goes to the card's action link -- the card
-                          anatomy /product already uses.
+                          than restyled, and the space went to a card action link.
+
+                          BQ-111 / BQ-134 takes that away too. It was the ninth copy of "Open →"
+                          on the page: a verb that names no destination, with an arrow appended,
+                          pointing at the href the card's own heading already links to. Two links
+                          to one page inside one card is one link and a decoration -- and it is
+                          the decoration a screen reader reads out nine times. The heading is the
+                          card's way in.
                         */}
-                        <p className={styles.tileAction}>
-                          <Link href={link.href as Route}>Open →</Link>
-                        </p>
                       </article>
                     );
                   })}
@@ -126,7 +141,7 @@ export default function ResourcesPage() {
                 and nothing to do with them. The action row is the one its sibling pages carry.
               */}
               <div className="actions">
-                <Link className="btn" href="/explore">Explore a compiled world</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href={"/docs/quickstart" as Route}>Read the quickstart</Link>
               </div>
               <p className="fine">

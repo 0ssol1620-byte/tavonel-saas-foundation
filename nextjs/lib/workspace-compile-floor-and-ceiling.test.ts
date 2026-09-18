@@ -5,6 +5,7 @@ import { judgeCorpusSet } from "./corpus-batching";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const compileStage = readFileSync(new URL("../components/compile-stage.tsx", import.meta.url), "utf8");
+const workspaceCss = readFileSync(new URL("../app/workspace-no1.css", import.meta.url), "utf8");
 
 /*
   Two limits, both of which were wrong on the primary intake path while every other layer
@@ -48,22 +49,65 @@ describe("workspace compile floor and ceiling", () => {
 
   it("moves an authorised staged compile into the real live Sources view before upload begins", () => {
     expect(workspace).toContain('navigateSurface("sources")');
-    expect(workspace).toContain('sources: "workspace-sources"');
-    expect(workspace).toContain('scrollIntoView({ block: "start", behavior: "smooth" })');
+    // Every surface starts at the top now; the anchor map that scrolled past shared blocks is gone.
+    expect(workspace).toContain("window.scrollTo({ top: 0 });");
     expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files)"));
   });
 
-  it("keeps live compilation on Sources and gives phones one readable stage at a time", () => {
+  /*
+    The same intent as before -- live compilation belongs to Knowledge, and to Home only while a
+    run is in flight, and a narrow screen gets one readable stage rather than four slivers --
+    now asserted against the 09-17 stage (BQ-083). The width branch is gone because there is no
+    longer a wide layout to branch to: one chapter plays at a time at every width, so the phone
+    case cannot regress separately from the desktop one.
+  */
+  it("keeps live compilation on Knowledge (and on Home while a run is in flight) and plays one chapter at a time", () => {
     const sourcesGate = workspace.indexOf('{surface === "sources" ? <>');
-    const stage = workspace.indexOf("<CompileStage");
+    const stageOnSources = workspace.indexOf("{compileBlock}", sourcesGate);
     expect(sourcesGate).toBeGreaterThan(-1);
-    expect(sourcesGate).toBeLessThan(stage);
+    expect(stageOnSources).toBeGreaterThan(sourcesGate);
+    expect(workspace).toContain("<CompileStage rows={pipelineRows}");
 
-    expect(compileStage).toContain("if (width < 640)");
-    expect(compileStage).toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
-    expect(compileStage).toContain("const current = panes[stageIndex]");
-    expect(compileStage).toContain('if (current === "sources") drawSources');
-    expect(compileStage.indexOf("if (width < 640)")).toBeLessThan(compileStage.indexOf("const gap = 10; const colH"));
+    // One pane, chosen by how far the run has got -- not four columns.
+    expect(compileStage).toContain("/* One pane. Not four, and not four with three of them empty. */");
+    expect(compileStage).toContain("if (reached === 0) drawSources");
+    expect(compileStage).not.toContain("if (width < 760)");
+    // The chapter names are the shared vocabulary, not a fifth set of labels.
+    expect(compileStage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
+    expect(compileStage).toContain("PIPELINE_STAGES.forEach((stage, i)");
+    expect(compileStage).not.toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
+  });
+
+  /*
+    D39. The reserved frame is space for a picture. Before a run has drawn one, the pane is a tab
+    strip over a short source list, and the reservation left 490px of black under it at 1440
+    (workspace-01). Asserted against the source for the same reason the two below are: what has to
+    stay true is a branch in a client component and a selector in a sheet no DOM test reads.
+  */
+  it("reserves the aspect-ratio frame only while a run is playing", () => {
+    expect(compileStage).toContain("const framed = reached > 0 || (state !== null && STARTING.includes(state));");
+    expect(compileStage).toContain('data-framed={framed ? "true" : "false"}');
+    // Idle it carries its own drawn height, and the sheet stops reserving a ratio.
+    expect(compileStage).toContain("style={framed || !drawable ? undefined : { height: idleHeight }}");
+    expect(workspaceCss).toContain('.compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }');
+  });
+
+  /*
+    BQ-021 and BQ-022, as source facts, for the same reason the two above are: they are
+    control-flow and colour decisions inside a canvas that no DOM assertion can see.
+  */
+  it("draws from tokens and from job position, never from a hash of a filename", () => {
+    // No hashed hue, no hashed geometry, no private palette.
+    expect(compileStage).not.toContain("16777619");
+    expect(compileStage).not.toContain("AREA_RGB");
+    // No literal paint anywhere the canvas actually draws.
+    expect(compileStage).not.toMatch(/(?:fillStyle|strokeStyle) = "(?:#|rgb)/);
+    expect(compileStage).toContain("const computed = window.getComputedStyle(section)");
+    // A stage that has been passed stays passed: position is the max of observation and record.
+    expect(compileStage).toContain("Math.max(observed, state ? STAGE_OF_STATE[state] : 0)");
+    expect(compileStage).toContain("const done = settled || i < current;");
+    // A canvas with no context reports itself instead of painting nothing.
+    expect(compileStage).toContain("setDrawable(false)");
   });
 
   it("agrees with the shared judgement at both ends", () => {

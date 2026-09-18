@@ -2,8 +2,24 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
+import SolutionProofSample, { type ProofPick } from "@/components/solution-proof-sample";
+import proofStyles from "@/components/solution-proof-sample.module.css";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
+
+/*
+  G1-019. The region this page opens on, selected out of the published corpus rather than written.
+
+  A printed financial statement is the honest choice for the page whose READ card says a price
+  table arrives as the paragraphs it was printed as: the reader can see the grid on the page
+  render and the paragraphs beside it, which is the claim, demonstrated.
+*/
+const READ_PROOF: ProofPick = {
+  form: "10-Q",
+  match: /CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS/,
+  framing: "A printed statement and what the read left behind: the paragraphs it was printed as, each carrying the page and the box it sat in.",
+};
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -124,15 +140,23 @@ const LAYOUT_BODY = [
   which is the honest arrangement: the finding keeps its page, the product page describes the
   product.
 */
+/*
+  BQ-109 / BQ-099. The four cards lost their kickers, which said the heading again.
+
+  LOCATION stood over "The place, kept"; UNCERTAINTY over "Confidence travels with the
+  region"; LAYOUT over "Read in the order it was printed". A kicker that repeats the heading
+  in 9.5px tracked mono is two lines of type doing one line of work, and it was under the
+  floor besides. The heading was always the better of the two sentences.
+*/
 const PARTS = [
-  ["READ", "Text, scans, and what survives them", READ_BODY],
-  ["LOCATION", "The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the box on it. This is what later lets every compiled fact stay traceable to its exact source location."],
-  ["LAYOUT", "Read in the order it was printed", LAYOUT_BODY],
+  ["Text, scans, and what survives them", READ_BODY],
+  ["The place, kept", "Every region keeps the address of where it was read — in a PDF, the page and the box on it. This is what later lets every compiled fact stay traceable to its exact source location."],
+  ["Read in the order it was printed", LAYOUT_BODY],
   // "arrive in review" was not supported: ocr-review.json is written only when the read fails,
   // and no threshold on confidence routes anything. The confidence is recorded, and that is all.
   // BA-014 keeps both halves of that and leads with the one a reader can use: the confidence
   // travels with the region it belongs to, and a failed read opens review rather than passing.
-  ["UNCERTAINTY", "Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. No threshold routes on that confidence — it is recorded, and a reader that never reports doubt cannot be believed later."],
+  ["Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. No threshold routes on that confidence — it is recorded, and a reader that never reports doubt cannot be believed later."],
 ] as const;
 
 export default function DocumentUnderstandingPage() {
@@ -144,20 +168,18 @@ export default function DocumentUnderstandingPage() {
           <div className="body">
             <div className="stack">
               {/* BA-026. The trail BreadcrumbJsonLd already declares, rendered for the reader. */}
-              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Document understanding</p>
-              <p className="slate"><b>PRODUCT</b><span />DOCUMENT UNDERSTANDING</p>
+              <DocBreadcrumb trail={[{ name: "Product", path: "/product" }, { name: "Document understanding", path: "/product/document-understanding" }]} />
               <h1 className="document-title">Reading is the first compile step.</h1>
             </div>
             <div className="stack">
               <p className="lede">
                 Read scans and complex layouts while retaining the location of every region and
                 the uncertainty around it. The compiler has to recover text and coordinates
-                <b> before anything can be compiled into a world.</b>
+                before anything can be compiled into a world.
               </p>
               <div className="tiles">
-                {PARTS.map(([state, title, body]) => (
+                {PARTS.map(([title, body]) => (
                   <article className="tile" key={title}>
-                    <span className="n">{state}</span>
                     {/*
                       BA-025. h2, not h3: the four cards are the first sections under the h1, and
                       an h3 here left the outline h1 -> h3 so the page could not be walked by
@@ -182,9 +204,19 @@ export default function DocumentUnderstandingPage() {
                 twice in two adjacent elements, with the button competing with the primary.
               */}
               <div className="actions">
-                <Link className="btn" href={"/explore" as Route}>See a page and its regions</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/knowledge-compiler">What happens after the read</Link>
               </div>
+            </div>
+            {/*
+              G1-019 / G1-020 (marketing-visual). The page about reading documents had no document
+              on it. BQ-077 / D4: it had one, but in the 420px title rail, where the page render
+              was too small to read -- which is a demonstration of the opposite of the claim. It
+              spans the body now, and it is the region itself, cut from the committed render of the
+              printed statement: the grid on the page, and the passage the read left behind.
+            */}
+            <div className={proofStyles.fullWidth}>
+              <SolutionProofSample pick={READ_PROOF} variant="crop" />
             </div>
           </div>
         </div>

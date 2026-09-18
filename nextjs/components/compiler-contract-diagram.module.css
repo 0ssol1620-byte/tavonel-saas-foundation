@@ -6,14 +6,19 @@
 
   Nothing here transitions or animates, so there is no reduced-motion block to write -- the
   drawing is already the same for every reader.
+
+  A user unit is a CSS pixel only while the drawing renders at its authored width, so the
+  drawing is pinned there -- `min-width` equal to the viewBox -- and `.scroller` pans it. A
+  viewBox scaled down to fit a column is a picture of a diagram: at 860px the labels below
+  landed at 8.3px, under the type floor, and no size written here meant what it said.
 */
 
 .scroller { width: 100%; overflow-x: auto; }
 .scroller:focus-visible { outline-offset: 4px; }
 
-.diagram { width: 100%; height: auto; max-width: 980px; display: block; }
+.diagram { width: 100%; height: auto; min-width: 980px; max-width: 980px; display: block; }
 
-.eyebrow { fill: var(--verified); font: 11px var(--f-mono); letter-spacing: 0.16em; }
+.eyebrow { fill: var(--verified); font: 12px var(--f-mono); letter-spacing: 0.08em; }
 
 /*
   The arrows carry the same claim the boxes do, so they are drawn to the same rule.
@@ -28,13 +33,13 @@
 .arrowHead { fill: var(--hairline-hi); }
 .arrowHeadDirection { fill: var(--hairline); }
 
-.bypassLabel text { fill: var(--text-mid); font: 9.5px var(--f-mono); letter-spacing: 0.13em; }
+.bypassLabel text { fill: var(--text-mid); font: 12px var(--f-mono); letter-spacing: 0.08em; }
 
 /* -------------------------------------------------------------------- stages */
 
 .frame { fill: var(--g1); stroke: var(--hairline-hi); }
-.title { fill: var(--text-hi); font: 12.5px var(--f-mono); letter-spacing: 0.1em; text-anchor: middle; }
-.detail { fill: var(--text-xlo); font: 10.5px var(--f-mono); letter-spacing: 0.04em; text-anchor: middle; }
+.title { fill: var(--text-hi); font: 14px var(--f-mono); letter-spacing: 0.06em; text-anchor: middle; }
+.detail { fill: var(--text-lo); font: 12px var(--f-mono); letter-spacing: 0.02em; text-anchor: middle; }
 
 /*
   Dashed is the whole honesty mechanism of this drawing, so it is one rule and not a per-box
@@ -58,15 +63,6 @@
 
 /* -------------------------------------------------------------------- legend */
 
-.legend text { fill: var(--text-xlo); font: 9.5px var(--f-mono); letter-spacing: 0.14em; }
+.legend text { fill: var(--text-lo); font: 12px var(--f-mono); letter-spacing: 0.08em; }
 .legendBuilt { stroke: var(--hairline-hi); fill: none; }
 .legendDirection { stroke: var(--hairline); stroke-dasharray: 4 3; fill: none; }
-
-@media (max-width: 900px) {
-  /*
-    Below about 900px the ten labelled boxes render as unreadable grey bars. The drawing keeps a
-    legible width and `.scroller` scrolls it, which is the treatment every other wide thing on
-    this site gets.
-  */
-  .diagram { min-width: 860px; }
-}

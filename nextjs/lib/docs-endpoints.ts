@@ -19,6 +19,14 @@ export type DocsEndpoint = {
   path: string;
   server: string;
   scope: string | null;
+  /**
+   * Which credential the operation takes, which decides the header a snippet prints.
+   *
+   * `none` is an operation the contract marks `security: []`; `session` is one carrying
+   * `x-tavonel-auth: browser-session`, where a developer API key is refused and the example says
+   * so rather than printing a key that cannot work.
+   */
+  auth: "key" | "session" | "none";
   description: string;
   requestExample: string | null;
   responses: Array<{ status: string; description: string }>;
@@ -27,6 +35,8 @@ export type DocsEndpoint = {
 type OperationObject = {
   operationId?: string;
   description?: string;
+  security?: unknown[];
+  "x-tavonel-auth"?: string;
   "x-tavonel-scope"?: string;
   requestBody?: { content?: Record<string, { schema?: unknown }> };
   responses?: Record<string, { description?: string }>;
@@ -94,6 +104,9 @@ export async function readDocsEndpoints(): Promise<Map<string, DocsEndpoint>> {
         path,
         server,
         scope: operation["x-tavonel-scope"] ?? null,
+        auth: operation.security?.length === 0
+          ? "none"
+          : operation["x-tavonel-auth"] === "browser-session" ? "session" : "key",
         description: operation.description ?? "",
         requestExample: exampleFromSchema(schema),
         responses: Object.entries(operation.responses ?? {}).map(([status, value]) => ({
@@ -107,17 +120,26 @@ export async function readDocsEndpoints(): Promise<Map<string, DocsEndpoint>> {
   return endpoints;
 }
 
+/** The environment variable a snippet reads, or null where the operation takes no credential. */
+function authVariable(endpoint: DocsEndpoint) {
+  if (endpoint.auth === "none") return null;
+  return endpoint.auth === "session" ? "TAVONEL_SESSION_JWT" : "TAVONEL_API_KEY";
+}
+
+/** The line above a browser-session snippet, so nobody spends an afternoon on a 401. */
+const SESSION_NOTE = "Browser session only. A developer API key is refused on this route.";
+
 /** The curl a reader can copy, assembled from the same values shown above it. */
 export function curlFor(endpoint: DocsEndpoint) {
-  const lines = [`curl -sS -X ${endpoint.method} ${endpoint.server}${endpoint.path} \\`];
-  lines.push(`  -H "Authorization: Bearer $TAVONEL_API_KEY" \\`);
+  const parts = [`curl -sS -X ${endpoint.method} ${endpoint.server}${endpoint.path}`];
+  const variable = authVariable(endpoint);
+  if (variable) parts.push(`  -H "Authorization: Bearer $${variable}"`);
   if (endpoint.requestExample) {
-    lines.push(`  -H "content-type: application/json" \\`);
-    lines.push(`  -d '${endpoint.requestExample.replace(/\n\s*/g, " ")}'`);
-  } else {
-    lines[lines.length - 1] = `  -H "Authorization: Bearer $TAVONEL_API_KEY"`;
+    parts.push(`  -H "content-type: application/json"`);
+    parts.push(`  -d '${endpoint.requestExample.replace(/\n\s*/g, " ")}'`);
   }
-  return lines.join("\n");
+  const request = parts.join(" \\\n");
+  return endpoint.auth === "session" ? `# ${SESSION_NOTE}\n${request}` : request;
 }
 
 /*
@@ -134,25 +156,29 @@ export type SnippetLanguage = "curl" | "python" | "typescript";
 export const SNIPPET_LANGUAGES: readonly SnippetLanguage[] = ["curl", "python", "typescript"];
 
 export function pythonFor(endpoint: DocsEndpoint) {
-  const lines = ["import os", "import requests", ""];
+  const variable = authVariable(endpoint);
+  const lines = variable ? ["import os", "import requests", ""] : ["import requests", ""];
+  if (endpoint.auth === "session") lines.unshift(`# ${SESSION_NOTE}`);
   if (endpoint.requestExample) lines.push(`body = ${pythonLiteral(endpoint.requestExample)}`, "");
   lines.push(
     "response = requests.request(",
     `    "${endpoint.method}",`,
     `    "${endpoint.server}${endpoint.path}",`,
-    `    headers={"Authorization": "Bearer " + os.environ["TAVONEL_API_KEY"]},`,
   );
+  if (variable) lines.push(`    headers={"Authorization": "Bearer " + os.environ["${variable}"]},`);
   if (endpoint.requestExample) lines.push("    json=body,");
   lines.push("    timeout=30,", ")", "response.raise_for_status()", "print(response.json())");
   return lines.join("\n");
 }
 
 export function typescriptFor(endpoint: DocsEndpoint) {
-  const authorization = "authorization: `Bearer ${process.env.TAVONEL_API_KEY}`";
-  const headers = endpoint.requestExample
-    ? `{ ${authorization}, "content-type": "application/json" }`
-    : `{ ${authorization} }`;
-  const lines = [`const response = await fetch("${endpoint.server}${endpoint.path}", {`];
+  const variable = authVariable(endpoint);
+  const parts: string[] = [];
+  if (variable) parts.push(`authorization: \`Bearer \${process.env.${variable}}\``);
+  if (endpoint.requestExample) parts.push('"content-type": "application/json"');
+  const headers = parts.length > 0 ? `{ ${parts.join(", ")} }` : "{}";
+  const lines = endpoint.auth === "session" ? [`// ${SESSION_NOTE}`] : [];
+  lines.push(`const response = await fetch("${endpoint.server}${endpoint.path}", {`);
   lines.push(`  method: "${endpoint.method}",`);
   lines.push(`  headers: ${headers},`);
   if (endpoint.requestExample) lines.push(`  body: JSON.stringify(${endpoint.requestExample.replace(/\n\s*/g, " ")}),`);

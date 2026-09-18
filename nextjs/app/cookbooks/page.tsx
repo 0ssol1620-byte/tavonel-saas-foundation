@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { COOKBOOKS, WORKFLOW_LABEL, orderedSections } from "@/lib/cookbook-content";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 /*
   BA-210. The six cookbooks had no index and no parent.
@@ -51,7 +52,6 @@ export default function CookbooksIndexPage() {
       <BreadcrumbJsonLd trail={[{ name: "Cookbooks", path: "/cookbooks" }]} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>COOKBOOKS</b><span aria-hidden="true" />· SIX TASKS</p>
           <h1 className="document-title">One task, start to finish.</h1>
         </div>
         <div className="stack">
@@ -84,7 +84,7 @@ export default function CookbooksIndexPage() {
           </div>
           <div className="actions">
             <Link className="btn ghost" href="/docs">Read the documentation</Link>
-            <Link className="btn ghost" href="/explore">Open the read-only sample</Link>
+            <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
           </div>
         </div>
       </div></div></section>

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
+import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustDisclosures } from "@/components/trust-disclosures";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/trust" },
@@ -174,7 +176,7 @@ const NOT_PUBLISHED: Array<[string, string, Route | null]> = [
     before meeting a single thing that is true.
   */
   ["Recovery objectives", "One database restore is on record: it was performed and checked, and the security page carries its date, its scope and what it does not commit to. No recovery point objective, no recovery time objective and no backup retention period is published for this deployment. The absence of a target is the state of it; ask before you depend on one.", "/security" as Route],
-  ["Third-party certification and audit", "What exists is on the security page: the controls this deployment enforces, checked by us. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set.", "/security" as Route],
+  ["Third-party certification and audit", "What exists is on the security page: the controls this deployment enforces, checked by us. No SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer, and SOC 2 has not started: it is planned alongside that test.", "/security" as Route],
 ];
 
 export default function TrustCenterPage() {
@@ -182,18 +184,22 @@ export default function TrustCenterPage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body">
+          <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
               {/*
-                BA-150. The eyebrow named this page's two sections. It now names the page's
-                subject, which is what a procurement reader scanning for it is looking for.
+                BA-150 put the page's subject in the heading, which is what a procurement reader
+                scanning for it is looking for. BA-176 was about the `<br/>` that fused
+                "publishabout" in the accessible name; BQ-097 removed the break entirely.
 
-                BA-176: the trailing space before the break has to be a string literal. JSX drops
-                the whitespace at the end of a text line, so the accessible name and the document
-                outline both read "publishabout" without it.
+                BQ-112. "Everything we publish" opened on a completeness claim and then spent the
+                page qualifying it -- including a section called "What is not published yet". A
+                heading that has to be withdrawn three screens later is not a heading, and
+                completeness was never the page's argument: its job is to be the one address
+                where the handling answers are, which is what it says now.
               */}
-              <p className="slate"><b>TRUST CENTER</b><span />SECURITY AND COMPLIANCE</p>
-              <h1 className="document-title">{"Everything we publish "}<br />about handling your documents.</h1>
+              <h1 className="document-title">What we publish about handling your documents.</h1>
+              {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
+              <PolicyJumpIndex />
             </div>
             <div className="stack">
               {/*
@@ -263,7 +269,7 @@ export default function TrustCenterPage() {
                 be seven destinations, that is the defect. Making the tile the anchor also gives a
                 phone a target the size of the card rather than the size of two words.
               */}
-              <p className="slate"><span />THE PAGES</p>
+              <h2>The pages</h2>
               <div className="tiles">
                 {DESTINATIONS.map(([title, body, href]) => (
                   <Link className="tile trust-link" key={title} href={href}>
@@ -290,7 +296,7 @@ export default function TrustCenterPage() {
                 </a>
               </div>
 
-              <p className="slate"><span />WHAT A REVIEW ASKS, AND WHERE IT IS ANSWERED</p>
+              <h2>What a review asks, and where it is answered</h2>
               <div className="chain">
                 {/*
                   BA-160. Each row is the anchor, for the same reason the tiles above are: the row
@@ -312,7 +318,7 @@ export default function TrustCenterPage() {
               </div>
 
               {/* BA-150. The section label states its subject rather than declaring a hole. */}
-              <p className="slate"><span />WHAT IS NOT PUBLISHED YET</p>
+              <h2>What is not published yet</h2>
               <div className="tiles">
                 {NOT_PUBLISHED.map(([title, body, href]) => (
                   <article className="tile" key={title}>
@@ -322,6 +328,17 @@ export default function TrustCenterPage() {
                   </article>
                 ))}
               </div>
+
+              {/*
+                G2-004. The two cards above are the summary; this is the checklist a procurement
+                reviewer works down, and it is the same list `/enterprise` and `/security` render,
+                from `lib/trust-disclosures.ts`. It is here rather than only there because this is
+                the page that owns the index -- what the finding fixes is that the page an
+                enterprise buyer lands on carried none of it. Two rows a reader met above appear
+                again in their checklist position, which is where somebody comparing vendors goes
+                looking for them.
+              */}
+              <TrustDisclosures heading="The checklist, row by row" on="/trust" />
 
               {/*
                 BA-173. The first sentence answered an accusation nobody made ("nothing here is a
@@ -339,7 +356,7 @@ export default function TrustCenterPage() {
                 <Link className="btn ghost" href={"/contact" as Route}>Ask a security review question</Link>
               </div>
             </div>
-          </div>
+          </IndexedPolicyBody></div>
         </div>
       </section>
     </PublicSitePage>

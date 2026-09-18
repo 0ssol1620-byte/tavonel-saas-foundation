@@ -42,7 +42,7 @@ describe("the Ask page documents both retrieval paths", () => {
 
   it("says when the fallback happens, in all three of the states that produce it", () => {
     const { text } = block("ask");
-    expect(text).toContain("promoted before its index was compiled");
+    expect(text).toContain("activated before its index was compiled");
     expect(text).toContain("failed on an unreachable embedder");
     expect(text).toContain("still in flight");
     // The three reported index states, by their literal values.

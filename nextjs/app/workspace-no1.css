@@ -1,0 +1,566 @@
+/* Layered here, not at the @import: `@import … layer()` is rewritten by the build into an
+   invalid `@media layer(…)` block and the whole sheet stops applying. See app/globals.css. */
+@layer overrides {
+/*
+  Workspace, 2026-09-16 redesign layer. Loaded last from globals.css and scoped to
+  `.one-path-workspace`, so it wins over the five older sheets without editing them.
+
+  Plan: D:\TAVONEL_WORKSPACE_NO1_DESIGN_PLAN_2026-09-16_KO.md
+  Rules it enforces: mono is for counts, ids, keys and state labels; buttons and prose are
+  Wanted Sans; nothing under 12px; colour means state; depth is luminance and hairlines;
+  cards are for instruments (drop zone, compile stage, result, board, forms), not for prose.
+*/
+.one-path-workspace {
+  /* Local aliases only. Every value resolves to a TOKEN_CONTRACT_0917 name; the fallbacks are
+     the numbers this sheet shipped with on 09-16, so the workspace is correct before L1's token
+     pass lands and unchanged after it. Do not add a value here that is not a var(). */
+  --ws-radius: var(--r-inst, 6px);
+  --ws-radius-sm: var(--r-paper-lg, 4px);
+  --ws-gap: 24px;
+  --ws-gap-sm: 12px;
+  /* These were named --t-1..--t-4, which is the TOKEN_CONTRACT_0917 *type scale* (12/13/14/16px).
+     Re-declaring those four names on .one-path-workspace redefined them for every descendant, so
+     every `font-size: var(--t-1)` tavonel.css applies inside the workspace resolved to `90ms` and
+     fell back to the inherited size. Durations get a prefix that cannot collide with the scale. */
+  --ws-d1: var(--dur-1, 90ms); --ws-d2: var(--dur-2, 140ms); --ws-d3: var(--dur-3, 200ms); --ws-d4: var(--dur-4, 280ms);
+  --e-out: var(--ease-out, cubic-bezier(.23, 1, .32, 1));
+}
+
+/* ---- type floor and voices ---------------------------------------------------------- */
+.one-path-workspace .workspace-content { gap: var(--ws-gap); padding: clamp(20px, 2.6vw, 36px) clamp(16px, 3vw, 40px) 72px; }
+.one-path-workspace .workspace-content h2 { margin: 0; color: var(--text-hi); font: 600 18px/1.35 var(--f-sans); letter-spacing: -.01em; }
+/* One eyebrow (sans, sentence case, no rule ornament) and one state label (mono caps, machine
+   state only). The workspace used to run both voices through .eyebrow, which is why every
+   section header read like a terminal banner. */
+.one-path-workspace .eyebrow { color: var(--text-mid); font: 500 12px/1.3 var(--f-sans); letter-spacing: .06em; text-transform: none; }
+.one-path-workspace .state-label { color: var(--text-lo); font: 500 12px/1.3 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; }
+.one-path-workspace .fine, .one-path-workspace small { font-size: 12px; line-height: 1.5; }
+.one-path-workspace .card p, .one-path-workspace .card li { font-size: 14px; line-height: 1.55; }
+.one-path-workspace .card { border-radius: var(--ws-radius); padding: 20px; gap: 12px; }
+.one-path-workspace .card .card { border-radius: var(--ws-radius-sm); }
+
+/* Buttons: three kinds, one face. Mono stays only on kbd, ids and state chips. */
+.one-path-workspace button:not(.compile-film-motion-control),
+.one-path-workspace .btn,
+.one-path-workspace a.btn {
+  font-family: var(--f-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  border-radius: var(--ws-radius);
+}
+.one-path-workspace .workspace-content button,
+.one-path-workspace .workspace-content a.btn,
+.one-path-workspace .workspace-content .btn {
+  min-height: 40px;
+  transition: background-color var(--ws-d2) var(--e-out), border-color var(--ws-d2) var(--e-out), color var(--ws-d2) var(--e-out), transform var(--ws-d2) var(--e-out);
+}
+.one-path-workspace .workspace-content button:active:not(:disabled) { transform: scale(.98); }
+/* BQ-092: opacity .6 put a filled primary at 2.5:1. A token pair holds above 3:1 against the
+   ground and does not fade the label out of readability with it. */
+.one-path-workspace .workspace-content button:disabled,
+.one-path-workspace .workspace-content button[aria-disabled="true"] {
+  cursor: not-allowed; opacity: 1;
+  background: var(--g2); border-color: var(--hairline-hi); color: var(--text-lo);
+}
+.one-path-workspace kbd { font-family: var(--f-mono); }
+/* `.sr-only` was defined here as a stopgap while no sheet in the repo defined it at all. D25
+   makes it one global utility in tavonel.css; the scoped copy is gone so there is one. */
+
+/* content-visibility on rows painted them as empty boxes in any capture and jumped on
+   scroll; the rows are bounded already (12 at a time) so nothing needs skipping. */
+.one-path-workspace .document-meta li,
+.one-path-workspace .board-list > li { content-visibility: visible; contain-intrinsic-size: auto; }
+
+/* ---- header action --------------------------------------------------------------- */
+.one-path-workspace .workspace-body > header button { display: inline-flex; align-items: center; gap: 8px; }
+/* D29, one filled control per viewport. This is chrome that repeats an act the page already
+   offers -- Upload, beside the drop box's own "Choose files" and beside the state hero's next
+   action, both of which were filled too. The act keeps the fill; the shortcut to it steps back
+   to a bordered face. Height and hit area are unchanged. */
+.one-path-workspace .workspace-body > header > div:last-child > button,
+.one-path-workspace .workspace-body > header > div:last-child .proof-actions button {
+  min-height: 36px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi);
+}
+.one-path-workspace .workspace-body > header > div:last-child > button:disabled { background: transparent; color: var(--text-lo); border-color: var(--hairline); }
+
+/* ---- notice ----------------------------------------------------------------------- */
+.one-path-workspace .notice.static { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; padding: 12px 16px; border: 1px solid var(--hairline); border-left: 2px solid var(--changed); border-radius: var(--ws-radius); background: var(--g1); color: var(--text-mid); font-size: 14px; line-height: 1.5; }
+.one-path-workspace .notice.static strong { color: var(--text-hi); }
+.one-path-workspace .notice.static button { min-height: 32px; padding: 0 10px; border: 1px solid var(--hairline-hi); color: var(--text-hi); font-size: 13px; }
+
+/* ---- needs attention: rows with written labels, not a tinted card -------------------- */
+.one-path-workspace .workspace-attention { margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; border: 0; border-radius: 0; background: transparent; }
+.one-path-workspace .workspace-attention h2 { margin: 6px 0 0; font-size: 18px; }
+.one-path-workspace .workspace-attention-items { gap: 0; margin-top: 12px; border-top: 1px solid var(--hairline-hi); }
+.one-path-workspace .workspace-attention-items li { grid-template-columns: 160px minmax(0, 1fr) auto; align-items: center; gap: 8px 20px; padding: 14px 0; border-top: 0; border-bottom: 1px solid var(--hairline); }
+.one-path-workspace .workspace-attention-items strong { color: var(--changed); font: 500 12px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+.one-path-workspace .workspace-attention-items p { margin: 0; color: var(--text-mid); font-size: 14px; line-height: 1.5; }
+.one-path-workspace .workspace-attention-items button { min-height: 36px; margin: 0; padding: 0 14px; border: 1px solid var(--hairline-hi); color: var(--text-hi); font-size: 13px; }
+.one-path-workspace .workspace-attention-actions { min-width: 0; }
+.one-path-workspace .workspace-attention-actions button { min-height: 36px; padding: 0 14px; border: 1px solid var(--hairline-hi); font-size: 13px; }
+
+/* ---- compile block: the stage and its counted panel travel together -------------------- */
+.one-path-workspace .workspace-compile-block { display: grid; gap: 1px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--hairline); overflow: hidden; }
+/* BQ-083: one pane at a time needs room for a pane, not a 16/6 letterbox split four ways. */
+.one-path-workspace .workspace-compile-block .compile-stage { margin: 0; border: 0; border-radius: 0; aspect-ratio: 16 / 9; max-height: none; background: var(--ground); }
+/* D39: the reserved frame is for a picture -- a page, the extracted text, the World. Idle the pane
+   draws a tab strip and one line per source, and `compile-stage.tsx` sets that content height. */
+.one-path-workspace .workspace-compile-block .compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }
+.one-path-workspace .workspace-compile-block .workspace-compile-job { margin: 0; border: 0; border-radius: 0; background: var(--g1); }
+.one-path-workspace .workspace-compile-job h2 { font: 600 17px/1.35 var(--f-sans); }
+.one-path-workspace .workspace-compile-job .fine { color: var(--text-mid); font-size: 13px; }
+.one-path-workspace .workspace-compile-job-progress { height: 3px; }
+.one-path-workspace .workspace-compile-job-progress::-webkit-progress-value { transition: width var(--ws-d4) var(--e-out); }
+/* A settled job needs less room than a running one. */
+.one-path-workspace .workspace-compile-job[data-state="review_required"],
+.one-path-workspace .workspace-compile-job[data-state="ready"] { padding-block: 16px; }
+.one-path-workspace .workspace-compile-job[data-state="review_required"] .fine:last-of-type { display: none; }
+
+/* ---- result block ---------------------------------------------------------------- */
+.one-path-workspace .workspace-complete { margin: 0; padding: 24px; gap: 24px; align-items: start; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .6fr); border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1); }
+.one-path-workspace .workspace-complete h2 { max-width: 20ch; margin: 6px 0 10px; font: 600 clamp(22px, 2vw, 28px)/1.2 var(--f-sans); letter-spacing: -.02em; }
+.one-path-workspace .workspace-complete p { color: var(--text-mid); font-size: 15px; line-height: 1.55; }
+.one-path-workspace .workspace-complete p.fine { font-size: 13px; color: var(--text-lo); }
+/* D29, one filled control per viewport. `.workspace-complete` renders only on Home, and the
+   shell state hero -- always above it there, because a compiled result means the workspace is
+   not `new` -- already holds a filled next action, and holds the SAME one: "Review & activate"
+   over "Review items", "Use with AI" over "Ask your World". Two filled buttons a few hundred
+   pixels apart saying the same thing is the ambiguity D29 names, so the restatement steps back
+   and these five actions read as one bordered row. Hit area and height are unchanged. */
+.one-path-workspace .workspace-complete-actions { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+.one-path-workspace .workspace-complete-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); }
+.one-path-workspace .workspace-complete .workspace-ai-use-guide { grid-column: 1 / -1; margin-top: 4px; border-radius: var(--ws-radius-sm); }
+.one-path-workspace .workspace-ai-use-guide > summary { font-size: 14px; }
+.one-path-workspace .workspace-ai-use-guide p, .one-path-workspace .workspace-ai-journey { font-size: 13px; }
+.one-path-workspace .workspace-ai-use-actions button, .one-path-workspace .workspace-ai-use-actions a { font-size: 13px; }
+.one-path-workspace .workspace-ai-package-files code { font-size: 12px; }
+
+/* ---- intake: always a real box ---------------------------------------------------------
+   D6/BQ-023. It used to be a faint dashed outline that collapsed into a 76px action bar as
+   soon as one source existed, with the drive and server connectors hidden by four separate
+   rules and gone entirely below 768px. It is a box now: a visible border on its own ground,
+   the connector tiles inside it, at every width down to 360px. A returning workspace gets a
+   shorter box, not a toolbar. */
+.one-path-workspace .workspace-intake {
+  grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0;
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--g1);
+  transition: border-color var(--ws-d2) var(--e-out), background-color var(--ws-d2) var(--e-out);
+}
+.one-path-workspace .workspace-intake[data-active="true"] { border-color: var(--verified); background: var(--verified-deep); }
+.one-path-workspace .workspace-intake[data-active="true"] .workspace-intake-copy { background: transparent; }
+.one-path-workspace .workspace-intake-copy { display: grid; align-content: center; min-height: 320px; padding: clamp(24px, 3.4vw, 40px) clamp(18px, 2.6vw, 32px); background: transparent; border-radius: var(--ws-radius); }
+/* A returning workspace has work above the box, so the box is shorter -- and still a box. */
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { min-height: 200px; }
+.one-path-workspace .workspace-intake-copy h1,
+.one-path-workspace .workspace-intake-copy h2 { margin: 12px 0 8px; color: var(--text-hi); font: 600 clamp(22px, 2.2vw, 28px)/1.18 var(--f-sans); letter-spacing: -.02em; }
+.one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { margin: 0; max-width: 56ch; color: var(--text-mid); font-size: 15px; line-height: 1.55; }
+.one-path-workspace .workspace-intake-copy > small { display: block; margin-top: 16px; color: var(--text-lo); font: 12px var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .workspace-intake-limits { margin-top: 6px !important; }
+.one-path-workspace .workspace-intake-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.one-path-workspace .workspace-intake-actions button { min-height: 44px; padding: 0 16px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: transparent; color: var(--text-hi); font-size: 14px; }
+.one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child,
+.one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+/* One filled primary per viewport. On a NEW workspace the box is the only primary and the fill
+   is correct; on a RETURNING one the state hero above it already holds the filled control, so
+   the box's first action steps back to a ghost. This changes the button face only -- D6's box
+   geometry (200px, connectors inside) is untouched. */
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child {
+  background: transparent; border-color: var(--hairline-hi); color: var(--text-hi);
+}
+/* The connectors live inside the box. Availability text is WORKSPACE_SOURCE_CHOICES verbatim. */
+.one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--hairline); text-align: left; }
+/* D6/BQ-023: the connectors are in the box at every width and in every mode. A returning
+   workspace is the visitor most likely to be connecting a system rather than dragging a file,
+   and tavonel.css hides the connectors there TWICE -- both off the same markup condition, since
+   `data-compact` and `data-existing-documents` are both set from `mode === "returning"`:
+
+     tavonel.css:1982  [data-compact="1"] ...            @layer components -- loses to this sheet
+     tavonel.css:4019  [data-existing-documents="1"] ... @layer overrides  -- this sheet's layer
+
+   The second is the one that actually hid them: same layer, and (0,3,0) beats the unqualified
+   `.one-path-workspace .workspace-source-choices` above. So this rule is NOT redundant once I1
+   deletes 1982 -- it is safe to delete only when both are gone. Both attributes are listed so
+   the guarantee does not hinge on which of the two a later edit keeps. */
+.one-path-workspace .workspace-intake[data-compact="1"] .workspace-source-choices,
+.one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: grid; }
+.one-path-workspace .workspace-source-choices button { min-height: 56px; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); background: var(--ground); color: var(--text-hi); text-align: left; font-size: 14px; }
+.one-path-workspace .workspace-source-choices small { color: var(--text-lo); font: 12px var(--f-sans); }
+/* Loading and unavailable stay honest and quiet. */
+.one-path-workspace .workspace-intake-loading { min-height: 160px; }
+.one-path-workspace .workspace-intake-loading h2 { font-size: 20px; }
+/* Archive progress and preflight keep their instrument face, at a readable size. */
+.one-path-workspace .workspace-archive-progress { border: 0; border-top: 1px solid var(--hairline); border-radius: 0; background: transparent; padding: 18px 24px; }
+.one-path-workspace .workspace-preflight { border-top: 1px solid var(--hairline); padding: 24px; background: transparent; }
+.one-path-workspace .workspace-preflight dl { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); overflow: hidden; }
+.one-path-workspace .workspace-preflight dt { font-size: 12px; letter-spacing: .06em; }
+.one-path-workspace .workspace-preflight dd { font-size: 16px; font-variant-numeric: tabular-nums; }
+.one-path-workspace .workspace-preflight-files { border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); overflow: hidden; }
+.one-path-workspace .workspace-preflight-files strong { font-size: 14px; }
+.one-path-workspace .workspace-preflight-files span { font-size: 12px; }
+.one-path-workspace .workspace-preflight .fine { color: var(--text-mid); font-size: 13px; }
+.one-path-workspace .workspace-preflight-blocked { color: var(--changed); }
+
+/* ---- getting started: a quiet, reopenable line under the work ---------------------------- */
+.one-path-workspace .workspace-getting-started { margin: 0; border-radius: var(--ws-radius); background: transparent; border-color: var(--hairline); }
+.one-path-workspace .workspace-getting-started-toggle { min-height: 44px; padding: 10px 16px; }
+.one-path-workspace .workspace-getting-started-toggle strong { font-size: 14px; }
+.one-path-workspace .workspace-getting-started-toggle > span:last-child { font-size: 12px; }
+.one-path-workspace .workspace-getting-started-body { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.25fr) auto; padding: 18px 16px 20px; background: var(--g1); }
+.one-path-workspace .workspace-getting-started-copy > p:not(.eyebrow) { font-size: 13px; }
+.one-path-workspace .workspace-getting-started-steps { border-radius: var(--ws-radius-sm); overflow: hidden; }
+.one-path-workspace .workspace-getting-started-steps strong { font-size: 14px; }
+.one-path-workspace .workspace-getting-started-steps small { font-size: 12px; }
+.one-path-workspace .workspace-step-state { font-size: 12px; }
+.one-path-workspace .workspace-getting-started-actions > button:not(.text), .one-path-workspace .workspace-getting-started-actions > a { min-height: 36px; border-radius: var(--ws-radius); font: 500 13px var(--f-sans); }
+.one-path-workspace .workspace-getting-started-actions > button.text { font-size: 12px; }
+
+/* ---- Knowledge: board without the tile row, then the selection card -------------------- */
+.one-path-workspace .board.card { padding: 20px; }
+.one-path-workspace .board-rows { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; background: transparent; }
+.one-path-workspace .board-rows > li { padding: 0; gap: 0; border: 0; border-left: 2px solid transparent; border-bottom: 1px solid var(--hairline); border-radius: 0; background: var(--ground); }
+.one-path-workspace .board-rows > li[data-held="1"] { border-left-color: var(--changed); }
+.one-path-workspace .board-rows > li[data-status="failed"] { border-left-color: #d36a62; }
+.one-path-workspace .board-rows > li:last-child { border-bottom: 0; }
+.one-path-workspace .board-row-detail:not([hidden]) { padding: 0 12px 14px; }
+/* BQ-087's age line. A timestamp is a machine identifier, so it is the one mono run here. */
+.one-path-workspace .board-row-observed { margin: 0 0 10px; color: var(--text-lo); }
+.one-path-workspace .board-row-observed time { font-family: var(--f-mono); }
+.one-path-workspace .board-transfer.compact { margin: 0 12px 10px; }
+.one-path-workspace .compile-selection-actions { position: static; background: transparent; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.one-path-workspace .compile-source-choice { font-family: var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .document-meta strong, .one-path-workspace .document-meta li > strong { font-family: var(--f-sans); letter-spacing: 0; }
+.one-path-workspace .workspace-compile-job .workspace-intake-actions { justify-content: flex-start; }
+.one-path-workspace .board-head-compact h2 { font-size: 18px; }
+.one-path-workspace .board-summary-copy { color: var(--text-mid); font-size: 14px; }
+.one-path-workspace .board-toolbar { margin-top: 12px; }
+/* workspace-14: these are interactive filters inside `role="group"`, not status pills. --r-full is
+   the pill radius and mono is for machine identifiers; "All" is neither. The counts keep their
+   column with tabular-nums, and a coarse pointer gets the 44px target the contract asks for. */
+.one-path-workspace .board-filters button { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: var(--r-inst); color: var(--text-lo); font: 500 12px var(--f-sans); font-variant-numeric: tabular-nums; }
+.one-path-workspace .board-filters button[data-active="true"] { color: var(--text-hi); background: var(--g3); border-color: var(--hairline-hi); }
+@media (pointer: coarse) {
+  .one-path-workspace .board-filters button { min-height: 44px; }
+}
+.one-path-workspace .board-search input { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: var(--ws-radius); background: var(--ground); color: var(--text-hi); font-size: 14px; }
+.one-path-workspace .board-list-wrap { border-radius: var(--ws-radius-sm); }
+/* BQ-093: the include-in-the-next-candidate tick sits on the row it applies to. It is a sibling
+   of the disclosure button, not a child -- a checkbox inside a button is not operable. */
+.one-path-workspace .board-row-head { display: flex; align-items: stretch; min-width: 0; }
+.one-path-workspace .board-row-head > .board-row-summary { flex: 1; min-width: 0; }
+.one-path-workspace .board-row-select { flex: none; width: 44px; min-height: 44px; display: grid; place-items: center; }
+.one-path-workspace .board-row-select input { width: 16px; height: 16px; accent-color: var(--verified); }
+.one-path-workspace .board-row-summary { min-height: 48px; border-radius: 0; font-family: var(--f-sans); }
+.one-path-workspace .board-row-name { font-size: 14px; font-weight: 500; }
+.one-path-workspace .board-row-status { font: 500 12px var(--f-mono); letter-spacing: .04em; }
+.one-path-workspace .board-stage-k, .one-path-workspace .board-stage-d { font-size: 12px; }
+.one-path-workspace .board-dismiss, .one-path-workspace .board-more { min-height: 36px; padding: 0 12px; border: 1px solid var(--hairline-hi); font-size: 13px; }
+.one-path-workspace .board-failure-banner button { font: 500 13px var(--f-sans); letter-spacing: 0; text-transform: none; }
+.one-path-workspace .workspace-grid { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+.one-path-workspace .document-card h2 { font-size: 18px; }
+.one-path-workspace .document-meta li strong { font-size: 14px; }
+.one-path-workspace .document-meta li small { font-size: 12px; }
+.one-path-workspace .compile-source-choice { font-size: 13px; }
+.one-path-workspace .compile-selection-actions button { min-height: 40px; padding: 0 16px; border: 1px solid var(--text-hi); background: var(--text-hi); color: var(--ground); }
+.one-path-workspace .compile-selection-actions button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .compile-selection-actions small { font-size: 12px; }
+.one-path-workspace .document-card .empty strong { font-size: 16px; }
+.one-path-workspace .document-card .empty p { font-size: 14px; }
+
+/* ---- Review, World, Ask, Settings: same voice, fewer boxes --------------------------------- */
+.one-path-workspace .review-decision-actions button { min-height: 38px; padding: 0 14px; border-radius: var(--ws-radius); }
+.one-path-workspace .review-decision-actions button:first-child { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+.one-path-workspace .review-decision-form label { font-size: 13px; color: var(--text-mid); }
+.one-path-workspace .workspace-advanced { padding: 0; gap: 0; background: transparent; }
+.one-path-workspace .workspace-advanced > summary { min-height: 44px; display: flex; align-items: center; padding: 10px 16px; color: var(--text-lo); font-size: 14px; cursor: pointer; list-style: none; }
+.one-path-workspace .workspace-advanced > summary::-webkit-details-marker { display: none; }
+.one-path-workspace .workspace-advanced > summary::after { content: "+"; margin-left: auto; color: var(--text-lo); font: 16px var(--f-mono); }
+.one-path-workspace .workspace-advanced[open] > summary::after { content: "−"; }
+.one-path-workspace .workspace-advanced > p, .one-path-workspace .workspace-advanced > div { padding: 0 16px 16px; }
+.one-path-workspace .workspace-advanced > p { margin: 0 0 12px; color: var(--text-mid); font-size: 14px; }
+.one-path-workspace .world-status { font: 500 12px var(--f-mono); letter-spacing: .06em; }
+.one-path-workspace .version-list small { font-size: 12px; }
+.one-path-workspace .binding-list span { font-size: 13px; }
+/* tavonel.css styles `.binding-list b` as 9.5px mono caps in --text-xlo. These are field labels
+   -- prose -- so in the workspace they read as the one eyebrow voice at the 12px floor. The
+   values beside them stay mono: they are timestamps and digests. */
+.one-path-workspace .binding-list b { font: 500 12px var(--f-sans); letter-spacing: .06em; text-transform: none; color: var(--text-lo); }
+.one-path-workspace .world-actions button, .one-path-workspace .version-list button { min-height: 38px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); color: var(--text-hi); }
+.one-path-workspace .world-actions button:not(:disabled) { background: var(--text-hi); border-color: var(--text-hi); color: var(--ground); }
+.one-path-workspace .world-actions small { font-size: 12px; }
+.one-path-workspace .ask-studio form button { min-height: 40px; padding: 0 16px; border: 1px solid var(--text-hi); border-radius: var(--ws-radius); background: var(--text-hi); color: var(--ground); }
+.one-path-workspace .ask-studio form button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .ask-result li b, .one-path-workspace .ask-result li span { font-size: 12px; }
+.one-path-workspace .ask-result button { min-height: 34px; padding: 0 12px; border: 1px solid var(--hairline-hi); font-size: 13px; }
+.one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 38px; padding: 0 14px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); color: var(--text-hi); font: 500 14px var(--f-sans); }
+/*
+  workspace-17: the contract gives `.btn[disabled]` and `.btn-secondary` the same `--g2`, and
+  tavonel.css:1945 applied the disabled fill to every workspace button -- so a disabled action
+  carried a filled face while the live action beside it was a transparent ghost, and the weights
+  read backwards ("Manage billing" heavier than "Refresh billing"). Disabled is a colour pair with
+  no fill; the live action in that row takes the secondary fill.
+*/
+.one-path-workspace .billing-card button:disabled { background: transparent; border-color: var(--hairline); color: var(--text-lo); }
+.one-path-workspace .billing-card .billing-actions button:not(:disabled) { background: var(--g2); border-color: var(--hairline-hi); color: var(--text-hi); }
+/* One tab face site-wide: a bare label with a 2px inset underline when selected. Settings used
+   to render its two views as filled buttons, which is the third control face on that surface. */
+.one-path-workspace nav.billing-actions { gap: 0; border-bottom: 1px solid var(--hairline); }
+.one-path-workspace nav.billing-actions button { min-height: 40px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text-lo); }
+.one-path-workspace nav.billing-actions button[aria-current="page"] { background: transparent; border-bottom-color: var(--verified); color: var(--text-hi); }
+.one-path-workspace .billing-card dt { font-size: 12px; }
+.one-path-workspace .billing-card dd { font-variant-numeric: tabular-nums; }
+.one-path-workspace .gate-list strong { font-size: 14px; }
+.one-path-workspace .gate-list p { font-size: 13px; }
+.one-path-workspace .pill { font: 500 12px var(--f-mono); }
+.one-path-workspace .workspace-access-gate p { max-width: 62ch; color: var(--text-mid); }
+/* BQ-096: an empty state is its sentence plus at most one action. The 500px void it used to
+   reserve read as a component that had failed to render. Solid hairline, not a fifth dashed
+   box on the screen (BQ-133). */
+.one-path-workspace .world-empty { display: grid; gap: 10px; justify-items: center; min-height: 0; padding: 20px 16px; border: 1px solid var(--hairline); border-radius: var(--ws-radius-sm); color: var(--text-lo); font: 14px var(--f-sans); text-align: center; }
+.one-path-workspace .document-card .empty { min-height: 0; padding: 20px 16px; }
+
+/* ---- native controls wear the token system (BQ-024) --------------------------------------
+   The review-queue filter was an unstyled OS select in the middle of a designed surface:
+   tavonel.css sets appearance:none for .workspace select but never gave it a face, so it lost
+   the platform chrome and gained nothing. Own chevron, own border, own height. */
+.one-path-workspace select {
+  appearance: none; -webkit-appearance: none;
+  width: 100%; max-width: 420px; min-height: 40px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius);
+  background-color: var(--ground); color: var(--text-hi);
+  font: 14px var(--f-sans);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-lo) 50%),
+    linear-gradient(135deg, var(--text-lo) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 13px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.one-path-workspace input[type="text"], .one-path-workspace textarea {
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--ground); color: var(--text-hi); font: 14px/1.5 var(--f-sans); padding: 10px 12px;
+}
+
+/* ---- the More panel, on the token system (BQ-095, BQ-026) ---------------------------------
+   Doubled class, because one-path.css is imported after globals.css: equal specificity would
+   lose to the block these replace, and !important is not an answer to load order.
+   It used to carry a green palette and 12px/9px radii found nowhere else, a summary whose
+   geometry differed from its sibling nav rows, and a panel anchored to its own bottom edge --
+   which on a full-height desktop rail opened it off the top of the viewport. These rules load
+   after one-path.css and replace that block; see the cross-lane request to delete it there. */
+.workspace.one-path-workspace .one-path-more > summary {
+  min-height: 40px; display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--ws-radius);
+  color: var(--text-lo); font: 500 14px/1.2 var(--f-sans); text-align: left;
+}
+.workspace.one-path-workspace .one-path-more[open] > summary { color: var(--text-hi); background: var(--g3); }
+.workspace.one-path-workspace .one-path-more-panel {
+  position: absolute; left: calc(100% + 10px); top: 0; bottom: auto;
+  width: 248px; max-height: min(560px, 70svh); overflow: auto; padding: 6px;
+  border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius);
+  background: var(--g1); box-shadow: var(--depth-overlay, 0 18px 50px rgb(0 0 0 / .34));
+}
+.workspace.one-path-workspace .one-path-more-panel p { margin: 0; padding: 10px 10px 6px; color: var(--text-mid); font: 500 12px var(--f-sans); letter-spacing: .06em; }
+.workspace.one-path-workspace .one-path-more-panel button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 10px; border-radius: var(--ws-radius); color: var(--text-lo); text-align: left; font: 500 14px var(--f-sans); }
+.workspace.one-path-workspace .one-path-more-panel button:focus-visible { color: var(--text-hi); background: var(--g2); }
+.workspace.one-path-workspace .one-path-more-panel button[aria-current="page"] { color: var(--text-hi); background: var(--g3); }
+.workspace.one-path-workspace .one-path-more-panel button[aria-pressed="true"] { color: var(--text-hi); }
+.workspace.one-path-workspace .one-path-more-panel button[aria-pressed="true"] svg { color: var(--verified); }
+.workspace.one-path-workspace .one-path-more-session { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+
+/* ---- motion: state reports; keyboard-initiated actions get none --------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .one-path-workspace .workspace-complete,
+  .one-path-workspace .workspace-compile-block { transition: opacity var(--ws-d4) var(--e-out), translate var(--ws-d4) var(--e-out); @starting-style { opacity: 0; translate: 0 6px; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .one-path-workspace * { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+
+/* ---- responsive --------------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  /* BQ-085/BQ-133: one bottom reserve. The shell already reserves the bar height plus the
+     safe area on .shell; adding a second 96px here doubled it to 160px of dead space while
+     the last list row was still under the bar on the surfaces that scroll inside a card. */
+  .one-path-workspace .workspace-content { padding: 18px 16px 32px; gap: 18px; overflow-x: clip; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
+  .one-path-workspace .workspace-complete { grid-template-columns: minmax(0, 1fr); }
+  .one-path-workspace .workspace-getting-started-body { grid-template-columns: minmax(0, 1fr); }
+  .one-path-workspace .workspace-attention-items li { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 6px; }
+  /* BQ-133: the 16ch cap broke a four-word heading over four lines on every tablet width.
+     A measure belongs on prose, not on a heading of five words. */
+  .one-path-workspace .workspace-intake-copy { min-height: 280px; padding: 28px 20px; text-align: center; }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { min-height: 200px; }
+  .one-path-workspace .workspace-intake-copy h1,
+  .one-path-workspace .workspace-intake-copy h2 { margin: 10px auto 8px; font-size: 26px; text-wrap: balance; }
+  .one-path-workspace .workspace-intake-copy > p:not(.eyebrow) { max-width: 44ch; margin-inline: auto; font-size: 15px; }
+  /* workspace-15: the 520px centred box this rule used to carry put three alignments in one drop
+     box at 768 -- heading, copy and connector tiles left, actions centred. The actions flow with
+     the rest of the box. */
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions button { width: 100%; min-height: 44px; text-align: center; justify-content: center; font-size: 14px; }
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .one-path-workspace .workspace-intake-copy > small { font-size: 12px; letter-spacing: .04em; }
+}
+@media (max-width: 767px) {
+  .one-path-workspace .workspace-intake-copy { min-height: 240px; padding: 24px 16px; }
+  .one-path-workspace .workspace-intake-actions button { width: 100%; min-height: 44px; }
+  /* BQ-023: the connectors stay in the box on a phone. This display:none was the fourth of
+     the four hiding rules, and it is the one that removed drive and server intake below
+     768px entirely -- the only widths where "connect the system it already lives in" is the
+     likelier answer than picking files. */
+  .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-top: 18px; padding-top: 16px; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
+  /* BQ-087: a source name is the thing being triaged; it wraps rather than ellipsing into
+     three characters and a dot. */
+  .one-path-workspace .board-row-summary { grid-template-columns: minmax(0, 1fr) auto; align-items: start; row-gap: 4px; padding-block: 10px; }
+  .one-path-workspace .board-row-name { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .one-path-workspace .board-row-status { grid-column: 1; }
+  .one-path-workspace .workspace-complete-actions button, .one-path-workspace .workspace-attention-items button { width: 100%; min-height: 44px; }
+  .one-path-workspace .board-toolbar { flex-direction: column; align-items: stretch; }
+  .one-path-workspace .board-search input { width: 100%; }
+  .one-path-workspace .review-decision-actions button, .one-path-workspace .billing-actions button, .one-path-workspace .billing-actions a { min-height: 44px; }
+  .one-path-workspace .workspace-preflight dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* workspace-23: at 360 the surface h1 is 24px and this subtitle came out at 26 -- two headings,
+     no step. It sits under the h1, so it takes the step below it. */
+  .one-path-workspace .studio-heading h2 { font-size: var(--t-5); line-height: 1.35; }
+}
+@media (max-width: 420px) {
+  .one-path-workspace .workspace-content { padding-inline: 14px; }
+  .one-path-workspace .workspace-preflight dl { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- flattening, 2026-09-17 ---------------------------------------------------------------
+   BQ-133: Ask nested cards three deep -- the .card surface, the AI-options card inside it, and
+   the disclosure card inside that. One card level: the inner blocks are separated by a seam. */
+.one-path-workspace .ask-studio .workspace-ai-use-guide,
+.one-path-workspace .workspace-complete .workspace-ai-use-guide {
+  margin: 0; border: 0; border-top: 1px solid var(--hairline); border-radius: 0; background: transparent;
+}
+/* workspace-08: on Ask this block is the first thing in the card, so the seam above it separated
+   it from nothing -- an orphan rule across the top of the card. A seam divides; it does not open. */
+.one-path-workspace .ask-studio .one-path-ai-options:first-child .workspace-ai-use-guide { border-top: 0; }
+.workspace.one-path-workspace .one-path-ai-options { margin-bottom: 0; }
+
+/* BQ-133: the settings tables are prose-and-number, not machine identifiers. */
+.one-path-workspace .billing-card dt,
+.one-path-workspace .gate-list strong,
+.one-path-workspace .gate-list p { font-family: var(--f-sans); letter-spacing: 0; text-transform: none; }
+.one-path-workspace .billing-card dd { font-family: var(--f-mono); }
+
+/* BQ-133: when a browser gives the compile view no 2D context, the run is reported in words
+   rather than behind a black rectangle. This is that fallback, not a decoration. */
+.one-path-workspace .compile-stage-text { display: block; margin: 0; padding: 24px; color: var(--text-mid); font: 14px/1.6 var(--f-sans); }
+.one-path-workspace .workspace-compile-block .compile-stage:has(.compile-stage-text) { aspect-ratio: auto; }
+
+/* ---- mono is for machine identifiers, 2026-09-17 (BQ-088) ---------------------------------
+   Wherever the older sheets set IBM Plex Mono on a sentence, a field label or a table header,
+   the workspace sets it back to Wanted Sans at the 12px floor. What stays mono: digests, ids,
+   object keys, page and region counts, timestamps, keyboard hints and state labels. */
+.one-path-workspace .workspace-preflight dt,
+.one-path-workspace .workspace-preflight-files span,
+.one-path-workspace .board-stage-k,
+.one-path-workspace .board-stage-d,
+.one-path-workspace .world-studio label,
+.one-path-workspace .ask-studio label,
+.one-path-workspace .ask-result > strong,
+.one-path-workspace .ask-result > small,
+.one-path-workspace .ask-result li,
+.one-path-workspace .connection-notice,
+.one-path-workspace .connection-form label,
+.one-path-workspace .api-key-form > label,
+.one-path-workspace .api-key-form legend,
+.one-path-workspace .api-key-form fieldset label,
+.one-path-workspace .connection-list small,
+.one-path-workspace .api-key-list small,
+.one-path-workspace .connection-title span,
+.one-path-workspace .billing-card small,
+.one-path-workspace .notice button,
+.one-path-workspace .workspace-name small {
+  font-family: var(--f-sans); font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-lo);
+}
+.one-path-workspace .ask-result li { font-size: 13px; }
+.one-path-workspace .ask-result li b,
+.one-path-workspace .connection-list small code,
+.one-path-workspace .board-id small { font-family: var(--f-mono); font-size: 12px; }
+.one-path-workspace .ask-result q { font-family: var(--f-sans); font-size: 14px; line-height: 1.55; color: var(--text-mid); }
+.one-path-workspace .world-actions small,
+.one-path-workspace .workspace-preflight dd { font-family: var(--f-mono); font-size: 12px; }
+.one-path-workspace .workspace-preflight dd { font-size: 16px; }
+.one-path-workspace .connection-form input,
+.one-path-workspace .connection-form select,
+.one-path-workspace .api-key-form input,
+.one-path-workspace .api-key-form select { font: 14px var(--f-sans); border-radius: var(--ws-radius); }
+
+/* BQ-087: the row's third field. Stage is a category, so it reads as a quiet label beside
+   the name rather than competing with the status. */
+.one-path-workspace .board-row-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; }
+.one-path-workspace .board-row-stage { color: var(--text-lo); font: 500 12px var(--f-sans); white-space: nowrap; }
+
+/* BQ-096: the connections surface reserved a 1.28fr column that is empty until a connection
+   exists. Columns start at the top and size to what is in them. */
+.one-path-workspace .connection-layout, .one-path-workspace .developer-layout { align-items: start; }
+.one-path-workspace .connection-list, .one-path-workspace .api-key-list { min-height: 0; }
+
+/*
+  workspace-05. BQ-096 was right that the column sizes to its content, and it turned the grid's
+  own seam fill into the defect: `.connection-layout` paints `--seam` behind a 1px gap, and with
+  the columns no longer stretching, the leftover of the row was painted too -- 757x250px of flat
+  grey under the status line, where the BEFORE build showed ground. The seam becomes a hairline
+  between the two columns, so there is no fill left to leak.
+*/
+.one-path-workspace .connection-layout, .one-path-workspace .developer-layout { gap: 0; background: var(--ground); }
+.one-path-workspace .connection-list, .one-path-workspace .developer-readout { border-left: 1px solid var(--hairline); }
+@media (max-width: 1023px) {
+  .one-path-workspace .connection-list, .one-path-workspace .developer-readout { border-left: 0; border-top: 1px solid var(--hairline); }
+}
+
+/*
+  workspace-16: "Name this connection optional" read as one sentence because `<small>` inherited
+  the label's own size and colour. The label carries the field, the aside carries a separator and
+  the quieter tone.
+*/
+.one-path-workspace .connection-form > label, .one-path-workspace .api-key-form > label { color: var(--text-mid); }
+.one-path-workspace .connection-form label small::before { content: "· "; }
+.one-path-workspace .connection-form h3 { margin: 0 0 2px; color: var(--text-hi); font: 600 15px/1.35 var(--f-sans); }
+
+/* ---- focus, and the mobile origin of the More panel ---------------------------------------
+   one-path.css sets a 5px-offset #dce9d8 ring on every workspace button, and anchors the More
+   panel to its own bottom edge for the bottom bar. Both are its rules, and it is imported
+   after globals.css, so these carry one extra class rather than an !important. The ring is the
+   single focus style the token contract names. The mobile panel keeps opening upward, because
+   above a bottom bar that is correct -- it is the desktop rail, where the same rule opened the
+   panel off the top of the viewport, that BQ-095 is about. */
+.workspace.one-path-workspace :is(button, summary, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--verified); outline-offset: 2px;
+}
+@media (max-width: 1023px) {
+  .workspace.one-path-workspace .one-path-more-panel {
+    position: fixed; left: auto; right: 12px; top: auto; bottom: calc(76px + env(safe-area-inset-bottom));
+    width: min(320px, calc(100vw - 24px)); max-height: min(60svh, 520px);
+  }
+  .workspace.one-path-workspace .one-path-more > summary {
+    min-height: 52px; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 4px; text-align: center; font-size: 12px;
+  }
+}
+
+/* ---- hover, in one gated place ------------------------------------------------------------
+   TOKEN_CONTRACT_0917: every :hover is wrapped in (hover: hover) and (pointer: fine), so a tap
+   on a phone does not leave a control stuck in its hover face. This sheet defines no :hover
+   outside this block; keep it that way. Relative order is the order the rules had inline, so
+   the cascade is unchanged on a pointer device. */
+@media (hover: hover) and (pointer: fine) {
+  .one-path-workspace .workspace-body > header > div:last-child > button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
+  .one-path-workspace .workspace-complete-actions button:hover:not(:disabled) { border-color: var(--text-lo); background: var(--g2); }
+  .one-path-workspace .workspace-intake-actions button:hover:not(:disabled) { background: var(--g2); border-color: var(--text-lo); }
+  .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled),
+  .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: #fff; }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled) {
+    background: var(--g2); border-color: var(--text-lo);
+  }
+  .one-path-workspace .workspace-source-choices button:hover { border-color: var(--text-lo); }
+  .one-path-workspace select:hover { border-color: var(--text-lo); }
+  .workspace.one-path-workspace .one-path-more-panel button:hover { color: var(--text-hi); background: var(--g2); }
+}
+}

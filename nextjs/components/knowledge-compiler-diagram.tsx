@@ -36,12 +36,13 @@ const endOf = (index: number) => startOf(index) + STAGE_WIDTH;
 /*
   BA-017. Below 640px the drawing is replaced by the same data as a list.
 
-  The figure is a real scroll container -- measured at 390 on this branch: a 354px box holding a
-  700px drawing with `overflow-x: auto`, so it does pan -- but panning was never the defect. At
-  700px the 980-unit viewBox renders at 0.71, which puts the stage labels at 9.6px and the span
-  notes at 8.6px: a picture of a diagram rather than a diagram, with the reader asked to scroll
-  sideways to read 8px type. The six stages and the four spans are the whole content, so a phone
-  gets them as rows it can read without scrolling in two directions.
+  Panning was never the defect -- measured at 390 on this branch, a 354px box held the drawing
+  and did pan. The defect was what it panned over: scaled to fit, the 980-unit viewBox rendered
+  the stage labels at 9.6px and the span notes at 8.6px, a picture of a diagram rather than a
+  diagram, with the reader asked to scroll sideways to read 8px type. The drawing is pinned to
+  its authored width now, so nothing scales -- but at 390 that is a 980px drawing in a 354px
+  box, and the six stages and four spans are the whole content. A phone gets them as rows it can
+  read without scrolling in two directions.
 
   One of the two is always `display: none`, which takes it out of the accessibility tree as well,
   so the stages are announced once. The SVG keeps its title and description for the widths where
@@ -54,7 +55,11 @@ const WHOLE_SPAN = SPANS.find(([from, to]) => from === 0 && to === STAGES.length
 export default function KnowledgeCompilerDiagram() {
   return (
     <>
-      <CompileSpanDrawing />
+      {/* The drawing is wider than the column it sits in, so the pan is a group a keyboard can
+          land on rather than a `overflow-x: auto` box only a pointer can reach. */}
+      <div className={styles.scroller} tabIndex={0} role="group" aria-label="Compile pipeline diagram, scrollable">
+        <CompileSpanDrawing />
+      </div>
       <ol className={styles.stack} aria-label="Where each category acts on the compile pipeline">
         {STAGES.map((stage, index) => {
           const span = spanStartingAt(index);

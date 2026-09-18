@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import {
   COOKBOOK_SLUGS,
   SECTION_LABEL,
@@ -18,7 +18,7 @@ import { formatReviewDate } from "@/lib/docs-content";
 import { loginUrlForRecipe } from "@/lib/recipe-intent";
 import { sanitizeDocumentText } from "@/lib/sanitize-html";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
-import anchor from "@/components/docs/page-toc.module.css";
+import { ACCESS_CTA } from "@/lib/site-navigation";
 
 /*
   One route for the six cookbooks, arranged the way `/docs/[section]` arranges the documentation:
@@ -84,12 +84,11 @@ function SectionBlock({ section, id }: { section: Extract<CookbookSection, { sta
     <Fragment>
       {/*
         The id comes from the page's own `tocEntries` call, so the anchor and the jump link that
-        names it are one derivation rather than two strings that have to agree. `anchor.anchor`
-        is the `scroll-margin-top` that keeps the heading out from under the fixed header -- the
-        reason the docs template puts the class on the element carrying the id and not on
-        `:target`.
+        names it are one derivation rather than two strings that have to agree. Clearing the fixed
+        header is `html { scroll-padding-top }` in `tavonel.css`, once for every fragment target
+        on the site, so the heading carries the id and nothing else.
       */}
-      <h2 id={id} className={anchor.anchor}>{SECTION_LABEL[section.key]}</h2>
+      <h2 id={id}>{SECTION_LABEL[section.key]}</h2>
       {/*
         Keyed by position, not by the paragraph text: two identical sentences in one section are
         a duplicate key, and React's answer to a duplicate key is to render one of them. A
@@ -132,15 +131,22 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
     which is exactly the order rendered below.
   */
   const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);
+  // One trail, read by the crawler and by the reader. See `DocBreadcrumb` (BQ-137).
+  const trail = [{ name: "Cookbooks", path: "/cookbooks" }, { name: record.title, path: `/cookbooks/${record.slug}` }];
 
   return (
     <PublicPageShell>
-      <BreadcrumbJsonLd
-        trail={[{ name: "Cookbooks", path: "/cookbooks" }, { name: record.title, path: `/cookbooks/${record.slug}` }]}
-      />
+      <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc"><div className="shell"><div className="body">
         <div className="stack">
-          <p className="slate"><b>COOKBOOK</b><span aria-hidden="true" />· {WORKFLOW_LABEL[record.workflowId]}</p>
+          <DocBreadcrumb trail={trail} />
+          {/*
+            BQ-099: the "COOKBOOK" half is gone and the workflow family stays. A reader who is on
+            /cookbooks/<slug> knows what kind of page they are on; what the title does not tell
+            them is which of the three workflow families this guide belongs to, and that is the
+            half `lib/cookbook-content.test.ts` holds here.
+          */}
+          <p className="slate">{WORKFLOW_LABEL[record.workflowId]}</p>
           <h1 className="document-title">{record.title}</h1>
         </div>
 
@@ -151,7 +157,7 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
             {ready.map((section, order) => (
               <SectionBlock key={section.key} section={section} id={toc[order]!.id} />
             ))}
-            <h2 id={toc[ready.length]!.id} className={anchor.anchor}>{PENDING_HEADING}</h2>
+            <h2 id={toc[ready.length]!.id}>{PENDING_HEADING}</h2>
             {/*
               Paragraphs with a bold lead-in rather than a list, so the six items inherit the
               measure, colour and line height `.docs-body p` already sets. A <ul> here would need
@@ -203,7 +209,7 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
           */}
           <div className="actions">
             <Link className="btn" href={loginUrlForRecipe(record.recipeId) as Route}>Start this recipe</Link>
-            <Link className="btn ghost" href="/contact">Talk to us about your corpus</Link>
+            <Link className="btn ghost" href={ACCESS_CTA.href as Route}>{ACCESS_CTA.label}</Link>
           </div>
         </div>
       </div></div></section>

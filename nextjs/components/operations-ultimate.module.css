@@ -1,30 +1,34 @@
 .root { display: grid; gap: 14px; padding-top: 18px; }
 .preflight, .theater, .activity { border: 1px solid var(--hairline); background: color-mix(in srgb, var(--ground) 97%, var(--g1)); }
 .head { display: flex; justify-content: space-between; gap: 18px; align-items: flex-end; padding: 18px; border-bottom: 1px solid var(--hairline); }
-.head p, .kicker { margin: 0 0 6px; color: var(--verified); font: 9px var(--f-mono); letter-spacing: .14em; }
+.head p, .kicker { margin: 0 0 6px; color: var(--verified); font: 500 12px var(--f-sans); letter-spacing: .06em; }
 .head h2 { margin: 0; color: var(--text-hi); font-size: clamp(21px, 2.6vw, 34px); letter-spacing: -.025em; }
-.state { padding: 5px 8px; border: 1px solid var(--hairline-hi); color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .1em; white-space: nowrap; }
+/* The chip is a machine state (ELIGIBLE / HELD) and wears the mono .state-label face; the
+   sentence next to it is prose and wears .nextAction, which is sans and carries no chip. */
+.state { padding: 5px 8px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-lo); font: 500 12px var(--f-mono); letter-spacing: .06em; white-space: nowrap; }
+.nextAction { display: block; color: var(--text-mid); font: 14px var(--f-sans); text-align: right; }
 .state[data-ok="true"] { color: var(--verified); border-color: var(--verified); }
-.streamState { display: block; margin-top: 7px; color: var(--text-xlo); font: 8px var(--f-mono); letter-spacing: .08em; text-align: right; }
+.streamState { display: block; margin-top: 7px; color: var(--text-lo); font: 12px var(--f-mono); letter-spacing: .08em; text-align: right; }
 .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--hairline); }
 .metrics div { display: grid; gap: 5px; padding: 14px 18px; border-right: 1px solid var(--hairline); }
 .metrics div:last-child { border-right: 0; }
-.metrics dt { color: var(--text-xlo); font: 9px var(--f-mono); letter-spacing: .1em; }
+.metrics dt { color: var(--text-lo); font: 500 12px var(--f-sans); letter-spacing: .06em; }
 .metrics dd { margin: 0; color: var(--text-hi); font: 22px var(--f-mono); }
-.blockers { margin: 0; padding: 14px 18px 14px 38px; color: var(--changed); font-size: 11px; line-height: 1.6; }
-.clear { margin: 0; padding: 14px 18px; color: var(--text-lo); font-size: 11px; }
+.blockers { margin: 0; padding: 14px 18px 14px 38px; color: var(--changed); font-size: 12px; line-height: 1.6; }
+.clear { margin: 0; padding: 14px 18px; color: var(--text-lo); font-size: 12px; }
 .runGrid { display: grid; grid-template-columns: minmax(180px, .65fr) minmax(0, 1.6fr); min-height: 360px; }
 .runList { margin: 0; padding: 0; list-style: none; border-right: 1px solid var(--hairline); }
 .runList button { width: 100%; display: grid; gap: 5px; padding: 14px; color: var(--text-lo); text-align: left; border-bottom: 1px solid var(--hairline); }
 .runList button[aria-current="true"] { color: var(--text-hi); background: var(--g2); box-shadow: inset 2px 0 var(--verified); }
-.runList small, .receipt, .eventMeta { color: var(--text-xlo); font: 9px var(--f-mono); overflow-wrap: anywhere; }
+.runList small, .eventMeta { color: var(--text-lo); font: 12px var(--f-mono); overflow-wrap: anywhere; }
+.receipt { color: var(--text-lo); font: 12px/1.6 var(--f-sans); overflow-wrap: anywhere; }
 .runDetail { padding: 18px; }
 .runDetail h3 { margin: 0 0 5px; color: var(--text-hi); font-size: 18px; }
 .stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 20px; border: 1px solid var(--hairline); }
 .stage { min-height: 112px; display: grid; align-content: space-between; gap: 14px; padding: 13px; border-right: 1px solid var(--hairline); }
 .stage:last-child { border-right: 0; }
-.stage b { color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .1em; }
-.stage span { color: var(--text-xlo); font-size: 10px; line-height: 1.5; }
+.stage b { color: var(--text-lo); font: 500 12px var(--f-sans); letter-spacing: .06em; }
+.stage span { color: var(--text-lo); font-size: 12px; line-height: 1.5; }
 .stage[data-state="done"] b { color: var(--verified); }
 .stage[data-state="active"] b { color: var(--changed); }
 .stage[data-state="held"] b, .stage[data-state="failed"] b { color: var(--danger, #d96b55); }
@@ -32,9 +36,9 @@
 .empty { padding: 28px 18px; color: var(--text-lo); font-size: 12px; }
 .events { margin: 0; padding: 0; list-style: none; }
 .events li { display: grid; grid-template-columns: minmax(150px, .45fr) minmax(0, 1fr) auto; gap: 14px; padding: 13px 18px; border-bottom: 1px solid var(--hairline); }
-.events strong { color: var(--text-hi); font-size: 11px; }
-.events span { color: var(--text-lo); font-size: 10px; overflow-wrap: anywhere; }
-.refresh { padding: 7px 10px; border: 1px solid var(--hairline-hi); color: var(--text-lo); font: 9px var(--f-mono); }
+.events strong { color: var(--text-hi); font-size: 12px; }
+.events span { color: var(--text-lo); font-size: 12px; overflow-wrap: anywhere; }
+.refresh { min-height: 44px; padding: 7px 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst, 6px); color: var(--text-hi); font: 500 13px var(--f-sans); }
 @media (max-width: 760px) {
   .head { align-items: start; flex-direction: column; }
   .streamState { text-align: left; }

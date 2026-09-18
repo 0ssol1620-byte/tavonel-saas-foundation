@@ -95,8 +95,8 @@ test("Act 1 draws a curated composition of compiled objects", async ({ page }) =
   // The opening composition is colourless: nothing here is claimed as an active fact.
   expect([...new Set(drawn.states)]).toEqual(["candidate"]);
 
-  await expect(page.getByText("SELECT AN OBJECT")).toBeVisible();
-  await expect(page.getByText(/^SHOWING \d+ OF \d+ GRAPH NODES$/)).toBeVisible();
+  await expect(page.getByText("Select an object")).toBeVisible();
+  await expect(page.getByText(/^Showing \d+ of \d+ graph nodes$/)).toBeVisible();
 
   const firstFiling = page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first();
   await firstFiling.click();
@@ -181,9 +181,9 @@ test("a dialog keeps focus and gives it back", async ({ page }) => {
   // §20: focus enters the drawer, Tab does not walk the world behind it, Escape returns focus to
   // the control that opened it.
   await enterWorld(page);
-  const opener = page.getByRole("button", { name: "TECHNICAL DETAILS" });
+  const opener = page.getByRole("button", { name: "Technical details" });
   await opener.click();
-  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  const drawer = page.getByRole("dialog", { name: "Technical details" });
   await expect(drawer).toBeVisible();
 
   for (let step = 0; step < 6; step += 1) {
@@ -209,19 +209,19 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   // The source sheet names the file, not the relation list that happens to name it too.
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-\d{4}(-\d+)?-.*\.pdf$/i).first()).toBeVisible();
-  // Original bytes are the default representation. Parsed text remains one explicit tab away,
-  // so the source is never mistaken for a typeset reconstruction of the filing.
-  const originalTab = sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ });
-  await expect(originalTab).toHaveAttribute("aria-selected", "true");
+  // BQ-014: the page is the first and largest thing in the sheet, and the passage read from it
+  // is below rather than behind a tab, so the source is never mistaken for a typeset
+  // reconstruction and never hidden behind a click either.
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
-  await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
+  await expect(sheet.locator("[data-parsed-source-page]")).toBeVisible();
   await expect(page.getByText("This object is supported by this exact source region.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Verify on SEC/ })).toBeVisible();
   // The marked line is the region the object came from, and it is one line, not the page.
   await expect(page.locator("[data-active-region]")).toHaveCount(1);
-  // The tether is the drawn claim: object to region, measured rather than described.
-  await expect(page.locator(`${STAGE} svg path[pathLength="1"]`)).toHaveCount(1);
+  // BQ-018: the relationship is stated at both ends -- one ring, one locator -- not drawn
+  // between them by a curve that vanishes on scroll.
+  await expect(page.locator(`${STAGE} svg path[pathLength="1"]`)).toHaveCount(0);
+  await expect(page.locator("[data-source-locator]")).toHaveCount(2);
 
   /*
     §11.3 and §11.6, and the one deliberate exception to "no machine detail on the default
@@ -236,8 +236,16 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   */
   const provenance = page.locator("[data-source-provenance]");
   await expect(provenance).toBeVisible();
-  await expect(provenance.getByText(/^(Reference render|Original) · apple-/)).toBeVisible();
-  await expect(provenance.getByText(/bbox \(per mille\) \d+, \d+, \d+, \d+/)).toBeVisible();
+  /*
+    The two nouns are `sourcePageQualifier`'s, from `lib/source-page-rasters.ts` -- the one place
+    the representation is named, so a surface cannot invent a third spelling of it. They read as
+    running words now ("reference render", "original PDF") rather than the sentence-cased labels
+    this pinned; what the line has to say is unchanged.
+  */
+  await expect(provenance.getByText(/^(reference render|original PDF) · apple-/)).toBeVisible();
+  // `proofCopy().bbox` spells the unit out for a reader on this surface; the parenthesised form
+  // is the technical drawer's label and is still asserted there. Same four numbers either way.
+  await expect(provenance.getByText(/bbox, per mille of the page · \d+, \d+, \d+, \d+/)).toBeVisible();
   await expect(provenance.getByText(/^\d{10}-\d{2}-\d{6}$/)).toBeVisible();
   await expect(provenance.getByText("official")).toBeVisible();
   const digests = await provenance.getByText(/^sha256:[a-f0-9]{64}$/).count();
@@ -256,13 +264,14 @@ test("a reference render never presents itself as the acquired original", async 
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const provenance = page.locator("[data-source-provenance]");
   await expect(provenance.locator('[data-representation="reference_render"]'))
-    .toContainText(/^Reference render · apple-2026-.*\.pdf/);
+    // `sourcePageQualifier` again: the noun is lower case in running text, the claim is the same.
+    .toContainText(/^reference render · apple-2026-.*\.pdf/);
   await expect(provenance.locator("[data-acquired-original]"))
     .toContainText(/^SEC EDGAR primary document · apple-2026-.*\.html/);
   await expect(provenance.getByText(/^sha256:[a-f0-9]{64}$/)).toHaveCount(2);
-  await expect(page.getByRole("link", { name: /Open reference render/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open acquired original/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open committed PDF/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Open the reference render/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the acquired original/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the original PDF/ })).toHaveCount(0);
 });
 
 test("an object with many regions is walked with previous and next", async ({ page }) => {
@@ -276,13 +285,13 @@ test("an object with many regions is walked with previous and next", async ({ pa
     The counter says how many regions this browser was sent and, when the compiler bound more
     than that, how many it bound. §24 bounds the payload; it does not get to shrink the number.
   */
-  await expect(group.getByText(/^REGION 1 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
-  await expect(group.getByRole("button", { name: "← PREVIOUS" })).toBeDisabled();
-  await group.getByRole("button", { name: "NEXT →" }).click();
-  await expect(group.getByText(/^REGION 2 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
-  await expect(group.getByRole("button", { name: "← PREVIOUS" })).toBeEnabled();
-  await group.getByRole("button", { name: "← PREVIOUS" }).click();
-  await expect(group.getByText(/^REGION 1 OF \d+( SHOWN · \d+ COMPILED)?$/)).toBeVisible();
+  await expect(group.getByText(/^Region 1 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
+  await expect(group.getByRole("button", { name: "← Previous" })).toBeDisabled();
+  await group.getByRole("button", { name: "Next →" }).click();
+  await expect(group.getByText(/^Region 2 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
+  await expect(group.getByRole("button", { name: "← Previous" })).toBeEnabled();
+  await group.getByRole("button", { name: "← Previous" }).click();
+  await expect(group.getByText(/^Region 1 of \d+( shown · \d+ compiled)?$/)).toBeVisible();
 });
 
 test("a filing says how much of itself is in the World", async ({ page }) => {
@@ -299,11 +308,11 @@ test("a filing says how much of itself is in the World", async ({ page }) => {
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const sheet = page.locator("[data-source-sheet]");
   await expect(
-    sheet.getByText(/^(FULL FILING COMPILED · \d+ PAGES|CURATED PAGE SLICE · \d+ OF \d+ PAGES COMPILED)$/),
+    sheet.getByText(/^(Full filing compiled · \d+ pages|Curated page slice · \d+ of \d+ pages compiled)$/),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "TECHNICAL DETAILS" }).click();
-  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  await page.getByRole("button", { name: "Technical details" }).click();
+  const drawer = page.getByRole("dialog", { name: "Technical details" });
   // Compiled pages against document pages, per filing, and no declared slice on any of the five.
   await expect(drawer.getByText(/\d+ of \d+ pages compiled/).first()).toBeVisible();
   await expect(drawer.getByText(/every page declared/)).toHaveCount(5);
@@ -327,7 +336,7 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
   */
   const arrivals = page.locator("[data-arrival]");
   await expect(arrivals).toHaveCount(4);
-  await expect(arrivals.getByText(/^REFERENCE RENDER · /)).toHaveCount(4);
+  await expect(arrivals.getByText(/^Source page · reference render · /)).toHaveCount(4);
   const filed = await arrivals.locator("header b").allInnerTexts();
   expect(filed).toHaveLength(4);
   expect(filed.map((label) => label.replace(/^.*FILED /, ""))).toEqual(
@@ -424,8 +433,8 @@ test("the technical drawer holds everything the stage keeps out of the way", asy
   await enterWorld(page);
   await expect(page.locator("body")).not.toContainText(/sha256:/);
 
-  await page.getByRole("button", { name: "TECHNICAL DETAILS" }).click();
-  const drawer = page.getByRole("dialog", { name: "TECHNICAL DETAILS" });
+  await page.getByRole("button", { name: "Technical details" }).click();
+  const drawer = page.getByRole("dialog", { name: "Technical details" });
   await expect(drawer).toBeVisible();
   await expect(drawer.getByText(/^sha256:[a-f0-9]{64}$/).first()).toBeVisible();
   await expect(drawer.getByText("Manifest digest")).toBeVisible();
@@ -468,15 +477,13 @@ test("a phone walks World, Object, Source as steps rather than shrinking three p
   await expect(page.locator(`${STAGE} ${NODE}[data-focus-dimmed="1"]`).first()).toBeHidden();
   await page.getByRole("button", { name: "Open source evidence" }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "object_focus");
-  await expect(page.getByRole("link", { name: /Open committed PDF/ })).toBeHidden();
+  await expect(page.getByRole("link", { name: /Open the original PDF/ })).toBeHidden();
 
   await page.getByRole("button", { name: /Open the source region/ }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "evidence");
   const sheet = page.locator("[data-source-sheet]");
-  await expect(sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ })).toHaveAttribute("aria-selected", "true");
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
-  await expect(page.getByText(/^REGION ON PAGE \d+ OF \d+$/)).toBeVisible();
+  await expect(sheet.locator("[data-parsed-source-page]")).toBeVisible();
 
   await page.getByRole("button", { name: "Back to the World" }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "object_focus");
@@ -503,14 +510,24 @@ test("reduced motion removes the transitions and none of the content", async ({ 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/explore?act=world");
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "world");
-  // The state swap is immediate; the objects are still all there.
+  /*
+    The state swap is immediate; the objects are still all there.
+
+    Read as a number, not as the string "0s". The eight reduced-motion blocks this site used to
+    carry were consolidated into one (`app/tavonel.css`, "One reduced-motion block for the whole
+    site"): it zeroes the duration tokens and then sweeps `animation-duration` and
+    `transition-duration` to `0.01ms !important` -- the standard form, which keeps `transitionend`
+    and `animationend` firing for anything that listens while leaving no frame a person can see.
+    `getComputedStyle` reports that as `1e-05s`, so the reading is "nothing visibly moves".
+  */
   const timings = await page.$$eval("[data-visual-node]", (elements) =>
     elements.map((element) => {
       const style = getComputedStyle(element);
-      return `${style.transitionDuration}|${style.animationDuration}`;
+      return [style.transitionDuration, style.animationDuration]
+        .flatMap((value) => value.split(",").map((part) => parseFloat(part)));
     }));
-  expect(timings.length).toBeGreaterThanOrEqual(7);
-  expect([...new Set(timings)]).toEqual(["0s|0s"]);
+  expect(timings.length, "the objects are still all there").toBeGreaterThanOrEqual(7);
+  expect(Math.max(...timings.flat()), "a node still runs a visible transition").toBeLessThanOrEqual(0.00001);
 
   await page.goto("/explore?act=change");
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "change_compare");
@@ -564,7 +581,7 @@ test("a deep link lands on the exact region it names, not only on the act", asyn
   expect(opening, "the source sheet publishes the id of the region it is showing").toBeTruthy();
 
   await page.getByRole("group", { name: "Source regions for this object" })
-    .getByRole("button", { name: "NEXT →" }).click();
+    .getByRole("button", { name: "Next →" }).click();
   const target = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
   expect(target, "NEXT must reach a different region, or the link proves nothing").not.toBe(opening);
 
@@ -581,7 +598,10 @@ test("a deep link lands on the exact region it names, not only on the act", asyn
 test("the closing action offers the reader their own sources", async ({ page }) => {
   await page.goto("/explore");
   await expect(page.getByRole("heading", { name: "Try the same path with your own knowledge." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Start with your files" })).toBeVisible();
+  // G1-001 / SD-01: the primary action is ACCESS_CTA until checkout *and* customer data are open.
+  const status = await (await page.request.get("/api/status")).json();
+  const selfServe = status.liveCheckout === true && status.activationPolicy?.customerData?.enabled === true;
+  await expect(page.getByRole("link", { name: selfServe ? "Start with your files" : "Request access" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Connect a source" })).toBeVisible();
   /*
     BA-036. Three sibling buttons in one row is the arrangement 3.4 bars, so the reading action

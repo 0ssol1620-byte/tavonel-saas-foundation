@@ -9,6 +9,10 @@ import { trackFunnel } from "@/lib/funnel-events";
 // The rejection sentence names the formats the server actually accepts, so it cannot fall
 // behind the whitelist that produced the rejection. Both come from the Capability Manifest.
 import { acceptedFormatSentence } from "@/lib/qualified-input";
+import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
+import { countNoun } from "@/lib/plural";
+// One UTC face for every device, so the time in a support conversation is the time on the screen.
+import { formatTimestamp } from "@/lib/format";
 
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 /*
@@ -24,6 +28,15 @@ type Filter = "all" | "attention" | "processing" | "ready" | "failed";
 */
 function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.slice(0, 3).some((stage) => stage.state === "active")) return "processing"; return "ready"; }
 function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return "Ready to compile"; if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
+/* Which chapter this source is in. The board's four internal stage keys collapse onto the
+   four the rest of the product says out loud. */
+function stageLabel(row: PipelineRow): string {
+  if (row.stages[3].state === "done") return PIPELINE_STAGES[3].label;
+  if (row.stages[3].state === "active" || row.stages[3].state === "held") return PIPELINE_STAGES[2].label;
+  if (row.stages[2].state === "active" || row.stages[2].state === "done") return PIPELINE_STAGES[1].label;
+  return PIPELINE_STAGES[0].label;
+}
+
 function failureCopy(detail: string) {
   if (detail.includes("TRIAL_FILE_TOO_LARGE")) return "Free Evaluation accepts files up to 50 MB. Use a smaller source or upgrade for larger manuals.";
   if (detail.includes("FILE_TOO_LARGE") || detail.includes("INTAKE_FILE_TOO_LARGE")) return "This file exceeds the 250 MB direct-upload limit. Connect the source system instead of uploading it directly.";
@@ -36,8 +49,24 @@ function failureCopy(detail: string) {
   return detail || "The source stopped before processing completed.";
 }
 
-export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss }: { rows: PipelineRow[]; reading?: Record<string, OcrProgress>; names?: DocumentNames; onDismiss?: () => void }) {
+/*
+  BQ-093: the board is the only list of sources on Knowledge, so "include this in the next
+  candidate" lives on the row it applies to rather than in a second card that reprinted every
+  name. The board does not decide which rows are eligible -- the page passes the ids it read
+  from the document list, so eligibility and the compile call cannot drift apart.
+*/
+export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected }: {
+  rows: PipelineRow[];
+  reading?: Record<string, OcrProgress>;
+  names?: DocumentNames;
+  onDismiss?: () => void;
+  selectableIds?: readonly string[];
+  selectedIds?: readonly string[];
+  onToggleSelected?: (documentId: string) => void;
+}) {
   const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
+  const selectable = new Set(selectableIds ?? []);
+  const selected = new Set(selectedIds ?? []);
   const [filter, setFilter] = useState<Filter>(() => firstFailed ? "failed" : "attention");
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(12);
@@ -54,7 +83,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
 
   return (
     <section className="card board board-compact" aria-label="Document processing">
-      <div className="board-head board-head-compact"><div><p className="eyebrow">SOURCES</p><h2>{rows.length} sources</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
+      <div className="board-head board-head-compact"><div><h2>{countNoun(rows.length, "source")}</h2><p className="board-summary-copy">{counts.failed > 0 ? `${counts.failed} failed and needs attention first.` : counts.attention > 0 ? `${counts.attention} need review. Focus on exceptions first; ready sources stay collapsed.` : counts.processing > 0 ? `${counts.processing} still processing. Ready sources stay out of the way.` : "All observed sources are settled."}</p></div>{onDismiss ? <button type="button" className="board-dismiss" onClick={onDismiss}>Clear finished</button> : null}</div>
 
       {firstFailed ? (
         <div className="board-failure-banner" role="alert">
@@ -63,19 +92,27 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
         </div>
       ) : null}
 
-      <div className="board-metrics" aria-label="Source status summary">
-        <button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}><strong>{counts.attention}</strong><span>Need review</span></button>
-        <button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}><strong>{counts.processing}</strong><span>Processing</span></button>
-        <button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}><strong>{counts.ready}</strong><span>Ready</span></button>
-        <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}><strong>{counts.failed}</strong><span>Failed</span></button>
-      </div>
+      {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
-      <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={`${filtered.length} matching sources`}>
+      <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={countNoun(filtered.length, "matching source")}>
         {visible.map((row) => { const rowStatus = statusOf(row); const expanded = expandedId === row.id; const progress = reading[row.id]; return (
           <li key={row.id} data-status={rowStatus} data-document-id={row.id} data-held={row.needsPerson ? "1" : "0"}>
-            <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+            <div className="board-row-head">
+              {onToggleSelected && selectable.has(row.id) ? (
+                <label className="board-row-select">
+                  <input type="checkbox" checked={selected.has(row.id)} onChange={() => onToggleSelected(row.id)} />
+                  <span className="sr-only">Include {displayName(row.id, names, row.filename)} in the next candidate</span>
+                </label>
+              ) : null}
+              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+            </div>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>
+              {/* BQ-087's third triage field. Absolute and UTC rather than "2 hours ago": this
+                  renders on the server too, and a relative age would be a different sentence on
+                  each side of hydration. A row the server gave no observation time for prints
+                  nothing. */}
+              {row.observedAt ? <p className="fine board-row-observed">Source ready <time dateTime={row.observedAt}>{formatTimestamp(row.observedAt)}</time></p> : null}
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
               <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
             </div>

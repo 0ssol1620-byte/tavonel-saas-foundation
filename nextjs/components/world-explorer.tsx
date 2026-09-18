@@ -134,7 +134,7 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
   if (!collection) {
     return (
       <section className="card">
-        <p className="eyebrow">KNOWLEDGE ARCHITECTURE</p>
+        <p className="eyebrow">Knowledge architecture</p>
         <h2>Nothing compiled yet</h2>
         <p>
           When a document finishes the safety chain and a collection is compiled, its structure
@@ -161,14 +161,14 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
 
   return (
     <section className="card">
-      <p className="eyebrow">KNOWLEDGE ARCHITECTURE</p>
+      <p className="eyebrow">Knowledge architecture</p>
       {/* An id and a digest are single unbreakable words. Marked so they wrap instead of
           pushing the whole page sideways on a phone. */}
       <h2 className="id">{collection.collectionId}</h2>
 
       {/* Six passes, reported by what they produced. See the note on PASSES above for why this
           is a result and not a progress display. */}
-      <p className="eyebrow">SIX PASSES</p>
+      <p className="eyebrow">Six passes</p>
       <CompilePasses collection={collection} />
 
       <div className="arch-counts">
@@ -228,7 +228,7 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
         <p className="fine id">Manifest {collection.manifestDigest}</p>
       ) : null}
       <p className="fine">
-        A candidate structure. Nothing here is promoted into a live world without an explicit
+        A candidate structure. Nothing here is activated as the live World without an explicit
         human decision.
       </p>
     </section>

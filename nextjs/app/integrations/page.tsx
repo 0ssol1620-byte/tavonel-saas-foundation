@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPageShell } from "@/components/public-page-shell";
-import { OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
+import PublicPrimaryCta from "@/components/public-primary-cta";
+import { activationPolicy } from "@/lib/activation-policy";
+import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
 
 export const metadata: Metadata = {
   title: "Integrations — TAVONEL",
@@ -92,12 +95,60 @@ const AGENT_OPERATIONS: Array<[string, string]> = [
   ["Monitoring", "The agent runs on your host under your scheduler, so your scheduler is where a failed run surfaces: the process exits non-zero and reports there. It has no inbound port, no health endpoint and no callback to us, so its liveness is whatever your scheduler reports. Timings are whatever a run on your own corpus produces."],
 ] as const;
 
+/*
+  G2-015. The support table, generated rather than written, and a named list of what is absent.
+
+  The page described five connectors in the present tense and said nothing about the six systems a
+  reader arrives asking for. A missing row reads as an oversight; a named absence reads as an
+  answer, and the reader who needs Confluence today can stop reading on this screen.
+
+  The supported half is `OAUTH_CONNECTOR_PROVIDERS` -- the same list the OAuth routes and the
+  connection store validate against -- joined to the rows above, so a provider added to the product
+  cannot ship without a row here and a row here cannot describe a provider the product does not
+  have: the throw below is that check. The unsupported half is a list of names with no capability
+  claim attached; nothing here says when, because nothing here knows.
+*/
+const OAUTH_BY_PROVIDER = new Map(OAUTH.map((connector) => [connector.provider, connector] as const));
+const SUPPORTED_ROWS = OAUTH_CONNECTOR_PROVIDERS.map((provider) => {
+  const connector = OAUTH_BY_PROVIDER.get(provider);
+  if (!connector) throw new Error(`/integrations has no row for the OAuth provider "${provider}"`);
+  return [connector.name, "Managed OAuth connection", "Read-only, with revisions tracked"] as const;
+});
+const SUPPORT_ROWS: ReadonlyArray<readonly [string, string, string]> = [
+  ...SUPPORTED_ROWS,
+  ...INFRA.map(([name, , description]) => [name, "Customer-run agent", description.split(".")[0]!] as const),
+];
+
+/*
+  Named because a reader looks for them, not because any of them is planned. None is on a roadmap
+  this site publishes, and adding one here without a connector behind it would be the promise the
+  rest of the page is careful not to make. Written as what has no connector rather than as a list
+  of absences: `public-copy-purge.test.ts` bars the defensive register on a sales surface, and a
+  reader who came for Confluence needs the answer, not an apology for it.
+*/
+const NO_CONNECTOR = ["Confluence", "Notion", "Slack", "GitHub", "Box", "Jira"] as const;
+
+/*
+  BQ-100. The connector sections, as the title column's navigation.
+
+  The decision puts navigation beside the heading on a reference route and collapses every other
+  route to one reading measure; the collapse in `app/product-polish.css` is the condition itself,
+  so naming the three sections is the whole of the fix. The section headings below already sit in
+  their own title columns -- only the H1 column was empty.
+*/
+const SECTIONS = ["What connects today", "Cloud document systems", "File and object storage"] as const;
+
 export default function IntegrationsPage() {
+  const sections = tocEntries(SECTIONS);
+
   return (
     <PublicPageShell>
       <section className="scene doc"><div className="shell">
         <div className="body">
-          <div className="stack"><p className="slate"><b>INTEGRATIONS</b><span />SOURCE SYSTEMS</p><h1 className="document-title">Compile where your knowledge already lives.</h1></div>
+          <div className="stack">
+            <h1 className="document-title">Compile where your knowledge already lives.</h1>
+            <PageToc entries={sections} />
+          </div>
           <div className="stack">
             <p className="lede">Connect a source once. TAVONEL discovers and imports read-only, then tracks revisions so the compiled World can stay traceable to the system it came from.</p>
             {/*
@@ -106,11 +157,77 @@ export default function IntegrationsPage() {
               uses a spaced one. Spaced is the site rule; this is it applied.
             */}
             <p className="fine">Connection health — configured, expired or unreachable — is reported in your workspace, where you can act on it.</p>
+            {/*
+              G2-005. The same sentence /pricing, /login, /security and /status carry, on the page
+              that describes connecting a source, read from the same record they read. A page that
+              names five connectors in the present tense and leaves the gate to be discovered after
+              a click is the shape the notice exists to prevent.
+            */}
+            {activationPolicy.customerData.enabled ? null : (
+              <p className="notice static" role="status">
+                <strong>Connecting your own sources is arranged with us.</strong>{" "}
+                {activationPolicy.customerData.reason}{" "}
+                <Link href="/contact">Request access</Link> to arrange it, or{" "}
+                <Link href="/explore">open the public Compiled World</Link> to see what a connected
+                source turns into.
+              </p>
+            )}
           </div>
         </div>
 
         <div className="body">
-          <div className="stack"><p className="slate"><b>OAUTH</b><span />MANAGED CONNECTIONS</p><h2>Cloud document systems.</h2></div>
+          <div className="stack"><h2 id={sections[0].id}>What connects today.</h2></div>
+          <div className="stack">
+            {/*
+              BQ-106. One presentation, not two.
+
+              This section rendered a five-row table of exactly the connectors the two card grids
+              below it describe -- source system, how it connects, what that means -- and then
+              described each of them again. At 390px the table stacked, so a reader met every
+              connector twice, in twelve rows, before reaching the cards that answer the question
+              they came with. The cards are the presentation: they carry the scopes, the deletion
+              behaviour and the cursor, which is what a reviewer is actually here for. What stays
+              is the part the table was for and the cards are not -- the count and the absences.
+
+              `SUPPORT_ROWS` is still derived from `OAUTH_CONNECTOR_PROVIDERS` and still throws
+              when a provider has no row, so the completeness check is untouched by not rendering
+              it, and the count below is read from it rather than typed.
+            */}
+            <p>
+              {SUPPORT_ROWS.length} source systems connect today:{" "}
+              {SUPPORT_ROWS.slice(0, -1).map(([name]) => name).join(", ")} and{" "}
+              {SUPPORT_ROWS.at(-1)![0]}. Each is described below, with the access it is given and
+              what happens when a file moves or disappears.
+            </p>
+            <p className="fine">
+              That is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
+              {NO_CONNECTOR.at(-1)} have no connector here, none of them is on a published roadmap,
+              and nothing on this site says when one would arrive. Where such a system keeps its
+              files in one of the cloud drives below, or exports to a directory or a bucket, that
+              path works today; the system&rsquo;s own API is not read.
+            </p>
+            {/*
+              BQ-106. The legend for the tier chip every card below carries.
+
+              It was an eight-character label in the corner of a card with nothing anywhere saying
+              what its two values mean -- and they mean the thing a security reviewer opened the
+              page to find out, which is who holds the credential.
+            */}
+            <dl className="connector-legend">
+              <div>
+                <dt>Read-only</dt>
+                <dd>We hold an OAuth grant scoped to reading, run the sync, and never write back.</dd>
+              </div>
+              <div>
+                <dt>Customer-run</dt>
+                <dd>You run the import agent inside your network, and the storage credential never leaves it.</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <div className="body">
+          <div className="stack"><h2 id={sections[1].id}>Cloud document systems.</h2></div>
           <div className="stack">
             <div className="connector-public-grid">{OAUTH.map((connector) => (
               <article key={connector.name}>
@@ -134,7 +251,7 @@ export default function IntegrationsPage() {
         </div>
 
         <div className="body">
-          <div className="stack"><p className="slate"><b>PRIVATE SOURCES</b><span />YOUR NETWORK</p><h2>File and object storage.</h2></div>
+          <div className="stack"><h2 id={sections[2].id}>File and object storage.</h2></div>
           <div className="stack">
             <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for repositories that stay inside your network. We configure the first route with you.</p>
             <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>
@@ -148,7 +265,13 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
-        <div className="actions"><Link className="btn" href="/login">Connect a source</Link><Link className="btn ghost" href="/developers">Developer setup</Link></div>
+        {/*
+          G1-010 / G2-005. The primary was "Connect a source" pointing at /login -- the one action
+          the closed gate refuses, offered as the page's loudest control. It is the site's access
+          action now, resolved from the same record as the notice above, so this page cannot end on
+          a promise the notice two screens up has already withdrawn.
+        */}
+        <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href="/developers">Developer setup</Link></div>
       </div></section>
     </PublicPageShell>
   );

@@ -19,7 +19,7 @@
   border: 1px solid var(--hairline-hi);
   border-left: 2px solid var(--verified);
   background: var(--g1);
-  border-radius: 4px;
+  border-radius: var(--r-paper-lg);
 }
 
 .leadLocator h3 {
@@ -30,34 +30,50 @@
   color: var(--text-hi);
 }
 
-.leadLocator > p {
+/*
+  type-05: `.leadLocator > p` outranked `.leadMark`, so the mark's size and colour never applied
+  and 13.5px -- off the scale -- was what rendered. Exclude the mark; put the body on the scale.
+*/
+.leadLocator > p:not(.leadMark) {
   margin: 0;
   max-width: 68ch;
-  font-size: 13.5px;
+  font-size: var(--t-3);
   line-height: 1.66;
   color: var(--text-mid);
 }
 
+/*
+  type-02: the one kicker face. "Reading today" names a section -- it is neither a machine
+  identifier nor a verified state, and the mint it carried is the colour this product spends on
+  state alone.
+*/
 .leadMark {
-  font-family: var(--f-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--verified);
+  margin: 0;
+  font-family: var(--f-sans);
+  font-size: var(--t-1);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
 }
 
 /*
-  The status a tile carries. 12px is the type floor, and the colour is a neutral rather than one
-  of the four status hues: "no reader yet" is not a warning, a change or a review -- it is the
-  absence of a thing, and giving it a hue would teach the reader a fifth meaning for a colour the
-  product already uses for something else.
+  The state of the grid under it (BQ-112).
+
+  It was a chip at the foot of each of seven tiles and is one sentence above them now, so the
+  rules go from "the bottom of a card" to "a paragraph with a rule over it", and the face goes
+  from mono to sans: a sentence is prose, and mono is for the machine identifiers inside one.
+
+  The colour stays a neutral rather than one of the four status hues. "No reader yet" is not a
+  warning, a change or a review -- it is the absence of a thing, and giving it a hue would teach
+  a reader a fifth meaning for a colour the product already uses for something else. `--text-xlo`
+  is deleted by the token contract, so the neutral is `--text-lo`.
 */
 .locatorState {
-  margin: auto 0 0;
+  margin: 0;
   padding-top: 10px;
   border-top: 1px solid var(--hairline);
-  font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--text-xlo);
+  max-width: 68ch;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-lo);
 }

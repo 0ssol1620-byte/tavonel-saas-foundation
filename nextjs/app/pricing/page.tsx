@@ -3,7 +3,7 @@ import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
-import { readCommercialState } from "@/lib/commercial-state";
+import { primaryCallToAction, readCommercialState } from "@/lib/commercial-state";
 import { readAccessMode } from "@/lib/foundation-pilot";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ const PURCHASE_GATES: PurchaseGate[] = [
   },
   {
     id: "candidatePromotion",
-    lead: "Human promotion",
+    lead: "Human activation",
     enabled: activationPolicy.candidatePromotion.enabled,
     reason: activationPolicy.candidatePromotion.reason,
   },
@@ -66,7 +66,7 @@ const CAPABILITIES: ReadonlyArray<{ capability: string; route: string; level: Pr
   { capability: "Review a candidate: continue, retry, remove, cancel", route: "app/api/v1/reviews/route.ts", level: "observer" },
   { capability: "Ask, with evidence, over what your plan can reach", route: "app/api/collections/[id]/ask/route.ts", level: "observer" },
   { capability: "API keys and MCP access", route: "app/api/developer/keys/route.ts", level: "observer" },
-  { capability: "Promote a candidate to the active World", route: "app/api/collections/[id]/promote/route.ts", level: "activation" },
+  { capability: "Activate a candidate World", route: "app/api/collections/[id]/promote/route.ts", level: "activation" },
   { capability: "Roll back the active World to an earlier revision", route: "app/api/collections/[id]/world/rollback/route.ts", level: "activation" },
 ];
 
@@ -85,12 +85,27 @@ const PLAN_CAPABILITIES: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
   })),
 }));
 
+/*
+  G2-032's JSON-LD is not here, and that is a runtime constraint rather than a preference.
+
+  The obvious home for an Offer and a FAQPage block is this server component. It cannot be: the
+  seventeen FAQ rows live in the client component, and a "use client" module's non-component
+  exports are replaced by client references in the server bundle, so importing the array here
+  builds and then fails at page-data collection with `PURCHASE_FAQ.map is not a function`.
+
+  Moving the rows into a lib module would work and costs three claim guards their reader. Emitting
+  the block from the client component costs nothing: Next server-renders it into the HTML a
+  crawler reads, and because the array is already in that chunk for the visible accordion, the
+  serialized block adds no duplicated strings to the client bundle. So it is emitted there, beside
+  the data, and `lib/output-escaping.test.ts` carries the justification for the sink.
+*/
 export default function PricingPage() {
   const commercial = readCommercialState();
   return (
     <PricingPageClient
       initialLiveCheckout={commercial.liveChargesEnabled}
       initialSelfService={readAccessMode() === "self_service"}
+      cta={primaryCallToAction()}
       gates={PURCHASE_GATES}
       planCapabilities={PLAN_CAPABILITIES}
     />

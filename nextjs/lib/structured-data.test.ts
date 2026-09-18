@@ -83,19 +83,69 @@ const emitters = ["app", "components"]
   .map((path) => ({ path: relative(sourceRoot, path), source: readFileSync(path, "utf8") }))
   .filter((file) => file.source.includes("application/ld+json"));
 
+/*
+  A schema name as JSON-LD uses it, rather than anywhere in the file.
+
+  The check used to be a plain substring over the whole source, which is right about the schemas
+  and wrong about English: the pricing surface carries a capability row reading "Review a
+  candidate: continue, retry, remove, cancel", and a guard that reads that as `schema.org/Review`
+  is telling the author to delete a true sentence. A schema name reaches a crawler as a quoted
+  value or as a property key, so that is what this matches.
+*/
+function emitsSchema(source: string, schema: string) {
+  return new RegExp(`"${schema}"|\\b${schema}\\s*:`).test(source);
+}
+
+/** Needs a fact this deployment does not have, on any page. */
+const UNAVAILABLE_SCHEMAS = ["datePublished", "dateModified", "AggregateRating", "Review", "Dataset", "TechArticle"];
+
+/*
+  G2-032, 2026-09-16 — edited from the commerce-legal lane, which owns `/pricing`. Recorded as a
+  cross-lane note in that lane's report.
+
+  `Offer` was banned outright here for a stated reason: it "needs a live catalogue", and this
+  deployment had none. It has one. `lib/billing-catalog.ts` holds two subscriptions with real
+  prices, `/pricing` renders both, `/api/status` reports `liveCheckout`, and a buyer can reach a
+  Paddle checkout for one of them. The fact arrived, so the markup is allowed -- which is the
+  order this file has always insisted on, and the order it still insists on for the six schemas
+  above, none of which has a fact behind it yet.
+
+  The permission is one page wide and comes with the condition that made `Offer` dangerous in the
+  first place: the prices in the block are the catalog's, not a second set typed for a crawler.
+*/
+const CATALOGUE_EMITTER = "components/pricing-page-client.tsx";
+
 describe("JSON-LD emitted anywhere in the tree", () => {
   /*
-    Non-vacuity: a filter that matched nothing would pass the whole class. Both known emitters are
+    Non-vacuity: a filter that matched nothing would pass the whole class. Every known emitter is
     named, so moving one still leaves a failure to read rather than a silent green.
   */
   it("finds the emission points it is guarding", () => {
-    expect(emitters.map((file) => file.path.replaceAll("\\", "/")).sort()).toEqual(["app/layout.tsx", "components/breadcrumb-json-ld.tsx"]);
+    // G1-018 (2026-09-16): /knowledge-compiler emits FAQPage built from the same five questions it renders.
+    expect(emitters.map((file) => file.path.replaceAll("\\", "/")).sort()).toEqual([
+      "app/knowledge-compiler/page.tsx",
+      "app/layout.tsx",
+      "components/breadcrumb-json-ld.tsx",
+      CATALOGUE_EMITTER,
+    ]);
   });
 
-  it.each(emitters.map((file) => file.path))("%s claims no date, price, rating or dataset", (path) => {
+  it.each(emitters.map((file) => file.path))("%s claims no date, rating or dataset", (path) => {
     const { source } = emitters.find((file) => file.path === path)!;
-    for (const schema of ["datePublished", "dateModified", "AggregateRating", "Review", "Dataset", "Offer", "TechArticle"]) {
-      expect(source, `${schema} needs a fact this deployment does not publish -- add the fact first, never the markup`).not.toContain(schema);
+    for (const schema of UNAVAILABLE_SCHEMAS) {
+      expect(emitsSchema(source, schema), `${schema} needs a fact this deployment does not publish -- add the fact first, never the markup`).toBe(false);
     }
+  });
+
+  it.each(emitters.map((file) => file.path))("%s offers nothing that is not in the billing catalog", (path) => {
+    const { source } = emitters.find((file) => file.path === path)!;
+    if (path.replaceAll("\\", "/") !== CATALOGUE_EMITTER) {
+      expect(emitsSchema(source, "Offer"), "only the page with the catalogue may describe an offer").toBe(false);
+      return;
+    }
+    expect(source, "the offers are the catalog's rows").toContain("Object.values(BILLING_OFFERS)");
+    expect(source, "and their prices are the catalog's numbers").toContain("price: offer.priceUsd");
+    expect(source, "no price is typed into the markup for a crawler").not.toMatch(/price:\s*\d/);
+    expect(source, "the currency is stated, because an unlabelled price is a guess").toContain('priceCurrency: "USD"');
   });
 });

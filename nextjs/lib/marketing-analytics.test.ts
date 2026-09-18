@@ -113,7 +113,7 @@ describe("the consent banner speaks the page's language", () => {
       one character.
     */
     expect(KO.prompt).toBe(
-      "Google Analytics 쿠키는 공개 페이지 방문과 그 페이지에서의 상호작용을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
+      "Google Analytics 쿠키는 공개 페이지의 방문과 클릭을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
     );
     for (const copy of [EN, KO]) {
       expect(copy.prompt, "a consent prompt states, it does not ask").not.toContain("?");

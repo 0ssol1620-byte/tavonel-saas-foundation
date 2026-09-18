@@ -71,11 +71,34 @@ export type EvidenceReceipt = {
   readonly digest: string;
   /** The artifact under `docs/evidence/artifacts/`. Not rendered; quoted when one is sent. */
   readonly file: string;
+  /*
+    G2-011. Where a reader fetches the bytes the digest is of.
+
+    The published copy is byte-identical to the artifact named in `file` -- that is what makes
+    the digest checkable, and `research-receipts.test.ts` hashes the file under `public/`
+    against `digest` on every run, so a receipt that drifts fails the build rather than the
+    reader.
+
+    It is published under a public name rather than the internal one. The constitution's rule is
+    that the artifact in the evidence repository keeps its campaign filename, and it does; a
+    sha256 is of bytes and not of a name, so a copy served at a readable URL verifies identically
+    while keeping a retired brand out of a public link.
+  */
+  readonly url: string;
 };
 
 export type EvidenceEntry = {
   readonly state: "measured" | "unsupported" | "unproven";
   readonly title: string;
+  /*
+    G2-045. One line of plain language, before the paragraph a researcher came for.
+
+    R-01 assumed its reader knew olmOCR-Bench, what a recovery lane is, and how to read
+    non-overlapping confidence intervals. Nothing is simplified and no figure moves: the takeaway
+    says what the finding means for the person deciding whether to buy, and it may not introduce
+    a number that is not on the receipt.
+  */
+  readonly takeaway: string;
   readonly body: string;
   readonly receipt?: EvidenceReceipt;
 };
@@ -84,6 +107,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
   {
     state: "measured",
     title: "Recovery changes the outcome",
+    takeaway: "What this means for you: on a page that is hard to read, the recovery step is the difference between getting the document's content and getting an empty page.",
     body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh. Ours, and never placed beside a competitor's number as if reproduced.",
     receipt: {
       id: "R-01",
@@ -91,11 +115,13 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
       date: "2026-08-08",
       digest: "1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0",
       file: "folynta-recovery-accuracy-counterfactual-olmocr-2026-08-08.json",
+      url: "/research/receipts/R-01-recovery-counterfactual-olmocr-2026-08-08.json",
     },
   },
   {
     state: "measured",
     title: "Compilation refuses more than it emits, sometimes",
+    takeaway: "What this means for you: when a document points at something that was not supplied with it, the compiler refuses that document rather than emitting a world with a dead link in it.",
     body: "Of a thousand documents offered, 596 compiled and 404 were refused, every one for a link the compiler could not resolve — most often a referenced figure asset that had not been supplied alongside the markdown. A vault with a broken link is not emitted, by design. Measured 2026-08-08, on that corpus and that build: a historical research measurement, not this service's live refusal rate, which is not published.",
     receipt: {
       id: "R-02",
@@ -103,16 +129,19 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
       date: "2026-08-08",
       digest: "936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25",
       file: "folynta-knowledge-compilation-properties-2026-08-08.json",
+      url: "/research/receipts/R-02-knowledge-compilation-properties-2026-08-08.json",
     },
   },
   {
     state: "unsupported",
     title: "Blind quality detection failed",
+    takeaway: "What this means for you: nothing here ranks your documents by a quality score, because the score we tested did not beat sorting by length.",
     body: "We tested whether prediction-only signals could pick the worst documents without ground truth. They could not beat ranking by length alone. Published as unsupported, and not shipped as a feature.",
   },
   {
     state: "unproven",
     title: "Most thresholds are uncalibrated",
+    takeaway: "What this means for you: the cut-offs that decide when the system refuses or merges are set by judgement rather than by a measurement, so ask before you depend on one.",
     body: "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result.",
   },
   /*
@@ -125,6 +154,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
   {
     state: "unproven",
     title: "Rebuilding only what changed",
+    takeaway: "What this means for you: the landing-page demonstration runs on fixed data, and it is not a capability this deployment gives you today.",
     body: "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability.",
   },
 ];
@@ -147,7 +177,8 @@ export const EVIDENCE_STATE: Record<string, string> = {
   direction: "IN PROGRESS",
 };
 
-/** "1f5b6220…efe33e0" -- enough to recognise, with the whole value one copy away. */
-export function shortDigest(digest: string) {
-  return `${digest.slice(0, 8)}…${digest.slice(-7)}`;
-}
+/*
+  G2-011 removed the only caller. `/research/notes` prints the whole 64 characters beside the
+  link that fetches the bytes they are of, because a shortened digest is enough to recognise a
+  file and never enough to verify one.
+*/

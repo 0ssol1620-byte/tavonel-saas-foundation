@@ -1,24 +1,163 @@
-.root { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #303841; background: #111820; color: #e9eef4; }
-.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px 20px; padding: 8px 12px; flex-wrap: wrap; border-bottom: 1px solid #303841; }
-.kind { font-size: 13px; line-height: 1.5; letter-spacing: .03em; }
+/*
+  The source page frame. Every colour here is a token: this file used to carry twenty literals,
+  including a cyan (#89cddd) that existed nowhere else in the system and read as a second brand.
+  Contract names are used with a fallback so the sheet is correct on its own and takes the tuned
+  value the moment the token lands. The `.tabs` rules went with the tab bar they styled -- the
+  page is no longer a peer of the text extracted from it.
+*/
+
+.root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst-lg, 8px);
+  overflow: hidden;
+  background: var(--g1);
+  color: var(--text-hi);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.kind { color: var(--text-mid); font-size: 13px; line-height: 1.5; }
+
 .controls { display: flex; flex-wrap: wrap; gap: 4px; }
-.controls button, .message button { min-height: 44px; min-width: 44px; background: #1a242e; border: 1px solid #40505e; color: #eff5fb; padding: 0 10px; font: inherit; font-size: 13px; cursor: pointer; border-radius: 4px; }
-.controls button:disabled { opacity: .5; cursor: default; }
-.controls button[aria-pressed="true"] { border-color: #89cddd; background: #163440; }
-.root button:focus-visible, .viewport:focus-visible { outline: 2px solid #89cddd; outline-offset: 3px; }
-.viewport { position: relative; height: clamp(420px, 60vh, 660px); overflow: auto; overscroll-behavior: contain; padding: 16px; scrollbar-gutter: stable; background: #182129; }
-.viewport[data-compact="1"] { height: 420px; }
-.page { position: relative; margin-inline: auto; background: #fff; box-shadow: 0 12px 35px #0005; }
+
+.controls button,
+.message button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  color: var(--text-hi);
+  background: var(--g2);
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst, 6px);
+  font: 500 14px/1 var(--f-sans);
+  transition: background-color var(--dur-2, 140ms) var(--ease-out, ease),
+    border-color var(--dur-2, 140ms) var(--ease-out, ease),
+    color var(--dur-2, 140ms) var(--ease-out, ease);
+}
+
+.controls button[disabled] { color: var(--text-lo); background: var(--g2); }
+.controls button[aria-pressed="true"] { color: var(--text-hi); border-color: var(--verified); background: var(--verified-deep); }
+
+@media (hover: hover) and (pointer: fine) {
+  .controls button:not([disabled]):hover,
+  .message button:hover { border-color: var(--verified-dim); }
+}
+
+/*
+  BQ-015. The frame was landscape while the page is portrait, so the one thing this block exists
+  to show rendered 275px wide inside a 1226px panel. The viewport now reserves the page's own
+  aspect ratio -- read off the committed raster, defaulting to US Letter -- so width is what binds
+  and the page fills the panel it sits in. Zooming scrolls inside a fixed frame instead; `Fit page`
+  returns to the reserve.
+*/
+/*
+  landing-06: `max-height: 92svh` was the rule that bound, not the width.
+
+  At the commonest laptop height 92svh is 828px, and against the page's 1/1.294 portrait ratio
+  that sized the frame from its height: 640px wide inside a 706px pane, with no centring, so all
+  66px of the leftover landed on the right and the largest, most important thing in the proof
+  block sat visibly off-centre and smaller than the panel it was sized for. The comment above
+  says width is what binds; now it is. Zoom still scrolls inside the frame.
+*/
+.viewport {
+  position: relative;
+  aspect-ratio: var(--page-aspect, 1 / 1.294);
+  margin-inline: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  scrollbar-gutter: stable;
+  background: var(--g2);
+}
+
+.page {
+  position: relative;
+  margin-inline: auto;
+  background: var(--paper, #f4f1ea);
+}
+
 .page canvas { display: block; max-width: none; }
-.selection { position: absolute; border: 2px solid #0b6c91; background: #57bdd525; pointer-events: none; box-sizing: border-box; transition: left 180ms ease, top 180ms ease, width 180ms ease, height 180ms ease; }
-.message { position: absolute; inset: 24px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; text-align: center; font-size: 15px; line-height: 1.6; z-index: 1; }
-.message strong { font-size: 17px; }
+
+/*
+  The committed raster: the first thing painted, and the thing a reader still sees when the live
+  verification cannot run. It is a render of the same bytes, never a substitute for them -- the
+  canvas above it replaces it the moment PDF.js has hashed the source and drawn it.
+*/
+.raster {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.selection {
+  position: absolute;
+  border: 2px solid var(--verified);
+  background: color-mix(in srgb, var(--verified) 14%, transparent);
+  pointer-events: none;
+  box-sizing: border-box;
+  transition: left var(--dur-3, 200ms) var(--ease-out, ease), top var(--dur-3, 200ms) var(--ease-out, ease),
+    width var(--dur-3, 200ms) var(--ease-out, ease), height var(--dur-3, 200ms) var(--ease-out, ease);
+}
+
+.message {
+  position: absolute;
+  inset: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+  color: var(--text-mid);
+  font-size: 15px;
+  line-height: 1.6;
+  z-index: 1;
+}
+
+.message strong { color: var(--text-hi); font-size: 17px; }
 .message span { max-width: 45ch; }
-.caption { padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; border-top: 1px solid #303841; font-size: 12px; line-height: 1.5; color: #b9c6d1; }
-.notice { padding: 0 12px 12px; font-size: 13px; line-height: 1.5; color: #e6c78b; }
-.tabs { display: flex; gap: 4px; padding: 8px 0; flex-wrap: wrap; }
-.tabs button { min-height: 44px; padding: 0 16px; font: inherit; font-size: 14px; color: #c0cbd5; background: #141c24; border: 1px solid #34414e; border-radius: 4px; cursor: pointer; }
-.tabs button[aria-selected="true"] { background: #e7eef4; color: #17222c; border-color: #e7eef4; }
-.tabs button:focus-visible { outline: 2px solid #89cddd; outline-offset: 3px; }
-@media (max-width: 600px) { .toolbar { padding: 8px; } .controls { width: 100%; justify-content: space-between; } .viewport, .viewport[data-compact="1"] { height: 460px; padding: 16px; } }
-@media (prefers-reduced-motion: reduce) { .selection { transition: none; } }
+
+/* A failure is said where the page is, at a readable size, rather than left as a blank frame. */
+.message[data-tone="error"] { background: color-mix(in srgb, var(--ground) 86%, transparent); border-radius: var(--r-inst, 6px); }
+.message[data-tone="error"] strong { color: var(--failed, #e2857a); }
+
+.caption {
+  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: space-between;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-lo);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.caption b { color: var(--text-mid); font-weight: 500; }
+
+.notice { padding: 0 12px 12px; color: var(--changed); font-size: 13px; line-height: 1.5; }
+
+@media (max-width: 600px) {
+  .toolbar { padding: 8px; }
+  .controls { width: 100%; justify-content: space-between; }
+  .viewport { padding: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection, .controls button, .message button { transition: none; }
+}

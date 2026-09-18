@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const mark = read("components/logomark.tsx");
 const favicon = read("app/icon.svg");
+const shareCard = read("lib/og-card.tsx");
 
 describe("the logomark", () => {
   it("is not a dot grid", () => {
@@ -59,5 +60,59 @@ describe("the logomark", () => {
       expect(Math.abs(nav * (32 / 24) - tab), `${nav} -> ${tab}`).toBeLessThan(0.15);
       expect(favicon).toContain(String(tab));
     }
+    /*
+      chrome-15. Faithful to the nav is not the same as sized for the tile.
+
+      Drawn at 24 -> 32 into a filled rounded tile the glyph covered 79% of the width and 54% of
+      the height and read as a blob at 16px. The scale is a transform about the tile centre, so
+      the coordinates above are untouched and this stays one mark -- and it is pinned here so it
+      cannot quietly go back to 1.
+    */
+    const scale = Number(favicon.match(/translate\(16 16\) scale\(([\d.]+)\)/)?.[1]);
+    expect(scale, "the glyph is scaled to the tile").toBeGreaterThan(1.1);
+    // The mark is 25.4 wide; anything past 1.26 puts it through the tile edge.
+    expect(scale * 25.4, "and stays inside the tile").toBeLessThan(32);
+  });
+
+  /*
+    BQ-008. The guard above pinned two of the three files that drew a mark, and the third was the
+    one most readers actually saw.
+
+    `lib/og-card.tsx` and `app/opengraph-image.tsx` each drew the banned nine-cell grid, on
+    twenty-nine share cards; `app/icon.tsx` drew a fourth mark again -- the retired cream tile
+    with a blue/teal T -- and shipped it as `/icon` beside `app/icon.svg`. Three marks, one
+    brand. The assertions follow the files rather than the pictures: a second drawing has to go
+    somewhere, and these are the somewheres.
+  */
+  it("draws the same mark on the share cards, from the same geometry", () => {
+    expect(shareCard.match(/<rect/g)).toBeNull();
+    expect(shareCard).not.toContain("Cell lit");
+    expect(shareCard).toContain("M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z");
+    expect(shareCard).toContain("M14.5 8.2H21.5V18.5H14.5Z");
+    expect(shareCard).toContain("M9.5 15.5L14.5 12.1");
+    // The root card is the same `ogCard` as the other twenty-nine, not a second drawing.
+    expect(read("app/opengraph-image.tsx")).toContain("ogCard(BRAND_LINE.headline");
+    expect(read("app/opengraph-image.tsx")).not.toContain("ImageResponse");
+  });
+
+  it("draws both copies in one ink, above the 3:1 a graphical object needs", () => {
+    // BQ-131. `--text-mid` is #9AA3A8; the two pages were 0.66 of `--text-lo` (2.95:1 at 20px)
+    // in the nav and #C8CED2 in the tab -- one mark, two greys, one of them under the floor.
+    expect(mark).not.toContain("opacity={0.66}");
+    expect(mark.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
+    // The share-card copy -- twenty-nine cards, the apple icon and the root OG card -- kept 0.66
+    // when the other two moved. One number, and this is the third place it is pinned.
+    expect(shareCard).not.toContain("opacity={0.66}");
+    expect(shareCard.match(/opacity=\{0\.8\}/g)).toHaveLength(2);
+    expect(read("app/one-path.css")).toContain(".wordmark .logomark { color: var(--text-mid); }");
+    expect(favicon).toContain('stroke="#9AA3A8"');
+    expect(favicon).not.toContain("#C8CED2");
+  });
+
+  it("ships exactly one favicon source", () => {
+    // `app/icon.tsx` drew the retired cream/teal tile and Next served it as `/icon` alongside
+    // `app/icon.svg`. Two icon files at one route segment is two brands on one tab.
+    expect(existsSync(join(process.cwd(), "app/icon.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "app/icon.svg"))).toBe(true);
   });
 });

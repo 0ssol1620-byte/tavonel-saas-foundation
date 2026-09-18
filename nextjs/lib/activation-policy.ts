@@ -28,8 +28,19 @@ export const activationPolicy = {
     BA-175. "Bucket" is a storage product, not a customer concept, and the PATH row on /security
     already says "tenant-scoped quarantine" two sections above this one. The two now use the same
     words for the same place.
+
+    G3-003. "Customer intake is open." and "Compiling your own files is not open in this deployment
+    yet." were served in the same `/api/status` payload, and resolving the contradiction required
+    knowing that `customerIntake` names the storage path while `customerData` names permission to
+    send files down it. Nothing about the deployment changed. The sentence now says which of the
+    two it is about, in the words the `customerData` row and the header state line already use:
+    intake is arranged, not switched on by a checkout.
+
+    The flag stays `true` because the path is built and the routes guarding on it
+    (`/api/uploads/capability`, the connector sync route) must keep refusing on the day it is set
+    `false`. This row states what the path does; `customerData` states who may use it.
   */
-  customerIntake: { enabled: true, reason: "Customer intake is open. Files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
+  customerIntake: { enabled: true, reason: "Intake for your own sources is arranged with us rather than opened by a checkout, and compiling them is gated separately. The path itself is built: files go to tenant-scoped quarantine storage before processing, and no other part of the deployment reads them there." },
   /*
     C-13 names the path that is actually carrying production Worker traffic.
 
@@ -43,9 +54,9 @@ export const activationPolicy = {
     It deliberately avoids the word "qualification", which the A-6 rule in
     `activation-policy.test.ts` treats as a promise of a public receipt.
   */
-  cdr: { enabled: true, reason: "Quarantine source objects are sanitized by an IAM-only PDFium and ClamAV service before anything downstream reads them. The production Worker uses short-lived workload identity, refuses redirects, and stores only digest-bound immutable PDFs for downstream reading." },
+  cdr: { enabled: true, reason: "Quarantine source objects are sanitized by an IAM-only PDFium and ClamAV service on Google Cloud Run (Seoul, asia-northeast3) before anything downstream reads them. The production Worker uses short-lived workload identity, refuses redirects, and stores only digest-bound immutable PDFs for downstream reading." },
   ocrGpu: { enabled: true, reason: "GPU OCR is open, with scale-to-zero and candidate-only review controls enforced." },
-  candidatePromotion: { enabled: false, reason: "Promotion is always an explicit human decision." },
+  candidatePromotion: { enabled: false, reason: "Activation is always an explicit human decision." },
   /*
     BA-118. This one string renders on /pricing, /security, /status, /login and /workspace, so the
     three words it used to carry -- "the founder", "the security suite" (our own CI) and "an

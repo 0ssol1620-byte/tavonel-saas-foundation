@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
+import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import { TrustDisclosures } from "@/components/trust-disclosures";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   title: "Enterprise — TAVONEL",
@@ -67,10 +70,11 @@ export default function EnterprisePage() {
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
-          <div className="body">
+          <div className="body policy-copy"><IndexedPolicyBody>
             <div className="stack">
-              <p className="slate"><b>ENTERPRISE</b><span />KNOWLEDGE COMPILER</p>
-              <h1 className="document-title">Compile enterprise knowledge<br />without giving up control.</h1>
+              <h1 className="document-title">Compile enterprise knowledge without giving up control.</h1>
+              {/* G2-040 / G2-041: one jump index for long documents, from the shared component. */}
+              <PolicyJumpIndex />
             </div>
             <div className="stack">
               <p className="lede">
@@ -87,7 +91,7 @@ export default function EnterprisePage() {
                 ))}
               </div>
 
-              <p className="slate"><span />HOW IT IS RUN</p>
+              <h2>How it is run</h2>
               <div className="chain">
                 {OPERATIONS.map(([title, body]) => (
                   <article className="link" key={title}>
@@ -97,13 +101,45 @@ export default function EnterprisePage() {
                 ))}
               </div>
 
+              {/*
+                G2-004 / G2-023 / G2-028. The honesty already existed and was published on
+                /trust, which is not the page an enterprise reviewer lands on. A reviewer who
+                arrives here from a search result and converts on "Talk about a pilot" used to
+                reach a contract conversation without having read one of these lines.
+
+                The rows are `lib/trust-disclosures.ts`, rendered identically on /trust and
+                /security, so this page cannot drift into carrying the shorter list.
+              */}
+              <TrustDisclosures />
+              <p className="fine">
+                The longer answers are on <Link href={"/trust" as Route}>Trust</Link> and{" "}
+                <Link href={"/security" as Route}>Security</Link>, and the{" "}
+                <a href="/policy/TAVONEL_DPA_v1_2026-09-11.md">data processing agreement</a> is
+                readable now as a draft v1 under review, not as a signed agreement.
+              </p>
+
+              {/*
+                G2-023's pricing anchor. What this page may state is what the site already
+                charges for and how an enterprise number is arrived at; the bands themselves are
+                the founder's to set, and the withdrawn sheet is why an invented one is worse
+                than none.
+              */}
+              <h2>What an engagement costs</h2>
+              <p>
+                The published plans and the per-page rate above them are on{" "}
+                <Link href={"/pricing#enterprise-pricing" as Route}>Pricing</Link>, in US dollars and excluding tax.
+                An enterprise number is quoted after the deployment review, against your page
+                volume, your source types and the work that connecting them takes — never before
+                it, because every part of that quote depends on what the review finds.
+              </p>
+
               <div className="actions">
-                <Link className="btn" href={"/contact" as Route}>Talk about a pilot</Link>
-                <Link className="btn ghost" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn" href={"/contact" as Route}>Scope an Enterprise pilot</Link>
+                <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/security">How your documents are handled</Link>
               </div>
             </div>
-          </div>
+          </IndexedPolicyBody></div>
         </div>
       </section>
     </PublicSitePage>

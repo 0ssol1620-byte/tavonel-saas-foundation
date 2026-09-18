@@ -1,0 +1,6 @@
+{
+  "comment": "Named exceptions to the 12px type floor. Every entry needs a reason a reviewer can disagree with. A label that does not fit at 12px is a label that is too long — this file is not for those. Emptied 2026-09-18: every excused sheet reached the floor in the brand-quality integration (census 0 on all 29), and the drawn reading-view facsimile the two selector exceptions covered was deleted (D28).",
+  "selectors": [],
+  "files": [],
+  "filesComment": "Stylesheets still under the floor when the token lane swept the sheets it owns. Each one belongs to another lane in the 2026-09-17 brand-quality campaign and is listed as a debt, not a dispensation: delete the entry with the sweep. The check still runs on every file named here — known_issues is the count it had at handover, and a sheet that gets worse fails the build. `node scripts/check-type-floor.mjs --census` prints the current numbers."
+}

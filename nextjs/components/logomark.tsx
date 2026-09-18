@@ -24,10 +24,18 @@ export default function Logomark({ size = 20 }: { size?: number }) {
       strokeLinecap="square"
       aria-hidden="true"
     >
+      {/*
+        BQ-131: the two pages were drawn at `opacity: 0.66` over `--text-lo`, which measures
+        2.95:1 at the 20px the nav renders them at -- under the 3:1 a graphical object needs, on
+        the brand mark itself. The depth between the pages and the thread is worth keeping, so
+        it is 0.8 here and the ink is `--text-mid` (`.wordmark .logomark`, `app/one-path.css`),
+        which puts the pages at about 5.2:1 and the thread above 6. `app/icon.svg` takes the same
+        ink, so the tab and the nav stop being two slightly different greys.
+      */}
       {/* Verso: x 2.5-9.5, with the top corner cut. */}
-      <path d="M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z" strokeWidth={1.9} opacity={0.66} />
+      <path d="M2.5 5.5H7.4L9.5 7.6V18.5H2.5Z" strokeWidth={1.9} opacity={0.8} />
       {/* Recto: x 14.5-21.5, deliberately shorter than the verso. */}
-      <path d="M14.5 8.2H21.5V18.5H14.5Z" strokeWidth={1.9} opacity={0.66} />
+      <path d="M14.5 8.2H21.5V18.5H14.5Z" strokeWidth={1.9} opacity={0.8} />
       {/* The thread: -34.2 degrees across the gap, and the one element at full contrast. */}
       <path d="M9.5 15.5L14.5 12.1" strokeWidth={1.6} />
     </svg>

@@ -1,3 +1,13 @@
+/* Layered here, not at the @import: `@import … layer()` is rewritten by the build into an
+   invalid `@media layer(…)` block and the whole sheet stops applying. See app/globals.css. */
+@layer overrides {
+/*
+  The route-level sheet for the editorial pages (/product, /pricing, /resources and their
+  siblings). It is loaded after `tavonel.css` in `app/globals.css` and stays unlayered, so a rule
+  here is a deliberate per-route override of the system sheet rather than a competing definition
+  of it. Nothing site-wide belongs in this file; that is `tavonel.css`.
+*/
+
 /*
   BA-021. One vertical scale for the page, instead of a per-block margin each time.
 
@@ -14,7 +24,6 @@
   justify-content: flex-start;
   padding-top: clamp(110px, 12vw, 168px);
 }
-.product-overview .shell { max-width: 1280px; }
 .product-overview .stack { gap: var(--product-inner); }
 .product-hero { align-items: end; padding-bottom: clamp(54px, 7vw, 96px); border-bottom: 1px solid var(--hairline); }
 /*
@@ -49,38 +58,532 @@
 /*
   BA-026. The trail `BreadcrumbJsonLd` already declares, rendered.
 
-  12px sans rather than the 9px mono the eyebrow under it uses: this is a navigation a reader
-  taps, not a label. Its own line above the eyebrow, so the eyebrow still introduces the title.
+  12px sans: this is a navigation a reader taps, not a label. BQ-137 makes it a real `<nav>` with
+  an ordered list, on every reference route rather than on two /product pages, so these rules
+  address the list rather than a paragraph's bare children. `--text-xlo` and `--decor` are gone
+  from it: the first is deleted by the token contract and the second is never a text colour.
 */
-.doc-breadcrumb { margin: 0; color: var(--text-xlo); font-size: 12px; letter-spacing: -.005em; }
+.doc-breadcrumb { margin: 0; font-size: 12px; letter-spacing: -.005em; }
+.doc-breadcrumb ol { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; }
+.doc-breadcrumb li { display: flex; align-items: baseline; min-width: 0; }
 .doc-breadcrumb a { color: var(--text-mid); }
-.doc-breadcrumb a:hover { color: var(--text-hi); }
-.doc-breadcrumb span { margin: 0 6px; color: var(--decor); }
+/* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
+@media (hover: hover) and (pointer: fine) {
+  .doc-breadcrumb a:hover { color: var(--text-hi); }
+}
+.doc-breadcrumb [aria-current="page"] { color: var(--text-lo); }
+.doc-breadcrumb [aria-hidden="true"] { margin: 0 6px; color: var(--text-lo); }
 .product-close { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 24px; }
 .product-close h2 { margin: 0; color: var(--text-hi); font-size: clamp(22px, 2.4vw, 34px); letter-spacing: -.03em; }
-.product-flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  margin-top: var(--product-gap);
-  border: 1px solid var(--hairline-hi);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--hairline);
-}
-.product-flow article { min-height: 164px; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; background: var(--g1); }
-.product-flow article:last-child { background: color-mix(in srgb, var(--verified-deep) 30%, var(--g1)); }
-.product-flow span { color: var(--text-lo); font: 9px var(--f-mono); letter-spacing: .13em; }
-.product-flow strong { max-width: 20ch; color: var(--text-hi); font-size: 16px; font-weight: 540; line-height: 1.35; }
+/*
+  BQ-109. `.product-flow` is deleted with the strip it styled: /product printed the same four
+  beats twice, once as a numbered strip and once as four cards, and the cards are the half
+  that links anywhere.
+
+  What is left is the card grid, on shared baselines. `min-height: 260px` made the cards the
+  same height and left their insides unaligned -- the state label sat at the top of each card,
+  the heading floated on `margin: auto`, and four headings of one, two and three lines started
+  at four different heights across one row. Subgrid gives label, heading and body a row each,
+  measured across the whole grid, so the row lines up by construction and nothing needs a
+  guessed height. A card with a short body still fills its track: the body row is the one that
+  stretches.
+*/
 /* Four surfaces; every column count below divides four, so the last row is never a card beside
    empty tracks. Three columns left exactly that orphan slot when the fourth card was added. */
-.product-surface-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: var(--product-gap); }
+.product-surface-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, auto);
+  grid-auto-rows: auto;
+  gap: 14px;
+  margin-top: var(--product-gap);
+}
 @media (max-width: 1240px) { .product-surface-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.product-surface { min-height: 260px; display: flex; flex-direction: column; padding: 24px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--g1); transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
-.product-surface:hover { border-color: var(--hairline-hi); background: var(--g2); transform: translateY(-2px); }
-.product-surface > span { color: var(--verified); font: 9px var(--f-mono); letter-spacing: .12em; }
-.product-surface h2 { margin: auto 0 10px; color: var(--text-hi); font-size: 26px; }
+.product-surface {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-inst);
+  background: var(--g1);
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+/* Hover is gated: on a touch screen it sticks after a tap and reads as a selection. */
+@media (hover: hover) and (pointer: fine) {
+  .product-surface:hover { border-color: var(--hairline-hi); background: var(--g2); transform: translateY(-2px); }
+}
+/*
+  BQ-134 / type floor: the card's state label is 12px and no longer sub-floor mono at 9px, and
+  the "Open →" line under the body is gone -- the whole card is the anchor, so it was a second
+  label for a link the reader is already inside.
+*/
+/*
+  type-02 / type-04: the card's section label is a kicker, so it takes the one kicker face from
+  `.eyebrow`; only its grid placement is this sheet's business. The mint it carried taught a second
+  meaning for the colour that marks a verified state elsewhere on the same page.
+*/
+.product-surface > .eyebrow { align-self: start; }
+.product-surface h2 { margin: 0; align-self: end; color: var(--text-hi); font-size: 26px; }
 .product-surface p { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.65; }
-.product-surface b { margin-top: 22px; color: var(--text-mid); font: 9px var(--f-mono); letter-spacing: .08em; font-weight: 500; }
-@media (max-width: 900px) { .product-flow { grid-template-columns: repeat(2, 1fr); } .product-surface-grid { grid-template-columns: 1fr; } .product-surface { min-height: 210px; } }
-@media (max-width: 560px) { .product-flow { grid-template-columns: 1fr; } .product-flow article { min-height: 112px; } }
+@media (max-width: 900px) { .product-surface-grid { grid-template-columns: 1fr; } }
+/* ======================================================================== /pricing
+
+  BQ-027. Four plan cards on four shared baselines, by subgrid rather than by min-height.
+
+  Measured at 1440 before this: the four titles, prices, bodies and buttons each started
+  wherever the card above them happened to end, 32px apart at the worst pair, because every card
+  was its own flex column. The grid owns four rows now -- head, body, features, action -- and
+  each card spans them, so a row is as tall as the tallest card's content and all four cards
+  start their slot on the same line. A `min-height` per part would be a measurement of today's
+  copy; this is a relationship between the cards, which is what was actually wrong.
+
+  At two columns and at one the rows repeat implicitly, so the pairing still holds where the
+  grid wraps and the rule needs no width query of its own.
+*/
+.pricing-page .plans { grid-template-rows: repeat(4, auto); grid-auto-rows: auto; align-items: stretch; }
+.pricing-page .plan {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  align-content: start;
+}
+.pricing-page .plan-head { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.pricing-page .plan-body { margin: 0; }
+.pricing-page .plan-features { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.pricing-page .plan-action { display: flex; flex-direction: column; gap: 10px; align-items: stretch; align-self: end; }
+.pricing-page .plan-action .btn { width: 100%; }
+
+/*
+  BQ-110. The section headings under "How your plan works" had no scale between them: `h3` came
+  out of the browser default with zero margin against the block above it, and `h4` was never
+  styled at all, so a tile's title and its body were the same 14px. Three real steps -- 24 / 18 /
+  15 -- with the space each one owns above it.
+*/
+.pricing-page .pricing-details h3 { margin: 40px 0 14px; font-size: 18px; letter-spacing: -.015em; }
+.pricing-page .pricing-details .tile h4 { margin: 0 0 6px; color: var(--text-hi); font-size: 15px; font-weight: 500; }
+
+/*
+  BQ-135. The page is roughly 13,000px on a phone. This is the way down it.
+
+  The jump strip is the one `/security` already uses -- plain anchors to headings that already
+  carry ids, in fine print under the plan grid -- so there is no new component and nothing to
+  keep in step: a section that loses its id loses its link in the same edit.
+*/
+.pricing-page .pricing-jump { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 26px 0 0; }
+
+/*
+  BQ-135. The estimator read as a machine ledger: 10px tracked uppercase mono for both the field
+  label and every row title, in `--text-xlo`. These are questions a buyer reads, not identifiers,
+  so they take sans at the type floor; the amounts stay tabular, because a column of figures a
+  reader compares is exactly what tabular numerals are for.
+*/
+.usage-estimator label,
+.usage-estimator dt {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-mid);
+  text-transform: none;
+}
+
+/*
+  BQ-135. One divider treatment in the glance grid. The tiles carried a bottom hairline each, so
+  a three-column row drew three segments that stopped short of each other and read as a broken
+  rule. The row gap is the separation; the segments are gone.
+*/
+.pricing-page .pricing-glance .tile { border-bottom: 0; padding-bottom: 0; }
+.pricing-page .pricing-glance { gap: 28px 24px; }
+
+/*
+  BQ-135. Air under the hero. The plan grid started 26px under a paragraph of fine print, which
+  put a $0/$29/$99/Custom row inside the same block as the sentence above it.
+*/
+.pricing-page .plans { margin-top: clamp(32px, 4vw, 56px); }
+
+/* ========================================================================== /docs
+
+  BQ-104. A real step between a heading and the paragraph under it.
+
+  The documentation inherited the site's editorial `h2` -- clamp(27px, 3.3vw, 43px) -- next to a
+  15px body, so a reference page went from 43px to 15px with nothing between, and there was no
+  `h3` level at all. A flat hierarchy with one enormous step in it is the same defect as a flat
+  hierarchy with none. Three steps: 22 / 17 / 15.
+*/
+.docs-body h2 { margin: 36px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.02em; }
+.docs-body h2:first-child { margin-top: 0; }
+.docs-body h3 { margin: 24px 0 0; font-size: 17px; line-height: 1.35; letter-spacing: -.012em; }
+
+/*
+  BQ-104. A note is not a success.
+
+  The accent bar was `--verified`, the token this system uses for a checked, passing state -- on
+  callouts that say tables are not extracted, that a gate is closed, and that a request this
+  deployment will refuse is documented anyway. A reader who has learned what green means on
+  /explore and in the workspace read those as reassurance. The bar is neutral and the "Note"
+  label does the work, which is what the component's own comment already said it was for.
+*/
+.docs-note { border-left-color: var(--hairline-hi); }
+
+/*
+  Type floor, across the documentation chrome. Every one of these was 9px or 10px tracked mono
+  in `--text-xlo`: a table's column headers, the pager, the language tabs and an endpoint's scope
+  line. None of them is a machine identifier -- the identifiers are the `<code>` elements inside
+  the cells, which keep the mono face.
+*/
+.docs-table th { color: var(--text-mid); font: 500 12px/1.4 var(--f-sans); letter-spacing: .02em; text-transform: none; }
+.docs-endpoint header { font-size: 12px; }
+.docs-endpoint header em { color: var(--text-mid); }
+
+/*
+  BQ-137. The pager carried 10px mono and an empty `<span>` as a spacer, so the last section's
+  "previous" link sat under an element with no content and no name. The page renders only the
+  links it has now, and the row pushes a lone "next" to the right without a placeholder.
+*/
+.docs-pager { font: 500 13px/1.4 var(--f-sans); letter-spacing: 0; }
+.docs-pager a { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-mid); }
+.docs-pager a:last-child:first-child { margin-left: auto; }
+
+/*
+  BQ-107. The language tabs are a real control: 12px sans, a 44px target, and an underline on the
+  selected one rather than a box. Keyboard handling is in `components/docs-snippet.tsx` -- the
+  roles were already there and nothing implemented them.
+*/
+.docs-langs button {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-mid);
+  font: 500 12px/1.2 var(--f-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.docs-langs button[aria-selected="true"] { border-bottom-color: var(--verified); color: var(--text-hi); }
+
+/*
+  BQ-103. A code block that overflows can be reached from the keyboard and shows that it can be
+  scrolled.
+
+  `overflow-x: auto` was already set, so a pointer could scroll it and nothing else could: a
+  scroll container with no focusable child is unreachable by keyboard, and the block gave no
+  sign that anything was past its right edge. `tabindex="0"` is added in the page that renders
+  these (it needs an accessible name to go with it), and the affordance is a scrollbar that is
+  always drawn rather than a fade: `scrollbar-gutter: stable` reserves the track so the block
+  does not reflow when one appears, and a thin permanent bar says "there is more to the right"
+  in the one idiom every reader already has. A right-edge mask was the other candidate and it is
+  the worse one -- it paints whether or not the block overflows, so it dims the last characters
+  of every line that fits.
+*/
+.docs-code pre { scrollbar-width: thin; scrollbar-gutter: stable; }
+/*
+  The offset only. The ring itself is the one global `:focus-visible` rule in `app/tavonel.css`
+  and is not redeclared here -- what this block needs is the ring drawn inside its own edge, as
+  `<pre>` fills a bordered `<figure>` and an outward ring lands on the figure's rule.
+*/
+.docs-code pre:focus-visible { outline-offset: -2px; }
+
+/*
+  BQ-103, the other half of the row: a code block that is not one flat tone.
+
+  Two classes, both from the text ramp, and no syntax palette invented. The site's colours already
+  carry meanings -- `--verified` is evidence, `--changed` is a diff, `--failed` is a failure -- and
+  a third meaning for one of them, "string literal", would cost more than the highlighting is
+  worth. The ramp answers the thing that actually costs a reader time: prose inside a block reads
+  as prose, a literal reads as data, and the syntax between them keeps the block's full contrast.
+
+  `components/docs/code-tokens.tsx` emits them and says how the tokenizing is kept lossless.
+*/
+.docs-code .tok-com { color: var(--text-lo); }
+.docs-code .tok-str { color: var(--text-mid); }
+
+/*
+  BQ-137. The copy button reserves the width of its longest state, so pressing it does not move
+  it. The reserve is a zero-height ghost of that string; the visible label sits on top of it.
+*/
+.docs-copy-label { position: relative; display: inline-grid; }
+.docs-copy-reserve { visibility: hidden; height: 0; overflow: hidden; }
+.docs-copy-text { grid-area: 1 / 1; }
+.docs-copy-reserve { grid-area: 1 / 1; }
+
+/*
+  BQ-102. The error catalogue's filter. It sits directly above its table, so the two read as one
+  block rather than as a stray input on a documentation page.
+*/
+.docs-table-filter { display: grid; gap: 6px; margin: 24px 0 12px; max-width: 30rem; }
+.docs-table-filter label { font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--text-mid); }
+.docs-table-filter input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst);
+  background: var(--g1);
+  color: var(--text-hi);
+  font: 14px/1.4 var(--f-sans);
+}
+/* No focus rule here: the input is an ordinary control and the global `:focus-visible` ring in
+   `app/tavonel.css` is already exactly what this file used to restate. */
+.docs-table-filter p { margin: 0; min-height: 1.4em; }
+
+/*
+  And the row it hides stays hidden on a phone.
+
+  `components/docs/docs-table-filter.tsx` filters by setting `row.hidden`, whose entire effect is
+  the user-agent's `[hidden] { display: none }`. The stacked rendering below 620px sets
+  `tr { display: block }`, which outranks a user-agent rule -- so on the narrow screen the filter
+  was written for ("the browser's own find, which on a stacked phone rendering matches text a
+  reader cannot see the row for") every filtered-out row stayed on screen and in the accessibility
+  tree. This file is unlayered and `app/tavonel.css` is not, so this wins wherever the stacking
+  rule lives.
+*/
+.docs-table tr[hidden] { display: none; }
+
+/*
+  BQ-105. The search panel had no focus ring at all.
+
+  `.docs-search-field input:focus { outline: none }` removed the browser's own and put nothing
+  back, and the result links inherited the global reset -- so a keyboard reader moving through
+  eight results could not see which one they were on. The ring goes on the field wrapper, which
+  is the thing that looks like the control, and on each result row.
+
+  The excerpt goes to 12px: at 11px it was under the floor, on the line that is the whole reason
+  the result is legible.
+
+  2026-09-18: `app/tavonel.css` no longer suppresses the input's outline (the contract keeps one
+  focus style, the global `:focus-visible` ring), so the wrapper ring that stood in for it is
+  gone -- keeping both drew two concentric rings. The ring now sits on the `<input>` itself.
+
+  The result rows take only the offset; the ring is the global one. They sit on a 1px seam inside
+  a bordered list, where an outward ring would cross into the neighbouring row.
+*/
+.docs-search-results a:focus-visible { outline-offset: -2px; }
+.docs-search-results span { font-size: 12px; }
+.docs-search-field { color: var(--text-mid); }
+
+/* ================================================================= the editorial body
+
+  BQ-100. A title column holding nothing but the H1 is not a column.
+
+  `.body` is a two-column grid -- a 420-480px title rail and a reading column -- and it is the
+  right composition for a page that puts a jump index, a date pair or a "For:" line beside its
+  heading. On the routes that put *only* the H1 there, it is 480px of nothing next to a reading
+  column squeezed to make room for it: the sticky rule in `tavonel.css` pins the heading above
+  1321px and below that there is nothing to pin.
+
+  The decision (design-direction, BQ-100) splits by surface: the reference routes -- /docs, /api,
+  /sources, /integrations, /developers -- put navigation in that column, and every other route
+  collapses to a single reading measure. This is that rule written as the condition itself rather
+  than as a list of routes: a `.body` whose first column holds an H1 and nothing else is one
+  column, and the moment a page puts something beside the heading the composition comes back. No
+  page file carries a modifier class, and none can fall out of step with the list.
+
+  `grid-column: 1` on `.trust-next` is the other half: `tavonel.css` places it in column two,
+  which in a one-column grid would mint an implicit second one and put it back where it was.
+*/
+/*
+  D32. One reading column, full-width instruments.
+
+  BQ-100 collapsed these routes to a single 72ch track and stopped there, so a 582px measure hugged
+  the left edge of a full-bleed shell and left ~800px of black beside it for the whole height of
+  /security, /benchmarks, /evidence, /resources, /solutions, /sources and /status. The track is the
+  content width now; the measure moves onto the prose itself, where it belongs, and the card grids,
+  tables, figures and code blocks spend the width they were always sized for.
+*/
+/*
+  regressions-11. A breadcrumb above the H1 is still a column holding only the heading.
+
+  The condition below reads ":only-child" because a stack with something beside the title is a
+  composition. A breadcrumb is not: on /product/document-understanding it left the hero's left
+  track holding 158px of content against a 650px grid, which is the exact hole this block was
+  written to close.
+*/
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Prose keeps a 68ch measure and headings their own; everything else is an instrument and takes
+   the column. `p` is already capped site-wide by `.public-page .body p`; these are the rest. */
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) :is(li, dd, blockquote),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) :is(li, dd, blockquote) {
+  max-width: 68ch;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack > :is(h2, h3),
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .stack > :is(h2, h3) {
+  max-width: 34ch;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .stack:first-child,
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .stack:first-child {
+  position: static;
+}
+.scene.doc .body:has(> .stack:first-child > .document-title:only-child) > .trust-next,
+.scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .trust-next {
+  grid-column: 1;
+}
+
+/*
+  BQ-106. The legend for the connector tier chip, on /integrations.
+
+  A definition list rather than two chips with sentences beside them: it is a term and its
+  meaning, which is what a `<dl>` is, and it puts the two answers on one line each at every width
+  instead of inventing a second card grid above the card grid it explains.
+*/
+.connector-legend { display: grid; gap: 10px; margin: 0; }
+.connector-legend > div { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: 4px 16px; }
+/* type-04: a glossary term carries no state, so it is not painted in the state colour. */
+.connector-legend dt { color: var(--text-mid); font-size: var(--t-1); font-weight: 500; letter-spacing: .04em; }
+.connector-legend dd { margin: 0; color: var(--text-lo); font-size: 13px; line-height: 1.6; }
+@media (max-width: 620px) {
+  .connector-legend > div { grid-template-columns: minmax(0, 1fr); }
+}
+
+/*
+  BQ-137. A MIME type breaks between tokens or not at all, on /sources.
+
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document` is 74 characters with
+  no space in it, and the cell it sits in is a narrow column: it was wrapping mid-token, so a
+  reader trying to copy the type read half of "wordprocessi" on one line and "ngml" on the next.
+  `word-break: break-word` put the break wherever the line ran out. `overflow-wrap: anywhere`
+  breaks only when the token genuinely cannot fit, after the browser has already tried the
+  boundaries the string has of its own -- the slash, the dots, the hyphens -- so the common case
+  wraps at `officedocument.` rather than inside it.
+
+  It is also the last sub-floor label on this page: 10px tracked mono goes to 12px. The face
+  stays mono, because a MIME type is exactly the machine identifier that face is reserved for.
+*/
+.src-matrix tbody th i,
+.src-matrix td > i {
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-lo);
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+/*
+  BQ-113. One typeface for a form label, and facts in the face that prose is set in.
+
+  /contact set a field label in 10px tracked uppercase mono (`.contact-field > span`) and the
+  checkbox label beside it in 13px sans (`.contact-checks label`), so the same object -- the
+  name of a thing you type into -- had two typefaces on one screen, and the mono half was two
+  sizes under the 12px floor. The mono face is reserved for hashes, paths, ids, error codes and
+  timestamps; "Work email" is none of those, and neither is "Google sign-in. No separate
+  TAVONEL password is created or stored."
+
+  The email addresses under `.contact-address a` stay in mono. An address is the one thing on
+  this page a reader copies character by character, which is what that face is for.
+*/
+.contact-address span,
+.contact-field > span,
+.contact-field > legend,
+.contact-qualify > legend {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-mid);
+}
+.contact-qualify > legend { color: var(--text-lo); }
+.contact-qualification-fold > summary span {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-lo);
+}
+.contact-submit span,
+.contact-status p {
+  font-family: var(--f-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-lo);
+}
+.auth-facts li {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-lo);
+}
+.auth-facts b { color: var(--text-hi); }
+
+/* ======================================================================== error and index counters
+
+  BQ-136. A section number is a number, not an identifier.
+
+  `decimal-leading-zero` turns 1 into 01, which is the form a machine writes -- a build number, a
+  take, a track. The counter is plain, the face is the one the list is set in, and the size is on
+  the floor. (The policy jump index this also covered renders `PageTocList` since pages-13.)
+
+  These rules live here rather than in app/ux-polish.css because that sheet belongs to another
+  lane; it is imported before this one, so ordering carries the override.
+*/
+.dev-journey li::before {
+  content: counter(devstep) ".";
+  font-family: var(--f-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-lo);
+}
+
+/*
+  BQ-137. Aligning the bodies of a card row without reserving a line in every card.
+
+  `.chain .link > h2 { min-height: 2.4em }` in app/tavonel.css used to buy that alignment by
+  reserving a second line on EVERY card heading, which opened 20px of empty space under each
+  one-line title -- three times on this row, where none of the three wraps. pages-06 deleted it.
+  Subgrid is what replaces it, here and on any row where a title does wrap: the four parts of the
+  card get a row each, measured across the row, so the bodies start together whatever the titles
+  do, and nothing reserves a line it does not use.
+*/
+.dev-paths { grid-template-rows: repeat(4, auto); }
+.dev-paths > .link {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  align-content: start;
+}
+@media (max-width: 760px) {
+  .dev-paths { grid-template-rows: auto; }
+  .dev-paths > .link { grid-row: auto; grid-template-rows: none; }
+}
+
+/*
+  BQ-136. The changelog entry header, after the chips came off it.
+
+  `.changelog-entry header a` was the bare "#" permalink and carried `margin-left: auto` to push
+  it to the far end of the row. The date is the link now, so it sits where the date sat, and the
+  rule that pushed it away is what would move the date instead. The date itself goes from 10px
+  mono to the type floor: a rendered date is prose, and the machine form is already in `datetime`.
+*/
+.changelog-entry header a { margin-left: 0; color: var(--text-mid); font: inherit; }
+@media (hover: hover) and (pointer: fine) {
+  .changelog-entry header a:hover { color: var(--text-hi); }
+}
+.changelog-entry header time { color: inherit; font: inherit; font-size: 13px; letter-spacing: 0; }
+.changelog-entry header b { font: 500 12px var(--f-sans); letter-spacing: 0; color: var(--verified); }
+
+/* ================================================== the section heading, after BQ-099
+
+  A promoted kicker is a section heading, and a section heading is not nearly an H1.
+
+  BQ-099 deleted the kickers that restated the heading beside them and promoted the rest from
+  `p.slate` to a real `<h2>` -- the right markup, and it landed them on `h2` in `tavonel.css`,
+  which is `clamp(27px, 3.3vw, 43px)`. That is the landing page's section type: a band heading
+  that owns a whole screen. On a document page it puts "What connects today." at 43px beside a
+  `.document-title` that tops out at 52px, so the page's second level is within nine pixels of
+  its first, and the level below it is 19px. One barely-there step and then a cliff is the flat
+  hierarchy the direction names.
+
+  The step is the fix, scoped to the composition it is wrong in: a heading that is a direct child
+  of a `.body` column. Card titles are untouched -- they are inside `.chain`, `.tiles` and
+  `.product-surface-grid`, never a column's own child -- and so is every `h2` outside `.scene.doc`.
+  `.docs-body h2` is 22px above, which is the same decision one surface further in.
+
+  The root fix is the type scale in `tavonel.css`; it is in the report for L1.
+*/
+.scene.doc .body > .stack > h2 {
+  font-size: clamp(22px, 2.2vw, 30px);
+  line-height: 1.22;
+  letter-spacing: -.02em;
+}
+}

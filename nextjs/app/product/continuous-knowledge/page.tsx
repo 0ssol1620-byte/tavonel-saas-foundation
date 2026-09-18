@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import CompilerContractDiagram from "@/components/compiler-contract-diagram";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import {
   CONTRACT_CLAUSES,
   CONTRACT_STATE,
@@ -12,6 +13,7 @@ import {
   type ContractClauseState,
 } from "@/lib/compiler-contract";
 import styles from "./continuous-knowledge.module.css";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -61,23 +63,42 @@ export const metadata: Metadata = {
 /** The two states this page actually uses, in the order a reader meets them. */
 const STATE_KEY: readonly ContractClauseState[] = ["demonstrated", "direction"];
 
+/** G1-026: the clauses in two halves, so the page's first action can sit between them. */
+const MID_CLAUSE = Math.ceil(CONTRACT_CLAUSES.length / 2);
+const CLAUSE_HALVES = [
+  [0, CONTRACT_CLAUSES.slice(0, MID_CLAUSE)],
+  [MID_CLAUSE, CONTRACT_CLAUSES.slice(MID_CLAUSE)],
+] as const;
+
+/** One trail, read by the crawler and by the reader. See `DocBreadcrumb` (BQ-137). */
+const TRAIL = [
+  { name: "Product", path: "/product" },
+  { name: "Continuous knowledge", path: "/product/continuous-knowledge" },
+];
+
 export default function ContinuousKnowledgePage() {
   return (
     <PublicSitePage>
-      <BreadcrumbJsonLd trail={[{ name: "Product", path: "/product" }, { name: "Continuous knowledge", path: "/product/continuous-knowledge" }]} />
+      <BreadcrumbJsonLd trail={TRAIL} />
       <section className="scene doc">
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>PRODUCT</b><span />CONTINUOUS RECOMPILATION</p>
+              <DocBreadcrumb trail={TRAIL} />
               <h1 className="document-title">Continuous recompilation — the Compiler Contract.</h1>
             </div>
             <div className="stack">
+              {/*
+                BQ-109 / BQ-134: the lede reads at one weight. The bold ran from the middle of the
+                paragraph to the end of the next sentence, which is not emphasis -- it is a second
+                heading typeset inside a paragraph, on the sentence a reader was going to read
+                anyway. The sentence is unchanged; only the weight is.
+              */}
               <p className="lede">
                 Knowledge is not compiled once. Sources keep moving, and a compiler that cannot say
                 what a change did to the knowledge standing on it is an indexer with extra steps.
-                <b> The Compiler Contract is the eight promises a compile has to keep</b> — and,
-                on this page, the state each one actually holds here.
+                The Compiler Contract is the eight promises a compile has to keep — and, on this
+                page, the state each one actually holds here.
               </p>
               <dl className={styles.key}>
                 {STATE_KEY.map((state) => (
@@ -98,20 +119,48 @@ export default function ContinuousKnowledgePage() {
 
           <section className={styles.section} aria-labelledby="clauses">
             <h2 id="clauses">The eight clauses</h2>
-            <ol className={styles.clauses} data-contract-clauses="">
-              {CONTRACT_CLAUSES.map((clause, index) => (
-                <li className={styles.clause} data-contract-clause="" data-state={clause.state} id={clause.id} key={clause.id}>
-                  <div className={styles.head}>
-                    <span className={styles.index}>{String(index + 1).padStart(2, "0")}</span>
-                    <h3>{clause.name}</h3>
-                    <span className={styles.state} data-state-label="">{CONTRACT_STATE[clause.state].label}</span>
-                  </div>
-                  <p className={styles.promise}>{clause.promise}</p>
-                  <p className={styles.explain}>{clause.body}</p>
-                  <p className={styles.check}><b>WHERE TO CHECK IT</b>{clause.evidence}</p>
-                </li>
-              ))}
-            </ol>
+            {/*
+              G1-026. One list became two, with the page's first action between them.
+
+              This page is about 5,800px of prose and its first action was at the very bottom, so a
+              reader who took the argument at clause 03 had nothing to do about it for five screens.
+              The break is halfway, derived from the clause count rather than written as a 4, and it
+              asks for the sample before it asks for anything else -- the contract's own claim is
+              that it can be checked, not that it should be bought. The closing row keeps its three
+              actions; this is not a second copy of them.
+
+              Two `<ol>` elements rather than an item inside one, because the list is a two-column
+              grid at 1100px and an aside cell inside it would need a column-span rule in CSS this
+              lane does not own. The numbering is unaffected: it is computed from the clause's index
+              in `CONTRACT_CLAUSES`, not from the list it is rendered in.
+            */}
+            {CLAUSE_HALVES.map(([from, half], group) => (
+              <Fragment key={from}>
+                {group === 1 ? (
+                  <p className="fine">
+                    {from} clauses in, and every one of them is checkable on a World that is already
+                    compiled.{" "}
+                    <Link href={"/explore" as Route}>Open the public Compiled World</Link> and follow
+                    a fact back to the page it was read from, or{" "}
+                    <Link href="/contact">request access</Link> to compile your own sources.
+                  </p>
+                ) : null}
+                <ol className={styles.clauses} data-contract-clauses="" start={from + 1}>
+                  {half.map((clause, index) => (
+                    <li className={styles.clause} data-contract-clause="" data-state={clause.state} id={clause.id} key={clause.id}>
+                      <div className={styles.head}>
+                        <span className={styles.index}>{String(from + index + 1).padStart(2, "0")}</span>
+                        <h3>{clause.name}</h3>
+                        <span className={styles.state} data-state-label="">{CONTRACT_STATE[clause.state].label}</span>
+                      </div>
+                      <p className={styles.promise}>{clause.promise}</p>
+                      <p className={styles.explain}>{clause.body}</p>
+                      <p className={styles.check}><b>WHERE TO CHECK IT</b>{clause.evidence}</p>
+                    </li>
+                  ))}
+                </ol>
+              </Fragment>
+            ))}
           </section>
 
           <section className={styles.section} aria-labelledby="flow">
@@ -178,7 +227,7 @@ export default function ContinuousKnowledgePage() {
 
           <div className={styles.section}>
             <div className="actions">
-              <Link className="btn" href={"/explore" as Route}>See a compiled World</Link>
+              <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
               <Link className="btn ghost" href="/product/compiled-world">What a World contains</Link>
               <Link className="btn ghost" href="/evidence">What has been measured</Link>
             </div>

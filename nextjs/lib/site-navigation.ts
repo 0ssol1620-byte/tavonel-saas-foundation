@@ -61,6 +61,98 @@ export const SELF_SERVE_CTA: SiteLink = { href: "/login", label: "Start with you
 export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compiled World" };
 
 /**
+ * The positioning line, once.
+ *
+ * Five different sentences were carrying it — one in the hero, one in the footer, one in the OG
+ * card, one in the metadata description and one on /ko — so the answer to "what is this" changed
+ * depending on which surface a reader landed on first. These two strings are the answer; every OG
+ * card, footer tagline and metadata description derives from them, and the other four go.
+ *
+ * Changing either string is a founder call: it is a public claim, not a copy edit.
+ */
+export const BRAND_LINE = {
+  headline: "Bring your knowledge. TAVONEL makes it ready for AI.",
+  descriptor: "Knowledge compiled with a traceable path back to every source.",
+} as const;
+
+/* ============================================================ G1-043 / G1-044: the Korean chrome
+
+  One page, one map, and deliberately not an i18n layer.
+
+  `/ko` is the site's only Korean URL (§12.4) and it was rendering an entirely English header and
+  footer around Korean body copy -- the access button, the sign-in link, five footer group titles
+  and the tagline -- so the one page written for a Korean reader asked them to read the navigation
+  in the other language. Installing a locale framework to translate eleven strings is the wrong
+  size of answer; a second page in a third language is when that conversation starts.
+
+  The two CTA labels are keyed by destination rather than written as a list, so this cannot invent
+  a third access action: a label here exists only where `ACCESS_CTA` or `SELF_SERVE_CTA` already
+  points, and `lib/brand-copy.test.ts` fails if one of them loses its Korean counterpart.
+
+  `stateLine` is the Korean form of `deploymentStateLine()`. It says the same two facts -- a
+  finished public World open to read now, your own files arranged with us -- and it is a
+  translation rather than a second policy: it lives beside the English one so the two cannot be
+  edited apart.
+*/
+export const KO_CHROME = {
+  cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
+  signIn: "로그인",
+  /*
+    BQ-013 / D12. The three primary destinations, keyed by href for the same reason the two CTA
+    labels are: a label exists here only where `CUSTOMER_NAV` already points, so this table cannot
+    invent a fourth section. Literal translations of the English labels -- a translation is not a
+    new claim, and the primary nav vocabulary itself is the founder's.
+  */
+  nav: {
+    "/product": "작동 방식",
+    "/integrations": "연결",
+    "/pricing": "요금",
+  } as Record<string, string>,
+  menu: "메뉴",
+  footerGroups: {
+    Product: "제품",
+    Research: "리서치",
+    Developers: "개발자",
+    Trust: "신뢰와 보안",
+    Legal: "약관",
+  } as Record<string, string>,
+  /*
+    chrome-14 / D36. The footer was half translated: Korean group headings over 24 English link
+    labels, which reads as an unfinished translation rather than a decision. Keyed by href for
+    the same reason the nav and CTA tables are -- a label exists here only where FOOTER_GROUPS
+    already points, so this cannot name a route the site does not have. Literal translations of
+    the English labels; product names (TAVONEL, MCP, API) are not translated.
+  */
+  footerLinks: {
+    "/product": "제품",
+    "/solutions": "솔루션",
+    "/integrations": "연동",
+    "/sources": "지원 파일",
+    "/knowledge-compiler": "지식 컴파일러",
+    "/enterprise": "엔터프라이즈",
+    "/pricing": "요금",
+    "/benchmarks": "방법론",
+    "/research": "리서치",
+    "/evidence": "증거",
+    "/resources": "자료",
+    "/docs": "문서",
+    "/api": "API",
+    "/developers": "MCP와 에이전트",
+    "/changelog": "변경 이력",
+    "/trust": "신뢰 센터",
+    "/security": "보안",
+    "/status": "상태",
+    "/subprocessors": "하위 처리자",
+    "/contact": "문의",
+    "/privacy": "개인정보 처리방침",
+    "/terms": "이용약관",
+    "/refunds": "환불 정책",
+  } as Record<string, string>,
+  tagline: "모든 결과에서 원문까지 다시 따라갈 수 있도록 컴파일합니다.",
+  stateLine: "공개 Compiled World: 지금 전체 열람 가능 · 내 자료 컴파일: 협의 후 진행",
+} as const;
+
+/**
  * How the product's own nouns are spelled in public copy.
  *
  * The audit found the central noun lower-cased in one sentence and capitalised in the next on the
@@ -69,6 +161,10 @@ export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compi
  * ordinary casing -- "a real-world thing" is not this noun.
  */
 export const PRODUCT_NOUNS = [
+  // BQ-098. The category noun, which the guide, the product page, the 404 and the root layout
+  // all capitalise and one resource description did not: "what a knowledge compiler is" on the
+  // card that links to the page titled "What is a Knowledge Compiler?".
+  "Knowledge Compiler",
   "World",
   "Compiled World",
   "Trust Center",
@@ -194,9 +290,14 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
   },
   { href: "/api", label: "API", purposes: ["build"], workflows: ["use-elsewhere"] },
   { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [], column: "verify" },
-  { href: "/arena", label: "TAVONEL Arena", purposes: ["evaluate", "verify"], workflows: [], column: "verify" },
+  /*
+    BQ-112 / D11: `/arena` is not listed here. The route still answers -- an existing link does
+    not 404 -- but it publishes no comparison yet, carries `robots: { index: false }` and is out
+    of `app/sitemap.ts`. A hub entry and a menu column are offers to read something, and the
+    protocol a reader was being sent there for is `/benchmarks`, two lines below.
+  */
   { href: "/research", label: "Research", purposes: ["learn"], workflows: [], column: "verify" },
-  { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [], column: "verify" },
+  { href: "/benchmarks", label: "Benchmark protocol", purposes: ["verify"], workflows: [], column: "verify" },
   {
     /*
       BA-252: "Evidence", the one name. The page carried three -- "Technical evidence" here, its
@@ -235,16 +336,30 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
         second way to it that does not require opening a menu at all.
       */
       { href: "/sources", label: "Supported files" },
+      /*
+        BQ-052. Three advertised routes the footer could not reach.
+
+        `/enterprise`, `/resources` and `/knowledge-compiler` are in the sitemap, are linked from
+        inside other pages and are what a reader who arrived on a docs page is looking for -- and
+        the only way to any of them was a link in running text on a page they might never open.
+      */
+      { href: "/knowledge-compiler", label: "Knowledge Compiler" },
+      { href: "/enterprise", label: "Enterprise" },
       { href: "/pricing", label: "Pricing" },
     ],
   },
   {
     title: "Research",
     links: [
-      { href: "/arena", label: "Arena" },
+      /*
+        D11. `/arena` is out of the footer until it has content. The route still answers -- it
+        says the work is not published yet and carries `robots: noindex` -- but a standing link
+        to a page with nothing on it is the site advertising a result it has not produced.
+      */
       { href: "/benchmarks", label: "Methodology" },
       { href: "/research", label: "Research" },
       { href: "/evidence", label: "Evidence" },
+      { href: "/resources", label: "Resources" },
     ],
   },
   {
@@ -298,8 +413,16 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
 export const FOOTER_LEGAL_ROW = {
   /** The brand, which is what this site is published as. No entity, no jurisdiction -- see above. */
   copyright: "© 2026 TAVONEL",
-  /** The §12.4 Korean entry, in Korean, because that is who it is for. */
+  /*
+    The §12.4 Korean entry, in Korean, because that is who it is for -- and its return trip.
+
+    chrome-06: this was one static entry rendered on every route, so on /ko itself the control
+    read "한국어" and pointed at /ko. A switch whose only job is to change language was a self-link
+    on the one page where it matters. The pair is reciprocal now and the footer picks the side the
+    page is not on.
+  */
   language: { href: "/ko", label: "한국어" },
+  languageBack: { href: "/", label: "English" },
   security: "security@tavonel.com",
 } as const;
 

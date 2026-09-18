@@ -34,13 +34,13 @@ export default function GlobalError({
             <p
               style={{
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 11,
+                fontSize: 12,
                 letterSpacing: "0.16em",
                 color: "#7D878D",
                 margin: "0 0 14px",
               }}
             >
-              TAVONEL &middot; SOMETHING FAILED
+              TAVONEL
             </p>
             <h1 style={{ margin: "0 0 14px", fontSize: 30, lineHeight: 1.2, color: "#EDEAE4", fontWeight: 600 }}>
               The application stopped loading.
@@ -56,10 +56,13 @@ export default function GlobalError({
                 font: "inherit",
                 fontSize: 13,
                 letterSpacing: "0.08em",
-                color: "#08090A",
-                background: "#7BE0BE",
-                border: 0,
-                borderRadius: 3,
+                // BQ-136: an outline, not a filled mint block. Nothing else on this site
+                // has a solid accent button, and the one place a reader meets one is the
+                // screen that has already told them the application failed to load.
+                color: "#EDEAE4",
+                background: "transparent",
+                border: "1px solid #3A4045",
+                borderRadius: 2,
                 padding: "11px 18px",
                 cursor: "pointer",
               }}

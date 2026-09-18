@@ -73,7 +73,7 @@ const MECHANISM = [
 ] as const;
 
 const VERIFY = [
-  ["Open a result", "Ask a question, or open any object in a compiled world, and follow its citation."],
+  ["Open a result", "Ask a question, or open any object in a Compiled World, and follow its citation."],
   ["Reach the location", "The evidence record names the source version and the exact location inside it, and opens that location."],
   ["Export the world", "Download the signed package: ontology, graph, retrieval corpus, provenance and validation."],
   ["Verify independently", "Check every file digest against the manifest, and the manifest signature against the published key."],
@@ -132,8 +132,7 @@ export default function EvidencePage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>EVIDENCE</b><span />SOURCE BINDING</p>
-              <h1 className="document-title">Follow grounded results<br />back to the source.</h1>
+              <h1 className="document-title">Follow grounded results back to the source.</h1>
             </div>
             <div className="stack">
               {/*
@@ -144,9 +143,9 @@ export default function EvidencePage() {
                 is part of the lede now; the cross-links are one labelled row at the foot.
               */}
               <p className="lede">
-                A compiled world is only worth as much as its ability to show its work.{" "}
-                <b>Every compiled fact stays traceable to its exact source location.</b> This page
-                is <b>how a compiled result stays bound to the source it came from</b>, and how to
+                A Compiled World is only worth as much as its ability to show its work.{" "}
+                Every compiled fact stays traceable to its exact source location. This page
+                is how a compiled result stays bound to the source it came from, and how to
                 check that yourself, without taking our word for it.
               </p>
               {/*
@@ -159,7 +158,7 @@ export default function EvidencePage() {
                 /trust, as one. What is gone is the count.
               */}
 
-              <p className="slate"><span />WHAT AN EXACT SOURCE LOCATION IS</p>
+              <h2>What an exact source location is</h2>
               <p className="fine">
                 A location is whatever addresses one place inside that kind of source. One of
                 these forms is what TAVONEL reads today; the rest are the shape the evidence
@@ -181,18 +180,36 @@ export default function EvidencePage() {
                 </p>
               </div>
               {/* BA-113: one heading level per card grid, in document order. This is h3's grid. */}
-              <p className="slate"><span />THE CONTRACT IS BUILT TO HOLD THESE TOO</p>
-              <div className="tiles">
+              <h2 id="contracted-locators">What the contract is built to hold</h2>
+              {/*
+                BQ-112. The state, once, above the grid.
+
+                BA-078 moved it out of a fold and onto every tile, and it was right about the
+                fold: a correction hidden under a grid of present-tense capability panels is the
+                brand contradicting itself one click away from where it does so. It got there by
+                putting the same four words on all seven tiles, and seven identical chips is not
+                seven facts -- it is one fact, typeset as the loudest thing in the section.
+
+                So the fact keeps its position and loses its repetition. It is prose, above the
+                grid, in the heading's own block: not folded, not a chip, and read before the
+                first tile rather than again after each one.
+              */}
+              <p className={styles.locatorState}>
+                Reader not shipped: none of these seven is read in this deployment today. They are
+                the locator shapes the evidence contract is defined for, so a format that gains a
+                reader gains a locator that was already specified rather than one invented at the
+                time.
+              </p>
+              <div className="tiles" aria-describedby="contracted-locators">
                 {CONTRACTED_LOCATORS.map(([family, locator]) => (
                   <article className="tile" key={family}>
                     <h3>{family}</h3>
                     <p>{locator}</p>
-                    <p className={styles.locatorState}>Reader not shipped</p>
                   </article>
                 ))}
               </div>
 
-              <p className="slate"><span />HOW EVIDENCE IS BOUND</p>
+              <h2>How evidence is bound</h2>
               <div className="tiles">
                 {MECHANISM.map(([title, body, href, label]) => (
                   <article className="tile" key={title}>
@@ -203,7 +220,7 @@ export default function EvidencePage() {
                 ))}
               </div>
 
-              <p className="slate"><span />VERIFY IT YOURSELF</p>
+              <h2>Verify it yourself</h2>
               <div className="chain">
                 {VERIFY.map(([title, body], index) => (
                   <article className="link" key={title}>

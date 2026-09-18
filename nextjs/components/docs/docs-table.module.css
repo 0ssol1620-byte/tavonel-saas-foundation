@@ -1,0 +1,31 @@
+/*
+  The one thing the global stacked-table pattern cannot do from the outside.
+
+  `app/tavonel.css` stacks any `.docs-table` whose cells carry `data-label` below 620px, so the
+  module that used to duplicate that pattern here -- at its own 760px breakpoint, unlayered and
+  therefore beating the global rule on the three routes that imported it -- is gone.
+
+  What is left is /pricing's shape: a row named by `<th scope="row">` rather than by a first
+  cell. A row header left as a table-cell inside a `display: block` row is laid out in an
+  anonymous table box of its own, which puts the row's name in a narrow column beside the stack
+  instead of at the top of it. It is the card's title there, so it is a block like the cells and
+  it carries a title's weight. `.src-matrix` on /sources resolves the same thing the same way.
+
+  The class is doubled in every selector on purpose. `.docs-table th` in the global sheet has the
+  same specificity as a single module class, so a tie would be decided by stylesheet order, which
+  is not something this file can see. The breakpoint is the global one, not a second answer to
+  the same question.
+*/
+@media (max-width: 620px) {
+  .rowHeader.rowHeader tbody th {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-hi);
+  }
+  .rowHeader.rowHeader th + td {
+    margin-top: 10px;
+  }
+}

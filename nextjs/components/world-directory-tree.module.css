@@ -1,7 +1,7 @@
 .tree {
   --dir-ink: var(--text-hi, #e8e7e2);
   --dir-muted: var(--text-lo, #a5a49d);
-  --dir-faint: var(--text-xlo, #74736d);
+  --dir-faint: var(--text-lo, #74736d);
   --dir-line: var(--hairline, rgb(255 255 255 / 0.12));
   --dir-accent: var(--verified, #9bb8a4);
   display: grid;
@@ -9,7 +9,7 @@
   min-width: 0;
 }
 
-.summary { margin: 0; color: var(--dir-faint); font: 10px var(--f-mono, monospace); letter-spacing: .04em; }
+.summary { margin: 0; color: var(--dir-faint); font: 13px var(--f-sans, sans-serif); font-variant-numeric: tabular-nums; }
 
 .root, .children { margin: 0; padding: 0; list-style: none; }
 .children { margin-left: 14px; border-left: 1px solid var(--dir-line); }
@@ -20,18 +20,36 @@
   gap: 8px;
   align-items: baseline;
   padding: 4px 6px;
+  /* WCAG 2.5.8 spacing: two stacked disclosure targets cannot overlap each other if the row is
+     as tall as the target is. */
+  min-height: 32px;
   min-width: 0;
 }
-.rowHead:hover { background: var(--g1, rgb(255 255 255 / 0.035)); }
 
+/*
+  WCAG 2.5.8. The glyph stays 16px so the tree indentation does not move; the pointer target is a
+  32px square centred on it, painted by a pseudo-element so it costs no layout at all. The button
+  keeps its own aria-expanded -- only the hit area grew.
+*/
 .disclosure {
+  position: relative;
   width: 16px;
+  padding: 0;
   color: var(--dir-faint);
-  font: 11px var(--f-mono, monospace);
+  font: 12px var(--f-mono, monospace);
   text-align: center;
 }
-.disclosure:hover, .disclosure:focus-visible { color: var(--dir-ink); }
-.leafMark { width: 16px; color: var(--dir-faint); font: 11px var(--f-mono, monospace); text-align: center; }
+.disclosure::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+}
+.disclosure:focus-visible { color: var(--dir-ink); }
+.leafMark { width: 16px; color: var(--dir-faint); font: 12px var(--f-mono, monospace); text-align: center; }
 
 .name {
   min-width: 0;
@@ -42,21 +60,30 @@
   white-space: nowrap;
 }
 button.name { text-decoration: underline; text-underline-offset: 2px; }
-button.name:hover, button.name:focus-visible { color: var(--dir-accent); }
+button.name:focus-visible { color: var(--dir-accent); }
 button.name[data-selected="true"] { color: var(--dir-accent); }
 
-.kind, .count, .sources { color: var(--dir-faint); font: 9px var(--f-mono, monospace); letter-spacing: .06em; }
+.kind, .count { color: var(--dir-faint); font: 12px var(--f-mono, monospace); letter-spacing: .06em; }
+.sources { color: var(--dir-faint); font: 12px var(--f-sans, sans-serif); }
 .kind { text-transform: uppercase; }
 .count { margin-left: auto; }
 /* Sources sit after the count so the eye reads name, kind, size, provenance in one pass. */
 .sources { white-space: nowrap; }
 
-.empty { display: grid; gap: 8px; padding: 32px; border: 1px dashed var(--hairline, rgb(255 255 255 / 0.12)); }
-.empty span { color: var(--text-xlo, #74736d); font: 9px var(--f-mono, monospace); letter-spacing: .12em; }
+.empty { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--hairline, rgb(255 255 255 / 0.12)); }
+.empty span { color: var(--text-lo, #74736d); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
 .empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
 .empty p { margin: 0; color: var(--text-lo, #a5a49d); font-size: 12px; }
 
 @media (max-width: 720px) {
   .count { margin-left: 0; }
   .rowHead { flex-wrap: wrap; }
+}
+
+/* Hover, in one gated place (TOKEN_CONTRACT_0917): a tap on a phone fires :hover and leaves the
+   row wearing that face until something else is tapped. Focus and selected faces stay above. */
+@media (hover: hover) and (pointer: fine) {
+  .rowHead:hover { background: var(--g1, rgb(255 255 255 / 0.035)); }
+  .disclosure:hover { color: var(--dir-ink); }
+  button.name:hover { color: var(--dir-accent); }
 }

@@ -78,8 +78,16 @@ describe("what reaches the mailbox", () => {
 
   it("reports the answered questions in the order they were asked", () => {
     const lines = qualificationLines({ region: ["Korea"], volume: ["Under 100"] });
-    expect(lines.map((line) => line.label)).toEqual(["Estimated document volume", "Data region requirement"]);
-    expect(lines[1].value).toBe("Korea");
+    /*
+      The labels are the questions' own, so rewording a question moves this with it. G2-024
+      reworded two of them from "requirement" to "preference": a form field is a promise, and
+      neither an arbitrary data region nor an air-gapped deployment is one we can keep. What is
+      pinned is the order and, for the region question, the word that stops it promising.
+    */
+    expect(lines.map((line) => line.label)).toEqual([QUALIFICATION[0]!.label, QUALIFICATION[5]!.label]);
+    expect(lines[1]!.label, "the region question asks a preference, not a requirement")
+      .toContain("preference");
+    expect(lines[1]!.value).toBe("Korea");
   });
 
   it("says nothing about a question nobody answered", () => {

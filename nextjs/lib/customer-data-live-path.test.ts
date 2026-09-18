@@ -70,6 +70,23 @@ describe("customer data is not on the live compile path", () => {
       .not.toMatch(/founder|approval receipt|security suite|delegated|decision log|FD-\d\d/i);
   });
 
+  /*
+    G3-003. One payload, two rows, and they used to disagree in plain sight.
+
+    `/api/status` served "Customer intake is open." beside "Compiling your own files is not open in
+    this deployment yet.", and `/docs/quickstart` read the first of the two. Both rows are still
+    true of what they name -- the storage path is built, permission to compile it is not granted --
+    so what this pins is that the intake row may not use the word the closed gate spends its whole
+    sentence denying, and that it names the arrangement instead.
+  */
+  it("never states intake as simply open while the compile gate is closed", () => {
+    expect(activationPolicy.customerData.enabled).toBe(false);
+    const { reason } = activationPolicy.customerIntake;
+    expect(reason, '"intake is open" beside a closed compile gate is the contradiction')
+      .not.toMatch(/intake is open/i);
+    expect(reason, "and what is true instead is named").toMatch(/arranged with us/i);
+  });
+
   it("says so on the public capability grid", () => {
     const grid = readCapabilities({ activationPolicy: { ...activationPolicy } }, false);
     expect(grid.find((capability) => capability.name === "Customer-data compilation")).toEqual({

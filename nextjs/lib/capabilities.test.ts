@@ -63,7 +63,7 @@ describe("capability grid", () => {
   });
 
   it("keeps a disabled gate closed rather than unknown", () => {
-    const promotion = readCapabilities(HEALTHY, false).find((c) => c.name === "Promotion to the live world");
+    const promotion = readCapabilities(HEALTHY, false).find((c) => c.name === "Activating a World");
     expect(promotion?.tone).toBe("closed");
   });
 

@@ -9,57 +9,74 @@
   unlayered `button { background: none; border: 0 }` and `a { text-decoration: none }` beat any
   layer, so the two choices rendered as bare text and the privacy link lost its underline.
 
-  So: no layer, a narrow sheet docked bottom-right on the desktop and full-width on a phone, and
-  `body` given room underneath it while it is up, so it covers nothing. Consent is two equal
-  choices, so neither is a filled primary: Allow carries the panel's own surface and a hairline,
-  No thanks is quiet, and both sit on the same left edge as the sentence above them.
+  BA-231's answer was a narrow sheet docked bottom-right with `body` padding under it. G2-006 is
+  the audit finding that the sheet still covers content: a floating card in the bottom-right
+  corner is in the content plane for the whole of a long scroll, whatever the body's padding says
+  about the end of it, and the audit measured it over the Team and Enterprise cards on /pricing,
+  the RunPod row on /subprocessors, the submit region on /contact and body copy on seven more
+  pages. Reserved space at the bottom only works if the thing occupying it is *at* the bottom.
+
+  So there is one surface at both widths now: a full-width bar docked to the bottom edge, one row
+  high, with `body` padding equal to its height while it is up. It overlaps nothing at any scroll
+  position, because it is not over the page -- the page ends above it.
+
+  G1-024 capped the phone height at 56px, and BQ-054 is where that cap stops being worth its
+  price: it only held because the sentence was set at 11px, under the site's 12px floor, on the
+  one paragraph every visitor is asked to read before answering. Three constraints meet here --
+  the 12px floor, the 44px control on a coarse pointer (`e2e/mobile-landing.spec.ts:330`), and
+  the four facts the sentence must name (`lib/marketing-analytics.test.ts`). The height is the
+  only one of the three that may move, so on a phone the row becomes two rows.
 */
 .panel, .settings {
   color: var(--text-hi);
-  background: var(--g1);
-  border: 1px solid var(--hairline-hi);
   font: inherit;
 }
 
+/*
+  Docked to the bottom edge, full width, one row.
+
+  It used to sit `var(--bar)` above the bottom -- 46px, reserved for the landing page's fixed
+  instrument bar. That bar is gone (`brand-copy.test.ts` fails if it returns), so what the offset
+  reserved was a 46px strip of page visible *under* a bar that is supposed to be docked: the one
+  detail that makes a system notice read as a floating advert. BQ-054: bottom is 0.
+*/
 .panel {
   position: fixed;
-  /* Bottom-right, out of the reading column, above the page and below the nav and the
-     landing page's instrument bar -- which is fixed at `--bar` tall, so the sheet clears it
-     rather than sitting on top of the one row that reports the product's state. */
-  inset: auto 1rem calc(var(--bar) + 12px) auto;
+  inset: auto 0 0 0;
   z-index: 55;
-  max-width: 30rem;
-  padding: 20px;
-  border-radius: 6px;
-  /* Depth is luminance and a hairline; this is the one surface that floats, so it gets one. */
-  box-shadow: 0 18px 44px rgb(0 0 0 / 0.55);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 60px;
+  padding: 8px clamp(16px, 4vw, 32px);
+  border: 1px solid var(--hairline-hi);
+  border-width: 1px 0 0;
+  background: var(--ground);
 }
 
 /*
-  Nothing on the page hides behind the sheet while it is up.
+  Nothing on the page hides behind the bar while it is up.
 
-  `:has()` rather than a class toggled from the component: the banner's own markup is the only
-  signal, so the padding cannot outlive it or be forgotten when the choice is made. The sheet is
-  about 150px tall at its widest wrap, and every page this appears on ends in a footer or a
-  closing action row rather than in content that has to be flush to the bottom.
+  `:has()` rather than a class toggled from the component: the bar's own markup is the only
+  signal, so the padding cannot outlive it or be forgotten when the choice is made. The value is
+  the bar's height, which this file now fixes rather than guessing at how the sentence wrapped.
 */
-:global(body):has(.panel) { padding-bottom: calc(var(--bar) + 184px); }
+:global(body):has(.panel) { padding-bottom: 76px; }
 
 .panel p {
-  margin: 0 0 14px;
-  font-size: 14px;
-  line-height: 1.55;
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /*
   The one control in this banner that was not thumb-sized.
 
-  `.actions button` and `.settings` both carry the 44px floor already; the "Privacy notice" link
-  inside the sentence was 19px. `e2e/mobile-landing.spec.ts:330` measures every `a` and `button`
-  on a coarse pointer against that floor, and it fails at 360 and 390 in both commercial
-  postures -- but no CI job has ever run those projects, so nothing said so. That is the
-  evidence hole the `product-qa` job in this same change closes, and this is the first thing it
-  found.
+  `.actions button` carries the 44px floor already; the "Privacy notice" link inside the sentence
+  was 19px. `e2e/mobile-landing.spec.ts:330` measures every `a` and `button` on a coarse pointer
+  against that floor, and it fails at 360 and 390 in both commercial postures -- but no CI job has
+  ever run those projects, so nothing said so.
 
   Padding grows the hit area to 44px; the equal negative block margin holds the line box at its
   text height, so the paragraph does not reflow and the sentence still reads as a sentence. The
@@ -67,75 +84,129 @@
 */
 .panel p a {
   display: inline-block;
-  padding-block: 12.5px;
-  margin-block: -12.5px;
+  /* 14, not 13: a 17px line plus 26px of padding measured 43.8px, under the 44px touch floor. */
+  padding-block: 14px;
+  margin-block: -14px;
   color: var(--verified);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
-.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+/*
+  BQ-054. Both answers, drawn the same.
+
+  "Refusing is as easy as allowing, and quieter only in weight" was the old note, and the weight
+  was the problem: refuse was a transparent box with a transparent border and `--text-mid` text
+  beside an accept button with a filled ground and a visible edge. Two controls of the same size
+  are not equally easy to press when only one of them looks like a control. Identical geometry,
+  identical border, identical colour -- if a reader has to look twice to tell which is which,
+  that is the correct outcome for a choice the site is not entitled to nudge.
+*/
+.actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .actions button {
   min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--hairline-hi);
-  border-radius: 3px;
+  border-radius: var(--r-inst, 6px);
   background: var(--g2);
   color: var(--text-hi);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
-/* Refusing is as easy as allowing, and quieter only in weight -- never in reach. */
-.actions button:first-child {
-  border-color: transparent;
-  background: none;
-  color: var(--text-mid);
+@media (hover: hover) and (pointer: fine) {
+  .actions button:hover { border-color: var(--text-lo); }
 }
-.actions button:hover { color: var(--text-hi); border-color: var(--hairline-hi); }
 
 /*
-  Once the choice is made, the reminder docks with the chrome instead of being left in the page.
+  The reopen control, in the footer's own link row.
 
-  It used to be a bare text button with a 5rem bottom margin, sitting under the closing action of
-  pages that have no footer -- 250px of empty floor and then an unexplained control, which reads
-  as debug UI somebody forgot to remove (BA-038).
+  It used to be a fixed pill in the bottom-left corner of every page, permanently (G1-033): an
+  unexplained control floating over the body and over the footer, which reads as debug UI somebody
+  forgot to remove (BA-038 moved it there; this moves it the rest of the way). A withdrawal path
+  has to exist -- that is not negotiable -- but it belongs where every other standing link lives,
+  and `components/public-site-chrome.tsx` renders that row. `.settings` is that link's styling and
+  carries no positioning at all.
+
+  `.floating` is the same control positioned as the old pill, and it is kept for one reason: it is
+  the only reopen path on a page that renders no site footer. `MarketingConsent` looks for the
+  footer anchor and falls back to it only when there is none, so a reader can always withdraw and
+  nobody ever sees two controls for one choice.
 */
 .settings {
-  position: fixed;
-  inset: auto auto calc(var(--bar) + 12px) 1rem;
-  z-index: 54;
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+/*
+  The token contract gates every :hover, so a touch device never keeps a hover state on the one
+  control that withdraws consent. Focus is not gated -- a keyboard has no hover -- which is the
+  same split `.floating` documents below.
+*/
+.settings:focus-visible { color: var(--text-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .settings:hover { color: var(--text-hi); }
+}
+
+.floating {
+  position: fixed;
+  inset: auto auto 12px 1rem;
+  z-index: 54;
   padding: 8px 12px;
-  border-radius: 3px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--r-inst, 6px);
+  background: var(--g1);
   color: var(--text-lo);
   font-size: 13px;
-  opacity: 0.6;
-  cursor: pointer;
+  text-decoration: none;
 }
-.settings:hover, .settings:focus-visible { opacity: 1; color: var(--text-hi); }
-
-.panel button:focus-visible, .panel a:focus-visible, .settings:focus-visible {
-  outline: 2px solid var(--text-hi);
-  outline-offset: 3px;
+/*
+  BQ-054 follow-up. The rest state was `opacity: 0.6` over `--text-lo`, which is under 4.5:1, and
+  the hover/focus rule that used to lift it back to 1 was dropped when the border came in -- so a
+  keyboard-focused control got a border change and nothing else. The opacity is gone rather than
+  re-lifted: `--text-lo` is already the quiet tone, and a second quieting multiplier on top of it
+  is what put this control under the floor. Hover is gated; focus is not (a keyboard has no hover).
+*/
+.floating:focus-visible { color: var(--text-hi); border-color: var(--text-lo); }
+@media (hover: hover) and (pointer: fine) {
+  .floating:hover { color: var(--text-hi); border-color: var(--text-lo); }
 }
 
 @media (max-width: 720px) {
-  /* Full width, opaque and shallow: a phone gives this a strip, not a third of the screen. */
+  /*
+    BQ-054. The 56px cap gives way to the 12px floor, and the row becomes two rows.
+
+    The cap was 44px of control plus 6px above and below, which only held because the sentence
+    was set at 11px -- below the site's floor, on the one paragraph every visitor is asked to
+    read before answering. The three constraints that meet here are the floor, the 44px control
+    and the four facts the sentence has to name; the height is the one that may move, so it does.
+
+    `height` becomes `min-height`, the sentence sits above the buttons rather than beside them,
+    and `:has()` pays the page back the exact room the bar takes (BQ-055) so nothing -- including
+    the footer's own links -- ends up underneath it.
+  */
   .panel {
-    inset: auto 0 var(--bar) 0;
-    max-width: none;
-    max-height: 45vh;
-    overflow-y: auto;
-    padding: 14px clamp(16px, 4vw, 24px);
-    border-width: 1px 0 0;
-    border-radius: 0;
-    background: var(--ground);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-height: 0;
+    padding: 10px clamp(12px, 3vw, 20px) 12px;
   }
-  .panel p { margin-bottom: 12px; font-size: 13px; }
-  :global(body):has(.panel) { padding-bottom: calc(var(--bar) + 220px); }
-  .settings { inset: auto auto calc(var(--bar) + 8px) 0.5rem; }
+  .panel p { font-size: 12px; line-height: 1.4; }
+  .panel p a { padding-block: 15px; margin-block: -15px; } /* 12px type: 16.8px line + 30px = 46.8px, above the 44px floor */
+  .actions { gap: 8px; }
+  .actions button { flex: 1 1 0; justify-content: center; padding: 10px; font-size: 12px; }
+  :global(body):has(.panel) { padding-bottom: 136px; }
+  .floating { inset: auto auto 8px 0.5rem; }
 }

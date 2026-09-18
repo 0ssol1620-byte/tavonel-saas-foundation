@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import PolicyLayout from "@/components/policy-layout";
+import Link from "next/link";
+import type { Route } from "next";
+import { PolicyDocument } from "@/components/policy-layout";
+import { PublicSitePage } from "@/components/public-site-chrome";
+import { CHANGELOG } from "@/lib/changelog";
 import { readPublicOperations } from "@/lib/operations";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { NOT_RUN, buildProbeSection } from "@/lib/status-probe";
@@ -28,6 +32,22 @@ const CHECKED_AT = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit", month: "long", year: "numeric",
   hour: "2-digit", minute: "2-digit", hour12: false,
 });
+
+/*
+  G2-013. The date the incident record starts, derived rather than typed.
+
+  An incident history that says "none" without saying "since when" is not a record, it is a
+  reassurance: the same sentence is true of a service that launched this morning and of one that
+  has run for three years. The earliest release this repository has recorded is the earliest date
+  anything about this service was public, so it is the date the claim is bounded by, and it moves
+  on its own when the changelog does.
+*/
+const RECORD_STARTS = CHANGELOG.reduce(
+  (earliest, entry) => (entry.date < earliest ? entry.date : earliest),
+  CHANGELOG[0]!.date,
+);
+
+const DAY = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", day: "numeric", month: "long", year: "numeric" });
 
 /** A timestamp or the not-yet-reported badge. Never an empty cell: an absence has to read as one. */
 function stamp(iso: string | null) {
@@ -84,11 +104,20 @@ export default async function StatusPage() {
   const probe = buildProbeSection(
     signer ? await readProbeHistory(signer) : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" },
   );
-  return <PolicyLayout group="SERVICE" label="LIVE CONFIGURATION AND ACTIVATION" title="TAVONEL service status" intro={<>Each row below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered: &ldquo;operational&rdquo; means a component is configured and its gate is open. Whether a request recently succeeded through one is the separate question the scheduled checks answer further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
-    <h3>Configuration and activation state</h3>
+    /*
+    BQ-136. The action this page closes on is the one it spends three paragraphs asking for.
+
+    PolicyDocument ends every document with "Back to the Trust Center", which is right for a
+    policy a reader arrived at from a contract. It is wrong here: somebody on the status page
+    is on it because something looks broken, and this page tells them twice to report what
+    they are seeing rather than wait for it to appear -- then offered them a link to a
+    marketing index. The reporting route is the closing action.
+  */
+  return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>Each row below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered: &ldquo;operational&rdquo; means a component is configured and its gate is open. Whether a request recently succeeded through one is the separate question the scheduled checks answer further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+    <h2>Configuration and activation state</h2>
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 
-    <h3>Scheduled dependency checks</h3>
+    <h2>Scheduled dependency checks</h2>
     <p>Each check here is a request this deployment sent through the dependency on a schedule, carrying no customer data, and it reports what came back. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
       Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
@@ -109,8 +138,44 @@ export default async function StatusPage() {
       : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
     <p>Full pipeline check: {probe.fixtureE2E}</p>
 
-    <h3>Incident contact</h3><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
+    {/*
+      G2-013. What a buyer expects from a status page and did not get: an incident record, and a
+      way to be told without coming back to look.
+
+      What is deliberately absent is an uptime percentage. The probe history holds twenty stored
+      runs of a check that does not carry a document through the pipeline, and a 30- or 90-day
+      figure computed from that would be a number about the prober rather than about the service.
+      The run window is already stated above in the terms it can actually support.
+
+      The subscribe path is the feed that already exists and already resolves, plus the address a
+      person reads. Neither is a new promise: an announcement list nobody has built would be.
+    */}
+    <h2>Incident history</h2>
+    <p>
+      No incident has been recorded since {DAY.format(new Date(`${RECORD_STARTS}T00:00:00+09:00`))},
+      the first release recorded in the changelog. When one occurs it is published here with what
+      happened, what it affected and what changed afterwards, and it stays published. What is
+      published is a customer-facing record: never a log location, a request id, a digest or
+      another customer&rsquo;s name.
+    </p>
+    <p>
+      This page is served by the same deployment it reports on, so an outage that takes the site
+      down takes this page with it. That is why the line above asks you to report what you are
+      seeing rather than wait for it to appear here.
+    </p>
+
+    <h2>Getting told without coming back</h2>
+    <p>
+      Releases and the changes that come with them are published on the{" "}
+      <Link href={"/changelog" as Route}>changelog</Link>, which has an{" "}
+      <a href="/changelog/feed.xml">Atom feed</a> any reader can subscribe to. For an incident
+      affecting your workspace, email support@tavonel.com and you will be replied to directly;
+      there is no announcement list, and saying otherwise would be describing one that does not
+      exist.
+    </p>
+
+    <h2>Incident contact</h2><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
     {/* The support target, imported rather than written: /contact prints the same constant. */}
     <p>{SUPPORT_ACKNOWLEDGEMENT}</p>
-  </PolicyLayout>;
+  </PolicyDocument></PublicSitePage>;
 }

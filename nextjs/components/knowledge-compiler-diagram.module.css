@@ -2,11 +2,35 @@
   The diagram borrows the page's type and hairlines rather than bringing its own palette, so it
   reads as part of the record it sits in. Every size is in user units on the viewBox: the drawing
   scales as one piece and there is no separate small-screen version to fall out of step.
-*/
-.diagram { width: 100%; height: auto; max-width: 980px; overflow: visible; }
 
-/* Sizes are user units on a 980-wide viewBox, so each renders about four fifths as large. */
-.eyebrow { fill: var(--verified); font: 11px var(--f-mono); letter-spacing: .16em; }
+  A user unit is a CSS pixel only while the drawing renders at its authored width. The column it
+  sits in is about 800px wide at 1440, which put every size below at four fifths of what it says
+  -- the stage labels at 11px and the span notes at 10.5px. The drawing is pinned to its viewBox
+  width instead and `.scroller` pans it, which is the treatment the contract diagram on
+  /product/continuous-knowledge gets -- including the half that makes the pan reachable. The
+  `<figure>` this sits in on /knowledge-compiler is `overflow-x: auto` and nothing else, and a
+  scroll container with no focusable child cannot be reached from a keyboard at all (WCAG 2.1.1).
+  That was a 640-to-760px window while the drawing still scaled above it; pinning the width
+  widened it to every laptop, so the pan is a `tabIndex` group here as it is there.
+*/
+.scroller { width: 100%; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--hairline-hi) transparent; }
+.scroller:focus-visible { outline-offset: 4px; }
+/*
+  pages-01. Where the drawing is still wider than its container -- below about 1040px, once the
+  row gives it the full content width -- the cut has to read as a pan and not as truncation. The
+  mask is the affordance; the thin scrollbar above is the second one, for a reader who does not
+  see the fade.
+*/
+@media (max-width: 1039px) {
+  .scroller {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+  }
+}
+
+.diagram { width: 100%; height: auto; min-width: 980px; max-width: 980px; overflow: visible; }
+
+.eyebrow { fill: var(--verified); font: 12px var(--f-mono); letter-spacing: .08em; }
 
 .stage { fill: none; stroke: var(--hairline-hi); }
 .stageLabel { fill: var(--text-hi); font: 13.5px var(--f-mono); letter-spacing: .1em; text-anchor: middle; }
@@ -16,7 +40,15 @@
 
 .who { fill: var(--text-hi); font: 14.5px var(--f-mono); letter-spacing: .04em; text-anchor: end; }
 .bracket { stroke: var(--hairline-hi); fill: none; }
-.what { fill: var(--text-xlo); font: 12px var(--f-mono); letter-spacing: .06em; }
+/*
+  G1-048. The span notes carry half this drawing's argument -- "finds the document", "retrieves
+  chunks at question time" -- and they were set in the smallest size on the scale in the dimmest
+  token, under a 14.5px name at full contrast. The drawing still scaled with its frame then, so
+  inside a 1,100px shell they were rendering under 11px; it is pinned to its viewBox now, and the
+  size below is the size on screen. One step up in each, which leaves them quieter than the name
+  they belong to and legible on the same screen as it.
+*/
+.what { fill: var(--text-lo); font: 13px var(--f-mono); letter-spacing: .04em; }
 .whatStart { text-anchor: start; }
 .whatMiddle { text-anchor: middle; }
 .whatEnd { text-anchor: end; }
@@ -35,16 +67,10 @@
 */
 .stack { display: none; }
 
-@media (max-width: 760px) {
-  /*
-    Between 640 and 760 the drawing still reads at a legible width and its container scrolls --
-    the same treatment every other wide thing on this site gets.
-  */
-  .diagram { min-width: 700px; }
-}
-
 @media (max-width: 640px) {
-  .diagram { display: none; }
+  /* The scroller, not just the drawing inside it: a hidden drawing in a focusable empty box is a
+     tab stop that lands on nothing. */
+  .scroller { display: none; }
   .stack {
     display: grid;
     gap: 1px;
@@ -52,12 +78,12 @@
     padding: 0;
     list-style: none;
     border: 1px solid var(--hairline-hi);
-    border-radius: 6px;
+    border-radius: var(--r-inst);
     overflow: hidden;
     background: var(--hairline);
   }
   .stack li { display: grid; gap: 4px; padding: 12px 14px; background: var(--ground); }
-  .stack b { color: var(--text-hi); font: 11px var(--f-mono); letter-spacing: .12em; }
+  .stack b { color: var(--text-hi); font: 12px var(--f-mono); letter-spacing: .08em; }
   .stack span { color: var(--text-lo); font-size: 12px; line-height: 1.5; }
   .stackWhole b, .stackWhole span { color: var(--verified); }
 }

@@ -3,7 +3,7 @@ import PolicyLayout from "@/components/policy-layout";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import { readCommercialState } from "@/lib/commercial-state";
-import { LEGAL_EFFECTIVE_DATE, LEGAL_LAST_UPDATED } from "@/lib/operations";
+import { LEGAL_DRAFT_NOTICE, LEGAL_EFFECTIVE_DATE, LEGAL_LAST_UPDATED } from "@/lib/operations";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,6 @@ export default function TermsPage() {
 
   return (
     <PolicyLayout
-      label="TERMS"
       title="Terms of service."
       effective={LEGAL_EFFECTIVE_DATE}
       lastUpdated={LEGAL_LAST_UPDATED}
@@ -57,15 +56,19 @@ export default function TermsPage() {
       }
     >
       <BreadcrumbJsonLd trail={[{ name: "Terms", path: "/terms" }]} />
+      <p className="fine">{LEGAL_DRAFT_NOTICE}</p>
       {/*
-        BA-154, the part this lane can do. "TAVONEL Foundation is a service name, not a separate
-        incorporated entity" is a detail of our corporate structure that raises the question it
-        answers, in a document where the reader is looking for the contracting party. It is gone.
+        BA-154, the part the previous lane could do. "TAVONEL Foundation is a service name, not a
+        separate incorporated entity" is a detail of our corporate structure that raises the
+        question it answers, in a document where the reader is looking for the contracting party.
+        It is gone.
 
-        The rest of BA-154 -- naming the contracting party, the governing law, the jurisdiction,
-        a liability section and a notices clause -- is legal and founder work and is not something
-        a lane may write. The operator disclosure below renders the published party when the
-        operator record exists, and BA-250 is in the lane report as an open question.
+        SD-07, 2026-09-16, is the rest of it. Governing law, jurisdiction, a liability cap, a
+        warranty disclaimer, an indemnity, a change-of-terms procedure and the renewal and
+        price-change mechanics were all absent from a document that governs live paid
+        subscriptions, which exposes both sides rather than only one. They are written below, as
+        Draft v1 under review: the label at the top of the document says the legal review has not
+        happened, and that is a different and more honest state than silence.
       */}
       <h2>Service operator</h2>
       <p>
@@ -113,8 +116,102 @@ export default function TermsPage() {
       <h2>{liveChargesEnabled ? "Payment" : "Pilot access"}</h2>
       <p>
         {liveChargesEnabled
-          ? "Prices shown at checkout are the prices charged. Paddle presents the final amount, applicable tax, renewal terms and payment method before purchase. Custom volumes are agreed in writing."
+          ? "Prices shown at checkout are the prices charged, in US dollars and excluding tax. Paddle presents the final amount, the applicable tax, the renewal terms and the payment method before purchase. Custom volumes are agreed in writing."
           : "Pilot access is granted by invitation and carries no fee. There is no checkout, no stored payment method and no recurring charge. If paid plans open, these terms are replaced by paid terms that you will be asked to accept before any charge."}
+      </p>
+
+      {/*
+        SD-07. Renewal and price changes, stated here rather than left to a checkout screen.
+
+        "Payment" deferred the whole of it to Paddle, so a buyer could not find out before paying
+        what happens at the end of a month or what notice a price change carries. Subscriptions
+        renew by design -- that is what `subscriptionStatus: "active"` means to every route that
+        reads it -- and the page-expiry term on /pricing is the other half of this clause.
+      */}
+      {liveChargesEnabled ? (
+        <>
+          <h2>Renewal and price changes</h2>
+          <p>
+            A subscription renews automatically each month at the plan price then published, until
+            you cancel it. You can cancel at any time through the billing portal or support, and
+            cancellation stops future renewals rather than ending the period you have paid for.
+            Included pages belong to the billing month they are granted in and do not roll over,
+            as stated on the pricing page.
+          </p>
+          <p>
+            We give at least 30 days&apos; notice, by email to the account address, before a price
+            change applies to your subscription. The change takes effect at the first renewal
+            after that notice, and cancelling before that renewal means you never pay the new
+            price. A price already charged is not changed retroactively.
+          </p>
+        </>
+      ) : null}
+
+      {/*
+        SD-07. What is disclaimed, capped and indemnified. A pilot with no charge has no fee to
+        cap, so the cap paragraph states the alternative rather than omitting the clause: a
+        reader of the pilot template still needs to know what the ceiling is.
+      */}
+      <h2>Warranties</h2>
+      <p>
+        The service is provided as it is and as it is available. To the extent the law allows, we
+        make no warranty of merchantability, fitness for a particular purpose, non-infringement,
+        uninterrupted availability, or that compiled output is complete, current or free of error.
+        Nothing in this section limits a warranty that applicable consumer law makes
+        non-excludable.
+      </p>
+
+      <h2>Limitation of liability</h2>
+      <p>
+        Neither party is liable for indirect, incidental, special or consequential loss, for lost
+        profits, lost revenue or lost goodwill, or for the cost of substitute services, however
+        caused.{" "}
+        {liveChargesEnabled
+          ? "Each party's total liability arising out of or relating to the service is limited to the fees you paid to TAVONEL in the twelve months immediately before the event giving rise to the claim."
+          : "Pilot access carries no fee, so there is no amount to cap against: our total liability for the pilot is limited to the amount the law does not allow to be excluded."}{" "}
+        This limit does not apply to death or personal injury caused by negligence, to fraud or
+        fraudulent misrepresentation, to a party&apos;s breach of its confidentiality obligations,
+        or to anything else the law does not allow to be limited.
+      </p>
+
+      <h2>Indemnity</h2>
+      <p>
+        You will defend and indemnify TAVONEL against third-party claims arising from material you
+        upload or connect — including a claim that you did not have the rights or the authority to
+        supply it — and from your use of the service in breach of these terms or of the law. We
+        will tell you promptly about any such claim, give you control of its defence, and give you
+        reasonable assistance with it at your cost. You may not settle a claim in a way that
+        imposes an obligation on us without our agreement.
+      </p>
+
+      <h2>Governing law and disputes</h2>
+      <p>
+        These terms are governed by the laws of the Republic of Korea, without regard to conflict
+        of law rules. The Seoul Central District Court has exclusive jurisdiction over any dispute
+        arising out of or relating to them. If you are a consumer, this does not remove any right
+        you have to bring a claim in the courts of the country where you live, or to rely on the
+        mandatory consumer law of that country. We ask that you write to{" "}
+        <a href="mailto:support@tavonel.com">support@tavonel.com</a> first: most disputes are
+        cheaper and faster to settle that way than in either court.
+      </p>
+
+      <h2>Changes to these terms</h2>
+      <p>
+        We may change these terms. A change that materially affects your rights or obligations is
+        notified at least 30 days before it takes effect, by email to the account address and by a
+        notice on this page, and the effective and last-updated dates at the top of the page move
+        with it. If you do not accept a material change, you may end your access before it takes
+        effect; continuing to use the service after that date is acceptance of it. A change
+        required by law or needed to close a security risk may take effect sooner, and we say so
+        when we give the notice.
+      </p>
+
+      <h2>Enterprise agreements</h2>
+      <p>
+        An Enterprise engagement may be governed by a separate written agreement. Where such an
+        agreement exists and conflicts with these terms, it prevails for that customer, for the
+        scope it covers. There is no standard master services agreement published today; the terms
+        of one are settled in the conversation that scopes the engagement.
       </p>
     </PolicyLayout>
   );

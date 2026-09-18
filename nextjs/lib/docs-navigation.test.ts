@@ -30,6 +30,46 @@ const sectionPage = read("../app/docs/[section]/page.tsx");
 const docsToc = read("../components/docs/docs-toc.tsx");
 const tocCss = read("../components/docs/docs-toc.module.css");
 
+/*
+  The offset that keeps an anchored heading out from under the fixed header is declared once, as
+  `html { scroll-padding-top }` in `app/tavonel.css`, and a per-target `scroll-margin-top` adds
+  to it rather than replacing it -- so a jump landed roughly a header's height above its target.
+  Six sheets carried one; the marker class `.anchor` existed for nothing else and is gone with
+  them. This is the guard that used to live on that class.
+*/
+describe("one scroll offset for a fragment jump", () => {
+  const sheets = [
+    "../app/product-polish.css",
+    "../app/resources/resources.module.css",
+    "../app/product/continuous-knowledge/continuous-knowledge.module.css",
+    "../components/docs/api-reference.module.css",
+    "../components/docs/page-toc.module.css",
+  ];
+
+  it("declares the offset globally", () => {
+    expect(read("../app/tavonel.css")).toContain("scroll-padding-top: calc(var(--header) + 16px)");
+  });
+
+  /*
+    The declaration, not the word. `resources.module.css` explains in prose why a
+    `scroll-margin-top` here would be wrong, so the colon is what separates a declaration from the
+    sentence about it -- and it is matched anywhere on the line rather than at the head of one,
+    because the offset `continuous-knowledge.module.css` carried was written inline in a
+    single-line rule. The previous spelling, `/^s*scroll-margin-top:/m`, was missing the backslash
+    on `\s` and therefore matched only a declaration at column zero, which no CSS rule has.
+  */
+  it.each(sheets)("adds no second offset in %s", (sheet) => {
+    expect(read(sheet)).not.toMatch(/scroll-margin-top:/);
+  });
+
+  it.each(["../app/docs/[section]/page.tsx", "../app/cookbooks/[slug]/page.tsx", "../app/api/page.tsx", "../app/developers/page.tsx", "../app/docs/page.tsx", "../app/integrations/page.tsx"])(
+    "leaves no reference to the retired marker class in %s",
+    (page) => {
+      expect(read(page)).not.toContain("page-toc.module.css");
+    },
+  );
+});
+
 describe("in-page table of contents", () => {
   it("derives a fragment from the text of the heading", () => {
     expect(slugify("Steps 1 to 4 — bash")).toBe("steps-1-to-4-bash");
@@ -90,10 +130,9 @@ describe("in-page table of contents", () => {
     That route shipped its own `<nav aria-label="Sections on this page">` with ids typed as
     `#cookbook-${section.key}` -- a second jump list with a second set of slug rules, and two
     strings that had to agree for a link to land. It now derives both halves from one
-    `tocEntries` call, so the anchor and the link that names it cannot disagree, and the
-    `scroll-margin-top` that keeps a heading out from under the fixed header comes with it
-    instead of being rediscovered. The last assertion is the one that stops the old list
-    growing back beside the new one.
+    `tocEntries` call, so the anchor and the link that names it cannot disagree, and the header
+    clearance comes with it instead of being rediscovered. The last assertion is the one that
+    stops the old list growing back beside the new one.
   */
   it("is reused by the cookbook route rather than copied", () => {
     const cookbook = read("../app/cookbooks/[slug]/page.tsx");
@@ -107,8 +146,8 @@ describe("in-page table of contents", () => {
     */
     expect(cookbook).toContain("const toc = tocEntries([...ready.map((section) => SECTION_LABEL[section.key]), PENDING_HEADING]);");
     expect(cookbook).toContain("id={toc[ready.length]!.id}");
-    // The id and the anchor class sit on the element the link points at.
-    expect(cookbook).toContain('<h2 id={id} className={anchor.anchor}>');
+    // The id sits on the element the link points at.
+    expect(cookbook).toContain('<h2 id={id}>');
     expect(cookbook).toContain("id={toc[order]!.id}");
     expect(cookbook).not.toContain("#cookbook-");
     expect(cookbook).not.toContain('aria-label="Sections on this page"');
@@ -127,27 +166,45 @@ describe("in-page table of contents", () => {
   text extraction read the two clauses as one word -- "DEVELOPERSONE WORLD",
   "DOCUMENTATIONAPI 2026-09-02.1", "DOCUMENTATIONAll sections".
 
-  The fix is the audit's second option: mark the rule decorative, and put a real separator in the
-  text. So the pattern this pins is the absence of a bare `<span />` between two clauses.
+  The fix was the audit's second option: mark the rule decorative, and put a real separator in
+  the text.
+
+  BQ-099 removes the cause instead of managing it. An eyebrow that restated the page name above
+  the H1 is deleted, and one that was carrying a section's name is the `<h2>` it was acting as,
+  so most of these pages have no eyebrow left at all -- the "renders no eyebrow" precondition
+  this used to assert is now the intended state, not a sign the pattern moved.
+
+  What still has to hold is the accessible name: whatever eyebrow survives may not fuse two
+  clauses together with a rule that reads as nothing. So the assertion is the same and the
+  precondition is inverted -- the surfaces are read for any eyebrow they still carry, and a page
+  with none passes.
 */
-describe("eyebrow labels read as two clauses", () => {
+describe("an eyebrow that survives reads as its own clauses", () => {
   const SURFACES = [
     "../app/developers/page.tsx",
     "../app/docs/page.tsx",
     "../app/docs/[section]/page.tsx",
     "../app/cookbooks/[slug]/page.tsx",
-    "../app/ko/page.tsx",
+    "../app/cookbooks/page.tsx",
   ];
+
+  /*
+    BQ-056. /ko used to be the fifth surface here, and is now the case below it.
+
+    Its five eyebrows were the numbered section kickers -- "01 / TAVONEL WORKS" through "05 /
+    READY FOR AI" -- a third ordinal system on a page that already numbers a six-step grid inside
+    one of those sections, above headings they restated. A kicker that says what the heading
+    below it says is deleted rather than restyled, so there is no two-clause label left on that
+    page to separate. The tripwire moves with it: that page must render none, not some.
+  */
+  it("../app/ko/page.tsx renders no eyebrow, because each one restated the heading under it", () => {
+    const source = read("../app/ko/page.tsx");
+    expect([...source.matchAll(/className="(?:slate|one-path-eyebrow|eyebrow)"/g)]).toHaveLength(0);
+  });
 
   it.each(SURFACES)("%s separates the label from the text it sits beside", (surface) => {
     const source = read(surface);
-    /*
-      Every `.slate` eyebrow on the page, and what follows the rule inside it. A two-clause
-      eyebrow (one with a <b>) has to carry a separator; a one-clause eyebrow, where the rule
-      leads and there is nothing before it, needs none -- but the rule is decorative either way.
-    */
     const eyebrows = [...source.matchAll(/<p className="(?:slate|one-path-eyebrow)">([\s\S]*?)<\/p>/g)].map((match) => match[1]!);
-    expect(eyebrows.length, surface + " renders no eyebrow -- the pattern has moved").toBeGreaterThan(0);
     for (const eyebrow of eyebrows) {
       expect(eyebrow, "the rule is decorative and says so: " + eyebrow).not.toContain("<span />");
       // A separator is owed only where there are two clauses: a label, the rule, and text after
@@ -156,6 +213,22 @@ describe("eyebrow labels read as two clauses", () => {
       if (!eyebrow.includes("<b>") || after.trim() === "") continue;
       expect(eyebrow, "two clauses fused into one accessible name: " + eyebrow).toMatch(/\/>·/);
     }
+  });
+
+  /*
+    The other half of BQ-099, which is what stops the deleted eyebrows growing back: no page in
+    this set may put an eyebrow immediately above its own H1 again. That is the shape the audit
+    counted nineteen of, and every one of them restated the page's own name.
+  */
+  it.each(SURFACES)("%s does not restate its own name above the H1", (surface) => {
+    /*
+      /cookbooks/<slug> is the one page in the set that keeps a label above its title, and the
+      label is the workflow family the record declares -- a fact the title does not carry, pinned
+      by `lib/cookbook-content.test.ts`. So the shape allowed here is that expression and nothing
+      else: a literal string above an H1 on this page fails like it does on the other five.
+    */
+    const source = read(surface).replace('<p className="slate">{WORKFLOW_LABEL[record.workflowId]}</p>', "");
+    expect(source).not.toMatch(/<p className="(?:slate|one-path-eyebrow)">[\s\S]*?<\/p>\s*<h1/);
   });
 });
 
@@ -171,7 +244,10 @@ describe("documentation section index", () => {
 
   it("marks the section being read, with the attribute assistive technology reads", () => {
     expect(docsToc).toContain('aria-current={section.slug === current ? "page" : undefined}');
-    expect(tocCss).toContain('.list a[aria-current="page"]');
+    // BQ-030: the anchor carries a class now, so app/ux-polish.css stops reading a list of
+    // twenty-two sections as twenty-two prose links. What the rule below styles is the same
+    // anchor in the same state; only the selector it is reached by changed.
+    expect(tocCss).toContain('.list .link[aria-current="page"]');
   });
 
   it("needs no client JavaScript: a details element and real links", () => {
@@ -204,7 +280,14 @@ describe("documentation section index", () => {
 
   it("keeps the pager and the way back to the index", () => {
     expect(sectionPage).toContain('className="docs-pager"');
-    expect(sectionPage).toContain('<Link href="/docs">All sections</Link>');
+    /*
+      BQ-137: the way back is the breadcrumb now, not a link inside the eyebrow. It is the same
+      destination from the same declaration the page already emits for a crawler -- `trail`, read
+      by both `BreadcrumbJsonLd` and `DocBreadcrumb` -- so the reader's path up and the machine
+      graph cannot disagree.
+    */
+    expect(sectionPage).toContain("<DocBreadcrumb trail={trail} />");
+    expect(sectionPage).toContain('{ name: "Documentation", path: "/docs" }');
   });
 
   it("swaps column for disclosure at the width the site header does", () => {

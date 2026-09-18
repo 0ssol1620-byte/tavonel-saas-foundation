@@ -1,5 +1,15 @@
 "use client";
 
+/*
+  BQ-137. The stylesheet this console is written in, imported by the console.
+
+  It was imported by app/enterprise/layout.tsx, which wraps the public /enterprise page -- and
+  that page is built out of PublicSitePage and uses none of these classes. The file that does
+  use them renders at /workspace/admin, which re-exports this component and imported nothing,
+  so the console shipped unstyled on the one route it actually has. The import belongs to the
+  component, which is the only thing that can take it to both routes.
+*/
+import "./enterprise.css";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, Fingerprint, Gauge, Globe2, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";

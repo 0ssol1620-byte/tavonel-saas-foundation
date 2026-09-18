@@ -52,6 +52,12 @@ const SALES_SURFACES = [
   "contact",
   "login",
   "resources",
+  /*
+    `sources` is the support-tier page: indexable, in the sitemap, linked from /integrations and
+    /product, and the page a buyer opens to find out whether their own files are readable. That is
+    a sales surface, and a sales surface that is on no list is a page nobody checks.
+  */
+  "sources",
   "knowledge-compiler",
   "changelog",
   "status",
@@ -176,6 +182,21 @@ describe("public copy purge", () => {
     expect(found, `/${route} metadata carries: ${found.join(", ")}`).toEqual([]);
   });
 
+  /*
+    The disclosure module is copy on three sales surfaces, and `shippedSourceFor` cannot see it.
+
+    It follows `@/components` imports, which is where page copy normally lives; the disclosures
+    are data in `lib/` precisely so /trust, /security and /enterprise cannot each carry their own
+    version. Widening the walk to every `@/lib` import would sweep in modules that legitimately
+    carry this register -- `evidence-record.ts` publishes a failed hypothesis with the words for
+    it -- so the one module that is customer copy is checked by name instead.
+  */
+  it("keeps defensive phrasing out of the shared trust disclosures", () => {
+    const source = strip(readFileSync(new URL("./trust-disclosures.ts", import.meta.url), "utf8")).toLowerCase();
+    const found = DEFENSIVE_PHRASES.filter((phrase) => source.includes(phrase));
+    expect(found, `the disclosures render defensive phrasing: ${found.join(", ")}`).toEqual([]);
+  });
+
   it("exempts only routes that are legal text or actually noindex", () => {
     for (const [route, reason] of Object.entries(EXEMPT)) {
       const url = new URL(`../app/${route}/page.tsx`, import.meta.url);
@@ -196,6 +217,37 @@ describe("public copy purge", () => {
     for (const route of SALES_SURFACES) {
       expect(Object.keys(EXEMPT), `/${route} is a sales surface and cannot be exempt`)
         .not.toContain(route);
+    }
+  });
+
+  /*
+    D9 and BQ-098, on the whole shipped surface rather than on `page.tsx`.
+
+    `lib/brand-copy.test.ts` asserts both of these over every `app/<route>/page.tsx`, which is where
+    page copy usually lives -- and the copy that broke both rules was not there. The verb was in
+    `components/pricing-page-client.tsx`, which /pricing's `page.tsx` renders and that walk never
+    opens, and the lower-cased noun was in two `opengraph-image.tsx` cards, which are copy a
+    searcher reads before any page. `shippedSourceFor` already follows the component imports, so
+    the same two rules are cheap to hold over the surface a reader actually meets.
+
+    The identifiers stay: the route is `app/api/collections/[id]/promote/route.ts` and the gate is
+    `candidatePromotion`, and renaming either is a migration rather than a copy fix.
+  */
+  it.each(SALES_SURFACES)("activates a candidate, and never promotes one, on /%s", (route) => {
+    const lines = shippedSourceFor(route)!
+      .split(/\r?\n/)
+      .filter((line) => !/candidatePromotion|promote\/route/.test(line))
+      .filter((line) => /\bpromot/i.test(line));
+    expect(lines, `/${route} writes the promote verb in copy a reader sees`).toEqual([]);
+  });
+
+  it.each(SALES_SURFACES)("writes the product nouns in their one casing on /%s", (route) => {
+    const dir = route === "" ? "app" : `app/${route}`;
+    const card = new URL(`../${dir}/opengraph-image.tsx`, import.meta.url);
+    const source = [shippedSourceFor(route)!, existsSync(card) ? strip(readFileSync(card, "utf8")) : ""].join("\n");
+    for (const noun of ["compiled world", "knowledge compiler", "trust center"]) {
+      expect(source, `/${route} lower-cases "${noun}"; the table is PRODUCT_NOUNS`)
+        .not.toMatch(new RegExp(noun));
     }
   });
 });

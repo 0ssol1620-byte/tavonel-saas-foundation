@@ -1,80 +1,115 @@
 "use client";
 
-/* The original PDF and extracted text are different views of the same source identity.
-   OriginalSourcePage renders hash-checked bytes. Parsed text is never passed off as a page image. */
-import { useEffect, useId, useRef, useState } from "react";
+/*
+  The source sheet: one region of one page of one filing, staged in the order the handoff asks for.
+
+    1. the source page, whole and readable;
+    2. the region cut out of that same render;
+    3. the passage the compiler read from that region;
+    4. the ledger that lets a reader check all three.
+
+  BQ-014. It used to be a two-tab control opening on the parsed text, which put the extracted text
+  and the page it came from on the same footing and showed the page only to a reader who clicked.
+  A block whose whole claim is "this is the real source" has to open on the real source. The tabs
+  are gone: the page is both the first and the largest thing here, and the text is what follows
+  from it. OriginalSourcePage still renders hash-checked bytes; extracted text is never passed off
+  as a page image.
+
+  BQ-074. One locator, printed once -- under the page frame. It used to be printed five times in
+  this one block: the header, the region map, the page caption, the provenance row and the footer.
+*/
 import Link from "next/link";
 import type { Route } from "next";
-import PageRegion from "./page-region";
 import OriginalSourcePage from "./original-source-page";
 import styles from "./world-visual.module.css";
-import sourceStyles from "./original-source-page.module.css";
 import type { VisualEvidence } from "@/lib/visual-world-model";
+import { proofCopy } from "@/lib/proof-copy";
 import { sameSourcePage } from "@/lib/source-page-geometry";
+import { sourcePageQualifier, sourceRegionRaster } from "@/lib/source-page-rasters";
 
-export default function SourceSheet({ regions, activeId, onSelectRegion, compact = false }: {
-  regions: VisualEvidence[]; activeId: string; onSelectRegion?: (id: string) => void; compact?: boolean;
+export default function SourceSheet({ regions, activeId, onSelectRegion, ledger = "open", korean }: {
+  regions: VisualEvidence[];
+  activeId: string;
+  onSelectRegion?: (id: string) => void;
+  /*
+    BQ-070. The sha256 ledger is a real capability, and a decoration when it is printed six times
+    across a landing page, so a marketing route gets it as a disclosure and the surfaces built for
+    verifying -- /explore and the workspace -- keep it open.
+  */
+  ledger?: "open" | "disclosure";
+  /*
+    BQ-063 / n34. /ko rendered this block's every word in English -- the field names of the
+    ledger, the page caption, the footer. The locale picks a record in lib/proof-copy.ts and
+    English is the default, so no English surface and no e2e selector moves.
+  */
+  korean?: boolean;
 }) {
-  const paperRef = useRef<HTMLDivElement | null>(null);
-  const [view, setView] = useState<"original" | "text">("original");
-  const uid = useId();
-  useEffect(() => {
-    const paper = paperRef.current;
-    const region = paper?.querySelector<HTMLElement>("[data-active-region]");
-    if (!paper || !region || view !== "text") return;
-    paper.scrollTop = Math.max(0, region.offsetTop - (paper.clientHeight - region.clientHeight) / 2);
-  }, [activeId, view]);
+  const copy = proofCopy(korean);
   const active = regions.find(region => region.id === activeId) ?? regions[0];
   if (!active) return null;
   const onPage = regions.filter(region => sameSourcePage(active, region));
   const rendered = active.representationKind === "reference_render";
-  return <article className={styles.sheet} data-source-sheet="" data-compact={compact ? "1" : "0"} data-source-view={view}>
+  const crop = sourceRegionRaster(active.digest, active.page, active.bbox1000);
+
+  return <article className={styles.sheet} data-source-sheet="" data-ledger={ledger}>
     <header>
       <span className={styles.sheetName}><span>{active.filename}</span>
         {active.sourceLabel ? <small className={styles.sheetSource}>{active.sourceLabel}</small> : null}
-      </span><b>PAGE {active.page}</b>
+      </span>
     </header>
-    <div role="tablist" aria-label="Source representation" className={sourceStyles.tabs} onKeyDown={event => {
-      const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-      const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
-      let target = index;
-      if (event.key === "ArrowRight") target = (index + 1) % tabs.length;
-      else if (event.key === "ArrowLeft") target = (index - 1 + tabs.length) % tabs.length;
-      else if (event.key === "Home") target = 0;
-      else if (event.key === "End") target = tabs.length - 1;
-      else return;
-      event.preventDefault(); tabs[target]?.focus();
-    }}>
-      <button id={`${uid}-original-tab`} type="button" role="tab" aria-selected={view === "original"} aria-controls={`${uid}-original-panel`} tabIndex={view === "original" ? 0 : -1} onClick={() => setView("original")}>{rendered ? "Reference page" : "Original page"}</button>
-      <button id={`${uid}-text-tab`} type="button" role="tab" aria-selected={view === "text"} aria-controls={`${uid}-text-panel`} tabIndex={view === "text" ? 0 : -1} onClick={() => setView("text")}>Parsed text</button>
-    </div>
-    <div id={`${uid}-original-panel`} role="tabpanel" aria-labelledby={`${uid}-original-tab`} hidden={view !== "original"} style={{ display: view === "original" ? undefined : "none" }}>
-      <OriginalSourcePage active={active} regions={onPage} onSelectRegion={onSelectRegion} compact={compact} />
-    </div>
-    <div id={`${uid}-text-panel`} role="tabpanel" aria-labelledby={`${uid}-text-tab`} hidden={view !== "text"} style={{ display: view === "text" ? undefined : "none" }}>
-      <div className={styles.paper} ref={paperRef} data-parsed-source-page="">
-        {onPage.map(region => {
-          const isActive = region.id === active.id;
-          const content = <>{isActive ? <span className={styles.regionPin} aria-hidden="true" /> : null}{region.excerpt}</>;
-          return onSelectRegion ? <button key={region.id} type="button" className={styles.line} data-active={isActive ? "1" : "0"} data-region-id={region.id} {...(isActive ? { "data-active-region": "" } : {})} onClick={() => onSelectRegion(region.id)}>{content}</button>
-            : <p key={region.id} className={styles.line} data-active={isActive ? "1" : "0"} data-region-id={region.id} {...(isActive ? { "data-active-region": "" } : {})}>{content}</p>;
-        })}
+
+    <div className={styles.sheetBody}>
+      <div className={styles.sheetPage}>
+        <OriginalSourcePage active={active} regions={onPage} onSelectRegion={onSelectRegion} korean={korean} />
       </div>
-      <PageRegion bbox1000={active.bbox1000} page={active.page} pageCount={active.pageCount} />
+
+      <div className={styles.sheetAside}>
+        {/*
+          The region, cropped from the same render at twice the scale. Where no crop is committed
+          the highlight drawn on the real page above carries the same information, so nothing is
+          drawn here rather than a rectangle standing in for the evidence.
+        */}
+        {crop ? (
+          <figure className={styles.regionCrop} data-region-crop={active.id}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster is
+                served byte for byte: next/image would re-encode it, and the manifest's sha256 of
+                these bytes is what makes the render checkable against its source. */}
+            <img src={crop.file} alt={copy.cropAlt(active.page)} width={crop.width} height={crop.height} decoding="async" />
+            <figcaption>{copy.cropCaption}</figcaption>
+          </figure>
+        ) : null}
+
+        <div className={styles.passage} data-parsed-source-page="">
+          <p className={styles.passageLabel}>{copy.passageLabel}</p>
+          {onPage.map(region => {
+            const isActive = region.id === active.id;
+            const content = <>{isActive ? <span className={styles.regionPin} aria-hidden="true" /> : null}{region.excerpt}</>;
+            return onSelectRegion ? <button key={region.id} type="button" className={styles.line} data-active={isActive ? "1" : "0"} data-region-id={region.id} {...(isActive ? { "data-active-region": "" } : {})} onClick={() => onSelectRegion(region.id)}>{content}</button>
+              : <p key={region.id} className={styles.line} data-active={isActive ? "1" : "0"} data-region-id={region.id} {...(isActive ? { "data-active-region": "" } : {})}>{content}</p>;
+          })}
+        </div>
+      </div>
     </div>
-    <dl className={styles.provenance} data-source-provenance="">
-      <div><dt>Filing</dt><dd>{active.form ? `${active.form}${active.filingDate ? ` · filed ${active.filingDate}` : ""}` : active.filename}</dd></div>
-      <div><dt>Read from</dt><dd data-representation={active.representationKind ?? "original"}>{rendered ? "Reference render" : "Original"} · {active.filename}<br /><span className={styles.digest}>{active.digest}</span></dd></div>
-      {rendered && active.sourceFilename && active.originalSha256 ? <div><dt>Source</dt><dd data-acquired-original="">SEC EDGAR primary document · {active.sourceFilename.replace(/^.*\//, "")}<br /><span className={styles.digest}>{active.originalSha256}</span></dd></div> : null}
-      <div><dt>Region</dt><dd>Page {active.page} of {active.pageCount} · bbox (per mille) {active.bbox1000.join(", ")}</dd></div>
-      {active.accession ? <div><dt>Accession</dt><dd>{active.accession}</dd></div> : null}
-      <div><dt>Authority</dt><dd>{active.authority}</dd></div>
-    </dl>
+
+    <details className={styles.ledger} open={ledger === "open"} data-source-provenance="">
+      <summary>{copy.verify}</summary>
+      <dl className={styles.provenance}>
+        <div><dt>{copy.fieldFiling}</dt><dd>{active.form ? `${active.form}${active.filingDate ? ` · ${copy.filed(active.filingDate)}` : ""}` : active.filename}</dd></div>
+        <div><dt>{copy.fieldReadFrom}</dt><dd data-representation={active.representationKind ?? "original"}>{sourcePageQualifier(active.representationKind, korean)} · {active.filename}<span className={styles.digest}>{active.digest}</span></dd></div>
+        {rendered && active.sourceFilename && active.originalSha256 ? <div><dt>{copy.fieldSource}</dt><dd data-acquired-original="">{copy.edgarPrimary} · {active.sourceFilename.replace(/^.*\//, "")}<span className={styles.digest}>{active.originalSha256}</span></dd></div> : null}
+        <div><dt>{copy.fieldRegion}</dt><dd>{copy.bbox} · {active.bbox1000.join(", ")}</dd></div>
+        {active.accession ? <div><dt>{copy.fieldAccession}</dt><dd>{active.accession}</dd></div> : null}
+        <div><dt>{copy.fieldAuthority}</dt><dd>{active.authority}</dd></div>
+      </dl>
+    </details>
+
     <footer>
-      <span>{active.compiledPageCount === undefined ? "THIS PAGE, AS THE COMPILER READ IT" : active.compiledPageCount >= active.pageCount ? `FULL FILING COMPILED · ${active.pageCount} PAGES` : `CURATED PAGE SLICE · ${active.compiledPageCount} OF ${active.pageCount} PAGES COMPILED`}</span>
-      <Link className={styles.sourceLink} href={active.href as Route} target="_blank" rel="noreferrer">{rendered ? "Open reference render ↗" : "Open committed PDF ↗"}</Link>
-      {rendered && active.sourceHref ? <Link className={styles.sourceLink} href={active.sourceHref as Route} target="_blank" rel="noreferrer">Open acquired original ↗</Link> : null}
-      {active.secHref ? <a className={styles.sourceLink} href={active.secHref} target="_blank" rel="noreferrer">Verify on SEC ↗</a> : null}
+      <span>{active.compiledPageCount === undefined ? copy.asRead : active.compiledPageCount >= active.pageCount ? copy.fullyCompiled(active.pageCount) : copy.slice(active.compiledPageCount, active.pageCount)}</span>
+      <span>
+        <Link className={`link-verify ${styles.sourceLink}`} href={active.href as Route} target="_blank" rel="noreferrer">{copy.openQualified(sourcePageQualifier(active.representationKind, korean))}</Link>
+        {rendered && active.sourceHref ? <Link className={`link-verify ${styles.sourceLink}`} href={active.sourceHref as Route} target="_blank" rel="noreferrer">{copy.openAcquired}</Link> : null}
+        {active.secHref ? <a className={`link-verify ${styles.sourceLink}`} href={active.secHref} target="_blank" rel="noreferrer">{copy.verifyOnSec}</a> : null}
+      </span>
     </footer>
   </article>;
 }

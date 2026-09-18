@@ -17,6 +17,8 @@
     recorded" -- never zero, never "now".
 */
 
+import { displayName } from "@/lib/document-names";
+
 /**
  * How many review decisions a caller must ask for before building a queue.
  *
@@ -184,7 +186,8 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
 
     return {
       documentId,
-      name: input.names?.[documentId] ?? documentId,
+      // The same display rule as every other list: a remembered filename, else a readable form of the id.
+      name: displayName(documentId, input.names ?? {}),
       status,
       securityBlocked: blocker?.kind === "security",
       reasons: [...new Set(reasons)],

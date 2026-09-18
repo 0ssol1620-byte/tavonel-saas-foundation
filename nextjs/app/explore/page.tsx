@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import ExploreStage from "@/components/explore/explore-stage";
+import stageStyles from "@/components/explore/explore-stage.module.css";
+import { PublicSiteFooter } from "@/components/public-site-chrome";
 import { chooseExploreEntryProof } from "@/lib/explore-entry-proof";
 import {
   exploreChangeBaselineDocument,
@@ -26,7 +28,7 @@ import {
 import secCorpusManifest from "@/public/explore-sample/sec-corpus-manifest.json";
 
 export const metadata: Metadata = {
-  title: "Explore a Compiled World | TAVONEL",
+  title: "Explore a Compiled World — TAVONEL",
   description:
     "Step inside a compiled World: open any object to the filing, the page and the exact region it came from, and see what four newly filed documents rebuilt.",
   alternates: { canonical: "/explore" },
@@ -106,15 +108,28 @@ const technical: ExploreTechnicalRecord = {
   },
 };
 
+/*
+  chrome-02 / D35. The stage keeps its own minimal header -- that is documented intent
+  (explore-stage.module.css's header note, G1-021) -- but a public route with no footer had no
+  Privacy, no Terms, no Trust group and no Korean entry at all, which is the half of the finding
+  that survived the skeptic. The site footer is rendered here rather than inside the stage so it
+  stays a server component: the stage is a client component, and importing the footer into it would
+  ship the whole footer directory to the browser for markup that never changes.
+*/
 export default function ExplorePage() {
   return (
-    <ExploreStage
-      model={model}
-      layout={layout}
-      change={change}
-      answers={answers}
-      technical={technical}
-      capturedOn={capturedOn}
-    />
+    <>
+      <ExploreStage
+        model={model}
+        layout={layout}
+        change={change}
+        answers={answers}
+        technical={technical}
+        capturedOn={capturedOn}
+      />
+      <div className={stageStyles.siteFooter}>
+        <PublicSiteFooter />
+      </div>
+    </>
   );
 }

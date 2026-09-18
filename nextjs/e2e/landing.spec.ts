@@ -74,7 +74,7 @@ test("renders the hero plus the five-step customer journey in the approved order
   // The retired persistent World canvas is not mounted behind the simplified customer journey.
   await expect(page.locator(".world-field")).toHaveCount(0);
   await expect(page.getByTestId("one-path-hero-film")).toBeVisible();
-  await expect(page.locator("#proof .one-path-source-proof")).toHaveCount(1);
+  await expect(page.locator('#proof [data-proof-variant="canonical"]')).toHaveCount(1);
 });
 
 test("hero leads with one commercial start path and keeps evidence out of the hero", async ({ page }) => {
@@ -143,10 +143,10 @@ test("the supporting film caption follows the selected approved cut", async ({ p
   const film = page.getByTestId("one-path-works-film");
   await film.scrollIntoViewIfNeeded();
 
-  await film.getByRole("tab", { name: "UPDATES", exact: true }).click();
-  await expect(film.getByRole("tab", { name: "UPDATES", exact: true })).toHaveAttribute("aria-selected", "true");
+  await film.getByRole("tab", { name: "Updates", exact: true }).click();
+  await expect(film.getByRole("tab", { name: "Updates", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(film.locator(".compile-film-caption p")).toHaveText("A changed source and its affected knowledge are shown together.");
 
-  await film.getByRole("tab", { name: "ORGANIZE", exact: true }).click();
+  await film.getByRole("tab", { name: "Organize", exact: true }).click();
   await expect(film.locator(".compile-film-caption p")).toHaveText("Related information is organized into a connected knowledge structure.");
 });

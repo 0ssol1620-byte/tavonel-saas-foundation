@@ -179,7 +179,17 @@ status page that stays quiet during an outage is worse than one that says "we ar
 ## 7. Post-incident record — required format
 
 One file per incident, `docs/incidents/YYYY-MM-DD-<slug>.md`, written for a reader who was not
-there. `[FOUNDER]` — whether these are ever shared with a customer on request.
+there. **This file stays internal.** It names log locations, request ids and artifact digests, and
+a document that tells a reader where our evidence lives is not a document we hand out.
+
+What is published is a customer-facing record on `/status`, and that is now a commitment rather
+than an open question: the status page states that no incident has been recorded since the first
+release and that when one occurs it is published there with what happened, what it affected and
+what changed afterwards. The summary is written from the record above and carries four things --
+date, what was affected, what was done, what changed since -- and never a log location, a request
+id, a digest or a customer name. `[FOUNDER]` — whether the full internal record is ever shared
+with a specific customer under NDA on request stays open; publishing the summary does not decide
+it.
 
 ```
 # <date> — <one line, what happened, not what caused it>

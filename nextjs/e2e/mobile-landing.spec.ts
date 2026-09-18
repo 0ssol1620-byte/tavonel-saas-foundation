@@ -26,19 +26,37 @@ test("the hero uses the approved encoded film instead of mounting a crushed live
   await expect(hero.locator(".compile-film-live canvas")).toHaveCount(0);
   const video = hero.locator(".compile-film-video");
   await expect(video).toBeVisible();
-  await expect(video.locator("source")).toHaveCount(1);
-  await expect(video.locator("source")).toHaveAttribute("src", "/film/compile-cut.mp4");
+  // The player carries `src` on the <video> rather than a `<source>` child: one decoder, one
+  // element, and a stage change that actually swaps the cut. Same approved bytes.
+  await expect(video.locator("source")).toHaveCount(0);
+  await expect(video).toHaveAttribute("src", "/film/compile-cut.mp4");
   await expect(video).toHaveAttribute("poster", "/film/poster-1-hero.webp");
 });
 
+/*
+  G1-012 (2026-09-16). Below 900px the film pans instead of shrinking: the frame is a horizontal
+  scroll-snap container and the recording inside it keeps its 16:10 at the frame's full height,
+  so a phone reader sees one legible column at a time rather than a 370px thumbnail of four. What
+  is pinned is therefore the recording's shape and that the frame really scrolls -- the frame's
+  own box is now portrait on purpose. Above 900px the panes are `display: none` and the frame
+  itself is the 16:10 box, as before.
+*/
 test("the hero film keeps its 16:10 source shape on a narrow screen", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the narrow frame is what is under test");
   await openHome(page);
-  const frame = await page.getByTestId("one-path-hero-film").locator(".compile-film-viewport").boundingBox();
-  expect(frame).not.toBeNull();
-  const ratio = frame!.width / frame!.height;
-  expect(ratio).toBeGreaterThan(1.58);
-  expect(ratio).toBeLessThan(1.62);
+  const viewport = page.getByTestId("one-path-hero-film").locator(".compile-film-viewport");
+  const measured = await viewport.evaluate((frame: HTMLElement) => {
+    const panes = frame.querySelector<HTMLElement>(".compile-film-panes");
+    const pans = !!panes && getComputedStyle(panes).display !== "none";
+    const box = (pans ? panes : frame).getBoundingClientRect();
+    return { pans, ratio: box.width / box.height, overflowX: getComputedStyle(frame).overflowX, scrollable: frame.scrollWidth > frame.clientWidth + 1 };
+  });
+  expect(measured.ratio).toBeGreaterThan(1.58);
+  expect(measured.ratio).toBeLessThan(1.62);
+  if (measured.pans) {
+    expect(measured.overflowX, "the panning frame must be a real scroller, not a clipped box").toBe("auto");
+    expect(measured.scrollable, "the recording is wider than the frame and can be panned").toBe(true);
+  }
 });
 
 test("the customer film vocabulary stays readable without reintroducing technical stage names", async ({ page }, testInfo) => {
@@ -46,7 +64,8 @@ test("the customer film vocabulary stays readable without reintroducing technica
   await openHome(page);
   const chips = page.locator(".one-path-hero-film-steps span");
   await expect(chips).toHaveCount(4);
-  await expect(chips).toHaveText(["SOURCE", "READ", "ORGANIZE", "READY FOR AI"]);
+  // BQ-011 / BQ-056: sentence case, from `PIPELINE_STAGES`, and no longer pill-shaped.
+  await expect(chips).toHaveText(["Source", "Read", "Organize", "Ready for AI"]);
   const boxes = await chips.evaluateAll(elements => elements.map(element => {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, right: rect.right, top: rect.top, width: rect.width };
@@ -55,7 +74,10 @@ test("the customer film vocabulary stays readable without reintroducing technica
   for (const box of boxes) {
     expect(box.left).toBeGreaterThanOrEqual(-1);
     expect(box.right).toBeLessThanOrEqual((page.viewportSize()?.width ?? 390) + 1);
-    expect(box.width).toBeGreaterThan(40);
+    // BQ-011: they are caption words now, not 999px pills. "Source" is the one span with no
+    // leading rule, so its box is the text: about 41px at 12px. The floor still catches a
+    // collapsed or clipped name, which is what this assertion was opened about.
+    expect(box.width).toBeGreaterThan(24);
   }
 });
 
@@ -64,7 +86,7 @@ test("the Works film remains a two-stage accessible tablist with readable captio
   const film = await openWorksFilm(page);
   const tabs = film.locator('.compile-film-stages[role="tablist"] [role="tab"]');
   await expect(tabs).toHaveCount(2);
-  await expect(tabs).toHaveText(["ORGANIZE", "UPDATES"]);
+  await expect(tabs).toHaveText(["Organize", "Updates"]);
   await expect(film.locator('.compile-film-viewport[role="tabpanel"]')).toHaveCount(1);
   await expect(film.locator(".compile-film-caption p")).toContainText(/knowledge|source/i);
   await expect(film.locator(".compile-film-progress")).toHaveText(/^\d\d \/ 02$/);
@@ -75,7 +97,7 @@ test("the Works film remains a two-stage accessible tablist with readable captio
 test("a visitor-selected Works stage stays selected when the current cut ends", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "390", "one phone width is enough for the manual-hold state machine");
   const film = await openWorksFilm(page);
-  const updates = film.getByRole("tab", { name: "UPDATES" });
+  const updates = film.getByRole("tab", { name: "Updates" });
   await updates.click();
   await expect(updates).toHaveAttribute("aria-selected", "true");
   const video = film.locator(".compile-film-video");
@@ -112,10 +134,23 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   const escaped = await page.evaluate(() => {
     const result: string[] = [];
+    /*
+      G1-012: the film pans below 900px, so its panes and recording sit past the right edge inside
+      a real `overflow-x: auto` frame. That is the supported wide-content pattern (the same rule
+      `overflow-audit.spec.ts` applies to tables and code); `overflow-x: hidden` is not a scroller
+      and still counts, because hidden is what made these defects invisible in the first place.
+    */
+    const clippedByScroller = (element: HTMLElement) => {
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const overflowX = getComputedStyle(parent).overflowX;
+        if (overflowX === "auto" || overflowX === "scroll") return true;
+      }
+      return false;
+    };
     for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
       const box = element.getBoundingClientRect();
       if (!box.width || !box.height) continue;
-      if (box.left < -1 || box.right > innerWidth + 1) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
+      if ((box.left < -1 || box.right > innerWidth + 1) && !clippedByScroller(element)) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
     }
     return result;
   });
@@ -152,7 +187,9 @@ test("the mobile menu exposes only the three customer choices plus the commercia
   const direct = panel.locator("a.mobile-nav-direct");
   await expect(direct).toHaveCount(3);
   await expect(direct).toHaveText(["How it works", "Connect", "Pricing"]);
-  await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(1);
+  // BQ-059: the header keeps the action at every width; the sheet is the three sections.
+  await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
+  await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
   await expect(panel.locator("details.mobile-nav-group")).toHaveCount(0);
   const geometry = await panel.boundingBox();
   expect(geometry).not.toBeNull();
@@ -176,9 +213,16 @@ test("Connect owns the Sources route and using a mobile customer link closes the
 test.describe("on a touch screen", () => {
   test.use({ hasTouch: true });
 
-  test("every reachable control keeps the 44px touch floor", async ({ page }, testInfo) => {
+  /*
+    BQ-043. The floor rule is unscoped CSS, so measuring it on the landing page alone proved the
+    home route and nothing else -- and the routes that actually failed the audit were /pricing,
+    /docs and /integrations. One test, six routes: if a route-scoped sheet undercuts the floor it
+    is that route that names itself in the failure.
+  */
+  for (const route of ["/", "/pricing", "/resources", "/docs/errors", "/integrations", "/knowledge-compiler"]) {
+  test(`every reachable control on ${route} keeps the 44px touch floor`, async ({ page }, testInfo) => {
     test.skip(!PHONE.includes(testInfo.project.name), "the touch floor is a phone contract");
-    await page.goto("/");
+    await page.goto(route);
     await page.evaluate(async () => {
       for (let y = 0; y < document.body.scrollHeight; y += 480) {
         window.scrollTo(0, y);
@@ -192,4 +236,5 @@ test.describe("on a touch screen", () => {
       .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height })));
     expect(short).toEqual([]);
   });
+  }
 });

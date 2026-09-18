@@ -2,8 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import { clause } from "@/lib/compiler-contract";
+import WorldDiffSample from "@/components/world-diff-sample";
+import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
+
+/*
+  G1-005. What an "exact location" is on this deployment, in the sentence rather than a link away.
+
+  The abstraction is right -- a cell, a slide shape and a MIME part are exact locations with no
+  page -- and stating only the abstraction let a reader assume their spreadsheet arrives with
+  cells. Every accepted entry in the capability manifest carries `evidenceLocatorKinds: ["pdf"]`,
+  because every accepted source is sanitized to PDF before anything reads it, so today there is
+  exactly one form and the page can name it without narrowing the contract behind it.
+
+  Derived rather than typed, and fail-closed: the day a second locator kind is implemented, this
+  throws instead of publishing a sentence that has quietly become false.
+*/
+const LOCATOR_KINDS = [...new Set(
+  CAPABILITY_MANIFEST.entries
+    .filter((entry) => isAcceptedAtUpload(entry.status))
+    .flatMap((entry) => entry.evidenceLocatorKinds),
+)];
+if (LOCATOR_KINDS.length !== 1 || LOCATOR_KINDS[0] !== "pdf") {
+  throw new Error(`this page states one locator kind; the manifest now accepts ${LOCATOR_KINDS.join(", ")}`);
+}
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -124,7 +148,7 @@ const PARTS: readonly Part[] = [
   {
     state: "EVIDENCE",
     title: "Where a fact came from",
-    body: "Every qualified claim points at a source version and its exact location inside it. A world holding an unresolved link is not emitted at all.",
+    body: "Every qualified claim points at a source version and its exact location inside it. On this deployment that location takes one form for every accepted format — a numbered page of the sanitized PDF and a box on it — because a spreadsheet, a slide deck and a Word file are all converted to PDF before anything reads them. A world holding an unresolved link is not emitted at all.",
   },
   {
     state: "VERSIONS",
@@ -165,20 +189,26 @@ export default function CompiledWorldPage() {
                 a reader arriving on this page from that same search had no visible way back to
                 /product except the navigation's disclosure menu.
               */}
-              <p className="doc-breadcrumb"><Link href={"/product" as Route}>Product</Link> <span aria-hidden="true">/</span> Compiled World</p>
-              <p className="slate"><b>PRODUCT</b><span />COMPILED WORLD</p>
+              <DocBreadcrumb trail={[{ name: "Product", path: "/product" }, { name: "Compiled World", path: "/product/compiled-world" }]} />
               {/*
                 BA-024. The headline spent its first two words on what the product is not, and
                 repeated the home page's contrast instead of advancing it. Six cards under it
                 make the case; the headline states the claim.
               */}
               <h1 className="document-title">A world your AI can reason about.</h1>
+              {/*
+                G1-019 / G1-020 (marketing-visual). Everything below the H1 in this column was
+                blank for about 900px while six paragraphs about a World ran down the right half.
+                This is /explore's own change surface, reduced to one arriving filing, with every
+                figure read out of two frozen compiles. No copy on this page changes.
+              */}
+              <WorldDiffSample />
             </div>
             <div className="stack">
               <p className="lede">
                 The output of a compile is a Compiled World: objects, relations, evidence,
                 versions and the artifacts that project them.
-                <b> One world, used by retrieval, agents, MCP, APIs and applications.</b>
+                 One world, used by retrieval, agents, MCP, APIs and applications.
               </p>
               <div className="tiles">
                 {PARTS.map((part) => (
@@ -217,7 +247,7 @@ export default function CompiledWorldPage() {
                 <Link href="/docs/use-with-ai">Use the result with AI</Link>.
               </p>
               <div className="actions">
-                <Link className="btn" href={"/explore" as Route}>Explore a Compiled World</Link>
+                <Link className="btn" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
                 <Link className="btn ghost" href="/developers">Read it from your code</Link>
               </div>
             </div>

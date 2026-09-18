@@ -46,29 +46,37 @@ export function ChangelogList() {
             id={entry.date}
             hidden={surface !== null && !entry.surfaces.includes(surface)}
           >
+            {/*
+              BQ-136. The date is the permalink, and the surface chips are gone.
+
+              The link to an entry was a bare "#" pushed to the right-hand end of the row: a
+              one-character target with an aria-label doing all the work, which a screen
+              reader's link list showed as a column of hashes and a mouse could barely hit.
+              The date is what a person cites an entry by, so the date is the link.
+
+              The chips beside it printed the surfaces the entry touched in 9px tracked mono
+              capitals, which is the same vocabulary the filter above the list already offers
+              -- and the filter is how a reader got here. Same call as the tag lines on
+              /resources: the control encodes it, so the card does not repeat it.
+            */}
             <header>
-              <time dateTime={entry.date}>
-                {new Date(`${entry.date}T00:00:00Z`).toLocaleDateString("en-GB", {
-                  day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
-                })}
-              </time>
+              <a href={`#${entry.date}`}>
+                <time dateTime={entry.date}>
+                  {new Date(`${entry.date}T00:00:00Z`).toLocaleDateString("en-GB", {
+                    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+                  })}
+                </time>
+              </a>
               {/*
                 BA-117, taking the audit's own alternative rather than its first choice.
 
-                It asks for a version chip on every entry or none, because one of three reads as
-                accidental versioning. Neither is available honestly: two of the three changes
-                were not releases and carry no version, so putting a number on them would invent
-                one, and deleting 2026.9.3.1 would remove a real fact the migration note beside
-                it tells the reader to pin.
-
-                So the chip says what it is. A labelled release number on the entry that was a
-                release, and silence on the two that were not, is a rule a reader can read; an
-                unlabelled number on one of three is not.
+                It asks for a version chip on every entry or none, because one of three reads
+                as accidental versioning. Neither is available honestly: two of the three
+                changes were not releases and carry no version, so putting a number on them
+                would invent one, and deleting 2026.9.3.1 would remove a real fact the
+                migration note beside it tells the reader to pin. So the chip says what it is.
               */}
               {entry.version ? <b>Release {entry.version}</b> : null}
-              {entry.surfaces.map((item) => <em key={item}>{item}</em>)}
-              {/* The permalink 13.3 asks for: an anchor to this entry, not to the page. */}
-              <a href={`#${entry.date}`} aria-label={`Link to ${entry.title}`}>#</a>
             </header>
             <h2>{entry.title}</h2>
 

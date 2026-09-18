@@ -1,0 +1,131 @@
+/*
+  The generated reference at /api.
+
+  Everything here is a site token. A reference page that arrives with its own palette and its own
+  type scale is exactly what a bundled documentation widget looks like, and the reason not to use
+  one was that the page should read as part of this site.
+*/
+
+.index {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg);
+  background: var(--g1);
+}
+
+@media (min-width: 900px) {
+  .index { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 28px; }
+}
+
+/* pages-05 / type-03: the operation index is navigation. One kicker face: sans, sentence case. */
+.groupName {
+  margin: 0 0 8px;
+  font: 500 var(--t-1) var(--f-sans);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+}
+
+.index ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; min-width: 0; }
+
+.indexLink {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 0;
+  color: var(--text-lo);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Hover is gated: on a touch screen an un-gated :hover sticks after a tap (token contract). */
+@media (hover: hover) and (pointer: fine) { .indexLink:hover { color: var(--text-hi); } }
+
+/* Touch targets on a phone, where this index is the fastest way through 33 operations. */
+@media (pointer: coarse) {
+  .indexLink { min-height: 44px; align-items: center; }
+}
+
+.group { display: grid; gap: 20px; min-width: 0; }
+
+.group > h2 { margin: 0; }
+
+.prose { margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.7; }
+
+.operation {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg);
+}
+
+.signature {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  min-width: 0;
+  font: 12px var(--f-mono);
+}
+
+.signature b { color: var(--text-hi); letter-spacing: 0.08em; }
+.signature > code { color: var(--text-mid); overflow-wrap: anywhere; }
+/* type-03: "No key required" is a sentence about the operation, not part of the signature. */
+.signature em { font-style: normal; font-family: var(--f-sans); color: var(--text-lo); font-size: var(--t-1); }
+
+.summary { margin: 0; font-size: 17px; font-weight: 500; line-height: 1.35; color: var(--text-hi); }
+
+.label {
+  margin: 4px 0 0;
+  font: 500 var(--t-1) var(--f-sans);
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+}
+
+.response { display: grid; gap: 8px; min-width: 0; padding-top: 10px; border-top: 1px solid var(--hairline); }
+
+/*
+  A response description is mostly error codes, and an error code is one 28-character word with no
+  break opportunity in it. At 390px `RETRIEVAL_INDEX_NOT_COMPILED` pushed the document 17px wider
+  than the viewport -- a horizontal scroll on the whole page, caused by a word.
+*/
+.status { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-lo); overflow-wrap: anywhere; }
+
+/* The number is the signal; the treatment is emphasis, never the only carrier of meaning. */
+.status code[data-kind="ok"] { color: var(--text-hi); font: 12px var(--f-mono); }
+.status code[data-kind="error"] { color: var(--text-mid); font: 12px var(--f-mono); }
+
+.codes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.codes code { padding: 2px 6px; border: 1px solid var(--hairline); border-radius: var(--r-paper); font: 12px var(--f-mono); color: var(--text-mid); overflow-wrap: anywhere; }
+
+/*
+  The reference below the header spends both grid columns.
+
+  `.body` is the two-column editorial grid: a title rail and a reading column. For eighty thousand
+  pixels of operation-by-operation reference that leaves a 480px rail empty for the entire scroll
+  and squeezes every parameter table and request example into 800px to do it. Spanning the grid is
+  the whole fix; the measure inside stays bounded by the elements' own max-widths.
+*/
+.full {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/*
+  pages-24. The examples disclosure: a grid row that keeps the operation's own rhythm when open,
+  and a summary that is a real 44px control rather than a line of text with a triangle.
+*/
+.examples { display: grid; gap: 10px; min-width: 0; }
+.examples > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; list-style: none; color: var(--text-mid); }
+.examples > summary::-webkit-details-marker { display: none; }
+/* The site's one disclosure marker, the same +/- the contact fold and the workspace use. */
+.examples > summary::before { content: "+"; font: 12px var(--f-mono); }
+.examples[open] > summary::before { content: "−"; }

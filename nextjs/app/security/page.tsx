@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
+import { ProcessingRegionTable, TrustDisclosures } from "@/components/trust-disclosures";
 import { BOUNDARY } from "@/lib/evidence-record";
 import { activationPolicy } from "@/lib/activation-policy";
 
@@ -41,7 +42,7 @@ const CAPABILITY_LABELS = {
   customerIntake: "Customer document intake",
   cdr: "Content disarm and reconstruction",
   ocrGpu: "Isolated GPU document reading",
-  candidatePromotion: "Candidate promotion into a live world",
+  candidatePromotion: "Candidate activation into a live world",
   customerData: "Compiling customer data",
 } as const;
 
@@ -97,7 +98,7 @@ const CONTROLS = [
     two-users-with-different-permissions case the audit wants tested is not a state this
     deployment can be put into: a workspace has one member.
   */
-  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and a promotion each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
+  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and an activation each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
   /*
     §17.1 asks two more questions this page did not answer: which model providers see a document,
     and what a model is allowed to do with it.
@@ -171,7 +172,7 @@ const UNANSWERED = [
     section keeps process vocabulary off a public page, and the founder's merge of the pull
     request carrying the log is the confirmation.
   */
-  ["Third-party certification and audit — none yet", "Every control above is enforced and checked by us, and that is the whole of what is being claimed. Not yet answered is who else has checked: no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer; SOC 2 timing is not set."],
+  ["Third-party certification and audit — none yet", "Every control above is enforced and checked by us, and that is the whole of what is being claimed. Not yet answered is who else has checked: no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer, and SOC 2 has not started: it is planned alongside that test."],
 ] as const;
 
 export default function SecurityPage() {
@@ -181,18 +182,37 @@ export default function SecurityPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>SECURITY</b><span />DATA PATH AND CONTROLS</p>
-              <h1 className="document-title">{"Where your documents go, "}<br />and what never sees them.</h1>
+              <h1 className="document-title">Where your documents go, and what never sees them.</h1>
             </div>
             <div className="stack">
               <p className="lede">
                 Your sources move through a tenant-scoped processing path, and activation remains
                 under human control. Browser-direct upload → quarantine → sanitize and disarm →
                 isolated analysis → candidate world → your approval.
-                <b> Every external operation fails closed.</b>
+                 Every external operation fails closed.
               </p>
 
-              <p className="slate"><span />THE BOUNDARY, IN THE ORDER IT IS ENFORCED</p>
+              {/*
+                G2-041. This page is 8,007 CSS px on a 412px phone -- roughly 25 screens of
+                near-unbroken prose -- and it had no way to reach any of it but the scrollbar.
+
+                One line of anchors, not a component and not a sticky rail: it costs no new CSS,
+                it is equally useful on a desktop, and a reader who lands here from a security
+                questionnaire is looking for exactly one of these six sections. The longer fix --
+                a sticky index inside the shared policy template -- is marketing-visual's, and
+                this page does not use that template.
+              */}
+              <nav className="fine" aria-label="On this page">
+                <b>On this page:</b>{" "}
+                <a href="#boundary">The enforced boundary</a> ·{" "}
+                <a href="#what-holds-what">What holds what</a> ·{" "}
+                <a href="#controls">Controls</a> ·{" "}
+                <a href="#regions">Where the work happens</a> ·{" "}
+                <a href="#review">What a security review will find</a> ·{" "}
+                <a href="#deployment">Current deployment controls</a>
+              </nav>
+
+              <h2 id="boundary">The boundary, in the order it is enforced</h2>
               <div className="chain">
                 {BOUNDARY.map(([num, name, text]) => (
                   <article className="link" key={num}>
@@ -203,15 +223,26 @@ export default function SecurityPage() {
                 ))}
               </div>
 
-              <p className="slate"><span />WHAT HOLDS WHAT</p>
-              <div className="chain">
+              <h2 id="what-holds-what">What holds what</h2>
+              {/*
+                BQ-136. Four names and what each one holds is a definition list.
+
+                It was four cards in a two-column grid, each with an <h2> inside it -- so the
+                page's heading outline carried "The browser", "Object storage", "The
+                application" and "The database" as siblings of its real sections, and a
+                reader walking the page by heading met four nouns with no question above them.
+                A <dl> says the relationship the cards were drawing: this term, that
+                definition. `.connector-legend` is the same list /integrations uses for the
+                same shape, so this adds no CSS.
+              */}
+              <dl className="connector-legend">
                 {PATH.map(([name, text]) => (
-                  <article className="link" key={name}>
-                    <h2>{name}</h2>
-                    <p>{text}</p>
-                  </article>
+                  <div key={name}>
+                    <dt>{name}</dt>
+                    <dd>{text}</dd>
+                  </div>
                 ))}
-              </div>
+              </dl>
 
               {/*
                 BA-155. One grid, not a controls grid followed by a section labelled "NOT ANSWERED
@@ -229,7 +260,7 @@ export default function SecurityPage() {
                 Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
                 contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
               */}
-              <p className="slate"><span />CONTROLS</p>
+              <h2 id="controls">Controls</h2>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -268,7 +299,49 @@ export default function SecurityPage() {
                 working is a control that is working, not a degradation; the row that is off is the
                 one in prose, and it says "on request" there in words rather than in a badge.
               */}
-              <p className="slate"><span />CURRENT DEPLOYMENT CONTROLS</p>
+              {/*
+                G2-021 / SD-11. "Global infrastructure; may process outside Korea" was the only
+                answer this page gave about location, and it gave it for every component at once
+                -- including the two that actually touch document bytes, which are the two a
+                reviewer is asking about. "We do not guarantee residency" and "we will not say
+                where" are different statements and only the first is defensible.
+
+                Every value in the table is read from configuration in `lib/trust-disclosures.ts`,
+                and the one component no configuration pins says so rather than being given a
+                plausible region.
+              */}
+              <h2 id="regions">Where the work happens</h2>
+              <p>
+                No data residency is guaranteed, and that is a separate statement from where the
+                work is configured to run. Below is the second one. Which provider is permitted to
+                process which class of data is on the{" "}
+                <Link href={"/subprocessors" as Route}>subprocessors page</Link>.
+              </p>
+              <ProcessingRegionTable />
+
+              {/*
+                G2-004 / G2-023 / G2-028. The same checklist /trust and /enterprise render, from
+                one module, so a reviewer who starts on any of the three reads the same answers.
+              */}
+              {/*
+                It folds here and nowhere else, and G2-041 is the reason. This page was already
+                8,007 CSS px on a phone, the controls and the two record rows above it already
+                state seven of these sixteen answers in full, and adding the list open took it
+                past thirty phone screens. `status-fold` is the pattern this site uses for a long
+                technical list a reader either wants in full or does not want at all -- /sources
+                folds its tier legend, /benchmarks folds its receipt schema.
+
+                What may not happen is the summary hiding what is inside it. It names all three
+                states, so a reader who never opens it has still been told that some of these
+                answers are "not in place".
+              */}
+              <h2 id="review">What a security review will find</h2>
+              <details className="status-fold">
+                <summary>The full checklist: what is in place, what is planned, and what is not in place</summary>
+                <TrustDisclosures on="/security" heading="In the order a review asks them" />
+              </details>
+
+              <h2 id="deployment">Current deployment controls</h2>
               <div className="status-list">
                 {Object.entries(activationPolicy)
                   .filter(([key]) => key !== "customerData")
@@ -285,11 +358,13 @@ export default function SecurityPage() {
                 checkout: {activationPolicy.customerData.reason}
               </p>
               <p className="fine">
-                Promotion is closed by design: a candidate world becomes active only after an
+                Activation is closed by design: a candidate world becomes active only after an
                 authenticated person approves it. Retention and deletion are set out step by step
-                in the <Link href={"/privacy" as Route}>privacy notice</Link>, and a security
-                review or a vulnerability report reaches us{" "}
-                <Link href={"/contact" as Route}>here</Link>.
+                in the <Link href={"/privacy" as Route}>privacy notice</Link>. A security review or
+                a vulnerability report reaches us through{" "}
+                {/* BQ-134: a link named "here" says nothing out of its sentence, and a screen
+                    reader's link list is exactly that. */}
+                <Link href={"/contact" as Route}>the contact page</Link>.
               </p>
 
               <div className="actions">

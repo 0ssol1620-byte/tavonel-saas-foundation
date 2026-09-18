@@ -5,7 +5,9 @@ import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { TrackedLink } from "@/components/tracked-link";
-import { REQUIRED_PACKAGE_PATHS } from "@/lib/collection-download";
+import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import { PACKAGE_CONTENTS } from "@/lib/package-contents";
+import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -40,19 +42,19 @@ const FIRST_CALL = `curl -H "Authorization: Bearer $TAVONEL_API_KEY" \\
 
 const PATHS = [
   {
-    kind: "LIVE",
+    kind: "Live",
     title: "MCP and the API",
-    body: "Read the active World over HTTP, or give an agent the read-only MCP server: eight tools over sources, World, search, Ask, objects, relations, evidence and package. Always the current revision, with no copy to keep in step.",
+    body: `Read the active World over HTTP, or give an agent the read-only MCP server: ${MCP_TOOL_COUNT_WORD} tools over sources, Worlds, one World, search, Ask, objects, relations, evidence and package. Always the current revision, with no copy to keep in step.`,
     detail: "No write tool, and the server refuses to start if one is added.",
   },
   {
-    kind: "PORTABLE",
+    kind: "Portable",
     title: "A signed package",
     body: "Take the World away as files: JSON-LD and Turtle semantic projections, graph nodes and relationships, a retrieval corpus, provenance activities and a validation report, under a signed manifest with a digest for every file.",
     detail: "Verifiable offline against a fingerprint you fetch separately. It is a snapshot of one revision — take the live path when the reader must stay current.",
   },
   {
-    kind: "HUMAN",
+    kind: "Human",
     title: "Ask and the workspace",
     body: "A person asks a question and gets an answer whose citations open the exact source location behind them, or a statement that the available evidence is insufficient rather than a filled gap.",
     detail: "The same World the two machine paths read, with a reviewer in front of it.",
@@ -67,53 +69,6 @@ const JOURNEY = [
   ["Receive evidence-bound context", "Every result carries the source version and the exact location inside it that it was compiled from."],
   ["Follow citations back to source", "Open that location and read the original. Where the evidence does not support an answer, the answer says so."],
 ] as const;
-
-/*
-  What the package holds, read out of the writer.
-
-  `REQUIRED_PACKAGE_PATHS` is the list `buildSignedCollectionArchive` refuses to emit without.
-  The five below are files the same function adds on the way out -- the two guidance documents,
-  the entrypoint, the candidate world, the export manifest and its detached signature.
-  `brand-copy.test.ts` checks every string here against `lib/collection-download.ts`, so a file
-  this page names is a file that module writes.
-*/
-const PACKAGE_EXTRAS = [
-  "README.md",
-  "AGENTS.md",
-  "manifest/ai-entrypoint.json",
-  "manifest/candidate-world.json",
-  "manifest/export-manifest.json",
-  "signatures/export-manifest.ed25519.json",
-] as const;
-
-/*
-  What each file is for (BA-204).
-
-  The list itself still comes from the exporter -- `REQUIRED_PACKAGE_PATHS` plus the six the same
-  function adds on the way out -- so this is a purpose per path and not a second inventory. The
-  lookup below throws on a path with no purpose, which is the point: a file added to the exporter
-  arrives here as a build failure rather than as a blank cell.
-
-  `/docs/use-with-ai` carries the same idea as a table of its own. The wording differs because
-  that page groups two paths per row for a reader choosing a consumer, and this one is the
-  archive's own inventory, file by file.
-*/
-const PACKAGE_PURPOSE: Record<string, string> = {
-  "ontology/knowledge.jsonld": "JSON-LD semantic projection, for linked-data consumers.",
-  "ontology/knowledge.ttl": "The same projection in Turtle, for RDF and SPARQL.",
-  "graph/nodes.csv": "Graph nodes, for a plain graph import.",
-  "graph/relationships.csv": "Graph edges, with the relation each one carries.",
-  "rag/documents.jsonl": "Document-level retrieval records.",
-  "rag/chunks.jsonl": "Retrieval chunks, each bound to the source location it came from.",
-  "provenance/activities.jsonl": "Lineage for every compiled artifact in the package.",
-  "validation/report.json": "The validation status, and any reason the result still requires review.",
-  "README.md": "Where a person starts, and which consumption path to take.",
-  "AGENTS.md": "What a filesystem-capable agent reads first.",
-  "manifest/ai-entrypoint.json": "The machine-readable map of the entrypoints and the grounding rules.",
-  "manifest/candidate-world.json": "The compiled World this archive was written from.",
-  "manifest/export-manifest.json": "A digest for every file above. The signature is made over these bytes.",
-  "signatures/export-manifest.ed25519.json": "The detached Ed25519 signature over that manifest.",
-};
 
 /*
   A package path that can wrap (measured, webkit at 390).
@@ -132,21 +87,34 @@ function breakable(path: string) {
   ));
 }
 
-function packagePurpose(path: string): string {
-  const purpose = PACKAGE_PURPOSE[path];
-  if (!purpose) throw new Error(`the export writes ${path} and this page says nothing about it`);
-  return purpose;
-}
+
+/*
+  BQ-100. The four sections of this page, in order, as the title column's navigation.
+
+  The decision puts navigation beside the heading on a reference route and collapses every other
+  route to one reading measure; the collapse in `app/product-polish.css` is written as the
+  condition -- an H1 alone in that column -- so naming the sections here is the whole of the fix.
+  "Next" is not in the list: it is the closing action row, and a jump list whose last entry is
+  "the end of the page" is a scrollbar with words on it.
+*/
+const SECTIONS = [
+  "Three ways to use a Compiled World",
+  "From sources to a grounded answer",
+  "Public tooling",
+  "What is in a portable package",
+] as const;
 
 export default function DevelopersPage() {
+  const sections = tocEntries(SECTIONS);
+
   return (
     <PublicSitePage>
       <section className="scene doc">
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <p className="slate"><b>DEVELOPERS</b><span aria-hidden="true" />· ONE WORLD</p>
               <h1 className="document-title">Give every model the same grounded world.</h1>
+              <PageToc entries={sections} />
             </div>
             <div className="stack">
               <p className="lede">
@@ -155,7 +123,7 @@ export default function DevelopersPage() {
                 the asset.
               </p>
 
-              <p className="slate"><span aria-hidden="true" />THREE WAYS TO USE A COMPILED WORLD</p>
+              <h2 id={sections[0].id}>Three ways to use a Compiled World</h2>
               <div className="chain dev-paths">
                 {PATHS.map((path) => (
                   <article className="link" key={path.kind}>
@@ -167,7 +135,7 @@ export default function DevelopersPage() {
                 ))}
               </div>
 
-              <p className="slate"><span aria-hidden="true" />FROM SOURCES TO A GROUNDED ANSWER</p>
+              <h2 id={sections[1].id}>From sources to a grounded answer</h2>
               <ol className="dev-journey">
                 {JOURNEY.map(([title, body]) => (
                   <li key={title}>
@@ -186,7 +154,7 @@ export default function DevelopersPage() {
               </p>
 
               <div className="stack">
-                <p className="slate"><b>PUBLIC TOOLING</b><span aria-hidden="true" />· VERSIONED FILES</p>
+                <h2 id={sections[2].id}>Public tooling</h2>
                 <h3>Start with the contract, then a scoped key.</h3>
                 <figure className="docs-code">
                   <figcaption>
@@ -198,7 +166,7 @@ export default function DevelopersPage() {
                 <div className="tiles">
                   <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><TrackedLink className="btn ghost" event="developer_api_started" href="/api/openapi">OpenAPI contract</TrackedLink></article>
                   <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a className="btn ghost" href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>
-                  <article className="tile"><h3>MCP</h3><p>Eight stdio tools: sources, World, search, Ask, objects, relations, evidence, package. No write tool, and it refuses to start if one is added.</p><TrackedLink className="btn ghost" event="developer_mcp_started" href="/developer/tavonel-mcp.mjs" download>Download MCP server</TrackedLink></article>
+                  <article className="tile"><h3>MCP</h3><p>{MCP_TOOL_NAMES.length} stdio tools: <code>{MCP_TOOL_NAMES.join(", ")}</code>. No write tool, and it refuses to start if one is added.</p><TrackedLink className="btn ghost" event="developer_mcp_started" href="/developer/tavonel-mcp.mjs" download>Download MCP server</TrackedLink></article>
                   {/*
                     The tile stays because the agent is real; its wording changes because
                     "connector agent" is not what it is. RESOLVED A-4 (2026-09-06).
@@ -226,36 +194,56 @@ export default function DevelopersPage() {
                   <article className="tile"><h3>Package verifier</h3><p>Checks what is inside the archive: relations resolve, every region sits inside its page in the 0-1000 frame, and the Turtle, JSON-LD and CSV describe the same graph. Add <code>tavonel-verify-roundtrip.py</code> to load it into SQLite and query the ids back.</p><a className="btn ghost" href="/developer/tavonel-verify-package.mjs" download>Download package verifier</a></article>
                 </div>
                 <p className="fine">Verify versions and SHA-256 values against <a href="/developer/channel.json">the public distribution channel</a>. The <a href="/developer/README.md">setup and safety contract</a> documents scopes, secret handling and fail-closed behavior.</p>
+                {/*
+                  G3-017. The two recipe scripts /docs/integration-recipes tells a reader to run
+                  were in a private repository, so a page whose premise is "these recipes are
+                  executed, so a drifted one fails a check rather than your afternoon" asked the
+                  reader to take that on trust. They are in the channel now, pinned like the rest.
+                */}
+                <p className="fine">
+                  The two runnable recipes are published too:{" "}
+                  <a href="/developer/tavonel-public-sample.py" download>tavonel-public-sample.py</a>{" "}
+                  reads the public sample World with no key, and{" "}
+                  <a href="/developer/tavonel-recipe-smoke.mjs" download>tavonel-recipe-smoke.mjs</a>{" "}
+                  runs all three against a deployment. Every request either one makes is an
+                  unauthenticated GET.
+                </p>
               </div>
 
               <div className="stack">
-                <p className="slate"><b>PORTABLE PACKAGE</b><span aria-hidden="true" />· WHAT IS IN THE ARCHIVE</p>
+                <h2 id={sections[3].id}>What is in a portable package</h2>
                 <p className="fine">
                   Every signed export contains these files, written by the exporter and named in
                   a manifest carrying a digest for each one. The two ontology files are the
                   Compiled World&rsquo;s RDF / JSON-LD semantic projection — a projection of the
-                  compiled objects and relations, not a hand-authored OWL schema.
+                  compiled objects and relations, with no schema for you to author.
                 </p>
+                <div className="table-scroll">
                 <table className="docs-table">
                   <thead><tr><th>Path</th><th>Use it for</th></tr></thead>
                   <tbody>
-                    {[...REQUIRED_PACKAGE_PATHS, ...PACKAGE_EXTRAS]
-                      .slice()
-                      .sort((a, b) => a.localeCompare(b))
-                      .map((path) => (
-                        <tr key={path}>
-                          <td data-label="Path"><code>{breakable(path)}</code></td>
-                          <td data-label="Use it for">{packagePurpose(path)}</td>
-                        </tr>
-                      ))}
+                    {/*
+                      G3-007. This table, /docs/exports and /docs/use-with-ai printed three
+                      different archives -- 14 paths, 9 and 11 -- and one of them named a file
+                      the exporter does not write. All three render `PACKAGE_CONTENTS` now, which
+                      is `REQUIRED_PACKAGE_PATHS` plus the six the writer adds on the way out.
+                    */}
+                    {PACKAGE_CONTENTS.map(([path, purpose]) => (
+                      <tr key={path}>
+                        <td data-label="Path"><code>{breakable(path)}</code></td>
+                        <td data-label="Use it for">{purpose}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
-              <p className="slate"><span aria-hidden="true" />NEXT</p>
+              <h2>Next</h2>
               <div className="actions">
                 <Link className="btn" href={"/docs/quickstart" as Route}>Run the quickstart</Link>
-                <Link className="btn ghost" href={"/docs/authentication" as Route}>API reference</Link>
+                {/* BA-184 is reversed here: /api is a rendered reference now, not a stub. G3-004. */}
+                <Link className="btn ghost" href={"/api" as Route}>API reference</Link>
                 <Link className="btn ghost" href="/evidence">How evidence is bound</Link>
               </div>
             </div>

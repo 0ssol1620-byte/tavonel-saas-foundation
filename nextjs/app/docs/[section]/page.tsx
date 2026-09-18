@@ -3,9 +3,11 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
-import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
+import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import { DocsCopyButton } from "@/components/docs-copy-button";
 import { DocsSnippet } from "@/components/docs-snippet";
+import { withMarks } from "@/components/docs/marks";
+import { CodeTokens } from "@/components/docs/code-tokens";
 import {
   DOCS_REVIEWED,
   DOCS_SECTIONS,
@@ -15,10 +17,11 @@ import {
   type DocsBlock,
 } from "@/lib/docs-content";
 import { readDocsEndpoints, snippetFor, SNIPPET_LANGUAGES, type DocsEndpoint } from "@/lib/docs-endpoints";
+import { WorldLifecycle } from "@/components/docs/world-lifecycle";
 import { DocsToc } from "@/components/docs/docs-toc";
-import { PageToc, tocEntries } from "@/components/docs/page-toc";
+import { DocsTableFilter } from "@/components/docs/docs-table-filter";
+import { PageToc, slugify, tocEntries } from "@/components/docs/page-toc";
 import layout from "@/components/docs/docs-toc.module.css";
-import anchor from "@/components/docs/page-toc.module.css";
 
 export function generateStaticParams() {
   return DOCS_SECTIONS.map((section) => ({ section: section.slug }));
@@ -29,36 +32,27 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
   const entry = findDocsSection(section);
   if (!entry) return {};
   return {
-    title: `${entry.title} — TAVONEL docs`,
+    title: `${entry.title} — TAVONEL`,
     description: entry.summary,
     alternates: { canonical: `/docs/${section}` },
     openGraph: { url: `/docs/${section}` },
   };
 }
 
-/**
- * Emphasis only, and only the pair the source actually uses.
- *
- * The content is data rather than MDX on purpose -- a markdown pipeline would let a section
- * carry a heading level, a link or a script that nothing here checks. `**bold**` is the one
- * mark the prose needs, so it is the one mark that renders.
- */
-function withEmphasis(text: string) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => (
-    part.startsWith("**") && part.endsWith("**")
-      ? <strong key={index}>{part.slice(2, -2)}</strong>
-      : <span key={index}>{part}</span>
-  ));
-}
 
 function CodeBlock({ label, body, id }: { label: string; body: string; id?: string }) {
   return (
-    <figure className={id ? `docs-code ${anchor.anchor}` : "docs-code"} id={id}>
+    <figure className="docs-code" id={id}>
       <figcaption>
         <span>{label}</span>
-        <DocsCopyButton value={body} />
+        {/* BQ-137: named by what it copies, so eight blocks are not eight identical "Copy"s. */}
+        <DocsCopyButton value={body} label={`Copy ${label.toLowerCase()}`} />
       </figcaption>
-      <pre><code>{body}</code></pre>
+      {/*
+        BQ-103: the block scrolls sideways, so it is focusable and named. A scroll container with
+        no focusable child cannot be reached from a keyboard at all, let alone scrolled.
+      */}
+      <pre tabIndex={0} role="group" aria-label={label}><code><CodeTokens body={body} /></code></pre>
     </figure>
   );
 }
@@ -68,7 +62,7 @@ const LANGUAGE_LABELS = { curl: "cURL", python: "Python", typescript: "TypeScrip
 
 function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
   return (
-    <article className={id ? `docs-endpoint ${anchor.anchor}` : "docs-endpoint"} id={id}>
+    <article className="docs-endpoint" id={id}>
       <header>
         <b data-method={endpoint.method}>{endpoint.method}</b>
         <code>{endpoint.path}</code>
@@ -87,17 +81,19 @@ function Endpoint({ endpoint, id }: { endpoint: DocsEndpoint; id?: string }) {
         }))}
       />
       {endpoint.requestExample ? <CodeBlock label="Request body" body={endpoint.requestExample} /> : null}
+      <div className="table-scroll">
       <table className="docs-table">
         <thead><tr><th>Status</th><th>Response</th></tr></thead>
         <tbody>
           {endpoint.responses.map((response) => (
             <tr key={response.status}>
               <td data-label="Status"><code>{response.status}</code></td>
-              <td data-label="Response">{response.description}</td>
+              <td data-label="Response">{withMarks(response.description)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </article>
   );
 }
@@ -121,16 +117,16 @@ function headingLabel(block: DocsBlock): string | null {
 function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<string, DocsEndpoint>; id?: string }) {
   switch (block.kind) {
     case "heading":
-      return <h2 id={id} className={anchor.anchor}>{block.text}</h2>;
+      return <h2 id={id}>{block.text}</h2>;
     case "prose":
-      return <p>{withEmphasis(block.text)}</p>;
+      return <p>{withMarks(block.text)}</p>;
     case "note":
       /*
         BA-217. The accent bar was doing two opposite jobs across the site -- real guidance here,
         and "this section has not been run" on every cookbook. The cookbook use is gone
         (BA-178); the label is what keeps this one legible without relying on the colour.
       */
-      return <p className="docs-note"><strong>Note</strong> {withEmphasis(block.text)}</p>;
+      return <p className="docs-note"><strong>Note</strong> {withMarks(block.text)}</p>;
     case "steps":
       return <ol className="docs-steps">{block.items.map((item) => <li key={item}>{item}</li>)}</ol>;
     case "code":
@@ -140,18 +136,43 @@ function Block({ block, endpoints, id }: { block: DocsBlock; endpoints: Map<stri
       return <DocsSnippet snippets={block.items.map((item) => ({ ...item }))} />;
     case "table":
       return (
-        <table className="docs-table">
-          <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
-          <tbody>
-            {block.rows.map((row) => (
-              <tr key={row.join("|")}>
-                {row.map((cell, index) => (
-                  <td key={index} data-label={block.head[index]}>{withEmphasis(cell)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          {/*
+            BQ-102. The filter sits immediately before the table's scroll wrapper because that is
+            how it finds it: it walks its own `nextElementSibling` and queries the rows out of it,
+            so nothing has to pass an id around and the two cannot point at different tables.
+          */}
+          {block.filterLabel ? <DocsTableFilter label={block.filterLabel} /> : null}
+          <div className="table-scroll">
+          <table className="docs-table">
+            <thead><tr>{block.head.map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
+            <tbody>
+              {block.rows.map((row) => (
+                /*
+                  BQ-102. A row that carries a stable identifier in its first cell gets that
+                  identifier as an anchor, so one error code is a linkable address. `slugify`
+                  is the documentation's own, the same function the heading anchors use.
+                */
+                <tr
+                  key={row.join("|")}
+                  id={block.rowAnchors ? slugify(row[0] ?? "") || undefined : undefined}
+                >
+                  {row.map((cell, index) => (
+                    <td key={index} data-label={block.head[index]}>{withMarks(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        </>
+      );
+    case "diagram":
+      return (
+        <div className="stack">
+          <WorldLifecycle />
+          <p className="fine">{block.caption}</p>
+        </div>
       );
     case "endpoint": {
       const endpoint = endpoints.get(block.operationId);
@@ -182,20 +203,20 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
     .filter((item): item is { position: number; label: string } => item.label !== null);
   const toc = tocEntries(labelled.map((item) => item.label));
   const anchorIds = new Map(labelled.map((item, order) => [item.position, toc[order]!.id]));
+  // One trail, read by the crawler and by the reader. See `DocBreadcrumb`.
+  const trail = [{ name: "Documentation", path: "/docs" }, { name: entry.title, path: `/docs/${section}` }];
   const index = DOCS_SECTIONS.findIndex((item) => item.slug === section);
   const previous = DOCS_SECTIONS[index - 1];
   const next = DOCS_SECTIONS[index + 1];
 
   return (
     <PublicPageShell>
-      <BreadcrumbJsonLd trail={[{ name: "Documentation", path: "/docs" }, { name: entry.title, path: `/docs/${section}` }]} />
+      <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc"><div className="shell"><div className={layout.layout}>
         <DocsToc current={section} />
         <div className="body">
           <div className="stack">
-            <p className="slate">
-              <b>DOCUMENTATION</b><span aria-hidden="true" />· <Link href="/docs">All sections</Link>
-            </p>
+            <DocBreadcrumb trail={trail} />
             <h1 className="document-title">{entry.title}</h1>
           </div>
 
@@ -207,22 +228,40 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
                 <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
               ))}
             </div>
-            <nav className="docs-pager">
-              {previous ? <Link href={`/docs/${previous.slug}` as Route}>← {previous.title}</Link> : <span />}
-              {next ? <Link href={`/docs/${next.slug}` as Route}>{next.title} →</Link> : <span />}
+            {/*
+              BQ-137 / BQ-134. The pager was two 10px mono links with an arrow glyph pasted into
+              the label, and an empty `<span>` on whichever side had no neighbour -- an element
+              with no content and no name, there only to hold `justify-content: space-between`
+              apart. It renders the links it has; a lone "next" is pushed right by CSS, and each
+              one says which direction it goes in words rather than in a character.
+            */}
+            <nav className="docs-pager" aria-label="Documentation sections">
+              {previous ? (
+                <Link href={`/docs/${previous.slug}` as Route}>Previous: {previous.title}</Link>
+              ) : null}
+              {next ? <Link href={`/docs/${next.slug}` as Route}>Next: {next.title}</Link> : null}
             </nav>
             <p className="fine">
-              API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)} ·{" "}
-              {/*
-                Feedback goes to an address that exists and is read. A form posting to an endpoint
-                nobody had built would look like feedback and be a hole in the floor.
+              API version {DOCS_VERSION} · reviewed {formatReviewDate(DOCS_REVIEWED)}
+            </p>
+            {/*
+              BQ-137. The way to tell us a page is wrong, on its own line.
 
-                BA-221: the label asked "Something wrong on this page?", which opens by assuming
-                the page is wrong. It is the same mailto, phrased as an action.
-              */}
+              It was the third item in a middot-separated meta row, after the API version and
+              the review date -- so the one element on the page that asks the reader for
+              something was formatted as a footnote about the page's edition. Feedback goes to
+              an address that exists and is read; a form posting to an endpoint nobody had
+              built would look like feedback and be a hole in the floor.
+
+              BA-221: the label asked "Something wrong on this page?", which opens by assuming
+              the page is wrong. It is the same mailto, phrased as an action.
+            */}
+            <p className="fine">
+              Something here out of date or wrong?{" "}
               <a href={`mailto:support@tavonel.com?subject=${encodeURIComponent(`Docs feedback: ${entry.title}`)}`}>
-                Report an issue with this page →
+                Report an issue with this page
               </a>
+              .
             </p>
           </div>
         </div>

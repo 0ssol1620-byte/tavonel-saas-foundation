@@ -18,6 +18,10 @@ describe("production security headers", () => {
     expect(config).toContain("object-src 'none'");
     expect(config).toContain('localHttpPlaywright ? null : "upgrade-insecure-requests"');
     expect(config).toContain('key: "Strict-Transport-Security"');
+    // T1-009. hstspreload.org refuses a domain whose header does not carry the directive, so
+    // without this word the submission the founder has to make cannot be made at all. Adding it
+    // submits nothing and changes nothing a browser does today.
+    expect(config).toContain('value: "max-age=31536000; includeSubDomains; preload"');
     expect(config).toContain('key: "Permissions-Policy"');
   });
 
@@ -184,6 +188,14 @@ describe("production security headers", () => {
       */
       expect(source).toContain("const nonce = generateCspNonce();");
       expect(source).toContain('response.headers.set("Content-Security-Policy-Report-Only", cspReportOnly(nonce));');
+      /*
+        T1-004. The header now goes only where a nonce reaches the page it polices. A prerendered
+        document has none -- its HTML was written at build time -- so the policy refused all ~26
+        of the framework's inline scripts on every view, which Chrome logged as a "serious" issue
+        on every public page and which buried the rows that would have meant something.
+      */
+      expect(source).toContain("const observed = cspNonceEnforcedPath(request.nextUrl.pathname);");
+      expect(source, "an unobserved route must take no nonce header at all").toContain("if (!observed) return response;");
       expect(source, "a second mint would enforce a policy nobody observed")
         .not.toContain("cspReportOnly(generateCspNonce())");
       // A refused nonce sets no header and is logged. Asserted as source because the builder
@@ -235,6 +247,25 @@ describe("production security headers", () => {
         for (const path of ["/workspace", "/workspace/admin", "/pricing", "/"]) {
           const response = await run(path, "1");
           expect(response.headers.get("Content-Security-Policy"), path).toBeNull();
+        }
+      });
+
+      /*
+        T1-004, as the two halves of one rule: the report-only policy is sent where it can be
+        satisfied and nowhere else.
+
+        The second half is the finding. A page whose HTML was written at build time carries no
+        nonce, so a nonce policy refuses its own framework's bootstrap on every view -- a stream
+        of violations that says only "this page is prerendered" and hides anything that does not.
+      */
+      it("observes only where it could enforce", async () => {
+        const observed = await run("/workspace/sources", "");
+        expect(observed.headers.get("Content-Security-Policy-Report-Only")).toContain("'nonce-");
+        expect(observed.headers.get("Reporting-Endpoints")).toContain("csp-endpoint");
+        for (const path of ["/", "/pricing", "/security", "/docs/quickstart", "/workspace", "/workspace/admin"]) {
+          const response = await run(path, "");
+          expect(response.headers.get("Content-Security-Policy-Report-Only"), `${path} cannot satisfy a nonce policy and must not be asked to`).toBeNull();
+          expect(response.headers.get("Reporting-Endpoints"), path).toBeNull();
         }
       });
     });

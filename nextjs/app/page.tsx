@@ -3,6 +3,7 @@ import { preload } from "react-dom";
 import HomePageClient from "@/components/home-page-client";
 import SolutionProofSample from "@/components/solution-proof-sample";
 import { isLiveCommerce } from "@/lib/commercial-state";
+import { BRAND_LINE } from "@/lib/site-navigation";
 
 /**
  * The English entry point, and one half of the site's only hreflang pair.
@@ -14,20 +15,29 @@ import { isLiveCommerce } from "@/lib/commercial-state";
  * `app/layout.tsx`. `canonical` is restated because declaring `alternates` replaces the inherited
  * object rather than merging into it.
  */
+/*
+  D26 / BQ-134. One tab-title pattern, and this page is its one named exception.
+
+  Every other page on the site is "X — TAVONEL", which reads correctly when the section is the
+  thing being named. The home tab has no section to name, so it names the product and what the
+  product is -- and both halves come from `BRAND_LINE`, the constant the footer tagline, the OG
+  card and the root metadata description already derive from, rather than from a fifth and sixth
+  positioning sentence typed here.
+*/
 export const metadata: Metadata = {
-  title: "TAVONEL — Make your knowledge ready for AI",
+  title: `TAVONEL — ${BRAND_LINE.descriptor}`,
   description: "Connect files, cloud and servers. TAVONEL prepares source-traceable, structured knowledge your AI can use, while difficult content is surfaced for verification instead of silently accepted.",
   alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
   openGraph: {
-    title: "TAVONEL — Make your knowledge ready for AI",
-    description: "Bring your knowledge. TAVONEL handles the processing, keeps a path back to the source, and prepares the reviewed result for your AI.",
+    title: BRAND_LINE.headline,
+    description: BRAND_LINE.descriptor,
     type: "website",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "TAVONEL — Make your knowledge ready for AI",
-    description: "Bring your knowledge. TAVONEL handles the processing, keeps a path back to the source, and prepares the reviewed result for your AI.",
+    title: BRAND_LINE.headline,
+    description: BRAND_LINE.descriptor,
   },
 };
 

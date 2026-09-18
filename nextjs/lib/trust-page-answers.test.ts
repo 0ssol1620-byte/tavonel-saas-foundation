@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -181,7 +182,9 @@ describe("/security answers the §17.1 questions", () => {
       read("app/security/page.tsx").match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "",
     );
     expect(absent).toContain("An external penetration test is planned after the first paying customer");
-    expect(absent).toContain("SOC 2 timing is not set");
+    // SD-09 (`docs/policy/DECISION_LOG_2026-09-16.md`) replaced "SOC 2 timing is not set" with a
+    // sequence that still carries no date: not started, and planned alongside the external test.
+    expect(absent).toContain("SOC 2 has not started");
     expect(absent, "the sequencing sentence carries no process label on a public page").not.toContain(
       "delegated decision pending the founder's confirmation",
     );
@@ -274,7 +277,9 @@ describe("/trust indexes the six published surfaces", () => {
     }
     // The one authorised sequencing sentence carries no date, on this page as on /security.
     expect(absent).toContain("An external penetration test is planned after the first paying customer");
-    expect(absent).toContain("SOC 2 timing is not set");
+    // SD-09 (`docs/policy/DECISION_LOG_2026-09-16.md`) replaced "SOC 2 timing is not set" with a
+    // sequence that still carries no date: not started, and planned alongside the external test.
+    expect(absent).toContain("SOC 2 has not started");
     for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for"]) {
       expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
     }
@@ -370,18 +375,46 @@ describe("/trust indexes the six published surfaces", () => {
       neither can be dropped without a red test, which is tighter than the one substring was.
     */
     expect(document).toContain("## Annex A — clauses completed at signature");
-    for (const clause of ["§1 Governing law", "§9 Recovery objectives", "§10 Transfer mechanism", "§13 Liability and precedence"]) {
+    /*
+      G2-018 and G2-019 (SD-07), 2026-09-16 — edited from the commerce-legal lane, which owns the
+      copy this case pins and not this file. Listed as a cross-lane note in that lane's report.
+
+      Three of the four clauses this case pinned as open are settled in Draft v1, so the markers
+      it looked for are gone by design rather than by accident: governing law and jurisdiction in
+      §1 (Republic of Korea, Seoul Central District Court, the same as /terms), the transfer
+      mechanism in §10 (the Standard Contractual Clauses, the UK Addendum for a transfer from the
+      United Kingdom, and the module mapping), and the liability cap in §13 at the fees of the
+      preceding twelve months, which is the cap /terms states.
+
+      The shape of the guard does not change, and the shape is what matters: a clause still open
+      is listed in Annex A *and* marked in place in the body, and a clause now settled is pinned
+      to the words that settle it. An edit that quietly reopens one, or that states a different
+      cap here than on /terms, fails here instead of shipping two contracts.
+    */
+    for (const clause of ["§9 Recovery objectives", "§10 Transfer annexes", "§13 Signature"]) {
       expect(document, `${clause} has to be listed in the annex`).toContain(clause);
     }
     for (const inPlace of [
-      "| Governing law | To be specified in the executed version",
-      "**Transfer mechanism: to be annexed",
       "Recovery objectives and a drill cadence: to be specified in the executed version",
-      "To be specified in the executed version — see Annex A: the liability cap",
+      "The signature blocks and the parties' registered details are completed in the",
     ]) {
       expect(document, `"${inPlace}" is the marker in place; the annex is not a substitute for it`)
         .toContain(inPlace);
     }
+    for (const settled of [
+      "| Governing law | The Republic of Korea, with the Seoul Central District Court",
+      "**Transfer mechanism: the Standard Contractual Clauses.**",
+      "limited to the fees paid to TAVONEL in the twelve months immediately before the event",
+    ]) {
+      expect(document, `"${settled}" is a Draft v1 term and may not be quietly reopened`)
+        .toContain(settled);
+    }
+    expect(
+      read("app/terms/page.tsx"),
+      "the cap in the DPA and the cap on /terms are one number, not two",
+    ).toContain("fees you paid to TAVONEL in the twelve months");
+    expect(document, "the party block may not deny what the live operator disclosure publishes")
+      .not.toContain("is not published in the pilot deployment");
     expect(document, "and the document may not publish our project plan as a checklist")
       .not.toContain("What has to happen before this is a signable document");
     expect(document, "the deletion clause must not promise a provider's backup expiry").toContain(
@@ -661,14 +694,18 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     `withoutComments` matters, because the page explains in a comment which words it stopped
     printing.
   */
-  it("says on the page that a receipt is hash-bound and how to get one", () => {
+  /*
+    G2-011. "Request any receipt named here at hello@tavonel.com" was the whole verification
+    path, and it was not one: a digest you cannot check against a file you cannot fetch verifies
+    nothing. The receipts are published now, so what this asserts inverts -- the page has to say
+    how to check a hash, and it may no longer route a reader to an inbox to get one.
+  */
+  it("says on the page that a receipt is hash-bound and how to check one", () => {
     const notes = withoutComments(read("app/research/notes/page.tsx"));
     expect(notes).toContain("bound by sha256");
-    expect(notes).toContain("Request any receipt named here");
-    expect(notes).toContain("check the hash");
-    expect(notes).toContain("hello@tavonel.com");
-    // BA-089: the missing space that rendered as "Askhello@tavonel.com".
-    expect(notes, "a JSX element after a word needs its space").not.toMatch(/[a-z]\s*\n?\s*<a href="mailto/);
+    expect(notes).toContain("published here");
+    expect(notes).toContain("hash it yourself");
+    expect(notes, "an email request is not a verification path").not.toContain("mailto:");
     for (const internal of ["docs/evidence/artifacts/", "claims pack", "campaign", "not published at a public URL"]) {
       expect(notes, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
     }
@@ -682,14 +719,35 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
     internal campaign name may not reach the page, and a 64-character digest may not be typeset
     as body prose. Both are asserted on the page rather than on the record.
   */
-  it("renders a receipt identifier and a shortened digest, not an internal filename", () => {
+  it("renders the whole digest and the file it is of, never the internal filename", () => {
     const notes = withoutComments(read("app/research/notes/page.tsx"));
     expect(notes).toContain("Receipt {entry.receipt.id}");
-    expect(notes).toContain("shortDigest(entry.receipt.digest)");
-    // The whole value stays one hover or one copy away, so nothing is withheld.
-    expect(notes).toContain("title={`sha256 ${entry.receipt.digest}`}");
+    // BA-092's shortened digest was enough to recognise a file and never enough to verify one.
+    expect(notes, "the published digest is the whole value").toContain("<code>{entry.receipt.digest}</code>");
+    expect(notes).toContain("href={entry.receipt.url}");
     expect(notes.toLowerCase(), "the internal campaign name may not be rendered").not.toContain("folynta");
-    expect(notes, "a receipt file name may not be rendered").not.toContain(".json");
+  });
+
+  /*
+    The check that makes a published digest worth printing.
+
+    Every receipt the page cites is hashed here against the file served under `public/`. A copy
+    that drifts from the artifact it was taken from, a digest edited to match a new file, and a
+    citation whose receipt was never published all fail on this run rather than on a reader's.
+
+    The internal filename stays in the record and is asserted absent from the page; what is
+    asserted present is that the public URL resolves to bytes whose sha256 is the printed one.
+  */
+  it("serves every cited receipt, and its bytes hash to the digest the page prints", () => {
+    const record = read("lib/evidence-record.ts");
+    const receipts = [...record.matchAll(/digest: "([0-9a-f]{64})",\s+file: "([^"]+)",\s+url: "([^"]+)",/g)];
+    expect(receipts.length, "both measured entries carry a published receipt").toBe(2);
+    for (const [, digest, file, url] of receipts) {
+      expect(url, "a receipt is served from one directory").toMatch(/^\/research\/receipts\/[\w.-]+\.json$/);
+      expect(url.toLowerCase(), "a retired campaign name may not reach a public URL").not.toContain("folynta");
+      const bytes = readFileSync(resolve(import.meta.dirname, "..", "public", url.slice(1)));
+      expect(createHash("sha256").update(bytes).digest("hex"), `${file} is published at ${url}`).toBe(digest);
+    }
   });
 });
 
@@ -842,5 +900,281 @@ describe("the security-review answer reconciles across the two pages that state 
     // two not published = the recovery objective and the external audit.
     expect(rows(read("app/trust/page.tsx"), "const PUBLISHED", "const NOT_PUBLISHED")).toBe(13);
     expect(rows(read("app/trust/page.tsx"), "const NOT_PUBLISHED", "export default")).toBe(2);
+  });
+});
+
+/*
+  G2-004 / G2-023 / G2-028. One disclosure list, rendered on all three pages a buyer can land on.
+
+  The failure this guards is not a wrong sentence, it is a page quietly carrying the shorter
+  version of the list. `/trust` published every absence; `/enterprise`, which is where an
+  enterprise reviewer actually arrives and converts, published none of them and said nothing
+  about deployment options, SSO, an SLA, an MSA, a questionnaire or a VPAT -- while `/contact`
+  offered air-gapped deployment and four data regions as selectable requirements.
+
+  So the check is structural: the module is the only place the wording lives, all three pages
+  render it, and the rules that make it publishable (three status words, no date in a plan, no
+  claim vocabulary anywhere) are asserted on the module rather than on any one page.
+*/
+describe("the trust disclosures are one list on three pages", () => {
+  const module_ = read("lib/trust-disclosures.ts");
+  const rows = (source: string) => (source.match(/^ {4}subject: "/gm) ?? []).length;
+
+  it("keeps the /security copy of the list behind a fold, and says so in the summary", () => {
+    // G2-041: /security was already 8,007 CSS px on a phone and states seven of these answers in
+    // full above the list. The fold is the site's pattern for a long technical list (/sources'
+    // tier legend, /benchmarks' receipt schema), and the summary may not hide what is inside it.
+    const page = read("app/security/page.tsx");
+    const fold = page.slice(page.indexOf("<details"), page.indexOf("</details>"));
+    expect(fold).toContain("<TrustDisclosures");
+    expect(fold, "the summary names all three states").toContain("what is in place, what is planned, and what is not in place");
+    for (const open of ["app/trust/page.tsx", "app/enterprise/page.tsx"]) {
+      expect(read(open), `${open} renders the same list open`).not.toContain("<details");
+    }
+  });
+
+  it.each(["app/trust/page.tsx", "app/security/page.tsx", "app/enterprise/page.tsx"])(
+    "%s renders the shared list rather than its own copy",
+    (page) => {
+      const source = read(page);
+      expect(source, "the disclosures come from one module").toContain("@/components/trust-disclosures");
+      expect(source).toContain("<TrustDisclosures");
+      // The wording may not be retyped on the page: a second copy is a copy that goes stale.
+      expect(withoutComments(source)).not.toContain("No SOC 2 report exists for this deployment");
+    },
+  );
+
+  it("names every procurement question a review asks, including the ones with no answer", () => {
+    for (const subject of [
+      "SOC 2",
+      "ISO 27001",
+      "Independent penetration test",
+      "Recovery objectives (RPO / RTO)",
+      "Backup and restore",
+      "SSO, SAML and SCIM",
+      "On-call and incident staffing",
+      "Deployment options",
+      "Data residency",
+      "Uptime SLA",
+      "Master services agreement",
+      "Data processing agreement",
+      "Security questionnaire (CAIQ / SIG)",
+      "Accessibility conformance (VPAT)",
+      "HIPAA business associate agreement",
+    ]) {
+      expect(module_, `${subject} is a row a reviewer looks for by name`).toContain(`subject: "${subject}"`);
+    }
+  });
+
+  it("keeps the row count even, so no absence is promoted to a full-width card", () => {
+    // `.status-list > :last-child:nth-child(odd)` stretches a trailing odd card across the
+    // section. The largest object on an enterprise page should not be whichever absence sorts
+    // last, which is the same defect BA-151 fixed one section down /security.
+    expect(rows(module_) % 2).toBe(0);
+  });
+
+  it("uses three status words and never a fourth", () => {
+    const statuses = [...module_.matchAll(/^ {4}status: "([a-z_]+)",$/gm)].map((match) => match[1]);
+    expect(statuses.length).toBe(rows(module_));
+    for (const status of statuses) {
+      expect(["provided", "roadmap", "not_provided"]).toContain(status);
+    }
+  });
+
+  it("states SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
+    expect(module_).toMatch(/No SOC 2 report exists/);
+    expect(module_).toContain("No ISO 27001 certificate exists");
+    expect(module_).toContain("Nobody outside this company has tested this deployment");
+    const copy = withoutComments(module_).toLowerCase();
+    for (const claim of ["attestation", "certified", "compliant", "audited by", "independently audited"]) {
+      expect(copy, `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
+    }
+  });
+
+  it("sequences what is planned without dating it", () => {
+    const copy = withoutComments(module_);
+    expect(copy).toContain("planned after the first paying customer");
+    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for", "this year", "next year"]) {
+      expect(copy.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
+    }
+    // The one date in this file is the restore that happened; a plan may carry none.
+    const plans = [...copy.matchAll(/status: "roadmap",\r?\n\s*line: "([^"]+)"/g)].map((match) => match[1]);
+    expect(plans.length).toBeGreaterThan(0);
+    for (const line of plans) {
+      expect(line, "a planned item with a year in it is a commitment nobody has funded").not.toMatch(/\b20\d\d\b/);
+    }
+  });
+
+  it("carries no process vocabulary onto a public page", () => {
+    const copy = withoutComments(module_);
+    for (const internal of ["SD-0", "SD-1", "delegated decision", "the founder decided", "FD-12"]) {
+      expect(copy, `"${internal}" is internal vocabulary on a public page`).not.toContain(internal);
+    }
+  });
+});
+
+/*
+  SD-11. Where the work happens, read from configuration rather than typed.
+
+  Each region below is fixed by a file in this repository -- `nextjs/vercel.json` for the Vercel
+  region, the Supabase and R2 provisioning record, the Cloud Run service definition -- and the
+  one component nothing pins prints that instead of a plausible region. The failure path this
+  guards is the helpful edit that fills the RunPod row in with "APAC" because the neighbouring
+  rows are in Seoul: a guessed residency answer is worse than a published absence, and it is the
+  component that reads document bytes.
+*/
+describe("SD-11 the processing-region table", () => {
+  const module_ = read("lib/trust-disclosures.ts");
+  const table = module_.slice(module_.indexOf("export const PROCESSING_REGIONS"));
+
+  it("names both components that touch document bytes", () => {
+    expect(table).toContain("Object storage — quarantine and artifacts");
+    expect(table).toContain("Content disarm and reconstruction");
+    expect(table).toContain("GPU document reading");
+  });
+
+  it("matches the regions the deployment configuration actually fixes", () => {
+    expect(JSON.parse(read("vercel.json")).regions, "the Vercel region is read from the deployment config")
+      .toEqual(["icn1"]);
+    expect(table).toContain("Seoul — icn1");
+    expect(table).toContain("Seoul — ap-northeast-2");
+    expect(table).toContain("Seoul — asia-northeast3");
+  });
+
+  it("says a region is not pinned rather than guessing one", () => {
+    expect(table).toContain("region: REGION_NOT_PINNED");
+    expect(module_).toContain('REGION_NOT_PINNED = "Not pinned to one region"');
+    const runpod = table.slice(table.indexOf('provider: "RunPod"'));
+    expect(runpod, "the GPU row may not be given a region no configuration fixes").not.toMatch(/region: "/);
+  });
+
+  it("does not turn a configured region into a residency guarantee", () => {
+    const copy = withoutComments(table).toLowerCase();
+    for (const promise of ["residency is guaranteed", "guaranteed residency", "data stays in korea", "never leaves korea"]) {
+      expect(copy, `"${promise}" is a promise no configuration here makes`).not.toContain(promise);
+    }
+    expect(table, "the R2 hint is a placement, not a guarantee").toContain("best-effort placement");
+  });
+});
+
+/*
+  G2-012 / SD-04. A page called Benchmarks with nothing to compare.
+
+  The protocol was the honest thing to publish and it is not the thing a reader arrived for:
+  "Verify and compare" led to rules for comparison and no measured result anywhere on the site.
+  What may fill that gap is fixed -- the two research findings already published with their
+  denominators and their receipts -- and what may not is an internal comparison measured under
+  conditions this protocol does not pin.
+
+  So the block is derived from the same record /research/notes renders, and the guard is that a
+  score cannot be typed into it. A figure that arrives as a literal on this page is a figure with
+  no receipt behind it, which is the one thing this page exists to refuse.
+*/
+describe("G2-012 /benchmarks says what exists today", () => {
+  const page = read("app/benchmarks/page.tsx");
+  const block = withoutComments(
+    page.slice(page.indexOf("What exists today"), page.indexOf("The eight metric families")),
+  );
+
+  it("links the published receipts rather than describing them", () => {
+    expect(page).toContain('import { EVIDENCE } from "@/lib/evidence-record"');
+    expect(block).toContain("entry.receipt!.url");
+    expect(block).toContain("Download the receipt");
+  });
+
+  it("says the results table is empty because nothing has qualified", () => {
+    expect(block).toContain("No run has yet qualified under the protocol above");
+  });
+
+  it("publishes no figure that is not on a receipt", () => {
+    expect(block, "a score typed onto this page has no receipt behind it").not.toMatch(/\b\d+\.\d+\b/);
+    expect(block.toLowerCase(), "an internal comparison is not a published result").not.toContain("arena");
+  });
+});
+
+/*
+  G2-043. The step after /research was /pricing, so the page that lists seven unsolved problems
+  asked the reader to buy. /research/notes answers what /research raises and was reachable only
+  from one inline link in a lede.
+
+  It is an override rather than a sixth entry in TRUST_SEQUENCE: the sequence is the §17 order of
+  the five hub pages and notes is a leaf of one of them. `brand-copy.test.ts` pairs every href in
+  that file with an action, which is why the override names its destination `to`.
+*/
+describe("G2-043 the research page's next step is its results", () => {
+  const component = read("components/trust-next.tsx");
+
+  it("sends /research to /research/notes", () => {
+    expect(component).toContain('"/research": {');
+    expect(component).toContain('to: "/research/notes" as Route');
+    expect(component).toContain('"/research": "Read what was measured"');
+  });
+
+  it("leaves the five-hub order alone", () => {
+    expect(TRUST_SEQUENCE.map((step) => step.href)).toEqual([
+      "/security", "/evidence", "/benchmarks", "/reproducibility", "/research", "/pricing",
+    ]);
+  });
+
+  it("ends the chain at the price question rather than looping", () => {
+    expect(read("app/research/notes/page.tsx")).toContain("Understand what it costs");
+  });
+});
+
+/*
+  G2-013. What separates a status page from a status claim.
+
+  Three things were missing and one of them may not be supplied. There was no incident record --
+  not even an empty one with a date on it, which is the difference between a record and a
+  reassurance. There was no way to be told without coming back to look. And the page is served by
+  the deployment it reports on, which it did not say.
+
+  What may not be supplied is an uptime percentage. The probe history is twenty stored runs of a
+  check that does not carry a document through the pipeline; a 30- or 90-day figure computed from
+  it would describe the prober rather than the service, and it would be the unsupported number
+  this repository stops the line for.
+*/
+describe("G2-013 /status carries a record, not a reassurance", () => {
+  const page = read("app/status/page.tsx");
+
+  it("bounds the empty incident history by a date it derives", () => {
+    expect(page).toContain("No incident has been recorded since");
+    expect(page, "the date is derived from the changelog, not typed").toContain("RECORD_STARTS");
+    expect(page).toContain("CHANGELOG.reduce");
+    expect(page, "an empty record has to promise what happens when it is not empty")
+      .toContain("published here with what");
+  });
+
+  it("offers a subscribe path that exists", () => {
+    expect(page).toContain("/changelog/feed.xml");
+    expect(page, "an announcement list nobody has built may not be implied")
+      .toContain("there is no announcement list");
+  });
+
+  it("says the page shares the deployment it reports on", () => {
+    expect(page).toContain("served by the same deployment it reports on");
+  });
+
+  it("publishes no uptime percentage", () => {
+    const copy = withoutComments(page);
+    expect(copy, "an uptime figure here would describe the prober, not the service")
+      .not.toMatch(/\d+(?:\.\d+)?\s*%/);
+    expect(copy.toLowerCase()).not.toContain("uptime");
+  });
+});
+
+/*
+  G2-036. Six tiers defined, two occupied, and nothing on the page saying which.
+
+  The two "Verified" tiers are the ones a buyer reads for, and they described capability no
+  format in this deployment has. Counted from the rendered rows rather than declared, so a format
+  that reaches a tier removes its own notice.
+*/
+describe("G2-036 /sources marks the tiers no format occupies", () => {
+  const table = read("components/source-capability-table.tsx");
+
+  it("counts occupancy from the rows it is rendering", () => {
+    expect(table).toContain("all.filter((entry) => entry.tier === CAPABILITY_TIER_LABEL[status])");
+    expect(table).toContain("No format has reached this tier yet.");
   });
 });

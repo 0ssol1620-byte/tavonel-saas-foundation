@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { activationPolicy } from "./activation-policy";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { pageMetadata, type PageSeoRecord } from "./page-seo";
 
@@ -155,7 +156,21 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
     // Activation is the owner's on Developer, and a free evaluation is refused. Both in Korean.
     expect(source, "the owner condition is what stops this reading as any Developer seat").toContain("워크스페이스");
     expect(source, "the owner condition, in the sentence itself").toContain("소유자라면");
-    expect(source, "the free evaluation must still read as refused at activation").toContain("활성화 요청은 거절됩니다");
+    /*
+      G1-002. The refusal moved up a level, and got broader rather than softer.
+
+      This pinned "활성화 요청은 거절됩니다" -- a free evaluation is refused at activation -- inside a
+      sentence whose first half said the evaluation uploads, compiles, reviews and exports. That
+      first half was false while `activationPolicy.customerData` is closed, and a reader who had
+      already accepted it would read the refusal as a detail about one plan. So the whole sentence
+      is gone and what stands in its place is the gate itself: no plan compiles customer files in
+      this deployment, which is a strictly stronger statement than the one this pinned.
+    */
+    expect(activationPolicy.customerData.enabled, "the assertion below turns on the closed gate").toBe(false);
+    expect(source, "the closed gate is stated in the pricing fold, not only in the hero notice")
+      .toContain("플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다");
+    expect(source, "and the hero carries the same notice a reader meets first")
+      .toContain("현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다");
     expect(source, "a paid plan is the bar, and the page must say so").toContain("유료 플랜");
   });
 

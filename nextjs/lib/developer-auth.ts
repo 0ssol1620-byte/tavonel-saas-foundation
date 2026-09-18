@@ -17,7 +17,16 @@ export type FoundationPrincipal = {
   accessSource?: SessionAccessSource;
 };
 
-const SCOPE_RATE_LIMITS: Record<DeveloperScope, number> = {
+/*
+  Requests per clock minute, per key, per scope.
+
+  Exported because /docs/billing-and-limits prints it (G3-018): the audit found no API rate
+  limit documented anywhere, zero `X-RateLimit-*` headers in the spec, and a 429 on
+  /uploads/capability whose triggering limit appeared on no page. The limits were real the whole
+  time -- `consume_foundation_api_rate_limit` in migration 0012 has enforced them since it
+  shipped -- so the fix is to publish the numbers the code uses, not to invent a table.
+*/
+export const SCOPE_RATE_LIMITS: Record<DeveloperScope, number> = {
   "documents:read": 120,
   "documents:intake": 30,
   "collections:read": 120,
