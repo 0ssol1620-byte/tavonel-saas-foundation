@@ -12,7 +12,7 @@ describe("approved one-path experience", () => {
   it("has exactly three shared customer destinations", () => {
     expect(CUSTOMER_NAV).toEqual([
       { href: "/product", label: "How it works" },
-      { href: "/integrations", label: "Connect" },
+      { href: "/integrations", label: "Integrations" },
       { href: "/pricing", label: "Pricing" },
     ]);
     expect(text("components/site-nav/desktop-primary-nav.tsx")).toContain("CUSTOMER_NAV.map");

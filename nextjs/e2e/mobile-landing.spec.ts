@@ -156,7 +156,7 @@ test("the mobile menu exposes only the three customer choices plus the commercia
   await expect(panel).toBeVisible();
   const direct = panel.locator("a.mobile-nav-direct");
   await expect(direct).toHaveCount(3);
-  await expect(direct).toHaveText(["How it works", "Connect", "Pricing"]);
+  await expect(direct).toHaveText(["How it works", "Integrations", "Pricing"]);
   // BQ-059: the header keeps the action at every width; the sheet is the three sections.
   await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
   await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
@@ -170,12 +170,12 @@ test("the mobile menu exposes only the three customer choices plus the commercia
   await expect(menu.locator(":scope > summary")).toBeFocused();
 });
 
-test("Connect owns the Sources route and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
+test("Integrations owns the Sources route and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
   await page.goto("/sources");
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
-  await expect(menu.getByRole("link", { name: "Connect", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("link", { name: "Integrations", exact: true })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("link", { name: "Pricing", exact: true }).click({ noWaitAfter: true });
   await expect(menu.locator(":scope > nav")).toBeHidden();
 });

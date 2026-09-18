@@ -789,8 +789,7 @@ describe("public surface: no process vocabulary in published copy", () => {
       "app/trust/page.tsx",
       "app/security/page.tsx",
       "app/refunds/page.tsx",
-      // app/ko/page.tsx left this list on 2026-09-18: the landing no longer prints the FD-02 plan
-      // labels (the activation details block moved off the landing), so it carries no delegated value.
+      "app/ko/page.tsx",
       "components/pricing-page-client.tsx",
       "lib/docs-content.ts",
       "lib/cookbook-content.ts",

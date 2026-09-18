@@ -74,7 +74,7 @@ const PROPERTIES = [
   ["Fail closed", "Knowledge that cannot be verified is not published as if it were. It is held for review, and the page says so."],
 ] as const;
 
-export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean }) {
+export default function HomePageClient({ liveCommerce, formats }: { liveCommerce: boolean; formats: string }) {
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +103,8 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
         <section className="one-path-hero" id="top" aria-labelledby="one-path-title" data-scene="1" tabIndex={-1}>
           <div className="one-path-wrap">
             <div className="one-path-intro">
+              {/* COPY-05: who the page is for, in one sentence, before the headline. */}
+              <p className="one-path-audience">For teams whose answers have to survive an audit: filings, contracts, standards and manuals.</p>
               <h1 id="one-path-title">{BRAND_LINE.headline}</h1>
               {/* The lede is the brand descriptor, which used to reach a visitor only in the footer. */}
               <p className="one-path-lede">{BRAND_LINE.descriptor}</p>
@@ -226,6 +228,22 @@ export default function HomePageClient({ liveCommerce }: { liveCommerce: boolean
               <Link className="btn" href={startHref} onClick={() => trackFunnel("cta_clicked", { cta: "closing_start", scene: "5" })}>{signedIn ? "Use with AI" : access.label}<ArrowUpRight size={17} aria-hidden="true" /></Link>
               <Link className="one-path-text-link" href={explore} prefetch={false} onClick={() => trackFunnel("cta_clicked", { cta: "closing_explore", scene: "5" })}>{EXPLORE_CTA.label}</Link>
               <Link className="one-path-text-link" href="/pricing" prefetch={false}>See pricing</Link>
+            </div>
+            {/*
+              COPY-44 / TRUST-07. The six questions a buyer asks before they write, answered in the
+              words the pages that own them already use, each with the link to that page. Nothing
+              here is new copy about the product: the training and provider answers are the
+              /security rows, the formats line is the capability manifest, the gate is the shared
+              activation record.
+            */}
+            <div className="one-path-faq">
+              <h3 id="one-path-faq-title">Questions we get first</h3>
+              <details className="one-path-details"><summary>Are my documents used to train models?</summary><p>No. Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else. <Link href="/security" prefetch={false}>Security</Link></p></details>
+              <details className="one-path-details"><summary>Which model providers see my documents?</summary><p>No third-party model API receives your documents in this deployment: document reading runs on GPU workers TAVONEL operates, and every document is treated as hostile data. <Link href="/security" prefetch={false}>Security</Link></p></details>
+              <details className="one-path-details"><summary>What happens when a passage cannot be verified?</summary><p>It is held for review and surfaced as such, not published as if it were verified. Fail closed is a property of the compiler, not a setting. <Link href="/trust" prefetch={false}>Trust Center</Link></p></details>
+              <details className="one-path-details"><summary>What can I bring?</summary><p>{formats}, as files, folders or a ZIP, plus connected sources. Every accepted format is sanitized to PDF and read the same way, so each passage keeps its page and region. <Link href="/sources" prefetch={false}>Supported sources</Link></p></details>
+              <details className="one-path-details"><summary>Can I compile my own files today?</summary><p>{activationPolicy.customerData.reason} <Link href={startHref}>{access.label}</Link></p></details>
+              <details className="one-path-details"><summary>Can what I upload be deleted?</summary><p>Source material, derived artifacts and compiled packages can be deleted on request, and that request is carried out by a person rather than by a self-service control. <Link href="/security" prefetch={false}>Retention and deletion</Link></p></details>
             </div>
             <p className="one-path-fine">Documents are treated as hostile data: the models that read them get no tools, no broad credentials and no outbound network. <Link href="/security" prefetch={false}>Security</Link> · <Link href="/trust" prefetch={false}>Trust Center</Link></p>
           </div>

@@ -74,7 +74,7 @@ describe("readCommercialState", () => {
 
   it("states the deployment line from the same gate", () => {
     const line = deploymentStateLine();
-    expect(line?.label).toBe("Public Compiled World: open · Your own files: arranged with us");
+    expect(line?.label).toBe("Public sample: open to read · Your own files: by arrangement");
     expect(line?.title).toBe(activationPolicy.customerData.reason);
   });
 });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
 import HomePageClient from "@/components/home-page-client";
 import { isLiveCommerce } from "@/lib/commercial-state";
 import { BRAND_LINE } from "@/lib/site-navigation";
@@ -24,7 +25,7 @@ import { BRAND_LINE } from "@/lib/site-navigation";
 */
 export const metadata: Metadata = {
   title: `TAVONEL — ${BRAND_LINE.descriptor}`,
-  description: "Connect files, cloud and servers. TAVONEL prepares source-traceable, structured knowledge your AI can use, while difficult content is surfaced for verification instead of silently accepted.",
+  description: "TAVONEL is the Knowledge Compiler for AI: every compiled result keeps a traceable path back to the page it was read from. A public Compiled World is open to read in full today.",
   alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
   openGraph: {
     title: BRAND_LINE.headline,
@@ -62,7 +63,7 @@ export default function HomePage() {
   return (
     <>
       <link rel="preload" as="image" href="/film/poster-1-hero-2x.webp" fetchPriority="high" />
-      <HomePageClient liveCommerce={isLiveCommerce()} />
+      <HomePageClient liveCommerce={isLiveCommerce()} formats={describeAcceptedFormats(CAPABILITY_MANIFEST)} />
     </>
   );
 }

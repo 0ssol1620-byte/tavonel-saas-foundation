@@ -85,7 +85,10 @@ test("renders the hero plus the four-step customer journey in the approved order
   await expect(page.locator(".one-path-hero-film-steps")).toHaveCount(0);
   await expect(page.locator("nav.one-path-jump")).toHaveCount(0);
   await expect(page.locator(".one-path-workflow, .one-path-source-options, .one-path-update-steps, .one-path-output-options")).toHaveCount(0);
-  await expect(page.locator("main details")).toHaveCount(0);
+  // The only disclosures on the page are the six FAQ answers in the close (COPY-44 / TRUST-07),
+  // plus the Korean plan fold on /ko; nothing in the hero or the steps folds anything away.
+  await expect(page.locator("main details:not(.one-path-faq details):not(.one-path-plan-details)")).toHaveCount(0);
+  await expect(page.locator("main .one-path-faq details")).toHaveCount(6);
   await expect(page.getByRole("tab")).toHaveCount(0);
 });
 
@@ -301,11 +304,12 @@ for (const entry of PAGES) {
         .toBeLessThanOrEqual(1);
     }
 
-    // §5.4 -- four H2s, each in a different section, five H3s, no H4, no nested section.
+    // §5.4 -- four H2s, each in a different section, six H3s (three steps, In, Out, the FAQ), no H4,
+    // no nested section.
     const h2s = outline.filter((heading) => heading.level === 2);
     expect(h2s).toHaveLength(4);
     expect(new Set(h2s.map((heading) => heading.section)).size).toBe(4);
-    expect(outline.filter((heading) => heading.level === 3)).toHaveLength(5);
+    expect(outline.filter((heading) => heading.level === 3)).toHaveLength(6);
     expect(outline.filter((heading) => heading.level > 3), "no H4 on this page").toHaveLength(0);
     await expect(page.locator("main section section")).toHaveCount(0);
 
@@ -418,13 +422,15 @@ for (const entry of PAGES) {
   test(`${entry.path} stays inside the audited document height`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "this test drives its own two viewports");
     /*
-      §5.7. The ceilings are re-derived from a measurement, not from the audit draft: fixture build 4
-      of 2026-09-18 measured 6,502px at 1440 and 7,994px at 390 (production before it: 8,116 and
-      11,487). Each ceiling is that measurement plus about four percent of slack for font and copy
-      drift. They are upper bounds -- a page that gets shorter never fails here -- and they ratchet
-      down only: lowering them with the next cut is fine, raising them to pass is not.
+      §5.7. The ceilings are re-derived from a measurement, not from the audit draft. Fixture build 8
+      of 2026-09-18 measured 6,076px at 1440 (two-column hero: the whole first screen fits the fold)
+      and 8,710px at 390 (production before the replan: 8,116 and 11,487). The phone number went up
+      from build 4 because the close gained six closed FAQ disclosures and, on /ko, the plan fold --
+      a deliberate content change, recorded here, not a drift. Each ceiling is the measurement plus
+      about four percent of slack. They are upper bounds -- a page that gets shorter never fails
+      here -- and outside a recorded content change they ratchet down only.
     */
-    for (const [width, height, ceiling] of [[1440, 900, 6800], [390, 844, 8300]] as const) {
+    for (const [width, height, ceiling] of [[1440, 900, 6400], [390, 844, 9100]] as const) {
       await page.setViewportSize({ width, height });
       await page.goto(entry.path);
       await settle(page);

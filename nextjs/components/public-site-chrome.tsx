@@ -141,7 +141,7 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
           <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}
-            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"}>{language.label}</Link>
+            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"}>{language.label}</Link>
           </span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}

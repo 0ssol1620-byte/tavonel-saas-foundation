@@ -43,6 +43,9 @@ describe("the Korean term table", () => {
   it.each(KO_SURFACES)("is true of the Korean copy in %s", (file) => {
     const copy = readFileSync(resolve(import.meta.dirname, file), "utf8");
     expect(koTermDrift(copy).map((entry) => entry.wrong + " -> " + entry.instead)).toEqual([]);
+    // COPY-40 took the artifact name out of the header state line, so the surfaces that do
+    // print it are where the table's spelling is held.
+    expect(copy, "the artifact keeps the table's spelling").toContain(KO_TERMS["Compiled World"]);
   });
 
   it("is already true of the Korean chrome", () => {
@@ -60,6 +63,5 @@ describe("the Korean term table", () => {
       ...Object.values(KO_CHROME.footerLinks),
     ].join("\n");
     expect(koTermDrift(chrome)).toEqual([]);
-    expect(chrome, "the chrome already spells the artifact the way the table does").toContain(KO_TERMS["Compiled World"]);
   });
 });

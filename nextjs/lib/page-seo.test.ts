@@ -143,29 +143,23 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
   const source = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
 
   /*
-    Landing replan, 2026-09-18. The Korean pricing fold is off this page.
-
-    /ko is the English landing's five sections, translated, and nothing else: it names no plan, no
-    sale channel and no activation condition of its own any more, and it sends a reader to
-    /pricing for all three. That is a deliberate narrowing, not an omission to detect -- but it
-    means two of the three cases here were guarding Korean sentences that no longer exist.
-
-    What replaces them is the rule that made those sentences safe in the first place: a page that
-    states no plan fact cannot state a stale one, so this asserts the page writes none, and that
-    the one commercial fact it does still carry -- the deployment gate, which a Korean reader meets
-    in the hero -- is the same closed gate the catalog and `activationPolicy` describe.
-
-    Reported with the replan: the Team consultation step, the owner-activation condition and the
-    "a free evaluation cannot activate" refusal are no longer published in Korean anywhere.
+    Landing replan, 2026-09-18 (evening). The Korean pricing fold is back on this page, as a closed
+    <details> in the closing section rather than a card in the middle: the Team consultation step,
+    the owner-activation condition and the plan-independent gate are published in Korean nowhere
+    else, so removing the fold had removed the facts. Both plan labels still come from the catalog
+    rather than being written again in Korean, which is the property this file exists to keep.
   */
-  it("writes no plan fact of its own, and sends a Korean reader to the page that maintains them", () => {
-    // Comments are stripped: the note above the page explains the replan ("리플랜"), and the word
-    // this checks for is a substring of it.
-    const copy = source.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, " ");
-    for (const named of ["BILLING_OFFERS", "TEAM_PLAN", "DEVELOPER_PLAN", "플랜"]) {
-      expect(copy, `/ko states "${named}" itself instead of linking to /pricing`).not.toContain(named);
-    }
-    expect(copy, "and offers the page that does").toContain('href="/pricing"');
+  it("reads both plan labels from the catalog instead of writing them again in Korean", () => {
+    expect(source).toContain("{BILLING_OFFERS.studio_access.label} 플랜");
+    expect(source).toContain("{BILLING_OFFERS.observer_access.label} 플랜");
+    expect(source, "the fold is a disclosure in the close, not a card").toContain('<details className="one-path-details one-path-plan-details">');
+  });
+
+  it("says which plans activate, that Team goes through a conversation, and that no plan opens the gate", () => {
+    expect(source, "the page must state the consultation step").toContain("상담을 거쳐 제공됩니다");
+    expect(source, "the owner condition is what stops this reading as any Developer seat").toContain("워크스페이스 소유자라면");
+    expect(source, "and the gate is stated as plan-independent").toContain("플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다");
+    expect(source, "and offers the page that maintains the plans").toContain('href="/pricing"');
   });
 
   it("carries the one commercial fact it states, and states it as the catalog does", () => {

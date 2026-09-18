@@ -11,6 +11,8 @@ import { isLiveCommerce } from "@/lib/commercial-state";
 import { LANDING_FRAMES } from "@/lib/landing-frames";
 import { FIRST_CALL } from "@/lib/developer-snippets";
 import { pageMetadata } from "@/lib/page-seo";
+import { BILLING_OFFERS } from "@/lib/billing-catalog"
+import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../../shared/capabilityManifest";
 
 /*
   랜딩 리플랜, 2026-09-18. 영문 `components/home-page-client.tsx`와 같은 다섯 섹션, 같은 섹션 id,
@@ -84,6 +86,8 @@ export default function KoreanEntryPage() {
         <div className="one-path-wrap">
           <div className="one-path-intro">
             {/* G1-043. 영문 H1과 같은 구조. BQ-116 / D12: 동사는 KO_TERMS의 "사용". */}
+            {/* COPY-05. 독자 호명 한 줄, 헤드라인 앞. */}
+            <p className="one-path-audience">답이 원문까지 추적되어야 하는 팀을 위해: 공시, 계약, 표준, 매뉴얼.</p>
             <h1 id="ko-one-path-title">자료를 가져오세요. AI가 사용하는 지식으로 만듭니다.</h1>
             <p className="one-path-lede">모든 결과에서 원문까지 되짚어 갈 수 있는, 컴파일된 지식.</p>
             <div className="one-path-actions actions">
@@ -192,6 +196,20 @@ export default function KoreanEntryPage() {
             <Link className="btn" href={startHref}>{startLabel}</Link>
             <Link className="one-path-text-link" href="/explore">공개 Compiled World 열기</Link>
             <Link className="one-path-text-link" href="/pricing" prefetch={false}>요금 확인</Link>
+          </div>
+          {/* FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the activation plan gate below is a
+              delegated decision, 2026-09-11; both plan labels come from the catalog. 랜딩 리플랜에서
+              접힘으로 돌아왔다: 이 세 문장이 한국어로 게재되는 유일한 자리다. */}
+          <details className="one-path-details one-path-plan-details"><summary>요금과 활성화 조건</summary><p>활성화는 유료 플랜에서 제공됩니다. 워크스페이스 소유자라면 {BILLING_OFFERS.observer_access.label} 플랜에서, 또는 {BILLING_OFFERS.studio_access.label} 플랜에서 활성화할 수 있습니다. {BILLING_OFFERS.studio_access.label} 플랜은 상담을 거쳐 제공됩니다. 다만 현재 배포에서는 고객 파일의 업로드·컴파일 자체가 열려 있지 않으므로, 플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다. 가격은 미국 달러(USD) 기준이며 세금은 별도입니다. 각 플랜의 정확한 범위는 Pricing 페이지가 기준입니다.</p><Link className="one-path-text-link" href="/pricing" prefetch={false}>요금과 플랜 범위</Link></details>
+          {/* COPY-44 / TRUST-07. 영문 FAQ와 같은 여섯 질문, 답은 해당 페이지의 문장을 옮긴 것. */}
+          <div className="one-path-faq">
+            <h3 id="ko-faq-title">먼저 받는 질문</h3>
+            <details className="one-path-details"><summary>내 문서가 모델 학습에 쓰이나요?</summary><p>아닙니다. 고객 문서는 공유 모델의 학습에 쓰이지 않습니다. 모델은 World를 컴파일하기 위해 원문을 읽을 뿐, 다른 용도로는 쓰지 않습니다. <Link href="/security" prefetch={false}>보안</Link></p></details>
+            <details className="one-path-details"><summary>어떤 모델 제공자가 내 문서를 보나요?</summary><p>현재 배포에서는 어떤 외부 모델 API도 고객 문서를 받지 않습니다. 문서 읽기는 TAVONEL이 운영하는 GPU 워커에서 실행되며, 모든 문서는 적대적 데이터로 다룹니다. <Link href="/security" prefetch={false}>보안</Link></p></details>
+            <details className="one-path-details"><summary>검증되지 않는 문단은 어떻게 되나요?</summary><p>검토 대상으로 표시되어 보류되며, 검증된 것처럼 게재되지 않습니다. 실패 시 닫힘은 설정이 아니라 컴파일러의 성질입니다. <Link href="/trust" prefetch={false}>Trust Center</Link></p></details>
+            <details className="one-path-details"><summary>어떤 자료를 가져올 수 있나요?</summary><p>{describeAcceptedFormats(CAPABILITY_MANIFEST)} 형식을 파일·폴더·ZIP으로, 그리고 연결된 소스에서 가져올 수 있습니다. 허용되는 모든 형식은 PDF로 정제해 같은 방식으로 읽으므로, 문단마다 페이지와 영역이 남습니다. <Link href="/sources" prefetch={false}>지원 소스</Link></p></details>
+            <details className="one-path-details"><summary>지금 내 파일을 컴파일할 수 있나요?</summary><p>현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다. 완성된 공개 Compiled World는 지금 전체를 열람할 수 있고, 내 자료의 처리는 결제가 아니라 협의로 진행합니다. <Link href={startHref}>{startLabel}</Link></p></details>
+            <details className="one-path-details"><summary>업로드한 자료를 삭제할 수 있나요?</summary><p>원본 자료, 파생 산출물, 컴파일된 패키지는 요청 시 삭제되며, 그 요청은 셀프서비스 버튼이 아니라 사람이 처리합니다. <Link href="/security" prefetch={false}>보존과 삭제</Link></p></details>
           </div>
           <p className="one-path-fine">문서는 적대적 데이터로 다룹니다. 문서를 읽는 모델에는 도구도, 넓은 자격 증명도, 외부 네트워크도 없습니다. <Link href="/security" prefetch={false}>보안</Link> · <Link href="/trust" prefetch={false}>Trust Center</Link></p>
         </div>

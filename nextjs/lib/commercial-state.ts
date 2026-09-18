@@ -100,7 +100,7 @@ export function isLiveCommerce(env: Environment = process.env) {
 export function deploymentStateLine(): { label: string; title: string } | null {
   if (activationPolicy.customerData.enabled) return null;
   return {
-    label: "Public Compiled World: open · Your own files: arranged with us",
+    label: "Public sample: open to read · Your own files: by arrangement",
     title: activationPolicy.customerData.reason,
   };
 }
