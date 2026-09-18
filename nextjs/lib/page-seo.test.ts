@@ -175,10 +175,14 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       .not.toContain("지금 한국어 페이지는 이 한 장입니다");
     expect(copy, "an absence is not a card heading").not.toContain("한국어로 있는 것");
     expect(copy, "the heading may not hedge").not.toContain("아는 편이 나은");
-    // Approved September 12 blueprint: inspect the sample before making an inquiry.
-    expect(copy, "the Korean entry page needs its own action row").toContain('className="actions"');
-    expect(copy).toContain('<Link className="btn" href="/explore">공개 샘플 열기</Link>');
-    expect(copy).toContain('<Link className="btn ghost" href="/contact">도입 문의</Link>');
+    // Approved one-path revision: film first, state-controlled start, public sample alongside.
+    expect(copy, "the Korean entry page needs its own action row").toContain('className="one-path-actions actions"');
+    expect(copy).toContain('playbackRate={1.5} compact');
+    expect(copy).toContain('id="ko-how-it-works"');
+    expect(copy.indexOf('id="ko-how-it-works"')).toBeLessThan(copy.indexOf('aria-labelledby="ko-intake-title"'));
+    expect(copy).toContain('href="/explore">공개 샘플 열기');
+    expect(copy).toContain('href={live ? "/login" : "/contact"}');
+    expect(copy).toContain('live ? "내 자료 추가하기" : "이용 문의"');
     // The language fact survives, once, rather than six times as a suffix.
     expect(copy, "a per-tile (EN) suffix is the inventory again").not.toContain('<span lang="en">(EN)</span>');
     expect(copy).toContain("링크는 영문 페이지로 연결됩니다");

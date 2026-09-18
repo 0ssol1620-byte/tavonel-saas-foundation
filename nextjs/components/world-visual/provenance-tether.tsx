@@ -97,7 +97,7 @@ export default function ProvenanceTether({
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["hidden", "style", "data-source-view", "data-active-region"],
+      attributeFilter: ["hidden", "style", "data-source-view", "data-render-state", "data-active-region"],
     });
 
     window.addEventListener("resize", scheduleMeasure);

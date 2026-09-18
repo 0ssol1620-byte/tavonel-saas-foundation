@@ -146,7 +146,7 @@ describe("eyebrow labels read as two clauses", () => {
       eyebrow (one with a <b>) has to carry a separator; a one-clause eyebrow, where the rule
       leads and there is nothing before it, needs none -- but the rule is decorative either way.
     */
-    const eyebrows = [...source.matchAll(/<p className="slate">([\s\S]*?)<\/p>/g)].map((match) => match[1]!);
+    const eyebrows = [...source.matchAll(/<p className="(?:slate|one-path-eyebrow)">([\s\S]*?)<\/p>/g)].map((match) => match[1]!);
     expect(eyebrows.length, surface + " renders no eyebrow -- the pattern has moved").toBeGreaterThan(0);
     for (const eyebrow of eyebrows) {
       expect(eyebrow, "the rule is decorative and says so: " + eyebrow).not.toContain("<span />");

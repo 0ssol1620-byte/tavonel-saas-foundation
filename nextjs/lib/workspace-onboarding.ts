@@ -34,15 +34,11 @@ export type WorkspaceStateInput = {
   /** A grounded answer has come back from the Active World in this session. */
   hasGroundedAnswer: boolean;
   /**
-   * The reader has taken the AI-connection step: opened the Use-with-AI guide, or downloaded the
-   * signed package that guide describes.
-   *
-   * Session-scoped, and deliberately so. It is still an observed act rather than a "seen it"
-   * flag -- dismissing the guide cannot set it -- but the workspace holds no durable record of an
-   * AI connection to read: there is no connect dialog, and API keys live on a surface this
-   * derivation does not fetch. So the row reappears after a reload, which is the honest failure
-   * direction: an already-taken step shown once more costs a glance, while a finished step
-   * asserted from a flag that outlived the truth is a checklist that lies.
+   * A successful external consumer request has been verified for the active knowledge.
+   * Guide opening, key creation and package download are setup intent, not this receipt.
+   * The current workspace has no authenticated consumer receipt to read and therefore passes
+   * false. A future integration may set it only from evidence bound to the current workspace,
+   * active revision and consumer request, never from a locally remembered click.
    */
   hasAiConnection: boolean;
 };
@@ -86,9 +82,9 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
   if (mode === "loading") {
     return {
       mode,
-      stateTitle: "Reading your workspace state.",
+      stateTitle: "Loading your knowledge.",
       stateDescription:
-        "Loading your sources and World state. Nothing is described until the workspace answers.",
+        "Checking your files and the latest processing state.",
       nextAction: { label: "Loading" },
     };
   }
@@ -96,7 +92,7 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
   if (mode === "unavailable") {
     return {
       mode,
-      stateTitle: "Workspace state could not be read.",
+      stateTitle: "Your knowledge could not be loaded.",
       stateDescription:
         "The source inventory did not load, so this workspace is not described as empty or as populated. Retry, or sign in again if the session expired.",
       nextAction: { label: "Retry loading sources", intent: "refresh" },
@@ -106,30 +102,30 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
   if (input.activityCount > 0) {
     return {
       mode,
-      stateTitle: `${input.activityCount} ${input.activityCount === 1 ? "source is" : "sources are"} becoming a world.`,
+      stateTitle: "Preparing your knowledge.",
       stateDescription:
-        "Follow only observed pipeline transitions. TAVONEL does not estimate progress between receipts.",
-      nextAction: { label: "Inspect current run", surface: "activity" },
+        `${input.activityCount} ${input.activityCount === 1 ? "source is" : "sources are"} being processed. View the latest recorded progress.`,
+      nextAction: { label: "View progress", surface: "activity" },
     };
   }
 
   if (input.candidateNeedsDecision) {
     return {
       mode,
-      stateTitle: "Candidate World ready for review.",
+      stateTitle: "Ready for your review.",
       stateDescription:
-        "Inspect the immutable candidate, evidence bindings, and review gates before any active-pointer decision.",
-      nextAction: { label: "Review candidate", surface: "review" },
+        "Check the prepared result and anything that needs attention. You decide when this version becomes active.",
+      nextAction: { label: "Review & activate", surface: "review" },
     };
   }
 
   if (input.activeRevision !== null) {
     return {
       mode,
-      stateTitle: `World v${input.activeRevision} is active and source-grounded.`,
+      stateTitle: `Your published knowledge · v${input.activeRevision}`,
       stateDescription:
-        "Ask with exact citations, connect an AI through the read-only interfaces, or export a signed portable snapshot.",
-      nextAction: { label: "Ask active World", surface: "ask" },
+        "Choose how to use it with your AI, or try a question here. Current source permissions still apply.",
+      nextAction: { label: "Use with AI", surface: "ask" },
     };
   }
 
@@ -165,10 +161,10 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
 
   return {
     mode,
-    stateTitle: mode === "new" ? "Build your first Compiled World." : "No source is ready to compile yet.",
+    stateTitle: mode === "new" ? "Add your knowledge." : "Your files are being prepared.",
     stateDescription:
       mode === "new"
-        ? "Add sources, compile a candidate, then review and activate it. The workspace keeps each step explicit."
+        ? "Choose files, a folder or a ZIP. You can also connect a source."
         : "Your sources are still being prepared and read. A source joins a candidate only once its reading is complete.",
     nextAction:
       mode === "new"

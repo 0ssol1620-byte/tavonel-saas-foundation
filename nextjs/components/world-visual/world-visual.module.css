@@ -314,7 +314,13 @@
 
 .sheet > header b { color: var(--verified); }
 
-.sourceLink { color: var(--verified); }
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 4px;
+  color: var(--verified);
+}
 
 .paper {
   /* `position: relative` makes this the offset parent the active region is scrolled against in

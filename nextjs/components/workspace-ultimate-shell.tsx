@@ -21,15 +21,17 @@ export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes
 type NavItem = { surface: WorkspaceSurface; label: string; icon: typeof Home; shortcut?: string; secondary?: boolean; mobileLabel?: string; rail?: boolean };
 const NAV_ITEMS: NavItem[] = [
   { surface: "home", label: "Home", icon: Home, shortcut: "G H", rail: true },
-  { surface: "sources", label: "Sources", icon: FileStack, shortcut: "G S", rail: true },
+  { surface: "sources", label: "Knowledge", icon: FileStack, shortcut: "G S", rail: true },
+  { surface: "ask", label: "Use with AI", icon: CircleHelp, shortcut: "G A", rail: true },
+];
+const MORE_ITEMS: NavItem[] = [
   { surface: "review", label: "Review", icon: GitCompareArrows, shortcut: "G R" },
   { surface: "changes", label: "Changes", icon: Inbox },
-  { surface: "world", label: "World", icon: Network, shortcut: "G W", rail: true },
-  { surface: "ask", label: "Ask", icon: CircleHelp, shortcut: "G A", rail: true },
+  { surface: "world", label: "Knowledge graph", icon: Network, shortcut: "G W" },
   { surface: "connections", label: "Connections", icon: Plug, secondary: true },
-  { surface: "developer", label: "Developer", icon: Braces, secondary: true },
+  { surface: "developer", label: "Developer tools", icon: Braces, secondary: true },
   { surface: "activity", label: "Activity", icon: Activity, secondary: true },
-  { surface: "settings", label: "Settings", mobileLabel: "More", icon: Settings, secondary: true, rail: true },
+  { surface: "settings", label: "Settings", icon: Settings, secondary: true },
 ];
 
 type TruthGate = { label: string; qualified: boolean; detail: string };
@@ -85,6 +87,17 @@ export default function WorkspaceUltimateShell({
   const [access, setAccess] = useState<AccessSummary | null>(null);
   const pendingGo = useRef(false);
   const paletteRef = useRef<HTMLElement>(null);
+  const moreRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => { if (moreRef.current) moreRef.current.open = false; }, [surface]);
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (event.target instanceof Node && moreRef.current && !moreRef.current.contains(event.target)) moreRef.current.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
+  const moreItems = MORE_ITEMS.filter((item) => access?.source !== "trial" || !["connections", "developer"].includes(item.surface));
 
   useEffect(() => {
     let current = true;
@@ -116,7 +129,11 @@ export default function WorkspaceUltimateShell({
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault(); setPaletteOpen((open) => !open); return;
       }
-      if (event.key === "Escape") { setPaletteOpen(false); pendingGo.current = false; return; }
+      if (event.key === "Escape") {
+        setPaletteOpen(false); pendingGo.current = false;
+        if (moreRef.current?.open) { moreRef.current.open = false; moreRef.current.querySelector("summary")?.focus(); }
+        return;
+      }
       if (!editing && event.key === "?") { event.preventDefault(); setPaletteOpen(true); return; }
       if (editing || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key.toLowerCase() === "g") {
@@ -161,8 +178,8 @@ export default function WorkspaceUltimateShell({
   const moveRailFocus = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
-    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button[data-rail-item]")];
-    const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>("[data-rail-item]")].filter((item) => item.getClientRects().length > 0);
+    const current = buttons.indexOf(document.activeElement as HTMLElement);
     const delta = event.key === "ArrowDown" ? 1 : -1;
     buttons[(current + delta + buttons.length) % buttons.length]?.focus();
   };
@@ -172,7 +189,7 @@ export default function WorkspaceUltimateShell({
     : null;
 
   return (
-    <main id="main" className={`workspace ${styles.shell}`} data-privacy={privacyMode} data-access={access?.source ?? "unknown"} tabIndex={-1}>
+    <main id="main" className={`workspace one-path-workspace ${styles.shell}`} data-privacy={privacyMode} data-access={access?.source ?? "unknown"} tabIndex={-1}>
       <aside className={styles.rail} aria-label="Workspace navigation" onKeyDown={moveRailFocus}>
         <Link href="/" className={styles.brand} aria-label="TAVONEL home"><Logomark size={23} /></Link>
         <nav className={styles.nav}>
@@ -191,6 +208,23 @@ export default function WorkspaceUltimateShell({
               </div>
             );
           })}
+          <div data-mobile-rail="">
+            <details className="one-path-more" ref={moreRef}>
+              <summary data-rail-item aria-label="More workspace tools"><Settings size={17} aria-hidden="true" /><span>More</span></summary>
+              <div className="one-path-more-panel" aria-label="More workspace tools">
+                <p>TOOLS & SETTINGS</p>
+                {moreItems.map((item) => {
+                  const Icon = item.icon;
+                  return <button key={item.surface} type="button" data-rail-item
+                    aria-current={surface === item.surface ? "page" : undefined}
+                    onClick={() => { if (moreRef.current) moreRef.current.open = false; onNavigate(item.surface); }}>
+                    <Icon size={16} aria-hidden="true" /><span>{item.label}</span>
+                    {item.surface === "review" && reviewCount ? <b>{reviewCount}</b> : null}
+                  </button>;
+                })}
+              </div>
+            </details>
+          </div>
         </nav>
         <div className={styles.railFooter}>
           <button type="button" onClick={onRefresh}>Refresh</button>
@@ -204,8 +238,8 @@ export default function WorkspaceUltimateShell({
             <span>TAVONEL</span>
             <strong>Knowledge workspace</strong>
           </div>
-          <button type="button" className={styles.topStatus} onClick={() => onNavigate("world")}><small>WORLD</small><b>{activeRevision ? `v${activeRevision} ACTIVE` : "NO ACTIVE WORLD"}</b></button>
-          <button type="button" className={styles.topStatus} onClick={() => onNavigate("review")}><small>CANDIDATE</small><b>{candidateReady ? `READY${reviewCount ? ` · ${reviewCount} REVIEW` : ""}` : "NONE"}</b></button>
+          {activeRevision !== null ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("world")}><small>PUBLISHED</small><b>v{activeRevision}</b></button> : null}
+          {candidateReady ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("review")}><small>NEEDS YOUR REVIEW</small><b>{reviewCount ? `${reviewCount} ITEMS` : "NEW VERSION"}</b></button> : null}
           <button type="button" className={styles.commandButton} onClick={() => setPaletteOpen(true)}><Search size={15} aria-hidden="true" /><span>Search / Command</span><kbd>Ctrl K</kbd></button>
           <div className={styles.headerAction}>{headerAction}</div>
         </header>
@@ -227,7 +261,7 @@ export default function WorkspaceUltimateShell({
 
         <div className={`workspace-content ${styles.content}`}>
           <section className={styles.stateHero} aria-labelledby="workspace-state-title">
-            <div><p>{surface.toUpperCase()} · CURRENT STATE</p><h1 id="workspace-state-title">{stateTitle}</h1><span>{stateDescription}</span></div>
+            <div><p>YOUR KNOWLEDGE</p><h1 id="workspace-state-title">{stateTitle}</h1><span>{stateDescription}</span></div>
             {/* While the workspace state is still resolving there is no honest next action, so
                 the control says so and stays inert rather than offering a guess. */}
             <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>

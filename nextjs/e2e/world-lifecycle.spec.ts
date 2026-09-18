@@ -498,7 +498,7 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
     .fill("Incident review requires the retained world.");
   await expect(rollback).toBeEnabled();
 
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.goto(`/workspace/ask?collection=${collectionId}`);
   await page.getByLabel("Question").fill("분기 매출은 얼마인가요?");
   await page.getByRole("button", { name: "Ask active world" }).click();
   await expect(page.getByText("Grounded answer")).toBeVisible();
@@ -540,7 +540,7 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   // The signed download sits with the collection result on Home; the review record now has a
   // dedicated Review surface. Crossing those surfaces proves that review-required packages stay
   // downloadable while promotion remains closed.
-  await page.getByRole("button", { name: "Review candidate" }).click();
+  await page.getByRole("button", { name: "Review & activate" }).click();
   const promote = page.getByRole("button", { name: "Promote reviewed candidate" });
   await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
   await expect(promote).toBeDisabled();

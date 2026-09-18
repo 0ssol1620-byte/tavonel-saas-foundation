@@ -127,9 +127,9 @@ test.describe("workspace first use — desktop", () => {
     await page.goto("/workspace");
     // Neither the intake hero nor the state hero may describe the workspace before it is read.
     await expect(page.getByRole("heading", { name: "Checking your sources…" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Reading your workspace state." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Loading your knowledge." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Build your first Compiled World." })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toHaveCount(0);
 
     const intake = page.locator(".workspace-intake");
     await expect(intake).toHaveAttribute("data-inventory-state", "ready");
@@ -162,8 +162,10 @@ test.describe("workspace first use — desktop", () => {
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Build your first Compiled World." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toBeVisible();
     const guide = page.getByRole("button", { name: /Getting started 0 of 6 complete/ });
+    await expect(guide).toHaveAttribute("aria-expanded", "false");
+    await guide.click();
     await expect(guide).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("heading", { name: "The short path to a useful Compiled World." })).toBeVisible();
     // The whole first-success spine, in order, before anything has been done. Six steps, because
@@ -176,8 +178,6 @@ test.describe("workspace first use — desktop", () => {
     // Progressive, not forced: it collapses and stays collapsed, and it is reopenable.
     await guide.click();
     await expect(guide).toHaveAttribute("aria-expanded", "false");
-    await guide.click();
-    await expect(guide).toHaveAttribute("aria-expanded", "true");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: receipt("home-new-1440.png"), fullPage: true });
   });
@@ -190,7 +190,7 @@ test.describe("workspace first use — desktop", () => {
     await page.goto("/workspace");
     await expect(page.getByRole("heading", { name: "Your sources could not be loaded" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Drop files, folders or ZIP here" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Build your first Compiled World." })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Add your knowledge." })).toHaveCount(0);
     await expect(page.locator(".workspace-intake")).toHaveAttribute("data-mode", "unavailable");
     await expect(page.getByRole("button", { name: "Retry loading sources" }).first()).toBeEnabled();
   });
@@ -222,7 +222,7 @@ test.describe("workspace first use — desktop", () => {
     await expect(attention.locator("li strong")).toHaveText(["Review required", "Operator action"]);
     await expect(attention).toContainText("1 review item needs a decision.");
     await expect(attention).toContainText("This source needs review before reading can continue.");
-    await expect(page.getByRole("heading", { name: "Your compiled candidate is ready for review." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ready for your review." })).toBeVisible();
     // §16.2/§16.3: the journey, and only files the export actually writes.
     const guide = page.getByTestId("workspace-ai-use-guide");
     await guide.getByText("Use with AI", { exact: true }).click();
@@ -248,16 +248,17 @@ test.describe("workspace first use — mobile", () => {
     await expect(page.locator(".workspace-intake")).toHaveAttribute("data-mode", "returning");
 
     // §13.2 on a phone: state, next action, needs attention, upload, changes.
-    await expect(page.getByRole("heading", { name: "Candidate World ready for review." })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Review candidate" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ready for your review." })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review & activate" })).toBeVisible();
     await expect(page.locator(".workspace-attention")).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
 
-    // §19.2 rail: Sources, World, Ask and More stay one tap away.
-    for (const label of ["Home", "Sources", "World", "Ask"]) {
+    // One-Path rail: Home, Knowledge, Use with AI and More stay one tap away.
+    for (const label of ["Home", "Knowledge", "Use with AI"]) {
       await expect(page.getByRole("button", { name: new RegExp(`^${label}`) }).first()).toBeVisible();
     }
+    await expect(page.locator("summary[aria-label='More workspace tools']")).toBeVisible();
 
     // §20 touch targets. Measured on what Home actually renders, not asserted in the abstract.
     const short = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(
@@ -279,6 +280,8 @@ test.describe("workspace first use — mobile", () => {
 
     await page.goto("/workspace");
     const guide = page.getByRole("button", { name: /Getting started 0 of 6 complete/ });
+    await expect(guide).toHaveAttribute("aria-expanded", "false");
+    await guide.click();
     await expect(guide).toHaveAttribute("aria-expanded", "true");
     await page.getByRole("button", { name: "Hide guide" }).click();
     await expect(guide).toHaveAttribute("aria-expanded", "false");

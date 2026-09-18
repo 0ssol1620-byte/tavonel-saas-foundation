@@ -1,0 +1,166 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_CANDIDATE_NOT_DEPLOYED",
+  "createdAt": "2026-09-12T10:44:21.540Z",
+  "branch": "agent/one-path-product-ux-20260912",
+  "base": "f100dce219e1e30fb1b76b029c191adc9d40a004",
+  "productionBaseObserved": "152cc3671ddbffeb968f4040d45b49d962b27557",
+  "sourceDigest": "a8fc6740f4f060bcb941c3145d26198680753385e29c463fceb4207b2d05cdbd",
+  "files": [
+    {
+      "path": "nextjs/app/ko/page.tsx",
+      "sha256": "2e7cf206a3016c7a96bae67a0fa42e3a72d889b54306a6ffe0497b2238f34e25"
+    },
+    {
+      "path": "nextjs/app/layout.tsx",
+      "sha256": "a25d6b771d5effbdd62c15323428a595f2c4c26971865e7eedb03237a62d5365"
+    },
+    {
+      "path": "nextjs/app/one-path.css",
+      "sha256": "ab7fd53af4195fa1cf8b328b23aca0a1b6b8136dcfc8178f7f6641dfafeb1fe6"
+    },
+    {
+      "path": "nextjs/app/page.tsx",
+      "sha256": "b573c8e777ea9b02f26e751fd7f9425415cc8f7266fc9e252a350d182884de4a"
+    },
+    {
+      "path": "nextjs/app/workspace/page.tsx",
+      "sha256": "8512b27139c4e193f5146f66dd2e8d1dd82673e0c38c44e9fdc265f7b0232064"
+    },
+    {
+      "path": "nextjs/components/compile-stage-player.tsx",
+      "sha256": "65e815cf78681fd23be4de94a37fa8b383f51539c1077553246b0c13be2624b9"
+    },
+    {
+      "path": "nextjs/components/home-page-client.tsx",
+      "sha256": "e28c1287791a0fa552936113260fd6685ec724497dc5ac63f0265ffdda8eb9ff"
+    },
+    {
+      "path": "nextjs/components/mobile-primary-nav.tsx",
+      "sha256": "9f2b6f33695347f003270360325ec22050710e63b77eaada85b9f9848d3bcfdc"
+    },
+    {
+      "path": "nextjs/components/site-nav/desktop-primary-nav.tsx",
+      "sha256": "a6e19c5a74476ebadec10b0921ba14a0cde2a4d0ebfc2c664886482b2fa3a40d"
+    },
+    {
+      "path": "nextjs/components/workspace-ultimate-shell.tsx",
+      "sha256": "3ab25c99907f53cb7d09c3e8ae79f6eec6b2a71b48e0753ab2dd842fd0b6f8f0"
+    },
+    {
+      "path": "nextjs/components/workspace-use-with-ai.tsx",
+      "sha256": "c70261baa351aca1301aa91abfeb74d2b3871f4ff43512bb227142bb9042cf70"
+    },
+    {
+      "path": "nextjs/components/world-visual/original-source-page.tsx",
+      "sha256": "3416ea875a267ea7854746538eedfa0db0efc8c220b8a9c73723f004ff9b5dec"
+    },
+    {
+      "path": "nextjs/e2e/one-path.spec.ts",
+      "sha256": "7808c8cf172c36a0dea5e158a0f0a1d894972f47120b4393c87df9dba7bd8211"
+    },
+    {
+      "path": "nextjs/lib/brand-copy.test.ts",
+      "sha256": "0e35e78514a05d181fe0ce0d103715c876e54bcd193f7dac5a35f13979aa4149"
+    },
+    {
+      "path": "nextjs/lib/change-inbox.test.ts",
+      "sha256": "de0fa8f51b73d73b0066739b56f74fcba92894a654449f442a8054ef40109870"
+    },
+    {
+      "path": "nextjs/lib/docs-navigation.test.ts",
+      "sha256": "3974804fb300ea778dc4e4154343c9c750e2cdf06943d5f6b14a370f90434230"
+    },
+    {
+      "path": "nextjs/lib/locked-film-assets.json",
+      "sha256": "004acf7700c31392bc9cfd2294c75ff79743c79ef521596798b4381bc3f2235d"
+    },
+    {
+      "path": "nextjs/lib/one-path-contract.test.ts",
+      "sha256": "9ba5fc332cfc2c556805268a4f9a0754a2ad37b11cfa9fc9060bea14be52b37f"
+    },
+    {
+      "path": "nextjs/lib/page-seo.test.ts",
+      "sha256": "5ceb3f177ffd2237a6f608133378de62deef39aaca060f82f9a2ae4743241ac5"
+    },
+    {
+      "path": "nextjs/lib/production-hardening.test.ts",
+      "sha256": "f0041e3890d7d4caa6f4e7e9a88ce79d09f48b004dfbc7a800eb6135cb2c342e"
+    },
+    {
+      "path": "nextjs/lib/site-navigation.ts",
+      "sha256": "146608692b5e9e861ad06a29f7fa7f19357290f5dca8fc084e84959f7993044d"
+    },
+    {
+      "path": "nextjs/lib/workspace-onboarding.test.ts",
+      "sha256": "62a53c0f7e23d881665e9380f76d3d13cfe0961cd1b0503f1182743647c50968"
+    },
+    {
+      "path": "nextjs/lib/workspace-onboarding.ts",
+      "sha256": "a4103ba3b5b670682c3974db8d7acc4e82a13d72f75686820b66764f5bed1278"
+    }
+  ],
+  "verification": {
+    "typescriptAndEslint": "PASS",
+    "unit": {
+      "total": 3813,
+      "passed": 3813,
+      "failed": 0,
+      "originalTimeouts": true,
+      "workers": 2
+    },
+    "productionModeBuild": "PASS_TEST_CONFIGURATION_ONLY",
+    "browser": [
+      {
+        "scope": "ui_original_sources_consent",
+        "passed": 21,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "startedAt": "2026-09-12T10:03:12.413Z",
+        "durationMs": 45469.112
+      },
+      {
+        "scope": "api_security_billing",
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "startedAt": "2026-09-12T10:05:26.614Z",
+        "durationMs": 14455.942000000001
+      },
+      {
+        "scope": "ai_destination_setup",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "startedAt": "2026-09-12T10:07:04.766Z",
+        "durationMs": 20894.258
+      }
+    ],
+    "totalBrowserPassed": 27,
+    "fullHistoricalBrowserMatrix": "NOT_RUN",
+    "physicalMobileDevices": "NOT_TESTED",
+    "realCustomerOrProviderE2E": "NOT_RUN"
+  },
+  "protected": {
+    "originalFilms": "BYTE_IDENTICAL_TO_BASE",
+    "databaseMigrations": "UNCHANGED",
+    "apiProcessing": "UNCHANGED",
+    "billingPolicy": "UNCHANGED",
+    "humanActivation": "RETAINED",
+    "dependencyLockfile": "UNCHANGED"
+  },
+  "repository": {
+    "originalCloneRetained": true,
+    "verifiedRecoveryFiles": 2420,
+    "verifiedRecoveryBytes": 4447833661,
+    "oldDirectoriesDeleted": 0,
+    "remoteBranchesDeleted": 0
+  },
+  "release": {
+    "deployed": false,
+    "mergeAllowed": false,
+    "reason": "Parent PR #63 migration-first production preflight and full integrated release qualification remain unverified; child draft must not bypass parent gates."
+  }
+}

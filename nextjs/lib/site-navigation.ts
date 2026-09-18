@@ -17,6 +17,19 @@
 
 export type SiteLink = { href: string; label: string };
 
+/** Customer entry points. Technical and trust destinations remain in the footer and docs. */
+export const CUSTOMER_NAV: readonly SiteLink[] = [
+  { href: "/product", label: "How it works" },
+  { href: "/integrations", label: "Connect" },
+  { href: "/pricing", label: "Pricing" },
+] as const;
+
+export function customerNavOwns(href: string, pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (href === "/integrations" && path === "/sources") return true;
+  return path === href || path.startsWith(`${href}/`);
+}
+
 /* ==================================================================== BA-232 / BA-252: vocabulary
 
   Two site-wide actions and one casing table, declared here because every chrome already reads
@@ -181,6 +194,7 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
   },
   { href: "/api", label: "API", purposes: ["build"], workflows: ["use-elsewhere"] },
   { href: "/changelog", label: "Changelog", purposes: ["build"], workflows: [], column: "verify" },
+  { href: "/arena", label: "TAVONEL Arena", purposes: ["evaluate", "verify"], workflows: [], column: "verify" },
   { href: "/research", label: "Research", purposes: ["learn"], workflows: [], column: "verify" },
   { href: "/benchmarks", label: "Benchmarks", purposes: ["verify"], workflows: [], column: "verify" },
   {
@@ -225,7 +239,16 @@ export const FOOTER_GROUPS: readonly { title: string; links: readonly SiteLink[]
     ],
   },
   {
-    title: "Build",
+    title: "Research",
+    links: [
+      { href: "/arena", label: "Arena" },
+      { href: "/benchmarks", label: "Methodology" },
+      { href: "/research", label: "Research" },
+      { href: "/evidence", label: "Evidence" },
+    ],
+  },
+  {
+    title: "Developers",
     links: [
       { href: "/docs", label: "Docs" },
       { href: "/api", label: "API" },

@@ -204,26 +204,26 @@ test("keeps the header's primary action reachable at the width the section row a
   The desktop half sets its own viewport, because the section row does not exist below 1080px and
   this file runs in every width project.
 */
-test("is reachable from the Product panel, the phone accordion and the footer", async ({ page }) => {
+test("is owned by Connect on desktop and phone and remains directly reachable from the footer", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
 
-  // Desktop: one open, one link. The trigger says this is where the reader already is.
-  await expect(page.locator("#site-nav-trigger-product")).toHaveAttribute("aria-current", "true");
-  await page.locator("#site-nav-trigger-product").click();
-  await expect(page.locator('#site-nav-product a[href="/sources"]')).toHaveCount(1);
-  await page.keyboard.press("Escape");
+  // Sources is not another top-level choice: the customer-facing Connect destination owns it.
+  const desktopConnect = page.locator('header.nav .one-path-primary-nav a[href="/integrations"]');
+  await expect(desktopConnect).toHaveText("Connect");
+  await expect(desktopConnect).toHaveAttribute("aria-current", "page");
 
   // The footer, which needs no menu at all.
   await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
-  // Phone: the Product group of the accordion, which starts open on this page.
+  // Phone: the same three-choice customer IA, with Connect marked current.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("header.nav details.mobile-primary-nav > summary").click();
-  const product = page.locator('details.mobile-nav-group[data-section="product"]');
-  expect(await product.evaluate((element: HTMLDetailsElement) => element.open)).toBe(true);
-  await expect(product.locator('a[href="/sources"]')).toHaveCount(1);
+  const mobileConnect = page.locator('header.nav details.mobile-primary-nav > nav a[href="/integrations"]');
+  await expect(mobileConnect).toHaveText("Connect");
+  await expect(mobileConnect).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("header.nav details.mobile-primary-nav details.mobile-nav-group")).toHaveCount(0);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");

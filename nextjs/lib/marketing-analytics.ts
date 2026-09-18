@@ -2,7 +2,7 @@
 export const GA_ID = "G-XQ6Z2RJME7";
 export const CONSENT_KEY = "tavonel.analytics-consent.v1";
 export const PUBLIC_MARKETING_PATHS = new Set([
-  "/", "/api", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise",
+  "/", "/api", "/arena", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise",
   "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy",
   "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
   "/refunds", "/research", "/research/notes", "/resources", "/security", "/sources", "/status",

@@ -326,17 +326,12 @@ describe("public copy", () => {
     expect(landingSource()).not.toContain("readCapabilities");
   });
 
-  it("names each scene the same way in the eyebrow and the instrument bar", () => {
-    const page = landingSource();
-    const barLabels = [...page.matchAll(/\{ id: \d+, label: "([^"]+)"/g)].map((m) => m[1]);
-    const eyebrows = [...page.matchAll(/eyebrow="([^"]+)"/g)].map((m) => m[1]);
-
-    expect(barLabels.length).toBeGreaterThan(1);
-    for (const label of barLabels.slice(1)) {
-      expect(eyebrows, `scene "${label}" must use its bar label as its eyebrow`).toContain(label);
-    }
+  it("uses the six approved customer sections without a second instrument navigation", () => {
+    const page = read("components/home-page-client.tsx");
+    expect([...page.matchAll(/data-scene="(\d+)"/g)].map(m => m[1])).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(page).not.toContain('className="bar"');
+    expect(page.match(/aria-labelledby="one-path-/g)).toHaveLength(6);
   });
-
   /*
     The lock, re-derived. RESOLVED A-2 (2026-09-06).
 
@@ -348,18 +343,16 @@ describe("public copy", () => {
     forever; it is a claim that the string does not drift without a decision. This is that
     decision, so the lock moves with it instead of being deleted.
   */
-  it("keeps the approved evidence-first hero and published-sample scope", () => {
-    const page = landingSource();
-    expect(page).toContain("Give your AI");
-    expect(page).toContain("knowledge you can check.");
-    expect(page).toContain("Explore a published sample. Open the source behind a result");
-    expect(page).toContain("Published sample and its source");
-    expect(page).toContain("Original source included");
+  it("keeps the approved film-first hero and the separately identified public source proof", () => {
+    const page = read("components/home-page-client.tsx");
+    expect(page).toContain("Bring your knowledge.");
+    expect(page).toContain("TAVONEL makes it ready for AI.");
+    expect(page).toContain("03 / PROOF");
+    expect(page).toContain("PUBLIC APPLE SEC SAMPLE · SOURCE INCLUDED");
     expect(page).toContain("{proof}");
-    // The retired wording must not come back by hand.
+    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf('className="one-path-source-proof"'));
     expect(page).not.toContain("evidence back to the page");
   });
-
   it("puts the locked hero proof and three motion cuts on the landing page", () => {
     const page = landingSource();
     expect(page).toContain("/film/poster-1.webp");
@@ -410,13 +403,15 @@ describe("public copy", () => {
     reader scrolled through eight screens of film, while four <video> elements competed for
     bandwidth and, on a phone, for a limited number of hardware decoders.
   */
-  it("presents the compile film as a single staged viewport", () => {
+  it("uses one compact hero film and one staged Works viewport", () => {
     const landing = read("components/home-page-client.tsx");
     expect(landing).toContain("<CompileStagePlayer");
-    expect(landing.match(/<CompileStagePlayer/g)).toHaveLength(1);
+    expect(landing.match(/<CompileStagePlayer/g)).toHaveLength(2);
+    expect(landing).toContain("playbackRate={1.5} compact");
+    expect(landing).toContain("stages={WORK_STAGES}");
 
     const player = read("components/compile-stage-player.tsx");
-    for (const stage of ["SOURCES", "READ", "STRUCTURE", "WORLD"]) {
+    for (const stage of ["FILES", "ORGANIZE", "UPDATES", "USE WITH AI"]) {
       expect(player, `the stage strip must offer ${stage}`).toContain(stage);
     }
     expect(player, "stages must be selectable, not decorative").toContain('role="tab"');
@@ -513,22 +508,16 @@ describe("public copy", () => {
     expect(page).not.toContain("IdentityResolve");
   });
 
-  it("keeps the landing to five scenes and names the exact evidence path", () => {
-    const page = landingSource();
-    expect(page.match(/<Scene id=/g)).toHaveLength(4);
+  it("keeps the six-scene final narrative and makes original-source proof reachable without teaching locator jargon", () => {
+    const page = read("components/home-page-client.tsx");
+    expect(page.match(/data-scene="[1-6]"/g)).toHaveLength(6);
     expect(page).toContain('id="s1"');
-    expect(page).toContain("Object");
-    expect(page).toContain("Relation");
-    /*
-      The path ends at a source location, not a page (RESOLVED A-1). "Document page" and
-      "Exact bbox" were the last two steps; they describe a PDF locator, and the landing page
-      may not present one locator as the shape of all evidence.
-    */
-    expect(page).toContain("Source version");
-    expect(page).toContain("Exact location");
+    expect(page).toContain("Every result keeps a path back to the source.");
+    expect(page).toContain("/explore?act=source");
+    expect(page).toContain("What is preserved");
+    expect(read("app/page.tsx")).toContain("<SolutionProofSample");
     expect(page).not.toContain("Exact bbox");
   });
-
   it("stages a customer's own upload in the workspace, not a fixture world", () => {
     const stage = read("components/compile-stage.tsx");
     expect(stage).toContain("SOURCES");
@@ -558,9 +547,9 @@ describe("public copy", () => {
       substrings rather than one, because either half going missing is the defect this line
       exists for -- copy that says only "supported files" has stopped saying where the ZIP opened.
     */
-    expect(source).toContain("ZIPs open on your machine");
-    expect(source).toContain("the supported files inside compile straight into your World.");
-    expect(source).toContain('className="intake-flow rv"');
+    expect(source).toContain("ZIPs open on your device");
+    expect(source).toContain("Only supported files are selected for upload");
+    expect(source).toContain('className="one-path-source-options"');
     expect(source).toContain('href="/integrations"');
     expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
     expect(workspace).toContain('{ name: "Google Drive", availability: "Read-only" }');
@@ -789,20 +778,15 @@ describe("public copy", () => {
     link to the page that substantiates it and the strip may carry no digit-bearing figure at
     all. This reads the rendered items, not the file, so a number added in any of them fails.
   */
-  it("keeps the landing proof strip linked and free of invented figures", () => {
-    const landing = read("components/home-page-client.tsx");
-    const strip = landing.match(/<ul className="hero-proof"[\s\S]*?<\/ul>/);
-    expect(strip, "the hero proof strip is still on the landing page").not.toBeNull();
-    const items = [...strip![0].matchAll(/<li>([\s\S]*?)<\/li>/g)].map((match) => match[1]!);
-    expect(items.length, "§10.2 asks for the strip, not one item").toBeGreaterThanOrEqual(4);
-    for (const item of items) {
-      expect(item, "every proof item points at the page that substantiates it").toContain("href=");
-      const text = item.replace(/<[^>]*>/g, "");
-      expect(text, `"${text.trim()}" carries a figure; §35 bars invented metrics`)
-        .not.toMatch(/[0-9]/);
-    }
+  it("moves source proof below the film without adding invented result figures", () => {
+    const page = read("components/home-page-client.tsx");
+    expect(page).not.toContain('className="hero-proof"');
+    expect(page).toContain('aria-label="Published sample and its source"');
+    expect(page).toContain("/explore?act=source");
+    expect(page).toContain('href="/sources"');
+    expect(page).not.toMatch(/\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i);
+    expect(page).not.toContain("128,470");
   });
-
   /*
     §54's purchase friction map, checked as coverage rather than as wording.
 
@@ -850,27 +834,18 @@ describe("public copy", () => {
     href must resolve to a real `app/solutions/[slug]` key, because a dead link under the hero is
     the worst place on the site for one, and no card body may carry a digit.
   */
-  it("puts three job cards under the locked hero, each pointing at a real solution", () => {
-    const landing = read("components/home-page-client.tsx");
-    const jobs = landing.match(/const JOBS = \[([\s\S]*?)\n\] as const;/);
-    expect(jobs, "the job cards are still declared on the landing page").not.toBeNull();
-    const hrefs = [...jobs![1]!.matchAll(/href: "([^"]+)" as Route/g)].map((match) => match[1]!);
-    expect(hrefs, "B01 asks for one card per job, not a single door").toHaveLength(3);
-
-    const solutions = read("app/solutions/[slug]/page.tsx");
-    for (const href of hrefs) {
-      const slug = href.replace("/solutions/", "");
-      expect(solutions, `${href} is linked from the hero and is not a solution slug`)
-        .toContain(`"${slug}": {`);
-    }
-    const bodies = [...jobs![1]!.matchAll(/body: "([^"]*)"/g)].map((match) => match[1]!);
-    expect(bodies).toHaveLength(3);
-    for (const body of bodies) {
-      expect(body, `"${body.slice(0, 40)}…" carries a figure; §35 bars invented metrics`)
-        .not.toMatch(/[0-9]/);
-    }
+  it("keeps source choices after the hero and leaves solution pages intact", () => {
+    const page = read("components/home-page-client.tsx");
+    const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="how-it-works"'));
+    expect(hero).toContain("playbackRate={1.5} compact");
+    expect(hero).not.toContain("JOBS.map");
+    expect(hero).not.toContain("<SolutionProofSample");
+    expect(page.indexOf('id="how-it-works"')).toBeLessThan(page.indexOf('id="connect"'));
+    expect(page).toContain("Files, folders & ZIP");
+    expect(page).toContain("Connected sources");
+    expect(page).toContain("assisted, customer-run connection");
+    expect(read("app/solutions/[slug]/page.tsx")).toContain("ai-ready-knowledge");
   });
-
   /*
     Audit B06, added deliberately with the caption under the compile film.
 
@@ -880,26 +855,14 @@ describe("public copy", () => {
     paragraph about a demo world. This asserts one sentence separating a directed recreation from
     the working interface, which is the affirmative version of the same job.
   */
-  it("says the compile film is a recreation and points at the working interface", () => {
-    const landing = read("components/home-page-client.tsx");
-    expect(landing).toContain("directed recreation of a compile, not a screen recording");
-    /*
-      The pointer without its label, which is the only part of this that changed at integration.
-
-      It pinned `label="See the working interface"`, and that collided with the other rule about
-      this page: landing.spec.ts requires every unqualified /explore link to read "Explore a
-      Compiled World", and a link carrying its own wording has to be a named proof (?act=...).
-      Two merged lanes disagreeing about one element, and the label lost -- it pointed at the
-      working interface in general, which is what the door already is.
-
-      What this test is for is untouched. `btn ghost` is the 44px control, and the failure it was
-      written against is a link inside the 14px `.fine` caption, which is about 18px tall under a
-      coarse pointer. That is still exactly what it asserts.
-    */
-    expect(landing, "and the pointer is a 44px control, not a link in fine print")
-      .toContain(String.raw`<ExploreLink className="btn ghost" />`);
+  it("discloses the directed film next to it and keeps the real sample control usable", () => {
+    const page = read("components/home-page-client.tsx");
+    expect(page).toContain("approved source film is preserved");
+    expect(page).toContain('className="one-path-film-note"');
+    expect(page).toContain("Inspect the public source");
+    expect(page).toContain('href={"/explore?act=source" as Route}');
+    expect(read("app/one-path.css")).toContain("min-height: 44px");
   });
-
   /*
     Audit B02. Five solution pages answered the same reader. Each now declares who it is for, as
     a field, so the label cannot drift from the copy under it and a new solution cannot ship

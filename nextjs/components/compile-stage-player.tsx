@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FILM_DURATION } from "@/lib/film-script";
 
 export type CompileStage = {
@@ -23,10 +23,10 @@ export type CompileStage = {
   a RAG index cannot do. Nothing else about the film changes; the films are locked.
 */
 export const COMPILE_STAGES: readonly CompileStage[] = [
-  { id: "sources", label: "SOURCES", line: "Files, folders, archives and connected drives arrive together.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
-  { id: "read", label: "READ", line: "Pages, regions, tables and layout are recovered with their coordinates.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
-  { id: "structure", label: "STRUCTURE", line: "Meaning resolves across sources. Changes propagate only where they matter.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
-  { id: "world", label: "WORLD", line: "One compiled world, read by Ask, search, the API and MCP.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
+  { id: "sources", label: "FILES", line: "From the original page to extracted content and connected knowledge.", src: "/film/compile-cut.mp4", poster: "/film/poster-1.webp" },
+  { id: "read", label: "ORGANIZE", line: "Related information is organized into a connected knowledge structure.", src: "/film/compile-cut-2.mp4", poster: "/film/poster-2.webp" },
+  { id: "structure", label: "UPDATES", line: "A changed source and its affected knowledge are shown together.", src: "/film/compile-cut-3.mp4", poster: "/film/poster-3.webp" },
+  { id: "world", label: "USE WITH AI", line: "An assistant, editor and terminal use the same knowledge and its citations.", src: "/film/compile-cut-4.mp4", poster: "/film/poster-4.webp" },
 ] as const;
 
 const LIVE_FILMS = [
@@ -117,16 +117,33 @@ export const FILM_CONTROL_LABEL: Record<FilmControl, { label: string; glyph: str
 export default function CompileStagePlayer({
   stages = COMPILE_STAGES,
   onStageChange,
+  preferVideo = false,
+  playbackRate = 1,
+  compact = false,
+  priorityPoster = false,
 }: {
   stages?: readonly CompileStage[];
   onStageChange?: (stage: CompileStage, index: number) => void;
+  /** Use the approved encoded films rather than rerendering a canvas version. */
+  preferVideo?: boolean;
+  /** Presentation-only acceleration. The source asset remains untouched. */
+  playbackRate?: number;
+  /** Hide chapter navigation/caption for a single-purpose hero presentation. */
+  compact?: boolean;
+  /** Mark an above-the-fold poster as the page's priority image without changing its bytes. */
+  priorityPoster?: boolean;
 }) {
+  const instanceId = useId().replaceAll(":", "");
+  const panelId = `${instanceId}-compile-stage-panel`;
+  const tabId = useCallback((stageId: string) => `${instanceId}-compile-stage-tab-${stageId}`, [instanceId]);
   const [index, setIndex] = useState(0);
   const [inView, setInView] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const [saveData, setSaveData] = useState(false);
+  const [documentVisible, setDocumentVisible] = useState(true);
+  const [videoError, setVideoError] = useState(false);
   /*
     WCAG 2.2.2. A cut runs ~18s and then advances on its own — auto-playing motion well past the
     five-second bound — so a mechanism to stop it is not optional.
@@ -159,7 +176,13 @@ export default function CompileStagePlayer({
   const [held, setHeld] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const active = stages[index] ?? stages[0]!;
+  /*
+    Route-level compositions may supply a narrowed stage list. Rendering must remain fail-safe if
+    that list is temporarily empty or malformed during a server/client boundary transition: a
+    missing stage is not allowed to turn a public entry route into a 500. The locked first stage is
+    the conservative visual fallback and does not change any source asset.
+  */
+  const active = stages[index] ?? stages[0] ?? COMPILE_STAGES[0]!;
   const admitted = useMemo(() => new Set([index]), [index]);
 
   useEffect(() => {
@@ -190,6 +213,7 @@ export default function CompileStagePlayer({
 
   const go = useCallback((next: number) => {
     const wrapped = ((next % stages.length) + stages.length) % stages.length;
+    setVideoError(false);
     setIndex(wrapped);
   }, [stages.length]);
 
@@ -206,18 +230,24 @@ export default function CompileStagePlayer({
 
   /* A held preference is lifted only by the visitor's own Play, never by the page. */
   const autoplay = (!reducedMotion && !saveData) || playRequested;
-  const cycling = autoplay && !paused && inView && held !== index;
+  useEffect(() => {
+    const update = () => setDocumentVisible(document.visibilityState !== "hidden");
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  const cycling = autoplay && !paused && inView && documentVisible && !videoError && held !== index;
 
   useEffect(() => {
     if (!cycling) return;
-    const timer = window.setTimeout(() => go(index + 1), STAGE_MS);
+    const timer = window.setTimeout(() => go(index + 1), STAGE_MS / Math.max(0.1, playbackRate));
     return () => window.clearTimeout(timer);
-  }, [cycling, index, go]);
+  }, [cycling, index, go, playbackRate]);
 
   const focusStage = useCallback((position: number) => {
     const stage = stages[((position % stages.length) + stages.length) % stages.length];
-    if (stage) document.getElementById(`compile-stage-tab-${stage.id}`)?.focus();
-  }, [stages]);
+    if (stage) document.getElementById(tabId(stage.id))?.focus();
+  }, [stages, tabId]);
 
   const chooseStage = useCallback((next: number, moveFocus = false) => {
     const wrapped = ((next % stages.length) + stages.length) % stages.length;
@@ -259,12 +289,19 @@ export default function CompileStagePlayer({
     reports one. When the visitor is holding this stage the cut restarts instead of advancing.
   */
   const onEnded = useCallback(() => {
+    if (stages.length === 1) {
+      const element = videoRef.current;
+      if (!element) return;
+      element.currentTime = 0;
+      void element.play().catch(() => {});
+      return;
+    }
     if (cycling) { go(index + 1); return; }
     const element = videoRef.current;
     if (!element) return;
     element.currentTime = 0;
     void element.play().catch(() => {});
-  }, [cycling, go, index]);
+  }, [cycling, go, index, stages.length]);
 
   const LiveFilm = LIVE_FILMS[index] ?? LIVE_FILMS[0];
   /*
@@ -275,22 +312,30 @@ export default function CompileStagePlayer({
     visitor who just pressed Play. The <video> path plays the same cut, so an explicit request
     is routed there and the button does what it says.
   */
-  const live = canvasReady && !narrow && !(reducedMotion && playRequested);
-  const still = !autoplay || paused || !inView;
+  const live = !preferVideo && canvasReady && !narrow && !(reducedMotion && playRequested);
+  const still = !autoplay || paused || !inView || !documentVisible || videoError;
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested });
 
   return (
-    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer={live ? "live-canvas" : "video-fallback"}>
-      <div className="compile-film-stages" role="tablist" aria-label="Compilation stages" onKeyDown={onKeyDown}>
+    <div className="compile-film-sequence rv" ref={frameRef} {...touchHandlers} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-compact={compact ? 1 : 0}>
+      {!compact ? <div className="compile-film-stages" role="tablist" aria-label="Compilation stages" onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
-          <button key={stage.id} type="button" role="tab" id={`compile-stage-tab-${stage.id}`} aria-selected={position === index} aria-controls="compile-stage-panel" tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
+          <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
         ))}
-      </div>
+      </div> : null}
 
-      <div className="compile-film-viewport" role="tabpanel" id="compile-stage-panel" tabIndex={0} aria-labelledby={`compile-stage-tab-${active.id}`}>
+      <div className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
         {still ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="compile-film-still" src={active.poster} width={1440} height={900} alt={`${active.label} — ${active.line}`} />
+          <img
+            className="compile-film-still"
+            src={active.poster}
+            width={1440}
+            height={900}
+            alt={`${active.label} — ${active.line}`}
+            fetchPriority={priorityPoster ? "high" : undefined}
+            loading={priorityPoster ? "eager" : undefined}
+          />
         ) : live ? (
           <div className="compile-film-live" aria-hidden="true"><LiveFilm /></div>
         ) : (
@@ -302,7 +347,7 @@ export default function CompileStagePlayer({
             frame that only ever played the first one. Keying the element to the stage replaces
             it, which is also what keeps exactly one decoder open on a phone.
           */
-          <video key={active.id} ref={videoRef} className="compile-film-video" data-active={1} muted autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`} onEnded={onEnded}>
+          <video key={active.id} ref={videoRef} className="compile-film-video" data-active={1} muted autoPlay playsInline preload="metadata" poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => { setVideoError(true); setPaused(true); }}>
             {stages.map((stage, position) => admitted.has(position) ? <source key={stage.id} src={stage.src} type="video/mp4" /> : null)}
           </video>
         )}
@@ -315,6 +360,7 @@ export default function CompileStagePlayer({
           aria-pressed={control === "pause"}
           onClick={() => {
             if (control === "pause") { setPaused(true); return; }
+            setVideoError(false);
             setPaused(false);
             setPlayRequested(true);
           }}
@@ -323,10 +369,11 @@ export default function CompileStagePlayer({
         </button>
       </div>
 
-      <div className="compile-film-caption">
-        <p>{active.line}</p>
+      {compact && videoError ? <p className="compile-film-inline-error" role="status">This browser could not play the film. The poster remains visible.</p> : null}
+      {!compact ? <div className="compile-film-caption">
+        <p>{videoError ? "This browser could not play the film. The poster remains visible; try another stage or inspect the public sample." : active.line}</p>
         <span className="compile-film-progress" aria-hidden="true">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
-      </div>
+      </div> : null}
     </div>
   );
 }

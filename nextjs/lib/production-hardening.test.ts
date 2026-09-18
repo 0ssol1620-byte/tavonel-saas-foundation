@@ -31,8 +31,8 @@ describe("2026-09-05 production hardening", () => {
   it("keeps source intake available after the first World and tells the truth about one-file compiles", () => {
     const workspace = read("app/workspace/page.tsx");
     expect(workspace).not.toContain("!activeWorld && !candidateNeedsDecision ? (");
-    expect(workspace).toContain("Add more knowledge without losing access to the World you already have.");
-    expect(workspace).toContain("Add more sources while this candidate waits for review.");
+    expect(workspace).toContain("Add more files while your published knowledge stays available.");
+    expect(workspace).toContain("Add more files while the prepared version waits for your review.");
     expect(workspace).toContain("Upload & compile");
     expect(workspace).toContain("Compile one or more ready sources");
     expect(workspace).not.toContain("Compile at least two ready sources");
@@ -85,7 +85,7 @@ describe("2026-09-05 production hardening", () => {
     const css = read("app/tavonel.css");
     const nav = read("components/mobile-primary-nav.tsx");
     expect(css).toContain(".mobile-primary-nav { display: block; }");
-    expect(nav).toContain("NAV_GROUPS.map");
+    expect(nav).toContain("CUSTOMER_NAV.map");
     expect(nav).toContain('aria-label="Mobile sections"');
     // The accordion is a disclosure, not a dialog: Tab must leave it. A focus trap imported here
     // would pass every geometry assertion in the suite. The import, not the word: both
@@ -93,14 +93,14 @@ describe("2026-09-05 production hardening", () => {
     expect(nav).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
   });
 
-  it("keeps the desktop section row as a disclosure with real links behind it", () => {
+  it("keeps the simplified desktop section row as direct links, not false menu controls", () => {
     const nav = read("components/site-nav/desktop-primary-nav.tsx");
-    expect(nav).toContain("NAV_GROUPS.map");
+    expect(nav).toContain("CUSTOMER_NAV.map");
     expect(nav).toContain('aria-label="Sections"');
     // `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"` promising arrow keys
     // this navigation does not implement.
-    expect(nav).toContain("aria-expanded=");
-    expect(nav).toContain("aria-controls=");
+    expect(nav).toContain("href={item.href as Route}");
+    expect(nav).toContain("aria-current=");
     expect(nav).not.toContain("role=\"menu\"");
     expect(nav).not.toContain("from \"@/components/world-visual/use-dialog-focus\"");
   });

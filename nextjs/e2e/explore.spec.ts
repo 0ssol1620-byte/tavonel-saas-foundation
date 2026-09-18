@@ -209,6 +209,8 @@ test("Act 2 opens an object onto the page region it was compiled from", async ({
   // The source sheet names the file, not the relation list that happens to name it too.
   const sheet = page.locator("[data-source-sheet]");
   await expect(sheet.getByText(/^apple-\d{4}(-\d+)?-.*\.pdf$/i).first()).toBeVisible();
+  // Original bytes are the default representation. Parsed text remains one explicit tab away,
+  // so the source is never mistaken for a typeset reconstruction of the filing.
   const originalTab = sheet.getByRole("tab", { name: /^(Original page|Reference page)$/ });
   await expect(originalTab).toHaveAttribute("aria-selected", "true");
   await expect(sheet.locator("[data-original-source]")).toBeVisible();
@@ -269,9 +271,6 @@ test("an object with many regions is walked with previous and next", async ({ pa
   await enterWorld(page);
   await page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first().click();
   await page.getByRole("button", { name: "Open source evidence" }).click();
-  const sheet = page.locator("[data-source-sheet]");
-  await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   const group = page.getByRole("group", { name: "Source regions for this object" });
   /*
     The counter says how many regions this browser was sent and, when the compiler bound more
@@ -561,8 +560,6 @@ test("a deep link lands on the exact region it names, not only on the act", asyn
   await page.locator(`${STAGE} ${NODE}[data-node-kind="Document"]`).first().click();
   await page.getByRole("button", { name: "Open source evidence" }).click();
   const sheet = page.locator("[data-source-sheet]");
-  await expect(sheet.locator("[data-original-source]")).toBeVisible();
-  await sheet.getByRole("tab", { name: "Parsed text" }).click();
   const opening = await sheet.locator("[data-active-region]").getAttribute("data-region-id");
   expect(opening, "the source sheet publishes the id of the region it is showing").toBeTruthy();
 
