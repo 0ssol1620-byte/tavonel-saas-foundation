@@ -71,6 +71,10 @@ jobs:
       run:
         working-directory: nextjs
     env:
+      # Same 480s webServer allowance as Browser QA: on 1c363e2 the push-event run of this job
+      # timed out at the 300s default waiting for `pnpm build && pnpm start` while the
+      # pull_request-event run of the same commit built, started and passed all seven projects.
+      PLAYWRIGHT_WEB_SERVER_TIMEOUT: "480000"
       # Live-commerce posture, for this job only.
       #
       # The width projects exist to catch layout defects in the header a customer actually sees,
