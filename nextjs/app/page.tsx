@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
-import HomePageClient from "@/components/home-page-client";
-import { isLiveCommerce } from "@/lib/commercial-state";
+import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
 import { BRAND_LINE } from "@/lib/site-navigation";
 
 /**
@@ -55,15 +53,31 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  // The hero poster is the homepage LCP resource. It is declared as a real <link> element, which
-  // React hoists into <head>, because `preload()` from react-dom never reached the shipped HTML
-  // here (audit MED-15, verified on the fixture build 2026-09-18: the only rel=preload in the
-  // document was a low-priority script). The poster is the re-rendered master's own frame at
-  // the size the hero paints it.
+  /*
+    Landing V2, 2026-09-19 (§27, contract rule 10). The LCP resource is the hero's source page.
+
+    It replaces the film poster, because this landing plays no video at all -- §27 bars an
+    autoplay video from being the LCP element, and §28 puts the hero in DOM and CSS. What is
+    preloaded is the exact resource the layout paints: the same `srcset` and the same `sizes`
+    the <img> carries, both from one constant, so the browser's candidate selection here and in
+    the element cannot disagree.
+
+    Still a real <link> element rather than react-dom's `preload()`: audit MED-15 measured that
+    the helper never reached the shipped HTML on this route (fixture build 2026-09-18, where the
+    document's only rel=preload was a low-priority script).
+  */
+  const hero = heroScene();
   return (
     <>
-      <link rel="preload" as="image" href="/film/poster-1-hero-2x.webp" fetchPriority="high" />
-      <HomePageClient liveCommerce={isLiveCommerce()} formats={describeAcceptedFormats(CAPABILITY_MANIFEST)} />
+      <link
+        rel="preload"
+        as="image"
+        href={hero.source.rasterSrc}
+        imageSrcSet={hero.source.rasterSrcSet}
+        imageSizes={HERO_IMAGE_SIZES}
+        fetchPriority="high"
+      />
+      <LandingPage />
     </>
   );
 }

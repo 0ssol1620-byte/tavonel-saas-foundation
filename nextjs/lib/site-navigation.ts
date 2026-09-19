@@ -17,17 +17,53 @@
 
 export type SiteLink = { href: string; label: string };
 
-/** Customer entry points. Technical and trust destinations remain in the footer and docs. */
+/*
+  Customer entry points. Technical and trust destinations remain in the footer and docs.
+
+  Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five, and the bar is the
+  reader's map of the site rather than the three destinations a pilot visitor was steered to.
+
+  "How it works" moves off /product and onto /knowledge-compiler. /product is a hub of four
+  surface cards -- it says what the parts are called, not how the thing works -- while the compile
+  contract, the four stages and the comparison with RAG, graphs and search are all written on
+  /knowledge-compiler. /product takes its own name back, which is also the label its <title> and
+  its H1 already use.
+
+  Integrations leaves the bar. It is one Product-group destination among several and it was
+  holding a top-level slot while Docs and Resources -- the two things an evaluating engineer looks
+  for first -- had none. It is still a footer row, still linked from /sources, and its URL has not
+  moved.
+*/
 export const CUSTOMER_NAV: readonly SiteLink[] = [
-  { href: "/product", label: "How it works" },
-  { href: "/integrations", label: "Integrations" },
+  { href: "/product", label: "Product" },
+  { href: "/knowledge-compiler", label: "How it works" },
+  { href: "/resources", label: "Resources" },
+  { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
 ] as const;
 
+/*
+  The routes a bar item speaks for that do not sit underneath it.
+
+  /sources used to be here, under Integrations, and it is deliberately not reassigned: no item in
+  the five-link bar is the section /sources belongs to, so marking one of them current while a
+  reader is on that page would tell them something false about where they are. It stays reachable
+  from the footer's Product group and from /integrations itself.
+
+  Resources owns the five pages its hub collects that have no bar item of their own. /explore,
+  /docs, /api and /knowledge-compiler are excluded on purpose: two of them are bar items in their
+  own right (Docs owns /docs and everything under it), /explore is the product, and /api is a
+  Developers page the bar does not carry.
+*/
+const NAV_ALSO_OWNS: Readonly<Record<string, readonly string[]>> = {
+  "/resources": ["/research", "/evidence", "/reproducibility", "/benchmarks", "/changelog"],
+};
+
 export function customerNavOwns(href: string, pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  if (href === "/integrations" && path === "/sources") return true;
-  return path === href || path.startsWith(`${href}/`);
+  // A prefix is only a prefix at a segment boundary: /productivity is not under /product.
+  const under = (prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
+  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href);
 }
 
 /* ==================================================================== BA-232 / BA-252: vocabulary
@@ -68,10 +104,14 @@ export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compi
  * depending on which surface a reader landed on first. These two strings are the answer; every OG
  * card, footer tagline and metadata description derives from them, and the other four go.
  *
- * Changing either string is a founder call: it is a public claim, not a copy edit.
+ * Changing either string is a founder call: it is a public claim, not a copy edit. The headline
+ * was changed once, by that route: the founder approved it through the 2026-09-19 Landing V2
+ * design master blueprint (§0, §10.1, §43), which puts the outcome before the category name so a
+ * first-time reader is not asked to learn "Knowledge Compiler" in order to parse the first
+ * sentence on the site. The descriptor is unchanged.
  */
 export const BRAND_LINE = {
-  headline: "Bring your knowledge. TAVONEL makes it ready for AI.",
+  headline: "AI-ready knowledge. Traceable to every source.",
   descriptor: "Knowledge compiled with a traceable path back to every source.",
 } as const;
 
@@ -89,10 +129,10 @@ export const BRAND_LINE = {
   a third access action: a label here exists only where `ACCESS_CTA` or `SELF_SERVE_CTA` already
   points, and `lib/brand-copy.test.ts` fails if one of them loses its Korean counterpart.
 
-  `stateLine` is the Korean form of `deploymentStateLine()`. It says the same two facts -- a
-  finished public World open to read now, your own files arranged with us -- and it is a
-  translation rather than a second policy: it lives beside the English one so the two cannot be
-  edited apart.
+  `stateLine` retired here with `deploymentStateLine()` on 2026-09-19. D2 took the deployment
+  line out of the header (blueprint §8, §35), nothing else rendered it, and a Korean translation
+  of a sentence no page prints is a claim with no surface. The gate itself is unchanged and is
+  still stated verbatim where it is stated; the inventory is in `lib/commercial-state.ts`.
 */
 export const KO_CHROME = {
   cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
@@ -100,12 +140,17 @@ export const KO_CHROME = {
   /*
     BQ-013 / D12. The three primary destinations, keyed by href for the same reason the two CTA
     labels are: a label exists here only where `CUSTOMER_NAV` already points, so this table cannot
-    invent a fourth section. Literal translations of the English labels -- a translation is not a
-    new claim, and the primary nav vocabulary itself is the founder's.
+    invent a sixth section. Literal translations of the English labels -- a translation is not a
+    new claim, and the primary nav vocabulary itself is the founder's. The spellings are the ones
+    `footerLinks` below already uses, with one deliberate difference: /knowledge-compiler carries
+    the bar's label ("How it works" / 작동 방식) rather than the page's name, because that is what
+    the English bar says there too.
   */
   nav: {
-    "/product": "작동 방식",
-    "/integrations": "연동",
+    "/product": "제품",
+    "/knowledge-compiler": "작동 방식",
+    "/resources": "자료",
+    "/docs": "문서",
     "/pricing": "요금",
   } as Record<string, string>,
   menu: "메뉴",
@@ -149,7 +194,21 @@ export const KO_CHROME = {
     "/refunds": "환불 정책",
   } as Record<string, string>,
   tagline: "모든 결과에서 원문까지 다시 따라갈 수 있도록 컴파일합니다.",
-  stateLine: "공개 샘플: 열람 가능 · 내 자료: 협의로 진행",
+  /*
+    The deployment gate, in Korean, and the site's only Korean spelling of it.
+
+    `stateLine` retired with the header line and this is not that sentence returning: it is the
+    literal translation of `activationPolicy.customerData.reason`, which the footer states on
+    every public route from this round on. D2's removal left eight routes stating the gate
+    nowhere at all (`lib/commercial-state.ts` carries that inventory), and `/contact` -- the
+    destination of the landing's own access action -- was one of them.
+
+    `lib/landing-v2-copy.ts` reads this constant for the landing's Korean microtext rather than
+    keeping a second translation of one sentence: the rule rule 5 applies to the English
+    ("verbatim, never a second spelling") applies to its translation too.
+  */
+  customerDataGate:
+    "이 배포판에서는 아직 고객의 파일을 컴파일하지 않습니다. 완성된 공개 Compiled World는 오늘 전체를 읽을 수 있고, 직접 가진 원문의 반입은 저희와 협의해 진행합니다.",
 } as const;
 
 /**

@@ -9,10 +9,20 @@ import films from "./locked-film-assets.json";
 const text = (relative: string) => readFileSync(fileURLToPath(new URL(`../${relative}`, import.meta.url)), "utf8");
 
 describe("approved one-path experience", () => {
-  it("has exactly three shared customer destinations", () => {
+  /*
+    Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five.
+
+    The order is the reader's path through the site rather than the repository's: what it is,
+    how it works, what to read, how to build, what it costs. Both chromes render the same array,
+    which is the half of this that used to be the defect -- the desktop bar and the phone sheet
+    read two different constants and made two different offers at two widths.
+  */
+  it("has exactly five shared customer destinations", () => {
     expect(CUSTOMER_NAV).toEqual([
-      { href: "/product", label: "How it works" },
-      { href: "/integrations", label: "Integrations" },
+      { href: "/product", label: "Product" },
+      { href: "/knowledge-compiler", label: "How it works" },
+      { href: "/resources", label: "Resources" },
+      { href: "/docs", label: "Docs" },
       { href: "/pricing", label: "Pricing" },
     ]);
     expect(text("components/site-nav/desktop-primary-nav.tsx")).toContain("CUSTOMER_NAV.map");
@@ -21,8 +31,29 @@ describe("approved one-path experience", () => {
   it("does not confuse a prefix with an unrelated route", () => {
     expect(customerNavOwns("/product", "/product/document-intelligence/")).toBe(true);
     expect(customerNavOwns("/product", "/productivity")).toBe(false);
-    expect(customerNavOwns("/integrations", "/sources/")).toBe(true);
+    expect(customerNavOwns("/docs", "/docs/mcp")).toBe(true);
+    expect(customerNavOwns("/docs", "/docsearch")).toBe(false);
     expect(customerNavOwns("/pricing", "/privacy")).toBe(false);
+  });
+  /*
+    What Resources speaks for, and what nothing in the bar does.
+
+    The hub collects nine destinations; five of them have no bar item of their own, and a reader
+    on one of those five is in the Resources section whether or not the URL says so. The failure
+    path is the second half: /sources lost its owner when Integrations left the bar, and marking
+    some other item current there would tell the reader something false about where they are.
+  */
+  it("lets Resources own the five hub pages that have no bar item, and leaves /sources unowned", () => {
+    for (const path of ["/research", "/research/notes", "/evidence", "/reproducibility", "/benchmarks", "/changelog"]) {
+      expect(customerNavOwns("/resources", path), path).toBe(true);
+    }
+    for (const href of CUSTOMER_NAV.map((item) => item.href)) {
+      expect(customerNavOwns(href, "/sources"), `${href} claims /sources`).toBe(false);
+      expect(customerNavOwns(href, "/integrations"), `${href} claims /integrations`).toBe(false);
+    }
+    // /explore and /api are hub entries too, and deliberately not Resources' to claim.
+    expect(customerNavOwns("/resources", "/explore")).toBe(false);
+    expect(customerNavOwns("/resources", "/api")).toBe(false);
   });
   it.each(films.files)("preserves the approved $file bytes", ({ file, bytes, sha256 }) => {
     const data = readFileSync(fileURLToPath(new URL(`../public/film/${file}`, import.meta.url)));
@@ -30,43 +61,34 @@ describe("approved one-path experience", () => {
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
   /*
-    Landing replan, 2026-09-18. Five sections, one film.
+    Landing V2, 2026-09-19 (D1, D9, §9). Five sections became nine, and the film left the page.
 
-    What this used to pin -- two players, "You bring the source.", and the
-    how-it-works → connect → proof → stays-current → ready-for-ai order -- is the page the replan
-    deleted. The rule it was written for is unchanged and is what is asserted here: the landing
-    runs one ordered story, the hero owns the only decoder on the page, and the sentence that
-    separates the directed film from what a compile emits travels with the film.
+    What this used to pin -- one decoder in the hero, the Hero → Compile → Why → Sources → Start
+    order, and the sentence separating the directed film from what a compile emits -- described a
+    page that no longer exists. The rule it was written for is unchanged and is what is asserted
+    here: the landing runs one ordered story, every scene is a named focusable landmark, and
+    nothing on the page is a recreation that has to be disclosed as one. The film note went with
+    the film; §21 and contract rule 2 now allow the entry pages only committed real rasters and
+    vector UI drawn from real World data, which is a stronger guarantee than a disclosure.
   */
-  it("orders the landing as Hero → Compile → Why → Sources → Start, with one film", () => {
-    const page = text("components/home-page-client.tsx");
-    expect(page.match(/<CompileStagePlayer/g), "one decoder on the page, in the hero").toHaveLength(1);
-    expect(page).toContain("playbackRate={1.5} compact priorityPoster");
-    const sections = [...page.matchAll(/<section[^>]*\bid="([a-z-]+)"[^>]*\bdata-scene="(\d)"/g)];
-    expect(sections.map((match) => match[1])).toEqual(["top", "compile", "why", "sources", "start"]);
-    expect(sections.map((match) => match[2])).toEqual(["1", "2", "3", "4", "5"]);
+  it("orders the landing as the nine V2 scenes, with no film on the page", () => {
+    const page = text("components/landing-v2/landing-page.tsx");
+    expect(page.match(/<CompileStagePlayer/g), "no decoder on the entry pages").toBeNull();
+    const scenes = [...page.matchAll(/<Scene scene=\{copy\.([a-z]+)\}/g)].map((match) => match[1]);
+    expect(["hero", ...scenes]).toEqual([
+      "hero", "proof", "sources", "evidence", "recompile", "why", "use", "trust", "start",
+    ]);
     // Each section is a named, focusable landmark -- the skip-target contract the audit checks in
     // a browser, pinned here so a refactor that never opens the page cannot lose it.
-    expect(page.match(/tabIndex=\{-1\}/g)?.length ?? 0, "main plus five sections").toBeGreaterThanOrEqual(6);
-    for (const id of ["one-path-title", "one-path-steps-title", "one-path-why-title", "one-path-io-title", "one-path-close-title"]) {
-      expect(page, `${id} names its section`).toContain(`aria-labelledby="${id}"`);
-    }
-    /*
-      G1-003 / G1-004. The note this used to pin -- "the approved source film is preserved and
-      presented at a faster 12-second pace" -- disclosed the *edit* and not the thing a visitor
-      could mistake the film for. The cuts draw an extracted table as a ruled grid, a
-      section-and-line locator and `.csv` sources, none of which this deployment produces, and the
-      bytes are locked, so the note names the recreation and says what a compile emits instead.
-      The guard follows the fact rather than the sentence: a landing page that stops separating
-      the film from the product still fails here.
-    */
-    expect(page).toContain("A directed film, not a screen recording");
-    expect(page).toContain("the page it was read from");
+    expect(page).toContain("tabIndex={-1}");
+    expect(page).toContain("aria-labelledby={titleId}");
+    expect(page).toContain('aria-labelledby="lv2-hero-title"');
     // The retired page's own landmarks, so none of them returns by copy-paste.
-    for (const gone of ['id="proof"', 'id="how-it-works"', 'id="connect"', "/explore?act=source", "data-proof-variant", "one-path-works-film"]) {
+    for (const gone of ['id="top"', 'id="compile"', 'id="how-it-works"', 'id="connect"', "one-path-works-film", "one-path-film-note"]) {
       expect(page, `${gone} belongs to the retired landing`).not.toContain(gone);
     }
   });
+
   /*
     BQ-013. The locale thread reached the chrome and stopped at the film.
 
@@ -82,8 +104,18 @@ describe("approved one-path experience", () => {
     all gone; the locale wiring the row exists for is not.
   */
   it("names the film and its controls in the language of the page they are on", () => {
+    /*
+      Landing V2, 2026-09-19. /ko plays no film, so the half of this that counted its players is
+      gone and the half that is a fact about the component stays.
+
+      BQ-013 was the real defect: the player kept the tablist name, the three control names and
+      the decoder-failure sentence in English whatever page it was on. None of that is visible
+      marketing copy, which is why it survived every copy pass; all of it is the accessible name
+      of a control. The wiring is still there and is still the thing worth guarding -- a film that
+      stops taking the locale fails here, on whichever route grows one next.
+    */
     const ko = text("app/ko/page.tsx");
-    expect(ko.match(/<CompileStagePlayer[^>]*korean/g)).toHaveLength(1);
+    expect(ko.match(/<CompileStagePlayer/g), "the Korean entry page plays no film").toBeNull();
     expect(ko, "the Korean film may not reuse the English stage labels verbatim")
       .not.toContain("const KO_WORK_STAGES");
     const player = text("components/compile-stage-player.tsx");
@@ -91,6 +123,7 @@ describe("approved one-path experience", () => {
       expect(player, `${wired} must read the locale, not a literal`).toContain(wired);
     }
   });
+
   /*
     landing-01 / regressions-01. A film stage that reaches a server component as a client
     reference paints nothing.
@@ -113,43 +146,42 @@ describe("approved one-path experience", () => {
     }
     expect(text("components/compile-stage-player.tsx"), "the strip may not live in the client module again")
       .not.toContain("export const COMPILE_STAGES");
-    for (const page of ["app/ko/page.tsx", "components/home-page-client.tsx"]) {
-      expect(text(page), `${page} must read the stages from the plain module`)
-        .toContain('import { COMPILE_STAGES } from "@/lib/compile-stages"');
+    /*
+      Landing V2, 2026-09-19. Neither entry page reads the table any more, because neither plays
+      a film. The rule -- a server component reads the stages from a plain module, never back out
+      of the "use client" player, where every export arrives as a reference rather than a value --
+      is asserted where it can still be broken: the table is a plain module, and the player does
+      not re-export it.
+    */
+    expect(text("lib/compile-stages.ts"), "the table stays a plain module a server component can read")
+      .not.toMatch(/^\s*["']use client["']/m);
+    for (const page of ["app/page.tsx", "app/ko/page.tsx"]) {
+      expect(text(page), `${page} plays no film and must not import the stage table`)
+        .not.toContain('from "@/lib/compile-stages"');
     }
   });
   it("preserves state-controlled entry and keeps the two locales on one story", () => {
-    expect(text("components/home-page-client.tsx")).toContain("liveCommerce ? SELF_SERVE_CTA : ACCESS_CTA");
-    expect(text("app/page.tsx")).toContain("isLiveCommerce()");
     /*
-      The interactive proof block moved off the landing (founder decision, 2026-09-18) and
-      `app/page.tsx` no longer renders `<SolutionProofSample>`. What replaces it is the thing it
-      was proving -- three screenshots of the live /explore route, each linked to the view it
-      shows -- so the guard follows the evidence rather than the component that used to carry it.
+      Landing V2, 2026-09-19. One composition serves both locales, so "the same sections in the
+      same order" stops being a thing two files can disagree about -- which is what this case was
+      really defending. What is left to check is the two halves that are still separable: the
+      commercial posture is resolved on the server and chooses between the two access actions
+      rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
-    expect(text("app/page.tsx"), "the proof block is not on the landing any more").not.toContain("<SolutionProofSample");
-    expect(text("components/home-page-client.tsx")).toContain('import { LANDING_FRAMES } from "@/lib/landing-frames"');
-    expect(text("app/ko/page.tsx")).toContain("playbackRate={1.5} compact");
-    /*
-      BQ-056. This pinned "01 / TAVONEL WORKS" -- one of five numbered section kickers that made a
-      third ordinal system on a page which already numbers a six-step grid inside one of those
-      sections. They are deleted, so the guard follows what it was there for: /ko runs the same
-      sections in the same order as `/`, identified by their headings rather than by a count.
-    */
+    const composition = text("components/landing-v2/landing-page.tsx");
+    expect(composition, "the posture is resolved where the flags are readable")
+      .toContain("primaryCallToAction()");
+    expect(composition, "and the Korean label is that action's own, keyed by destination")
+      .toContain("KO_CHROME.cta[access.href]");
     const korean = text("app/ko/page.tsx");
+    expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean>");
+    expect(korean).toContain('canonical: "/ko"');
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     expect(korean.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
       .not.toMatch(/0\d \/ /);
-    const KO_HEADINGS = ["ko-one-path-title", "ko-steps-title", "ko-why-title", "ko-io-title", "ko-close-title"];
-    for (const heading of KO_HEADINGS) expect(korean).toContain(`id="${heading}"`);
-    // Same five sections, same order, same ids as `/` -- checked as positions so a reordered
-    // translation fails here rather than in a screenshot.
-    expect(KO_HEADINGS.map((heading) => korean.indexOf(`id="${heading}"`)))
-      .toEqual([...KO_HEADINGS.map((heading) => korean.indexOf(`id="${heading}"`))].sort((a, b) => a - b));
-    expect([...korean.matchAll(/<section[^>]*\bid="([a-z-]+)"/g)].map((match) => match[1]))
-      .toEqual(["top", "compile", "why", "sources", "start"]);
-    expect(korean).toContain('canonical: "/ko"');
+    expect(text("app/page.tsx"), "the proof block is not on the landing any more").not.toContain("<SolutionProofSample");
   });
+
   it("keeps low-motion, Save-Data and hidden-tab playback protections", () => {
     const player = text("components/compile-stage-player.tsx");
     expect(player).toContain("prefers-reduced-motion");

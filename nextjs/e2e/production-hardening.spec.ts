@@ -21,10 +21,16 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
   const menu = page.locator(".mobile-primary-nav");
   await expect(menu).toBeVisible();
   await menu.locator(":scope > summary").click();
+  /*
+    Five, not three. Landing V2's `CUSTOMER_NAV` (contract D2) is a five-destination bar, and the
+    sheet renders that array -- so the count and the labels are read off the same source of truth
+    the header uses rather than being a second spelling of it. What this case asserts is unchanged:
+    every section the bar offers is reachable on a phone.
+  */
   const direct = menu.locator(":scope > nav a.mobile-nav-direct");
-  await expect(direct).toHaveCount(3);
-  await expect(direct).toHaveText(["How it works", "Integrations", "Pricing"]);
-  // BQ-059: the header keeps the action at every width; the sheet is the three sections.
+  await expect(direct).toHaveCount(5);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
+  // BQ-059: the header keeps the action at every width; the sheet is the sections and Sign in.
   await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
   await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
   await expect(menu.locator("details.mobile-nav-group")).toHaveCount(0);
@@ -58,22 +64,36 @@ test("odd grids compose the final item instead of painting an empty cell", async
   }
 });
 
-test("One-Path landing sections flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
+test("landing scenes flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
   await page.goto("/");
   const geometry = await page.locator('main > section[data-scene]').evaluateAll(sections => sections.map(section => {
     const rect = section.getBoundingClientRect();
     return { id: section.id, top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
   }));
-  // Landing replan, 2026-09-18: five sections, not six. The rule is unchanged -- they butt up
-  // against each other and none of them is floored to a viewport height.
-  expect(geometry.map(item => item.id)).toEqual(["top", "compile", "why", "sources", "start"]);
+  /*
+    Landing V2, 2026-09-19: nine scenes, not five. Two of the three rules are unchanged -- the
+    scenes butt up against each other, and none of them is collapsed.
+
+    The third is restated rather than kept verbatim. It barred a viewport-height floor outright,
+    because the old landing used one to manufacture emptiness. V2 floors every scene on purpose
+    (`.lv2-scene--full` at `min(900px, 100vh)`, `.lv2-scene--proof` at 80vh) so that a scene is a
+    held frame rather than a paragraph that happens to be tall -- so the assertion becomes the
+    thing the old rule was actually protecting: no scene may floor at more than one viewport, and
+    no scene may be taller than two. An ocean is still a failure; a composed frame is not one.
+  */
+  expect(geometry.map(item => item.id)).toEqual(["hero", "proof", "sources", "evidence", "recompile", "why", "use", "trust", "start"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }
+  const viewport = page.viewportSize()!.height;
   for (const section of geometry) {
     expect(section.height, `${section.id} collapsed`).toBeGreaterThan(180);
-    expect(section.minHeight, `${section.id} still carries a viewport-height scene floor`).not.toMatch(/vh|svh|dvh/);
+    expect(section.height, `${section.id} is an ocean, not a scene`).toBeLessThanOrEqual(viewport * 2);
+    const floor = Number.parseFloat(section.minHeight);
+    if (Number.isFinite(floor)) {
+      expect(floor, `${section.id} floors past one viewport`).toBeLessThanOrEqual(viewport + 1);
+    }
   }
 });
 

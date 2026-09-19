@@ -15,8 +15,14 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   page, rather than restated here against a page that no longer exists.
 */
 test("the homepage Verify frame opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
+  /*
+    Landing V2, 2026-09-19. Same claim, current scene. The Verify frame lived in `#compile`; the
+    nine-scene composition puts the same offer in Scene 04, "Evidence, not a citation string"
+    (`section#evidence`), whose one next action is `SCENE_ACTIONS.en.evidence` -- the label moved
+    with it and the destination did not.
+  */
   await page.goto("/");
-  const cta = page.locator("#compile").getByRole("link", { name: "Open the Verify view" }).last();
+  const cta = page.locator("#evidence").getByRole("link", { name: "Open an evidence record" }).last();
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();

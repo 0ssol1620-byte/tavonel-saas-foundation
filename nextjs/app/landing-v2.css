@@ -1,0 +1,990 @@
+/*
+  Landing V2 (blueprint 2026-09-19). Landing-only rules: the nine scenes, the hero demo, the evidence primitives.
+  Unlayered on purpose, like one-path.css: it must win over the layered system sheets. Token-only colours.
+
+  Everything here is scoped under `.lv2`, the landing root element, for one reason: this sheet
+  loads on every route (app/layout.tsx imports it) and the landing's type scale, grounds and
+  section rhythm are not the site's. A bare `h1` rule here would repaint 28 documentation pages
+  that nobody in this campaign looks at.
+
+  This file is the skeleton only -- scale, container, grounds, rhythm, grid, radius, focus and
+  reduced motion. Scene and component rules land on top of it in the hero and proof lanes.
+*/
+
+/* ============================================================ scale + container */
+
+.lv2 {
+  /*
+    §6 desktop scale, as custom properties rather than as rules, so a scene can set a heading to
+    the H2 size without inheriting the H2's margins. Sizes are named by role, never by number.
+
+    The 12px floor (scripts/check-type-floor.mjs) is a hard bound on --lv2-meta: mono metadata is
+    12-13px here and never 11px, which is the one place the blueprint (§6, "Meta Mono 11-13px")
+    is overridden by a truth rule.
+  */
+  /*
+    D3 / §32 AMENDED, 2026-09-19 (fix round 2, QA P1 "hero typography vs D3/§32").
+
+    §32 asks for Display XL at clamp(64px, 6.1vw, 92px) -- 87.84px at 1440 -- inside a 510px
+    measure, and §6 caps the hero headline at 2.2 lines. With this headline the three cannot hold
+    at once: "Traceable to every source." sets about 11em wide at this tracking, so one line of it
+    needs roughly 890px at 88px, and a 510px measure holds one line only up to about 46px. The
+    2.2-line rule is the published QA gate and §11.1's own drawing puts the headline on two lines
+    inside the text column, so the measure wins and the size follows it.
+
+    The token now carries the size the hero actually sets, and `.lv2-hero-h1` is its only
+    consumer. Before this round it held §32's number, nothing read it, and the hero set its own
+    clamp four hundred lines further down: two competing rules, one of them dead, and no record
+    of which was the decision. This comment is the record.
+  */
+  --lv2-display: clamp(34px, 4.4vw, 44px);
+  --lv2-h2: clamp(46px, 3.75vw, 54px);
+  --lv2-h3: clamp(28px, 2.2vw, 32px);
+  --lv2-body-l: 20px;
+  --lv2-body: clamp(16px, 1.2vw, 18px);
+  --lv2-small: 14px;
+  --lv2-meta: 13px;
+
+  /*
+    §7. The outer margin is the gutter, and it steps by breakpoint rather than scaling, because
+    the header wordmark has to land on the same left edge as the landing content at every width.
+    72px at >=1440 is the blueprint's 1440 grid: 1440 - 2*72 = 1296 content.
+  */
+  --lv2-gutter: 20px;
+
+  /*
+    §34's section rhythm, declared here and not in :root. The token name already exists site-wide
+    at clamp(88px, 9vw, 144px) and about thirty documentation routes lay their bodies out with
+    it; raising it globally would re-space every one of them, and no lane in this campaign
+    screenshots those pages. Same name, landing scope, blueprint value.
+  */
+  --space-section: clamp(112px, 11vw, 176px);
+
+  /*
+    The one shadow the paper layer adds. Depth is otherwise --depth-* and nothing else: a sheet
+    of paper lifted off a dark ground is a real object with a real edge; a card with a glow is
+    not. Scene rules read this token and do not write a second shadow.
+  */
+  --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+
+  color: var(--text-hi);
+  font-family: var(--f-sans);
+}
+
+/* Mobile scale (§6). One block, one breakpoint: the hero is recomposed below 768, not shrunk. */
+@media (max-width: 767px) {
+  .lv2 {
+    --lv2-display: clamp(30px, 7.6vw, 34px);
+    --lv2-h2: clamp(34px, 8.5vw, 40px);
+    --lv2-h3: clamp(24px, 6vw, 28px);
+    --lv2-body-l: 18px;
+    --lv2-body: 17px;
+    --lv2-meta: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .lv2 { --lv2-gutter: 32px; }
+}
+@media (min-width: 1200px) {
+  .lv2 {
+    --lv2-gutter: 48px;
+    /* The measure stops growing at 520 (§32), so the headline stops growing with it. */
+    --lv2-display: clamp(40px, 3.15vw, 46px);
+  }
+}
+@media (min-width: 1440px) {
+  .lv2 { --lv2-gutter: 72px; }
+}
+
+.lv2-wrap {
+  width: min(1296px, calc(100% - 2 * var(--lv2-gutter)));
+  margin-inline: auto;
+}
+
+/* ============================================================ type */
+
+/*
+  text-wrap: balance on the headings, and only the headings. It is what keeps a two-line H1 from
+  leaving one orphaned word on line two, and the browser balances a bounded number of lines, so
+  it is cheap on a heading and refused on a long paragraph anyway.
+*/
+/*
+  `word-break: keep-all` is here for Hangul and costs Latin nothing.
+
+  Korean has no inter-syllable word boundary a browser can see, so the default breaks a heading
+  anywhere -- the QA round measured the Korean H1 splitting "사용할 / 수 있는" mid-phrase. keep-all
+  restricts the break to a space, which in Korean is a phrase boundary. On Latin text the rule is
+  a no-op: a space is already where the break lands.
+*/
+.lv2 h1,
+.lv2 h2,
+.lv2 h3 {
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+/*
+  `.lv2-h2` has consumers; `.lv2-h3`, `.lv2-body` and `.lv2-small`'s siblings do not yet, and that
+  is deliberate rather than dead. They are §6's scale, and the scene visuals of P1 and P2 set
+  their headings and captions from it -- the alternative is each scene inventing a size. What was
+  actually dead was `.lv2-h1`, which named the hero's own role and competed with the rule the hero
+  used; it is gone and `--lv2-display` is the hero's size (see the top of this file).
+*/
+.lv2-h2 {
+  font-size: var(--lv2-h2);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.lv2-h3 {
+  font-size: var(--lv2-h3);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+.lv2-body-l {
+  font-size: var(--lv2-body-l);
+  line-height: 1.55;
+}
+.lv2-body {
+  font-size: var(--lv2-body);
+  line-height: 1.55;
+}
+.lv2-small {
+  font-size: var(--lv2-small);
+  line-height: 1.45;
+}
+/* Source locations, page numbers, digests, snapshot labels. Mono because it is read as data. */
+.lv2-meta {
+  font-family: var(--f-mono);
+  font-size: var(--lv2-meta);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+/* The editorial accent (§6). One phrase of the H1, the manifesto line. Never a paragraph. */
+.lv2-serif {
+  font-family: var(--f-serif);
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================ grounds */
+
+/*
+  Two grounds, alternating (§5.1). A scene declares which one it is and everything inside it is
+  correct, because the ground class remaps the neutral and accent token names rather than asking
+  each component to know where it landed. A primitive written against var(--source) is legible on
+  obsidian and on paper; without the remap it would be 8.03:1 on one and 2.14:1 on the other.
+*/
+.lv2-obsidian {
+  background: var(--ink-950);
+  color: var(--text-hi);
+}
+
+.lv2-paper {
+  background: var(--paper-50);
+  color: var(--text-on-paper);
+  --text-hi: var(--text-on-paper);
+  --text-mid: var(--text-muted-paper);
+  --text-lo: var(--text-muted-paper);
+  --hairline: var(--border-paper);
+  --hairline-hi: var(--border-paper-hi);
+  --source: var(--source-ink);
+  --relation: var(--relation-ink);
+  --unresolved: var(--unresolved-ink);
+  --verified: var(--verified-ink);
+  --changed: var(--changed-ink);
+}
+
+/* A link on paper is the ink colour with a rule under it; there is no second link blue here. */
+.lv2-paper a {
+  color: var(--text-on-paper);
+  text-decoration-color: var(--border-paper-hi);
+}
+
+/* ============================================================ scene rhythm */
+
+.lv2-scene {
+  padding-block: var(--space-section);
+}
+/*
+  Hero and full-bleed motion scenes (§24). min() rather than a bare 100vh: on a tall window a
+  100vh hero is a band of mostly nothing, and it keeps the 1440 canvas at the 900px the
+  blueprint specifies instead of letting it grow with the viewport.
+*/
+.lv2-scene--full {
+  min-height: min(900px, 100vh);
+}
+.lv2-scene--proof {
+  min-height: 80vh;
+}
+
+/* ============================================================ grid */
+
+.lv2-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 24px;
+}
+
+/*
+  Editorial Split (§7): text 4 columns, visual 8. Expressed as a two-track grid rather than as
+  spans inside .lv2-grid, because that is one rule instead of three and the text column lands
+  8px narrower than a true 4-of-12 -- a difference no reader can see. Stacked below 1200, where
+  a 4-column text block is about 260px and has stopped being a column.
+*/
+.lv2-split {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1200px) {
+  .lv2-split {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  }
+}
+
+/* ============================================================ radius by material */
+
+/*
+  §34. Not everything is a 22px rounded card. The radius says what the object is made of: a
+  document has the corner of a printed page, a panel is an instrument, a scene is a slab. Pills
+  (--r-full) stay where they already are -- status chips and buttons -- and nowhere else.
+*/
+.lv2-document { border-radius: var(--radius-sm); }
+.lv2-panel { border-radius: var(--radius-md); }
+.lv2-stage { border-radius: var(--radius-lg); }
+
+/* ============================================================ focus */
+
+/*
+  The site-wide ring is mint (`:focus-visible` in tavonel.css). It cannot be the ring here: mint
+  on --paper-50 is 1.43:1, which is not a focus indicator, it is a rumour of one. Blue is the
+  landing's ring on dark (8.03:1 on --ink-950) and the ink colour is the ring on paper (17.6:1).
+  Two colours, both measured, neither decorative.
+*/
+.lv2 a:focus-visible,
+.lv2 button:focus-visible,
+.lv2 summary:focus-visible,
+.lv2 [tabindex]:focus-visible {
+  outline: 2px solid var(--source);
+  outline-offset: 2px;
+}
+/*
+  .lv2-paper already remaps --source to the paper sibling, so this would be legible either way.
+  It is the ink colour rather than the blue because a focus ring on a document should read as the
+  page's own mark, and because at 17.6:1 there is no argument about whether it is visible.
+*/
+.lv2-paper a:focus-visible,
+.lv2-paper button:focus-visible,
+.lv2-paper summary:focus-visible,
+.lv2-paper [tabindex]:focus-visible {
+  outline-color: var(--text-on-paper);
+}
+
+/* ============================================================ reduced motion */
+
+/*
+  §26. Every timed thing on this landing either reads a --motion-* token or runs a keyframe
+  animation, so both are handled here once and no scene writes its own reduced-motion block.
+
+  Animations are collapsed, not stopped: 1ms and a single iteration leaves the last keyframe on
+  screen, which is the static complete state the guardrail asks for. A paused animation would
+  leave the first frame, and `animation: none` would leave whatever the element looked like
+  before the beat ran -- a source page that never arrives.
+
+  Transitions are capped at 120ms and narrowed to opacity, so a hover or focus still confirms
+  itself and nothing travels. There is deliberately no blanket `transform: none`: that would also
+  cancel the static transforms that position things, and the requirement is that motion stops,
+  not that layout collapses. Camera and node travel are removed at their source -- by the scene
+  rules that would otherwise animate a transform -- and this block is what makes those animations
+  land on their final frame instead of their first.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .lv2 {
+    --motion-fast: 1ms;
+    --motion-ui: 1ms;
+    --motion-med: 1ms;
+    --motion-scene: 1ms;
+  }
+  .lv2 *,
+  .lv2 *::before,
+  .lv2 *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity !important;
+    transition-duration: 120ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+/* ============================================================================================
+   SCENES -- the nine sections (D9, §9, §24)
+   ============================================================================================ */
+
+/*
+  Every scene is the same five things: a label, a heading, one paragraph, an optional qualifier,
+  and one thing to do next. The composition differs; the shape does not, which is what makes the
+  page read as a slide deck rather than as nine one-off layouts (§24).
+*/
+.lv2-scene-head { max-width: 72ch; }
+.lv2-split .lv2-scene-head { max-width: none; }
+
+/*
+  The eyebrow names the scene's subject; it never restates the heading under it, which is the
+  shape BQ-099 deleted nineteen of. Mono and tracked, because on this landing mono is the voice
+  of a label rather than of prose.
+*/
+.lv2-eyebrow {
+  margin: 0 0 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mid);
+}
+
+/* One sentence per line. Both lines are the heading; the second is set apart, not set smaller. */
+.lv2-h2 { margin: 0; }
+.lv2-h2-line { display: block; }
+.lv2-h2-accent { color: var(--text-mid); }
+/* D3: the serif is allowed on the H1's accent phrase and on the §16 manifesto line. Nowhere else. */
+.lv2-h2-accent.lv2-serif { color: var(--text-hi); }
+
+.lv2-scene-support { margin: 24px 0 0; color: var(--text-mid); max-width: 64ch; }
+.lv2-scene-note { margin: 16px 0 0; color: var(--text-lo); max-width: 72ch; }
+
+/*
+  One next action per scene (§39). A text link with a rule under it rather than a second button:
+  §29 gives this page exactly one filled control per viewport, and a page of buttons is a page
+  with no hierarchy.
+*/
+.lv2-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: var(--lv2-small);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-hi);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hairline-hi);
+  transition: text-decoration-color var(--motion-ui) var(--ease-ui);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lv2-text-link:hover { text-decoration-color: var(--source); }
+}
+.lv2-scene-next { margin-top: 28px; }
+
+/*
+  Scene 08's four proofs (§18), as a list rather than as four cards.
+
+  §7 cuts the card-inside-a-card pattern and §18 allows this scene the site's only border-heavy
+  treatment, so the border is one rule per proof rather than a box around each: a rule, a label,
+  a sentence. Two columns from 900 up because the four notes are one or two lines each and a
+  single 72ch column would run the scene past a viewport for no gain.
+
+  Tokens only, and `--hairline` because `.lv2-paper` remaps it to `--border-paper` -- the same
+  markup would read correctly if the ground alternation ever moved this scene to obsidian.
+*/
+.lv2-proof-list {
+  list-style: none;
+  margin: 36px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 24px;
+  max-width: 72ch;
+}
+@media (min-width: 900px) {
+  .lv2-proof-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 44px;
+    max-width: none;
+  }
+}
+.lv2-proof {
+  border-top: 1px solid var(--hairline);
+  padding-top: 14px;
+}
+.lv2-proof-label { margin: 0; font-weight: 500; color: var(--text-hi); }
+.lv2-proof-note { margin: 8px 0 0; color: var(--text-mid); }
+
+/*
+  The one filled control keeps its size on the landing (§32: CTA row h48). The colour is the
+  system's -- `.btn` paints `--text-hi` on `--ground` -- and the paper override below exists
+  because `.lv2-paper` remaps `--text-hi` to the ink, which would otherwise paint near-black
+  text on a near-black button the first time a lane puts an action on a paper scene.
+*/
+.lv2 .btn.lv2-cta { min-height: 48px; padding-inline: 22px; }
+.lv2-paper .btn { color: var(--paper-50); }
+
+/* ============================================================================================
+   HERO (§10, §11, §32, D11)
+   ============================================================================================ */
+
+/*
+  §32's 1440 canvas, as one grid. Text 520, gap 68, visual 708 -- which is 1296 exactly, so the
+  text column starts on the wrap's left edge (x72) and the visual starts at x660 and ends on the
+  wrap's right edge. Expressed as `fr` rather than as pixels so the same ratio holds from 1200 up
+  instead of leaving a gap that grows with the viewport.
+
+  Below 1200 the two stack and the demo recomposes as a vertical narrative (§25). There is no
+  intermediate state where the desktop demo is simply smaller; a 708-wide composition at 900px is
+  the shrunken hero §25 forbids.
+*/
+.lv2-hero { padding-block: 96px 72px; }
+.lv2-hero-grid { display: grid; gap: 48px; align-items: start; }
+
+@media (min-width: 768px) {
+  .lv2-hero { padding-block: 128px 96px; }
+}
+@media (min-width: 1200px) {
+  .lv2-hero { padding-block: 170px 96px; }
+  .lv2-hero-grid { grid-template-columns: minmax(0, 520fr) minmax(0, 708fr); gap: 68px; }
+}
+
+.lv2-hero-text { min-width: 0; }
+
+/*
+  THE HEADLINE SIZE IS THE ONE PLACE §32 IS OVERRIDDEN, AND THIS IS THE ARITHMETIC.
+
+  §32 asks for 82px in a 510px measure, and §6 caps the hero headline at 2.2 lines. With this
+  headline the two are not both reachable: "Traceable to every source." sets about 11em wide at
+  this tracking, so one line of it needs roughly 890px at 82px, and a 510px measure holds one
+  line only up to about 46px. The 2.2-line rule is the published QA gate and §11.1's own drawing
+  puts the headline on two lines inside the text column, so the measure wins and the size
+  follows it. Raising the size instead would produce a five-line hero at 1440.
+
+  The size itself now lives on `--lv2-display` at the top of this file, so the amended scale and
+  the element that sets it are one declaration instead of two that disagreed. Only the optical
+  settings step per breakpoint.
+
+  Each sentence is its own block, so the break is a decision rather than a wrap that a font
+  update can move onto a third line.
+*/
+.lv2-hero-h1 {
+  margin: 0;
+  font-size: var(--lv2-display);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  max-width: 510px;
+}
+@media (min-width: 768px) {
+  .lv2-hero-h1 { line-height: 0.98; letter-spacing: -0.04em; }
+}
+@media (min-width: 1200px) {
+  .lv2-hero-h1 { line-height: 0.96; letter-spacing: -0.045em; }
+}
+.lv2-h1-line { display: block; }
+/* The serif runs optically larger than the sans at the same em and sits a hair high; both are
+   corrected here rather than by choosing a rounder number for the headline. */
+.lv2-hero-h1 .lv2-serif { font-size: 1.04em; line-height: 0.9; }
+
+.lv2-hero-support {
+  margin: 24px 0 0;
+  font-size: 19px;
+  line-height: 30px;
+  max-width: 500px;
+  color: var(--text-mid);
+}
+
+/* §32: CTA row mt32 h48, meta row mt24. */
+.lv2-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin-top: 32px; }
+.lv2-hero-intake { margin: 24px 0 0; color: var(--text-lo); max-width: 500px; }
+
+/* ============================================================================================
+   HERO DEMO (§11.2, §28, D11) -- DOM and CSS, no canvas, no video, no SVG
+   ============================================================================================ */
+
+.lv2-demo { min-width: 0; }
+.lv2-demo-label { margin: 0 0 12px; color: var(--text-lo); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/*
+  Below 1200 the stage is a column: source page, evidence line, compiled claim, the objects it
+  connects to, the snapshot step, the comparison, the answer. That is §25's vertical narrative in
+  the order the beats run, and it is also the DOM order -- so the desktop composition further
+  down is a set of positions laid over a document that already reads correctly without them.
+*/
+.lv2-demo-stage { position: relative; display: grid; gap: 20px; justify-items: start; }
+
+.lv2-demo-foot { display: flex; align-items: center; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+
+/*
+  The eight beats as text, stacked in one slot with one visible at a time. The stack is what keeps
+  the row height constant while the sentence changes; the reduced-motion block at the end of this
+  file unstacks it into a list, which is the complete state §26 asks for when movement is what
+  carries the information.
+*/
+.lv2-demo-captions {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 0;
+  /*
+    The box is reserved in the captions' own units, not the inherited ones.
+
+    `min-height: 3.2em` was 3.2 x the inherited 16px = 51px, while a caption sets at
+    --lv2-small / 1.45 -- so a three-line beat sentence grew the row after first paint and the QA
+    round measured it as the 1440 layout shift (CLS 0.02, sources OL.lv2-demo-captions and
+    LI.lv2-demo-caption). Three of its own lines is the tallest beat this deck has, and reserving
+    exactly that makes the shift zero rather than small.
+  */
+  font-size: var(--lv2-small);
+  line-height: 1.45;
+  min-height: calc(3 * 1.45em);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lv2-demo-caption { position: absolute; inset: 0; margin: 0; color: var(--text-mid); opacity: 0; }
+/* The last beat is the resting state: it is what is on screen through the two-second hold. */
+.lv2-cap-8 { opacity: 1; }
+
+.lv2-demo-control {
+  order: -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-hi);
+  font-family: var(--f-mono);
+  font-size: var(--lv2-meta);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color var(--motion-ui) var(--ease-ui);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lv2-demo-control:hover { border-color: var(--source); }
+}
+/* Two bars while it is playing (press to pause), one triangle while it is paused. Shape, not
+   colour, and the label beside it says the same thing in words. */
+.lv2-demo-control-glyph {
+  width: 10px;
+  height: 11px;
+  border-left: 3px solid currentColor;
+  border-right: 3px solid currentColor;
+}
+.lv2-demo[data-playing="0"] .lv2-demo-control-glyph {
+  width: 0;
+  height: 0;
+  border-left: 9px solid currentColor;
+  border-right: 0;
+  border-block: 6px solid transparent;
+}
+
+/* ------------------------------------------------------------------ the source page and region */
+
+.lv2-src { margin: 0; display: grid; gap: 10px; max-width: 320px; }
+/*
+  The metadata reads before the page, the way a filing's own header does and the way the product's
+  evidence pane puts the record above the render. It is also what keeps the page's lower edge free
+  for the compiled claim to sit over in the desktop composition.
+*/
+.lv2-src-meta { display: grid; gap: 4px; order: -1; }
+.lv2-src-noun, .lv2-src-unit { color: var(--text-lo); }
+.lv2-src-id { color: var(--text-mid); }
+/*
+  The §4.1 signature label wraps; it is never ellipsised.
+
+  It read `SOURCE · 10-K · p.4 · [30,291 → …` at 1440 and 1280, which is the one string on this
+  page whose whole job is to state a coordinate -- a receipt cut off before its figures is not a
+  receipt, and the full value being in a `title` attribute means a reader with no pointer never
+  reaches it. Breaks land on the ` · ` separators, so a wrapped label is still four fields.
+*/
+.lv2-region-label { color: var(--text-mid); }
+
+.lv2-page { position: relative; display: block; overflow: hidden; box-shadow: var(--lv2-paper-shadow); }
+.lv2-page-img { display: block; width: 100%; height: auto; }
+
+/* §22: 1px Source Blue on the box, a 4-7% fill behind it, and nothing else drawn on the page. */
+.lv2-region { position: absolute; border: 1px solid var(--source); border-radius: 2px; }
+.lv2-region::before { content: ""; position: absolute; inset: 0; background: var(--source); opacity: 0.06; }
+
+/* ------------------------------------------------------------------------- the evidence line */
+
+/*
+  §4.1. One hairline, one meaning. Vertical by default -- source region above, compiled object
+  below -- and the relation variant runs horizontally from the filing to the objects it connects.
+  `scaleY` from the top is the whole of the draw; there is no path length to keep in step with
+  the layout around it.
+*/
+.lv2-line {
+  display: block;
+  width: 1px;
+  height: 36px;
+  margin-left: 40px;
+  background: var(--source);
+  transform-origin: top;
+}
+.lv2-line--relation { background: var(--relation); }
+/* In the column layout the objects hang off the filing directly and the group's own rule says so. */
+.lv2-line--rel { display: none; }
+
+/* ------------------------------------------------------------------------- the compiled claim */
+
+.lv2-claim {
+  display: grid;
+  gap: 10px;
+  max-width: 420px;
+  padding: 16px 18px;
+  border: 1px solid var(--hairline-hi);
+  background: var(--ink-900);
+  color: var(--text-hi);
+  text-decoration: none;
+  transition: border-color var(--motion-ui) var(--ease-ui);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lv2-claim:hover { border-color: var(--source); }
+}
+.lv2-claim-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--text-lo); }
+.lv2-claim-kind { text-transform: uppercase; letter-spacing: 0.08em; }
+/* Colour is never the carrier: the dot is beside the word, and the word is the World's own. */
+/*
+  The dot takes its colour from the state, not from the tone of the sentence around it.
+  `candidate` is this deterministic public sample's state -- PUBLISHED SAMPLE -- and it is
+  deliberately NOT mint: §5.2 fixes mint to "verified", and a sample nobody has verified painted
+  in the verified colour is the exact drift the semantic table exists to stop.
+*/
+.lv2-claim-state { display: inline-flex; align-items: center; gap: 7px; color: var(--text-mid); }
+.lv2-claim-state[data-state="current"] { color: var(--verified); }
+.lv2-claim-state[data-state="changed"] { color: var(--changed); }
+.lv2-claim-state[data-state="unresolved"] { color: var(--unresolved); }
+.lv2-claim-state i { width: 6px; height: 6px; border-radius: var(--r-full); background: currentColor; }
+.lv2-claim-text { font-size: 14px; line-height: 1.55; color: var(--text-mid); }
+
+/* --------------------------------------------------------------------------- the bound objects */
+
+/*
+  The relations leave the filing, not the claim (`lib/landing-v2-hero.ts`). The group names the
+  node they leave once, the violet rule down its edge is the relation's colour, and each row
+  carries its predicate in words as well as in that colour.
+*/
+.lv2-nodes { display: grid; gap: 10px; padding-left: 16px; border-left: 1px solid var(--relation); max-width: 260px; }
+.lv2-nodes-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.lv2-node {
+  display: grid;
+  gap: 3px;
+  padding: 9px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--ink-850);
+  text-decoration: none;
+  transition: border-color var(--motion-ui) var(--ease-ui);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lv2-node:hover { border-color: var(--relation); }
+}
+.lv2-node-label { font-size: 14px; line-height: 1.35; font-weight: 500; color: var(--text-hi); }
+.lv2-node-meta { color: var(--text-lo); }
+/* Which node the relation leaves. It reads quieter than the predicate but it is on every row. */
+.lv2-node-via { color: var(--text-lo); }
+.lv2-node-rel { color: var(--relation); font-weight: 400; }
+
+/* ---------------------------------------------------------------------------- the snapshot step */
+
+.lv2-revision {
+  display: grid;
+  gap: 8px;
+  max-width: 300px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  background: var(--ink-900);
+}
+.lv2-revision-step { display: grid; gap: 4px; margin: 0; color: var(--text-mid); }
+.lv2-revision-arrow { color: var(--text-lo); }
+.lv2-revision-after { color: var(--text-hi); }
+.lv2-revision-title { margin: 0; color: var(--text-lo); text-transform: uppercase; letter-spacing: 0.08em; }
+.lv2-revision-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+/* Amber is the arrival colour (§5.2); the form and the date beside it are what it means. */
+.lv2-revision-list li { display: flex; align-items: center; gap: 8px; color: var(--changed); }
+.lv2-revision-list i { width: 5px; height: 5px; background: currentColor; flex: none; }
+
+/* ------------------------------------------------------------------------ the comparison counts */
+
+/*
+  Four figures, each printed with the noun that says what it counts (contract rule 4). Rebuilt
+  crosses from amber to mint over its beat, because that is the state change the comparison
+  reports; added is mint, and untouched and removed are grey because neither is a state change.
+*/
+.lv2-counts { display: grid; gap: 8px; max-width: 440px; }
+/* The noun the four figures count, above them. Without it they are four numbers of nothing. */
+.lv2-counts-title { margin: 0; color: var(--text-lo); text-transform: uppercase; letter-spacing: 0.08em; }
+.lv2-counts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+.lv2-count { display: grid; gap: 2px; }
+.lv2-count b { font-size: 20px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums; }
+.lv2-count span { color: var(--text-lo); }
+.lv2-count--rebuilt b { color: var(--verified); }
+.lv2-count--added b { color: var(--verified); }
+.lv2-count--removed b { color: var(--text-mid); }
+.lv2-count--untouched b { color: var(--text-mid); }
+
+/* ---------------------------------------------------------------------------------- the answer */
+
+.lv2-ask {
+  display: grid;
+  gap: 8px;
+  max-width: 440px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  background: var(--ink-900);
+}
+.lv2-ask-q { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-hi); }
+.lv2-ask-cite { margin: 0; color: var(--source); }
+
+/* ============================================================================================
+   THE DESKTOP COMPOSITION (>= 1200) -- §32's 708-wide canvas
+   ============================================================================================ */
+
+/*
+  REWRITTEN 2026-09-19 (fix round 2, QA P0 "hero demo composition"). WHY IT IS A GRID NOW.
+
+  The first implementation laid the seven panels out as percentages of a 708 x 600 box. That is
+  exactly the layout technique that cannot promise anything about the boxes it positions: a
+  percentage knows where an element starts and nothing about how tall its content is, so four
+  pairs intersected at 1440 -- the claim card over the source page, the counts and the objects
+  list, the revision panel over the objects. §39's gate is "text overlap 0", and a composition
+  that can only be checked by screenshotting it is a composition that will overlap again the
+  first time a filing label, an excerpt or a count label changes length.
+
+  A grid cannot overlap. Rows and columns size to their content, so the arrangement below holds
+  for any excerpt length, any locale and any font fallback, and the 1440 screenshot stops being
+  the only thing that knows whether the hero is correct.
+
+  THE ARRANGEMENT, and it is still §11.1's
+    left column   the source page with its metadata, the evidence line, then the compiled claim
+                  it was read into -- §11.1's own vertical reading, top to bottom
+    gutter        the relation connector: it leaves the filing on the left and reaches the
+                  objects on the right, which is the one thing that line is allowed to mean
+    right column  the snapshot step, the objects the filing connects to, the comparison and the
+                  answer
+
+  THE HEIGHT, and where §32's 600 went
+  §32 draws the visual as 708 x 600. Seven real panels -- a letter-proportioned page render, a
+  four-field caption, a quoted passage, three object rows, four filings, four figures and an
+  answer -- do not fit 600px at a legible size, which is what the overlap was. The stage
+  therefore sizes to its content and the hero scene grows with it; `min-height` on the hero is
+  unchanged, so D9's 92-100vh floor still holds. Shrinking the content to reach 600 instead
+  would mean a smaller source page, and the source page is the proof.
+*/
+@media (min-width: 1200px) {
+  .lv2-demo-stage {
+    display: grid;
+    width: 100%;
+    /* 312 + 12 + 20 + 12 + 352 = 708: §32's canvas width, with the connector's gutter in it. */
+    grid-template-columns: minmax(0, 312fr) 20px minmax(0, 352fr);
+    grid-template-areas:
+      "src   .     revision"
+      "src   rel   nodes"
+      "line  .     nodes"
+      "claim claim counts"
+      "claim claim ask";
+    align-items: start;
+    justify-items: stretch;
+    gap: 20px 12px;
+  }
+  .lv2-demo-stage > * { margin: 0; }
+
+  .lv2-src { grid-area: src; max-width: none; }
+  .lv2-line { grid-area: line; margin-left: 40px; }
+  .lv2-claim { grid-area: claim; max-width: none; }
+  .lv2-revision { grid-area: revision; max-width: none; }
+  .lv2-nodes { grid-area: nodes; max-width: none; }
+  /* The relation connector: the filing on the left, the objects it reaches on the right. */
+  .lv2-line--rel {
+    display: block;
+    grid-area: rel;
+    width: 100%;
+    height: 1px;
+    margin-left: 0;
+    align-self: center;
+    transform-origin: left;
+  }
+  .lv2-counts { grid-area: counts; max-width: none; }
+  .lv2-ask { grid-area: ask; max-width: none; }
+
+  /*
+    §22: a 1-2 degree perspective, on the hero page only. Any more and a real document starts to
+    look like a rendering of one, which is the thing §21 exists to prevent.
+  */
+  .lv2-src .lv2-page { transform: perspective(1600px) rotateY(-1.4deg); }
+}
+
+/* ============================================================================================
+   THE SEQUENCE (§11.2) -- one 16s timeline, 14s of beats and a 2s hold
+   ============================================================================================ */
+
+/*
+  Percentages are seconds over sixteen. Every element's base style is its finished state and its
+  keyframes hide it and bring it back, which is what makes the reduced-motion collapse at the top
+  of this file land on a composed hero rather than on an empty one.
+*/
+.lv2-demo-stage > *,
+.lv2-demo-caption {
+  animation-duration: 16s;
+  animation-iteration-count: infinite;
+  animation-timing-function: var(--ease-scene);
+}
+.lv2-src { animation-name: lv2-b-source; }
+.lv2-region { animation: lv2-b-read 16s var(--ease-scene) infinite; }
+.lv2-line { animation-name: lv2-b-line; }
+.lv2-claim { animation-name: lv2-b-compile; }
+.lv2-nodes { animation-name: lv2-b-structure; }
+.lv2-line--rel { animation-name: lv2-b-rel; }
+.lv2-claim-state { animation: lv2-b-verify 16s var(--ease-scene) infinite; }
+.lv2-revision { animation-name: lv2-b-change; }
+.lv2-counts { animation-name: lv2-b-recompile; }
+.lv2-count--rebuilt b { animation: lv2-b-rebuilt 16s var(--ease-scene) infinite; }
+.lv2-ask { animation-name: lv2-b-use; }
+
+.lv2-cap-1 { animation-name: lv2-cap-1; }
+.lv2-cap-2 { animation-name: lv2-cap-2; }
+.lv2-cap-3 { animation-name: lv2-cap-3; }
+.lv2-cap-4 { animation-name: lv2-cap-4; }
+.lv2-cap-5 { animation-name: lv2-cap-5; }
+.lv2-cap-6 { animation-name: lv2-cap-6; }
+.lv2-cap-7 { animation-name: lv2-cap-7; }
+.lv2-cap-8 { animation-name: lv2-cap-8; }
+
+/*
+  §23: the loop never disturbs reading. It stops while a pointer is over the demo, while focus is
+  inside it, and whenever the reader says so -- and the control's label reports which it is.
+*/
+.lv2-demo[data-playing="0"] *,
+.lv2-demo:hover *,
+.lv2-demo:focus-within * { animation-play-state: paused; }
+
+/* 0.0-1.2s -- the filing arrives. */
+@keyframes lv2-b-source { 0% { opacity: 0; transform: translateY(12px); } 7.5%, 100% { opacity: 1; transform: none; } }
+/* 1.2-2.4s -- one region of one page is read. No scanning beam (§11.2). */
+@keyframes lv2-b-read { 0%, 7.5% { opacity: 0; } 15%, 100% { opacity: 1; } }
+/* 2.4-4.0s -- the evidence line draws, then the claim arrives bound to the region. */
+@keyframes lv2-b-line { 0%, 15% { transform: scaleY(0); } 25%, 100% { transform: scaleY(1); } }
+@keyframes lv2-b-compile { 0%, 15% { opacity: 0; transform: scale(0.985); } 25%, 100% { opacity: 1; transform: scale(1); } }
+/* 4.0-5.8s -- the objects the compiler bound to the same filing. Nothing moves at random. */
+@keyframes lv2-b-structure { 0%, 25% { opacity: 0; } 36.25%, 100% { opacity: 1; } }
+@keyframes lv2-b-rel { 0%, 25% { transform: scaleX(0); } 36.25%, 100% { transform: scaleX(1); } }
+/* 5.8-7.2s -- the state the World gives the object, named in words beside its dot. */
+@keyframes lv2-b-verify { 0%, 36.25% { opacity: 0; } 45%, 100% { opacity: 1; } }
+/* 7.2-9.5s -- later filings arrive. They arrived; nothing was revised (contract rule 7). */
+@keyframes lv2-b-change { 0%, 45% { opacity: 0; transform: translateY(6px); } 59.375%, 100% { opacity: 1; transform: none; } }
+/* 9.5-11.5s -- the comparison between two complete compiles, with what each figure counts. */
+@keyframes lv2-b-recompile { 0%, 59.375% { opacity: 0; } 71.875%, 100% { opacity: 1; } }
+@keyframes lv2-b-rebuilt {
+  0%, 59.375% { opacity: 0; color: var(--changed); }
+  65% { opacity: 1; color: var(--changed); }
+  71.875%, 100% { opacity: 1; color: var(--verified); }
+}
+/* 11.5-14s -- a prepared question, answered out of the region it cites. Then the hold. */
+@keyframes lv2-b-use { 0%, 71.875% { opacity: 0; transform: translateY(6px); } 87.5%, 100% { opacity: 1; transform: none; } }
+
+@keyframes lv2-cap-1 { 0%, 6% { opacity: 1; } 7.5%, 100% { opacity: 0; } }
+@keyframes lv2-cap-2 { 0%, 6% { opacity: 0; } 7.5%, 13.5% { opacity: 1; } 15%, 100% { opacity: 0; } }
+@keyframes lv2-cap-3 { 0%, 13.5% { opacity: 0; } 15%, 23.5% { opacity: 1; } 25%, 100% { opacity: 0; } }
+@keyframes lv2-cap-4 { 0%, 23.5% { opacity: 0; } 25%, 34.75% { opacity: 1; } 36.25%, 100% { opacity: 0; } }
+@keyframes lv2-cap-5 { 0%, 34.75% { opacity: 0; } 36.25%, 43.5% { opacity: 1; } 45%, 100% { opacity: 0; } }
+@keyframes lv2-cap-6 { 0%, 43.5% { opacity: 0; } 45%, 57.875% { opacity: 1; } 59.375%, 100% { opacity: 0; } }
+@keyframes lv2-cap-7 { 0%, 57.875% { opacity: 0; } 59.375%, 70.375% { opacity: 1; } 71.875%, 100% { opacity: 0; } }
+@keyframes lv2-cap-8 { 0%, 70.375% { opacity: 0; } 71.875%, 100% { opacity: 1; } }
+
+/* ============================================================================================
+   THE SIGNATURE INTERACTION (§4.1)
+   ============================================================================================ */
+
+/*
+  Hover or focus a compiled object and the line to its source is drawn in full, the region it was
+  read from is ringed, and the mono label naming that region reads in the source colour. Hovering
+  also pauses the loop (the rule above), so the reader is looking at a held frame rather than at
+  a beat that is about to move.
+
+  `:has()` is the implementation; `[data-signature="1"]` is the same state written by
+  `hero-compiler-demo.tsx` for engines without it, and that file registers no listener at all
+  where `:has()` is supported. `!important` is load-bearing here for the only reason it ever is:
+  an author declaration outranks a running animation, and these three properties are animated.
+*/
+.lv2-demo:has(:is(.lv2-claim, .lv2-node):is(:hover, :focus-visible)) .lv2-line,
+.lv2-demo[data-signature="1"] .lv2-line { transform: scaleY(1) !important; }
+
+.lv2-demo:has(:is(.lv2-claim, .lv2-node):is(:hover, :focus-visible)) .lv2-region,
+.lv2-demo[data-signature="1"] .lv2-region {
+  opacity: 1 !important;
+  outline: 2px solid var(--source);
+  outline-offset: 2px;
+}
+
+.lv2-demo:has(:is(.lv2-claim, .lv2-node):is(:hover, :focus-visible)) .lv2-region-label,
+.lv2-demo[data-signature="1"] .lv2-region-label { color: var(--source); }
+
+/* ============================================================================================
+   REDUCED MOTION (§26) -- the complete state, stated
+   ============================================================================================ */
+
+/*
+  The block at the top of this file collapses every animation here to 1ms and one iteration, and a
+  finished animation with the default fill mode reverts each element to its base style -- which is
+  the composed hero. What that leaves wrong is the caption stack, where seven of the eight base
+  styles are "hidden": a reader who is not being shown the sequence would get its last sentence
+  and none of the seven before it. So the stack becomes a list and the whole story is on the page
+  at once, and the page stops tilting the document it is showing.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .lv2-demo-captions { position: static; min-height: 0; display: grid; gap: 6px; }
+  .lv2-demo-caption { position: static; inset: auto; opacity: 1; }
+  .lv2-demo-foot { align-items: flex-start; }
+  .lv2-src .lv2-page { transform: none; }
+}
+
+/* ============================================================================================
+   KOREAN (D12) -- the one typographic difference between the two entry pages
+   ============================================================================================ */
+
+/*
+  Hangul does not want the tracking a Latin display face is given at this size, and it has no
+  italic. `app/one-path.css` carried this as `.one-path-ko h1`; the class went with the old
+  landing, so the rule follows the `lang` attribute `LandingPage` sets instead -- which is also
+  what the word-break pair left in that sheet keys on.
+
+  The serif accent is absent rather than restyled on this page: `hero-statement.tsx` passes no
+  accent phrase when the locale is Korean, because Instrument Serif has no Hangul and a synthetic
+  oblique of the fallback face is a browser guessing rather than an editorial decision.
+*/
+.lv2[lang="ko"] .lv2-hero-h1,
+.lv2[lang="ko"] .lv2-h2 { letter-spacing: -0.012em; }
+
+/*
+  AND THE KOREAN HEADLINE SETS SMALLER, BECAUSE IT IS LONGER (fix round 2, QA P0 "Korean H1").
+
+  D12 makes the Korean H1 the literal translation of `BRAND_LINE.headline`, and shortening it is
+  a founder call rather than a lane's. What a lane can decide is the size the translation is set
+  at. The measured arithmetic: the longer of its two sentences advances about 13.3em at this
+  tracking -- Hangul syllables are close to a full em each -- so the 510px measure §32 fixes for
+  the H1 holds one line of it only up to about 38px. At the English size (46px at 1440) each
+  sentence wrapped, and the QA round measured four lines against §6's cap of 2.2.
+
+  Each step below is the size at which the longer sentence still fits the measure that step has:
+  36px against 510 at >=1200, 36px against the same 510 at tablet widths, and a viewport-relative
+  size on a phone, where the measure is the viewport rather than 510.
+
+  WHAT THIS DOES NOT FIX, AND WHY IT IS REPORTED RATHER THAN FORCED
+  At 360-430px the Korean headline still sets in three lines, not two: fitting both sentences on
+  one line each inside a 320px measure needs about 24px, which is no longer a headline. Two lines
+  on a phone needs shorter Korean copy, and that is D5's founder call.
+*/
+.lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(24px, 7.2vw, 30px); }
+@media (min-width: 768px) {
+  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(30px, 4.4vw, 36px); }
+}
+@media (min-width: 1200px) {
+  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(28px, 2.5vw, 36px); }
+}

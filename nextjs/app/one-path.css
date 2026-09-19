@@ -11,406 +11,31 @@
   and everything follows it afterwards.
 */
 
-/* ==================================================================== chrome: header and menu */
 
-/*
-  BQ-007. The desktop/phone switch moves from 1079px to 1249px.
+/* ============================================================== what the landing left behind
 
-  Between 1080 and 1250 the header was still rendering the full desktop row -- wordmark, state
-  line, three sections, the access action and the sign-in link -- into a bar that could not hold
-  it, so the lockup wrapped to "TAVO / NEL" and the action dropped onto a second line. A 170px
-  header with the brand broken in half, across the whole band a 13" laptop runs at.
+  Landing V2, 2026-09-19 (contract D1/D14, blueprint §35). The landing block is gone.
 
-  The rules are two classes deep on purpose: `app/tavonel.css` switches at 1079 with `.nav > nav`
-  (0,1,2) and `.mobile-primary-nav` (0,1,0), and these outrank both without that sheet being
-  edited by this lane.
+  What was here was the whole of the old entry page: `.one-path-home` and its five-step type
+  scale, the hero, the film frame and its note, the steps, the properties list, the in/out grid,
+  the close and the FAQ -- about 230 lines serving two routes that now render
+  `components/landing-v2/` against `app/landing-v2.css`. Nothing else referenced any of it;
+  `components/home-page-client.tsx` went with it.
+
+  Two rules survive because two things outside the landing still select them, and both were
+  grepped rather than assumed:
+
+  - `.one-path-wrap` is the wider measure `PublicSiteFooter`'s `onePath` prop asks for, and
+    `app/tavonel.css` styles `footer.site .one-path-wrap` as the flex column that footer needs.
+  - `.one-path-footer` is that same footer's padding.
+
+  `.one-path-workspace` below is unrelated to the landing and was never part of this block.
 */
-@media (max-width: 1249px) {
-  .nav > .one-path-primary-nav { display: none; }
-  .mobile-primary-nav.one-path-mobile-nav { display: block; }
-}
-@media (min-width: 1250px) {
-  .mobile-primary-nav.one-path-mobile-nav { display: none; }
-}
 
-.nav > .one-path-primary-nav { width: auto; min-width: 0; flex: 0 1 auto; gap: 10px; }
-/*
-  BQ-131. The brand mark, above the contrast floor.
-
-  `.wordmark` sets `--text-lo`, and `logomark.tsx` draws its two pages at 0.66 of it: 2.95:1 at
-  the 20px the header renders, under the 3:1 a graphical object needs, on the one element on the
-  page that is the brand. `--text-mid` with the mark's own opacity raised to 0.8 puts the pages
-  near 5.2:1 and leaves the thread -- the element A-06 keeps at full contrast -- above 6.
-*/
-.wordmark .logomark { color: var(--text-mid); }
-/*
-  BQ-060. One face and one size for every label in the header row.
-
-  The bar carried five type treatments at once -- a monospace wordmark, monospace 11px nav links,
-  a sans CTA, a 9.5px monospace state chip and a 13px sans sign-in link -- at control heights of
-  21 and 44px. That mix, and the two heights inside one `align-items: center` row, is what reads
-  as the misaligned baseline the founder photographed: nothing in the row shares a cap height, so
-  nothing lines up with anything.
-
-  The wordmark stays monospace. It is a lockup, and changing a lockup is the founder's call, not
-  a sweep's. Everything else is the page's own face at 14px in a 44px box.
-*/
-.one-path-primary-nav .site-nav-direct {
-  flex: 0 0 auto;
-  width: auto;
-  margin: 0;
-  min-height: 44px;
-  padding: 10px 14px;
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-  font-family: var(--f-sans);
-  font-size: var(--t-3, 14px);
-  letter-spacing: 0;
-  color: var(--text-mid);
-}
-@media (hover: hover) and (pointer: fine) {
-  .one-path-primary-nav .site-nav-direct:hover { color: var(--text-hi); }
-}
-.one-path-primary-nav .site-nav-direct[aria-current="page"] {
-  color: var(--text-hi);
-  text-decoration: underline;
-  text-decoration-color: var(--verified);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 7px;
-}
-/*
-  BQ-059. The phone sheet's own active state, keyed on the attribute the component sets.
-
-  `app/tavonel.css` styles `[aria-current="true"]`, and `customerNavOwns` sets `aria-current` to
-  `"page"` -- the only value the attribute takes on a link -- so that rule has never matched
-  anything and a reader in the menu could not tell which section they were already in.
-*/
-.one-path-mobile-nav .mobile-nav-direct {
-  display: flex;
-  align-items: center;
-  min-height: 48px;
-  font-family: var(--f-sans);
-  font-size: var(--t-3, 14px);
-  letter-spacing: 0;
-}
-.one-path-mobile-nav .mobile-nav-direct[aria-current="page"] {
-  color: var(--text-hi);
-  box-shadow: inset 2px 0 0 var(--verified);
-}
-/*
-  BQ-059. The one control that is the whole navigation on a phone, at a readable size.
-
-  It was 9.5px monospace caps -- under the site's 12px floor, in the instrument voice, for a
-  control that is neither an instrument nor a state. Same 44px box, the page's own face.
-*/
-.one-path-mobile-nav > summary {
-  min-width: 44px;
-  justify-content: center;
-  font: 500 var(--t-2, 13px) / 1.2 var(--f-sans);
-  letter-spacing: 0;
-  text-transform: none;
-}
-/*
-  Below 400px the header row holds four things: the wordmark (104px), this toggle, Request access
-  (109px) and Sign in (44px). With the word on screen the toggle is 76px and the row measures 379px
-  in a 360px viewport -- Sign in was clipped on every English route. The toggle becomes the 44px
-  square every phone reader knows; the word stays in the DOM as the control's name and is what a
-  screen reader announces. Open state turns the three bars into a cross.
-*/
-@media (max-width: 400px) {
-  .one-path-mobile-nav > summary {
-    position: relative;
-    width: 44px;
-    min-height: 44px;
-    padding: 0;
-  }
-  .one-path-mobile-nav > summary > span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-  .one-path-mobile-nav > summary::before,
-  .one-path-mobile-nav > summary::after,
-  .one-path-mobile-nav[open] > summary::after {
-    content: "";
-    position: absolute;
-    left: 13px;
-    top: 50%;
-    width: 16px;
-    height: 1.5px;
-    margin: 0;
-    background: currentColor;
-    color: var(--text-hi);
-    transition: transform .18s ease, box-shadow .18s ease;
-  }
-  .one-path-mobile-nav > summary::before { transform: translateY(-5.5px); box-shadow: 0 5px 0 currentColor; }
-  .one-path-mobile-nav > summary::after { transform: translateY(4.5px); }
-  .one-path-mobile-nav[open] > summary::before { transform: rotate(45deg); box-shadow: none; }
-  .one-path-mobile-nav[open] > summary::after { transform: rotate(-45deg); }
-  @media (prefers-reduced-motion: reduce) {
-    .one-path-mobile-nav > summary::before,
-    .one-path-mobile-nav > summary::after { transition: none; }
-  }
-}
-
-/* ================================================================================ the landing */
-
-/*
-  Landing replan, 2026-09-18. Five sections, one film, one equal grid.
-
-  The audits (`site-review-0915/reports/landing-0918/audit-visual.md`) measured nine type sizes,
-  twenty-nine spacing values and twenty-four full-width rules on the old page. This block scopes a
-  five-step type scale and a seven-step spacing ladder to the landing; the global `--t-*` tokens
-  are untouched because twenty-seven other routes read them. Every size below is one of these.
-*/
-.one-path-home {
-  --lp-display: clamp(40px, 4.5vw, 64px);
-  --lp-section: clamp(28px, 2.9vw, 40px);
-  --lp-lead: clamp(19px, 1.55vw, 22px);
-  --lp-body: 17px;
-  --lp-meta: 13px;
-  --sp-1: 8px; --sp-2: 16px; --sp-3: 24px; --sp-4: 40px; --sp-5: 64px; --sp-6: 104px; --sp-7: 160px;
-  background: var(--ground);
-  color: var(--text-hi);
-}
-/*
-  D33 / chrome-03 / chrome-04. One container, on all 27 routes: the same formula as `.shell`, so
-  the landing, its Korean twin and the other routes share one left edge with the header wordmark.
-*/
 .one-path-wrap {
   width: min(var(--shell-wide), calc(100% - 2 * var(--gutter, 30px)));
   margin-inline: auto;
   min-width: 0;
-}
-.one-path-home main > section { scroll-margin-top: 84px; }
-.one-path-home main > section:focus { outline: none; }
-
-/* --------------------------------------------------------------------------------------- hero */
-
-/* The header is 69px; 160px of top padding leaves the display line a full measure of air. */
-.one-path-hero { padding: calc(var(--sp-6) + var(--sp-2)) 0 var(--sp-5); }
-.one-path-intro { min-width: 0; max-width: 880px; }
-.one-path-home h1 {
-  font-size: var(--lp-display);
-  line-height: 1.02;
-  letter-spacing: -.035em;
-  font-weight: 500;
-  margin: 0 0 var(--sp-3);
-  text-wrap: balance;
-}
-.one-path-lede {
-  font-size: var(--lp-lead);
-  line-height: 1.5;
-  color: var(--text-mid);
-  max-width: 46ch;
-  margin: 0;
-}
-.one-path-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin: var(--sp-4) 0 0; }
-/* Scoped to the CTA rows: `.one-path-home` wraps the header too. */
-.one-path-home .one-path-actions .btn {
-  min-height: 48px;
-  display: inline-flex;
-  gap: 10px;
-  justify-content: center;
-  align-items: center;
-  font-size: 15px;
-  padding: 12px 22px;
-  border-radius: var(--r-inst, 6px);
-}
-/*
-  The deployment gate, as a sentence under the action it qualifies. No border, no panel: the
-  fact is the sentence, and a box around a sentence is one more rectangle on a page that had
-  thirty-three of them.
-*/
-.one-path-home .one-path-state {
-  margin: var(--sp-3) 0 0;
-  max-width: 68ch;
-  color: var(--text-mid);
-  font-size: var(--lp-meta);
-  line-height: 1.6;
-}
-/*
-  landing-08 / D34. One link contract on this page: --text-hi, weight 500, a persistent 1px
-  underline at a 5px offset in --hairline-hi that comes up to --text-hi on hover, and no glyph.
-  --verified is reserved for links that open a verification surface.
-*/
-.one-path-text-link, .one-path-links a, .one-path-io-col a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: var(--text-hi);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: var(--hairline-hi);
-  text-underline-offset: 5px;
-}
-@media (hover: hover) and (pointer: fine) {
-  .one-path-text-link:hover, .one-path-links a:hover, .one-path-io-col a:hover { text-decoration-color: var(--text-hi); }
-}
-/* landing-07. Inline prose links carry a non-colour cue as well as a colour cue. */
-.one-path-home main p > a:not(.btn):not(.one-path-text-link) {
-  color: var(--text-hi);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: var(--hairline-hi);
-  text-underline-offset: 3px;
-}
-@media (hover: hover) and (pointer: fine) {
-  .one-path-home main p > a:not(.btn):not(.one-path-text-link):hover { text-decoration-color: var(--text-hi); }
-}
-
-/* --------------------------------------------------------------------------------- the film */
-
-.one-path-hero-film { min-width: 0; margin-top: var(--sp-4); position: relative; }
-.one-path-hero-film .compile-film-sequence { width: 100%; max-width: 100%; min-width: 0; margin: 0; opacity: 1; transform: none; visibility: visible; }
-/* The recording is 16:10 at 2880x1800; the frame keeps its ratio rather than cropping it. */
-.one-path-home .compile-film-viewport {
-  position: relative;
-  aspect-ratio: 16 / 10;
-  min-height: 0;
-  height: auto;
-  width: 100%;
-  background: var(--g1);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-media, 12px);
-  overflow: hidden;
-}
-.one-path-home .compile-film-video, .one-path-home .compile-film-still, .one-path-home .compile-film-live { width: 100%; height: 100%; display: block; object-fit: contain; }
-.one-path-home .compile-film-stages { display: none; }
-.one-path-home .compile-film-caption { min-height: 0; padding: var(--sp-2) 0 0; display: flex; align-items: baseline; gap: 12px; }
-.one-path-home .compile-film-caption p { font-size: var(--lp-meta); line-height: 1.5; color: var(--text-mid); margin: 0; }
-.one-path-home .compile-film-inline-error { margin: 10px 0 0; color: var(--text-mid); font-size: var(--lp-meta); line-height: 1.5; }
-/* A one-stage strip has no count to show. */
-.one-path-home .compile-film-progress { display: none; }
-.one-path-home .compile-film-motion-control {
-  min-width: 44px;
-  min-height: 44px;
-  right: 12px;
-  bottom: 12px;
-  background: var(--g2);
-  color: var(--text-hi);
-  border: 1px solid var(--hairline-hi);
-  border-radius: var(--r-inst, 6px);
-  /* MED-20: above the analytics consent layer (z 55), so the one motion control is never buried under it. */
-  z-index: 56;
-}
-/* The qualification under the film: one sentence, at the meta size, in the mid ink. */
-.one-path-film-note { margin: var(--sp-3) 0 0; font-size: var(--lp-meta); line-height: 1.6; color: var(--text-mid); max-width: 92ch; }
-.one-path-film-note code { font-family: var(--f-mono); font-size: 1em; color: var(--text-mid); }
-
-/* ------------------------------------------------------------------------------- the sections */
-
-/* One boundary device: the hairline. No section grounds. */
-.one-path-section { padding: var(--sp-6) 0; border-top: 1px solid var(--hairline); }
-.one-path-section-heading { max-width: 820px; margin-bottom: var(--sp-5); }
-.one-path-section-heading h2 {
-  font-size: var(--lp-section);
-  line-height: 1.1;
-  font-weight: 500;
-  letter-spacing: -.02em;
-  margin: 0 0 var(--sp-3);
-  text-wrap: balance;
-}
-.one-path-section-heading > p:last-child { font-size: var(--lp-lead); line-height: 1.5; color: var(--text-mid); margin: 0; max-width: 56ch; }
-.one-path-links { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: var(--sp-4); }
-
-/*
-  Compile / Verify / Recompile. Three real frames of the /explore route, in a staggered layout:
-  frame left and copy right, then the reverse, then left again. This alternation is the page's
-  one rhythm device, and it is used only here.
-*/
-.one-path-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); }
-.one-path-step { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--sp-3); align-items: center; }
-.one-path-step .one-path-frame { grid-column: 1 / span 7; }
-.one-path-step .one-path-step-copy { grid-column: 8 / span 5; }
-.one-path-step[data-side="right"] .one-path-frame { grid-column: 6 / span 7; }
-.one-path-step[data-side="right"] .one-path-step-copy { grid-column: 1 / span 5; grid-row: 1; }
-.one-path-frame { margin: 0; min-width: 0; }
-.one-path-frame a { display: block; border-radius: var(--r-media, 12px); }
-.one-path-frame img, .one-path-frame picture { display: block; width: 100%; height: auto; }
-.one-path-frame img {
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-media, 12px);
-  background: var(--g1);
-}
-.one-path-frame figcaption { margin-top: var(--sp-2); font-size: var(--lp-meta); line-height: 1.5; color: var(--text-lo); }
-.one-path-step-copy h3 { margin: 0 0 var(--sp-2); font-size: var(--lp-lead); font-weight: 500; line-height: 1.3; }
-.one-path-step-copy p { margin: 0 0 var(--sp-2); font-size: var(--lp-body); line-height: 1.6; color: var(--text-mid); }
-
-/*
-  Compiler, not parser. No cards: a hanging list, label then sentence, one hairline per row.
-  The right third of the measure is left empty on purpose -- the page's one deliberate blank.
-*/
-.one-path-properties { margin: 0; max-width: 1080px; border-top: 1px solid var(--hairline-hi); }
-.one-path-properties > div { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 7fr); gap: var(--sp-3); padding: var(--sp-3) 0; border-bottom: 1px solid var(--hairline-hi); }
-.one-path-properties dt { margin: 0; font-size: var(--lp-body); font-weight: 500; line-height: 1.5; color: var(--text-hi); }
-.one-path-properties dd { margin: 0; font-size: var(--lp-body); line-height: 1.6; color: var(--text-mid); max-width: 60ch; }
-
-/* In and out. The one equal grid on the page, and the one code block. */
-.one-path-io-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; }
-.one-path-io-col h3 { margin: 0 0 var(--sp-1); font-size: var(--lp-lead); font-weight: 500; line-height: 1.3; }
-.one-path-io-col ul { list-style: none; margin: 0; padding: 0; }
-.one-path-io-col li { display: flex; flex-direction: column; align-items: flex-start; padding: var(--sp-3) 0; border-top: 1px solid var(--hairline-hi); }
-.one-path-io-col strong { font-size: var(--lp-body); font-weight: 500; line-height: 1.4; }
-.one-path-io-col span { margin: 6px 0 4px; font-size: 15px; line-height: 1.6; color: var(--text-mid); max-width: 38ch; }
-.one-path-code { margin: 0; min-width: 0; align-self: stretch; }
-.one-path-code figcaption { font-size: var(--lp-meta); color: var(--text-lo); margin: 0 0 var(--sp-2); line-height: 1.5; padding-top: 6px; }
-.one-path-code pre {
-  margin: 0;
-  padding: var(--sp-3);
-  background: var(--g1);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-inst, 6px);
-  font-family: var(--f-mono);
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text-hi);
-  overflow-x: auto;
-  white-space: pre;
-}
-.one-path-code code { font: inherit; }
-
-/* The close repeats the hero's actions and ends on one fact about how sources are handled. */
-.one-path-close .one-path-section-heading { margin-bottom: 0; }
-.one-path-close .one-path-section-heading h2 { font-size: clamp(32px, 3.4vw, 48px); }
-.one-path-fine { margin: var(--sp-4) 0 0; max-width: 80ch; font-size: var(--lp-meta); line-height: 1.6; color: var(--text-mid); }
-
-/* COPY-05: the audience, one sentence above the headline. Not an eyebrow: it adds a fact the headline lacks. Sentence case, no tracking. */
-.one-path-audience { margin: 0 0 var(--sp-2); font-size: var(--lp-meta); line-height: 1.5; color: var(--text-lo); }
-
-/* ---------------------------------------------------------------------- FAQ + plan disclosure */
-.one-path-faq { margin-top: var(--sp-5); max-width: 760px; }
-.one-path-faq h3 { margin: 0 0 var(--sp-2); font-size: var(--lp-lead); font-weight: 500; line-height: 1.3; }
-.one-path-plan-details { margin-top: var(--sp-4); max-width: 760px; border-bottom: 1px solid var(--hairline-hi); }
-.one-path-details { border-top: 1px solid var(--hairline-hi); }
-.one-path-faq .one-path-details:last-child { border-bottom: 1px solid var(--hairline-hi); }
-.one-path-details summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); min-height: 44px; padding: var(--sp-2) 0; font-size: var(--lp-body); font-weight: 500; line-height: 1.4; color: var(--text-hi); }
-.one-path-details summary::-webkit-details-marker { display: none; }
-.one-path-details summary::after { content: "+"; flex: none; color: var(--text-lo); font-weight: 400; }
-.one-path-details[open] summary::after { content: "\2212"; }
-.one-path-details > p { margin: 0 0 var(--sp-3); max-width: 68ch; font-size: var(--lp-body); line-height: 1.6; color: var(--text-mid); }
-.one-path-details > .one-path-text-link { margin-bottom: var(--sp-3); }
-
-/*
-  Desktop hero: one screen. Copy in the left five columns, the film in the right seven, so the
-  headline, the two actions, the gate sentence and the whole film sit inside a 900px fold. The
-  display size steps down for the narrower column; below 1100px the hero stacks as before.
-*/
-@media (min-width: 1100px) {
-  .one-path-home { --lp-display: clamp(44px, 3.7vw, 56px); }
-  .one-path-hero { padding: calc(var(--sp-5) + var(--sp-1)) 0 var(--sp-4); }
-  .one-path-hero .one-path-wrap { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--sp-4); row-gap: var(--sp-3); align-items: center; }
-  .one-path-hero .one-path-intro { grid-column: 1 / span 5; max-width: none; }
-  .one-path-hero .one-path-hero-film { grid-column: 6 / -1; margin-top: 0; }
-  .one-path-hero .one-path-film-note { grid-column: 6 / -1; margin-top: 0; }
 }
 
 .one-path-footer { padding-block: 48px 68px; }
@@ -470,44 +95,31 @@
 
   Korean keeps the pair the language needs -- `keep-all` so an eojeol stays whole, `break-word` so
   a single token wider than its column still cannot push the page sideways. Keyed on `:lang(ko)`
-  as well as the page class, so it follows the `lang="ko"` the /ko page sets rather than needing a
+  as the one key, so it follows the `lang="ko"` the /ko page sets rather than needing a
   new class on every future Korean surface.
 */
-.one-path-ko,
-.one-path-ko.one-path-home :is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label),
-.one-path-ko :is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label),
 :lang(ko):is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label),
 :lang(ko) :is(p, h1, h2, h3, h4, span, a, li, strong, b, em, dt, dd, summary, figcaption, label) {
   word-break: keep-all;
   overflow-wrap: break-word;
 }
-/* Korean does not need the tracking the Latin display face was given at this size. */
-.one-path-ko h1 { letter-spacing: -0.012em; }
+/* The Korean tracking override moved with the page: app/landing-v2.css sets it on .lv2[lang="ko"]. */
 
 /* ======================================================================== the film on a phone */
 
 /*
-  G1-012. Below 900px the film pans instead of shrinking. `compile-stage-player.tsx` carries why.
+  G1-012 / BQ-011. Below 900px the film pans instead of shrinking; compile-stage-player.tsx
+  carries why. The recording's width follows the frame's *height* and its own 16:10, so the frame
+  overflows and scroll-snap stops on one pane at a time. overscroll-behavior-x keeps the
+  browser's back-swipe out of it.
 
-  The recording's width follows the frame's *height* and its own 16:10, so the frame overflows by
-  roughly four column widths and `scroll-snap` stops on one pane at a time.
-  `overscroll-behavior-x: contain` keeps the browser's back-swipe out of it.
-
-  BQ-011 is the height and the affordance. At 412px the frame stood at `min(68svh, 600px)` and
-  showed 39% of the recording with nothing on screen saying it could be moved -- a reader saw one
-  crushed column and no reason to think there were three more. The reserve is smaller, so the
-  film and the sentence that qualifies it are in one viewport, and the line under the frame says
-  the frame moves.
+  Landing V2, 2026-09-19. Everything in this block that was scoped to .one-path-home went with
+  the landing -- the frame height, the pane width, the object-fit trio, the sticky motion control
+  and the two swipe captions. The landing plays no film at all now. What is left is the unscoped
+  pan, which is what /film and /film-2..4 use, and those routes are unchanged.
 */
 @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
-  /*
-    `.one-path-home .compile-film-viewport` above sets `overflow: hidden` with two classes, which
-    outranked this one-class rule: the frame never scrolled, the audit saw four panes past the
-    right edge, and a phone reader saw the first column only. Same specificity here, later in
-    the sheet, so the pan wins below 900px.
-  */
-  .compile-film-viewport,
-  .one-path-home .compile-film-viewport {
+  .compile-film-viewport {
     position: relative;
     overflow-x: auto;
     overflow-y: hidden;
@@ -516,91 +128,7 @@
   }
   .compile-film-panes { position: absolute; inset: 0 auto 0 0; display: flex; height: 100%; pointer-events: none; }
   .compile-film-panes > span { flex: 1 1 0; scroll-snap-align: start; }
-  .one-path-home .compile-film-viewport { aspect-ratio: auto; height: min(52svh, 460px); }
-  .one-path-home .compile-film-panes { width: calc(min(52svh, 460px) * 1.6); }
-  .one-path-home .compile-film-video,
-  .one-path-home .compile-film-still,
-  .one-path-home .compile-film-live {
-    width: auto;
-    height: 100%;
-    max-width: none;
-    aspect-ratio: 16 / 10;
-    object-fit: contain;
-  }
-  /*
-    The one motion control may not scroll out of the frame with the film -- and it may not push
-    the film out of the frame either.
-
-    landing-13: `position: sticky` is in flow, so the button stopped being the absolutely
-    positioned overlay it is above 900px and claimed an implicit 44px grid row of its own. The
-    frame's only explicit row is `minmax(0, 1fr)`, so the media lost exactly that 44px: a 460px
-    frame painted a 414px film top-aligned with a 46px empty band under it and the control
-    floating in the band. Placing it in row 1 alongside the media keeps the sticky pan behaviour
-    and gives the film the whole frame back.
-  */
-  .one-path-home .compile-film-motion-control {
-    position: sticky;
-    grid-area: 1 / 1;
-    align-self: end;
-    justify-self: start;
-    left: calc(100% - 56px);
-    margin-bottom: 12px;
-  }
-  /* The frame moves, so the page says so rather than leaving a reader to find out. */
-  .one-path-hero-film-v2::after,
-  .one-path-works-film::after {
-    content: "Swipe the frame to move across the film";
-    display: block;
-    margin-top: 10px;
-    font-size: var(--t-1, 12px);
-    line-height: 1.5;
-    color: var(--text-lo);
-  }
-  /* BQ-013: the works film carries the same caption, and it was only overridden on the hero. */
-  .one-path-ko .one-path-hero-film-v2::after,
-  .one-path-ko .one-path-works-film::after { content: "옆으로 밀어 영상을 이동하세요"; }
 }
 @media (min-width: 900px) {
   .compile-film-panes { display: none; }
 }
-
-/* G1-007. The derived support-tier line under the format chips. */
-.one-path-tier-note { color: var(--text-lo); font-size: var(--t-2, 13px); line-height: 1.6; }
-.one-path-tier-note a { color: var(--text-hi); }
-
-/* =================================================================================== narrower */
-
-@media (max-width: 1100px) {
-  .one-path-step .one-path-frame, .one-path-step[data-side="right"] .one-path-frame { grid-column: 1 / span 7; }
-  .one-path-step .one-path-step-copy, .one-path-step[data-side="right"] .one-path-step-copy { grid-column: 8 / span 5; }
-  .one-path-step[data-side="right"] .one-path-step-copy { grid-row: auto; }
-  .one-path-io-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .one-path-code { grid-column: 1 / -1; }
-}
-@media (max-width: 800px) {
-  .one-path-home { --sp-5: 40px; --sp-6: 64px; --sp-7: 100px; }
-  .one-path-hero { padding-bottom: var(--sp-5); }
-  .one-path-intro { margin-bottom: 0; }
-  .one-path-lede { max-width: 46ch; }
-  .one-path-section-heading { margin-bottom: var(--sp-4); }
-  .one-path-step, .one-path-step[data-side="right"] { display: block; }
-  .one-path-step .one-path-step-copy { margin-top: var(--sp-3); }
-  .one-path-properties > div { grid-template-columns: 1fr; gap: 6px; }
-  .one-path-io-grid { grid-template-columns: 1fr; gap: var(--sp-3); }
-  .one-path-io-col li { padding: var(--sp-2) 0; }
-  .one-path-io-col span { max-width: 52ch; }
-}
-@media (max-width: 480px) {
-  .one-path-home .one-path-actions { gap: 8px 20px; }
-  .one-path-home .one-path-actions .btn { width: 100%; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .one-path-home *, .one-path-home *::before, .one-path-home *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
-}
-
-/*
-  Touch floor for links that live inside running text on the landing page. A sentence link is
-  one line tall; the phone contract is 44px for every reachable control. The padding is paid
-  back with negative block margins so the paragraph keeps its rhythm and only the hit box grows.
-*/
-.one-path-home main p > a:not(.btn):not(.one-path-text-link) { display: inline-block; padding-block: 12px; margin-block: -12px; }

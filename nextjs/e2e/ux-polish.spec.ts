@@ -44,33 +44,21 @@ test("solution workflow is five complete steps with no orphan cell", async ({ pa
   await testInfo.attach("solution-polish", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("compilation film is autoplay-first without a blocking play control", async ({ page }) => {
-  await page.goto("/");
-  const frame = page.getByTestId("one-path-hero-film").locator(".compile-film-sequence");
-  await expect(frame).toBeVisible();
-  await expect(frame).toHaveAttribute("data-film-renderer", "video-fallback");
-  await expect(frame.locator(".compile-film-live canvas")).toHaveCount(0);
-  const video = frame.locator("video[data-active='1']");
-  await expect(video).toHaveCount(1);
-  const media = await video.evaluate((element: HTMLVideoElement) => ({ autoplay: element.autoplay, muted: element.muted, inline: element.playsInline, controls: element.controls, rate: element.playbackRate }));
-  expect(media.autoplay).toBe(true);
-  expect(media.muted).toBe(true);
-  expect(media.inline).toBe(true);
-  expect(media.controls).toBe(false);
-  expect(media.rate).toBeGreaterThanOrEqual(1);
-  /*
-    film-01 -- the control is always rendered now, and says which of three things it does.
+/*
+  Landing V2, 2026-09-19. The autoplay-first film case is deleted rather than retargeted.
 
-    What this case is about is unchanged: on a default browser the film starts by itself and
-    nothing blocks the frame waiting for a click. So the control must read Pause here -- if it
-    ever reads Play at these media settings, autoplay-first has regressed.
-  */
-  const control = frame.locator(".compile-film-motion-control");
-  await expect(control).toHaveCount(1);
-  await expect(control).toHaveAttribute("data-control", "pause");
-  await expect(control).toHaveAttribute("aria-label", "Pause the compilation film");
-  await expect(frame.getByRole("button", { name: /^Play/i })).toHaveCount(0);
-});
+  It asserted that the entry page's hero film starts by itself: `one-path-hero-film`, a
+  `video-fallback` renderer, no live canvas, and a control reading Pause. V2's hero is not a film.
+  It is a CSS storyboard over a committed raster of a real filing page (contract D3: no video and
+  no canvas on the entry pages at all), so there is no media element left for autoplay-first to be
+  a property of, and a retarget would be a new assertion wearing this one's name.
+
+  Nothing it protected is unguarded. That the landing ships no `<video>` or `<canvas>` is asserted
+  in `e2e/landing-v2.spec.ts`; that the storyboard offers a real pause control and honours
+  `prefers-reduced-motion` is asserted there too; and `lib/film-motion-control.test.ts` still pins
+  the control's three states for `components/compile-stage-player.tsx`, which after this lane has
+  no caller on any route (reported).
+*/
 
 test("Explore reaches the actual interactive instrument without a hero-length detour", async ({ page }, testInfo) => {
   /*

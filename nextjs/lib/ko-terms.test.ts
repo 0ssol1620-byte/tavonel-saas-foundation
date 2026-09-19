@@ -51,7 +51,7 @@ describe("the Korean term table", () => {
   it("is already true of the Korean chrome", () => {
     const chrome = [
       KO_CHROME.tagline,
-      KO_CHROME.stateLine,
+      /* `stateLine` retired with `deploymentStateLine()` on 2026-09-19; see site-navigation.ts. */
       KO_CHROME.signIn,
       ...Object.values(KO_CHROME.cta),
       ...Object.values(KO_CHROME.footerGroups),

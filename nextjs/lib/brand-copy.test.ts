@@ -6,6 +6,7 @@ import { activationPolicy } from "./activation-policy";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
 import { LANDING_FRAMES } from "./landing-frames";
+import { LANDING_V2_SCENE_ORDER } from "./landing-v2-copy";
 import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
 
 /**
@@ -31,7 +32,17 @@ const root = join(here, "..");
 /** Every file that carries public-facing copy. Add new surfaces here as they are built. */
 const COPY_SURFACES = [
   "app/page.tsx",
-  "components/home-page-client.tsx",
+  /*
+    Landing V2, 2026-09-19 (D1). The landing page is a copy deck and a composition now.
+
+    `components/home-page-client.tsx` is deleted. Every sentence a visitor reads at `/` and
+    `/ko` is in `lib/landing-v2-copy.ts`, in both languages; `landing-page.tsx` arranges them
+    and `scene-actions.ts` carries the eight next-action labels. `read` takes a literal path
+    and never follows an import, so each of the three needs its own row.
+  */
+  "components/landing-v2/landing-page.tsx",
+  "components/landing-v2/scene-actions.ts",
+  "lib/landing-v2-copy.ts",
   "app/layout.tsx",
   "app/workspace/page.tsx",
   "app/auth/callback/page.tsx",
@@ -299,36 +310,25 @@ function marketingPageFiles(directory = "app", found: string[] = []): string[] {
 }
 
 /*
-  The landing page is three files now.
+  The landing page, as a visitor reads it (Landing V2, 2026-09-19).
 
-  Scene 3's four stacked bands became one pinned player, so the film sources, posters and stage
-  labels moved into `compile-stage-player.tsx`. Every assertion below is about what a visitor
-  sees at `/`, so the player is part of the landing source they read.
-
-  landing-01: the stage table moved again, out of the "use client" player and into
-  `lib/compile-stages.ts`, because a client-module export reaches a server component as a
-  reference rather than a value. Four files now.
+  Six files, and the film modules are deliberately not among them any more: this landing plays no
+  film, so `compile-stage-player.tsx` and `lib/compile-stages.ts` are no longer part of what a
+  visitor sees at `/`. What replaced them is the two route files, the composition, the two copy
+  modules, and the hero's data module -- the last because every figure on this page comes out of
+  it, and a barred phrase written into a label there would render on the page while every page
+  file stayed clean. The hero's components carry no copy of their own and the three primitives
+  are copy-free by contract (D10).
 */
 function landingSource(): string {
   return [
     read("app/page.tsx"),
-    read("components/home-page-client.tsx"),
-    read("components/compile-stage-player.tsx"),
-    read("lib/compile-stages.ts"),
+    read("app/ko/page.tsx"),
+    read("components/landing-v2/landing-page.tsx"),
+    read("components/landing-v2/scene-actions.ts"),
+    read("lib/landing-v2-copy.ts"),
+    read("lib/landing-v2-hero.ts"),
   ].join("\n");
-}
-
-/**
- * The two files that decide what the landing page itself points at.
- *
- * `landingSource()` is deliberately wider -- it exists so a barred phrase cannot hide in the
- * player or in the stage table -- and that width is wrong for a question about which film the
- * landing plays: `lib/compile-stages.ts` still declares all four locked cuts, because /film and
- * the stage strip still use them. A test that asks "is cut 2 on the landing" has to read the
- * landing.
- */
-function landingPages(): string {
-  return [read("app/page.tsx"), read("components/home-page-client.tsx")].join("\n");
 }
 
 describe("public copy", () => {
@@ -346,7 +346,7 @@ describe("public copy", () => {
     }
   });
 
-  it("keeps fixture disclosure with the fixture and off the five-scene landing page", () => {
+  it("keeps fixture disclosure with the fixture and off the nine-scene landing page", () => {
     const disclosure = read("lib/demo-world.ts");
     expect(disclosure).toContain("fictional demonstration data");
     expect(disclosure).toContain("not a recording of a compiler run");
@@ -361,60 +361,81 @@ describe("public copy", () => {
     expect(landingSource()).not.toContain("readCapabilities");
   });
 
-  // Landing replan, 2026-09-18: six sections became five. The rule is the one it always was --
-  // every scene is a named landmark, and the page carries no second instrument navigation.
-  it("uses the five approved customer sections without a second instrument navigation", () => {
-    const page = read("components/home-page-client.tsx");
-    expect([...page.matchAll(/data-scene="(\d+)"/g)].map(m => m[1])).toEqual(["1", "2", "3", "4", "5"]);
+  /*
+    Landing V2, 2026-09-19 (D9, §9). Five sections became nine, and the rule is the one it always
+    was: every scene is a named focusable landmark, in one declared order, and the page carries no
+    second instrument navigation of its own.
+
+    The order is read off the composition rather than off a count of `data-scene` attributes,
+    because eight of the nine are rendered by one component from one table -- which is the half
+    that used to be the defect, when a reordered translation was only caught in a screenshot.
+  */
+  it("composes the nine V2 scenes in §9's order, with no second instrument navigation", () => {
+    const page = read("components/landing-v2/landing-page.tsx");
+    // The hero is written out; the other eight arrive as `<Scene scene={copy.<id>} …>`.
+    const rendered = [...page.matchAll(/<Scene scene=\{copy\.([a-z]+)\}/g)].map((match) => match[1]!);
+    expect(["hero", ...rendered]).toEqual([...LANDING_V2_SCENE_ORDER]);
+    expect(page).toContain('id="hero"');
+    expect(page).toContain('data-scene="1"');
+    // The skip-target contract: a named, focusable landmark per scene.
+    expect(page).toContain("tabIndex={-1}");
+    expect(page).toContain("aria-labelledby={titleId}");
     expect(page).not.toContain('className="bar"');
-    expect(page, "the phone jump nav went with the sixth section").not.toContain("one-path-jump");
-    expect(page.match(/aria-labelledby="one-path-/g)).toHaveLength(5);
+    expect(page, "the phone jump nav went with the old landing").not.toContain("one-path-jump");
   });
   /*
-    The lock, re-derived. RESOLVED A-2 (2026-09-06).
+    The lock, re-derived three times, and moved once more here.
 
-    The previous lock pinned "Turn documents and connected systems / into a source-grounded
-    world your AI can use." and a lede ending "evidence back to the page." That lede is the
-    reason this test changes rather than the headline alone: "back to the page" is only true
-    while every accepted format is converted to PDF before reading, and it is the wording
-    RESOLVED A-1 retires across the site. A lock is not a claim that the string is right
-    forever; it is a claim that the string does not drift without a decision. This is that
-    decision, so the lock moves with it instead of being deleted.
-
-    D8 / BQ-056 move it again, for the same reason and in the same way. The headline is no longer
-    typed into the page at all -- it is `BRAND_LINE.headline`, the one constant the share card,
-    the footer tagline and the root metadata description also derive from -- so the lock is on the
-    constant, and the landing page is checked for reading it rather than for repeating it. The
-    "03 / PROOF" kicker is gone with the other four numbered section kickers, and the proof
-    block's own label is sentence case rather than monospace caps with a middle dot.
-
-    Landing replan, 2026-09-18. The interactive proof block moved off the landing entirely
-    (founder decision), so the half of this that ordered the film against `{proof}` is replaced by
-    the thing that took its place: the hero's lede is the brand descriptor -- the sentence that
-    used to reach a visitor only in the footer -- and the film still comes before the three
-    frames of the live route that are now the page's evidence.
+    It has never been a claim that the headline is right forever; it is a claim that the headline
+    does not drift without a decision. RESOLVED A-1 moved it, D8 moved it, and the Landing V2
+    design master blueprint moves it again -- this time by taking the string out of the page
+    altogether. The H1 is a rendering of `BRAND_LINE.headline`: `hero-statement.tsx` splits the
+    constant so one phrase can carry the editorial serif (D3), and the copy deck imports it
+    rather than spelling it. So what is pinned is the constant, plus the two places that read it
+    without repeating it.
   */
-  it("keeps the approved film-first hero and the brand line it is written from", () => {
-    const page = read("components/home-page-client.tsx");
-    expect(BRAND_LINE.headline).toBe("Bring your knowledge. TAVONEL makes it ready for AI.");
+  it("keeps the brand line the hero is written from, and writes it in no second place", () => {
+    expect(BRAND_LINE.headline).toBe("AI-ready knowledge. Traceable to every source.");
     expect(BRAND_LINE.descriptor).toBe("Knowledge compiled with a traceable path back to every source.");
-    expect(page).toContain("{BRAND_LINE.headline}");
+    expect(read("lib/landing-v2-copy.ts"), "the copy deck imports the headline rather than typing it")
+      .toContain("headline: BRAND_LINE.headline");
+    const hero = read("components/landing-v2/hero-statement.tsx");
+    expect(hero, "the H1 is a rendering of the constant, not a copy of it")
+      .toContain("copy.headline.split(");
     // Comments stripped: the rationale for deleting them names the strings it deleted.
-    expect(page.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
-      .not.toMatch(/0\d \/ /);
-    /*
-      BQ-076 / n39 moves this assertion rather than deleting it. The wrapper it named is gone --
-      it framed a figure that brings its own frame, above an eyebrow that restated the figure's
-      own figcaption -- so what is guarded is the same two things without it: the label is not
-      written twice, and the hero film still comes before the proof block.
-    */
-    expect(page, "the proof block's figcaption names the sample; a wrapper eyebrow restated it")
-      .not.toContain("Public Apple SEC sample, source included");
-    expect(page, "the lede is the descriptor, not a sixth positioning sentence")
-      .toContain('<p className="one-path-lede">{BRAND_LINE.descriptor}</p>');
-    expect(page.indexOf("<CompileStagePlayer")).toBeLessThan(page.indexOf('id="compile"'));
+    const page = landingSource().replace(/\{?\/\*[\s\S]*?\*\/\}?/g, "");
+    expect(page, "a numbered section kicker is not a section name").not.toMatch(/0\d \/ /);
     expect(page).not.toContain("evidence back to the page");
   });
+
+  /*
+    Landing V2, 2026-09-19 (§27, §28, D1). The entry pages play no film.
+
+    This used to pin which cut the landing reached for. The answer is now none: §27 bars an
+    autoplay video from being the LCP element and §28 puts the hero in DOM and CSS, so the hero
+    is a real source page with a real compiled object beside it and there is no decoder on the
+    page at all. The four locked cuts are byte-for-byte untouched and are still checked, in
+    `lib/one-path-contract.test.ts`; what changes is that the landing no longer reaches for any
+    of them, the poster included.
+  */
+  it("puts no film, and no film asset, on the entry pages", () => {
+    const page = landingSource();
+    for (const asset of [
+      "/film/compile-cut-hq.mp4",
+      "/film/compile-cut-hq-1440.mp4",
+      "/film/poster-1-hero-2x.webp",
+      "/film/poster-1.webp",
+      "/film/poster-1-hero.webp",
+      "/film/compile-cut.mp4",
+      "/film/compile-cut-2.mp4",
+      "/film/compile-cut-3.mp4",
+      "/film/compile-cut-4.mp4",
+    ]) {
+      expect(page, `${asset} is not a landing asset any more`).not.toContain(asset);
+    }
+    expect(page, "and the stage player is not on the entry pages").not.toContain("CompileStagePlayer");
+  });
+
   /*
     D26. One tab-title pattern with one named exception, so the pattern is a rule rather than the
     six spellings the audit counted. Every advertised page is "X — TAVONEL"; the home page is
@@ -433,25 +454,6 @@ describe("public copy", () => {
       const titles = [...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g)].map((match) => match[1]!);
       expect(titles.length, `${file} declares a title`).toBeGreaterThan(0);
       for (const title of titles) expect(title, file).toMatch(/ — TAVONEL$/);
-    }
-  });
-
-  /*
-    Landing replan, 2026-09-18. One film, from the re-rendered master.
-
-    This used to assert that all four locked cuts and the 1x poster were on the landing. The page
-    played the film twice -- hero and How-it-works -- which was the single largest source of the
-    "assembled" feel, so the hero keeps one player on `compile-cut-hq.mp4` (the same 450 frames at
-    a lower CRF) with a poster at the size it is painted, and the other three cuts are not on this
-    page at all. The four originals stay byte-locked and are still checked, in
-    `lib/one-path-contract.test.ts`; what changes is which of them the landing reaches for.
-  */
-  it("plays one re-rendered hero film on the landing and none of the supporting cuts", () => {
-    const page = landingPages();
-    expect(page).toContain("/film/compile-cut-hq.mp4");
-    expect(page).toContain("/film/poster-1-hero-2x.webp");
-    for (const retired of ["/film/poster-1.webp", "/film/poster-1-hero.webp", "/film/compile-cut.mp4", "/film/compile-cut-2.mp4", "/film/compile-cut-3.mp4", "/film/compile-cut-4.mp4"]) {
-      expect(page, `${retired} is not a landing asset any more`).not.toContain(retired);
     }
   });
 
@@ -474,10 +476,15 @@ describe("public copy", () => {
     four cuts share one viewport and the interesting invariant is that only one of them holds a
     decoder. The scene files must still contain no <video> of their own.
   */
-  it("keeps every landing film inside the stage player, never in a scene file", () => {
-    for (const file of ["app/page.tsx", "components/home-page-client.tsx"]) {
+  it("hand-rolls no <video> on the entry pages, and keeps the one decoder in the player", () => {
+    for (const file of [
+      "app/page.tsx",
+      "app/ko/page.tsx",
+      "components/landing-v2/landing-page.tsx",
+      "components/landing-v2/hero-compiler-demo.tsx",
+    ]) {
       // Comments in these files discuss the <video> element by name, so the check is run
-      // against the source with comments stripped — otherwise it fails on its own rationale.
+      // against the source with comments stripped -- otherwise it fails on its own rationale.
       const source = read(file)
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "");
@@ -487,18 +494,10 @@ describe("public copy", () => {
     const player = read("components/compile-stage-player.tsx");
     expect(player, "the player owns exactly one <video> template").toMatch(/<video/);
     /*
-      BQ-130. The guard moved with the mechanism it guards.
-
-      It used to pin `admitted.has(position) ?` -- the `<source>` children filter that kept every
-      stage but the active one out of the element. The element takes `src` from the active stage
-      directly now, so there are no `<source>` children to filter and nothing to admit. What the
-      guard is for -- one decoder, open on the active cut, not remounted per stage, which is what
-      cancelled `compile-cut-2.mp4` mid-fetch on every advance -- is what it asserts.
-    */
-    /*
-      Read as a shape rather than a literal. The element takes a narrow-screen encode when the
-      stage declares one (`active.phoneSrc`), so the exact expression is a ternary; what has to
-      stay true is that the `<video>` carries `src` itself and resolves it from the active stage.
+      BQ-130. The guard moved with the mechanism it guards, and the mechanism is unchanged: one
+      decoder, open on the active cut, not remounted per stage -- which is what cancelled
+      `compile-cut-2.mp4` mid-fetch on every advance. Read as a shape rather than as a literal,
+      because the element takes a narrow-screen encode when the stage declares one.
     */
     expect(player, "the one decoder plays the active stage and nothing else")
       .toMatch(/<video[^>]*\ssrc=\{[^}]*active\.src\}/);
@@ -513,21 +512,17 @@ describe("public copy", () => {
     reader scrolled through eight screens of film, while four <video> elements competed for
     bandwidth and, on a phone, for a limited number of hardware decoders.
   */
-  it("uses one compact hero film and no second viewport", () => {
-    const landing = read("components/home-page-client.tsx");
-    expect(landing).toContain("<CompileStagePlayer");
-    // Landing replan: the second player is the thing that went. Four cuts became one frame in
-    // 2026-09; one frame became one film in the replan, for the same reason stated one level up.
-    expect(landing.match(/<CompileStagePlayer/g)).toHaveLength(1);
-    expect(landing).toContain("playbackRate={1.5} compact");
-    expect(landing, "the Works viewport and its stage table are gone").not.toContain("WORK_STAGES");
-
+  it("keeps the stage strip in the reader's voice and its controls selectable", () => {
     /*
-      BQ-056. The labels are sentence case now, and this guard must read the strip rather than the
-      file: the uppercase list it used to assert went on passing after the change because the
-      commit note above `COMPILE_STAGES` quotes the old names. Assert the exported values.
-      landing-01: the strip moved to lib/compile-stages.ts, so the guard follows it there; the
-      player keeps the tab/reduced-motion half.
+      Landing V2, 2026-09-19. The landing half of this case went with the film.
+
+      What it pinned -- one player, `playbackRate={1.5} compact`, no second viewport -- was about
+      a page that no longer plays a film. The strip itself is unchanged and is still read by
+      `/film`, so the half that is a fact about the component stays exactly as it was.
+
+      BQ-056: the labels are sentence case, and this guard reads the strip rather than the file,
+      because the uppercase list it used to assert went on passing after the change -- the commit
+      note above `COMPILE_STAGES` quotes the old names.
     */
     const player = read("components/compile-stage-player.tsx").replace(/\/\*[\s\S]*?\*\//g, "");
     const strip = read("lib/compile-stages.ts");
@@ -551,7 +546,7 @@ describe("public copy", () => {
     figures reading as results from a real deployment.
   */
   it("keeps fabricated world metrics off the landing instrument bar", () => {
-    const landing = read("components/home-page-client.tsx")
+    const landing = landingSource()
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/^\s*\/\/.*$/gm, "")
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
@@ -605,7 +600,8 @@ describe("public copy", () => {
   });
 
   it("gives every film stage a poster file that actually exists", () => {
-    const page = landingSource();
+    // Landing V2: the posters are the stage table's and the player's now. The landing names none.
+    const page = [read("lib/compile-stages.ts"), read("components/compile-stage-player.tsx")].join("\n");
     /*
       Match the path wherever it is written, not only in a JSX attribute.
 
@@ -648,27 +644,32 @@ describe("public copy", () => {
   });
 
   /*
-    Landing replan, 2026-09-18. Five scenes, and the source proof is three real frames.
+    Landing V2, 2026-09-19. Nine scenes, and the source proof is in the hero itself.
 
-    "Every result keeps a path back to the source." was a sentence about the product printed
-    above a widget that demonstrated it. The widget moved off the landing and the sentence went
-    with it, so what this asserts is the evidence that replaced both: three screenshots of the
-    public /explore route, each one a link to the view it shows. The jargon half of the rule is
-    unchanged -- no locator vocabulary is taught to a first-time reader.
+    The replan's answer to "where is the proof" was three screenshots of /explore under the film.
+    The V2 answer is one step earlier: the hero is a committed render of a real filing page with
+    the region it was read from drawn on it, the compiled object beside it, and a link into the
+    Evidence act of the route that holds both. So what is asserted is that the hero reaches the
+    real thing rather than a picture of it, and the jargon half of the rule is unchanged -- no
+    locator vocabulary is taught to a first-time reader.
+
+    `LANDING_FRAMES` still exists and its hrefs are still checked: the frames are real captures
+    of the live route and a later scene may use them. They are simply not on the entry pages.
   */
-  it("keeps the five-scene narrative and makes original-source proof reachable without teaching locator jargon", () => {
-    const page = read("components/home-page-client.tsx");
-    expect(page.match(/data-scene="[1-5]"/g)).toHaveLength(5);
-    expect(page).toContain('id="top"');
-    expect(page, "the retired hero id must not come back").not.toContain('id="s1"');
-    expect(page).toContain("LANDING_FRAMES.compile");
-    expect(page).toContain("LANDING_FRAMES.verify");
-    expect(page).toContain("LANDING_FRAMES.recompile");
+  it("reaches original-source proof from the hero without teaching locator jargon", () => {
+    const demo = read("components/landing-v2/hero-compiler-demo.tsx");
+    expect(demo, "the compiled object opens the evidence behind it").toContain("scene.links.evidence");
+    /* §4.1's label is assembled in this component now -- the copy deck's format filled with the
+       record's coordinates -- so that /ko stops printing it in English. */
+    expect(demo, "and the region it was read from is named on the page").toContain("regionLabelFormat");
+    expect(demo, "from the coordinates the compiler stored").toContain("region.coordinates");
+    expect(demo, "every figure in the hero declares that it was measured").toContain('data-derived="1"');
+    expect(read("lib/landing-v2-hero.ts"), "the deep link is the product's own URL shape")
+      .toContain("/explore?act=evidence&evidence=");
     for (const href of Object.values(LANDING_FRAMES).map((frame) => frame.href)) {
       expect(href, "every frame opens the live route it is a screenshot of").toMatch(/^\/explore/);
     }
-    expect(page, "and the reader is offered the same screen under each frame").toContain("Open the ${step.title} view");
-    expect(page).not.toContain("Exact bbox");
+    expect(landingSource()).not.toContain("Exact bbox");
   });
   it("stages a customer's own upload in the workspace, not a fixture world", () => {
     const stage = read("components/compile-stage.tsx");
@@ -687,7 +688,7 @@ describe("public copy", () => {
   const A4_WORDS = ["QUALIFIED", "BETA", "ENTERPRISE-ASSISTED", "UNSUPPORTED"];
 
   it("keeps qualification details reachable without leading the landing page with a beta badge", () => {
-    const source = read("components/home-page-client.tsx");
+    const source = landingSource();
     const workspace = read("app/workspace/page.tsx");
     expect(source).not.toContain('<span className="st">BETA</span>');
     expect(source).not.toContain('<span className="st">ENTERPRISE-ASSISTED</span>');
@@ -706,11 +707,14 @@ describe("public copy", () => {
       click from the decision they qualify.
     */
     expect(source, "the fold and its grid are on /sources now").not.toContain("one-path-source-options");
-    expect(source).toContain("Files, folders &amp; ZIP");
-    expect(source).toContain("Connected sources");
-    expect(source).toContain("Private infrastructure");
-    expect(source).toContain('href="/integrations"');
-    expect(source).toContain('href="/sources"');
+    /*
+      The three ways in are declared rather than laid out as three cards (§35 bars the repeated
+      card grid), so the guard follows them into the copy deck: each is a row with a real
+      destination, and the ampersand became the word the rest of the site writes.
+    */
+    expect(source).toContain("Files, folders and ZIP");
+    expect(source).toContain('href: "/integrations"');
+    expect(source).toContain('href: "/sources"');
     expect(read("lib/docs-content.ts"), "and the ZIP fact travels with the format list")
       .toContain("A ZIP archive is expanded before upload");
     expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
@@ -772,8 +776,18 @@ describe("public copy", () => {
     // region" as what every qualified claim points at. Retired for the same reason as the rest.
     "version, page and region",
   ];
+  /*
+    Landing V2, 2026-09-19. The composition takes the deleted client's row.
+
+    NOT `lib/landing-v2-copy.ts`, and that is a reported finding rather than an omission: the
+    copy deck's Evidence scene and its fourth trust proof both publish "version, page and region"
+    -- the universal form RESOLVED A-1 retires -- because blueprint §14 asks for that sentence by
+    name. Which of the two wins is a decision about what a public claim says, which is not an
+    implementer's to take, so the wording is named in the lane report instead of being quietly
+    rewritten here or quietly passed by adding the file to a list it would fail.
+  */
   const A1_SURFACES = [
-    "components/home-page-client.tsx",
+    "components/landing-v2/landing-page.tsx",
     "app/product/compiled-world/page.tsx",
     "app/solutions/[slug]/page.tsx",
     "app/api/page.tsx",
@@ -932,7 +946,9 @@ describe("public copy", () => {
     page says when nobody decided which.
   */
   const CONVERSION_SURFACES = [
-    "components/home-page-client.tsx",
+    "components/landing-v2/landing-page.tsx",
+    "components/landing-v2/scene-actions.ts",
+    "lib/landing-v2-copy.ts",
     "components/pricing-page-client.tsx",
     "app/sources/page.tsx",
     "app/security/page.tsx",
@@ -958,18 +974,24 @@ describe("public copy", () => {
     link to the page that substantiates it and the strip may carry no digit-bearing figure at
     all. This reads the rendered items, not the file, so a number added in any of them fails.
   */
-  it("moves source proof below the film without adding invented result figures", () => {
-    const page = read("components/home-page-client.tsx");
+  it("orders the scenes proof-first and adds no invented result figure", () => {
+    const page = read("components/landing-v2/landing-page.tsx");
     expect(page).not.toContain('className="hero-proof"');
-    // n39 asserted the proof rendered in its own section rather than in the hero. The proof
-    // section is gone; the ordering it stood for is not, so it is read off what replaced it --
-    // the hero, then the three frames of the live route, then everything else.
-    expect(page.indexOf('data-scene="1"')).toBeLessThan(page.indexOf('id="compile"'));
-    expect(page.indexOf('id="compile"')).toBeLessThan(page.indexOf("Open the ${step.title} view"));
-    expect(page).toContain('href="/sources"');
-    expect(page).not.toMatch(/\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i);
-    expect(page).not.toContain("128,470");
+    // §9's order, read as positions: the hero, then the instant proof, then the rest.
+    expect(page.indexOf('data-scene="1"')).toBeLessThan(page.indexOf("copy.proof"));
+    expect(page.indexOf("copy.proof")).toBeLessThan(page.indexOf("copy.trust"));
+    /*
+      The strip under a hero is where invented figures arrive: "10M pages compiled", "99.9%
+      uptime", a customer count. §35 bars every one of them, none is measured here, and the copy
+      deck is digit-free by construction -- `lib/landing-v2-copy.test.ts` fails on a digit in any
+      string in it, so the only figures that can reach this page come from a module that read the
+      compiled World.
+    */
+    const deck = read("lib/landing-v2-copy.ts");
+    expect(deck).not.toMatch(/\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i);
+    expect(landingSource()).not.toContain("128,470");
   });
+
   /*
     §54's purchase friction map, checked as coverage rather than as wording.
 
@@ -1018,52 +1040,42 @@ describe("public copy", () => {
     the worst place on the site for one, and no card body may carry a digit.
   */
   it("keeps source choices after the hero and leaves solution pages intact", () => {
-    const page = read("components/home-page-client.tsx");
-    const hero = page.slice(page.indexOf('id="top"'), page.indexOf('id="compile"'));
-    expect(hero).toContain("playbackRate={1.5} compact");
-    expect(hero).not.toContain("JOBS.map");
-    expect(hero).not.toContain("<SolutionProofSample");
-    // The replan's section order, read as positions. "assisted, customer-run connection" was the
-    // Private infrastructure card's body; the card is a list row now and says what it is in the
-    // reader's words ("set up with us in your environment") rather than in the access model's.
-    const order = ['id="top"', 'id="compile"', 'id="why"', 'id="sources"', 'id="start"'].map((id) => page.indexOf(id));
+    /*
+      Audit B01 / U02. The hero is followed by a named way in rather than by a jump straight into
+      World, compile, candidate and ontology. Two things can go wrong and both are still checked:
+      a link to a page that does not exist, and a figure. The copy deck declares the three intake
+      paths with a real destination each, and the landing itself reaches /sources and
+      /integrations from its scene actions.
+    */
+    const deck = read("lib/landing-v2-copy.ts");
+    expect(deck).toContain("Files, folders and ZIP");
+    expect(deck).toContain('href: "/sources"');
+    expect(deck).toContain('href: "/integrations"');
+    const actions = read("components/landing-v2/scene-actions.ts");
+    expect(actions, "the landing offers the format rules one click from the decision they qualify")
+      .toContain('href: "/sources"');
+    expect(actions).toContain('href: "/integrations"');
+    // §9's order, read as positions.
+    const page = read("components/landing-v2/landing-page.tsx");
+    const order = ['id="hero"', "copy.proof", "copy.sources", "copy.trust", "copy.start"].map((id) => page.indexOf(id));
     expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
-    expect(page).toContain("Files, folders &amp; ZIP");
-    expect(page).toContain("Connected sources");
     expect(read("app/solutions/[slug]/page.tsx")).toContain("ai-ready-knowledge");
   });
-  /*
-    Audit B06, added deliberately with the caption under the compile film.
 
-    Four evidence levels share this page and the film is the one a visitor is most likely to read
-    as a screen recording of the product. The rule above keeps the *fixture* disclosure off the
-    landing page, which is a different thing: it bars importing `DISCLOSURE.fixture`, a defensive
-    paragraph about a demo world. This asserts one sentence separating a directed recreation from
-    the working interface, which is the affirmative version of the same job.
+  /*
+    Audit B06's case is deleted, and this comment is what is left of it.
+
+    It asserted one sentence separating a directed recreation from the working interface -- "A
+    directed film, not a screen recording" -- because the film drew an extracted table as a ruled
+    grid, labelled a result with a section and line number, and listed `.csv` among the sources,
+    none of which this deployment produces. The entry pages play no film now, so there is no
+    recreation on them to separate from the product: every pixel in the hero is a committed render
+    of a real filing page or vector UI drawn from real World data (§21, contract rule 2). The
+    rule the case existed for is enforced by the case above it -- no film asset on the landing --
+    and by `lib/landing-v2-hero.test.ts`, which fails if the hero resolves to a page this
+    repository has no committed render of.
   */
-  it("discloses the directed film next to it and keeps the real sample control usable", () => {
-    const page = read("components/home-page-client.tsx");
-    /*
-      G1-003 / G1-004. Same note, stronger sentence. The old one disclosed that the cut had been
-      sped up; it did not say the cut draws an extracted table as a ruled grid, labels a result
-      with a section and line number, and lists `.csv` among the sources -- three things the
-      capability manifest and the evidence locator contradict, in bytes that are locked and
-      cannot be re-cut. The note now separates the recreation from the product and states what a
-      compile emits, and this asserts both halves.
-    */
-    expect(page).toContain("A directed film, not a screen recording");
-    expect(page).toContain("the page it was read from");
-    expect(page).toContain('<p className="one-path-film-note">');
-    /*
-      Landing replan: the note's "inspect it yourself" half used to be a link to
-      `/explore?act=source` in a separate proof section. It is the three frames directly under
-      the note now -- the same route, at the view each frame is a screenshot of -- so the control
-      this pinned is asserted where it moved rather than deleted.
-    */
-    expect(page, "the note's last sentence points at the frames under it").toMatch(/the three frames below/i);
-    expect(page).toContain(`href={step.frame.href as Route}`);
-    expect(read("app/one-path.css")).toContain("min-height: 44px");
-  });
+
   /*
     Audit B02. Five solution pages answered the same reader. Each now declares who it is for, as
     a field, so the label cannot drift from the copy under it and a new solution cannot ship
