@@ -283,3 +283,10 @@
 .inspector:has(.figure:hover) .claim {
   border-color: var(--source);
 }
+
+/* The original stays complete and opens at full size; its preview has a readable phone measure. */
+@media (max-width: 767px) {
+  .figure > :global(.lv2-page) { max-width: 280px; }
+  .inspector { margin-top: 28px; }
+  .claim { padding: 16px; }
+}

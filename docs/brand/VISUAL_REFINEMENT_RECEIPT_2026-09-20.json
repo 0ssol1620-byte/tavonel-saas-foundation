@@ -1,0 +1,39 @@
+{
+  "schema": "tavonel.visual-review.v1",
+  "observedAt": "2026-09-19T21:41:23.946Z",
+  "baseline": "3e2d54c08fbf1ee6e835b3cc321b813d244f99a2",
+  "scope": "Local fixture build; not production or an authenticated customer transaction",
+  "checks": {
+    "typeLintBuild": "PASS",
+    "unitFiles": 293,
+    "unitTests": 4528,
+    "browser": {
+      "startTime": "2026-09-19T21:38:20.990Z",
+      "duration": 110172.395,
+      "expected": 257,
+      "skipped": 55,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "publicAudit": {
+      "phase": "release-loaded",
+      "routeCount": 59,
+      "contexts": 118,
+      "htmlContexts": 116,
+      "exceptions": [
+        "Intentionally hidden anti-spam honeypot",
+        "Atom feed validated by MIME and XML, not HTML axe"
+      ],
+      "failures": []
+    },
+    "secretScan": "PASS",
+    "lockedAssetDelta": []
+  },
+  "unchanged": [
+    "Customer-data activation gate",
+    "Billing logic",
+    "Compiler authority",
+    "Source data and geometry",
+    "Original film bytes"
+  ]
+}

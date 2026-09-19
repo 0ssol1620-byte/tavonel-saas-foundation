@@ -81,7 +81,7 @@ const attr = (open: string, name: string): string | undefined =>
   open.match(new RegExp(`\\s${name}="([^"]*)"`, "i"))?.[1];
 
 /** D9's ground alternation, read off the page rather than off the composition's own table. */
-const GROUND = ["obsidian", "paper", "obsidian", "paper", "obsidian", "paper", "obsidian", "paper", "obsidian"];
+const GROUND = ["obsidian", "paper", "obsidian", "paper", "obsidian", "obsidian", "obsidian", "obsidian", "obsidian"];
 
 describe("landing v2 -- the composition", () => {
   it.each(LOCALES)("%s renders §9's nine scenes, once each, in order", (locale) => {
@@ -99,7 +99,7 @@ describe("landing v2 -- the composition", () => {
     }
   });
 
-  it.each(LOCALES)("%s alternates the two grounds D9 sets", (locale) => {
+  it.each(LOCALES)("%s reserves paper for actual proof and source evidence", (locale) => {
     const main = mainOf(render(locale));
     const grounds = elements(main, "section").map((open) =>
       /\blv2-obsidian\b/.test(attr(open, "class") ?? "") ? "obsidian" : "paper",
@@ -117,7 +117,7 @@ describe("landing v2 -- the composition", () => {
     expect(elements(html, "h1")).toHaveLength(1);
     /*
       Whitespace removed on both sides, not collapsed. The hero sets one sentence per line and
-      sets one phrase in the serif, so the headline reaches the DOM as three element boundaries
+      emphasizes one phrase in the same sans family, so the headline reaches the DOM as three element boundaries
       where the constant has two spaces. What this test owns is that the H1 says the founder's
       string and nothing else; where it breaks is the hero lane's measurement.
     */

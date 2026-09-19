@@ -1,36 +1,10 @@
-/*
-  Site chrome V2 (blueprint 2026-09-19 §8). The header and footer every public route renders.
-  Unlayered on purpose. Token-only colours.
 
-  Everything under "chrome: header and menu" was cut from `app/one-path.css` and reworked here.
-  It was never landing CSS: the desktop/phone switch, the section-row face, the phone sheet's
-  rows and the brand mark's colour are what every public route's header looks like, and they
-  lived in the landing sheet only because the landing was the page that first needed them. The
-  landing block of `one-path.css` stays where it is; another lane deletes it.
-
-  `app/layout.tsx` imports this after `one-path.css`, and both are unlayered, so these rules
-  outrank `app/tavonel.css` (which is inside `@layer components`) on cascade layer alone. The
-  two-classes-deep selectors below are for the rules that must also beat an unlayered module
-  sheet or a later unlayered rule, not for beating the layered system.
-*/
-
-/*
-  The one measure the chrome shares with the landing content (blueprint §7, contract D9).
-
-  Content max 1296 with a 72px outer margin at 1440. The header cannot hold a wrapper element --
-  it is a flex row, and `app/tavonel.css` and the rules below both select its children directly --
-  so it takes the measure as padding instead: `max(gutter, (100% - 1296px) / 2)` is the same left
-  edge a 1296px centred column has, and collapses to the plain gutter below 1296 + 2 * gutter.
-  The footer gets `.chrome-v2-wrap` alongside the `.shell` or `.one-path-wrap` it already had, so
-  the flex column those two give it survives.
-*/
 :root {
-  --chrome-gutter: 20px;
-  --chrome-measure: 1296px;
+  --chrome-gutter: clamp(20px, 3vw, 64px);
+  --chrome-measure: 1600px;
 }
-@media (min-width: 768px) { :root { --chrome-gutter: 32px; } }
-@media (min-width: 1200px) { :root { --chrome-gutter: 48px; } }
-@media (min-width: 1440px) { :root { --chrome-gutter: 72px; } }
+
+
 
 .chrome-v2-wrap {
   width: min(var(--chrome-measure), calc(100% - 2 * var(--chrome-gutter)));
@@ -38,23 +12,6 @@
   margin-inline: auto;
   padding-inline: 0;
 }
-
-/* ==================================================================== chrome: header and menu */
-
-/*
-  64px, transparent over the page, opaque once the reader has moved (blueprint §8).
-
-  The two rgba values are the only colour literals in this file and they are the blueprint's own:
-  the ground is `--ink-950` at 78% and the hairline is white at 8%. Neither can be written as a
-  token with an alpha applied to it without `color-mix`, whose result is not bit-identical to the
-  value the design specifies, so they are written out and this comment is the receipt.
-
-  `padding-block: 0` with an explicit height rather than 12px of padding around a 44px control:
-  the row is `align-items: center`, so the height is the height, and 64 is the number §32's 1440
-  grid is drawn against. `--header` in `app/tavonel.css` is 68 and is what `scroll-padding-top`
-  reads -- four pixels more clearance than an anchor needs is not a defect, and that token belongs
-  to the tokens lane.
-*/
 .nav.chrome-v2-header {
   height: 64px;
   padding-block: 0;
@@ -63,85 +20,26 @@
   border-bottom: 1px solid transparent;
 }
 .nav.chrome-v2-header[data-scrolled="1"] {
-  background: rgba(8, 9, 11, 0.78);
+  background: rgba(9, 13, 20, 0.94);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
-
-/*
-  BQ-007. The desktop/phone switch is at 1249px, and it stays there.
-
-  The contract asked whether five links fit at 1080+. Measured against the faces this sheet sets:
-  wordmark 104 + five labels at 14px with 24px of padding each (Product 61, How it works 90,
-  Resources 78, Docs 40, Pricing 55 -- 324 of text plus 120 of padding) + four 10px gaps + the
-  row's own 14px gaps + the filled action 109 + Sign in 44 is about 790px of content. At 1080 with
-  48px margins there is 984px of room, which fits; at 1024 with 32px margins there is 960, which
-  also fits but leaves nothing for a longer Korean label or a larger default font size. A switch
-  that is marginal at the width it triggers is the BQ-007 defect again, so it stays at 1249 --
-  where it also still matches `e2e/sources.spec.ts`, which measures the row at 1080.
-
-  Two classes deep on purpose: `app/tavonel.css` switches at 1079 with `.nav > nav` (0,1,2) and
-  `.mobile-primary-nav` (0,1,0), and these outrank both without that sheet being edited here.
-*/
 @media (max-width: 1249px) {
   .nav > .one-path-primary-nav { display: none; }
   .mobile-primary-nav.one-path-mobile-nav { display: block; }
-  /* Sign in is a row in the sheet at this width; see `components/mobile-primary-nav.tsx`. */
   .nav-signin.chrome-v2-signin { display: none; }
 }
-
-/*
-  The 44px floor is square, not just tall (QA round 4).
-
-  `tavonel.css` gives `.nav-signin` `min-height: 44px` and only adds `min-width` below 380px. The
-  Korean label is one short word -- 로그인 -- and measured 42x44 at 1440 and 1280: two pixels
-  short of the contract's touch floor in one language and not the other, which is exactly the
-  kind of gap a width-specific rule leaves. The floor belongs to the control, at every width.
-*/
 .nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }
 }
-
 .nav > .one-path-primary-nav { width: auto; min-width: 0; flex: 0 1 auto; gap: 10px; }
-/*
-  §8's composition: the sections follow the wordmark, the actions are pinned to the right edge.
-
-  `app/tavonel.css` gives `.nav > nav` `margin-left: auto`, which pushed the whole section row
-  over to sit against the access button -- the five labels and the two controls read as one
-  clump on the right with 700px of nothing to the left of them. The auto margin belongs to the
-  actions. Scoped to the desktop band because below it the phone toggle already owns that margin,
-  and two auto margins in one flex row share the free space rather than pinning anything.
-*/
 @media (min-width: 1250px) {
   .chrome-v2-header > .one-path-primary-nav { margin-left: 28px; }
   .chrome-v2-header > .nav-actions { margin-left: auto; }
 }
-/*
-  BQ-131. The brand mark, above the contrast floor.
-
-  `.wordmark` sets `--text-lo`, and `logomark.tsx` draws its two pages at 0.66 of it: 2.95:1 at
-  the 20px the header renders, under the 3:1 a graphical object needs, on the one element on the
-  page that is the brand. `--text-mid` with the mark's own opacity raised to 0.8 puts the pages
-  near 5.2:1 and leaves the thread -- the element A-06 keeps at full contrast -- above 6.
-
-  It moved here with the rest of the chrome; `lib/brand-marks.test.ts` reads this file for it now.
-*/
 .wordmark .logomark { color: var(--text-mid); }
-/*
-  BQ-060. One face and one size for every label in the header row.
-
-  The bar carried five type treatments at once -- a monospace wordmark, monospace 11px nav links,
-  a sans CTA, a 9.5px monospace state chip and a 13px sans sign-in link -- at control heights of
-  21 and 44px. That mix, and the two heights inside one `align-items: center` row, is what reads
-  as the misaligned baseline the founder photographed: nothing in the row shares a cap height, so
-  nothing lines up with anything.
-
-  The wordmark stays monospace. It is a lockup, and changing a lockup is the founder's call, not
-  a sweep's. Everything else is the page's own face at 14px in a 44px box. The horizontal padding
-  drops from 14 to 12 because the row carries five labels now instead of three.
-*/
 .one-path-primary-nav .site-nav-direct {
   flex: 0 0 auto;
   width: auto;
@@ -152,7 +50,7 @@
   align-items: center;
   text-decoration: none;
   font-family: var(--f-sans);
-  font-size: var(--t-3, 14px);
+  font-size: 15px;
   letter-spacing: 0;
   color: var(--text-mid);
 }
@@ -166,34 +64,19 @@
   text-decoration-thickness: 2px;
   text-underline-offset: 7px;
 }
-/*
-  BQ-059. The phone sheet's own active state, keyed on the attribute the component sets.
-
-  `app/tavonel.css` styles `[aria-current="true"]`, and `customerNavOwns` sets `aria-current` to
-  `"page"` -- the only value the attribute takes on a link -- so that rule has never matched
-  anything and a reader in the menu could not tell which section they were already in.
-*/
 .one-path-mobile-nav .mobile-nav-direct,
 .one-path-mobile-nav .mobile-nav-signin {
   display: flex;
   align-items: center;
   min-height: 48px;
   font-family: var(--f-sans);
-  font-size: var(--t-3, 14px);
+  font-size: 15px;
   letter-spacing: 0;
 }
 .one-path-mobile-nav .mobile-nav-direct[aria-current="page"] {
   color: var(--text-hi);
   box-shadow: inset 2px 0 0 var(--verified);
 }
-/*
-  The sign-in row is apart from the sections, not sixth among them.
-
-  It is a different kind of destination -- an account, not a part of the site -- and a reader
-  scanning five section names should not have to read a sixth line to discover it is not one.
-  `app/tavonel.css` already gives every row in this sheet its padding and its ground; the rule
-  above this one is the whole of the separation.
-*/
 .one-path-mobile-nav .mobile-nav-signin {
   border-top: 1px solid var(--border-dark, var(--hairline));
   color: var(--text-mid);
@@ -201,12 +84,6 @@
 @media (hover: hover) and (pointer: fine) {
   .one-path-mobile-nav .mobile-nav-signin:hover { color: var(--text-hi); }
 }
-/*
-  BQ-059. The one control that is the whole navigation on a phone, at a readable size.
-
-  It was 9.5px monospace caps -- under the site's 12px floor, in the instrument voice, for a
-  control that is neither an instrument nor a state. Same 44px box, the page's own face.
-*/
 .one-path-mobile-nav > summary {
   min-width: 44px;
   justify-content: center;
@@ -214,13 +91,6 @@
   letter-spacing: 0;
   text-transform: none;
 }
-/*
-  Below 400px the header row holds three things: the wordmark (104px), this toggle and Request
-  access (109px). Sign in left the row for the sheet in the V2 chrome, which is most of what the
-  icon treatment below was buying. It stays because the 44px square is what a phone reader expects
-  of a menu, and because the word remains the control's accessible name -- what a screen reader
-  announces and what voice control matches. Open state turns the three bars into a cross.
-*/
 @media (max-width: 400px) {
   .one-path-mobile-nav > summary {
     position: relative;
@@ -259,44 +129,16 @@
     .one-path-mobile-nav > summary::after { transition: none; }
   }
 }
-
-/* ============================================================================= chrome: footer */
-
-/*
-  The V2 footer is the same footer, quieter.
-
-  A hairline on top instead of the system border, and the tagline drops to the mono metadata face
-  so it reads as the footer's positioning line rather than as a sentence competing with the five
-  link groups above it. 13px, not 12: `scripts/check-type-floor.mjs` puts the floor at 12 and the
-  blueprint's Meta Mono band is 12-13, so 13 is the readable end of that band rather than the edge
-  of the rule.
-*/
 footer.site.chrome-v2-footer {
   border-top: 1px solid var(--border-dark, var(--hairline));
 }
 .chrome-v2-footer .site-footer-tagline {
-  font-family: var(--f-mono);
-  font-size: var(--t-2, 13px);
+  font-family: var(--f-sans);
+  font-size: 14px;
   line-height: 1.35;
   letter-spacing: 0.02em;
   color: var(--text-lo);
 }
-
-/*
-  THE FOOTER LINKS ARE CONTROLS AT EVERY WIDTH, not only on a phone.
-
-  `app/tavonel.css` gives `.site-footer-groups a` a 44px box inside
-  `@media (pointer: coarse), (max-width: 1079px)`, so a desktop mouse got 24 links at 240x21 --
-  under WCAG 2.2 AA 2.5.8's 24px minimum and far under this campaign's 44px floor. The QA round
-  measured it at 1440 and 1280 with zero violations at 1024 and narrower, which is exactly the
-  shape of that media query.
-
-  Written here rather than in `tavonel.css` for two reasons: this sheet is unlayered and that one
-  is layered, so a rule here wins without an `!important`; and the V2 footer is the surface this
-  campaign owns. The values are the ones the phone rule already uses -- top padding only and a
-  1.25 line, so a one-line and a two-line label make the same 44px row and their first lines
-  still share a baseline (chrome-12).
-*/
 .chrome-v2-footer .site-footer-groups a {
   min-height: 44px;
   display: flex;
@@ -305,52 +147,9 @@ footer.site.chrome-v2-footer {
   line-height: 1.25;
 }
 .chrome-v2-footer .site-footer-groups nav { gap: 0; }
-
-/*
-  The same media query left two more chrome controls short at desktop widths.
-
-  `.skip` measured 136x41 and the footer wordmark 104x21 at 1440 -- both because their 44px rules
-  in `app/tavonel.css` sit inside `@media (pointer: coarse), (max-width: 1079px)` as well. A
-  keyboard user on a desktop is the only person who ever sees the skip link, so it is the last
-  control that should be sized for a phone alone.
-*/
 body .skip { min-height: 44px; display: inline-flex; align-items: center; }
-/*
-  The lockup is a link in both chromes, and round 2 still measured it at 104x21.
-
-  This rule named the footer alone, so the header's lockup was never in its reach -- and the
-  header is where the QA screenshot measured it, at 1440 and 1280. Both are named now, with
-  `display: flex` restated so the height applies whichever sheet is in force. The header row is
-  64px and `align-items: center`, so a 44px lockup changes nothing a reader sees.
-*/
 .chrome-v2-header .wordmark,
 .chrome-v2-footer .wordmark { display: flex; align-items: center; min-height: 44px; }
-
-/*
-  WCAG 2.2 AA 2.5.8, and this campaign's own 44px floor, in the legal row.
-
-  Round 2 measured the Korean language switch at 42x47: the height passed and the width was two
-  pixels short, carried entirely by how many characters 한국어 is -- /ko's "English" link is 49
-  wide and passed. The same row's other controls were 18px tall (한국어/English 42x18,
-  security@tavonel.com 142x18), under 2.5.8's 24px as well. Every link in `.site-footer-groups`
-  cleared the floor after round 2; these did not, because they are inline `<a>` and `<button>` in
-  a paragraph rather than rows in a group.
-
-  A box rather than two pixels of extra padding: `min-width` alone would leave the height at 18.
-  The separators stay outside the controls (BQ-051 owns those), so the row still breaks between
-  pairs and never before one.
-
-  AND THE ROW IS A FLEX ROW NOW, WHICH IS WHAT KEEPS THE 44px BOXES FROM INFLATING IT.
-
-  Round 3 measured the /integrations footer at 812px against a 760px ceiling on a 390x844 phone,
-  and these boxes were half of the reason (the deployment-gate paragraph, since removed, was the
-  other). As inline boxes in a paragraph, each 44px control makes the line box it sits in 44px
-  tall AND the paragraph's own leading still applies around it, so a three-line row cost well
-  over 132px. As flex items each wrapped line is exactly as tall as its tallest item, the gap is
-  declared rather than inherited from the font, and the controls keep every pixel of their target
-  size. `flex-wrap` plus the nowrap pairs preserves BQ-051's rule that a separator never leads a
-  line.
-*/
 .chrome-v2-footer .site-footer-legal {
   display: flex;
   flex-wrap: wrap;
@@ -368,14 +167,16 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
   min-width: 44px;
 }
 
-/*
-  THE DEPLOYMENT GATE IS NOT STYLED HERE BECAUSE IT IS NOT RENDERED HERE.
+/* Shared edges and legible navigation across public pages. */
+.chrome-v2-header .wordmark b, .chrome-v2-footer .wordmark b { font-family: var(--f-sans); font-size: 15px; font-weight: 650; letter-spacing: .12em; }
+.chrome-v2-footer .site-footer-groups a { font-size: 14px; }
 
-  `.site-footer-gate` was the footer's copy of `activationPolicy.customerData.reason`, added to
-  give back the routes that lost the header's state line. It broke two gates this repository
-  already enforces -- `e2e/explore.spec.ts` forbids "this deployment" on /explore, and
-  `e2e/public-layout-balance.spec.ts` caps the footer at 90% of a phone viewport -- so the
-  paragraph is gone from `components/public-site-chrome.tsx` and the rule with it. The fact is
-  still published verbatim on /pricing, /security, /integrations, in the /docs first-run notes
-  and in the landing's closing scene.
-*/
+/* The header, public article grid and footer share one outer alignment. */
+.public-page main .shell,
+.pricing-page main .shell {
+  width: min(var(--chrome-measure), calc(100% - 2 * var(--chrome-gutter)));
+  max-width: var(--chrome-measure);
+  margin-inline: auto;
+  padding-inline: 0;
+}
+.public-page, .pricing-page { font-size: 16px; }

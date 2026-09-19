@@ -301,3 +301,13 @@
 
 /* The intake receipt reads as a caption; the naming line is the sentence the scene builds to. */
 .naming { margin: 18px 0 0; color: var(--text-hi); }
+
+/* A phone gets an overview, not six oversized single-column labels. */
+@media (max-width: 767px) {
+  .diagram { gap: 16px; }
+  .item { grid-template-columns: 72px minmax(0, 1fr); }
+  .objectList { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+  .diagram .connLine { height: 20px; }
+  .compiler { padding-block: 12px; }
+  .foot { margin-top: 24px; }
+}

@@ -63,7 +63,7 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
       data-scene={String(LANDING_V2_SCENE_ORDER.indexOf("why") + 1)}
       tabIndex={-1}
       aria-labelledby={titleId}
-      className="lv2-scene lv2-scene--proof lv2-paper"
+      className="lv2-scene lv2-scene--proof lv2-obsidian lv2-surface"
     >
       <div className="lv2-wrap">
         <div className="lv2-split">
@@ -77,7 +77,7 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
             */}
             <h2 className="lv2-h2" id={titleId}>
               <span className="lv2-h2-line">{copy.headline}</span>
-              <span className="lv2-h2-line lv2-h2-accent lv2-serif">{copy.headlineAccent}</span>
+              <span className="lv2-h2-line lv2-h2-accent lv2-emphasis">{copy.headlineAccent}</span>
             </h2>
             <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
             {/*

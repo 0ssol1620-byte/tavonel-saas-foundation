@@ -134,7 +134,7 @@ export const metadata: Metadata = {
   Android and installed surface.
 */
 export const viewport: Viewport = {
-  themeColor: "#08090A",
+  themeColor: "#090D14",
   colorScheme: "dark",
 };
 

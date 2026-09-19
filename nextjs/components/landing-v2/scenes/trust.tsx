@@ -95,7 +95,7 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
       data-scene={String(SCENE_INDEX)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
-      className="lv2-scene lv2-scene--compact lv2-paper"
+      className="lv2-scene lv2-scene--compact lv2-obsidian lv2-surface"
     >
       <div className="lv2-wrap">
         <div className="lv2-scene-head">

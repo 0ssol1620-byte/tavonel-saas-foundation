@@ -75,8 +75,8 @@
   without borrowing a meaning.
 */
 .tab[aria-selected="true"] {
-  border-color: var(--text-hi);
-  box-shadow: inset 0 -2px 0 0 var(--text-hi);
+  border-color: var(--source);
+  box-shadow: inset 0 -2px 0 0 var(--source);
   color: var(--text-hi);
   font-weight: 500;
 }
@@ -183,7 +183,7 @@
 
 @media (min-width: 900px) {
   .frames {
-    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
   }
 }
 
@@ -246,3 +246,6 @@
 .grid:has(.answer a:focus-visible) .citation {
   color: var(--source);
 }
+
+/* Keep evidence together instead of floating on an empty field. */
+.panel { padding: clamp(16px, 2vw, 28px); border: 1px solid var(--hairline); border-radius: var(--radius-md); }

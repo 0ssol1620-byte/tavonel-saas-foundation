@@ -42,7 +42,7 @@ export function WorldLifecycle() {
   const boxWidth = 132;
   const gap = (width - boxWidth * 4) / 3;
   return (
-    <figure className={styles.figure}>
+    <figure className={styles.figure} tabIndex={0} role="group" aria-label="Compiled World lifecycle diagram and definitions">
       <svg
         viewBox={`0 0 ${width} 132`}
         className={styles.svg}

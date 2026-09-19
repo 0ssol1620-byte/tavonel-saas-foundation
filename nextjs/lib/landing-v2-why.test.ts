@@ -125,7 +125,7 @@ describe("landing V2 scene 06 across languages", () => {
       const copy = LANDING_V2_COPY[locale].why;
       expect(copy.manifesto).toEqual(copy.headlineAccent);
       expect(html.split(copy.manifesto).length - 1).toBe(1);
-      expect(html).toContain("lv2-serif");
+      expect(html).toContain("lv2-emphasis");
     }
   });
 });

@@ -17,7 +17,7 @@
   composition a close can hold without a visual.
 */
 .close {
-  max-width: 760px;
+  max-width: 1040px;
   margin-inline: auto;
   text-align: center;
 }

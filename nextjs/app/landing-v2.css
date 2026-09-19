@@ -1,198 +1,54 @@
-/*
-  Landing V2 (blueprint 2026-09-19, hero amended by the founder 2026-09-20). Landing-only rules:
-  the nine scenes, the centered hero and its film frame, and the shared evidence primitives.
-  Unlayered on purpose, like one-path.css: it must win over the layered system sheets. Token-only colours.
-
-  Everything here is scoped under `.lv2`, the landing root element, for one reason: this sheet
-  loads on every route (app/layout.tsx imports it) and the landing's type scale, grounds and
-  section rhythm are not the site's. A bare `h1` rule here would repaint 28 documentation pages
-  that nobody in this campaign looks at.
-
-  This file is the skeleton only -- scale, container, grounds, rhythm, grid, radius, focus and
-  reduced motion. Scene and component rules land on top of it in the hero and proof lanes.
-*/
-
-/* ============================================================ scale + container */
+/* 2026-09-20 visual refinement: shared geometry and source-first hierarchy. */
 
 .lv2 {
-  /*
-    §6 desktop scale, as custom properties rather than as rules, so a scene can set a heading to
-    the H2 size without inheriting the H2's margins. Sizes are named by role, never by number.
-
-    The 12px floor (scripts/check-type-floor.mjs) is a hard bound on --lv2-meta: mono metadata is
-    12-13px here and never 11px, which is the one place the blueprint (§6, "Meta Mono 11-13px")
-    is overridden by a truth rule.
-  */
-  /*
-    D3 / §6 / §32 AMENDED, 2026-09-19 (hero recomposition; QA round 3 P0 "inverted hierarchy").
-
-    §6 asks for a Display XL of clamp(64px, 6.1vw, 92px) over an H2 of 46-54px. The first build
-    took the H2 half literally and cut the display to fit a 520px text column, which produced a
-    45px H1 under a 54px H2 -- the page's most important line set smaller than every section
-    heading below it. §2.5 and §39 both make visible hierarchy a gate, and it outranks either
-    absolute number: a display that is not the largest type on the page is not a display.
-
-    So BOTH ends move, and the arithmetic is measured rather than guessed. Ink extents read off
-    the 1440 QA capture (H1 at 45.36px): "Traceable to every source." 10.21em, "AI-ready
-    knowledge." 8.97em. At 56px the longer line wants about 575px, which the recomposed 600px
-    text column holds on one line -- so the H1 clamps to 56 and the H2 drops to 44, and the gap
-    between them is a step a reader can see.
-
-    §6's 64-92px display is not reachable at all with a nineteen-character line in a 600px
-    column: 64px would need 654px and 92px would need 940px. It is recorded here as overridden by
-    §6's own 2.2-line cap and §39's hierarchy rule, not as an oversight.
-
-    RAISED AGAIN 2026-09-19 (design review D1), AND PARTLY PUT BACK THE SAME DAY (P3 QA round 1).
-
-    D1 restored §6's intent -- display clamp(56px, 5vw, 72px) at >=1200 and clamp(40px, 10vw,
-    46px) below 768 -- and widened the hero's text track to 752px so the longer sentence would
-    still set on one line at 72px. Both halves were derived from an assumed em advance rather
-    than from a rendered page, and both were wrong where it counts: the English H1 set in FOUR
-    lines at 390 and 360 (cap 3.2) and the Korean H1 in three at 1440 and 1280 (cap 2.2), while
-    the widened track inverted §32's 42:58 text:visual ratio to 58:42.
-
-    THE STEPS BELOW ARE MEASURED, NOT DERIVED. Every one was read off the built fixture server in
-    chromium AND webkit at 1440/1280/1200/1024/768/430/390/360 on both / and /ko, against the
-    600px text track §32 asks for (see the hero block). What the measurement says for the English
-    headline in a 600px column: 58px sets in two lines and 60px in three, so the >=1200 step
-    stops at 56 -- two pixels of slack kept rather than spent. Below 768 the measure is the
-    viewport: 40px sets it in four lines at 390 and 360, and 34-38px in three.
-
-    THE MEASURE IS 760 SINCE THE FOUNDER'S CENTERED HERO (2026-09-20) AND THE STEPS DID NOT MOVE.
-    A wider measure can only set the same string in fewer lines, so every step above stays inside
-    its own cap; what it buys is slack rather than a larger display. Raising the clamp on the
-    strength of that would be a measurement this lane has not made, and an assumed em advance is
-    what put this scale wrong twice already.
-
-    §6's 64-92px Display XL is still unreachable in a 600px column, and is still recorded as
-    overridden by §6's own 2.2-line cap and §39's hierarchy rule rather than as an oversight.
-  */
-  --lv2-display: clamp(46px, 4.6vw, 52px);
-  --lv2-h2: clamp(38px, 3.2vw, 46px);
+  --lv2-display: clamp(46px, 5.1vw, 64px);
+  --lv2-h2: clamp(34px, 3.1vw, 46px);
   --lv2-h3: 28px;
   --lv2-body-l: 20px;
   --lv2-body: clamp(16px, 1.2vw, 18px);
-  --lv2-small: 14px;
+  --lv2-small: 15px;
   --lv2-meta: 13px;
-
-  /*
-    §7. The outer margin is the gutter, and it steps by breakpoint rather than scaling, because
-    the header wordmark has to land on the same left edge as the landing content at every width.
-    72px at >=1440 is the blueprint's 1440 grid: 1440 - 2*72 = 1296 content.
-  */
-  --lv2-gutter: 20px;
-
-  /*
-    §34's section rhythm, declared here and not in :root. The token name already exists site-wide
-    at clamp(88px, 9vw, 144px) and about thirty documentation routes lay their bodies out with
-    it; raising it globally would re-space every one of them, and no lane in this campaign
-    screenshots those pages. Same name, landing scope, blueprint value.
-  */
-  /*
-    D2 (chapter budget), 2026-09-19: was clamp(112px, 11vw, 176px). At 1440 that spent 316px of
-    the 900px viewport on padding alone and put four of the five proof scenes 19-27% over §24's
-    80-95vh band, with the excess showing as empty ground at the end of each one. 96px a side is
-    the largest value that leaves every proof scene inside 95vh at 1440x900 with its content
-    unchanged; §34's rhythm is a proportion between scenes, and it survives the cut intact.
-  */
-  --space-section: clamp(72px, 6.6vw, 96px);
-
-  /*
-    The one shadow the paper layer adds. Depth is otherwise --depth-* and nothing else: a sheet
-    of paper lifted off a dark ground is a real object with a real edge; a card with a glow is
-    not. Scene rules read this token and do not write a second shadow.
-  */
+  --lv2-gutter: var(--chrome-gutter);
+  --space-section: clamp(56px, 5.2vw, 88px);
   --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
-
-  /*
-    `--lv2-rest` was declared here: the resting emphasis of the hero demo's sixteen-second
-    sequence, set at 0.85 because that is where --text-lo stops clearing 4.5:1 against --ink-950
-    once an ancestor's opacity multiplies into it. The demo and its sequence left the hero with
-    the founder's 2026-09-20 decision, and a token nothing reads is a measured number waiting to
-    be reused for something it was not measured for.
-  */
-
   color: var(--text-hi);
   font-family: var(--f-sans);
 }
-
-/* Mobile scale (§6). One block, one breakpoint: the hero stacks below 768, it is not shrunk. */
 @media (max-width: 767px) {
   .lv2 {
-    /*
-      9vw is 32px at 360 and 35px at 390, and the floor holds the narrow end at 32.
-
-      Measured in BOTH engines, which is what decided the number: at 360 Chromium sets the English
-      headline in three lines at 34px and WebKit sets the same 34px in FOUR. The two engines shape
-      this string differently enough to cross the cap between them, so the step is taken from the
-      one that breaks first -- 32px is three lines in both, 40px is four in both. Contract rule 12
-      puts webkit at 360 inside "done", so this is not a Chromium number with a WebKit footnote.
-
-      The H2 floor drops with it so the step between them stays visible: 28px against a 32px H1 is
-      a hierarchy a reader can see, 30 against 32 is not.
-    */
-    --lv2-display: clamp(32px, 9vw, 40px);
+    --lv2-display: clamp(28px, 8.8vw, 40px);
     --lv2-h2: clamp(28px, 7.5vw, 32px);
     --lv2-h3: 24px;
     --lv2-body-l: 18px;
     --lv2-body: 17px;
-    --lv2-meta: 12px;
+    --lv2-meta: 13px;
   }
 }
-
 @media (min-width: 768px) {
-  .lv2 { --lv2-gutter: 32px; }
+  .lv2 { --lv2-gutter: var(--chrome-gutter); }
 }
 @media (min-width: 1200px) {
   .lv2 {
-    --lv2-gutter: 48px;
-    /* The desktop display, measured against a 600px track at two lines up to 58px and at three
-       from 60px, so 56 is the step. The centered block is 760 wide, which is slack on the same
-       measurement rather than a reason to raise the clamp. */
-    --lv2-display: clamp(44px, 3.9vw, 56px);
+    --lv2-gutter: var(--chrome-gutter);
+    --lv2-display: clamp(64px, 5vw, 76px);
   }
 }
 @media (min-width: 1440px) {
-  .lv2 { --lv2-gutter: 72px; }
+  .lv2 { --lv2-gutter: var(--chrome-gutter); }
 }
-
 .lv2-wrap {
-  width: min(1296px, calc(100% - 2 * var(--lv2-gutter)));
+  width: min(var(--chrome-measure), calc(100% - 2 * var(--lv2-gutter)));
   margin-inline: auto;
 }
-
-/* ============================================================ type */
-
-/*
-  text-wrap: balance on the headings, and only the headings. It is what keeps a two-line H1 from
-  leaving one orphaned word on line two, and the browser balances a bounded number of lines, so
-  it is cheap on a heading and refused on a long paragraph anyway.
-*/
-/*
-  `word-break: keep-all` is here for Hangul and costs Latin nothing.
-
-  Korean has no inter-syllable word boundary a browser can see, so the default breaks a heading
-  anywhere -- the QA round measured the Korean H1 splitting "사용할 / 수 있는" mid-phrase. keep-all
-  restricts the break to a space, which in Korean is a phrase boundary. On Latin text the rule is
-  a no-op: a space is already where the break lands.
-*/
 .lv2 h1,
 .lv2 h2,
 .lv2 h3 {
   text-wrap: balance;
   word-break: keep-all;
 }
-
-/*
-  `.lv2-h2` has consumers; `.lv2-h3`, `.lv2-body` and `.lv2-small`'s siblings do not yet, and that
-  is deliberate rather than dead. They are §6's scale, and the scene visuals of P1 and P2 set
-  their headings and captions from it -- the alternative is each scene inventing a size. What was
-  actually dead was `.lv2-h1`, which named the hero's own role and competed with the rule the hero
-  used; it is gone and `--lv2-display` is the hero's size (see the top of this file).
-*/
 .lv2-h2 {
   font-size: var(--lv2-h2);
-  line-height: 1;
+  line-height: 1.1;
   letter-spacing: -0.035em;
 }
 .lv2-h3 {
@@ -212,33 +68,24 @@
   font-size: var(--lv2-small);
   line-height: 1.45;
 }
-/* Source locations, page numbers, digests, snapshot labels. Mono because it is read as data. */
 .lv2-meta {
   font-family: var(--f-mono);
   font-size: var(--lv2-meta);
   line-height: 1.35;
   letter-spacing: 0.02em;
 }
-/* The editorial accent (§6). One phrase of the H1, the manifesto line. Never a paragraph. */
-.lv2-serif {
-  font-family: var(--f-serif);
-  font-style: italic;
-  letter-spacing: -0.01em;
+.lv2-emphasis {
+  font-family: var(--f-sans);
+  font-style: normal;
+  font-weight: inherit;
+  font-synthesis: inherit;
+  letter-spacing: inherit;
+  color: var(--source);
 }
-
-/* ============================================================ grounds */
-
-/*
-  Two grounds, alternating (§5.1). A scene declares which one it is and everything inside it is
-  correct, because the ground class remaps the neutral and accent token names rather than asking
-  each component to know where it landed. A primitive written against var(--source) is legible on
-  obsidian and on paper; without the remap it would be 8.03:1 on one and 2.14:1 on the other.
-*/
 .lv2-obsidian {
   background: var(--ink-950);
   color: var(--text-hi);
 }
-
 .lv2-paper {
   background: var(--paper-50);
   color: var(--text-on-paper);
@@ -253,52 +100,23 @@
   --verified: var(--verified-ink);
   --changed: var(--changed-ink);
 }
-
-/* A link on paper is the ink colour with a rule under it; there is no second link blue here. */
 .lv2-paper a {
   color: var(--text-on-paper);
   text-decoration-color: var(--border-paper-hi);
 }
-
-/* ============================================================ scene rhythm */
-
 .lv2-scene {
   padding-block: var(--space-section);
 }
-/*
-  Hero and full-bleed motion scenes (§24). min() rather than a bare 100vh: on a tall window a
-  100vh hero is a band of mostly nothing, and it keeps the 1440 canvas at the 900px the
-  blueprint specifies instead of letting it grow with the viewport.
-*/
 .lv2-scene--full {
-  min-height: min(900px, 100vh);
+  min-height: 0;
 }
-/*
-  A floor, never a reservation. D2 caps the proof scenes at 95vh and the compact trust scene at
-  760px; the floor below only stops a short scene from reading as a strip.
-*/
 .lv2-scene--proof {
-  min-height: 72vh;
+  min-height: 0;
 }
-/* §24's compact scene: Scene 08 states four things and stops. */
 .lv2-scene--compact {
   min-height: 0;
-  padding-block: clamp(64px, 5.4vw, 80px);
+  padding-block: clamp(48px, 4.8vw, 80px);
 }
-
-/* ============================================================ grid */
-
-/*
-  Editorial Split (§7): text 4 columns, visual 8. Expressed as a two-track grid rather than as
-  spans inside a 12-column parent, because that is one rule instead of three and the text column lands
-  8px narrower than a true 4-of-12 -- a difference no reader can see.
-
-  D4, 2026-09-19: 768-1199 gets a composition of its own. It used to jump from one column straight
-  to 4+8 at 1200, so the blueprint's whole tablet band rendered the phone stack at desktop width --
-  the page measured 8,780px at 1280 and 11,128px at 1024, 27% taller at the narrower viewport. A
-  5:7 split is the shape that band can hold: a 4-column text track is about 260px there and has
-  stopped being a column, but 5 of 12 is 370px at 1024, which is a measure.
-*/
 .lv2-split {
   display: grid;
   gap: 24px;
@@ -312,29 +130,12 @@
 @media (min-width: 1200px) {
   .lv2-split {
     gap: 40px;
-    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   }
 }
-
-/* ============================================================ radius by material */
-
-/*
-  §34. Not everything is a 22px rounded card. The radius says what the object is made of: a
-  document has the corner of a printed page, a panel is an instrument, a scene is a slab. Pills
-  (--r-full) stay where they already are -- status chips and buttons -- and nowhere else.
-*/
 .lv2-document { border-radius: var(--radius-sm); }
 .lv2-panel { border-radius: var(--radius-md); }
 .lv2-stage { border-radius: var(--radius-lg); }
-
-/* ============================================================ focus */
-
-/*
-  The site-wide ring is mint (`:focus-visible` in tavonel.css). It cannot be the ring here: mint
-  on --paper-50 is 1.43:1, which is not a focus indicator, it is a rumour of one. Blue is the
-  landing's ring on dark (8.03:1 on --ink-950) and the ink colour is the ring on paper (17.6:1).
-  Two colours, both measured, neither decorative.
-*/
 .lv2 a:focus-visible,
 .lv2 button:focus-visible,
 .lv2 summary:focus-visible,
@@ -342,36 +143,12 @@
   outline: 2px solid var(--source);
   outline-offset: 2px;
 }
-/*
-  .lv2-paper already remaps --source to the paper sibling, so this would be legible either way.
-  It is the ink colour rather than the blue because a focus ring on a document should read as the
-  page's own mark, and because at 17.6:1 there is no argument about whether it is visible.
-*/
 .lv2-paper a:focus-visible,
 .lv2-paper button:focus-visible,
 .lv2-paper summary:focus-visible,
 .lv2-paper [tabindex]:focus-visible {
   outline-color: var(--text-on-paper);
 }
-
-/* ============================================================ reduced motion */
-
-/*
-  §26. Every timed thing on this landing either reads a --motion-* token or runs a keyframe
-  animation, so both are handled here once and no scene writes its own reduced-motion block.
-
-  Animations are collapsed, not stopped: 1ms and a single iteration leaves the last keyframe on
-  screen, which is the static complete state the guardrail asks for. A paused animation would
-  leave the first frame, and `animation: none` would leave whatever the element looked like
-  before the beat ran -- a source page that never arrives.
-
-  Transitions are capped at 120ms and narrowed to opacity, so a hover or focus still confirms
-  itself and nothing travels. There is deliberately no blanket `transform: none`: that would also
-  cancel the static transforms that position things, and the requirement is that motion stops,
-  not that layout collapses. Camera and node travel are removed at their source -- by the scene
-  rules that would otherwise animate a transform -- and this block is what makes those animations
-  land on their final frame instead of their first.
-*/
 @media (prefers-reduced-motion: reduce) {
   .lv2 {
     --motion-fast: 1ms;
@@ -390,46 +167,20 @@
     transition-delay: 0ms !important;
   }
 }
-
-/* ============================================================================================
-   SCENES -- the nine sections (D9, §9, §24)
-   ============================================================================================ */
-
-/*
-  Every scene is the same five things: a label, a heading, one paragraph, an optional qualifier,
-  and one thing to do next. The composition differs; the shape does not, which is what makes the
-  page read as a slide deck rather than as nine one-off layouts (§24).
-*/
-.lv2-scene-head { max-width: 72ch; }
+.lv2-scene-head { max-width: 840px; }
 .lv2-split .lv2-scene-head { max-width: none; }
-
-/*
-  The eyebrow names the scene's subject; it never restates the heading under it, which is the
-  shape BQ-099 deleted nineteen of. Mono and tracked, because on this landing mono is the voice
-  of a label rather than of prose.
-*/
 .lv2-eyebrow {
   margin: 0 0 14px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-mid);
 }
-
-/* One sentence per line. Both lines are the heading; the second is set apart, not set smaller. */
 .lv2-h2 { margin: 0; }
 .lv2-h2-line { display: block; }
 .lv2-h2-accent { color: var(--text-mid); }
-/* D3: the serif is allowed on the H1's accent phrase and on the §16 manifesto line. Nowhere else. */
-.lv2-h2-accent.lv2-serif { color: var(--text-hi); }
-
+.lv2-h2-accent.lv2-emphasis { color: var(--text-mid); }
 .lv2-scene-support { margin: 20px 0 0; color: var(--text-mid); max-width: 64ch; }
 .lv2-scene-note { margin: 14px 0 0; color: var(--text-lo); max-width: 72ch; }
-
-/*
-  One next action per scene (§39). A text link with a rule under it rather than a second button:
-  §29 gives this page exactly one filled control per viewport, and a page of buttons is a page
-  with no hierarchy.
-*/
 .lv2-text-link {
   display: inline-flex;
   align-items: center;
@@ -449,28 +200,6 @@
   .lv2-text-link:hover { text-decoration-color: var(--source); }
 }
 .lv2-scene-next { margin-top: 22px; }
-
-/*
-  A LINK INSIDE A SENTENCE (P3 QA round 1).
-
-  `.lv2-text-link` above is the scene's ONE next action and stays unique -- `lib/landing-v2-
-  recompile.test.ts` pins that there is exactly one of it per scene. This is the other kind: a
-  reference that is part of the prose, on a proof's own label or at the end of a note. It exists
-  because two lanes reached for a bare `<a>` and produced the same two defects at once.
-
-  THE 44px FLOOR IS NOT A PHONE RULE. An inline anchor is as tall as its line box, so the four
-  trust proofs measured 19px and Scene 05's contract link 18px at 390 and 38px at 1440 -- at every
-  width and in both locales. Contract rule 8 puts the floor on every reachable control.
-  `inline-flex` gives the anchor a box without taking it out of the sentence.
-
-  AND IT LOOKS LIKE A LINK BEFORE IT IS TOUCHED. The first version carried no resting affordance
-  at all: no underline, no arrow, no colour, nothing until hover or focus. Rule 8 bars colour as
-  the only carrier of a state; nothing at all is worse, and a touch reader has no hover to
-  discover it with. The underline is at rest in the hairline ink, and goes to the text's own
-  colour on hover and focus -- the same step `.lv2-text-link` makes.
-
-  It inherits colour and size on purpose: it is a word in a sentence, not a control beside one.
-*/
 .lv2-inline-link {
   display: inline-flex;
   align-items: center;
@@ -486,18 +215,6 @@
 @media (hover: hover) and (pointer: fine) {
   .lv2-inline-link:hover { text-decoration-color: currentColor; }
 }
-
-/*
-  Scene 08's four proofs (§18), as a list rather than as four cards.
-
-  §7 cuts the card-inside-a-card pattern and §18 allows this scene the site's only border-heavy
-  treatment, so the border is one rule per proof rather than a box around each: a rule, a label,
-  a sentence. Two columns from 900 up because the four notes are one or two lines each and a
-  single 72ch column would run the scene past a viewport for no gain.
-
-  Tokens only, and `--hairline` because `.lv2-paper` remaps it to `--border-paper` -- the same
-  markup would read correctly if the ground alternation ever moved this scene to obsidian.
-*/
 .lv2-proof-list {
   list-style: none;
   margin: 36px 0 0;
@@ -519,170 +236,67 @@
 }
 .lv2-proof-label { margin: 0; font-weight: 500; color: var(--text-hi); }
 .lv2-proof-note { margin: 8px 0 0; color: var(--text-mid); }
-
-/*
-  The one filled control keeps its size on the landing (§32: CTA row h48). The colour is the
-  system's -- `.btn` paints `--text-hi` on `--ground` -- and the paper override below exists
-  because `.lv2-paper` remaps `--text-hi` to the ink, which would otherwise paint near-black
-  text on a near-black button the first time a lane puts an action on a paper scene.
-*/
 .lv2 .btn.lv2-cta { min-height: 48px; padding-inline: 22px; }
 .lv2-paper .btn { color: var(--paper-50); }
-
-
-/* ============================================================================================
-   HERO (§10, §32) -- FOUNDER DECISION 2026-09-20: one centered statement, then one visual
-   ============================================================================================ */
-
-/*
-  WHAT THIS REPLACES, AND WHY IT IS NOT §11.1'S SPLIT ANY MORE.
-
-  §11.1 draws the hero as a 42:58 split with a compiled-object composition in the right-hand
-  column, and this sheet built it: a region strip, a page locator, a claim card, two entity chips,
-  the arrivals and the comparison counts, each in its own grid cell, narrated by seven rotating
-  captions over a 16-second timeline. Every one of those objects was real and every figure in it
-  had a receipt, and it still failed the only test that matters at the top of a page -- the
-  founder read it and could not tell what it said. §2.5's own rule is the diagnosis: a premium
-  page is not one with less information, it is one with a clear hierarchy, and nine text blocks at
-  one weight in one column have none.
-
-  So the hero is the shape every reference site in `reports/landing-v2-0919/compare/` uses. One
-  centered block -- eyebrow, headline, support, two actions, the intake line -- and then one
-  visual under it, full width and unexplained. The visual is the four locked compile films, which
-  the previous landing played and which the founder asked for back.
-
-  THE MEASURE IS 760, NOT THE 600 THE SPLIT NEEDED.
-  A centered block reads as one column, so its measure is set by the headline rather than by a
-  grid track. 760px holds "Traceable to every source." on one line at the 56px display this scale
-  clamps to (the line wants about 575px; see the note over `--lv2-display`), which is what keeps
-  the H1 at two lines and the largest type on the page. The support and the intake line sit inside
-  it at their own measures so the block is not a 760px wall of text.
-*/
 .lv2-hero { padding-block: 88px 40px; }
-
 @media (min-width: 768px) {
-  .lv2-hero { padding-block: 112px 48px; }
+  .lv2-hero { padding-block: 96px 48px; }
 }
 @media (min-width: 1200px) {
-  /*
-    120 rather than §32's content top of 170. That number was measured against a two-column hero
-    whose visual had to start high enough to be read beside the text; here everything below the
-    block is the film, and C1 asks the block to END by about y=560 at 1440x900 so the film's top
-    third is above the fold. 120 + the block's own 360 lands it at about 480.
-  */
-  .lv2-hero { padding-block: 120px 56px; }
+  .lv2-hero { padding-block: 96px 48px; }
 }
-
-/*
-  The centered block. `text-align: center` is on the wrapper, so every child inherits it and each
-  one carries only its own measure -- there is no per-element alignment to keep in step.
-*/
 .lv2-hero-text {
-  max-width: 760px;
+  max-width: 1080px;
   margin-inline: auto;
   text-align: center;
 }
-
-/*
-  The H1, at the size the hierarchy needs and in the measure that size needs.
-
-  `--lv2-display` carries the size (see the top of this file); this element carries the optical
-  settings, which step per breakpoint because tracking that reads as tight at 56px reads as broken
-  at 36px. 22ch is the cap below the desktop step, where the viewport rather than the block is the
-  measure; above 1200 the 760px block is the measure and this cap would only fight it.
-*/
 .lv2-hero-h1 {
   margin: 0 auto;
   font-size: var(--lv2-display);
-  line-height: 1.04;
+  line-height: 1.08;
   letter-spacing: -0.03em;
-  max-width: 22ch;
+  max-width: none;
 }
 @media (min-width: 768px) {
-  .lv2-hero-h1 { line-height: 0.99; letter-spacing: -0.038em; }
+  .lv2-hero-h1 { line-height: 1.06; letter-spacing: -0.042em; }
 }
 @media (min-width: 1200px) {
-  .lv2-hero-h1 { line-height: 0.96; letter-spacing: -0.045em; max-width: none; }
+  .lv2-hero-h1 { line-height: 1.06; letter-spacing: -0.045em; max-width: none; }
 }
 .lv2-h1-line { display: block; }
-/* The serif runs optically larger than the sans at the same em and sits a hair high; both are
-   corrected here rather than by choosing a rounder number for the headline. */
-.lv2-hero-h1 .lv2-serif { font-size: 1.04em; line-height: 0.9; }
-
-/* §6's body measure, taken over §32's 500px: a 52-character line is not a paragraph. Centred on
-   the block rather than filling it, so the support reads as one sentence under the headline. */
+.lv2-hero-h1 .lv2-emphasis { font-size: 1em; line-height: inherit; }
 .lv2-hero-support {
   margin: 22px auto 0;
-  font-size: 19px;
+  font-size: clamp(18px, 1.45vw, 20px);
   line-height: 30px;
-  max-width: 56ch;
+  max-width: 780px;
   color: var(--text-mid);
 }
-
-/* §32: CTA row mt32 h48, meta row mt24. Centred with the block, and the two controls stay side
-   by side until the viewport is too narrow for them (`flex-wrap`). */
 .lv2-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 12px 28px;
-  margin-top: 32px;
+  margin-top: 24px;
 }
-/* D10: commas are the only break points in the run; the connector clause is one phrase. */
 .lv2-hero-intake {
-  margin: 24px auto 0;
+  margin: 18px auto 0;
   color: var(--text-lo);
-  max-width: 60ch;
+  max-width: none;
   overflow-wrap: normal;
 }
 .lv2-hero-intake-tail { white-space: nowrap; }
-
-/* ============================================================================================
-   THE HERO FILM (§11.3, contract rules 3 and 7) -- the four locked cuts, under the statement
-   ============================================================================================ */
-
-/*
-  `components/landing-v2/hero-film.tsx` mounts the site's one film player; every rule the player
-  itself needs is already in `app/tavonel.css`, which loads on every route. What is here is only
-  the landing's frame around it, and there are three things in that frame.
-
-  THE WIDTH IS CAPPED BY THE VIEWPORT'S HEIGHT, NOT ONLY BY ITS WIDTH.
-  The frame keeps the cuts' own 1440x900, so its height is its width over 1.6 -- and at 1120px
-  that is 700px of film under a 360px block of text, which is a hero of about 1.6 viewports on the
-  commonest laptop. C6 caps it at 1.3. A width cap alone cannot express that, because the thing
-  being bounded is the sum of a fixed block and a ratio, so the cap is written in the unit the
-  bound is in: `100svh` minus what the statement, the note and the padding take, times the film's
-  own ratio. `svh` rather than `vh` so a phone's retracting toolbar does not resize the film under
-  the reader. The 520px floor is what stops a short window from shrinking the film to a thumbnail,
-  and `min(100%, ...)` keeps it inside the wrap at every width.
-
-  The 545px subtrahend is MEASURED, not estimated: on the built server at 1440x900 the English
-  hero spends 120px of top padding, 390px of statement, 40px of gap to the film, 46px of tab
-  strip, 32px of the sequence gaps, 21px of caption, 73px of note and 56px of bottom padding --
-  everything except the frame itself. It is re-derived, not nudged, whenever that chrome changes.
-
-  IT IS THE CUTS' RATIO AND NOT 16:9. The films are 1440x900 and their bytes are locked
-  (`lib/locked-film-assets.json`). A 16:9 frame over a 16:10 recording either crops the top and
-  bottom of a cut that composes to its own edges, or pillarboxes it -- so the frame takes the
-  shape of what is in it. Reported as a deliberate deviation rather than silently met.
-
-  THE TAB IS 44px AT EVERY WIDTH. `app/tavonel.css` raises the stage tabs to the touch floor only
-  under `(pointer: coarse)`, which is a real device and not the 390px project this campaign's QA
-  runs. A tab that is 40px tall under a thumb is 40px tall whatever the pointer reports, so the
-  floor is unconditional here.
-*/
 .lv2-film {
   margin-top: 40px;
   --lv2-film-w: 1120px;
 }
 @media (min-width: 768px) {
-  .lv2-film { margin-top: 56px; }
+  .lv2-film { margin-top: 36px; }
 }
 @media (min-width: 900px) {
-  .lv2-film { --lv2-film-w: min(1120px, max(520px, calc((100svh - 545px) * 1.6))); }
+  .lv2-film { --lv2-film-w: 1120px; }
 }
-
 .lv2-film .compile-film-sequence { gap: 16px; }
 .lv2-film .compile-film-stages,
 .lv2-film .compile-film-viewport,
@@ -691,55 +305,22 @@
   margin-inline: auto;
 }
 .lv2-film .compile-film-stages button { min-height: 44px; }
-/*
-  `min-height` is cleared because `app/tavonel.css` sets `clamp(430px, 52vw, 850px)` on this box
-  for the retired landing's full-bleed frame; with the aspect ratio doing the work here, a floor
-  taller than the ratio's height would letterbox the cut inside its own frame.
-*/
 .lv2-film .compile-film-viewport {
   min-height: 0;
   border: 1px solid var(--border-dark);
   border-radius: var(--radius-md);
   background: var(--ink-900);
-  /*
-    `app/one-path.css` turns this frame into a horizontal scroller below 900px (G1-012): the
-    retired landing sized the recording off the frame's HEIGHT there and panned across it, because
-    the live canvas draws a fixed four-column stage that a 350px frame crushes rather than
-    shrinks. The rules that made the recording overflow went with that landing; what is left is a
-    scroll container with nothing in it that is wider than itself -- a scrollbar gutter, a
-    swipe that does nothing, and a snap axis on a box with one pane.
-
-    This hero plays a RECORDING at every width, so it has no crushing to avoid: the cut scales
-    down whole and stays legible as a film. The frame is a frame again, and the four snap targets
-    the pan needed are hidden with the scrolling they were targets for.
-  */
   overflow: hidden;
 }
 .lv2-film .compile-film-panes { display: none; }
 .lv2-film .compile-film-caption p { color: var(--text-mid); }
-
-/*
-  The sentence that separates a directed film from what a compile emits (§11.3, contract rule 7).
-  It is the film's own footnote, so it is set at metadata weight and sits with the frame rather
-  than under the page.
-*/
 .lv2-film-note {
   margin: 14px auto 0;
-  max-width: 96ch;
+  max-width: min(1120px, 100%);
   color: var(--text-lo);
   text-align: center;
   line-height: 1.5;
 }
-
-/* ============================================================================================
-   THE EVIDENCE PRIMITIVES (§4.1, §22, D10) -- shared by Scenes 02, 03, 04 and 05
-   ============================================================================================ */
-
-/*
-  These four were written for the hero and outlived it. They are the design primitives D10 asks
-  for -- token-only, copy-free, positioned by their caller -- and the proof scenes render every
-  one of them, so the rules stay here as base rules with no hero modifiers left on them.
-*/
 .lv2-page {
   position: relative;
   display: block;
@@ -748,17 +329,8 @@
   box-shadow: var(--lv2-paper-shadow);
 }
 .lv2-page-img { display: block; width: 100%; height: auto; }
-
-/* §22: 1px Source Blue on the box, a 4-7% fill behind it, and nothing else drawn on the page. */
 .lv2-region { position: absolute; border: 1px solid var(--source); border-radius: 2px; }
 .lv2-region::before { content: ""; position: absolute; inset: 0; background: var(--source); opacity: 0.06; }
-
-/*
-  §4.1. One hairline, one meaning: a compiled object came from a source region. It is a 1px column
-  rather than an SVG path because a `<span>` with a background scales correctly at every width
-  without a viewBox to keep in step with the layout around it, and `scaleY` from the top is the
-  whole of the "draw". The caller positions it and says which relation it carries.
-*/
 .lv2-line {
   display: block;
   width: 1px;
@@ -768,8 +340,6 @@
   transform-origin: top;
 }
 .lv2-line--relation { background: var(--relation); }
-
-/* The snapshot step and the filings that arrived on top of it -- Scene 05's panel (D10). */
 .lv2-revision {
   display: grid;
   gap: 8px;
@@ -784,80 +354,46 @@
 .lv2-revision-after { color: var(--text-hi); }
 .lv2-revision-title { margin: 0; color: var(--text-lo); text-transform: uppercase; letter-spacing: 0.08em; }
 .lv2-revision-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
-/* Amber is the arrival colour (§5.2); the form and the date beside it are what it means. */
 .lv2-revision-list li { display: flex; align-items: center; gap: 8px; color: var(--changed); }
 .lv2-revision-list i { width: 5px; height: 5px; background: currentColor; flex: none; }
-
-/* ============================================================================================
-   KOREAN (D12) -- the one typographic difference between the two entry pages
-   ============================================================================================ */
-
-/*
-  Hangul does not want the tracking a Latin display face is given at this size, and it has no
-  italic. The serif accent is absent rather than restyled on this page: `hero-statement.tsx`
-  passes no accent phrase when the locale is Korean, because Instrument Serif has no Hangul and a
-  synthetic oblique of the fallback face is a browser guessing rather than an editorial decision.
-*/
 .lv2[lang="ko"] .lv2-hero-h1,
 .lv2[lang="ko"] .lv2-h2 { letter-spacing: -0.012em; }
-
-/*
-  ROUND3-P0. Korean prose wants `word-break: keep-all`; Latin mono data wants the opposite.
-
-  `app/one-path.css` sets the prose pair on `:lang(ko) :is(p, span, a, li, ...)`, and a module
-  class cannot outrank it, so the `overflow-wrap: anywhere` the scene sheets declare on their
-  filename and metadata lines was overridden on /ko. `keep-all` forbids the break outright, so
-  the 37-character token apple-2026-proxy-def14a-reference.pdf painted 275px wide inside a 202px
-  grid track and pushed the document to a constant 403px -- 53px of sideways scroll on WebKit at
-  360 (Chromium survived because it still breaks that token at its hyphens).
-
-  `.lv2-meta` is the class the landing already uses for data rather than prose -- filenames, page
-  numbers, digests, coordinates -- so the pair is restated once here instead of in four modules.
-  Korean text inside a `.lv2-meta` label is unaffected in practice: CJK has a break opportunity
-  between any two characters under `word-break: normal`, which is what these short labels want.
-*/
 .lv2[lang="ko"] .lv2-meta {
   word-break: normal;
   overflow-wrap: anywhere;
 }
-
-/*
-  THE KOREAN SCALE IS ITS OWN, AND BOTH HALVES OF IT MOVE TOGETHER.
-
-  D12 makes the Korean H1 the literal translation of `BRAND_LINE.headline`, and shortening it is a
-  founder call rather than a lane's. What a lane can decide is the size the translation is set at
-  -- and, since this round restored the H1 above the H2, the size the Korean H2 is set at as well.
-  Both are needed: the Korean headline's longer sentence advances about 13.14em (measured off the
-  1440 QA capture, where it set at 36px and ran 473px), so it cannot be set at the English 56px
-  inside a 600px measure, and leaving the H2 at the English size would simply invert the hierarchy
-  again in the other language.
-
-  Each step below is the size at which the longer sentence still fits the measure that step has:
-  44px against the 600px hero column at >=1200, 42px against the full wrap at tablet widths, and a
-  viewport-relative size on a phone, where the measure is the viewport. The H2 sits a clear step
-  under each of them.
-
-  WHAT THIS DOES NOT FIX, AND WHY IT IS REPORTED RATHER THAN FORCED
-  At 360-430px the Korean headline still sets in three lines, not two: fitting both sentences on
-  one line each inside a 320px measure needs about 24px, which is no longer a headline. Two lines
-  on a phone needs shorter Korean copy, and that is D5's founder call.
-
-  7.5vw BECAME 7vw (P3 QA round 1). 7.5vw is 27px at 360, and at 27px WebKit sets this headline in
-  FOUR lines while Chromium sets it in three -- a 4px difference in the two engines' shaping of the
-  same Hangul string, against a 320px measure. Contract rule 12 puts webkit at 360 inside "done",
-  so the step is taken from the engine that breaks first: at 7vw (25px at 360, 27px at 390) both
-  engines set it in three. The measurement is this lane's, on the built fixture server.
-*/
 .lv2[lang="ko"] { --lv2-h2: clamp(24px, 6.4vw, 28px); }
-.lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(24px, 7vw, 30px); max-width: none; }
-/* Both Korean steps move with the English ones, and like them they are measured rather than
-   derived from an assumed advance: in the 600px track the Korean headline sets in two lines up to
-   44px and in three at 46px, so the >=1200 step stops at 44. D1's 3.95vw reached 56px at 1440,
-   where the headline set in three lines on both /ko projects that measure it. */
+.lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(28px, 7.3vw, 32px); max-width: none; }
 @media (min-width: 768px) {
   .lv2[lang="ko"] { --lv2-h2: clamp(30px, 2.6vw, 38px); }
-  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(34px, 4.1vw, 42px); }
+  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(38px, 4.5vw, 48px); }
 }
 @media (min-width: 1200px) {
-  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(38px, 3.06vw, 44px); }
+  .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(48px, 4vw, 60px); }
+}
+
+/* Visual hierarchy: paper is reserved for actual source evidence. */
+.lv2-surface { background: var(--ink-900); border-block: 1px solid var(--border-dark); }
+.lv2-hero-h1 { font-synthesis: weight; font-weight: 600; font-variation-settings: "wght" 600; }
+.lv2-hero-intake, .lv2-film-note {
+  font-family: var(--f-sans); font-size: 14px; letter-spacing: 0; line-height: 1.55;
+}
+.lv2-film-note { text-align: left; }
+.lv2-film .compile-film-stages button { font-size: 14px; letter-spacing: 0; }
+.lv2 .lv2-eyebrow { font-family: var(--f-sans); font-size: 13px; font-weight: 600; letter-spacing: .1em; }
+.lv2-proof-note { max-width: 62ch; }
+@media (min-width: 1600px) {
+  .lv2-film { --lv2-film-w: 1280px; }
+  .lv2-film-note { max-width: 1280px; }
+}
+@media (max-width: 767px) {
+  .lv2-scene-support { margin-top: 16px; }
+  .lv2-film { margin-top: 28px; }
+  .lv2-hero-support { font-size: 18px; line-height: 1.55; }
+}
+
+/* Keep Korean at a readable size: sentences flow together on a phone instead of each wrapping twice. */
+@media (max-width: 767px) {
+  .lv2[lang="ko"] .lv2-hero-h1 { text-wrap: balance; }
+  .lv2[lang="ko"] .lv2-h1-line { display: inline; }
 }

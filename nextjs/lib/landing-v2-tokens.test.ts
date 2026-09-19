@@ -91,17 +91,17 @@ function hue(hex: string): number {
 /* ---------------------------------------------------------------- tests */
 
 describe("landing V2 design tokens", () => {
-  it("declares the blueprint's ink, paper, accent, radius and motion tokens", () => {
+  it("declares the reviewed ink, paper, accent, radius and motion tokens", () => {
     const expected: Record<string, string> = {
-      "--ink-950": "#08090b",
-      "--ink-900": "#0e1013",
-      "--ink-850": "#14171b",
+      "--ink-950": "#090d14",
+      "--ink-900": "#101721",
+      "--ink-850": "#17202c",
       "--graphite-700": "#292d33",
-      "--paper-50": "#f6f3ec",
-      "--paper-100": "#eeeae1",
-      "--paper-200": "#e3ded3",
-      "--text-on-paper": "#141516",
-      "--text-muted-paper": "#666b70",
+      "--paper-50": "#f4f5f7",
+      "--paper-100": "#e8edf3",
+      "--paper-200": "#d7dfe9",
+      "--text-on-paper": "#142034",
+      "--text-muted-paper": "#4f5d70",
       "--border-paper": "rgba(10, 12, 14, 0.12)",
       "--border-dark": "rgba(255, 255, 255, 0.1)",
       "--source": "#7da7ff",
@@ -193,7 +193,7 @@ describe("app/landing-v2.css", () => {
       900px viewport on padding and put four of the five proof scenes 19-27% past §24's band. The
       pin moves with the decision -- it is a scope guard, not a value the blueprint fixed.
     */
-    expect(landing).toContain("--space-section: clamp(72px, 6.6vw, 96px)");
+    expect(landing).toContain("--space-section: clamp(56px, 5.2vw, 88px)");
     expect(token("--space-section")).toBe("clamp(88px, 9vw, 144px)");
     expect(landing).toContain("padding-block: var(--space-section)");
   });
