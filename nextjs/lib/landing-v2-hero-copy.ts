@@ -37,7 +37,13 @@ export const LANDING_V2_HERO_EXTRA: Record<"en" | "ko", LandingV2HeroExtraCopy> 
   en: {
     filedFormat: "{form} · filed {filingDate}",
     readStripAlt: "The region of the original filing page this Compiled World was read from.",
-    boundObjectsCaption: "objects bound to this region, as this sample's compiler emits them",
+    /*
+      C7: it read "objects bound to this region, ..." -- lowercase, with no count in front of the
+      noun, so on screen it was a sentence with a word missing. It is a caption, not a fragment of
+      one, so it is capitalised and stopped. No count is added: a figure here would need its own
+      receipt and a `data-derived` wrapper to say something the list beside it already shows.
+    */
+    boundObjectsCaption: "Objects bound to this region, as this sample's compiler emits them.",
     askCitationFormat: "↳ {form} · p.{page}",
     countsQualifier: EXPLORE_COPY.countsQualifier,
     entityDisclaimer: EXPLORE_COPY.entityDisclaimer,
@@ -45,7 +51,7 @@ export const LANDING_V2_HERO_EXTRA: Record<"en" | "ko", LandingV2HeroExtraCopy> 
   ko: {
     filedFormat: "{form} · {filingDate} 제출",
     readStripAlt: "이 Compiled World를 읽어 온 원본 공시 문서 페이지의 해당 영역입니다.",
-    boundObjectsCaption: "이 영역에 묶인 객체들이며, 이 샘플의 컴파일러가 내보내는 그대로입니다",
+    boundObjectsCaption: "이 영역에 묶인 객체들이며, 이 샘플의 컴파일러가 내보내는 그대로입니다.",
     askCitationFormat: "↳ {form} · {page}쪽",
     countsQualifier: "이 저장소의 TypeScript 컬렉션 컴파일러가 내보내는 그대로입니다",
     entityDisclaimer:

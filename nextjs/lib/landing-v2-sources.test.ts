@@ -74,10 +74,21 @@ describe("landing v2 scene 03 -- sources into a World", () => {
     const html = render(locale);
     const { stack } = buildSourcesScene();
     expect(stack.length).toBeGreaterThan(0);
+    /*
+      D7 put a `<wbr>` after every hyphen, so a filename is no longer one text node: it is a run
+      of spans that reads back as the same string. The assertion is against the READ-BACK text,
+      which is what a reader and a screen reader both get, and it is stricter than the old
+      substring pin -- it fails if the wrapper ever introduces or drops a character.
+    */
+    const readBack = html.replace(/<[^>]*>/g, "");
     for (const source of stack) {
-      expect(html).toContain(`data-derived="1">${source.filename}`);
+      expect(readBack).toContain(source.filename);
       expect(html).toContain(source.raster.src);
     }
+    /* The break opportunities are at the hyphens and nowhere else (D7). */
+    expect(html.match(/<wbr\s*\/?>/g)?.length ?? 0).toBe(
+      stack.reduce((total, source) => total + source.filename.split("-").length - 1, 0),
+    );
   });
 
   it.each(locales)("makes no forbidden claim (%s)", (locale) => {

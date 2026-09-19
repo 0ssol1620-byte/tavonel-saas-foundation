@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
 import DocumentLangKo from "./document-lang";
+import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
 import { pageMetadata } from "@/lib/page-seo";
 import { KO_CHROME } from "@/lib/site-navigation";
 
@@ -41,7 +43,21 @@ export const metadata: Metadata = pageMetadata({
 });
 
 /** Korean entry, not a claim that the technical and legal documentation is translated. */
-export default function KoreanEntryPage() {
+/*
+  D8. 실험 진영(arm)은 영문 `/`와 똑같이 서버에서 읽는다 — 쿠키 `tavonel.lp-variant`와 `?lp=`.
+  실험이 꺼져 있으면(기본값) 쿠키는 존재하지 않고 언제나 arm "a"이며, 어떤 이벤트에도 `variant`
+  속성이 붙지 않는다. 두 진입 페이지가 같은 함수를 쓰므로 한쪽만 다른 헤드라인을 보일 수 없다.
+*/
+export default async function KoreanEntryPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = (await searchParams)?.[LANDING_VARIANT_QUERY];
+  const experiment = landingVariantState({
+    cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
+    query: Array.isArray(query) ? query[0] : query,
+  });
   const hero = heroScene();
   return (
     <>
@@ -54,7 +70,7 @@ export default function KoreanEntryPage() {
         imageSizes={HERO_IMAGE_SIZES}
         fetchPriority="high"
       />
-      <LandingPage korean>
+      <LandingPage korean experiment={experiment}>
         <DocumentLangKo />
         <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }]} />
       </LandingPage>

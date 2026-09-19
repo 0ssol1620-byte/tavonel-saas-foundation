@@ -1,6 +1,7 @@
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
 import HeroCompilerDemo from "./hero-compiler-demo";
 import HeroStatement from "./hero-statement";
+import LandingAnalytics from "./landing-analytics";
 import EvidenceScene from "./scenes/evidence";
 import ProofScene from "./scenes/proof";
 import RecompileScene from "./scenes/recompile";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/landing-v2-proof";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
 import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
+import { landingVariantState, type LandingVariantState } from "@/lib/landing-experiments";
 
 /*
   Landing V2 (blueprint 2026-09-19, contract D1/D9/D10/D11). One composition, two languages.
@@ -102,9 +104,20 @@ function proofData(): ProofData {
 
 export default function LandingPage({
   korean = false,
+  /*
+    D8: the running experiment and this reader's arm, resolved on the server by `app/page.tsx`
+    and `app/ko/page.tsx` from the request's cookie and `?lp=`.
+
+    The default is the whole of "experiments are off": no test, arm "a" in both places, and no
+    `variant` property on any event -- which is what this page renders on every deployment
+    today, and what `lib/landing-v2-page.test.ts` renders when it calls this component with no
+    props at all.
+  */
+  experiment = landingVariantState({ experiment: null }),
   children,
 }: {
   korean?: boolean;
+  experiment?: LandingVariantState;
   /** `/ko`'s document-language effect and breadcrumb. Rendered inside the landmark, as today. */
   children?: React.ReactNode;
 }) {
@@ -133,6 +146,13 @@ export default function LandingPage({
       <PublicSiteHeader cta={access} korean={korean} />
       <main id="main" tabIndex={-1}>
         {children}
+        {/*
+          D7: the landing's whole funnel, in one mounted listener that renders nothing (§30).
+          It is inside `main` because that is what it listens to -- the site chrome above and
+          below is every page's, not this page's. `variant` is undefined while no test runs, and
+          no event then carries the property at all.
+        */}
+        <LandingAnalytics variant={experiment.tracked} />
 
         {/* 01 Hero (§10, §11, §32). Text : visual 42 : 58, asymmetric, no film and no video. */}
         <section
@@ -148,7 +168,13 @@ export default function LandingPage({
               titleId="lv2-hero-title"
               /* D3 allows the serif on one phrase of the H1; Instrument Serif has no Hangul. */
               accent={korean ? undefined : "every source"}
-              actions={{ ...heroActions, scene: "1" }}
+              headlineVariant={experiment.headlineVariant}
+              /*
+                D8 Test 02 applies to the hero row only. Scene 09's close keeps the access action
+                filled on both arms: that is §19's composition and not the variable under test,
+                and swapping two rows at once would make the result unattributable.
+              */
+              actions={{ ...heroActions, scene: "1", ctaOrderVariant: experiment.ctaOrderVariant }}
             />
             <HeroCompilerDemo
               scene={scene}

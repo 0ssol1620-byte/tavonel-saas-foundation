@@ -8,8 +8,9 @@
  * two routes that deliberately return 404. A visitor moving between pages watched the site's
  * structure change under them — the repository's folder layout showing through as UI.
  *
- * Navigation is data here so the landing page, which needs its own scroll-reactive header
- * element, still renders the same links as the static shell rather than a copy that drifts.
+ * Navigation is data here so the three surfaces that render it -- the scroll-reactive header
+ * every public page now shares (blueprint §8, 2026-09-19), its phone sheet, and the footer --
+ * read one list rather than three copies that drift.
  *
  * `/research` is no longer disguised as "Resources". Resources is its own hub that lists the
  * research, evidence and reproducibility material underneath it.

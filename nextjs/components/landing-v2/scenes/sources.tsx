@@ -40,6 +40,28 @@ function cx(...parts: (string | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
 }
 
+/*
+  A filename with a break opportunity after every hyphen, and nowhere else (D7).
+
+  `apple-2026-proxy-def14a-reference.pdf` is one unbreakable token to a line breaker, and the two
+  ways out of that are both bad on their own: `overflow-wrap: anywhere` cuts it mid-word ("apple-
+  2026-proxy-def14a-refe / rence.pdf"), and `keep-all` alone lets it push the column wider than
+  the viewport -- which is exactly the 53px of WebKit /ko overflow round 3 closed. `<wbr>` adds the
+  break points a reader would choose, so the token wraps at its own hyphens before anything else
+  is tried, and the sheet's `overflow-wrap` stays as the last-resort net for a name with no hyphen
+  at all.
+*/
+function withHyphenBreaks(filename: string) {
+  const parts = filename.split("-");
+  return parts.map((part, index) => (
+    <span key={`${part}-${index}`}>
+      {index > 0 ? "-" : ""}
+      {index > 0 ? <wbr /> : null}
+      {part}
+    </span>
+  ));
+}
+
 const SCENE_ID = "sources";
 
 export default function Scene({
@@ -88,7 +110,7 @@ export default function Scene({
                     <SourcePage
                       src={source.raster.src}
                       srcSet={source.raster.srcSet}
-                      sizes="(min-width: 900px) 108px, 96px"
+                      sizes="(min-width: 1200px) 108px, 96px"
                       width={source.raster.width}
                       height={source.raster.height}
                       alt={source.representationKind === "reference_render" ? words.alt.reference : words.alt.original}
@@ -96,7 +118,7 @@ export default function Scene({
                     <div className={styles.itemMeta}>
                       {/* The file the compiler read, spelled as the source record spells it. */}
                       <p className={cx("lv2-meta", styles.filename)} data-derived="1">
-                        {source.filename}
+                        {withHyphenBreaks(source.filename)}
                       </p>
                       <p className={cx("lv2-meta", styles.itemLine)} data-derived="1">
                         {source.form} · {source.filingDate} ·{" "}
@@ -114,15 +136,6 @@ export default function Scene({
                   </li>
                 ))}
               </ul>
-              {/*
-                The breadth claim, with its receipt. `describeAcceptedFormats(CAPABILITY_MANIFEST)`
-                is the sentence the upload route's own manifest produces, so a format this
-                deployment refuses cannot be advertised here.
-              */}
-              <p className={cx("lv2-small", styles.formatsLabel)}>{words.formatsLabel}</p>
-              <p className={cx("lv2-meta", styles.formats)} data-derived="1">
-                {view.acceptedFormats}
-              </p>
             </div>
 
             {/* --------------------------------------------- sources reach the compiler (blue) */}
@@ -148,7 +161,7 @@ export default function Scene({
               <p className={cx("lv2-meta", styles.colLabel)}>{words.objectsLabel}</p>
               <ul className={styles.objectList}>
                 {words.objects.map((object) => (
-                  <li key={object.id} className={cx("lv2-panel", styles.chip)}>
+                  <li key={object.id} className={styles.chip}>
                     <p className={cx("lv2-meta", styles.chipLabel)}>{object.label}</p>
                     <p className={cx("lv2-small", styles.chipNote)}>{object.note}</p>
                   </li>
@@ -164,6 +177,19 @@ export default function Scene({
           inside the text column they would precede it on a phone, where the split stacks.
         */}
         <div className={styles.foot}>
+          {/*
+            The breadth claim, with its receipt. `describeAcceptedFormats(CAPABILITY_MANIFEST)` is
+            the sentence the upload route's own manifest produces, so a format this deployment
+            refuses cannot be advertised here.
+
+            It sits under the diagram rather than under the source stack (B3): the stack column has
+            to end where its three rows end, or the connector fan spreading across that column's
+            height points between rows instead of at them.
+          */}
+          <p className={cx("lv2-small", styles.formatsLabel)}>{words.formatsLabel}</p>
+          <p className={cx("lv2-meta", styles.formats)} data-derived="1">
+            {view.acceptedFormats}
+          </p>
           <p className={cx("lv2-body-l", styles.naming)}>{words.naming}</p>
           <Link className="lv2-text-link lv2-scene-next" href={words.next.href as Route} prefetch={false}>
             {words.next.label}

@@ -147,7 +147,33 @@ export type RecompileView = {
 /* -------------------------------------------------------------------------------- the reading */
 
 const EXCERPT_LIMIT = 240;
-const AFFECTED_SAMPLE = 6;
+/*
+  D5, 2026-09-19: four objects, not six, and each one quoted whole.
+
+  The six used to be cut at 90 characters, so the column read "...associated with commercial paper
+  for…", "...income tax laws of any state, municipality, or…" -- six mid-sentence fragments, which
+  the design review called the page's most fake-looking element. A passage that stops where its
+  own sentence stops is a quotation; one that stops at a character count is a picture of a bug.
+  160 characters is the ceiling at which a filing sentence still sets in about two lines of this
+  column.
+*/
+const AFFECTED_SAMPLE = 4;
+const AFFECTED_SENTENCE_LIMIT = 160;
+
+/**
+ * The first complete sentence of a compiled passage, if the passage has one that fits.
+ *
+ * Returns `null` rather than a truncation: the caller's job is to pick objects that can be quoted
+ * whole, not to cut the ones that cannot. The lower bound is the one the old filter used -- a
+ * two-word running header says nothing about what an arrival reached.
+ */
+function wholeSentence(label: string): string | null {
+  const text = label.trim();
+  const end = text.search(/[.!?](\s|$)/u);
+  if (end < 0) return null;
+  const sentence = text.slice(0, end + 1);
+  return sentence.length >= 40 && sentence.length <= AFFECTED_SENTENCE_LIMIT ? sentence : null;
+}
 
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
@@ -299,23 +325,26 @@ export function buildRecompileView(): RecompileView {
   const affectedSample = exploreChangeStory.affectedNodeIds
     .map((id) => byId.get(id))
     .filter((node): node is NonNullable<typeof node> => Boolean(node))
-    // Objects a reader can recognise: the compiler labels an object with its own text, and a
-    // two-word running header says nothing about what the arrival reached.
-    .filter((node) => node.label.trim().length >= 40)
+    /*
+      Objects a reader can recognise AND quote (D5): the compiler labels an object with its own
+      text, and only the ones whose first sentence ends inside the column are shown. The others
+      are not cut to fit -- they are simply not this scene's sample.
+    */
+    .map((node) => ({ node, sentence: wholeSentence(node.label) }))
+    .filter((pick): pick is { node: typeof pick.node; sentence: string } => pick.sentence !== null)
     .slice(0, AFFECTED_SAMPLE)
-    .map((node) => {
-      // The flag travels with the text: a quotation cut short without a marker is a small lie
-      // the component would otherwise have to guess at.
-      const preview = excerptPreview(node.label, 90);
-      return {
-        id: node.id,
-        label: preview.text,
-        labelTruncated: preview.truncated,
-        kind: node.kind,
-        state: node.state,
-        stateLabel: LANDING_V2_STATE_WORD[node.state],
-      };
-    });
+    .map(({ node, sentence }) => ({
+      id: node.id,
+      label: sentence,
+      /* Never true any more: the label IS a whole sentence, so there is nothing to mark. */
+      labelTruncated: false,
+      kind: node.kind,
+      state: node.state,
+      stateLabel: LANDING_V2_STATE_WORD[node.state],
+    }));
+
+  /* Fail closed (implementation rule): an impact view with nothing in it is not a smaller view. */
+  if (affectedSample.length === 0) throw new Error("landing_v2_recompile_no_quotable_affected_object");
 
   const baselineFiled = exploreChangeBaselineDocument.filingDate;
   if (!baselineFiled || !exploreChangeBaselineDocument.form) {

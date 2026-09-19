@@ -67,6 +67,30 @@ export default function Scene({
     `title` carries the full digest: the VERSION row shows a truncation, and a truncation that is
     the only copy of a value is not a receipt.
   */
+  /*
+    §4.1's line has to REACH the box, and where the box is on the page is data, not a guess.
+
+    ROUND3-P1 measured the old composition: the connector lived in a 32px gutter track while the
+    page raster was pushed to the far right of its column, so the line stopped 135px short and
+    read as a dash floating in the margin. The geometry below is what closes that gap, and every
+    number in it is read off the record:
+
+      --lv2-region-left  the box's left edge as a fraction of the page width, so the line can
+                         overrun the page's edge by exactly that much and stop ON the box
+      --lv2-region-mid   the box's vertical centre as a fraction of the page height, so the line
+                         sits at the region's middle rather than at the column's
+      --lv2-page-ar      the committed raster's own height/width, which turns the rendered page
+                         width into a rendered page height without measuring anything at runtime
+
+    A style ATTRIBUTE, not a <style> element: CSP is `style-src-elem 'self'` (rule 9).
+  */
+  const [regionLeft, regionTop, , regionBottom] = record.region.normalized;
+  const geometry = {
+    "--lv2-region-left": `${regionLeft}`,
+    "--lv2-region-mid": `${(regionTop + regionBottom) / 2}`,
+    "--lv2-page-ar": `${record.rasters.page.height / record.rasters.page.width}`,
+  } as React.CSSProperties;
+
   const fields: { key: string; term: string; value: string; title?: string; unit?: string }[] = [
     /* D12: the World's own state word, in the page's language (round 4: it was English on /ko). */
     { key: "status", term: copy.fields.status, value: landingV2StateWord(record.status.state, locale) },
@@ -145,7 +169,12 @@ export default function Scene({
                 the page the region is on. Same tab, so the browser's back button is the way
                 back -- this scene's subject is that there is one.
               */}
-              <a className={`lv2-text-link ${styles.open}`} href={record.hrefs.original}>
+              {/*
+                D7's hook, and nothing more: `landing-analytics.tsx` fires `source_open` off it
+                and reads the scene id for the `from` value, so this scene stays a server
+                component that ships no JavaScript of its own.
+              */}
+              <a className={`lv2-text-link ${styles.open}`} href={record.hrefs.original} data-analytics="source-open">
                 {copy.openOriginal}
               </a>
               <EvidenceCopyCitation
@@ -158,35 +187,39 @@ export default function Scene({
           </div>
 
           {/*
-            §4.1's line, between the two halves. Horizontal in the grid's gutter on a wide
-            viewport, vertical between the stacked page and record on a phone -- one hairline
-            either way, and the same primitive the hero draws.
+            §4.1's line and the page it points at are ONE row, so the line's far end is the page's
+            near edge and not a gutter track's. On a wide viewport the row runs
+            [line ---------][page] and the line overruns the page edge to land on the box; on a
+            phone the same two elements stack (column-reverse: the page reads first) and the line
+            is the vertical hairline between the page above and the record below, touching both.
           */}
-          <EvidenceLine className={styles.connector} />
+          <div className={styles.source} style={geometry}>
+            <EvidenceLine className={styles.connector} />
 
-          <figure className={styles.figure}>
-            <SourcePage
-              src={record.rasters.page.src}
-              srcSet={record.rasters.page.srcSet}
-              sizes={PAGE_SIZES}
-              width={record.rasters.page.width}
-              height={record.rasters.page.height}
-              alt={HERO_PAGE_ALT[locale]}
-              /*
-                No `regionLabel`, so `SourceRegion` renders the box `aria-hidden`. The label is
-                the figcaption below, which the `<figure>` already associates with the image: an
-                `aria-label` here as well would read the same four fields twice.
-              */
-              bbox1000={record.region.bbox1000}
-            />
-            {/*
-              §4.1's label names the box drawn above it. The unit is not repeated here -- the
-              REGION row states it once, and one page should state a unit once.
-            */}
-            <figcaption className={`${styles.caption} ${styles.regionLabel} lv2-meta`} data-derived="1">
-              {regionLabel}
-            </figcaption>
-          </figure>
+            <figure className={styles.figure}>
+              <SourcePage
+                src={record.rasters.page.src}
+                srcSet={record.rasters.page.srcSet}
+                sizes={PAGE_SIZES}
+                width={record.rasters.page.width}
+                height={record.rasters.page.height}
+                alt={HERO_PAGE_ALT[locale]}
+                /*
+                  No `regionLabel`, so `SourceRegion` renders the box `aria-hidden`. The label is
+                  the figcaption below, which the `<figure>` already associates with the image: an
+                  `aria-label` here as well would read the same four fields twice.
+                */
+                bbox1000={record.region.bbox1000}
+              />
+              {/*
+                §4.1's label names the box drawn above it. The unit is not repeated here -- the
+                REGION row states it once, and one page should state a unit once.
+              */}
+              <figcaption className={`${styles.caption} ${styles.regionLabel} lv2-meta`} data-derived="1">
+                {regionLabel}
+              </figcaption>
+            </figure>
+          </div>
         </div>
       </div>
     </section>

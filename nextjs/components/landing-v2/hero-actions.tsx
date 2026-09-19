@@ -33,6 +33,7 @@ export default function HeroActions({
   accessHref,
   workspaceLabel,
   scene,
+  ctaOrderVariant = "a",
 }: {
   exploreLabel: string;
   exploreHref: string;
@@ -48,6 +49,14 @@ export default function HeroActions({
     with its own scene and nothing else.
   */
   scene: string;
+  /*
+    D8 Test 02: which of the two actions is the filled control. "a" -- the default, and what
+    every deployment renders while no experiment is active -- is Explore, for §29's reason: the
+    fastest way to believe this product is to open a finished World. "b" swaps them and makes
+    the access action primary. Nothing else changes: both controls are present on both arms,
+    both keep their own destination, and both keep the funnel name that says which one it is.
+  */
+  ctaOrderVariant?: "a" | "b" | "c";
 }) {
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
@@ -72,31 +81,63 @@ export default function HeroActions({
     };
   }, []);
 
-  const secondaryLabel = signedIn ? workspaceLabel : accessLabel;
-  const secondaryHref = (signedIn ? "/workspace" : accessHref) as Route;
+  const accessRowLabel = signedIn ? workspaceLabel : accessLabel;
+  const accessRowHref = (signedIn ? "/workspace" : accessHref) as Route;
+
+  /*
+    THE TWO ACTIONS AS DATA, SO D8 TEST 02 IS AN ORDER AND NOT A SECOND COMPOSITION.
+
+    Each descriptor carries its own destination and its own funnel name, and the arm decides only
+    which of them is rendered first and filled. That separation is the point of the test: the
+    names below travel with the DESTINATION (Explore, access) and keep meaning on both arms,
+    while `hero_primary_click` / `hero_secondary_click`, which D7 adds and
+    `components/landing-v2/landing-analytics.tsx` fires off the `data-analytics` hooks, travel
+    with the POSITION. Reading the two pairs together is what says whether making the access
+    action primary moved anything, and either pair alone cannot.
+
+    `hero_explore_clicked` and `hero_start_clicked` are kept firing exactly as before (D7): they
+    are the funnel's oldest landing columns, somebody is reading them today, and a dashboard that
+    went to zero the day this page shipped would report a launch as a collapse.
+  */
+  const explore = {
+    label: exploreLabel,
+    href: exploreHref as Route,
+    cta: "explore",
+    legacy: "hero_explore_clicked",
+  } as const;
+  const access = {
+    label: accessRowLabel,
+    href: accessRowHref,
+    cta: "access",
+    legacy: "hero_start_clicked",
+  } as const;
+  const [primary, secondary] = ctaOrderVariant === "b" ? [access, explore] : [explore, access];
+
+  const onSelect = (action: typeof explore | typeof access) => () => {
+    if (scene === "1") trackFunnel(action.legacy);
+    trackFunnel("cta_clicked", { cta: action.cta, scene });
+  };
+
   return (
     <div className="lv2-actions" data-scene-actions={scene}>
       <Link
         className="btn lv2-cta"
-        href={exploreHref as Route}
+        href={primary.href}
         prefetch={false}
-        onClick={() => {
-          if (scene === "1") trackFunnel("hero_explore_clicked");
-          trackFunnel("cta_clicked", { cta: "explore", scene });
-        }}
+        onClick={onSelect(primary)}
+        /* D7's position names are fired by the landing's one delegated listener, off these. */
+        data-analytics="hero-primary"
       >
-        {exploreLabel}
+        {primary.label}
       </Link>
       <Link
         className="lv2-text-link"
-        href={secondaryHref}
+        href={secondary.href}
         prefetch={false}
-        onClick={() => {
-          if (scene === "1") trackFunnel("hero_start_clicked");
-          trackFunnel("cta_clicked", { cta: "access", scene });
-        }}
+        onClick={onSelect(secondary)}
+        data-analytics="hero-secondary"
       >
-        {secondaryLabel}
+        {secondary.label}
         <ArrowUpRight size={17} aria-hidden="true" />
       </Link>
     </div>

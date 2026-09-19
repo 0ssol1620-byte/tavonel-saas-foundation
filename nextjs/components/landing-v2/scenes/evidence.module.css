@@ -7,9 +7,13 @@
   the ground alternation ever moved this scene to obsidian.
 */
 
+/*
+  No gap between the two halves, on purpose: the hairline between them IS the gap, and a gap
+  either side of it would be the 135px of dead margin ROUND3-P1 found.
+*/
 .inspector {
   display: grid;
-  gap: 32px;
+  gap: 0;
   margin-top: 48px;
 }
 
@@ -20,17 +24,25 @@
   the reader meets one screen at a time: the document with the box on it reads as evidence, and
   the five fields under it read as what binds them. In the other order the fields are five lines
   of metadata about something not yet on screen.
+
+  `column-reverse` rather than a pair of `order`s: the DOM keeps line-then-page, which is the
+  order the wide layout reads in, and the phone flips the pair once in one declaration.
 */
-.figure {
+.source {
   order: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 0;
+}
+.figure {
   margin: 0;
   display: grid;
   gap: 12px;
   justify-items: start;
+  min-width: 0;
 }
-.connector { order: 2; }
 .record {
-  order: 3;
+  order: 2;
   display: grid;
   gap: 24px;
   min-width: 0;
@@ -178,27 +190,51 @@
 
 /* ---------------------------------------------------------------------------- the wide layout */
 
+/*
+  THE WIDE LAYOUT, AND WHY THE LINE NOW LANDS ON THE BOX.
+
+  Two tracks, no gutter track and no column gap, so the right half starts exactly at the record's
+  right edge. Inside it the line and the page are one flex row: the page takes a fixed share and
+  the line takes what is left, which makes the line's length a consequence of the layout instead
+  of a number in this sheet.
+
+  The last stretch is the negative right margin. §4.1 asks for a line from the compiled object to
+  the SOURCE REGION, not to the page's edge, so the line overruns the page by the box's own left
+  offset -- `--lv2-page-w * --lv2-region-left`, both of which the component passes down from the
+  record. In a flex row a negative end margin is handed straight back to the flexible item, so the
+  line grows by exactly that much and the page does not move. `margin-top` puts it at the box's
+  vertical centre for the same reason, through the raster's own aspect ratio.
+
+  The page is capped at 72% of the half rather than at its intrinsic 440px because at the 1000px
+  breakpoint a 440px page would eat the whole half and leave the line 12px long. 72% keeps the
+  line legible at 1000 and still renders the page at 424px at 1440.
+*/
 @media (min-width: 1000px) {
   .inspector {
-    grid-template-columns: minmax(0, 6fr) 32px minmax(0, 5fr);
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
     align-items: start;
     column-gap: 0;
   }
   .record { order: 1; }
-  .connector {
+  .source {
+    --lv2-page-w: min(440px, 72%);
     order: 2;
-    width: 100%;
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .connector {
+    flex: 1 1 auto;
+    width: auto;
     height: 1px;
     margin-left: 0;
-    align-self: center;
+    margin-right: calc(var(--lv2-page-w) * var(--lv2-region-left) * -1);
+    margin-top: calc(var(--lv2-page-w) * var(--lv2-page-ar) * var(--lv2-region-mid));
     transform-origin: left;
   }
   .figure {
-    order: 3;
-    justify-items: end;
-    justify-self: end;
+    flex: 0 0 auto;
+    width: var(--lv2-page-w);
   }
-  .caption { text-align: right; }
 }
 
 /* =============================================================================================
@@ -206,20 +242,15 @@
    ============================================================================================= */
 
 /*
-  TWO NEUTRALISERS FIRST, AND THEY ARE NOT COSMETIC.
+  THE TWO NEUTRALISERS THAT USED TO STAND HERE ARE GONE, BECAUSE THE LEAK IS FIXED AT SOURCE.
 
-  `app/landing-v2.css` binds `lv2-b-read` and `lv2-b-verify` to `.lv2-region` and
-  `.lv2-claim-state` with the shorthand -- duration included -- and those two rules are NOT
-  scoped to the hero's stage. Any other use of the primitives on this page therefore inherits the
-  hero's 16-second loop: the box on this page would vanish for the first 1.2s of every cycle and
-  the STATUS dot for the first 5.8s, on a scene that has no sequence and is far below the fold.
-  Two declarations at (0,2,0) stop it here without touching another lane's sheet. Reported as an
-  open issue: those two rules want `.lv2-demo-stage` in front of them.
+  `app/landing-v2.css` bound `lv2-b-read` and `lv2-b-verify` to the bare `.lv2-region` and
+  `.lv2-claim-state` primitives, so every scene that renders one inherited the hero's 16-second
+  loop. This sheet stopped it locally with `animation: none`; Scene 02 renders the same box and
+  had no such rule, so its outline really was fading in and out on the hero's timeline. The
+  bindings now carry `.lv2-demo` in front of them (motion lane, 2026-09-19), which fixes both
+  scenes in one place instead of asking every future scene to remember the workaround.
 */
-.inspector :global(.lv2-region),
-.inspector :global(.lv2-claim-state) {
-  animation: none;
-}
 
 /*
   Hover or focus the record and the box on the page is ringed and its label reads in the source

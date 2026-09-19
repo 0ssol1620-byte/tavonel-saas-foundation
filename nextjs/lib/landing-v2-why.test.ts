@@ -35,16 +35,19 @@ describe.each(LOCALES)("landing V2 scene 06 (%s)", (locale) => {
     expect(html).toContain('tabindex="-1"');
   });
 
-  it("offers one next action -- the Knowledge Compiler guide -- and one quieter reference", () => {
+  /*
+    D6 tightened this case rather than relaxing it. The scene used to carry the Knowledge
+    Compiler guide AND the compiler contract, and the contract is the same label and route Scene
+    05 hands a reader one scene earlier -- two terminal actions in one scene, one of them a
+    repeat. The assertion is now that the scene has exactly ONE link, so a second cannot return
+    without this failing.
+  */
+  it("offers exactly one next action -- the Knowledge Compiler guide", () => {
     const next = SCENE_ACTIONS[locale].why;
-    const reference = SCENE_ACTIONS[locale].recompile;
     expect(html).toContain(`href="${next.href}"`);
     expect(html).toContain(next.label);
-    expect(html).toContain(`href="${reference.href}"`);
-    expect(html).toContain(reference.label);
-    // Exactly one link carries the next-action treatment, and it is the guide (§39).
     expect(html.match(/lv2-scene-next/g)).toHaveLength(1);
-    expect(html.match(/<a /g)).toHaveLength(2);
+    expect(html.match(/<a /g)).toHaveLength(1);
   });
 
   it("publishes no figure: nothing on this scene was measured, so nothing may look measured", () => {
@@ -76,28 +79,35 @@ describe.each(LOCALES)("landing V2 scene 06 (%s)", (locale) => {
     }
   });
 
-  it("draws every layer of the continuum, each with a responsibility it is drawn at", () => {
+  /*
+    C3 REPLACED THE TWO PINS BELOW, AND THAT IS NOT WIDENING A GUARD.
+
+    They used to assert the coverage matrix: `data-coverage="full|partial"` on every layer and
+    exactly `stages.length` full cells on the compiler row. The matrix is gone -- it was a
+    product-category scoreboard with no receipt behind a single mark, which §16 bars as a ladder
+    reading and §37 warns about as perception. What replaces it is stricter about the thing that
+    matters: every layer must still be drawn and must still carry its own sentence, the compiler
+    row must still name all four stages, NO other row may name any stage (which is the shape a
+    scoreboard would have to come back in), and the sheet may spend no semantic colour.
+  */
+  it("draws every layer, each with the sentence that says what it keeps", () => {
     const copy = LANDING_V2_COPY[locale].why;
     for (const layer of copy.layers) {
       expect(html).toContain(`data-layer="${layer.id}"`);
       expect(html).toContain(layer.responsibility);
-      // The COVERAGE map in the component is the mapping the copy module delegates to it. A layer
-      // with no covered cell is a row drawn as an empty line, which says nothing at all.
-      const track = html.split(`data-layer="${layer.id}"`)[1]?.split("</dd>")[0] ?? "";
-      expect(track).toMatch(/data-coverage="(full|partial)"/);
     }
-    // Only the compiler runs the whole contract; that is the scene's argument, and it is drawn.
-    const compiler = html.split('data-layer="compiler"')[1]?.split("</dd>")[0] ?? "";
-    expect(compiler.match(/data-coverage="full"/g)).toHaveLength(copy.stages.length);
+    expect(html, "the coverage matrix does not come back").not.toContain("data-coverage");
   });
 
-  it("reads the same words to a screen reader as the drawing shows, stage by stage", () => {
+  it("names the four stages on the compiler row, and scores no other row against them", () => {
     const copy = LANDING_V2_COPY[locale].why;
-    // The axis header is decorative repetition; the covered cells carry the stage names.
-    expect(html).toContain('aria-hidden="true"');
-    for (const stage of copy.stages) expect(html).toContain(`data-stage="${stage.id}"`);
     const compiler = html.split('data-layer="compiler"')[1]?.split("</dd>")[0] ?? "";
     for (const stage of copy.stages) expect(compiler).toContain(stage.label);
+    for (const layer of copy.layers) {
+      if (layer.id === "compiler") continue;
+      const row = html.split(`data-layer="${layer.id}"`)[1]?.split("</dd>")[0] ?? "";
+      for (const stage of copy.stages) expect(row, `${layer.id} / ${stage.id}`).not.toContain(stage.label);
+    }
   });
 });
 
@@ -106,7 +116,7 @@ describe("landing V2 scene 06 across languages", () => {
     const en = render("en");
     const ko = render("ko");
     expect(en).not.toEqual(ko);
-    for (const marker of ['id="why"', 'data-layer="compiler"', 'data-stage="bind"', "lv2-scene-next"]) {
+    for (const marker of ['id="why"', 'data-layer="compiler"', 'data-layer="parser"', "lv2-scene-next"]) {
       expect(en).toContain(marker);
       expect(ko).toContain(marker);
     }

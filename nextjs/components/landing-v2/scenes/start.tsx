@@ -79,49 +79,52 @@ export default function Scene({
       className="lv2-scene lv2-obsidian"
     >
       <div className="lv2-wrap">
-        <div className="lv2-scene-head">
-          <p className="lv2-eyebrow lv2-meta">{copy.eyebrow}</p>
-          <h2 className="lv2-h2" id={TITLE_ID}>
-            <span className="lv2-h2-line">{copy.headline}</span>
-            {copy.headlineAccent ? (
-              <span className="lv2-h2-line lv2-h2-accent">{copy.headlineAccent}</span>
-            ) : null}
-          </h2>
-          <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
-        </div>
+        {/* D9: one centred column, 760px, for the only scene on the page with no visual. */}
+        <div className={styles.close}>
+          <div className="lv2-scene-head">
+            <p className="lv2-eyebrow lv2-meta">{copy.eyebrow}</p>
+            <h2 className="lv2-h2" id={TITLE_ID}>
+              <span className="lv2-h2-line">{copy.headline}</span>
+              {copy.headlineAccent ? (
+                <span className="lv2-h2-line lv2-h2-accent">{copy.headlineAccent}</span>
+              ) : null}
+            </h2>
+            <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
+          </div>
 
-        <div className={styles.row}>
-          {/* §39's one next action for this scene, and the page's conversion. */}
-          <Link
-            className={`btn lv2-cta ${styles.cta}`}
-            href={actions.accessHref as Route}
-            prefetch={false}
-            data-scene-next="start"
-          >
-            {actions.accessLabel}
-          </Link>
-          {/*
-            `EXPLORE_CTA.label` as the page resolved it. "Explore the public World" -- the wording
-            §19 types -- is on `RETIRED_NAMES`; the constant is the only spelling of this action.
-          */}
-          <Link className={`lv2-text-link ${styles.link}`} href={actions.exploreHref as Route} prefetch={false}>
-            {actions.exploreLabel}
-            <span aria-hidden="true">→</span>
-          </Link>
-        </div>
+          <div className={styles.row}>
+            {/* §39's one next action for this scene, and the page's conversion. */}
+            <Link
+              className={`btn lv2-cta ${styles.cta}`}
+              href={actions.accessHref as Route}
+              prefetch={false}
+              data-scene-next="start"
+            >
+              {actions.accessLabel}
+            </Link>
+            {/*
+              `EXPLORE_CTA.label` as the page resolved it. "Explore the public World" -- the wording
+              §19 types -- is on `RETIRED_NAMES`; the constant is the only spelling of this action.
+            */}
+            <Link className={`lv2-text-link ${styles.link}`} href={actions.exploreHref as Route} prefetch={false}>
+              {actions.exploreLabel}
+              <span aria-hidden="true">→</span>
+            </Link>
+          </div>
 
-        {activationPolicy.customerData.enabled ? null : (
-          <p className="lv2-scene-note lv2-small" data-customer-data="arranged">
-            {copy.microtext}
+          {activationPolicy.customerData.enabled ? null : (
+            <p className="lv2-scene-note lv2-small" data-customer-data="arranged">
+              {copy.microtext}
+            </p>
+          )}
+
+          <p className={`lv2-small ${styles.pricing}`}>
+            <Link className={styles.pricingLink} href={"/pricing" as Route} prefetch={false}>
+              {PRICING_LABEL[locale]}
+              <span aria-hidden="true">→</span>
+            </Link>
           </p>
-        )}
-
-        <p className={`lv2-small ${styles.pricing}`}>
-          <Link className={styles.pricingLink} href={"/pricing" as Route} prefetch={false}>
-            {PRICING_LABEL[locale]}
-            <span aria-hidden="true"> →</span>
-          </Link>
-        </p>
+        </div>
       </div>
     </section>
   );

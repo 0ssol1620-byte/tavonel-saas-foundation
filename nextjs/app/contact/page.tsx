@@ -131,14 +131,20 @@ export default function ContactPage() {
                   </details>
                   <details className={faq.item}>
                     {/*
-                      The one answer whose link moved with the page rather than with the copy. On
-                      the landing it pointed at the access action; this IS that action's page, so
-                      the link is dropped in the posture where it would point here and kept in the
-                      one where the action is a sign-in elsewhere. A link to the page you are
-                      already reading is not an answer.
+                      C6, 2026-09-19: the original link is back.
+
+                      D6 moved these six Q&As "unchanged, with the same links", and this one had
+                      been rewritten to drop the link in the posture where it points at /contact
+                      -- the page it now lives on. The argument was that a link to the page you
+                      are already reading is not an answer; it is a fair argument and it is also a
+                      copy change to a founder-approved Q&A, made by a lane, which D6 forbids.
+                      `d52fa26:nextjs/components/home-page-client.tsx:245` renders
+                      `<Link href={startHref}>{access.label}</Link>` unconditionally, and
+                      `startHref` is `access.href`, so that is what renders here. Dropping the
+                      self-link is a founder decision about the copy, not this lane's.
                     */}
                     <summary>Can I compile my own files today?</summary>
-                    <p className={faq.answer}>{activationPolicy.customerData.reason}{access.href === "/contact" ? null : <> <Link href={access.href as Route} prefetch={false}>{access.label}</Link></>}</p>
+                    <p className={faq.answer}>{activationPolicy.customerData.reason} <Link href={access.href as Route} prefetch={false}>{access.label}</Link></p>
                   </details>
                   <details className={faq.item}>
                     <summary>Can what I upload be deleted?</summary>

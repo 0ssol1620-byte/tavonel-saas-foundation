@@ -37,40 +37,25 @@ import s from "./why.module.css";
   allowance, not a requirement, and a static scene is already the reduced-motion complete state.
 */
 
-/** The one string this scene needs that the copy deck does not carry. Literal translation (D12). */
-const PARTIAL_WORD: Record<LandingV2Locale, string> = { en: "partial", ko: "일부" };
-
-type Coverage = "full" | "partial";
-
 /*
-  Which stage each layer is responsible for, and how far.
+  C3, 2026-09-19: THE COVERAGE GRID IS GONE, AND WHAT REPLACED IT.
 
-  `lib/landing-v2-copy.ts` states outright that this mapping is the component's ("Which stages a
-  row covers is the component's mapping"), because it is a reading of the responsibility
-  sentences rather than a sentence of its own. Each entry is defensible from the row's own words:
+  This scene used to draw a four-stage matrix with `full` and `partial` cells per layer. Rendered,
+  it read as "the two competitor rows are in pieces, ours is unbroken" -- a product-category
+  scoreboard with no receipt behind a single cell, which is exactly the ladder reading §16 bars
+  and the perception §37 warns about. Neither mark was measured; both were this component's
+  reading of a sentence in the copy deck.
 
-    parser      READ full          -- turns a file into text and layout, and stops.
-    retrieval   READ full          -- it reads the text it indexes,
-                BIND partial       -- and hands back where the passage was, without binding an
-                                      object to that region; it never produces STRUCTURE.
-    graph       STRUCTURE partial  -- stores entities and relations produced upstream. Storing a
-                                      structure is part of the responsibility, not all of it.
-    compiler    all four full      -- the only unbroken row.
-
-  A layer or stage added to the copy deck with no entry here renders as an uncovered cell rather
-  than throwing; `lib/landing-v2-why.test.ts` fails instead, which is where that should be caught.
+  What is here now is four rows of plain text: each layer, and one neutral sentence about what
+  that layer KEEPS. The compiler's row names the four stages, because "all four" is a description
+  of its own responsibility rather than a score against anyone else's. No cells, no coverage
+  words, no mint anywhere in the scene -- mint means `verified` on this site and nothing in this
+  comparison has been verified.
 */
-const COVERAGE: Record<string, Record<string, Coverage>> = {
-  parser: { read: "full" },
-  retrieval: { read: "full", bind: "partial" },
-  graph: { structure: "partial" },
-  compiler: { read: "full", structure: "full", bind: "full", maintain: "full" },
-};
 
 export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy: LandingV2WhyCopy }) {
   const actions = SCENE_ACTIONS[locale];
   const titleId = "lv2-why-title";
-  const partial = PARTIAL_WORD[locale];
 
   return (
     <section
@@ -96,61 +81,40 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
             </h2>
             <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
             {/*
-              Two links, one next action. The guide is the scene's next action (the primary text
-              link, `lv2-scene-next`); the contract is a quieter second reference. Both labels and
-              both destinations come from `scene-actions.ts` -- the contract link is the same
-              label and route Scene 05 already hands a reader for the same page, rather than a
-              second spelling of it.
+              D6: ONE next action. The second link here was `actions.recompile` -- the same label
+              and the same route Scene 05 hands a reader one scene earlier, so the page offered
+              the compiler contract twice in two screens and made this scene a choice rather than
+              a step. Scene 05 keeps it, inline in the sentence that needs it.
             */}
             <p className={s.links}>
               <Link className="lv2-text-link lv2-scene-next" href={actions.why.href as Route} prefetch={false}>
                 {actions.why.label}
               </Link>
-              <Link className={`lv2-text-link ${s.secondary}`} href={actions.recompile.href as Route} prefetch={false}>
-                {actions.recompile.label}
-              </Link>
             </p>
           </div>
 
           <div className={s.continuum}>
-            <div className={s.axis} aria-hidden="true">
-              <span className={s.axisSpacer} />
-              {copy.stages.map((stage) => (
-                <span className={s.axisCell} key={stage.id} data-stage={stage.id}>
-                  <span className={s.axisLabel}>{stage.label}</span>
-                  <span className={s.axisCaption}>{stage.caption}</span>
-                </span>
-              ))}
-            </div>
             <dl className={s.tracks}>
               {copy.layers.map((layer) => (
-                <div className={s.row} key={layer.id}>
+                <div className={s.row} key={layer.id} data-layer={layer.id}>
                   <dt className={s.layer}>{layer.label}</dt>
                   <dd className={s.detail}>
-                    <span className={s.track} data-layer={layer.id}>
-                      {copy.stages.map((stage) => {
-                        const coverage = COVERAGE[layer.id]?.[stage.id];
-                        return (
-                          <span
-                            className={s.cell}
-                            key={stage.id}
-                            data-stage={stage.id}
-                            data-coverage={coverage ?? "none"}
-                          >
-                            {coverage ? (
-                              <span className={s.cellLabel}>
-                                {stage.label}
-                                {/* The space is for the reader, not the layout: a flex gap is not
-                                    a word boundary to a screen reader, which would say
-                                    "BINDpartial". */}
-                                {coverage === "partial" ? <> <span className={s.partial}>{partial}</span></> : null}
-                              </span>
-                            ) : null}
-                          </span>
-                        );
-                      })}
-                    </span>
                     <span className={s.responsibility}>{layer.responsibility}</span>
+                    {/*
+                      The four stages, on the compiler's row only, and as its own stage names --
+                      not as marks in a grid that the other three rows would be scored against.
+                      Each stage keeps its caption, so the row says what the four stages ARE.
+                    */}
+                    {layer.id === "compiler" ? (
+                      <span className={s.stages}>
+                        {copy.stages.map((stage) => (
+                          <span className={s.stage} key={stage.id}>
+                            <span className={s.stageLabel}>{stage.label}</span>
+                            <span className={s.stageCaption}>{stage.caption}</span>
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                   </dd>
                 </div>
               ))}

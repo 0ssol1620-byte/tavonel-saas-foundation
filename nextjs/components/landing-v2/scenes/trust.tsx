@@ -29,16 +29,40 @@ import styles from "./trust.module.css";
   exists; a landing that implied one would be the unsupported claim that stops the line.
   `lib/landing-v2-trust.test.ts` holds all of it against the rendered markup.
 
-  There is no `/architecture` route on this site. The three links below are `/security`,
-  `/trust` and `/subprocessors`, and every one of them is `copy.links`' own href -- this file
-  invents no destination.
+  There is no `/architecture` route on this site. Every destination below -- the four proof
+  links, the next action, the two references and the footnote -- is a route that exists in
+  `app/`, and all but `/status` come from the copy deck rather than from this file.
+
+  D2: this is the campaign's one compact scene (`.lv2-scene--compact`), not a 72vh proof scene.
+  It states four things and stops, and a screen-height floor under it was the empty ground the
+  chapter-budget review measured.
 */
 
-/** The three routes §18 sends the reader to, in the order it lists them. */
-const LINK_HREFS = ["/security", "/trust", "/subprocessors"] as const;
+/*
+  D6: ONE next action, and it is the Trust Center.
 
-/** Of those three, the one next action (§39). The other two are secondary text links. */
+  §18 lists three routes and this scene used to render all three as equal `lv2-text-link`s in one
+  row -- three terminal actions competing for the same decision, which is the pattern the design
+  review counted across four scenes. `/security` and `/subprocessors` are references rather than
+  next steps, so they read in the footnote line with `/status`, and each of the four proofs above
+  now links to the page it is written down on (C4). Every destination §18 names is still one
+  click away; only one of them is the thing to do next.
+*/
 const NEXT_HREF = "/trust";
+
+/*
+  The §18 route that is a reference rather than the next step.
+
+  It was two (P3 QA round 1). /security was here AND on the `training` proof above, so the scene
+  rendered two anchors to the same page, and the `review` proof pointed at /trust, which is the
+  scene's one next action. Two anchors to one destination are not two competing actions, but in a
+  scene this short they are a reader choosing twice between identical links, and
+  `e2e/landing-v2.spec.ts` pins each §18 route at exactly one anchor for that reason. Every
+  destination §18 names is still one click away and none of them twice: /security on the training
+  proof, /evidence and /docs/exports on theirs, /trust as the next action, /status and
+  /subprocessors in the footnote.
+*/
+const REFERENCE_HREFS = ["/subprocessors"] as const;
 
 /*
   The footnote, in both languages.
@@ -60,7 +84,9 @@ const SCENE_INDEX = LANDING_V2_SCENE_ORDER.indexOf("trust") + 1;
 const TITLE_ID = "lv2-trust-title";
 
 export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy: LandingV2TrustCopy }) {
-  const links = LINK_HREFS.map((href) => copy.links.find((link) => link.href === href)).filter(
+  const byHref = (href: string) => copy.links.find((link) => link.href === href);
+  const next = byHref(NEXT_HREF);
+  const references = REFERENCE_HREFS.map(byHref).filter(
     (link): link is { label: string; href: string } => Boolean(link),
   );
   return (
@@ -69,7 +95,7 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
       data-scene={String(SCENE_INDEX)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
-      className="lv2-scene lv2-scene--proof lv2-paper"
+      className="lv2-scene lv2-scene--compact lv2-paper"
     >
       <div className="lv2-wrap">
         <div className="lv2-scene-head">
@@ -82,30 +108,54 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
         <ul className="lv2-proof-list">
           {copy.proofs.map((proof) => (
             <li key={proof.id} className="lv2-proof">
-              <p className="lv2-proof-label">{proof.label}</p>
+              {/*
+                C4: the proof's own label is the link to where it is written down. The support
+                line above says "each written down where it can be checked" and, until this
+                round, three of the four had nowhere to go. A link on the label rather than a
+                fourth row of "read more" links: the claim and its receipt are one thing.
+
+                Except where that page is the scene's own next action (P3 QA round 1). The
+                `review` proof is written down on /trust, which is the Trust Center link below
+                it; linking the label there too would put the reader's one next step on the page
+                twice. The proof keeps its destination in the copy deck either way, so
+                `lib/landing-v2-trust.test.ts` still checks that every proof names a route this
+                site publishes -- what moves is only where the anchor is.
+              */}
+              <p className="lv2-proof-label">
+                {proof.href === NEXT_HREF ? (
+                  proof.label
+                ) : (
+                  <Link className="lv2-inline-link" href={proof.href as Route} prefetch={false}>
+                    {proof.label}
+                  </Link>
+                )}
+              </p>
               <p className="lv2-proof-note lv2-small">{proof.note}</p>
             </li>
           ))}
         </ul>
-        <p className={styles.links}>
-          {links.map((link) => (
+        {next ? (
+          <p className={styles.links}>
             <Link
-              key={link.href}
-              className={`lv2-text-link${link.href === NEXT_HREF ? ` ${styles.next}` : ""}`}
-              href={link.href as Route}
+              className={`lv2-text-link ${styles.next}`}
+              href={next.href as Route}
               prefetch={false}
-              {...(link.href === NEXT_HREF ? { "data-scene-next": "trust" } : {})}
+              data-scene-next="trust"
             >
-              {link.label}
+              {next.label}
               <span aria-hidden="true">→</span>
             </Link>
-          ))}
-        </p>
+          </p>
+        ) : null}
         <p className={`lv2-meta ${styles.footnote}`}>
           <Link className={styles.footnoteLink} href={"/status" as Route} prefetch={false}>
             {FOOTNOTE[locale]}
-            <span aria-hidden="true">→</span>
           </Link>
+          {references.map((link) => (
+            <Link key={link.href} className={styles.footnoteLink} href={link.href as Route} prefetch={false}>
+              {link.label}
+            </Link>
+          ))}
         </p>
       </div>
     </section>

@@ -134,10 +134,17 @@ test.describe("structure", () => {
   }
 
   test("the H1 is the brand line, set as one heading within its line cap", async ({ page }, testInfo) => {
+    /*
+      Scoped to the default arm (D8). Test 01 replaces the H1 with one of the copy deck's two
+      experiment headlines, so this string is the page's H1 only while no experiment is running
+      -- which is every deployment with `NEXT_PUBLIC_LANDING_EXPERIMENT` unset, CI included. The
+      line cap below is NOT scoped: an arm that set in four lines would be the same defect.
+    */
+    const headlineExperiment = process.env.NEXT_PUBLIC_LANDING_EXPERIMENT === "headline";
     await page.goto("/");
     const h1 = page.locator("h1#lv2-hero-title");
     await expect(h1).toHaveCount(1);
-    expect((await h1.innerText()).replace(/\s+/g, " ").trim()).toBe(HEADLINE);
+    if (!headlineExperiment) expect((await h1.innerText()).replace(/\s+/g, " ").trim()).toBe(HEADLINE);
     /*
       §6's cap, measured rather than asserted. The headline sets as two blocks, one sentence each,
       so a third line means one of them wrapped.
@@ -151,8 +158,9 @@ test.describe("structure", () => {
     const phone = Number(testInfo.project.name) <= 767;
     const cap = phone ? 3.2 : 2.2;
     expect(await headlineLines(page), `the hero headline is capped at ${cap} lines`).toBeLessThanOrEqual(cap);
-    // D3: the editorial serif carries one phrase of it, and only on the English page.
-    await expect(h1.locator("em.lv2-serif")).toHaveCount(1);
+    // D3: the editorial serif carries one phrase of it, and only on the English page. The
+    // accented phrase belongs to the brand line, so this is the default arm's too.
+    if (!headlineExperiment) await expect(h1.locator("em.lv2-serif")).toHaveCount(1);
     await page.goto("/ko");
     await expect(page.locator("h1#lv2-hero-title em")).toHaveCount(0);
   });
@@ -671,15 +679,26 @@ test.describe("at 390", () => {
       expect(box!.height, "a half of the strip is too short to read").toBeGreaterThan(40);
     }
     /*
-      The beats are additive here: the slot's four panels are in flow, so nothing a reader is part
-      way through disappears. The desktop's resting stack would restate three of them and is not
-      rendered at this width.
+      The slot rotates here exactly as it does at desktop (D3), and this assertion moved with that
+      decision rather than being relaxed around it.
+
+      It used to read "the beats are additive on a phone": each of the four arrived and stayed, in
+      flow, and the resting stack was `display: none` because it would have restated three of
+      them. The measured cost of four panels in flow was a hero 2,525px tall at 390 -- three
+      viewports on the surface contract rule 12 makes part of done -- so D3 gave the phone the
+      same rotation, the same resting stack and the same one-caption-at-a-time as 1440. A reader
+      who wants to hold a beat still has the pause control, the hover and the focus, which is what
+      §23 asks for and what "additive" was standing in for.
+
+      What the assertion is now: the stack is rendered (it is the resting composition), and the
+      four beats share its grid cell rather than being taken out of flow -- so the slot is as tall
+      as the tallest of the five and none of them can paint over the caption row below.
     */
-    expect(await page.locator(".lv2-slot-static").evaluate((node) => getComputedStyle(node).display)).toBe("none");
+    expect(await page.locator(".lv2-slot-static").evaluate((node) => getComputedStyle(node).display)).toBe("grid");
     for (const beat of ["structure", "change", "recompile", "use"]) {
       expect(
         await page.locator(`.lv2-slot-beat--${beat}`).evaluate((node) => getComputedStyle(node).position),
-        `the ${beat} beat is stacked rather than in flow`,
+        `the ${beat} beat is positioned rather than sharing the slot's cell`,
       ).toBe("static");
     }
     /*
@@ -891,10 +910,33 @@ test.describe("the scenes below the hero", () => {
     const scene = page.locator("section#trust");
     await scene.scrollIntoViewIfNeeded();
     await expect(scene.locator(".lv2-proof")).toHaveCount(4);
-    await expect(scene.locator("a.lv2-text-link")).toHaveCount(3);
+    /*
+      ONE `.lv2-text-link`, NOT THREE (P3 QA round 1).
+
+      Three was written when §18's three routes were three equal terminal links in one row. D6
+      replaced that with one next action and a footnote, which is §39's "one next action per
+      scene" -- so the count that is honest about this scene is one, and the rules the three was
+      standing in for are asserted directly underneath instead of through a class name.
+    */
+    await expect(scene.locator("a.lv2-text-link")).toHaveCount(1);
+    await expect(scene.locator("[data-scene-next]"), "one next action").toHaveCount(1);
     for (const href of ["/security", "/trust", "/subprocessors"]) {
       await expect(scene.locator(`a[href="${href}"]`), `${href} left the trust scene`).toHaveCount(1);
     }
+    /*
+      Every anchor in this scene clears the touch floor, including the ones inside prose.
+
+      C4 put the four proof labels inline in their `<p>`s and D6 did the same to the references,
+      and an inline anchor is as tall as its line box: the round measured 19px at every width and
+      in both locales. Contract rule 8 puts the floor on every reachable control, so it is
+      measured here as well as on the phone projects -- this was not a phone defect.
+    */
+    const short = await scene.locator("a").evaluateAll((nodes) =>
+      nodes
+        .map((node) => ({ text: (node.textContent ?? "").trim().slice(0, 40), height: node.getBoundingClientRect().height }))
+        .filter((row) => row.height > 0 && row.height < 43.99),
+    );
+    expect(short, "a link in the trust scene is under the 44px floor").toEqual([]);
   });
 });
 
@@ -955,5 +997,101 @@ test.describe("the FAQ that left the landing", () => {
   test("the landing itself no longer answers them", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("main details")).toHaveCount(0);
+  });
+});
+
+/*
+  D7 / §30: the landing's funnel, measured where it actually fires.
+
+  `lib/funnel-events.test.ts` can see that every declared name has a call site somewhere in the
+  tree; it cannot see whether a click on the hero button reaches the listener, whether the tab
+  index that travels with `proof_claim_switch` is the tab that was pressed, or whether the scroll
+  quartiles ever arrive. Those are facts about a delegated listener over a rendered document, so
+  they are settled here.
+
+  `trackFunnel` dispatches `tavonel:funnel` on the window with the detail it is about to send, so
+  the assertion reads exactly the record the collector would receive -- including the absence of
+  anything that is not an enumerated UI state.
+*/
+test.describe("analytics", () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== "1440", "one width is enough for a listener contract");
+  });
+
+  type FunnelRecord = { event: string } & Record<string, string | undefined>;
+
+  /** Collect the funnel records a page fires, with navigation suppressed so the page survives. */
+  async function watchFunnel(page: Page): Promise<() => Promise<FunnelRecord[]>> {
+    await page.addInitScript(() => {
+      const seen: unknown[] = [];
+      (window as unknown as { __funnel: unknown[] }).__funnel = seen;
+      window.addEventListener("tavonel:funnel", (event) => seen.push((event as CustomEvent).detail));
+      /*
+        Capture phase, so the landing's own listener on `main` (bubble phase) still runs and only
+        the navigation is cancelled. Clicking a real control is the point; leaving the page in
+        the middle of it would end the test rather than measure it.
+      */
+      document.addEventListener(
+        "click",
+        (event) => {
+          if ((event.target as Element | null)?.closest?.("a[href]")) event.preventDefault();
+        },
+        true,
+      );
+    });
+    return () => page.evaluate(() => (window as unknown as { __funnel: FunnelRecord[] }).__funnel);
+  }
+
+  test("fires the hero, proof, depth and trust events with enumerated detail only", async ({ page }) => {
+    const records = await watchFunnel(page);
+    await page.goto("/");
+
+    // The hero's filled control. Both names fire: D7's position name and the legacy destination
+    // one the dashboard has been reading since before this page existed.
+    await page.locator("#hero a.btn.lv2-cta").click();
+    expect((await records()).map((record) => record.event)).toEqual(
+      expect.arrayContaining(["hero_primary_click", "hero_explore_clicked", "cta_clicked"]),
+    );
+
+    // The hero's text link, which is the access action on the default arm.
+    await page.locator('#hero a.lv2-text-link[data-analytics="hero-secondary"]').click();
+    expect((await records()).map((record) => record.event)).toContain("hero_secondary_click");
+
+    // Scene 02's tabs. The detail is the tab's POSITION in its group -- never its label.
+    const tabs = page.locator('#proof [role="tab"]');
+    await tabs.nth(1).click();
+    const switched = (await records()).filter((record) => record.event === "proof_claim_switch");
+    expect(switched).toHaveLength(1);
+    expect(switched[0].cta).toBe("2");
+
+    /*
+      Scene 03 is the quarter mark: nine scenes, so scene index 2 of 8 is exactly 0.25. Scrolling
+      to it must produce the first quartile and no deeper one.
+    */
+    await page.locator("section#sources").scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => (await records()).map((record) => record.event))
+      .toContain("scroll_scene_25");
+    expect((await records()).map((record) => record.event)).not.toContain("scroll_scene_75");
+
+    // The Trust scene's next action, routed by destination rather than by a per-link hook.
+    await page.locator('#trust a[href="/trust"]').first().click();
+    expect((await records()).map((record) => record.event)).toContain("trust_open");
+
+    /*
+      And the privacy rule, over every record the page produced: the allowlist is enforced in
+      `lib/funnel-events.ts`, and this is the end-to-end proof that no call site on this page
+      tried to attach something else. Experiments are off in CI, so no `variant` travels either.
+    */
+    const produced = await records();
+    expect(produced.length).toBeGreaterThan(4);
+    for (const record of produced) {
+      for (const [key, value] of Object.entries(record)) {
+        expect(["event", "cta", "scene", "from", "variant"], `${record.event} attached ${key}`).toContain(key);
+        // An enumerated UI state is a word or a digit, never a sentence, a path or a digest.
+        expect(String(value).length, `${record.event}.${key} is not a UI state`).toBeLessThan(32);
+      }
+      expect(record.variant, "no experiment is running, so no arm may be reported").toBeUndefined();
+    }
   });
 });

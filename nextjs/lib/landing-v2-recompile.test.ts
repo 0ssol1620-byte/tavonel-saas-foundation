@@ -47,10 +47,17 @@ describe("Scene 05 recompile", () => {
     expect(html).toContain('tabindex="-1"');
   });
 
-  it.each(locales)("offers one next action, with the contract as secondary text (%s)", (locale) => {
+  /*
+    D6: the contract link moved out of the action row and into the sentence above it, so the two
+    hrefs swapped order -- the note is in the scene head, the action row ends the visual. The case
+    is stricter than before rather than looser: it now pins that exactly ONE link carries the
+    terminal `.lv2-text-link` treatment, which is the rule the old two-action row broke.
+  */
+  it.each(locales)("offers one terminal action, with the contract inline in the note (%s)", (locale) => {
     const html = render(locale);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    expect(hrefs).toEqual([view.hrefs.change, view.hrefs.contract]);
+    expect(hrefs).toEqual([view.hrefs.contract, view.hrefs.change]);
+    expect(html.match(/lv2-text-link/g)).toHaveLength(1);
     expect(html).toContain(RECOMPILE_ACTIONS[locale].change);
     expect(html).toContain(RECOMPILE_ACTIONS[locale].contract);
     // Below the fold: neither link may cost a prefetch (T1-014).
@@ -129,10 +136,29 @@ describe("Scene 05 recompile", () => {
     expect(render("en")).not.toContain(LANDING_V2_COPY.en.recompile.countLabels.removed);
   });
 
-  it("gives every affected object its own state word, and claims no equivalence", () => {
+  /*
+    D5 CHANGED WHAT "EVERY OBJECT HAS ITS STATE WORD" LOOKS LIKE, NOT WHETHER IT IS TRUE.
+
+    Every object in this deterministic sample holds the same state, so the column used to print
+    the same word four times. The word is now the column's label, said once, and the case below
+    pins the two halves of that: the word IS on the page, and it is on it exactly once. If a
+    future sample ever mixes states the component falls back to a word per row and this assertion
+    fails loudly -- which is the intent, because one label over rows that disagree is an average.
+
+    D5 also pins the quotation shape: four objects, each a whole sentence, no ellipsis.
+  */
+  it("states the sample's one state word once, quotes whole sentences, and claims no equivalence", () => {
     const html = render("en");
     expect(view.affectedSample.length).toBeGreaterThan(0);
-    for (const node of view.affectedSample) expect(html).toContain(node.stateLabel);
+    expect(view.affectedSample.length).toBeLessThanOrEqual(4);
+    const states = new Set(view.affectedSample.map((node) => node.state));
+    expect(states.size).toBe(1);
+    expect(html.split(view.affectedSample[0]!.stateLabel).length - 1).toBe(1);
+    for (const node of view.affectedSample) {
+      expect(node.labelTruncated).toBe(false);
+      expect(node.label).toMatch(/[.!?]$/);
+      expect(node.label.length).toBeLessThanOrEqual(160);
+    }
     // exploreChangeStory.equivalence.state is `not_yet`, so the scene shows no badge for it.
     expect(exploreChangeStory.equivalence.state).toBe("not_yet");
     expect(html).not.toContain(view.equivalence.reason);
@@ -140,11 +166,10 @@ describe("Scene 05 recompile", () => {
 
   it("translates the state words and the qualifier rather than leaving them in English", () => {
     const html = render("ko");
-    for (const node of view.affectedSample) {
-      expect(html).toContain(landingV2StateWord(node.state, "ko"));
-      // And the English word is not also on the page: one state, one spelling (D12).
-      expect(html).not.toContain(landingV2StateWord(node.state, "en"));
-    }
+    const state = view.affectedSample[0]!.state;
+    expect(html).toContain(landingV2StateWord(state, "ko"));
+    // And the English word is not also on the page: one state, one spelling (D12).
+    expect(html).not.toContain(landingV2StateWord(state, "en"));
     expect(html).toContain(RECOMPILE_COUNTS_QUALIFIER.ko);
     expect(koTermDrift(RECOMPILE_COUNTS_QUALIFIER.ko)).toEqual([]);
     expect(koTermDrift(Object.values(RECOMPILE_ACTIONS.ko).join(" "))).toEqual([]);

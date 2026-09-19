@@ -174,7 +174,7 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
 
           <div className={styles.lists}>
             <div className={styles.group}>
-              <p className={`${styles.groupLabel} lv2-meta`} id={inLabelId}>
+              <p className={`lv2-eyebrow lv2-meta ${styles.groupLabel}`} id={inLabelId}>
                 {copy.inLabel}
               </p>
               <ul className={`${styles.rows} ${styles.inRows}`} aria-labelledby={inLabelId}>
@@ -187,7 +187,7 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
             <Pipeline />
 
             <div className={styles.group}>
-              <p className={`${styles.groupLabel} lv2-meta`} id={outLabelId}>
+              <p className={`lv2-eyebrow lv2-meta ${styles.groupLabel}`} id={outLabelId}>
                 {copy.outLabel}
               </p>
               <ul className={`${styles.rows} ${styles.outRows}`} aria-labelledby={outLabelId}>

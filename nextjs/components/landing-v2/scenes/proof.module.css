@@ -65,12 +65,18 @@
 
 /*
   The selected tab. Colour is not the carrier: `aria-selected` is on the element, the weight
-  changes, and the underline is a shape a reader sees without reading the blue. The 2px rule is
-  an inset shadow rather than a border so the button does not move by a pixel when it is chosen.
+  changes, and the underline is a shape a reader sees without reading a hue. The 2px rule is an
+  inset shadow rather than a border so the button does not move by a pixel when it is chosen.
+
+  D11: it used to be drawn in `--source`. Blue means "source / location" in the D4 semantic table
+  and a selected tab is neither -- it is which of three questions is open. A semantic colour spent
+  on emphasis is the drift §5.2 bars, and here it also weakened the blue where it does mean
+  something on this same scene: the region drawn on the page below. Ink and weight say "this one"
+  without borrowing a meaning.
 */
 .tab[aria-selected="true"] {
-  border-color: var(--source);
-  box-shadow: inset 0 -2px 0 0 var(--source);
+  border-color: var(--text-hi);
+  box-shadow: inset 0 -2px 0 0 var(--text-hi);
   color: var(--text-hi);
   font-weight: 500;
 }
@@ -140,6 +146,8 @@
 .citation {
   margin: 0;
   color: var(--text-mid);
+  /* The signature's label step (§4.1), at the one duration every scene runs it at. */
+  transition: color var(--motion-ui) var(--ease-ui);
 }
 
 .open {
@@ -199,4 +207,42 @@
 
 .nextRow {
   margin: 28px 0 0;
+}
+
+/* =============================================================================================
+   THE SIGNATURE INTERACTION (§4.1)
+   ============================================================================================= */
+
+/*
+  ONE INTERACTION, THREE SCENES, SAME BEHAVIOUR AND SAME DURATION.
+
+  §4.1 makes this the effect the brand owns, so it cannot mean one thing in the hero and nothing
+  here: hover or focus the compiled object and the region it was read from is ringed on the page,
+  and the line of metadata that names that location reads in the source colour. Scene 04 already
+  did it from the record side; the hero does it from the claim and the object chips. Scene 02 was
+  the one panel where the same gesture did nothing at all.
+
+  The ring is the hero's ring exactly -- 2px `--source` at 2px offset -- and the label's colour
+  moves over `--motion-ui`, which is what `.lv2-read-label` and Scene 04's `.regionLabel` cost.
+
+  WHAT IS DELIBERATELY NOT HERE. The line is not drawn on hover. In the hero the line is hidden
+  by the sequence and the signature is what completes it; on this scene the connector is already
+  at full strength because the scene has no sequence to draw it. Making it appear on hover would
+  mean hiding it at rest, which would take the §43 key visual away from a reader who never hovers
+  -- and from every screenshot.
+
+  `:has()` is the whole implementation, with no JavaScript fallback: an engine without it gets
+  the quotation, the citation, the page, the box and the link. It loses an emphasis, not evidence.
+  Focus reaches it through the panel's one link, which is also the only tab stop in the panel --
+  the box on the page navigates nowhere and is not made one (the `entity-node.tsx` argument).
+*/
+.grid:has(.answer:hover) :global(.lv2-region),
+.grid:has(.answer a:focus-visible) :global(.lv2-region) {
+  outline: 2px solid var(--source);
+  outline-offset: 2px;
+}
+
+.grid:has(.answer:hover) .citation,
+.grid:has(.answer a:focus-visible) .citation {
+  color: var(--source);
 }

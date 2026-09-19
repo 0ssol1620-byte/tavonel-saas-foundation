@@ -148,7 +148,7 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
 
   it("renders the shared composition rather than a second Korean page", () => {
     expect(source, "one composition, two locales -- not two pages to keep in step")
-      .toContain("<LandingPage korean>");
+      .toContain("<LandingPage korean");
     expect(source, "and the Korean document language is still declared").toContain("<DocumentLangKo />");
     expect(source, "the Korean entry keeps its own canonical").toContain('canonical: "/ko"');
     // The page file itself states no commercial fact any more; the copy deck does.

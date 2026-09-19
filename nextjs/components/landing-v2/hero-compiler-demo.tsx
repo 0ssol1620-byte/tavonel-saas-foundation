@@ -105,7 +105,6 @@ export default function HeroCompilerDemo({
 }) {
   const [playing, setPlaying] = useState(true);
   const root = useRef<HTMLDivElement>(null);
-  const labelId = useId();
   const staticCountsId = useId();
   const beatCountsId = useId();
   const objectsId = useId();
@@ -130,14 +129,31 @@ export default function HeroCompilerDemo({
       and no state to get out of step. The intent is that a hero one pixel into view is not being
       read either.
 
-      ROUND3-P1: that intent was written as `{ threshold: 0.25 }`, which only means "a quarter of
-      it is on screen" while the observed node is SMALLER than the viewport. The phone composition
+      THREE ROUNDS OF THIS RULE WERE WRONG, AND ALL THREE FOR ONE REASON: each tried to express
+      "is being read" as a fraction, and this demo is not shaped like a viewport.
+
+      ROUND3-P1 wrote it as `{ threshold: 0.25 }` -- "a quarter of it is on screen" -- which is
+      only reachable while the observed node is SMALLER than the viewport. The phone composition
       makes `.lv2-demo` 1719px tall against an 844px viewport, so at scroll 0 only 13% of it can
-      ever be visible: the sequence was frozen mid-beat at first paint while the control still
-      said "Pause the compile sequence" -- the first impression on a phone, and the cause of the
-      settled-hero e2e timeouts. A viewport BAND says the same thing at any element height:
-      `threshold: 0` with a -25% inset top and bottom intersects once the middle half of the
-      viewport is over the demo.
+      ever be visible and the sequence froze mid-beat at first paint.
+
+      ROUND3-QA replaced it with a symmetric `-25% 0px -25% 0px` band, which asks the demo to
+      reach the middle half of the viewport; on a phone the demo's TOP already sits below it.
+
+      P3-QA-ROUND1: the asymmetric band `0px 0px -25% 0px` failed the same way, and its comment
+      claimed to be "genuinely independent of the element's height". It was -- and irrelevantly
+      so, because it is not independent of the element's POSITION. That band's bottom edge sits at
+      0.75 x the viewport height, so a demo whose TOP is below that line never intersects at any
+      height: measured at first paint, the demo top was 669px at 390x844 and 715px at 360x780
+      against band bottoms of 633px and 585px. `data-offscreen="1"` was written with no scrolling
+      at all, about 175px of the demo was on screen, and the source raster sat at 43% opacity
+      under a control that still read "Pause the compile sequence" -- on the surface contract
+      rule 12 says the founder checks first.
+
+      So the rule is not a fraction any more. Any pixel on screen is being read; no pixel on
+      screen is not. `threshold: 0` with no inset is exactly that sentence, and there is no
+      width, height or position at which it can come to mean something else. The loop that keeps
+      cycling for a reader who has scrolled past is still stopped, which is all §23 asked for.
 
       Written straight onto the node, not into React state, for the same reason the signature
       fallback is: re-rendering the hero on a scroll is an INP cost for something no reader sees.
@@ -148,7 +164,7 @@ export default function HeroCompilerDemo({
       ([entry]) => {
         if (entry) node.setAttribute("data-offscreen", entry.isIntersecting ? "0" : "1");
       },
-      { threshold: 0, rootMargin: "-25% 0px -25% 0px" },
+      { threshold: 0 },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -327,11 +343,16 @@ export default function HeroCompilerDemo({
 
   return (
     <div className="lv2-demo" ref={root} data-playing={playing ? "1" : "0"} data-signature="0" data-offscreen="0">
-      <p className="lv2-demo-label lv2-meta" id={labelId}>
-        {hero.demoLabel}
-      </p>
-
-      <div className="lv2-demo-stage" role="group" aria-labelledby={labelId}>
+      {/*
+        D8: the visible demo eyebrow is gone. "THE KNOWLEDGE COMPILER" (x=72) and "WHAT THE
+        COMPILER DOES WITH ONE PAGE" (x=700) sat on the same baseline, in the same mono face, the
+        same 13px and the same tracking, with the second 2.4x the width of the first -- two
+        competing eyebrows in the same optical position, and the reader's eye landed on the wrong
+        one. The rotating caption under the control narrates the demo, which is what this label
+        was doing badly. It survives as the group's accessible name, where it is still needed and
+        where it competes with nothing.
+      */}
+      <div className="lv2-demo-stage" role="group" aria-label={hero.demoLabel}>
         {/*
           READ (0.0-2.4s). The region the compiler read, at the size its own words are readable.
           §4.1's coordinate label sits at the strip's corner and appears on the Verify beat and on
@@ -356,9 +377,26 @@ export default function HeroCompilerDemo({
 
         {/*
           LOCATOR. Where on the filing that strip is: the whole page, the same box drawn on it,
-          and one line of metadata. The Evidence Line above the thumbnail reaches the strip.
+          and one line of metadata.
+
+          The Evidence Line reaches from the strip above all the way ONTO the box (§4.1, round 3
+          design review: it used to be a 18px tick in the gap, which connected two things without
+          touching either). Where the box is on the page is read off the same `bbox1000` the
+          outline is drawn from, so the two cannot drift: `--lv2-region-midx` is the box's
+          horizontal centre and `--lv2-region-top` its top edge, both as fractions of the page,
+          and `--lv2-page-ar` turns the rendered page width into a rendered page height.
+          A style ATTRIBUTE, never a <style> element (CSP, rule 9).
         */}
-        <figure className="lv2-locator">
+        <figure
+          className="lv2-locator"
+          style={
+            {
+              "--lv2-region-midx": `${(region.bbox1000[0] + region.bbox1000[2]) / 2000}`,
+              "--lv2-region-top": `${region.bbox1000[1] / 1000}`,
+              "--lv2-page-ar": `${source.height / source.width}`,
+            } as React.CSSProperties
+          }
+        >
           <EvidenceLine className="lv2-line--locator" />
           <SourcePage
             src={source.rasterSrc}

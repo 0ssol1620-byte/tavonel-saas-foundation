@@ -34,22 +34,58 @@
 .stack,
 .objects { min-width: 0; }
 
-@media (min-width: 900px) {
+/*
+  THE HORIZONTAL COMPOSITION STARTS AT 1200, NOT 900 (D4 + D7).
+
+  It used to start at 900, which was wrong in both directions once `.lv2-split` grew a 5:7 tablet
+  band: at 1024 the visual column is about 527px, and five tracks inside it left the object column
+  55px wide -- narrower than one word of it. Above 1200 the same five tracks have room, and that
+  is also where D7 puts the object list in one column, which is what makes the outgoing fan's six
+  lines able to land on six rows.
+
+  NO COLUMN GAP, and that is the fix for "the lines connect nothing": the connector spans exactly
+  the distance between the two things it connects, so it starts at the stack's right edge and ends
+  at the compiler's left edge with no dead space at either end.
+
+  `--lv2-col-head` is the height of a column's label block (18px line + 14px margin). The
+  connectors are inset by it so their vertical span is the LIST's span rather than the column's,
+  and the compiler carries the same offset so the single converging endpoint lands on its middle.
+*/
+@media (min-width: 1200px) {
   .diagram {
-    /* stack | connector | compiler | connector | objects, with the connectors as real gutters. */
-    grid-template-columns: minmax(0, 212px) minmax(40px, 0.5fr) minmax(0, 132px) minmax(40px, 0.5fr) minmax(0, 1fr);
+    --lv2-col-head: 32px;
+    /* stack | connector | compiler | connector | objects. */
+    grid-template-columns:
+      minmax(0, 250px) minmax(40px, 0.45fr) minmax(0, 128px) minmax(40px, 0.45fr) minmax(0, 1.4fr);
     align-items: stretch;
-    gap: 0 14px;
+    gap: 0;
   }
+  /*
+    Both lists fill the height their column is given, with equal rows, so the evenly spaced
+    endpoints of the fan are the rows' own centres rather than an approximation of them.
+  */
   .stack,
-  .objects { align-self: start; }
-  .compiler { align-self: center; }
+  .objects {
+    align-self: stretch;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .stackList,
+  .objectList { grid-auto-rows: 1fr; align-content: stretch; }
+  .conn { padding-top: var(--lv2-col-head); }
+  .compiler { align-self: center; margin-top: var(--lv2-col-head); min-width: 0; }
 }
 
 /* --------------------------------------------------------------------------- the source stack */
 
+/*
+  A fixed 18px line, not the inherited 1.35 -- `--lv2-col-head` above is 18 + 14, and a label
+  block whose height depends on the rendered font would put the connectors half a line off the
+  lists they point at.
+*/
 .colLabel {
   margin: 0 0 14px;
+  line-height: 18px;
   color: var(--text-lo);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -64,7 +100,14 @@
   gap: 14px;
 }
 
-/* Preview then caption, side by side, so a long filename wraps in a column of its own. */
+/*
+  Preview then caption, side by side, so a long filename wraps in a column of its own.
+
+  D7 widened the caption column: at the old 212px stack the caption had about 104px, which is
+  eight mono characters, and `apple-2026-proxy-def14a-reference.pdf` could not reach a hyphen
+  before it ran out of line. The column is 250px now and the caption gets about 142px, which
+  holds the longest hyphen-delimited run this corpus has ("reference.pdf").
+*/
 .item {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
@@ -79,7 +122,14 @@
   min-width: 0;
 }
 
-/* The filename breaks on its own hyphens rather than running past the column. */
+/*
+  The filename breaks on its own hyphens rather than running past the column.
+
+  The break opportunities are `<wbr>` elements the component inserts after every hyphen (D7), not
+  a wrapping mode: a mode strong enough to break this token would also break it mid-word, and one
+  weak enough to protect the word would let it push the document sideways -- the WebKit /ko defect
+  round 3 closed. `anywhere` stays underneath as the net for a name with no hyphen in it at all.
+*/
 .filename {
   margin: 0;
   color: var(--text-hi);
@@ -96,14 +146,22 @@
 .itemKind { margin: 0; color: var(--text-lo); overflow-wrap: anywhere; }
 
 .formatsLabel {
-  margin: 22px 0 6px;
+  margin: 0 0 4px;
   color: var(--text-mid);
 }
 
+/*
+  D10: the intake format run wraps at its commas and nowhere else.
+
+  `describeAcceptedFormats` returns "PDF, DOCX, ... or ZIP" -- short uppercase tokens separated by
+  ", ", which are the only break opportunities a line breaker finds in it once `anywhere` is off.
+  With `anywhere` on it could cut PDF between the D and the F, which is how a receipt starts
+  reading like a rendering fault.
+*/
 .formats {
   margin: 0;
   color: var(--text-lo);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 /* ------------------------------------------------------------------------------ the connector */
@@ -111,6 +169,7 @@
 .conn {
   display: grid;
   place-items: center;
+  min-width: 0;
 }
 
 /* Vertical hairline while the scene is a column; see `.flow` for the horizontal composition. */
@@ -135,7 +194,7 @@
 */
 .flow { display: none; }
 
-@media (min-width: 900px) {
+@media (min-width: 1200px) {
   .diagram .connLine { display: none; }
   .flow {
     display: block;
@@ -184,32 +243,44 @@
 
 /* --------------------------------------------------------------------------- the object stack */
 
+/*
+  D7: SIX ROWS, NOT SIX CARDS.
+
+  It was a 2x3 grid of bordered panels about 106px wide -- a 13-character measure, which is a
+  feature grid rendered at the size of a chip, and the card-inside-a-card §7 cuts. A row is what
+  this actually is: the compiler's word for the object, in mono, and one line saying what it
+  holds. One column from 1200 up, where the fan's six lines end on six row edges; two columns in
+  the 768-1199 band, where the scene is stacked and a single column of six would be a long list
+  of short lines.
+*/
 .objectList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: 0;
 }
 
-@media (min-width: 560px) {
-  .objectList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 768px) and (max-width: 1199px) {
+  .objectList { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
 }
 
-/* A UI object, not a database icon: a panel with the type's name and what it holds. */
+/* A UI object, not a database icon: the type's name and what it holds, on a rule. */
 .chip {
   display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--hairline);
-  background: var(--ink-850);
+  gap: 2px;
+  align-content: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  min-width: 0;
 }
 
 .chipLabel {
   margin: 0;
   color: var(--text-hi);
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .chipNote { margin: 0; color: var(--text-mid); }
@@ -221,11 +292,12 @@
   rather than inside the text column, where a phone would put it above the visual.
 */
 .foot {
-  margin-top: 48px;
+  margin-top: 36px;
   display: grid;
   gap: 4px;
   justify-items: start;
   max-width: 64ch;
 }
 
-.naming { margin: 0; color: var(--text-hi); }
+/* The intake receipt reads as a caption; the naming line is the sentence the scene builds to. */
+.naming { margin: 18px 0 0; color: var(--text-hi); }

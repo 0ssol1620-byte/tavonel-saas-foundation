@@ -50,6 +50,28 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     shipped work, in the other direction.
   */
   {
+    date: "2026-09-19",
+    title: "A rebuilt entry page: nine scenes, and every figure on them read out of the public Compiled World",
+    surfaces: ["Website"],
+    added: [
+      "Release candidate, pending merge. Everything in this entry is reviewed and not yet merged, so it is not live on tavonel.com today. It is recorded before it lands for the reason the entry below gives.",
+      "The entry pages at / and /ko are rebuilt as nine scenes, each one a keyboard-reachable landmark that answers a single question and offers a single next action: what TAVONEL is, whether it works, what happens to your files, whether the result can be trusted, what happens when a source changes, why a compiler rather than a parser, how work comes in and goes out, what is safe to assume, and what to do next.",
+      "The first screen is the product rather than a picture of it: a real page of a real SEC filing, the region the compiler read on it, a line from that region to the passage compiled out of it, and the objects bound to that passage — every one of them read out of the public Compiled World when the page is built. It plays no video.",
+      "An evidence inspector on the entry page prints the five things a citation needs — the object's state, the file, the page, the region as coordinates on that page, and the source version's digest — with Copy citation and a link that opens the original document at the right page.",
+      "A design record for the entry pages at docs/LANDING_V2_2026-09-19.md: the rules every figure on them obeys, the component and data-module inventory, the semantic colour table, the navigation model, and the two commands that regenerate the committed page images.",
+    ],
+    improved: [
+      "One header and one footer across every public page: five sections, Request access as the single filled control, and a phone sheet whose rows meet the 44px touch floor and close on Escape.",
+      "The six questions that sat at the foot of the old entry page are on /contact, above the form they are usually asked before answering.",
+      "A colour means one thing everywhere it is used, on the site and in the workspace alike: blue is where something came from, mint is verified, violet is a relation, amber is a changed source, coral is held for review.",
+      "Reduced motion gets the whole story at once as a static composition with the play control still present, rather than a hidden animation.",
+    ],
+    fixed: [
+      "What this deployment does and does not yet do was spread across the header, the first screen and a note about how the film was made. It is stated once, in the deployment's own words, at the two points where a reader is deciding what to do about it.",
+      "Numbers on the entry pages could be typed into the copy. Every figure the pages print is read out of the compiled public World and marked as measured, and a browser check walks both rendered pages for a digit that carries no such mark.",
+    ],
+  },
+  {
     date: "2026-09-16",
     title: "A rendered API reference, published error codes, and the limits that were already enforced",
     surfaces: ["API", "Developer tools", "Website", "Billing"],

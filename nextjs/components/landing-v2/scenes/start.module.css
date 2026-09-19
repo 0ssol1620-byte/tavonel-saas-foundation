@@ -8,10 +8,28 @@
   not control. One row declared once here is smaller than a specificity fight.
 */
 
+/*
+  D9: the close is centred, in a 760px measure.
+
+  It was left-aligned in a 640px column with the right 55% of a 1440 viewport empty and nothing to
+  balance it -- the only scene on the page with no visual at all, which made the ending read as a
+  page that had been cut off rather than one that had finished. A centred column is the
+  composition a close can hold without a visual.
+*/
+.close {
+  max-width: 760px;
+  margin-inline: auto;
+  text-align: center;
+}
+.close :global(.lv2-scene-head) { max-width: none; }
+.close :global(.lv2-scene-support),
+.close :global(.lv2-scene-note) { margin-inline: auto; }
+
 .row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 14px 28px;
   margin-top: 36px;
 }
@@ -43,10 +61,16 @@
   color: var(--text-lo);
 }
 
-/* A secondary line is still a reachable control: 44px, visibly underlined, focusable. */
+/*
+  A secondary line is still a reachable control: 44px, visibly underlined, focusable.
+
+  `gap` and not a space in the markup (D6): a leading space inside a flex item is collapsed away,
+  which is why this rendered as "See pricing→".
+*/
 .pricingLink {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 44px;
   color: var(--text-mid);
   text-decoration: underline;

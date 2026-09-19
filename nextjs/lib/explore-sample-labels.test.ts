@@ -36,6 +36,13 @@ describe("the Explore sample says what it is", () => {
       WG-034 and WG-091: the World is compiled once at build time and the route reads it. A
       progress sequence would need a timer to advance, and there is none in the page or in any
       component of the stage -- which is also why exploring the sample costs no processing.
+
+      2026-09-19, D7. There is now exactly ONE timer under `components/explore`, and it is not a
+      sequence: `world_explore_60s` counts a minute of VISIBLE dwell and its only effect is a
+      `trackFunnelOnce` call -- it renders nothing, sets no state and advances no view. The ban
+      is narrowed to say that rather than dropped, because "no timer" was never the invariant;
+      "nothing here advances on a clock" is, and a count with a carve-out still fails the day a
+      second timer appears.
     */
     const directory = resolve(import.meta.dirname, "../components/explore");
     const sources = [
@@ -45,7 +52,9 @@ describe("the Explore sample says what it is", () => {
         .map((name) => readFileSync(resolve(directory, name), "utf8")),
     ];
     for (const source of sources) {
-      expect(source).not.toMatch(/setInterval|setTimeout/);
+      const timers = [...source.matchAll(/set(?:Interval|Timeout)\(/g)].length;
+      const dwell = source.includes('trackFunnelOnce("world_explore_60s")') ? 1 : 0;
+      expect(timers, "a timer on this route advances a view unless it is the dwell measurement").toBe(dwell);
       expect(source).not.toMatch(/Compiling|Processing\.\.\./);
     }
     expect(read("../app/explore/page.tsx")).not.toContain('"use client"');

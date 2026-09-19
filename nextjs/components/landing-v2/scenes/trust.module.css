@@ -3,14 +3,20 @@
   needs (`.lv2-proof-list`, `.lv2-proof`, `.lv2-text-link`) is already in `app/landing-v2.css`.
 */
 
-/* The three §18 links on one line, wrapping to as many as the width allows. The 44px touch
-   floor comes from `.lv2-text-link`'s own min-height, so the row only supplies the gaps. */
+/* D6: one link on this row now. The 44px touch floor comes from `.lv2-text-link`'s own
+   min-height, so the row only supplies the spacing. */
 .links {
   display: flex;
   flex-wrap: wrap;
   gap: 0 28px;
-  margin: 32px 0 0;
+  margin: 28px 0 0;
 }
+
+/*
+  C4's proof-label link is `.lv2-inline-link` in `app/landing-v2.css` now, not a rule of this
+  module: Scene 05's contract reference needed the identical box and affordance, and two copies of
+  the 44px floor is two places for it to drift out of the contract.
+*/
 
 /* The one next action (§39). Ink underline against the others' hairline -- hierarchy without a
    second filled button and without spending an accent colour, whose meanings are taken. */
@@ -18,7 +24,11 @@
   text-decoration-color: currentColor;
 }
 
+/* The footnote row: /status, then the two §18 references D6 took out of the action row. */
 .footnote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
   margin: 4px 0 0;
   color: var(--text-lo);
 }

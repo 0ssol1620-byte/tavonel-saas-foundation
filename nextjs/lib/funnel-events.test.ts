@@ -19,7 +19,10 @@ describe("funnel event property allowlist", () => {
     `sourceName`, and the point of the list is that a new key costs somebody a decision.
   */
   it("holds no key that could carry an identifier or a user string", () => {
-    expect([...FUNNEL_DETAIL_KEYS]).toEqual(["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status"]);
+    expect([...FUNNEL_DETAIL_KEYS]).toEqual(["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "variant"]);
+    // D8's experiment arm: three enumerated values, and no fourth. It is on the list for the
+    // same reason `scene` and `act` are -- it names a UI state, not a thing a reader typed.
+    expect(FUNNEL_DETAIL_KEYS as readonly string[]).toContain("variant");
     for (const forbidden of ["id", "documentId", "collectionId", "filename", "file", "name", "path", "question", "prompt", "text", "query", "reason", "email", "user", "digest", "title"]) {
       expect(FUNNEL_DETAIL_KEYS as readonly string[], `${forbidden} is not an enumerated UI state`).not.toContain(forbidden);
     }
@@ -59,7 +62,7 @@ function sourceFiles(directory: string): string[] {
 
 const modulePath = resolve(import.meta.dirname, "./funnel-events.ts");
 const moduleSource = readFileSync(modulePath, "utf8");
-const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)";?$/gm)].map((match) => match[1]);
+const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z0-9_]+)";?$/gm)].map((match) => match[1]);
 
 /*
   There are two unions now, and the extraction above reads both: `FunnelEvent`, fired from a
@@ -75,7 +78,7 @@ function unionMembers(name: string): string[] {
   const start = moduleSource.indexOf(`export type ${name} =`);
   if (start < 0) throw new Error(`${name} is not declared in funnel-events.ts`);
   const body = moduleSource.slice(start, moduleSource.indexOf('";', start) + 1);
-  return [...body.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
+  return [...body.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
 }
 const clientEvents = unionMembers("FunnelEvent");
 const serverEvents = unionMembers("ServerFunnelEvent");
@@ -88,7 +91,7 @@ const serverEvents = unionMembers("ServerFunnelEvent");
 */
 const callSites = ["../app", "../components", "../lib"]
   .flatMap((path) => sourceFiles(resolve(import.meta.dirname, path)))
-  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z_]+";?$/gm, "") : readFileSync(path, "utf8")))
+  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z0-9_]+";?$/gm, "") : readFileSync(path, "utf8")))
   .join("\n");
 
 describe("every declared funnel event has a control that fires it", () => {
@@ -114,6 +117,15 @@ describe("every declared funnel event has a control that fires it", () => {
     expect(declaredEvents).toContain("workspace_compile_failed");
     expect(declaredEvents).toContain("checkout_completed");
     expect(declaredEvents).toContain("signed_in");
+    /*
+      D7's four scroll quartiles are the only event names in either union that contain a digit,
+      and all three extractions above read a character class that excluded digits. Named here
+      rather than left to the count check, because that check passes either way: a name no
+      extraction sees is missing from BOTH of the numbers it compares.
+    */
+    for (const quartile of ["scroll_scene_25", "scroll_scene_50", "scroll_scene_75", "scroll_scene_100"]) {
+      expect(declaredEvents, `${quartile} escaped the extraction`).toContain(quartile);
+    }
   });
 
   it.each(declaredEvents)("%s is fired from somewhere", (event) => {

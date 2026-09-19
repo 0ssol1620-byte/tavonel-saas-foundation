@@ -82,6 +82,22 @@ export type LandingV2Scene = {
 };
 
 export type LandingV2HeroCopy = LandingV2Scene & {
+  /*
+    D8 TEST 01 -- THE HEADLINE EXPERIMENT, AND THE ONLY EXPERIMENT COPY ON THIS SITE.
+
+    Arm A is `headline` above, which is `BRAND_LINE.headline` and stays the default everywhere:
+    with `NEXT_PUBLIC_LANDING_EXPERIMENT` unset these two strings are rendered by nothing. Arm B
+    is the shortest statement of what the product does; arm C is the same promise written as the
+    outcome a reader gets. Both are single sentences on purpose -- the H1 composition is one
+    sentence per line and a three-line hero headline is what §6's cap exists to stop.
+
+    They are in this module rather than beside the experiment code so that the four guards in
+    `landing-v2-copy.test.ts` sweep them exactly as they sweep the default: §20.2's forbidden
+    claims, BARRED / OVERCLAIMS / RETIRED_NAMES, no digit, and `koTermDrift` over the Korean.
+    An experiment arm is a public claim for as long as it is live, and a claim that is only
+    checked when it ships is checked too late.
+  */
+  headlineExperiment?: { b: string; c: string };
   /** The derived intake line under the CTA row. Formats, then the connector path. */
   microProofFormats: string;
   microProofConnected: string;
@@ -179,7 +195,12 @@ export type LandingV2UseCopy = LandingV2Scene & {
 };
 
 export type LandingV2TrustCopy = LandingV2Scene & {
-  proofs: { id: string; label: string; note: string }[];
+  /*
+    C4: `href` is where this proof is WRITTEN DOWN, and the support line above the four promises
+    exactly that ("each written down where it can be checked"). It is required rather than
+    optional so a fifth proof cannot be added without naming the page that backs it.
+  */
+  proofs: { id: string; label: string; note: string; href: string }[];
   links: { label: string; href: string }[];
 };
 
@@ -213,8 +234,18 @@ const EN: LandingV2Copy = {
       end.
     */
     headline: BRAND_LINE.headline,
+    headlineExperiment: {
+      b: "Compile your knowledge.",
+      c: "Turn your files into knowledge your AI can trust.",
+    },
+    /*
+      C1, 2026-09-19. It read "Connect the files and systems you already have", and neither half
+      of that is what this deployment offers in the present tense: `activationPolicy` keeps
+      customer data closed, and connectors are not this deployment's shipped claim. "Bring the
+      files you already have" is the same invitation with nothing promised that is not built.
+    */
     support:
-      "Connect the files and systems you already have. TAVONEL compiles them into structured, versioned knowledge your AI can use—and you can verify.",
+      "Bring the files you already have. TAVONEL compiles them into structured, versioned knowledge your AI can use — and you can verify.",
     microProofFormats: ACCEPTED_FORMATS,
     microProofConnected: "connected sources",
     regionLabelFormat: "SOURCE · {form} · p.{page} · {coordinates}",
@@ -275,8 +306,15 @@ const EN: LandingV2Copy = {
     eyebrow: "SOURCES INTO A WORLD",
     headline: "Bring the mess.",
     headlineAccent: "Keep the meaning.",
+    /*
+      C2, 2026-09-19. "Documents, spreadsheets, decks and scans come in" stated an intake range
+      this World has never run: the sample is five SEC filings, all PDF. The accepted-format list
+      under the stack has a receipt (`describeAcceptedFormats(CAPABILITY_MANIFEST)`), and it says
+      what the upload route ACCEPTS -- so the sentence now says accepted, which is the claim the
+      receipt actually supports, and the receipt stays where it is.
+    */
     support:
-      "Documents, spreadsheets, decks and scans come in. A structured, evidence-bound World comes out.",
+      "Documents, spreadsheets, decks and scans are accepted at upload. What comes out is a structured, evidence-bound World.",
     note: "Every accepted source is sanitized to PDF and read the same way, so a paragraph keeps its page and its region.",
   },
 
@@ -356,11 +394,20 @@ const EN: LandingV2Copy = {
       layer takes and stops. Which stages a row covers is the component's mapping, and it says
       "this layer is responsible for" rather than "this layer fails at".
     */
+    /*
+      C3, 2026-09-19: each row says what that layer KEEPS, and stops.
+
+      The scene used to draw a coverage grid over these rows -- full and partial cells across four
+      stages -- which rendered as "two competitor rows in pieces, our row unbroken". That is a
+      product scoreboard with no receipt behind either mark, the ladder reading §16 forbids and
+      the perception §37 warns about. What each layer keeps is a plain fact about it and needs no
+      comparison to be useful: text, chunks, nodes, and a binding.
+    */
     layers: [
-      { id: "parser", label: "Parser", responsibility: "Turns a file into text and layout." },
-      { id: "retrieval", label: "Retrieval index", responsibility: "Finds passages to put in front of a model at question time." },
-      { id: "graph", label: "Graph database", responsibility: "Stores entities and relations that something upstream produced." },
-      { id: "compiler", label: "Knowledge Compiler", responsibility: "Reads, structures, binds each object to its source region, and keeps that binding as versions arrive." },
+      { id: "parser", label: "Parser", responsibility: "Keeps the text and the layout it read off the file." },
+      { id: "retrieval", label: "Retrieval index", responsibility: "Keeps chunks of text it can find again at question time." },
+      { id: "graph", label: "Graph database", responsibility: "Keeps nodes and edges that something upstream produced." },
+      { id: "compiler", label: "Knowledge Compiler", responsibility: "Keeps every object bound to the source version, page and region it came from, across all four stages." },
     ],
     manifesto: "A compiler keeps what connects them.",
   },
@@ -417,11 +464,17 @@ const EN: LandingV2Copy = {
                       third outcome. The old note promised a signed package unconditionally, which
                       is not what a deployment without a signer does.
     */
+    /*
+      C4, 2026-09-19: every proof now names the page it is written down on, and every one of
+      those pages exists in `app/` (there is no /architecture on this site and none is invented).
+      The support line promises "written down where it can be checked" and three of the four had
+      nowhere to go.
+    */
     proofs: [
-      { id: "training", label: TRAINING_DATA_CLAIM.label, note: TRAINING_DATA_CLAIM.body },
-      { id: "evidence", label: "Evidence stays attached", note: "A published object carries the source version, page and region it was compiled from, and is not emitted without them." },
-      { id: "review", label: "Unverified knowledge is held for review", note: "A passage that cannot be verified is held for review and surfaced as such, not published as if it were verified. Fail closed is a property of the compiler, not a setting." },
-      { id: "portable", label: "Portable output, and a verifier you run", note: "A download is signed at request time or refused; there is no unsigned archive. The verifiers that check the signature and the contents are published for download." },
+      { id: "training", label: TRAINING_DATA_CLAIM.label, note: TRAINING_DATA_CLAIM.body, href: "/security" },
+      { id: "evidence", label: "Evidence stays attached", note: "A published object carries the source version, page and region it was compiled from, and is not emitted without them.", href: "/evidence" },
+      { id: "review", label: "Unverified knowledge is held for review", note: "A passage that cannot be verified is held for review and surfaced as such, not published as if it were verified. Fail closed is a property of the compiler, not a setting.", href: "/trust" },
+      { id: "portable", label: "Portable output, and a verifier you run", note: "A download is signed at request time or refused; there is no unsigned archive. The verifiers that check the signature and the contents are published for download.", href: "/docs/exports" },
     ],
     /* Only routes that exist. There is no /architecture on this site and none is invented. */
     links: [
@@ -452,8 +505,13 @@ const KO: LandingV2Copy = {
     eyebrow: "지식 컴파일러",
     /* A literal translation of `BRAND_LINE.headline`, not a second claim. */
     headline: "AI가 바로 사용할 수 있는 지식. 모든 원문까지 추적됩니다.",
+    /* D12: the literal translation of each arm. The subject is dropped, as the deck does. */
+    headlineExperiment: {
+      b: "지식을 컴파일하세요.",
+      c: "파일을 AI가 신뢰할 수 있는 지식으로 바꾸세요.",
+    },
     support:
-      "이미 가지고 있는 파일과 시스템을 연결하세요. TAVONEL은 그것을 AI가 사용할 수 있고, 직접 검증할 수 있는 구조화된 버전 관리 지식으로 컴파일합니다.",
+      "이미 가지고 있는 파일을 가져오세요. TAVONEL은 그것을 AI가 사용할 수 있고, 직접 검증할 수 있는 구조화된 버전 관리 지식으로 컴파일합니다.",
     microProofFormats: ACCEPTED_FORMATS,
     microProofConnected: "연결 소스",
     /* 원문 is KO_TERMS' spelling of "source"; 쪽 is the page counter the filing metadata uses. */
@@ -492,7 +550,7 @@ const KO: LandingV2Copy = {
     headline: "그대로 가져오세요.",
     headlineAccent: "의미는 그대로 남습니다.",
     support:
-      "문서, 스프레드시트, 발표자료, 스캔본이 들어갑니다. 구조화되고 근거에 묶인 World가 나옵니다.",
+      "문서, 스프레드시트, 발표자료, 스캔본을 업로드에서 허용합니다. 나오는 것은 구조화되고 근거에 묶인 World입니다.",
     note: "허용되는 모든 원문은 PDF로 정제해 같은 방식으로 읽으므로, 문단마다 페이지와 영역이 남습니다.",
   },
 
@@ -552,10 +610,10 @@ const KO: LandingV2Copy = {
       { id: "maintain", label: "유지", caption: "버전과 의존 관계" },
     ],
     layers: [
-      { id: "parser", label: "파서", responsibility: "파일을 텍스트와 레이아웃으로 바꿉니다." },
-      { id: "retrieval", label: "검색 색인", responsibility: "질문 시점에 모델 앞에 놓을 문단을 찾습니다." },
-      { id: "graph", label: "그래프 데이터베이스", responsibility: "앞 단계가 만들어 준 개체와 관계를 저장합니다." },
-      { id: "compiler", label: "지식 컴파일러", responsibility: "읽고, 구조화하고, 각 객체를 원문 영역에 묶고, 버전이 도착해도 그 연결을 유지합니다." },
+      { id: "parser", label: "파서", responsibility: "파일에서 읽어 낸 텍스트와 레이아웃을 가지고 있습니다." },
+      { id: "retrieval", label: "검색 색인", responsibility: "질문 시점에 다시 찾을 수 있는 텍스트 조각을 가지고 있습니다." },
+      { id: "graph", label: "그래프 데이터베이스", responsibility: "앞 단계가 만들어 준 노드와 간선을 가지고 있습니다." },
+      { id: "compiler", label: "지식 컴파일러", responsibility: "네 단계 전부에 걸쳐, 모든 객체를 그것이 나온 원문 버전과 페이지와 영역에 묶어 둡니다." },
     ],
     manifesto: "컴파일러는 그것들을 잇는 것을 지킵니다.",
   },
@@ -588,10 +646,10 @@ const KO: LandingV2Copy = {
     headline: "잃어버려서는 안 되는 지식을 위해 만들었습니다.",
     support: "이 배포판이 실제로 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
     proofs: [
-      { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다." },
-      { id: "evidence", label: "근거는 계속 붙어 있습니다", note: "게시된 객체는 그것이 컴파일된 원문 버전, 페이지, 영역을 함께 가지며, 그것이 없으면 게시되지 않습니다." },
-      { id: "review", label: "검증되지 않은 지식은 검토를 위해 보류됩니다", note: "검증할 수 없는 구절은 검토를 위해 보류되고 그렇게 표시되며, 검증된 것처럼 게시되지 않습니다. 닫힌 상태로 실패하는 것은 컴파일러의 성질이며 설정이 아닙니다." },
-      { id: "portable", label: "이식 가능한 결과물과 직접 실행하는 검증기", note: "내려받기는 요청 시점에 서명되거나 거부되며, 서명되지 않은 아카이브는 없습니다. 서명과 내용을 검사하는 검증기를 내려받을 수 있습니다." },
+      { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다.", href: "/security" },
+      { id: "evidence", label: "근거는 계속 붙어 있습니다", note: "게시된 객체는 그것이 컴파일된 원문 버전, 페이지, 영역을 함께 가지며, 그것이 없으면 게시되지 않습니다.", href: "/evidence" },
+      { id: "review", label: "검증되지 않은 지식은 검토를 위해 보류됩니다", note: "검증할 수 없는 구절은 검토를 위해 보류되고 그렇게 표시되며, 검증된 것처럼 게시되지 않습니다. 닫힌 상태로 실패하는 것은 컴파일러의 성질이며 설정이 아닙니다.", href: "/trust" },
+      { id: "portable", label: "이식 가능한 결과물과 직접 실행하는 검증기", note: "내려받기는 요청 시점에 서명되거나 거부되며, 서명되지 않은 아카이브는 없습니다. 서명과 내용을 검사하는 검증기를 내려받을 수 있습니다.", href: "/docs/exports" },
     ],
     links: [
       { label: "보안", href: "/security" },

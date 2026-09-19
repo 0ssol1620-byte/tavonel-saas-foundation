@@ -1,19 +1,18 @@
 /*
-  Scene 06's continuum (blueprint §16). Tokens only -- every colour, radius and type size here is
-  a custom property declared in `app/tavonel.css` or `app/landing-v2.css`, so the scene is correct
-  on whichever ground D9 puts it on: `.lv2-paper` remaps --text-hi/--text-mid/--hairline and the
+  Scene 06's four rows (blueprint §16). Tokens only -- every colour and type size here is a custom
+  property declared in `app/tavonel.css` or `app/landing-v2.css`, so the scene is correct on
+  whichever ground D9 puts it on: `.lv2-paper` remaps --text-hi/--text-mid/--hairline and the
   accents, and nothing below names a literal colour.
 
-  Written phone-first. The stacked chip list is the base case and the continuum is what a wide
-  viewport gets, rather than a desktop drawing undone by four overrides at 767px.
+  C3, 2026-09-19: the coverage matrix this sheet used to draw is gone -- the axis header, the
+  four-column track, the full/partial cells and the mint far end with it. It rendered as a
+  category scoreboard with no receipt behind a single mark (§16's ladder reading, §37's
+  perception), and the mint told a reader something was verified on a page where nothing is.
+  What is left is what a list of layers actually needs: a rule, a name, a sentence.
 */
 
-/* ------------------------------------------------------------------ the two links under the copy */
+/* ------------------------------------------------------------------ the link under the copy */
 
-/*
-  One next action, one quieter reference. `.lv2-scene-next` carries its own 28px top margin for
-  the single-link scenes; here the row owns the spacing so both links sit on one baseline.
-*/
 .links {
   margin: 28px 0 0;
   display: flex;
@@ -24,21 +23,11 @@
 .links > :global(.lv2-text-link) {
   margin-top: 0;
 }
-/* The second link is a reference, not a second call to action: same face, quieter ink. */
-.secondary {
-  color: var(--text-mid);
-  font-weight: 400;
-}
 
-/* ------------------------------------------------------------------------ the stacked list (phone) */
+/* ------------------------------------------------------------------------------- the four rows */
 
 .continuum {
-  margin: 40px 0 0;
-}
-
-/* The axis header is a wide-viewport device; the cell labels carry the same words on a phone. */
-.axis {
-  display: none;
+  margin: 36px 0 0;
 }
 
 .tracks {
@@ -48,7 +37,7 @@
 
 .row {
   border-top: 1px solid var(--hairline);
-  padding-block: 18px;
+  padding-block: 16px;
 }
 
 .layer {
@@ -61,36 +50,45 @@
   margin: 0;
 }
 
-.track {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 0;
+.responsibility {
+  display: block;
+  margin: 8px 0 0;
+  font-size: var(--lv2-small);
+  line-height: 1.45;
+  color: var(--text-mid);
+  max-width: 62ch;
 }
 
-/* A stage this layer takes no responsibility for is simply absent from its list. */
-.cell[data-coverage="none"] {
-  display: none;
+/*
+  The four stages, on the compiler's row only. They are that row's own description of its work,
+  not marks a reader can compare the three rows above against, so they are set as text with their
+  captions rather than as cells on an axis. The neutral ink is deliberate: no accent on this
+  scene says "better", and mint in particular means `verified`, which nothing here is.
+*/
+.stages {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px 20px;
+  margin: 14px 0 0;
 }
 
-.cell {
-  border: 1px solid var(--hairline-hi);
-  border-radius: var(--radius-sm);
-  padding: 5px 9px;
-}
-/* Shape, not colour: a partial responsibility is a dashed edge AND the word inside the chip. */
-.cell[data-coverage="partial"] {
-  border-style: dashed;
-}
-/* §16's "full contract" end. The only accent in the scene besides the violet BIND label. */
-.track[data-layer="compiler"] .cell[data-stage="maintain"] {
-  border-color: var(--verified);
+@media (min-width: 560px) {
+  .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-.cellLabel {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
+@media (min-width: 1200px) {
+  .stages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.stage {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-top: 1px solid var(--hairline);
+  padding-top: 8px;
+}
+
+.stageLabel {
   font-family: var(--f-mono);
   font-size: var(--lv2-meta);
   line-height: 1.35;
@@ -99,138 +97,34 @@
   color: var(--text-mid);
 }
 
-.partial {
-  font-family: var(--f-sans);
-  letter-spacing: 0;
-  text-transform: none;
+/* BIND is the responsibility this product is named for; violet is the relation accent (D4). */
+.stage:nth-child(3) .stageLabel {
+  color: var(--relation);
+}
+
+.stageCaption {
+  font-size: var(--lv2-meta);
+  line-height: 1.35;
   color: var(--text-lo);
 }
 
-.responsibility {
-  display: block;
-  margin: 12px 0 0;
-  font-size: var(--lv2-small);
-  line-height: 1.45;
-  color: var(--text-mid);
-  max-width: 62ch;
-}
-
-/* ------------------------------------------------------------------- the continuum (≥768px) */
+/* ------------------------------------------------------------------------ the wide composition */
 
 @media (min-width: 768px) {
   /*
-    One column ladder shared by the axis header and every track, so a segment sits under its own
-    stage label. The label column is a fixed track rather than a fraction: the four layer nouns
-    are short and a fraction would move the whole drawing when a translation is longer.
+    One column ladder for every row, so the four layer names line up and the sentences share a
+    left edge. The label column is a fixed track rather than a fraction: the four nouns are short
+    and a fraction would move the whole list when a translation is longer.
   */
-  .continuum {
-    --why-label: 152px;
-  }
-
-  .axis {
-    display: grid;
-    grid-template-columns: var(--why-label) repeat(4, minmax(0, 1fr));
-    align-items: end;
-    margin: 0 0 14px;
-  }
-  .axisSpacer {
-    display: block;
-  }
-  .axisCell {
-    display: block;
-    padding-right: 12px;
-  }
-  .axisLabel {
-    display: block;
-    font-family: var(--f-mono);
-    font-size: var(--lv2-meta);
-    line-height: 1.35;
-    letter-spacing: 0.08em;
-    color: var(--text-mid);
-  }
-  /* BIND is the responsibility this product is named for; violet is the relation accent (D4). */
-  .axisCell[data-stage="bind"] .axisLabel {
-    color: var(--relation);
-  }
-  .axisCaption {
-    display: block;
-    margin-top: 4px;
-    font-size: var(--lv2-meta);
-    line-height: 1.35;
-    color: var(--text-lo);
-  }
-
   .row {
     display: grid;
-    grid-template-columns: var(--why-label) minmax(0, 1fr);
+    grid-template-columns: 152px minmax(0, 1fr);
     align-items: start;
-    padding-block: 16px;
   }
   .layer {
     padding-right: 16px;
   }
-
-  /*
-    The continuum itself: one hairline the full width of the contract, with this layer's
-    responsibility drawn on top of it. The hairline is a background image rather than a border so
-    it runs behind the segments instead of beside them.
-  */
-  .track {
-    /* The containing block for the clipped cell labels below. */
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    align-items: center;
-    height: 20px;
-    margin: 0;
-    background-image: linear-gradient(var(--hairline), var(--hairline));
-    background-size: 100% 1px;
-    background-position: 0 center;
-    background-repeat: no-repeat;
-  }
-
-  .cell {
-    height: 3px;
-    margin-right: 5px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--r-full);
-    background: var(--text-mid);
-  }
-  .cell:last-child {
-    margin-right: 0;
-  }
-  .cell[data-coverage="none"] {
-    display: block;
-    background: none;
-  }
-  /* A dashed run reads as "part of this", and the cell label still says the word to a reader. */
-  .cell[data-coverage="partial"] {
-    background: repeating-linear-gradient(90deg, var(--text-mid) 0 5px, transparent 5px 10px);
-  }
-  /* The one unbroken row is drawn in the strongest neutral; only its far end is mint. */
-  .track[data-layer="compiler"] .cell {
-    background: var(--text-hi);
-    border-color: transparent;
-  }
-  .track[data-layer="compiler"] .cell[data-stage="maintain"] {
-    background: var(--verified);
-    border-color: transparent;
-  }
-
-  /* The words are the accessible reading of the drawing; the drawing repeats the axis header. */
-  .cellLabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   .responsibility {
-    margin-top: 10px;
+    margin-top: 0;
   }
 }

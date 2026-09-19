@@ -146,9 +146,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             tavonel.css resolve everywhere, including in a portal rendered outside <body>. */}
         {/*
           A6 -- the first thing in the tab order, on every page.
-          The landing page opens with a nav, a mode badge, four section links and a scene rail
-          before it reaches a sentence, and a keyboard or screen-reader visitor had to walk all
-          of it on every page. Visually hidden until focused, and then a real, visible control.
+          The header runs a wordmark, five section links and two actions before any page reaches
+          its first sentence, and a keyboard or screen-reader visitor had to walk all of it every
+          time. Visually hidden until focused, and then a real, visible control.
+          (The mode badge, the four section links and the scene rail this comment used to name
+          belonged to the client landing that Landing V2 replaced on 2026-09-19.)
         */}
         <SkipLink />
         {/*

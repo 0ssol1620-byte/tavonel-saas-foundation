@@ -41,13 +41,28 @@
     column: 64px would need 654px and 92px would need 940px. It is recorded here as overridden by
     §6's own 2.2-line cap and §39's hierarchy rule, not as an oversight.
 
-    Below 768 the display clamps to 9.2vw rather than the 9.6 first drawn, because at 360 the
-    shorter sentence has 8px of slack at 9.2 and 3px at 9.6 -- and a third line on the first
-    sentence would push the headline to four.
+    RAISED AGAIN 2026-09-19 (design review D1), AND PARTLY PUT BACK THE SAME DAY (P3 QA round 1).
+
+    D1 restored §6's intent -- display clamp(56px, 5vw, 72px) at >=1200 and clamp(40px, 10vw,
+    46px) below 768 -- and widened the hero's text track to 752px so the longer sentence would
+    still set on one line at 72px. Both halves were derived from an assumed em advance rather
+    than from a rendered page, and both were wrong where it counts: the English H1 set in FOUR
+    lines at 390 and 360 (cap 3.2) and the Korean H1 in three at 1440 and 1280 (cap 2.2), while
+    the widened track inverted §32's 42:58 text:visual ratio to 58:42.
+
+    THE STEPS BELOW ARE MEASURED, NOT DERIVED. Every one was read off the built fixture server in
+    chromium AND webkit at 1440/1280/1200/1024/768/430/390/360 on both / and /ko, against the
+    600px text track §32 asks for (see the hero block). What the measurement says for the English
+    headline in a 600px column: 58px sets in two lines and 60px in three, so the >=1200 step
+    stops at 56 -- two pixels of slack kept rather than spent. Below 768 the measure is the
+    viewport: 40px sets it in four lines at 390 and 360, and 34-38px in three.
+
+    §6's 64-92px Display XL is still unreachable in a 600px column, and is still recorded as
+    overridden by §6's own 2.2-line cap and §39's hierarchy rule rather than as an oversight.
   */
-  --lv2-display: clamp(40px, 4.6vw, 52px);
-  --lv2-h2: clamp(34px, 3vw, 44px);
-  --lv2-h3: clamp(24px, 2.2vw, 28px);
+  --lv2-display: clamp(46px, 4.6vw, 52px);
+  --lv2-h2: clamp(38px, 3.2vw, 46px);
+  --lv2-h3: 28px;
   --lv2-body-l: 20px;
   --lv2-body: clamp(16px, 1.2vw, 18px);
   --lv2-small: 14px;
@@ -66,7 +81,14 @@
     it; raising it globally would re-space every one of them, and no lane in this campaign
     screenshots those pages. Same name, landing scope, blueprint value.
   */
-  --space-section: clamp(112px, 11vw, 176px);
+  /*
+    D2 (chapter budget), 2026-09-19: was clamp(112px, 11vw, 176px). At 1440 that spent 316px of
+    the 900px viewport on padding alone and put four of the five proof scenes 19-27% over §24's
+    80-95vh band, with the excess showing as empty ground at the end of each one. 96px a side is
+    the largest value that leaves every proof scene inside 95vh at 1440x900 with its content
+    unchanged; §34's rhythm is a proportion between scenes, and it survives the cut intact.
+  */
+  --space-section: clamp(72px, 6.6vw, 96px);
 
   /*
     The one shadow the paper layer adds. Depth is otherwise --depth-* and nothing else: a sheet
@@ -82,9 +104,21 @@
 /* Mobile scale (§6). One block, one breakpoint: the hero is recomposed below 768, not shrunk. */
 @media (max-width: 767px) {
   .lv2 {
-    --lv2-display: clamp(34px, 9.2vw, 40px);
+    /*
+      9vw is 32px at 360 and 35px at 390, and the floor holds the narrow end at 32.
+
+      Measured in BOTH engines, which is what decided the number: at 360 Chromium sets the English
+      headline in three lines at 34px and WebKit sets the same 34px in FOUR. The two engines shape
+      this string differently enough to cross the cap between them, so the step is taken from the
+      one that breaks first -- 32px is three lines in both, 40px is four in both. Contract rule 12
+      puts webkit at 360 inside "done", so this is not a Chromium number with a WebKit footnote.
+
+      The H2 floor drops with it so the step between them stays visible: 28px against a 32px H1 is
+      a hierarchy a reader can see, 30 against 32 is not.
+    */
+    --lv2-display: clamp(32px, 9vw, 40px);
     --lv2-h2: clamp(28px, 7.5vw, 32px);
-    --lv2-h3: clamp(22px, 6vw, 26px);
+    --lv2-h3: 24px;
     --lv2-body-l: 18px;
     --lv2-body: 17px;
     --lv2-meta: 12px;
@@ -97,7 +131,8 @@
 @media (min-width: 1200px) {
   .lv2 {
     --lv2-gutter: 48px;
-    /* The hero text column is 600 from here up, and 56px is the size that line holds inside it. */
+    /* The desktop display, against the 600px text track below: measured at two lines up to 58px
+       and at three from 60px, so 56 is the step and its slack is measured rather than assumed. */
     --lv2-display: clamp(44px, 3.9vw, 56px);
   }
 }
@@ -222,8 +257,17 @@
 .lv2-scene--full {
   min-height: min(900px, 100vh);
 }
+/*
+  A floor, never a reservation. D2 caps the proof scenes at 95vh and the compact trust scene at
+  760px; the floor below only stops a short scene from reading as a strip.
+*/
 .lv2-scene--proof {
-  min-height: 80vh;
+  min-height: 72vh;
+}
+/* §24's compact scene: Scene 08 states four things and stops. */
+.lv2-scene--compact {
+  min-height: 0;
+  padding-block: clamp(64px, 5.4vw, 80px);
 }
 
 /* ============================================================ grid */
@@ -231,16 +275,27 @@
 /*
   Editorial Split (§7): text 4 columns, visual 8. Expressed as a two-track grid rather than as
   spans inside a 12-column parent, because that is one rule instead of three and the text column lands
-  8px narrower than a true 4-of-12 -- a difference no reader can see. Stacked below 1200, where
-  a 4-column text block is about 260px and has stopped being a column.
+  8px narrower than a true 4-of-12 -- a difference no reader can see.
+
+  D4, 2026-09-19: 768-1199 gets a composition of its own. It used to jump from one column straight
+  to 4+8 at 1200, so the blueprint's whole tablet band rendered the phone stack at desktop width --
+  the page measured 8,780px at 1280 and 11,128px at 1024, 27% taller at the narrower viewport. A
+  5:7 split is the shape that band can hold: a 4-column text track is about 260px there and has
+  stopped being a column, but 5 of 12 is 370px at 1024, which is a measure.
 */
 .lv2-split {
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(0, 1fr);
 }
+@media (min-width: 768px) {
+  .lv2-split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+}
 @media (min-width: 1200px) {
   .lv2-split {
+    gap: 40px;
     grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
   }
 }
@@ -338,7 +393,7 @@
   of a label rather than of prose.
 */
 .lv2-eyebrow {
-  margin: 0 0 20px;
+  margin: 0 0 14px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-mid);
@@ -351,8 +406,8 @@
 /* D3: the serif is allowed on the H1's accent phrase and on the §16 manifesto line. Nowhere else. */
 .lv2-h2-accent.lv2-serif { color: var(--text-hi); }
 
-.lv2-scene-support { margin: 24px 0 0; color: var(--text-mid); max-width: 64ch; }
-.lv2-scene-note { margin: 16px 0 0; color: var(--text-lo); max-width: 72ch; }
+.lv2-scene-support { margin: 20px 0 0; color: var(--text-mid); max-width: 64ch; }
+.lv2-scene-note { margin: 14px 0 0; color: var(--text-lo); max-width: 72ch; }
 
 /*
   One next action per scene (§39). A text link with a rule under it rather than a second button:
@@ -377,7 +432,44 @@
 @media (hover: hover) and (pointer: fine) {
   .lv2-text-link:hover { text-decoration-color: var(--source); }
 }
-.lv2-scene-next { margin-top: 28px; }
+.lv2-scene-next { margin-top: 22px; }
+
+/*
+  A LINK INSIDE A SENTENCE (P3 QA round 1).
+
+  `.lv2-text-link` above is the scene's ONE next action and stays unique -- `lib/landing-v2-
+  recompile.test.ts` pins that there is exactly one of it per scene. This is the other kind: a
+  reference that is part of the prose, on a proof's own label or at the end of a note. It exists
+  because two lanes reached for a bare `<a>` and produced the same two defects at once.
+
+  THE 44px FLOOR IS NOT A PHONE RULE. An inline anchor is as tall as its line box, so the four
+  trust proofs measured 19px and Scene 05's contract link 18px at 390 and 38px at 1440 -- at every
+  width and in both locales. Contract rule 8 puts the floor on every reachable control.
+  `inline-flex` gives the anchor a box without taking it out of the sentence.
+
+  AND IT LOOKS LIKE A LINK BEFORE IT IS TOUCHED. The first version carried no resting affordance
+  at all: no underline, no arrow, no colour, nothing until hover or focus. Rule 8 bars colour as
+  the only carrier of a state; nothing at all is worse, and a touch reader has no hover to
+  discover it with. The underline is at rest in the hairline ink, and goes to the text's own
+  colour on hover and focus -- the same step `.lv2-text-link` makes.
+
+  It inherits colour and size on purpose: it is a word in a sentence, not a control beside one.
+*/
+.lv2-inline-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hairline-hi);
+  transition: text-decoration-color var(--motion-ui) var(--ease-ui);
+}
+.lv2-inline-link:focus-visible { text-decoration-color: currentColor; }
+@media (hover: hover) and (pointer: fine) {
+  .lv2-inline-link:hover { text-decoration-color: currentColor; }
+}
 
 /*
   Scene 08's four proofs (§18), as a list rather than as four cards.
@@ -440,9 +532,10 @@
   463px). A 56px headline therefore needs about 575px of measure to stay on one line, and §6's
   2.2-line cap plus §11.1's own two-line drawing require it to.
 
-  The text column is 600 and the visual takes the rest -- 668 at 1440, not 708. The stage keeps
-  §32's 708:600 PROPORTION (`aspect-ratio` further down) and loses 40px of width. Of the two
-  numbers that could not both hold, the headline's is the one a visitor reads first.
+  The text column is 600 and the visual takes the rest -- 668 at 1440, not 708. That is 42:58, the
+  ratio §32 and D11 draw; the visual gives up 40px of absolute width and the headline gets the
+  measure it needs. Of the two numbers that could not both hold, §32's ratio is the one a visitor
+  reads as the shape of the page, and the display size is the one that gave way.
 
   Below 1200 the two stack: the text takes the full measure and the demo lays its three blocks
   across it. There is no band where the desktop stage is simply smaller (§25).
@@ -472,10 +565,16 @@
   /*
     A clamped text track rather than an `fr` share, and the clamp is measured.
 
-    The H1's longer sentence advances 10.21em, so at `--lv2-display`'s 3.9vw it wants 39.8vw of
-    measure; 43vw gives it a consistent margin from 1200 up and stops growing at 600, where the
-    headline stops growing too. An `fr` share would have handed the text 475px at 1200 -- 12px
-    less than the sentence needs -- and put the headline back on three lines at one width.
+    600 at 1440 is 42% of the 1296 measure, which is §32's and D11's text:visual ratio, and the
+    demo takes the remaining 668. D1 widened this track to 752 so that a 72px headline would hold
+    its longer sentence on one line, and that inverted the ratio to 58:42: measured at 1440, the
+    headline's full stop landed at x~800 against a demo starting at x~845, and the thumbnail's
+    metadata folded to four lines with empty ground beside it. Of the two numbers that could not
+    both hold, §32's composition is the one a visitor reads as the shape of the page; the display
+    size is the one that gave way, and it gave way to a measurement rather than to an assumption.
+
+    An `fr` share would have handed the text 475px at 1200 -- 45px less than the sentence needs --
+    and put the headline on three lines at one width, so the track is clamped instead.
   */
   .lv2-hero-grid { grid-template-columns: clamp(520px, 43vw, 600px) minmax(0, 1fr); gap: 28px; }
 }
@@ -520,14 +619,15 @@
 
 /* §32: CTA row mt32 h48, meta row mt24. */
 .lv2-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin-top: 32px; }
-.lv2-hero-intake { margin: 24px 0 0; color: var(--text-lo); max-width: 60ch; }
+/* D10: commas are the only break points in the run; the connector clause is one phrase. */
+.lv2-hero-intake { margin: 24px 0 0; color: var(--text-lo); max-width: 60ch; overflow-wrap: normal; }
+.lv2-hero-intake-tail { white-space: nowrap; }
 
 /* ============================================================================================
    HERO DEMO (§11.1, §22, §28, §43, D11) -- DOM and CSS, no canvas, no video, no SVG
    ============================================================================================ */
 
 .lv2-demo { min-width: 0; }
-.lv2-demo-label { margin: 0 0 12px; color: var(--text-lo); text-transform: uppercase; letter-spacing: 0.08em; }
 
 /*
   Below 1200 the stage is a column in beat order: the region that was read, where it sits on the
@@ -669,18 +769,33 @@
   rules further down), and it holds its place in the layout the rest of the time so nothing moves
   when it appears. Under reduced motion it is simply there, which is the base style.
 */
-.lv2-read-label { margin: 0; justify-self: end; text-align: right; color: var(--text-mid); }
+.lv2-read-label {
+  margin: 0;
+  justify-self: end;
+  text-align: right;
+  color: var(--text-mid);
+  /* The signature's label step, at the same speed Scene 02 and Scene 04 run it (§4.1). */
+  transition: color var(--motion-ui) var(--ease-ui);
+}
 .lv2-read-unit { color: var(--text-lo); }
 
 /* -------------------------------------------------------------------------------- the LOCATOR */
 
 /*
   Where that strip is on the filing: the whole page, small, with the same box drawn on it, and one
-  line of metadata under it. The hairline above the thumbnail is the Evidence Line up to the
-  strip -- centred, because the box it points at spans the page's own measure.
+  line of metadata under it. The hairline is the Evidence Line between the strip and the box on
+  that thumbnail -- it reaches the box itself, not the page's edge (§4.1).
+
+  `container-type: inline-size` is what lets the line below say "down to the box" as a fraction of
+  the RENDERED page: the thumbnail is this container's full width, so `100cqw` times the raster's
+  own aspect ratio is the page's height at any width -- nothing measured at runtime, no number
+  typed into this sheet.
+
+  Row gap 0, with the caption carrying the space it used to get from the gap: a line that stops
+  8px short of the thing it points at is not a connector.
 */
-.lv2-locator { margin: 0; display: grid; gap: 8px; justify-items: stretch; max-width: 220px; }
-.lv2-locator-meta { color: var(--text-mid); }
+.lv2-locator { margin: 0; display: grid; row-gap: 0; justify-items: stretch; max-width: 220px; container-type: inline-size; }
+.lv2-locator-meta { margin-top: 8px; color: var(--text-mid); }
 
 .lv2-page { position: relative; display: block; overflow: hidden; border-radius: var(--r-paper-lg); box-shadow: var(--lv2-paper-shadow); }
 .lv2-page-img { display: block; width: 100%; height: auto; }
@@ -716,8 +831,27 @@
   36px column as given. 18px is the stage's row gap here -- the line spans exactly the distance
   between the strip and the block it reaches, and a line that overshoots is a line that means
   something else.
+
+  THE LOCATOR'S LINE GOES ONTO THE BOX (round 3 design review).
+  It used to be exactly the 18px of gap, which made it a tick floating between two things and
+  touching neither. Now it runs from the strip down THROUGH the thumbnail to the top edge of the
+  outlined region, at the region's own horizontal centre -- the three fractions come from the same
+  `bbox1000` the outline is drawn from (`hero-compiler-demo.tsx` writes them as custom properties),
+  so the line cannot point somewhere the box is not.
+
+  `margin-bottom` gives the extra length back to the layout, so the row is still the 18px the
+  composition was measured with and the thumbnail does not move; `z-index` puts the hairline over
+  the raster it crosses, which is otherwise painted after it.
 */
-.lv2-line--locator { height: 18px; margin-left: 0; margin-inline: auto; }
+.lv2-line--locator {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  height: calc(18px + 100cqw * var(--lv2-page-ar) * var(--lv2-region-top));
+  margin-bottom: calc(-100cqw * var(--lv2-page-ar) * var(--lv2-region-top));
+  margin-left: calc((100% - 1px) * var(--lv2-region-midx));
+  margin-right: 0;
+}
 .lv2-line--claim { height: 18px; margin-left: 0; justify-self: end; margin-right: 28px; }
 
 /* ------------------------------------------------------------------------- the compiled claim */
@@ -769,12 +903,40 @@
   visual needs, with nothing on top of anything else.
 */
 .lv2-slot { position: relative; display: grid; align-content: start; }
-.lv2-slot-static { display: none; }
-.lv2-slot-beat { display: grid; align-content: start; }
-.lv2-slot-beat + .lv2-slot-beat { margin-top: 18px; }
+.lv2-slot-static { display: grid; gap: 14px; align-content: start; }
+/*
+  D3: the beats are an overlay at every width now, not only at 1200 and up. See the animation
+  bindings near the end of this file for why the phone stopped being additive.
+*/
+/*
+  The beats share ONE grid cell with the static stack rather than being taken out of flow -- at
+  every width now (P3 QA round 1). Same result on screen, one beat legible at a time over a stack
+  that outlives them, but the slot's height is the tallest of the five, so a beat that runs longer
+  than the resting stack (the Change beat, with its four arrivals) cannot paint over the caption
+  row underneath. `position: absolute` at 1200 and up made the slot's box the stack's height and
+  let everything taller than it overflow; a grid cell cannot do that.
+*/
+.lv2-slot-static,
+.lv2-slot-beat {
+  grid-area: 1 / 1;
+}
+.lv2-slot-beat {
+  display: grid;
+  align-content: start;
+  opacity: 0;
+  pointer-events: none;
+}
+/*
+  A beat is only reachable while the sequence is held. Four stacked panels are four sets of links
+  in the same box; letting an invisible one take a click or a tab stop would be a keyboard trap
+  made of decoration. When the loop is paused -- by the control, by hover or by focus -- the beat
+  on screen is the one that answers.
+*/
+.lv2-demo[data-playing="0"] .lv2-slot-beat,
+.lv2-demo:hover .lv2-slot-beat,
+.lv2-demo:focus-within .lv2-slot-beat { pointer-events: auto; }
 
 @media (min-width: 1200px) {
-  .lv2-slot-static { display: grid; gap: 14px; align-content: start; }
   /*
     The resting stack is a summary, not four panels stacked.
 
@@ -785,22 +947,23 @@
   */
   .lv2-slot-static .lv2-revision { padding: 0; border: 0; background: none; }
   .lv2-slot-static .lv2-revision-step { display: flex; flex-wrap: wrap; gap: 0 6px; }
-  .lv2-slot-beat {
-    position: absolute;
-    inset: 0;
-    margin-top: 0;
-    opacity: 0;
-    pointer-events: none;
-  }
+
   /*
-    A beat is only reachable while the sequence is held. Four stacked panels are four sets of
-    links in the same 190px box; letting an invisible one take a click or a tab stop would be a
-    keyboard trap made of decoration. When the loop is paused -- by the control, by hover or by
-    focus -- the beat on screen is the one that answers.
+    THE RESTING STACK DOES NOT RESTATE THE OBJECTS AT DESKTOP (P3 QA round 1).
+
+    Measured at 1440, in a 215px column: the snapshot step is 53px, the comparison with its
+    qualifier and its contract note is 373px, and the bound objects with their caveat are another
+    469px -- 922px of resting content in a hero whose whole second row has 538px before it runs
+    past the fold. The objects are the Structure beat's own panel and they are on screen for 3.2
+    seconds of every loop; restating them in the two-second hold as well is the duplication that
+    made the column overflow. Without them the stack is 439px, the slot takes the Structure beat's
+    469px as its height, and the hero measures 900 at 1440 in both engines.
+
+    Reduced motion is the exception and it is the one that matters: nothing rotates there, so the
+    stack is the only place the objects can appear, and the block at the end of this file puts
+    them back. §26 asks for the complete static state and that is where it is owed.
   */
-  .lv2-demo[data-playing="0"] .lv2-slot-beat,
-  .lv2-demo:hover .lv2-slot-beat,
-  .lv2-demo:focus-within .lv2-slot-beat { pointer-events: auto; }
+  .lv2-slot-static .lv2-nodes { display: none; }
 }
 
 /* --------------------------------------------------------------------------- the snapshot step */
@@ -936,26 +1099,38 @@
     row 2, three tracks   the LOCATOR (where it is), the CLAIM (what came out of it) and the
                           rotating SLOT (what the compiler did next)
 
-  THE HEIGHT. `aspect-ratio` keeps §32's 708:600 proportion at whatever width the column ends up
-  being -- 668 x 566 at 1440 -- and `min-height: fit-content` is the escape hatch that stops a
-  longer Korean label or a larger default font size from pushing content out of the frame. The
-  ratio is a floor on the frame, never a cap on the content.
+  THE HEIGHT, AND THE FRAME THAT IS NOT THERE ANY MORE (P3 QA round 1).
+
+  This block used to set `aspect-ratio: 708 / 600` for §32's proportion with `min-height:
+  fit-content` as the escape hatch, on the reading that the ratio was "a floor on the frame, never
+  a cap on the content". Measured in Chromium it was a cap: at 1440 the stage box was 566px while
+  the slot's resting stack measured 922px, so 464px of it painted over the caption row and past the
+  hero, and the reduced-motion screenshot showed two sentences crossing. At 1280 the overhang was
+  709px and it reached into Scene 02 -- with the stack at opacity 0 for fourteen of every sixteen
+  seconds, carrying links nobody could see.
+
+  There is no frame now. The stage is a grid and its height is its rows', which is the only shape
+  that cannot produce the overlap §39 puts at zero. §32's proportion survives as the COLUMN widths
+  (668 at 1440) rather than as a box, and the height is what the composition needs -- 576px at 1440,
+  ten more than the ratio drew and, unlike it, the same number the content occupies.
 
   The row gap is zero on purpose: each block in row 2 begins with its own Evidence Line, and a
   line that does not touch the strip above it means nothing.
 */
 @media (min-width: 1200px) {
   .lv2-demo-stage {
-    aspect-ratio: 708 / 600;
-    min-height: fit-content;
     /*
       165 : 260 : 215 of the 640 the two gaps leave at 1440, not §11.1's 200 : 300 : 190.
 
-      The slot is the track that decides the stage's height -- it holds the resting stack, which
-      is the snapshot step, the comparison with its qualifier and the bound objects, all set in
-      13px mono. At 177px that stack wrapped to roughly 600px tall and pushed the hero back past
-      a viewport, which is the defect this whole recomposition exists to fix. The thumbnail is
-      the block that needs width least: it is a locator, not a reading surface.
+      The slot is the track that decides the stage's height -- it holds the resting stack (the
+      snapshot step and the comparison with its qualifier and contract note) and, stacked in the
+      same cell, the four beats, all set in 13px mono. The thumbnail is the block that needs
+      width least: it is a locator, not a reading surface.
+
+      215px is not generous and the column is what makes the slot the tallest track: at 1440 the
+      Structure beat measures 469px there. Below 1440 it is worse -- 177px at 1280 and 151px at
+      1200 -- and the hero grows past a viewport at those widths rather than overlapping, which
+      is the better of the two failures but is still one. Reported, not hidden.
     */
     grid-template-columns: minmax(0, 165fr) minmax(0, 260fr) minmax(0, 215fr);
     grid-template-rows: auto auto;
@@ -991,62 +1166,87 @@
   place that needs a second element rather than a cleverer keyframe -- four beats cannot share a
   resting frame -- so the stack's base is visible and the beats' base is not.
 */
-.lv2-read,
-.lv2-locator,
-.lv2-read-label,
-.lv2-region,
-.lv2-line,
-.lv2-claim,
-.lv2-claim-state,
-.lv2-slot-static,
-.lv2-slot-beat,
-.lv2-demo-caption {
+/*
+  EVERY BINDING BELOW IS SCOPED TO `.lv2-demo`, AND THAT IS NOT TIDINESS.
+
+  `.lv2-region`, `.lv2-line`, `.lv2-claim` and `.lv2-claim-state` are D10 PRIMITIVES, and
+  Scene 02 and Scene 04 render three of them far below the fold. Unscoped, those scenes inherited
+  this stage's 16-second loop: Scene 02's box on the page vanished for the first 1.2s of every
+  cycle and faded back over the next 1.2s, on a scene that has no sequence at all. Scene 04 had
+  already worked around it locally (`animation: none` in its own sheet); Scene 02 had not, and
+  nothing would have told anyone. The loop belongs to the demo, so the demo is what names it.
+
+  It is also what makes the pause rule below complete: every animation on this landing is now a
+  descendant of `.lv2-demo`, so `animation-play-state: paused` on `.lv2-demo *` reaches all of
+  them. An animation outside this subtree would have no control, no hover pause and no observer.
+*/
+.lv2-demo .lv2-read,
+.lv2-demo .lv2-locator,
+.lv2-demo .lv2-read-label,
+.lv2-demo .lv2-region,
+.lv2-demo .lv2-line,
+.lv2-demo .lv2-claim,
+.lv2-demo .lv2-claim-state,
+.lv2-demo .lv2-claim-state i,
+.lv2-demo .lv2-slot-static,
+.lv2-demo .lv2-slot-beat,
+.lv2-demo .lv2-demo-caption {
   animation-duration: 16s;
   animation-iteration-count: infinite;
   animation-timing-function: var(--ease-scene);
 }
 
 /* 0.0-1.2s -- the filing arrives: the region and the page it was cut from, together. */
-.lv2-read { animation-name: lv2-b-source; }
-.lv2-locator { animation-name: lv2-b-source; }
+.lv2-demo .lv2-read { animation-name: lv2-b-source; }
+.lv2-demo .lv2-locator { animation-name: lv2-b-source; }
 /* 1.2-2.4s -- the box is drawn, on the strip and on the page at once. */
-.lv2-region { animation-name: lv2-b-read; }
-.lv2-line--locator { animation-name: lv2-b-read-line; }
+.lv2-demo .lv2-region { animation-name: lv2-b-read; }
+.lv2-demo .lv2-line--locator { animation-name: lv2-b-read-line; }
 /* 2.4-4.0s -- the line draws down from the strip, then the claim arrives bound to it. */
-.lv2-line--claim { animation-name: lv2-b-claim-line; }
-.lv2-claim { animation-name: lv2-b-compile; }
-/* 5.8-7.2s -- the state the World gives the object, and the coordinate that locates it. */
-.lv2-claim-state { animation-name: lv2-b-verify; }
-.lv2-read-label { animation-name: lv2-b-coordinate; }
+.lv2-demo .lv2-line--claim { animation-name: lv2-b-claim-line; }
+.lv2-demo .lv2-claim { animation-name: lv2-b-compile; }
+/*
+  5.8-7.2s -- the state the World gives the object, the one pulse that says it was just read off
+  the record, and the coordinate that locates it.
+
+  THE STATE USED TO FADE IN OVER 1.4 SECONDS, which is the whole beat: a state word that takes a
+  beat to become legible is not a state change, it is a dissolve. §11.2 asks for the dot to PULSE
+  ONCE here. So the pair arrives at motion-fast speed and the dot swells once, 360ms, and stops --
+  `lv2-b-pulse` holds `transform: none` for the other 15.6 seconds, so it is a single event on
+  the timeline rather than a heartbeat. Under reduced motion the collapse to 1ms lands on the base
+  style, which is the dot at rest: no pulse, same composed hero.
+*/
+.lv2-demo .lv2-claim-state { animation-name: lv2-b-verify; }
+.lv2-demo .lv2-claim-state i { animation-name: lv2-b-pulse; }
+.lv2-demo .lv2-read-label { animation-name: lv2-b-coordinate; }
 /* ROUND3-P1: the 9.5-11.5s amber-to-mint cross on `rebuilt` is gone. It painted a `candidate`
    object's count in the verified colour for most of the loop -- see `.lv2-count--rebuilt` above. */
 
-.lv2-cap-1 { animation-name: lv2-cap-1; }
-.lv2-cap-2 { animation-name: lv2-cap-2; }
-.lv2-cap-3 { animation-name: lv2-cap-3; }
-.lv2-cap-4 { animation-name: lv2-cap-4; }
-.lv2-cap-5 { animation-name: lv2-cap-5; }
-.lv2-cap-6 { animation-name: lv2-cap-6; }
-.lv2-cap-7 { animation-name: lv2-cap-7; }
-.lv2-cap-8 { animation-name: lv2-cap-8; }
+.lv2-demo .lv2-cap-1 { animation-name: lv2-cap-1; }
+.lv2-demo .lv2-cap-2 { animation-name: lv2-cap-2; }
+.lv2-demo .lv2-cap-3 { animation-name: lv2-cap-3; }
+.lv2-demo .lv2-cap-4 { animation-name: lv2-cap-4; }
+.lv2-demo .lv2-cap-5 { animation-name: lv2-cap-5; }
+.lv2-demo .lv2-cap-6 { animation-name: lv2-cap-6; }
+.lv2-demo .lv2-cap-7 { animation-name: lv2-cap-7; }
+.lv2-demo .lv2-cap-8 { animation-name: lv2-cap-8; }
 
 /*
-  The slot below 1200: each beat arrives and stays. Nothing is taken away from a reader who is
-  still reading it, which is what "additive" means on a phone.
-*/
-.lv2-slot-beat--structure { animation-name: lv2-in-structure; }
-.lv2-slot-beat--change { animation-name: lv2-in-change; }
-.lv2-slot-beat--recompile { animation-name: lv2-in-recompile; }
-.lv2-slot-beat--use { animation-name: lv2-in-use; }
+  One at a time in one box, over the stack that outlives them -- at EVERY width (D3).
 
-/* And at 1200 and up: one at a time in one box, over the stack that outlives them. */
-@media (min-width: 1200px) {
-  .lv2-slot-beat--structure { animation-name: lv2-slot-structure; }
-  .lv2-slot-beat--change { animation-name: lv2-slot-change; }
-  .lv2-slot-beat--recompile { animation-name: lv2-slot-recompile; }
-  .lv2-slot-beat--use { animation-name: lv2-slot-use; }
-  .lv2-slot-static { animation-name: lv2-slot-hold; }
-}
+  It used to be additive below 1200: the four beats arrived one after another and each one stayed,
+  on the argument that a phone should not take a sentence away from someone still reading it. The
+  measured cost of that argument was a hero 2,525px tall at 390 -- three viewports, on the surface
+  the founder checks first -- because four beats in flow is four beats' worth of height. D3 makes
+  the phone read exactly like the desktop instead: the same rotation, the same resting stack, the
+  same one caption at a time. A reader who wants to hold a beat still has the pause control, the
+  hover and the focus, which is what §23 asks for and what "additive" was standing in for.
+*/
+.lv2-demo .lv2-slot-beat--structure { animation-name: lv2-slot-structure; }
+.lv2-demo .lv2-slot-beat--change { animation-name: lv2-slot-change; }
+.lv2-demo .lv2-slot-beat--recompile { animation-name: lv2-slot-recompile; }
+.lv2-demo .lv2-slot-beat--use { animation-name: lv2-slot-use; }
+.lv2-demo .lv2-slot-static { animation-name: lv2-slot-hold; }
 
 /*
   §23: the loop never disturbs reading, and it never runs for nobody.
@@ -1066,23 +1266,39 @@
 @keyframes lv2-b-read-line { 0%, 7.5% { transform: scaleY(0); } 15%, 100% { transform: scaleY(1); } }
 @keyframes lv2-b-claim-line { 0%, 15% { transform: scaleY(0); } 25%, 100% { transform: scaleY(1); } }
 @keyframes lv2-b-compile { 0%, 15% { opacity: 0; transform: scale(0.985); } 25%, 100% { opacity: 1; transform: scale(1); } }
-@keyframes lv2-b-verify { 0%, 36.25% { opacity: 0; } 45%, 100% { opacity: 1; } }
-/* The coordinate reads on the Verify beat and is quiet the rest of the loop (§4.1). */
-@keyframes lv2-b-coordinate { 0%, 36.25% { opacity: 0; } 38%, 44% { opacity: 1; } 45%, 100% { opacity: 0; } }
+@keyframes lv2-b-verify { 0%, 36.25% { opacity: 0; } 37.125%, 100% { opacity: 1; } }
+/* One swell, 360ms, at the top of the Verify beat -- and `transform: none` for the rest of the
+   loop, so the dot is read once and never becomes a pulsing ornament (§23: movement = state
+   change). It is a `transform`, so it costs no layout and no repaint of the card around it. */
+@keyframes lv2-b-pulse { 0%, 37.125% { transform: none; } 38.25% { transform: scale(1.9); } 39.375%, 100% { transform: none; } }
+/*
+  The coordinate reads on the Verify beat and is quiet the rest of the loop (§4.1).
 
-/* The four beats of the slot, one at a time, each fully gone before the next begins to rise. */
-@keyframes lv2-slot-structure { 0%, 25% { opacity: 0; } 26.5%, 43.5% { opacity: 1; } 45%, 100% { opacity: 0; } }
-@keyframes lv2-slot-change { 0%, 45% { opacity: 0; } 46.5%, 57.875% { opacity: 1; } 59.375%, 100% { opacity: 0; } }
-@keyframes lv2-slot-recompile { 0%, 59.375% { opacity: 0; } 60.875%, 70.375% { opacity: 1; } 71.875%, 100% { opacity: 0; } }
-@keyframes lv2-slot-use { 0%, 71.875% { opacity: 0; } 73.375%, 86% { opacity: 1; } 87.5%, 100% { opacity: 0; } }
+  It rises WITH the state word rather than 0.28s behind it: §11.2 asks for the source region and
+  the page metadata to highlight together, and a label that arrives late reads as a second event
+  on a beat that has only one. Same 140ms, so the two are one movement of two elements.
+*/
+@keyframes lv2-b-coordinate { 0%, 36.25% { opacity: 0; } 37.125%, 44.125% { opacity: 1; } 45%, 100% { opacity: 0; } }
+
+/*
+  The four beats of the slot, one at a time, each fully gone before the next begins to rise.
+
+  THE CROSS GAP IS 140ms (0.875% of sixteen seconds), NOT 240ms.
+
+  It used to be 1.5%, which put every slot beat 0.24s behind the storyboard: Structure reached
+  full opacity at 4.24s against §11.2's 4.0s, and Change, Recompile and Use each inherited the
+  same lateness. 0.24s is outside the +-0.2s this lane measures against, and the four errors do
+  not cancel -- they are all in the same direction, so a caption and the panel it describes drift
+  apart by a quarter of a second at every handover. --motion-fast is 140ms and that is what a
+  panel swap should cost anyway; the sequence stays strictly sequential, so two beats are still
+  never legible at once. `lib/landing-v2-motion.test.ts` recomputes every start from this sheet.
+*/
+@keyframes lv2-slot-structure { 0%, 25% { opacity: 0; } 25.875%, 44.125% { opacity: 1; } 45%, 100% { opacity: 0; } }
+@keyframes lv2-slot-change { 0%, 45% { opacity: 0; } 45.875%, 58.5% { opacity: 1; } 59.375%, 100% { opacity: 0; } }
+@keyframes lv2-slot-recompile { 0%, 59.375% { opacity: 0; } 60.25%, 71% { opacity: 1; } 71.875%, 100% { opacity: 0; } }
+@keyframes lv2-slot-use { 0%, 71.875% { opacity: 0; } 72.75%, 86.625% { opacity: 1; } 87.5%, 100% { opacity: 0; } }
 /* The hold: the static stack is the resting composition, and it is also the base style. */
-@keyframes lv2-slot-hold { 0%, 86% { opacity: 0; } 87.5%, 100% { opacity: 1; } }
-
-/* Below 1200 the same windows open and never close. */
-@keyframes lv2-in-structure { 0%, 25% { opacity: 0; } 26.5%, 100% { opacity: 1; } }
-@keyframes lv2-in-change { 0%, 45% { opacity: 0; } 46.5%, 100% { opacity: 1; } }
-@keyframes lv2-in-recompile { 0%, 59.375% { opacity: 0; } 60.875%, 100% { opacity: 1; } }
-@keyframes lv2-in-use { 0%, 71.875% { opacity: 0; } 73.375%, 100% { opacity: 1; } }
+@keyframes lv2-slot-hold { 0%, 87.5% { opacity: 0; } 88.375%, 100% { opacity: 1; } }
 
 /*
   The captions: sequential windows with a gap, so two sentences are never legible at once.
@@ -1143,16 +1359,32 @@
   widths: their content is in that stack. Below 1200 their base is visible and the stack is the
   one that is not rendered, so the same rule produces the same complete state either way.
 
-  What that leaves wrong is the caption stack, where seven of the eight base styles are "hidden":
-  a reader who is not being shown the sequence would get its last sentence and none of the seven
-  before it. So the stack becomes a list, the whole story is on the page at once, and the page
-  stops tilting the document it is showing.
+  THE CAPTION STACK IS ALL EIGHT AGAIN (P3 QA round 1; D3 reversed).
+
+  D3 collapsed this to `.lv2-cap-8` alone, on the argument that the complete state of a sequence
+  is its last beat and that the list cost 151px of hero at 1440. Measured, what that produced was
+  one legible sentence out of eight for the only audience whose DEFAULT rendering this is: seven
+  captions at opacity 0, describing seven beats that are not going to play. §26 and §39 both ask
+  for a static COMPLETE state, and a transcript of eight sentences is exactly the alternative §26
+  names when movement is what carries the information. The 151px is the price of it, and §26 is
+  where the blueprint already agreed to pay -- the hero is allowed to grow here, and the 1440
+  viewport bound in `e2e/landing-v2.spec.ts` does not run on this project.
+
+  The same reasoning restores the objects to the slot's resting stack. At desktop widths they are
+  hidden from it because the Structure beat shows them (see the 1200 block above); here nothing
+  rotates, so the stack is the only place they can be, and leaving them out would publish the
+  compiled claim without the objects bound to it.
+
+  The stage's height is its content's at every width now, so neither of these can overlap what is
+  under it -- which is the other half of what this round found: the resting stack was overflowing
+  a 566px frame by 464px and crossing the caption row.
 */
 @media (prefers-reduced-motion: reduce) {
-  .lv2-demo-captions { position: static; min-height: 0; display: grid; gap: 6px; }
-  .lv2-demo-caption { position: static; inset: auto; opacity: 1; }
   .lv2-demo-foot { align-items: flex-start; }
   .lv2-locator .lv2-page { transform: none; }
+  .lv2-demo-captions { position: static; min-height: 0; display: grid; gap: 6px; }
+  .lv2-demo-caption { position: static; inset: auto; opacity: 1; }
+  .lv2-slot-static .lv2-nodes { display: grid; }
 }
 
 /* ============================================================================================
@@ -1208,9 +1440,19 @@
   At 360-430px the Korean headline still sets in three lines, not two: fitting both sentences on
   one line each inside a 320px measure needs about 24px, which is no longer a headline. Two lines
   on a phone needs shorter Korean copy, and that is D5's founder call.
+
+  7.5vw BECAME 7vw (P3 QA round 1). 7.5vw is 27px at 360, and at 27px WebKit sets this headline in
+  FOUR lines while Chromium sets it in three -- a 4px difference in the two engines' shaping of the
+  same Hangul string, against a 320px measure. Contract rule 12 puts webkit at 360 inside "done",
+  so the step is taken from the engine that breaks first: at 7vw (25px at 360, 27px at 390) both
+  engines set it in three. The measurement is this lane's, on the built fixture server.
 */
 .lv2[lang="ko"] { --lv2-h2: clamp(24px, 6.4vw, 28px); }
-.lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(26px, 7.5vw, 30px); max-width: none; }
+.lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(24px, 7vw, 30px); max-width: none; }
+/* Both Korean steps move with the English ones, and like them they are measured rather than
+   derived from an assumed advance: in the 600px track the Korean headline sets in two lines up to
+   44px and in three at 46px, so the >=1200 step stops at 44. D1's 3.95vw reached 56px at 1440,
+   where the headline set in three lines on both /ko projects that measure it. */
 @media (min-width: 768px) {
   .lv2[lang="ko"] { --lv2-h2: clamp(30px, 2.6vw, 38px); }
   .lv2[lang="ko"] .lv2-hero-h1 { font-size: clamp(34px, 4.1vw, 42px); }

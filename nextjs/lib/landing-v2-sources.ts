@@ -1,5 +1,6 @@
 import { exploreSampleDocuments } from "./explore-sample";
 import { LANDING_V2_IMAGES, type LandingV2Image } from "./landing-v2-assets";
+import { KO_TERMS } from "./ko-terms";
 import { landingV2Copy } from "./landing-v2-copy";
 import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
 
@@ -141,13 +142,19 @@ const EN_OBJECTS: readonly SourcesObject[] = [
   { id: "retrieval", label: "Retrieval", note: "What an Ask returns, with the regions it cites." },
 ];
 
+/*
+  C5, 2026-09-19. These six chips carried their ENGLISH labels on /ko while Scene 04 above them
+  called the same thing 근거 and printed Korean field names -- one page, two names for one noun.
+  Every label is now read out of `KO_TERMS`, so the spelling cannot drift from the rest of the
+  Korean site and a reviewer who disagrees with one changes it in a single place.
+*/
 const KO_OBJECTS: readonly SourcesObject[] = [
-  { id: "entities", label: "Entities", note: "원문이 가리키는 이름 있는 대상입니다." },
-  { id: "claims", label: "Claims", note: "원문이 인쇄한 문장 그대로 진술한 내용입니다." },
-  { id: "relations", label: "Relations", note: "한 객체가 다른 객체에 닿는 방식이며, 술어가 함께 남습니다." },
-  { id: "evidence", label: "Evidence", note: "문단을 읽어 온 파일과 페이지와 영역입니다." },
-  { id: "versions", label: "Versions", note: "객체가 어느 원문의 어느 버전에 묶여 있는지입니다." },
-  { id: "retrieval", label: "Retrieval", note: "Ask가 돌려주는 내용과 그것이 인용한 영역입니다." },
+  { id: "entities", label: KO_TERMS.entity, note: "원문이 가리키는 이름 있는 대상입니다." },
+  { id: "claims", label: KO_TERMS.claim, note: "원문이 인쇄한 문장 그대로 진술한 내용입니다." },
+  { id: "relations", label: KO_TERMS.relation, note: "한 객체가 다른 객체에 닿는 방식이며, 술어가 함께 남습니다." },
+  { id: "evidence", label: KO_TERMS.evidence, note: "문단을 읽어 온 파일과 페이지와 영역입니다." },
+  { id: "versions", label: KO_TERMS.revision, note: "객체가 어느 원문의 어느 버전에 묶여 있는지입니다." },
+  { id: "retrieval", label: KO_TERMS.retrieval, note: "Ask가 돌려주는 내용과 그것이 인용한 영역입니다." },
 ];
 
 /*

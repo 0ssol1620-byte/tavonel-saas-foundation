@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
+import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
 import { BRAND_LINE } from "@/lib/site-navigation";
 
 /**
@@ -52,7 +54,27 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+/*
+  D8: the experiment arm, read on the server and never on the client.
+
+  This page is already `force-dynamic` for the commercial posture, so reading a cookie costs it
+  nothing it was not already paying, and it is what keeps the arm out of the first paint's
+  critical path: a client that decided the headline after hydration would flash the control arm
+  at every reader in the test. The cookie is WRITTEN in `middleware.ts`, which is the one place
+  in Next 15 that can set one for the response a Server Component is rendering.
+
+  With no experiment active this reads a cookie that is never set and returns the frozen default.
+*/
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = (await searchParams)?.[LANDING_VARIANT_QUERY];
+  const experiment = landingVariantState({
+    cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
+    query: Array.isArray(query) ? query[0] : query,
+  });
   /*
     Landing V2, 2026-09-19 (§27, contract rule 10). The LCP resource is the hero's READ strip.
 
@@ -82,7 +104,7 @@ export default function HomePage() {
         imageSizes={HERO_IMAGE_SIZES}
         fetchPriority="high"
       />
-      <LandingPage />
+      <LandingPage experiment={experiment} />
     </>
   );
 }

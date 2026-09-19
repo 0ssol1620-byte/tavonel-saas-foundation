@@ -184,9 +184,16 @@ describe("landing V2 design tokens", () => {
 
 describe("app/landing-v2.css", () => {
   it("scopes the landing's section rhythm rather than re-spacing every documentation route", () => {
-    // --space-section already exists site-wide and about thirty routes lay out with it, so the
-    // blueprint value is declared on .lv2 and :root keeps the value those routes were built on.
-    expect(landing).toContain("--space-section: clamp(112px, 11vw, 176px)");
+    /*
+      --space-section already exists site-wide and about thirty routes lay out with it, so the
+      landing's own value is declared on .lv2 while :root keeps the value those routes were built
+      on. That separation is what this case guards, and it still does.
+
+      D2 (2026-09-19) changed the landing's number: clamp(112px, 11vw, 176px) spent 316px of a
+      900px viewport on padding and put four of the five proof scenes 19-27% past §24's band. The
+      pin moves with the decision -- it is a scope guard, not a value the blueprint fixed.
+    */
+    expect(landing).toContain("--space-section: clamp(72px, 6.6vw, 96px)");
     expect(token("--space-section")).toBe("clamp(88px, 9vw, 144px)");
     expect(landing).toContain("padding-block: var(--space-section)");
   });

@@ -87,7 +87,43 @@ export type FunnelEvent =
   | "workspace_review_required"
   | "workspace_world_activated"
   | "workspace_first_ask"
-  | "workspace_ai_connect_opened";
+  | "workspace_ai_connect_opened"
+  /*
+    D7 / §30: the Landing V2 funnel, one name per thing a reader can do on the entry pages.
+
+    Every one of them fires from `components/landing-v2/landing-analytics.tsx`, a single
+    delegated listener mounted inside the landing's `main` -- not from fifteen handlers spread
+    over eight server-rendered scenes. The scenes stay server components that ship no JavaScript;
+    what they expose is a `data-analytics` hook or a real `href`, and the mapping from those to
+    these names lives in one file that can be read in one sitting.
+
+    THE TWO OLD HERO NAMES ARE NOT RETIRED. `hero_explore_clicked` and `hero_start_clicked` keep
+    firing from `hero-actions.tsx` on the same two clicks, because they are the funnel's oldest
+    landing columns and somebody is reading them. They name a DESTINATION (Explore, access); the
+    two names below name a POSITION (the filled button, the text link), which is what D8 Test 02
+    swaps and what an experiment on CTA order has to be able to count.
+
+    `world_explore_60s` is the one that does not fire from the landing: it is a dwell timer in
+    `components/explore/explore-stage.tsx`, counted only while the tab is visible, because a
+    minute spent on another tab is not a minute spent reading a World. `world_explore_start` is
+    deliberately absent -- D7 says it is the existing `explore_entered`, and a second name for
+    one hop is two columns somebody has to add together by hand forever.
+  */
+  | "hero_primary_click"
+  | "hero_secondary_click"
+  | "hero_demo_interact"
+  | "proof_claim_switch"
+  | "source_open"
+  | "world_explore_60s"
+  | "integration_open"
+  | "trust_open"
+  | "pricing_open"
+  | "request_access_start"
+  | "request_access_complete"
+  | "scroll_scene_25"
+  | "scroll_scene_50"
+  | "scroll_scene_75"
+  | "scroll_scene_100";
 
 /*
   §15.2's product events, which the client half above cannot honestly carry.
@@ -145,7 +181,14 @@ export type ServerFunnelEvent =
   hold a name, an identifier or anything a person typed -- which is a property of what the call
   sites pass, so `lib/funnel-events.test.ts` pins the list and this comment together.
 */
-export const FUNNEL_DETAIL_KEYS = ["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status"] as const;
+/*
+  `variant` (D8) carries the experiment arm a reader was assigned -- "a", "b" or "c" and nothing
+  else. It is an enumerated UI state in the strictest sense available here: the values are the
+  whole of `LANDING_VARIANTS` in `lib/landing-experiments.ts`, there is no fourth arm, and the
+  key is absent entirely from every event while no experiment is active. It can hold no id and
+  no string a reader typed, which is the test every key on this list has to pass.
+*/
+export const FUNNEL_DETAIL_KEYS = ["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "variant"] as const;
 export type FunnelDetailKey = (typeof FUNNEL_DETAIL_KEYS)[number];
 export type FunnelDetail = Partial<Record<FunnelDetailKey, string>>;
 

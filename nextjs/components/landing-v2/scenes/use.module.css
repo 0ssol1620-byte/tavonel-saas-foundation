@@ -14,11 +14,16 @@
 
 .group { margin: 0; }
 
+/*
+  D10: the two groups are LABELLED, not inferred from a tick colour.
+
+  The label carries `.lv2-eyebrow` now -- the same device that names every scene on this page --
+  so IN and OUT read as the two halves of the drawing. The blue rule on the built intake rows
+  stays, but it is no longer the only thing saying which side a row is on, which is what §5.2
+  asks of any colour carrying state.
+*/
 .groupLabel {
   margin: 0 0 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-lo);
   font-weight: 500;
 }
 

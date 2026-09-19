@@ -117,12 +117,39 @@ describe("landing scene 08 -- trust", () => {
     expect(html).toMatch(/<a[^>]*href="\/trust"[^>]*data-scene-next="trust"|data-scene-next="trust"[^>]*href="\/trust"/);
   });
 
+  /*
+    C4 + D6 changed the SHAPE of this scene's links, not the set of routes it may reach.
+
+    Each of the four proofs now links to the page it is written down on -- which is what the
+    support line above them has promised all along -- and §18's three routes are no longer three
+    equal terminal actions: /trust is the next action, /security and /subprocessors read in the
+    footnote. So the pin is no longer a fixed list in DOM order; it is the pair of rules that
+    list was standing in for, and it is stricter: EVERY proof must carry a destination, and every
+    destination in the rendered scene must be on the allowed set. An invented route still fails.
+  */
   it.each(LOCALES)("%s links only to routes this site publishes, and footnotes /status", (locale) => {
     const html = render(locale);
+    const copy = landingV2Copy(locale === "ko").trust;
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/security", "/trust", "/subprocessors", "/status"]);
+    const allowed = ["/security", "/trust", "/subprocessors", "/status", "/evidence", "/docs/exports"];
+    for (const href of hrefs) expect(allowed, `trust scene links ${href}`).toContain(href);
+    for (const proof of copy.proofs) {
+      expect(allowed, `proof "${proof.id}" points at ${proof.href}`).toContain(proof.href);
+      expect(hrefs).toContain(proof.href);
+    }
+    expect(hrefs).toContain("/status");
     // There is no /architecture route, and a security deep-dive is not this scene's job.
     expect(html).not.toContain("/architecture");
+    /*
+      AND NO DESTINATION TWICE (P3 QA round 1).
+
+      C4 gave the `training` proof an href of /security while D6 left /security in the footnote
+      row, and the `review` proof pointed at /trust, which is this scene's one next action. The
+      scene rendered two anchors to each. Nothing here saw it -- the case above only asks whether
+      a route is reachable -- and it reached CI as ten Playwright failures. A set comparison is
+      the whole guard, and it is the one a browser should not have had to find.
+    */
+    expect(hrefs, "the trust scene links a destination twice").toEqual([...new Set(hrefs)]);
   });
 
   it.each(LOCALES)("%s prints no figure, because this scene measured nothing", (locale) => {

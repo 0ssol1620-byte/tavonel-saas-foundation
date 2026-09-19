@@ -73,6 +73,9 @@ export default function Scene({
   const countsId = `lv2-${SCENE_ID}-counts`;
   const objectsId = `lv2-${SCENE_ID}-objects`;
   const actions = RECOMPILE_ACTIONS[locale];
+  /* D5: one state word for the column when the sample agrees, per-row when it does not. */
+  const states = new Set(data.affectedSample.map((node) => node.state));
+  const sharedState = states.size === 1 ? data.affectedSample[0]?.state : undefined;
 
   /*
     The snapshot labels, assembled the way hero-compiler-demo.tsx assembles them so the two
@@ -119,7 +122,24 @@ export default function Scene({
               ) : null}
             </h2>
             <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
-            <p className="lv2-scene-note lv2-small">{copy.contractNote}</p>
+            {/*
+              D6: one terminal action per scene. The compiler contract used to be a second link
+              in the action row, competing with the change record for the same decision; it is
+              the sentence above it that needs the reference, so it is an inline link inside that
+              sentence now -- content, not a choice.
+
+              P3 QA round 1: it was a bare <Link> with no class, so it inherited nothing and
+              measured 18px at 390 and 38px at 1440 against contract rule 8's 44px floor. Being
+              inline in a sentence does not exempt a control from the floor, and `.lv2-inline-
+              link` is the class that carries it -- not `.lv2-text-link`, which is the scene's
+              one terminal action and whose count this scene's test pins at one.
+            */}
+            <p className="lv2-scene-note lv2-small">
+              {copy.contractNote}{" "}
+              <Link className="lv2-inline-link" href={data.hrefs.contract as Route} prefetch={false}>
+                {actions.contract}
+              </Link>
+            </p>
           </div>
 
           <div className={styles.impact}>
@@ -148,8 +168,19 @@ export default function Scene({
               </svg>
 
               <div className={styles.objects}>
+                {/*
+                  D5: the state word is the COLUMN's label, not a tag repeated on every row.
+
+                  Every object in this deterministic sample holds the same state, so the rows read
+                  PUBLISHED SAMPLE once each -- a column of identical tags rather than information.
+                  The word is still on the page, still the World's own, still beside the objects it
+                  describes; it is said once. If a future sample ever mixes states the shared word
+                  disappears and every row carries its own, because one label over rows that
+                  disagree would be an average, and this project does not publish those.
+                */}
                 <p className="lv2-meta" id={objectsId}>
                   {copy.affectedLabel}
+                  {sharedState ? ` · ${landingV2StateWord(sharedState, locale)}` : ""}
                 </p>
                 <ul className={styles.objectList} aria-labelledby={objectsId}>
                   {data.affectedSample.map((node) => (
@@ -157,11 +188,12 @@ export default function Scene({
                       {/* The compiler labels an object with its own text, digits included. */}
                       <span className={styles.objectLabel} data-derived="1">
                         {node.label}
-                        {node.labelTruncated ? "…" : ""}
                       </span>
-                      <span className={`lv2-meta ${styles.objectState}`}>
-                        {landingV2StateWord(node.state, locale)}
-                      </span>
+                      {sharedState ? null : (
+                        <span className={`lv2-meta ${styles.objectState}`}>
+                          {landingV2StateWord(node.state, locale)}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -190,9 +222,6 @@ export default function Scene({
             <p className={styles.actions}>
               <Link className="lv2-text-link" href={data.hrefs.change as Route} prefetch={false}>
                 {actions.change}
-              </Link>
-              <Link className={`lv2-small ${styles.secondary}`} href={data.hrefs.contract as Route} prefetch={false}>
-                {actions.contract}
               </Link>
             </p>
           </div>

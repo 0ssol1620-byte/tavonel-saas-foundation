@@ -181,7 +181,7 @@ describe("approved one-path experience", () => {
     expect(composition, "and the Korean label is that action's own, keyed by destination")
       .toContain("KO_CHROME.cta[access.href]");
     const korean = text("app/ko/page.tsx");
-    expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean>");
+    expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     expect(korean.replace(/\{?\/\*[\s\S]*?\*\/\}?/g, ""), "a numbered section kicker is not a section name")
