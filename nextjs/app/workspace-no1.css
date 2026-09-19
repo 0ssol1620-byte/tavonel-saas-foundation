@@ -104,7 +104,7 @@
 /* ---- compile block: the stage and its counted panel travel together -------------------- */
 .one-path-workspace .workspace-compile-block { display: grid; gap: 1px; border: 1px solid var(--hairline-hi); border-radius: var(--ws-radius); background: var(--hairline); overflow: hidden; }
 /* BQ-083: one pane at a time needs room for a pane, not a 16/6 letterbox split four ways. */
-.one-path-workspace .workspace-compile-block .compile-stage { margin: 0; border: 0; border-radius: 0; aspect-ratio: 16 / 9; max-height: none; background: var(--ground); }
+.one-path-workspace .workspace-compile-block .compile-stage { display: block; margin: 0; border: 0; border-radius: 0; aspect-ratio: auto; min-height: 0; max-height: none; background: var(--ground); }
 /* D39: the reserved frame is for a picture -- a page, the extracted text, the World. Idle the pane
    draws a tab strip and one line per source, and `compile-stage.tsx` sets that content height. */
 .one-path-workspace .workspace-compile-block .compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }
@@ -384,7 +384,7 @@
      safe area on .shell; adding a second 96px here doubled it to 160px of dead space while
      the last list row was still under the bar on the surfaces that scroll inside a card. */
   .one-path-workspace .workspace-content { padding: 18px 16px 32px; gap: 18px; overflow-x: clip; }
-  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: auto; }
   .one-path-workspace .workspace-complete { grid-template-columns: minmax(0, 1fr); }
   .one-path-workspace .workspace-getting-started-body { grid-template-columns: minmax(0, 1fr); }
   .one-path-workspace .workspace-attention-items li { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 6px; }
@@ -411,7 +411,7 @@
      768px entirely -- the only widths where "connect the system it already lives in" is the
      likelier answer than picking files. */
   .one-path-workspace .workspace-source-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-top: 18px; padding-top: 16px; }
-  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: 4 / 3; }
+  .one-path-workspace .workspace-compile-block .compile-stage { aspect-ratio: auto; }
   /* BQ-087: a source name is the thing being triaged; it wraps rather than ellipsing into
      three characters and a dot. */
   .one-path-workspace .board-row-summary { grid-template-columns: minmax(0, 1fr) auto; align-items: start; row-gap: 4px; padding-block: 10px; }
@@ -563,4 +563,19 @@
   .one-path-workspace select:hover { border-color: var(--text-lo); }
   .workspace.one-path-workspace .one-path-more-panel button:hover { color: var(--text-hi); background: var(--g2); }
 }
+}
+
+@layer overrides {
+  .one-path-workspace .compile-stage-status { display: grid; gap: 6px; padding: 20px; border-left: 3px solid var(--hairline-hi); }
+  .one-path-workspace .compile-stage-status strong { font: 600 16px/1.4 var(--f-sans); color: var(--text-hi); }
+  .one-path-workspace .compile-stage-status p { margin: 0; max-width: 76ch; font: 14px/1.6 var(--f-sans); color: var(--text-mid); }
+  .one-path-workspace .compile-stage[data-tone="attention"] .compile-stage-status { border-left-color: var(--changed); }
+  .one-path-workspace .compile-stage[data-tone="stopped"] .compile-stage-status { border-left-color: var(--failed); }
+  .one-path-workspace .compile-stage[data-tone="ready"] .compile-stage-status { border-left-color: var(--verified); }
+  .one-path-workspace .compile-stage-canvas { display: block; width: 100%; height: clamp(260px, 30vw, 380px); }
+  .one-path-workspace .compile-stage-canvas[hidden] { display: none; }
+  .one-path-workspace .compile-stage-summary { margin: 0; padding: 4px 20px 18px; font: 13px/1.6 var(--f-sans); color: var(--text-mid); }
+  .one-path-workspace .workspace-attention-items button,
+  .one-path-workspace .workspace-content button,
+  .one-path-workspace .workspace-body > header > div:last-child > button { min-height: 44px; }
 }

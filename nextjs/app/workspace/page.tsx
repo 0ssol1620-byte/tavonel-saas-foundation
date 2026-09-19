@@ -30,6 +30,7 @@ import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
+import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
@@ -2042,10 +2043,10 @@ export default function WorkspacePage() {
     travel together so Home never shows a progress row without its picture or a picture without
     its counts.
   */
-  const compileBlock = compileJob || pipelineRows.length > 0 ? (
+  const compileBlock = compileJob || hasActiveSourceWork(pipelineRows) ? (
     <div className="workspace-compile-block">
-      {compileJob || pipelineRows.length > 0 ? (
-        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} />
+      {compileJob || hasActiveSourceWork(pipelineRows) ? (
+        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} resultId={compileJob?.collectionId ?? null} />
       ) : null}
       {compileJob ? (
         <CompileJobPanel

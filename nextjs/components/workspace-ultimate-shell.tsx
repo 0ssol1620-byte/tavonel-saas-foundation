@@ -297,7 +297,7 @@ export default function WorkspaceUltimateShell({
           </div>
           {activeRevision !== null ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("world")}><small>Published</small><b>v{activeRevision}</b></button> : null}
           {candidateReady ? <button type="button" className={styles.topStatus} onClick={() => onNavigate("review")}><small>Needs your review</small><b>{reviewCount ? `${reviewCount} to review` : "New version"}</b></button> : null}
-          <button type="button" className={styles.commandButton} onClick={() => setPaletteOpen(true)}><Search size={15} aria-hidden="true" /><span>Search / Command</span><kbd>Ctrl K</kbd></button>
+          <button type="button" className={styles.commandButton} aria-label="Search workspace commands" aria-haspopup="dialog" aria-expanded={paletteOpen} onClick={() => setPaletteOpen(true)}><Search size={15} aria-hidden="true" /><span>Search / Command</span><kbd>Ctrl K</kbd></button>
           <div className={styles.headerAction}>{headerAction}</div>
         </header>
 

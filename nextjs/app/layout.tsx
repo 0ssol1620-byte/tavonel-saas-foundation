@@ -83,6 +83,13 @@ export const metadata: Metadata = {
     www.tavonel.com already 308s to it.
   */
   metadataBase: new URL("https://tavonel.com"),
+  icons: {
+    icon: [
+      { url: "/brand/locus-v2.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/brand/locus-v2-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    shortcut: "/brand/locus-v2.ico",
+  },
   verification: {
     other: { "naver-site-verification": "8543297cf37328d0919d31e4d3d618beecc532de" },
   },

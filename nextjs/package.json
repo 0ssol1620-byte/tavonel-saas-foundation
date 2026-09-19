@@ -18,7 +18,7 @@
     "qa:launch:firefox": "playwright test --project=launch-firefox",
     "qa:launch:webkit": "playwright test --project=launch-webkit",
     "qa:lighthouse": "node scripts/launch-qa/lighthouse-budgets.mjs",
-    "check": "node scripts/check-type-floor.mjs && tsc --noEmit && eslint app components lib",
+    "check": "pnpm brand:verify && node scripts/check-type-floor.mjs && tsc --noEmit && eslint app components lib",
     "lint": "eslint app components lib",
     "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
     "ops:smoke": "node scripts/operations-smoke.mjs",
@@ -26,7 +26,8 @@
     "verify:package": "node scripts/compiled-world/validate.mjs",
     "verify:developer-clean": "node scripts/verify-developer-clean-install.mjs",
     "qa:links": "node scripts/launch-qa/internal-links.mjs",
-    "scan:secrets": "node scripts/secret-scan.mjs .."
+    "scan:secrets": "node scripts/secret-scan.mjs ..",
+    "brand:verify": "node scripts/build-brand-assets.mjs --check"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

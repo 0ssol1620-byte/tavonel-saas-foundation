@@ -1,0 +1,16 @@
+{
+  "version": "locus-v2",
+  "viewBox": "0 0 24 24",
+  "ground": "#08090A",
+  "ink": "#9AA3A8",
+  "paths": [
+    {
+      "d": "M4.5 3.5H14.5L19.5 7V20.5H4.5Z",
+      "strokeWidth": 2.5
+    },
+    {
+      "d": "M9.5 12V16H15",
+      "strokeWidth": 2
+    }
+  ]
+}

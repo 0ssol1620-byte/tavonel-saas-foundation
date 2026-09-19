@@ -397,3 +397,9 @@
   .lv2[lang="ko"] .lv2-hero-h1 { text-wrap: balance; }
   .lv2[lang="ko"] .lv2-h1-line { display: inline; }
 }
+
+/* Measured evidence links paint ABOVE the page margin and never consume a grid column. */
+.lv2-evidence-connector { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: hidden; }
+.lv2-evidence-connector path { fill: none; stroke: var(--source); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.lv2-evidence-connector circle { fill: var(--source); }
+.lv2-evidence-connector[data-connected="false"] { visibility: hidden; }

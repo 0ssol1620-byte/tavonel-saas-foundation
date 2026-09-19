@@ -78,3 +78,7 @@ nextjs/scripts/compiled-world/verify-external-roundtrip.py text eol=lf
 # eol=lf would make the served bytes differ from the printed digest on every Linux checkout, which
 # is exactly what CI caught on 2026-09-16. So they are stored and served as-is, no conversion.
 nextjs/public/research/receipts/*.json -text
+
+# Deterministic browser icon representations
+nextjs/public/brand/*.svg text eol=lf
+nextjs/public/icon.svg text eol=lf
