@@ -10,39 +10,25 @@ async function dismissConsent(page: import("@playwright/test").Page) {
 }
 
 /*
-  Landing replan, 2026-09-18. The three Connect cards became three rows of one list.
+  Landing V2, 2026-09-19. The in/out grid is Scene 07's, and its rows are a P2 visual.
 
-  Four equal grids in a row was the composition the replan was opened about, and this one is the
-  survivor: three ways in, three ways out and the first call, in a single grid. So the assertions
-  move from card geometry to what the rows still owe a reader -- every one of them ends on a real
-  destination, at a target a thumb can hit.
+  This has measured the same thing through three layouts: three Connect cards, then three rows of
+  one list, and now a scene whose list has not been built. What a reader is owed is unchanged --
+  a real destination at a target a thumb can hit -- so the assertion is made against the next
+  action Scene 07 does carry, and the row-level geometry comes back here with the rows.
 */
-test("the input and output routes fill their grid and provide usable next actions", async ({ page }) => {
+test("the Bring it / Use it scene ends on a usable next action", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const grid = page.locator("#sources .one-path-io-grid");
-  await expect(grid).toHaveCount(1);
-  await grid.scrollIntoViewIfNeeded();
-  const columns = grid.locator(".one-path-io-col");
-  await expect(columns).toHaveCount(2);
-  await expect(grid.locator("figure.one-path-code pre code")).toHaveCount(1);
-
-  const rows = columns.locator("li");
-  await expect(rows).toHaveCount(6);
-  for (const row of await rows.all()) {
-    const rowBox = await row.boundingBox();
-    expect(rowBox).not.toBeNull();
-    expect(rowBox!.width).toBeGreaterThan(100);
-    const action = row.getByRole("link");
-    await expect(action).toHaveCount(1);
-    // Reveal transforms can produce 43.999969 for a CSS 44px target.
-    // Preserve the 44px threshold at hundredth-pixel measurement precision.
-    expect(Math.round((await action.boundingBox())!.height * 100) / 100).toBeGreaterThanOrEqual(44);
-    expect(await action.getAttribute("href"), "a row that ends nowhere is not a route").toMatch(/^\//);
-  }
-  await expect(rows.nth(0).getByRole("link")).toHaveAttribute("href", /\/(login|contact)$/);
-  await expect(rows.nth(1).getByRole("link")).toHaveAttribute("href", "/integrations");
-  await expect(rows.nth(2).getByRole("link")).toHaveAttribute("href", "/sources");
+  const scene = page.locator("section#use");
+  await expect(scene).toHaveCount(1);
+  await scene.scrollIntoViewIfNeeded();
+  const action = scene.locator("a.lv2-text-link");
+  await expect(action).toHaveCount(1);
+  // Reveal transforms can produce 43.999969 for a CSS 44px target; keep the threshold at
+  // hundredth-pixel precision rather than loosening it.
+  expect(Math.round((await action.boundingBox())!.height * 100) / 100).toBeGreaterThanOrEqual(44);
+  expect(await action.getAttribute("href"), "a scene that ends nowhere is not a route").toMatch(/^\//);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -116,13 +102,16 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     return { width: r.width, height: r.height, inside: hit === e || e.contains(hit) };
   }));
   /*
-    Three, not four. BQ-059 stopped drawing the header's commercial action a second time inside
-    the sheet, forty pixels below the first copy of it -- `e2e/mobile-landing.spec.ts` and
-    `e2e/production-hardening.spec.ts` both assert `a.mobile-nav-cta` is gone. What this test
-    measures is unchanged: every row a thumb lands on is a real target, and the point at its
-    centre belongs to the row.
+    Six, not three, and still not the commercial action. BQ-059 stopped drawing the header's
+    action a second time inside the sheet, forty pixels below the first copy of it --
+    `e2e/mobile-landing.spec.ts` and `e2e/production-hardening.spec.ts` both assert
+    `a.mobile-nav-cta` is gone, and both still do. What changed is the bar: Landing V2's §8
+    navigation is five destinations rather than three (contract D2), and the sheet carries a
+    Sign-in row of its own because the header hides that link below the desktop switch. So the
+    rows a thumb lands on are five links plus Sign in. What this test measures is unchanged:
+    every one of them is a real target, and the point at its centre belongs to the row.
   */
-  expect(targets.length).toBe(3);
+  expect(targets.length).toBe(6);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);

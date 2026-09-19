@@ -3,7 +3,8 @@ import type { Route } from "next";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
-import { deploymentStateLine, primaryCallToAction } from "@/lib/commercial-state";
+import HeaderScrollState from "@/components/site-nav/header-scroll-state";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
 import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, type SiteLink } from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
@@ -11,7 +12,7 @@ import chrome from "./public-site-chrome.module.css";
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
  *
- * The landing page needed a scroll-reactive `data-stuck` and its KNOWLEDGE COMPILER badge,
+ * The landing page needed a scroll-reactive header and its KNOWLEDGE COMPILER badge,
  * `/pricing` needed its own access label, and the policy pages had a two-link nav of their own --
  * so three files each kept a copy of the row, and a change to the navigation had to be made four
  * times or the site's structure changed as a visitor moved through it. Those three differences are
@@ -27,61 +28,64 @@ import chrome from "./public-site-chrome.module.css";
  * which every caller can: two of them are client components that already receive the commercial
  * state as a prop, and the rest reach this file through `PublicSitePage` below.
  *
- * G1-001 / G2-026: `mode` now falls back to `deploymentStateLine()` rather than to nothing.
- * What this deployment is -- a finished public World to read, and your own files arranged with
- * us rather than switched on by a checkout -- was stated on /pricing, /security, /status and
- * behind the /login click, and nowhere a visitor meets first. It is read off `activationPolicy`,
- * so it appears wherever the header does and removes itself on the day the gate opens.
+ * Landing V2, 2026-09-19 (blueprint §8, §35; contract D2). Three changes, and the first is a
+ * removal.
+ *
+ * The deployment state line leaves the header. `Public sample: open to read · Your own files: by
+ * arrangement` is true, and it was the first thing a reader met on every page of the site -- an
+ * operations notice in the position a visitor reads as the product's opening sentence, which is
+ * §2.1's diagnosis of the old hero applied to the bar above it. Nothing here decides the fact is
+ * unimportant; it decides where a fact about the deployment sits relative to what the product is.
+ * The fact itself -- `activationPolicy.customerData.reason` -- is still published verbatim on
+ * /pricing, /security, /integrations, in the /docs first-run notes and in the landing's closing
+ * scene. `deploymentStateLine()` was deleted in the 2026-09-19 fix round, once this removal left
+ * it with no caller anywhere in the tree; `lib/commercial-state.ts` carries the inventory of the
+ * surfaces that still state the gate and of the ones that no longer do.
+ *
+ * The `mode` and `stuck` props went with it. `mode` was a caller's override for that line and no
+ * caller passed one; `stuck` hard-coded the bar's opaque state and every caller took the default,
+ * so the bar was opaque at the top of the page where §8 wants it transparent. `HeaderScrollState`
+ * sets `data-scrolled` instead -- server-rendered absent, which is the unscrolled state, so the
+ * first paint is right before any JavaScript runs.
+ *
+ * BA-249 is reversed here, deliberately. The access action is the filled `btn` again, because §8
+ * asks for exactly one filled control in the bar and §29 makes Request access the site's one
+ * commercial conversion. What BA-249 was avoiding -- two filled buttons for the same action in
+ * one viewport on /product and /developers -- is a hero problem, and this row is transparent over
+ * the page until 40px of scroll, so at the moment a reader meets a hero's own primary button the
+ * header's is on no ground at all.
  */
 export function PublicSiteHeader({
   cta,
-  mode,
   signedIn,
-  stuck = true,
   korean = false,
 }: {
   cta: SiteLink;
-  mode?: { label: string; title: string };
   signedIn?: boolean;
-  stuck?: boolean;
   /** G1-043: /ko is the site's one Korean URL, and it rendered an English header around it. */
   korean?: boolean;
 }) {
-  // G1-001 / G2-026: see the note above. A caller's own `mode` (the pilot badge) still wins.
-  const english = deploymentStateLine();
-  const state = mode ?? (english && korean ? { ...english, label: KO_CHROME.stateLine } : english);
   const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;
   return (
-    <header className={`nav ${chrome.header}`} data-stuck={stuck ? 1 : 0}>
+    <header className={`nav chrome-v2-header ${chrome.header}`}>
+      <HeaderScrollState />
       <Link href="/" className={`wordmark ${chrome.wordmark}`} aria-label="TAVONEL home">
         <Logomark />
         <b>TAVONEL</b>
       </Link>
-      {/*
-        BQ-058 / D10. One meaning, and it is a destination rather than a tooltip.
-
-        This was a 9.5px monospace chip with an amber `--changed` dot and the whole explanation
-        hidden in a `title` attribute -- unreadable, unreachable by touch or keyboard, and dressed
-        as a live status indicator for a fact that is a policy. The dot is gone (a status light
-        for something that never changes is the "glowing status dot" tell), the label is the same
-        one string `deploymentStateLine()` emits at 12px in the page's own face, and the sentence
-        that used to be the tooltip is a click away on /status, where the rest of what this
-        deployment does and does not run belongs.
-      */}
-      {state ? (
-        <Link className={chrome.state} href="/status">{state.label}</Link>
-      ) : null}
       <DesktopPrimaryNav korean={korean} />
-      <MobilePrimaryNav korean={korean} />
+      <MobilePrimaryNav korean={korean} signedIn={signedIn} />
       <span className="nav-actions">
+        <Link className="btn small" href={cta.href as Route}>{ctaLabel}</Link>
         {/*
-          BA-249: ghost, not filled. On /product and /developers the header's filled button and
-          the hero's filled button were the same action, twice, in one viewport -- and a view with
-          two filled primaries has none. The hero keeps the fill; the header keeps the action
-          available on every scroll position, which is what it is for.
+          Below the desktop switch this link is in the phone sheet instead, where it gets a 44px
+          row of its own. At 360px the row was wordmark + toggle + a 109px filled button + Sign in
+          and it did not fit: `app/tavonel.css` hid the link outright on one posture and drew the
+          toggle as a bare icon to buy back the width. A secondary destination belongs in the
+          sheet on a phone; the action beside it is the one thing that may not go behind a
+          disclosure.
         */}
-        <Link className="btn small ghost" href={cta.href as Route}>{ctaLabel}</Link>
-        {signedIn ? null : <Link className="nav-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
+        {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
       </span>
     </header>
   );
@@ -94,13 +98,22 @@ export function PublicSiteHeader({
  * neither carried the legal row -- so the copyright, the Korean entry, the security inbox and the
  * consent-withdrawal link existed on every page except the two a visitor meets first. `onePath`
  * keeps the landing page's wider measure (`.one-path-wrap`); nothing else differs.
+ *
+ * Landing V2, 2026-09-19 (contract D9). `.chrome-v2-wrap` rides alongside whichever of the two
+ * the caller asked for rather than replacing it: `app/tavonel.css` styles `footer.site .shell`
+ * and `footer.site .one-path-wrap` as the flex column this content needs, and swapping the class
+ * would have taken that with it. `chrome-v2.css` is unlayered, so the measure it sets wins over
+ * both while the layout they give stays. The header takes the same measure through its own
+ * padding (it is a full-bleed flex row and cannot hold a wrapper element without breaking the
+ * `.nav > nav` child selectors two sheets rely on), which is what puts the wordmark on the same
+ * left edge as the content below it.
  */
 export function PublicSiteFooter({ korean = false, onePath = false }: { korean?: boolean; onePath?: boolean } = {}) {
   /* chrome-06: the switch points at the language the reader is not reading. */
   const language = korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language;
   return (
-    <footer className={`${onePath ? "site one-path-footer" : "site"} ${chrome.footer}`}>
-      <div className={onePath ? "one-path-wrap" : "shell"}>
+    <footer className={`${onePath ? "site one-path-footer" : "site"} chrome-v2-footer ${chrome.footer}`}>
+      <div className={`${onePath ? "one-path-wrap" : "shell"} chrome-v2-wrap`}>
         {/* BQ-131: the wordmark at the bottom of a page is where a reader goes home from. It was
             a bare <span> -- the one instance of the lockup on the site that was not a link. */}
         <Link href="/" className={`wordmark ${chrome.wordmark}`} aria-label="TAVONEL home"><Logomark /><b>TAVONEL</b></Link>
@@ -125,6 +138,29 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
         */}
         <p className="fine site-footer-tagline">{korean ? KO_CHROME.tagline : BRAND_LINE.descriptor}</p>
         {/*
+          THE DEPLOYMENT GATE IS NOT IN THE CHROME. 2026-09-19, hero/chrome fix round.
+
+          A previous round put `activationPolicy.customerData.reason` here, in the footer, to give
+          back the eight routes that lost it when D2 cleared the header line. The reasoning was
+          sound and the placement was not: the footer renders on every public route, and two gates
+          this repository already enforces say so.
+
+            e2e/explore.spec.ts (BA-028) forbids the phrase "this deployment" anywhere on
+            /explore -- that page's argument is that a reader can open the sample and check it,
+            and a sentence about what is closed contradicts the page it is printed on; and
+
+            e2e/public-layout-balance.spec.ts caps the footer at 90% of a phone viewport. With the
+            gate paragraph the /integrations footer measured 812px against a 760px ceiling at
+            390x844 -- a bottom of page that is taller than the screen.
+
+          The fact itself is unchanged and still published verbatim, on the surfaces where a
+          reader is actually deciding: /pricing, /security, /integrations, the /docs first-run
+          notes, and the landing's own closing scene, which is what /contact's access action is
+          reached from. `KO_CHROME.customerDataGate` remains its one Korean translation for those
+          surfaces. Restoring it to shared chrome needs a placement that satisfies both gates
+          above, which is a design decision rather than a re-add.
+        */}
+        {/*
           BA-250: the row a procurement reader looks for. Copyright, the Korean entry and the
           security inbox -- the last two are pages and an address this site already publishes, so
           nothing here is a new commitment. The legal entity and the governing jurisdiction are
@@ -141,7 +177,9 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
           <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}
-            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"}>{language.label}</Link>
+            {/* T1-014 again (ROUND3-P2): the one footer link that was missing the flag, so /ko
+                fired an RSC prefetch for `/` that the browser then aborted. */}
+            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"} prefetch={false}>{language.label}</Link>
           </span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}

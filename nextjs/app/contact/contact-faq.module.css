@@ -1,0 +1,70 @@
+/*
+  The six questions that moved off the landing (D6), in the contact page's own visual language.
+
+  `.contact-qualification-fold` already sets a `<details>` on this page, and its summary is a
+  12px tracked label because it opens a form fieldset. A question a buyer asks before they write
+  is prose, so it keeps that fold's `+`/`−` marker and hairline rhythm and takes the body size --
+  a 12px grey question would be the smallest text on the page and the first thing a reader is
+  supposed to find. Token-only; nothing here is a colour or a size of its own.
+*/
+
+.faq {
+  display: grid;
+  gap: 0;
+  margin: 0 0 clamp(28px, 3vw, 40px);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: var(--t-6);
+  line-height: 1.25;
+  letter-spacing: -0.014em;
+  color: var(--text-hi);
+}
+
+.item {
+  border-top: 1px solid var(--hairline);
+}
+
+.item > summary {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  color: var(--text-hi);
+  font: 500 var(--t-3) / 1.45 var(--f-sans);
+  cursor: pointer;
+  list-style: none;
+}
+
+.item > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The marker is the same affordance the qualification fold uses, so one page has one fold. */
+.item > summary::before {
+  content: "+";
+  color: var(--verified);
+}
+
+.item[open] > summary::before {
+  content: "−";
+}
+
+.answer {
+  margin: 0 0 16px;
+  max-width: 64ch;
+  color: var(--text-mid);
+  font-size: var(--t-3);
+  line-height: 1.7;
+}
+
+/* The link that ends each answer is where the answer is written down in full. */
+.answer a {
+  color: var(--text-hi);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hairline-hi);
+}

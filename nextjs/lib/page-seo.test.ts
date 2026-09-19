@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { BILLING_OFFERS } from "./billing-catalog";
+import { LANDING_V2_COPY } from "./landing-v2-copy";
 import { pageMetadata, type PageSeoRecord } from "./page-seo";
 
 /*
@@ -125,91 +126,81 @@ describe("pageMetadata refuses a verification date that verifies nothing", () =>
 });
 
 /*
-  The one page built with it, and the one product fact its copy stands on.
+  The one page built with it, and what its copy now stands on.
 
-  §0 of the campaign contract said activating a reviewed World requires the Team plan, sold
-  through a conversation. FD-02 changed half of that: the Developer plan reaches activation when
-  the caller is the workspace owner, and Team is still `saleChannel: "contact"`. What did not
-  change is that a *free* evaluation cannot activate, so no public copy may imply a self-serve
-  path to an approved World without a paid plan.
+  Landing V2, 2026-09-19 (D1, D12, §35). /ko is the same nine-scene composition as `/`, rendered
+  from the Korean half of `lib/landing-v2-copy.ts`, and the page file itself is metadata and a
+  breadcrumb. So the three cases that read Korean sentences out of this file have moved to what
+  the file now decides, and the catalog assertions they hung on stay -- those are facts about
+  `lib/billing-catalog.ts`, not about this page, and they are the tripwire worth keeping.
 
-  The Korean page states all three facts in Korean -- and the day either channel flips, or the
-  owner condition moves, that sentence becomes wrong in a language most reviewers of this
-  repository do not read. So the assertions are on the catalog and on the words that carry the
-  conditions: when `saleChannel` changes on either offer, or the page stops naming the owner
-  condition or the evaluation's refusal, this fails and the Korean sentence is revisited with it.
+  WHAT LEFT THE PAGE, STATED PLAINLY. The FD-02 activation fold went with the rest of the pricing
+  detail. It published three facts in Korean that are published in Korean nowhere else on this
+  site: that the Team plan is sold through a conversation, that activation on the Developer plan
+  requires the workspace owner, and that no plan opens the customer-data gate. The third survives
+  -- Scene 09's microtext is `activationPolicy.customerData.reason` in Korean, and that is the
+  strongest of the three. The first two do not, and that is a reported gap for /pricing rather
+  than something this file can assert its way out of.
 */
 describe("the Korean entry page stands on a fact, not a translation", () => {
   const source = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
+  const copyDeck = readFileSync(new URL("./landing-v2-copy.ts", import.meta.url), "utf8");
 
-  /*
-    Landing replan, 2026-09-18 (evening). The Korean pricing fold is back on this page, as a closed
-    <details> in the closing section rather than a card in the middle: the Team consultation step,
-    the owner-activation condition and the plan-independent gate are published in Korean nowhere
-    else, so removing the fold had removed the facts. Both plan labels still come from the catalog
-    rather than being written again in Korean, which is the property this file exists to keep.
-  */
-  it("reads both plan labels from the catalog instead of writing them again in Korean", () => {
-    expect(source).toContain("{BILLING_OFFERS.studio_access.label} 플랜");
-    expect(source).toContain("{BILLING_OFFERS.observer_access.label} 플랜");
-    expect(source, "the fold is a disclosure in the close, not a card").toContain('<details className="one-path-details one-path-plan-details">');
+  it("renders the shared composition rather than a second Korean page", () => {
+    expect(source, "one composition, two locales -- not two pages to keep in step")
+      .toContain("<LandingPage korean");
+    expect(source, "and the Korean document language is still declared").toContain("<DocumentLangKo />");
+    expect(source, "the Korean entry keeps its own canonical").toContain('canonical: "/ko"');
+    // The page file itself states no commercial fact any more; the copy deck does.
+    expect(source, "a plan label written in Korean here is the drift this file exists to catch")
+      .not.toContain("BILLING_OFFERS");
   });
 
-  it("says which plans activate, that Team goes through a conversation, and that no plan opens the gate", () => {
-    expect(source, "the page must state the consultation step").toContain("상담을 거쳐 제공됩니다");
-    expect(source, "the owner condition is what stops this reading as any Developer seat").toContain("워크스페이스 소유자라면");
-    expect(source, "and the gate is stated as plan-independent").toContain("플랜과 무관하게 내 자료 처리는 협의를 거쳐 시작합니다");
-    expect(source, "and offers the page that maintains the plans").toContain('href="/pricing"');
-  });
-
-  it("carries the one commercial fact it states, and states it as the catalog does", () => {
+  it("carries the commercial facts it states, and states them as the catalog does", () => {
     expect(BILLING_OFFERS.studio_access.saleChannel, "Team is self-serve now -- /pricing must be revisited").toBe("contact");
     expect(BILLING_OFFERS.observer_access.saleChannel, "Developer is not self-serve now -- /pricing must be revisited").toBe("self_serve");
     /*
-      G1-002. The refusal moved up a level, and got broader rather than softer.
-
-      This pinned "활성화 요청은 거절됩니다" -- a free evaluation is refused at activation -- inside a
-      sentence whose first half said the evaluation uploads, compiles, reviews and exports. That
-      first half was false while `activationPolicy.customerData` is closed, and a reader who had
-      already accepted it would read the refusal as a detail about one plan. So the whole sentence
-      is gone and what stands in its place is the gate itself: no plan compiles customer files in
-      this deployment, which is a strictly stronger statement than the one this pinned.
+      G1-002, followed to where it landed. The gate itself is the strongest of the three facts
+      the old fold carried, and it is on the page in Korean as the deployment's own sentence --
+      `activationPolicy.customerData.reason`, translated literally beside it so the two cannot be
+      edited apart. The assertion turns on the closed gate, as it always did.
     */
     expect(activationPolicy.customerData.enabled, "the assertion below turns on the closed gate").toBe(false);
-    expect(source, "the hero carries the notice a Korean reader meets first")
-      .toContain("현재 배포에서는 고객 파일 컴파일이 열려 있지 않습니다");
-    expect(source, "and it is rendered only while the gate is closed")
-      .toContain("activationPolicy.customerData.enabled ? null : (");
+    /*
+      Asserted on the value rather than on the copy module's source text, because the Korean
+      sentence moved out of that file in fix round 3. The chrome states the same gate on every
+      public route now, so its one Korean translation lives in `KO_CHROME.customerDataGate` and
+      the landing's close reads that constant -- one gate, one spelling, in both languages. What
+      this case is about has not changed: the gate is on the Korean page, in Korean.
+    */
+    expect(LANDING_V2_COPY.ko.start.microtext, "the Korean close states the gate in the reader's language")
+      .toContain("이 배포판에서는 아직 고객의 파일을 컴파일하지 않습니다");
+    expect(copyDeck, "and the English close is the policy's own sentence, not a paraphrase")
+      .toContain("microtext: activationPolicy.customerData.reason");
+    expect(copyDeck, "the Korean close reads the site's one spelling of the gate, not a second one")
+      .toContain("microtext: KO_CHROME.customerDataGate");
   });
 
   /*
-    BA-224/225/227. What the page led with, and what it gave a reader to do.
+    BA-224/225/227. What the page leads with, and what it gives a reader to do.
 
     The first Korean sentence was "지금 한국어 페이지는 이 한 장입니다" -- there is one Korean page,
     this one -- and six of the eight cards carried an "(EN)" suffix, so a Korean buyer's first
-    impression was an inventory of what we had not translated. The page also ended in prose with
-    one English-labelled inline link, while every English page in the lens ends in a button row.
-
-    Pinned here because these are properties a reviewer who does not read Korean can still check.
+    impression was an inventory of what we had not translated. Pinned here because these are
+    properties a reviewer who does not read Korean can still check; they are asserted against the
+    copy deck now, which is where the Korean sentences live.
   */
   it("leads with what a Korean reader gets, and ends on a Korean call to action", () => {
-    const copy = source.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const copy = copyDeck.replace(/\/\*[\s\S]*?\*\//g, " ");
     expect(copy, "the page may not open on what is missing in Korean")
       .not.toContain("지금 한국어 페이지는 이 한 장입니다");
     expect(copy, "an absence is not a card heading").not.toContain("한국어로 있는 것");
     expect(copy, "the heading may not hedge").not.toContain("아는 편이 나은");
-    // Approved one-path revision: film first, state-controlled start, public sample alongside.
-    expect(copy, "the Korean entry page needs its own action row").toContain('className="one-path-actions actions"');
-    expect(copy).toContain('playbackRate={1.5} compact');
-    // Landing replan, 2026-09-18: the same five sections as `/`, in the same order, with the
-    // Korean heading ids. Read as positions so a reordered translation fails here.
-    const sections = [...copy.matchAll(/<section[^>]*\bid="([a-z-]+)"/g)].map(match => match[1]);
-    expect(sections).toEqual(["top", "compile", "why", "sources", "start"]);
-    expect(copy).toContain('href="/explore">공개 Compiled World 열기');
-    expect(copy).toContain('const startHref = (live ? "/login" : "/contact") as Route;');
-    expect(copy).toContain('const startLabel = live ? "내 자료로 시작하기" : "이용 문의";');
-    // The language fact survives, once, rather than six times as a suffix.
     expect(copy, "a per-tile (EN) suffix is the inventory again").not.toContain('<span lang="en">(EN)</span>');
+    // The Korean close offers the two actions the English one does, in Korean.
+    const actions = readFileSync(new URL("../components/landing-v2/scene-actions.ts", import.meta.url), "utf8");
+    expect(actions, "the Explore action has a Korean label").toContain("공개 Compiled World 열기");
+    expect(actions, "and so does the signed-in destination").toContain("워크스페이스 열기");
   });
 
   it("quotes no price, page count or limit it would have to keep in step", () => {

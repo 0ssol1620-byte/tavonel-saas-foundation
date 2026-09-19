@@ -6,6 +6,7 @@ import { TrustNext } from "@/components/trust-next";
 import { ProcessingRegionTable, TrustDisclosures } from "@/components/trust-disclosures";
 import { BOUNDARY } from "@/lib/evidence-record";
 import { activationPolicy } from "@/lib/activation-policy";
+import { TRAINING_DATA_CLAIM } from "@/lib/security-claims";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -56,7 +57,9 @@ const PATH = [
 const CONTROLS = [
   ["Tenant isolation", "Workspace identity is derived server-side from an authenticated session, never from an identifier the browser supplies. Storage prefixes, database rows and signed capabilities are all scoped to it."],
   ["Encryption and secrets", "Transport is TLS throughout, and stored objects are encrypted at rest by the storage provider. Authentication, billing, storage and disarm credentials are server-side secrets; the browser may hold a provider's own publishable token and nothing else."],
-  ["Your data is not training data", "Your documents are not used to train shared models. Models read your sources to compile your world, and for nothing else."],
+  /* ROUND3-P2: one sentence, three surfaces. This page, the landing's trust scene and the
+     /contact FAQ each carried their own copy, and this one spelled the product noun lowercase. */
+  [TRAINING_DATA_CLAIM.label, TRAINING_DATA_CLAIM.body],
   ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request, and that request is carried out by a person rather than by a self-service control. Which parts of it happen the moment you act, which wait on a provider backup schedule, and where no number is published yet, are set out step by step in the privacy notice."],
   ["Reliability", "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world. There is no best-effort path that publishes anyway."],
   /*

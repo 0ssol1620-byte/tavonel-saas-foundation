@@ -19,18 +19,24 @@
         the sake of moving. Transitions exist where something genuinely changed, and
         the reduced-motion block below removes them wholesale without removing content.
 
-     Type: Wanted Sans Variable, self-hosted from public/fonts (see the @font-face
-     blocks below). It is already vendored in this repository under the OFL, carries a
-     real 400-1000 weight axis, and needs no webfont host -- so display weight here is
-     a cut of the family, never a synthesised bold. IBM Plex Mono, loaded by
-     app/layout.tsx, carries the instrument voice: counts, clocks, state labels, keys.
+     Type: Geist is the text and display face (landing V2 blueprint §6), loaded by
+     app/layout.tsx through next/font/google and self-hosted by the build, so no webfont
+     host is contacted for it either. Wanted Sans Variable stays behind it in --f-sans as
+     the fallback, self-hosted from public/fonts (see the @font-face blocks below): it is
+     vendored under the OFL, carries a real 400-1000 weight axis and carries Hangul, which
+     is what /ko renders if the Geist file has not arrived. Instrument Serif is the
+     editorial accent (--f-serif) and appears on the landing only -- one phrase of the H1
+     and the manifesto line, never a paragraph. IBM Plex Mono carries the instrument voice:
+     counts, clocks, state labels, keys, source locations.
      ============================================================================ */
 
   /* --------------------------------------------------------------------------
      Wanted Sans Variable -- SIL Open Font License 1.1, licence vendored beside the
      files at public/fonts/OFL.txt. Two Latin subsets from the upstream split build:
      [90] basic Latin + punctuation + currency, [89] Latin Extended. The English page
-     downloads [90] only, and layout.tsx preloads exactly that one.
+     downloads [90] only. Nothing preloads either of them: since 2026-09-19 Wanted Sans is
+     the fallback behind Geist in --f-sans, and font-display: optional means a client that
+     has not got the file simply keeps the face above it rather than waiting.
      -------------------------------------------------------------------------- */
   @font-face {
     font-family: "Wanted Sans Variable";
@@ -56,10 +62,10 @@
 
   :root {
     /* Grounds. Near-black with a faint cool bias, so it reads as chosen rather than #000. */
-    --ground: #08090a;
-    --g1: #0e1011;
-    --g2: #14171a;
-    --g3: #1b1f23;
+    --ground: #090d14;
+    --g1: #101721;
+    --g2: #17202c;
+    --g3: #1d2938;
     /*
       --seam and --hairline were one token doing two jobs: a 1px border colour, and the opaque fill
       behind a `gap: 1px` grid. They cannot both move -- an alpha border reads correctly over any
@@ -81,11 +87,11 @@
       --decor is for marks that are not text a reader needs: a strikethrough rule, a tree glyph, an
       inert control. It and --reused are surface tones and never a `color:` for words.
     */
-    --text-hi: #edeae4;
+    --text-hi: #f4f6fa;
     /* The one step above --text-hi: the primary button's hover fill, and nothing else. */
     --text-max: #ffffff;
-    --text-mid: #9aa3a8;
-    --text-lo: #8b959b;
+    --text-mid: #bac3d0;
+    --text-lo: #a3afbf;
     --decor: #4c565c;
 
     /* State. The entire chromatic vocabulary of the product. */
@@ -95,8 +101,29 @@
     --changed: #f2a65a;
     --changed-dim: #6a4a26;
     --changed-deep: #3a2714;
-    --unresolved: #6e93b8;
-    --unresolved-dim: #31424f;
+    /*
+      Unresolved moved from blue to coral on 2026-09-19 (landing V2 blueprint §5.2, lane D4). The
+      semantic table is now one table for the landing and the app:
+
+        Blue   --source      source / document / location
+        Mint   --verified    verified / current / safe
+        Violet --relation    relation / compiled structure
+        Amber  --changed     source update / changed dependency
+        Coral  --unresolved  unresolved / held for review
+
+      Blue had to give up "held for review" because blue now means location, and one colour cannot
+      carry two meanings on the same page. Every existing call site was measured against the ground
+      it actually sits on before this value was chosen: 7.48:1 on --ground, 7.16:1 on --g1, 6.76:1
+      on --g2, 6.22:1 on --g3, so all of them clear AA as text with no per-site shade.
+
+      -dim is a border and an SVG stroke and never the sole carrier of a state; at 2.05:1 on --g1
+      it sits in the same register as --verified-dim and --changed-dim. -deep is a background tint
+      and is new: .pill[data-v="held"] was the one pill in the set with no ground of its own,
+      because a blue -deep was never derived.
+    */
+    --unresolved: #f07d73;
+    --unresolved-dim: #6c3834;
+    --unresolved-deep: #361d1a;
     --reused: #4a5257;
     /* A run that failed is not a run that changed. 7.05:1 on --g2 as text. */
     --failed: #e9877e;
@@ -108,8 +135,91 @@
     --paper: #f4f1ea;
     --paper-ink: #20262d;
 
-    --f-sans: "Wanted Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
-      Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* ------------------------------------------------------------------ blueprint 2026-09-19
+
+       The landing V2 blueprint (§5, §34) adds a second ground to a product that had one. The site
+       stopped being all-dark: a company that compiles documents alternates a dark computational
+       layer with a light document layer, so paper is a brand surface here and not just a raster.
+
+       Two families arrive with it:
+
+       - The ink/paper ladder. --ink-* re-states the existing --ground/--g1/--g2 steps under the
+         blueprint's names rather than replacing them, because 28 routes are built on the old
+         names and a rename is a rewrite. They are within a point of each other and the landing
+         reads the blueprint names.
+       - --source and --relation: two meanings that had no token at all, because nothing before
+         the landing drew a line from a claim to the place it was read.
+
+       Every one of these five accents is legible on dark and illegible on paper -- --source is
+       8.03:1 on --g1 and 2.14:1 on --paper-50 -- so each has a paper-ground sibling under -ink,
+       same hue, lightness lowered until it clears 4.6:1 on --paper-200, the darkest paper. The
+       landing remaps the family name to the sibling on .lv2-paper (app/landing-v2.css), so a
+       component written against var(--source) is correct on either ground and no scene has to
+       invent a hex. Measurements are in the lane report; the assertions are in
+       lib/landing-v2-tokens.test.ts, which recomputes them from this file.
+       ------------------------------------------------------------------ */
+    --ink-950: #090d14;
+    --ink-900: #101721;
+    --ink-850: #17202c;
+    --graphite-700: #292d33;
+    --paper-50: #f4f5f7;
+    --paper-100: #e8edf3;
+    --paper-200: #d7dfe9;
+    --text-on-paper: #142034;
+    /*
+      The blueprint's muted paper tone, and the one token here with a boundary on it: 4.86:1 on
+      --paper-50, 4.48:1 on --paper-100, 4.01:1 on --paper-200. It is AA body text on the paper
+      scene ground and it is not AA body text on a paper panel. On --paper-100 or --paper-200 use
+      it for large text, a label or a rule, or set the panel in --paper-50 -- do not set a 14px
+      paragraph in it there.
+    */
+    --text-muted-paper: #4f5d70;
+    --border-paper: rgba(10, 12, 14, 0.12);
+    /* The paper counterpart of --hairline-hi: an edge meant to be seen, not merely inferred. */
+    --border-paper-hi: rgba(10, 12, 14, 0.24);
+    --border-dark: rgba(255, 255, 255, 0.1);
+    --source: #7da7ff;
+    --relation: #a996ff;
+    /* Paper-ground siblings. Text on paper needs 4.5:1 and the dark-ground accents give 2.1-2.4:1. */
+    --source-ink: #2259ce;
+    --relation-ink: #5f42e0;
+    --unresolved-ink: #b82a1e;
+    --verified-ink: #1a6d51;
+    --changed-ink: #8c5217;
+
+    /*
+      The blueprint's radius ladder, by material: 8px a document, 14px a UI panel, 22px a scene.
+      It sits beside --r-* rather than replacing it -- --r-* is a finer ladder (2/4/6/8/12) that
+      the instrument surfaces are built on, and the landing's materials are larger objects.
+    */
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+
+    /*
+      Motion tokens (§23). Named by what moves: fast is a state dot, ui is a control, med is a
+      panel, scene is a whole beat. --ease-ui and --ease-scene are the one easing pair the
+      blueprint allows. --ease/--ease-out stay: they are what the existing surfaces animate on.
+    */
+    --motion-fast: 140ms;
+    --motion-ui: 220ms;
+    --motion-med: 420ms;
+    --motion-scene: 700ms;
+    --ease-ui: cubic-bezier(0.22, 0.8, 0.22, 1);
+    --ease-scene: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /*
+      Geist is the text and display face, loaded by app/layout.tsx through next/font/google and
+      self-hosted by the build, so no webfont host is contacted. Wanted Sans Variable stays behind
+      it as the fallback: its @font-face blocks above are unchanged and it is what renders if the
+      Geist file has not arrived, which matters because Wanted Sans carries Hangul and /ko is a
+      real page. Instrument Serif is an editorial accent -- one phrase of the landing H1 and the
+      manifesto line -- and nothing else; --f-serif exists so no component reaches for a font
+      name directly.
+    */
+    --f-sans: var(--font-geist), "Wanted Sans Variable", -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --f-serif: var(--font-serif), "Instrument Serif", Georgia, serif;
     --f-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
     /*
@@ -1636,7 +1746,7 @@
   .pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
   .pill[data-v="current"] { color: var(--verified); border-color: var(--verified-dim); background: var(--verified-deep); }
   .pill[data-v="stale"] { color: var(--changed); border-color: var(--changed-dim); background: var(--changed-deep); }
-  .pill[data-v="held"] { color: var(--unresolved); border-color: var(--unresolved-dim); }
+  .pill[data-v="held"] { color: var(--unresolved); border-color: var(--unresolved-dim); background: var(--unresolved-deep); }
   .pill[data-v="unchanged"] { color: var(--text-lo); }
 
   /* ---------------------------------------------------------- 07 console + meters */
@@ -2469,7 +2579,14 @@
 
   .board-stage[data-s="active"] { background: var(--g2); }
   .board-stage[data-s="active"] .board-stage-k { color: var(--text-mid); }
-  .board-stage[data-s="active"] .board-stage-k i { background: var(--unresolved); }
+  /*
+    Neutral, not coral. This dot marked the stage that is running, which is not a state coral is
+    allowed to mean any more -- coral is "held for review" now -- and the stage beside it marks a
+    failure in --failed, a coral of the same hue. Two coral dots in one strip, one meaning "this
+    is working" and one meaning "this did not", is worse than no colour at all, so running gets
+    luminance instead: a stage in progress is not a state of the knowledge.
+  */
+  .board-stage[data-s="active"] .board-stage-k i { background: var(--text-mid); }
   .board-stage[data-s="active"] .board-stage-d { color: var(--text-lo); }
 
   .board-stage[data-s="done"] .board-stage-k { color: var(--text-mid); }

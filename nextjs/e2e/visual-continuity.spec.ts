@@ -21,19 +21,37 @@ test.describe("visual continuity — locked film side", () => {
 
     await page.goto("/");
     /*
-      Landing replan, 2026-09-18. The Works film and its tablist are gone -- one film, in the
-      hero, and no tab anywhere on the page -- so the retired WORLD stage cannot return through a
-      tab that does not exist. The three output destinations moved with the section they were in:
-      they are the `Out` column of the input/output grid in `#sources` now.
+      Landing V2, 2026-09-19. The retired WORLD landing stage still cannot come back, and the two
+      absences that prove it are unchanged: no tab anywhere on the entry page, and no Works film.
+
+      What is dropped is the second half, which read the three output destinations out of the
+      `Out` column of `#sources`'s in/out grid. That grid is Scene 07's P2 visual in V2 and has
+      not been built, so there is no column to read -- `e2e/home-source-routes.spec.ts` and
+      `e2e/premium-craft.spec.ts` carry the note that the row-level assertions return with it.
+      The three docs routes themselves are reachable and pinned elsewhere --
+      `lib/docs-navigation.test.ts` owns the map, `e2e/docs-reading-layout.spec.ts` the pages.
     */
-    await expect(page.getByRole("tab")).toHaveCount(0);
+    /*
+      THE ABSENCE IS THE RETIRED STAGE, NOT THE ROLE (corrected round 4).
+
+      This asserted zero tabs anywhere on the entry page, which was a proxy for "the WORLD
+      landing stage has not come back" and stopped being one the moment blueprint §12 put a real
+      tablist in Scene 02 -- three grounded questions, each opening its own committed region. The
+      absence is asserted against the retired markup itself, and the tabs that do exist are
+      required to be that scene's rather than a stage wearing the role.
+    */
+    await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
+    /*
+      Founder decision 2026-09-20: the hero shows the four locked compile cuts again (centred
+      statement, films below), so the stage player's tablist is back beside Scene 02's. Two
+      tablists, and the hero one carries exactly the four cuts -- cut 4 included, by that decision.
+      The retired One-Path markup (.one-path-world-stage, one-path-works-film) still stays out.
+    */
+    await expect(page.getByRole("tablist")).toHaveCount(2);
+    await expect(page.locator("#hero").getByRole("tab")).toHaveCount(4);
+    await expect(page.locator("#proof").getByRole("tab")).toHaveCount(3);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
-    const output = page.locator("#sources .one-path-io-col").nth(1);
-    await output.scrollIntoViewIfNeeded();
-    await expect(output.getByRole("heading", { name: "Out", exact: true })).toBeVisible();
-    await expect(output.getByRole("link", { name: "Use results with AI" })).toHaveAttribute("href", "/docs/use-with-ai");
-    await expect(output.getByRole("link", { name: "Quickstart" })).toHaveAttribute("href", "/docs/quickstart");
-    await expect(output.getByRole("link", { name: "CLI and package verification" })).toHaveAttribute("href", "/docs/cli");
+    await expect(page.locator(".one-path-io-col")).toHaveCount(0);
   });
 });
 

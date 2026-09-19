@@ -19,15 +19,18 @@
   rather than by two numbers that happen to match. The header takes `--gutter`, which is L1's
   token (TOKEN_CONTRACT); the fallback is the value it resolves to until that lands.
 
-  What this does *not* claim to fix: `header.nav` is full-bleed and the content columns are
-  capped at 1280px, so above ~1340px the header's own edge is outside the content edge by
-  design. Making those two agree means putting the header's contents in the same measure, which
-  is a structural change to a row three e2e specs select into -- noted for the integrator rather
-  than done quietly here.
+  What this did *not* claim to fix: `header.nav` is full-bleed and the content columns are capped
+  at 1280px, so above ~1340px the header's own edge sat outside the content edge, and the note
+  here said that making the two agree meant putting the header's contents in the same measure --
+  a structural change to a row three e2e specs select into.
+
+  Landing V2, 2026-09-19 (contract D9) does that, and does it without the structural change: the
+  header keeps its flex children and takes the measure as asymmetric padding instead
+  (`.nav.chrome-v2-header` in `app/chrome-v2.css`). So the header's inline padding is *not* set
+  here any more. Two unlayered rules of equal specificity setting the same property is decided by
+  which sheet the bundler emits last, which is not a thing to leave to a bundler. The footer's
+  zero stays: it cancels `footer.site`'s `padding-left: var(--rail)`, which is a different fault.
 */
-.header.header {
-  padding-inline: var(--gutter, clamp(16px, 3vw, 30px));
-}
 .footer.footer {
   padding-inline: 0;
 }
@@ -38,7 +41,7 @@
   `.nav` is a flex row and every item in it was allowed to shrink, so in that band the wordmark
   wrapped to "TAVO / NEL" and the access action dropped to a second line -- a 170px header with
   the brand broken in half, on the width a 13" laptop actually runs at. The switch to the phone
-  disclosure is at 1249px now (`app/one-path.css`), and these two rules are the other half: the
+  disclosure is at 1249px now (`app/chrome-v2.css`), and these two rules are the other half: the
   lockup never wraps, and the row never becomes two rows.
 */
 .header.header {
@@ -50,37 +53,17 @@
 }
 
 /*
-  BQ-058 / D10. The deployment state, as a label a reader can act on.
+  BQ-058 / D10's `.state` rules are gone with the element they styled.
 
-  It was `.mode` -- 9.5px monospace, an amber `--changed` dot, and the actual sentence hidden in
-  a `title` attribute no phone and no keyboard ever shows. One meaning, at the site's type floor,
-  in the site's own face, linking to the page that carries the rest.
-
-  It still hides itself, now at the same 1249px the desktop row leaves at (BQ-007): the label is
-  one `white-space: nowrap` line, and in a `position: fixed` header a line that does not fit
-  pushes the access action and the sign-in link off the right edge, where no amount of scrolling
-  brings them back. It appears with the desktop navigation and goes with it. Every page where
-  this fact decides something -- /pricing, /login, /integrations, /security, /status, /ko --
-  states it in the body, where it has room to wrap.
+  The deployment state line left the header in Landing V2 (blueprint §35, contract D2): it was
+  the first thing a reader met on every page, and an operations notice in the position a visitor
+  reads as the product's opening sentence. The fact is unchanged and still published:
+  `activationPolicy.customerData.reason` renders verbatim on /pricing, /security, /integrations,
+  in the /docs first-run notes and in the landing's closing scene. `deploymentStateLine()` itself
+  was deleted in the 2026-09-19 fix round once it had no caller left; `lib/commercial-state.ts`
+  records which surfaces still state the gate and which no longer do. Nothing styles it here
+  because nothing renders it here.
 */
-.state {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--text-mid);
-  font-family: var(--f-sans);
-  font-size: 12px;
-  line-height: 1.4;
-  letter-spacing: 0;
-  text-decoration: none;
-  white-space: nowrap;
-}
-@media (hover: hover) and (pointer: fine) {
-  .state:hover { color: var(--text-hi); }
-}
-@media (max-width: 1249px) {
-  .state { display: none; }
-}
 
 /*
   BQ-052. Five groups, laid out as five.

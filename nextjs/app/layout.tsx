@@ -1,24 +1,72 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { IBM_Plex_Mono } from "next/font/google";
+import { Geist, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
 import MarketingConsent from "@/components/marketing-consent";
 import SkipLink from "@/components/skip-link";
 import { BRAND_LINE } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
 import "./one-path.css";
+import "./chrome-v2.css";
+import "./landing-v2.css";
 
 /**
- * SPEC §6.11 — Wanted Sans is the display and text face. It is self-hosted from
- * `public/fonts` (see the @font-face block at the top of `tavonel.css`), so no
- * webfont host is contacted for it. Only the monospace utility face is fetched
- * from Google; it carries the instrument voice — clocks, counts, state labels.
+ * The three faces, landing V2 blueprint §6 / lane D3.
+ *
+ * All three come through `next/font/google`, which downloads the files at build time and serves
+ * them from this origin. Nothing here contacts fonts.googleapis.com at runtime — the CSP is
+ * `font-src 'self' data:` and a `<link>` to a font host would simply fail.
+ *
+ * Geist is the text and display face. No `weight` is passed on purpose: Geist publishes a
+ * variable file with a real 100–900 axis, and asking for three static cuts would download three
+ * files where the axis is one. Wanted Sans Variable stays behind it in `--f-sans` (its
+ * `@font-face` blocks are still in `tavonel.css`) as the fallback that carries Hangul for `/ko`.
+ *
+ * Instrument Serif is an editorial accent and appears on the landing only — one phrase of the H1
+ * and the manifesto line. `preload: false` because of that: preloading a face that most routes
+ * never render spends the first-paint budget on nothing. Italic ships with it because the
+ * accent is set in italic.
+ *
+ * IBM Plex Mono is unchanged and carries the instrument voice — clocks, counts, state labels,
+ * source locations.
+ *
+ * WHY `display: "optional"` ON THE TWO PRELOADED FACES (QA round 4, 2026-09-19).
+ * D3 asked for `swap`. `swap` paints the page in the fallback face and then repaints it in the
+ * real one, and a repaint that changes glyph widths changes line counts: QA measured /ko at CLS
+ * 0.2351 (1024) and 0.3059 (768) — one shift at ~322ms in which the hero support sentence lost a
+ * line and everything under it (the action row, the intake line, the whole demo) was pulled up
+ * 30px. That is six times the contract's 0.05 budget and above the CI Lighthouse gate, and
+ * reserving height does not fix it, because the box SHRINKS when the real face arrives.
+ * `optional` removes the second paint: the face is preloaded and used when it is ready inside
+ * the block period, and otherwise that one page view renders in the metric-adjusted fallback
+ * `next/font` already generates. `tavonel.css` made the same choice for Wanted Sans for the same
+ * reason. Contract rule 10 (CLS) outranks D3's spelling of this option.
+ *
+ * Instrument Serif keeps `swap`: it is `preload: false` by design, and an unpreloaded `optional`
+ * face would effectively never paint — which is not a font setting but a deletion of the accent.
+ * It sets two words of the English H1 only (/ko passes no accent phrase) and English measured
+ * 0.043 / 0.035, inside the budget.
  */
+const sans = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "optional",
+});
+
+const serif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
+  preload: false,
+});
+
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-mono",
-  display: "swap",
+  display: "optional",
 });
 
 /**
@@ -86,21 +134,23 @@ export const metadata: Metadata = {
   Android and installed surface.
 */
 export const viewport: Viewport = {
-  themeColor: "#08090A",
+  themeColor: "#090D14",
   colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={mono.variable}>
+    <html lang="en" className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
       <body>
-        {/* Wanted Sans is font-display: optional. Constrained clients keep the system fallback
-            instead of competing with the verified hero proof frame for initial bandwidth. */}
+        {/* The three font variables are on <html> so `--f-sans`, `--f-serif` and `--f-mono` in
+            tavonel.css resolve everywhere, including in a portal rendered outside <body>. */}
         {/*
           A6 -- the first thing in the tab order, on every page.
-          The landing page opens with a nav, a mode badge, four section links and a scene rail
-          before it reaches a sentence, and a keyboard or screen-reader visitor had to walk all
-          of it on every page. Visually hidden until focused, and then a real, visible control.
+          The header runs a wordmark, five section links and two actions before any page reaches
+          its first sentence, and a keyboard or screen-reader visitor had to walk all of it every
+          time. Visually hidden until focused, and then a real, visible control.
+          (The mode badge, the four section links and the scene rail this comment used to name
+          belonged to the client landing that Landing V2 replaced on 2026-09-19.)
         */}
         <SkipLink />
         {/*

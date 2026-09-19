@@ -52,7 +52,9 @@ const SECURITY_ANSWERS: Array<[string, string]> = [
 ];
 
 describe("/security answers the §17.1 questions", () => {
-  const page = read("app/security/page.tsx") + read("lib/evidence-record.ts");
+  /* ROUND3-P2: the training-data row moved to `lib/security-claims.ts` so /security, the landing
+     and /contact share one spelling of it. The page still publishes it; the string lives next door. */
+  const page = read("app/security/page.tsx") + read("lib/evidence-record.ts") + read("lib/security-claims.ts");
 
   it.each(SECURITY_ANSWERS)("answers %s", (_question, phrase) => {
     expect(page).toContain(phrase);

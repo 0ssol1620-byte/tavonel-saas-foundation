@@ -1,0 +1,234 @@
+/*
+  Scene 05's composition. Token-only (D10): every colour, easing and radius here is a variable
+  declared in app/tavonel.css or app/landing-v2.css, and nothing in this file redefines one.
+
+  It is a module rather than rules in app/landing-v2.css because the shared sheet binds the hero
+  storyboard's infinite keyframes to .lv2-count--rebuilt b and .lv2-claim-state by element
+  selector, outside .lv2-demo-stage. Reusing those class names in a static scene would import a
+  16-second loop into a scene that has no timeline; the markup reuses the primitives instead.
+*/
+
+.impact {
+  display: grid;
+  gap: 32px;
+  min-width: 0;
+}
+
+/*
+  Source side, fan, objects. Below 1200 the fan is gone and the two lists stack in reading
+  order -- what arrived, then what it reached -- which is the phone composition the contract
+  asks for rather than a shrunken desktop one.
+*/
+.columns {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+@media (min-width: 1200px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1.25fr);
+    align-items: center;
+    gap: 0;
+  }
+}
+
+.source {
+  max-width: none;
+}
+
+/* ------------------------------------------------------------------------------------ the fan */
+
+.fan {
+  display: none;
+  width: 100%;
+  height: 100%;
+  min-height: 1px;
+  fill: none;
+  align-self: stretch;
+}
+
+.fan path {
+  stroke: var(--relation);
+  stroke-width: 1;
+  /* Base state is the drawn line, so every engine and every motion setting ends here. */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+@media (min-width: 1200px) {
+  .fan {
+    display: block;
+  }
+}
+
+/*
+  The draw. One object moves, it is tied to the scene entering the viewport, and it needs no
+  JavaScript: the animation only exists where a view timeline exists, and where it does not the
+  base state above is already the finished picture.
+*/
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .fan path {
+      animation: draw linear both;
+      animation-timeline: view();
+      animation-range: entry 20% cover 40%;
+    }
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* -------------------------------------------------------------------------------- the objects */
+
+.objects {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text-lo);
+}
+
+/* The phone rail: one hairline in the relation colour, standing in for the fan. */
+.objectList {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: grid;
+  gap: 8px;
+  border-left: 1px solid var(--relation);
+}
+
+@media (min-width: 1200px) {
+  .objectList {
+    padding-left: 20px;
+    /* Equal rows are what the fan's evenly spaced endpoints are aimed at. */
+    grid-auto-rows: 1fr;
+    border-left: none;
+  }
+}
+
+.object {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  padding: 10px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--ink-900);
+}
+
+.objectLabel {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text-hi);
+  /* Two lines each: the compiler's own label, clamped so the rows stay the same height. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* The state word, never the colour alone -- and here the word is all there is, because every
+   object of this public sample holds the same state and none of them changed. */
+.objectState {
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* --------------------------------------------------------------------------------- the counts */
+
+.counts {
+  display: grid;
+  gap: 8px;
+  color: var(--text-lo);
+}
+
+.countList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px 24px;
+}
+
+.count {
+  display: grid;
+  gap: 2px;
+}
+
+.count b {
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.count span {
+  color: var(--text-lo);
+}
+
+/*
+  Amber is the changed partition, grey the objects nothing reached.
+
+  ROUND3-P1: `added` was mint. Mint is `verified` in the D4 semantic table, and an object the diff
+  added is not an object anything verified -- every node in this World is `candidate`
+  ("PUBLISHED SAMPLE"), which is constraint 3 at the top of this scene. The neutral high-contrast
+  ink is the honest colour for a partition of a diff, and it leaves the accent budget to the one
+  figure that really does record a change.
+*/
+.rebuilt b {
+  color: var(--changed);
+}
+
+.added b {
+  color: var(--text-hi);
+}
+
+.removed b,
+.untouched b {
+  color: var(--text-mid);
+}
+
+.qualifier {
+  margin: 0;
+  color: var(--text-lo);
+  max-width: 60ch;
+}
+
+/* --------------------------------------------------------------------------------- the actions */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 28px;
+  margin: 0;
+}
+
+/* Secondary: text weight, not link weight, and still a 44px target. */
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-mid);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hairline);
+  transition: color var(--motion-ui) var(--ease-ui);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .secondary:hover {
+    color: var(--text-hi);
+  }
+}

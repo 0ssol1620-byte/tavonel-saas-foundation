@@ -24,6 +24,14 @@ describe("the Korean term table", () => {
     expect(KO_TERMS.parser).toBe("파서");
     expect(KO_TERMS.activate, "D9: activate, never promote").toBe("활성화");
     expect(KO_TERMS.use, "쓰다 is not a spelling of use").toBe("사용");
+    /*
+      C5: the compiler's object vocabulary. Scene 03's Korean chips read these, so a second
+      spelling of any one of them anywhere on /ko is the drift this table exists to stop.
+    */
+    expect(KO_TERMS.entity).toBe("개체");
+    expect(KO_TERMS.claim, "진술 is a statement made; 주장 is a contention").toBe("진술");
+    expect(KO_TERMS.relation).toBe("관계");
+    expect(KO_TERMS.retrieval).toBe("검색");
   });
 
   it("names a replacement for every banned spelling, and does not ban its own", () => {
@@ -51,7 +59,7 @@ describe("the Korean term table", () => {
   it("is already true of the Korean chrome", () => {
     const chrome = [
       KO_CHROME.tagline,
-      KO_CHROME.stateLine,
+      /* `stateLine` retired with `deploymentStateLine()` on 2026-09-19; see site-navigation.ts. */
       KO_CHROME.signIn,
       ...Object.values(KO_CHROME.cta),
       ...Object.values(KO_CHROME.footerGroups),

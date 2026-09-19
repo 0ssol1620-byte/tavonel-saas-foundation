@@ -19,7 +19,10 @@ describe("funnel event property allowlist", () => {
     `sourceName`, and the point of the list is that a new key costs somebody a decision.
   */
   it("holds no key that could carry an identifier or a user string", () => {
-    expect([...FUNNEL_DETAIL_KEYS]).toEqual(["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status"]);
+    expect([...FUNNEL_DETAIL_KEYS]).toEqual(["act", "cta", "family", "filter", "from", "kind", "lifecycle", "mode", "offer", "plan", "plans", "scene", "sources", "status", "variant"]);
+    // D8's experiment arm: three enumerated values, and no fourth. It is on the list for the
+    // same reason `scene` and `act` are -- it names a UI state, not a thing a reader typed.
+    expect(FUNNEL_DETAIL_KEYS as readonly string[]).toContain("variant");
     for (const forbidden of ["id", "documentId", "collectionId", "filename", "file", "name", "path", "question", "prompt", "text", "query", "reason", "email", "user", "digest", "title"]) {
       expect(FUNNEL_DETAIL_KEYS as readonly string[], `${forbidden} is not an enumerated UI state`).not.toContain(forbidden);
     }
@@ -59,7 +62,7 @@ function sourceFiles(directory: string): string[] {
 
 const modulePath = resolve(import.meta.dirname, "./funnel-events.ts");
 const moduleSource = readFileSync(modulePath, "utf8");
-const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z_]+)";?$/gm)].map((match) => match[1]);
+const declaredEvents = [...moduleSource.matchAll(/^\s*\|\s*"([a-z0-9_]+)";?$/gm)].map((match) => match[1]);
 
 /*
   There are two unions now, and the extraction above reads both: `FunnelEvent`, fired from a
@@ -75,20 +78,23 @@ function unionMembers(name: string): string[] {
   const start = moduleSource.indexOf(`export type ${name} =`);
   if (start < 0) throw new Error(`${name} is not declared in funnel-events.ts`);
   const body = moduleSource.slice(start, moduleSource.indexOf('";', start) + 1);
-  return [...body.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
+  return [...body.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
 }
 const clientEvents = unionMembers("FunnelEvent");
 const serverEvents = unionMembers("ServerFunnelEvent");
 
 /*
-  The union's own lines are struck out of the corpus and the rest of the module is kept. The
-  declaration is not a call site; `trackSceneDepth`, three functions further down, is -- it is the
-  only wrapper that names an event itself, and dropping the whole file would make `scene_reached`
-  look dead when what it actually has is one indirection.
+  The union's own lines are struck out of the corpus and the rest of the module is kept.
+
+  The declaration is not a call site. The module body used to hold one -- `trackSceneDepth`, which
+  named `scene_reached` itself -- and F9 deleted both for having no caller of their own, so today
+  nothing in this file fires an event. The body stays in the corpus anyway: the next wrapper that
+  names an event would otherwise read as dead, and the strike-out below is what keeps a name from
+  matching its own declaration either way.
 */
 const callSites = ["../app", "../components", "../lib"]
   .flatMap((path) => sourceFiles(resolve(import.meta.dirname, path)))
-  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z_]+";?$/gm, "") : readFileSync(path, "utf8")))
+  .map((path) => (path === modulePath ? moduleSource.replace(/^\s*\|\s*"[a-z0-9_]+";?$/gm, "") : readFileSync(path, "utf8")))
   .join("\n");
 
 describe("every declared funnel event has a control that fires it", () => {
@@ -114,6 +120,15 @@ describe("every declared funnel event has a control that fires it", () => {
     expect(declaredEvents).toContain("workspace_compile_failed");
     expect(declaredEvents).toContain("checkout_completed");
     expect(declaredEvents).toContain("signed_in");
+    /*
+      D7's four scroll quartiles are the only event names in either union that contain a digit,
+      and all three extractions above read a character class that excluded digits. Named here
+      rather than left to the count check, because that check passes either way: a name no
+      extraction sees is missing from BOTH of the numbers it compares.
+    */
+    for (const quartile of ["scroll_scene_25", "scroll_scene_50", "scroll_scene_75", "scroll_scene_100"]) {
+      expect(declaredEvents, `${quartile} escaped the extraction`).toContain(quartile);
+    }
   });
 
   it.each(declaredEvents)("%s is fired from somewhere", (event) => {
@@ -122,12 +137,14 @@ describe("every declared funnel event has a control that fires it", () => {
 
   /*
     Both halves of the corpus, named. Without the strike-out every event passes by matching its
-    own declaration; without the module body `scene_reached` fails for having a wrapper.
+    own declaration; with the module body a wrapper that names an event is still a call site.
   */
   it("reads the module body but not the union that declares the names", () => {
-    expect(callSites.includes("trackFunnel(\"scene_reached\""), "the module body is not in the corpus, so a wrapper's event reads as dead").toBe(true);
+    expect(callSites.includes("export function trackFunnelOnce"), "the module body is not in the corpus, so a wrapper's event would read as dead").toBe(true);
     expect(callSites.includes("| \"cta_clicked\""), "the union is in the corpus, so every name matches its own declaration").toBe(false);
-    expect(callSites.includes("\"film_stage_selected\""), "a name deleted for having no caller is back in the tree").toBe(false);
+    for (const gone of ["film_stage_selected", "scene_reached"]) {
+      expect(callSites.includes(`"${gone}"`), `${gone} was deleted for having no caller and is back in the tree`).toBe(false);
+    }
   });
 });
 
@@ -155,7 +172,10 @@ const routeHandlers = sourceFiles(resolve(import.meta.dirname, "../app/api"))
 */
 const BROWSER_EVENTS_BEFORE_THE_SERVER_HALF = [
   "generate_lead", "login_reached_with_intent", "signed_in", "checkout_opened", "checkout_completed",
-  "scene_reached", "cta_clicked", "source_filter_changed", "hero_explore_clicked", "hero_start_clicked",
+  /* `scene_reached` was here until F9 (2026-09-19). It is dropped rather than kept, because the
+     rule this list encodes is "a column somebody is already reading" and this one never had a
+     caller to write a row: the landing's depth signal is `scroll_scene_25..100`. */
+  "cta_clicked", "source_filter_changed", "hero_explore_clicked", "hero_start_clicked",
   "pricing_plan_viewed", "pricing_start_clicked", "source_category_viewed", "developer_mcp_started",
   "developer_api_started", "explore_entered", "explore_object_selected", "explore_evidence_opened",
   "explore_change_opened", "explore_ask_used", "explore_to_signup", "workspace_first_source_added",
@@ -166,7 +186,7 @@ const BROWSER_EVENTS_BEFORE_THE_SERVER_HALF = [
 
 describe("server funnel events", () => {
   it("renames, redefines and drops none of the browser events", () => {
-    expect(BROWSER_EVENTS_BEFORE_THE_SERVER_HALF).toHaveLength(29);
+    expect(BROWSER_EVENTS_BEFORE_THE_SERVER_HALF).toHaveLength(28);
     for (const event of BROWSER_EVENTS_BEFORE_THE_SERVER_HALF) {
       expect(clientEvents, `${event} left the browser union -- a column somebody reads went to zero`).toContain(event);
     }

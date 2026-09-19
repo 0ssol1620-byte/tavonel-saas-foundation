@@ -161,7 +161,7 @@ export default function DevelopersPage() {
                     <span>Your first authenticated read</span>
                     <DocsCopyButton value={FIRST_CALL} />
                   </figcaption>
-                  <pre><code>{FIRST_CALL}</code></pre>
+                  <pre tabIndex={0} role="region" aria-label="First API request example"><code>{FIRST_CALL}</code></pre>
                 </figure>
                 <div className="tiles">
                   <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><TrackedLink className="btn ghost" event="developer_api_started" href="/api/openapi">OpenAPI contract</TrackedLink></article>

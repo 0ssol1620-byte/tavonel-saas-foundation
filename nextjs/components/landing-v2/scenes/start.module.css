@@ -1,0 +1,80 @@
+/*
+  Scene 09's action row. Token-only and small: the controls themselves are `.btn.lv2-cta` and
+  `.lv2-text-link` from `app/landing-v2.css`, so this sheet supplies the row and the phone
+  composition and nothing else.
+
+  It does not reuse `.lv2-actions` because the phone rule below has to win over it, and two
+  unlayered sheets of equal specificity are decided by import order -- which a CSS module does
+  not control. One row declared once here is smaller than a specificity fight.
+*/
+
+/*
+  D9: the close is centred, in a 760px measure.
+
+  It was left-aligned in a 640px column with the right 55% of a 1440 viewport empty and nothing to
+  balance it -- the only scene on the page with no visual at all, which made the ending read as a
+  page that had been cut off rather than one that had finished. A centred column is the
+  composition a close can hold without a visual.
+*/
+.close {
+  max-width: 1040px;
+  margin-inline: auto;
+  text-align: center;
+}
+.close :global(.lv2-scene-head) { max-width: none; }
+.close :global(.lv2-scene-support),
+.close :global(.lv2-scene-note) { margin-inline: auto; }
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 28px;
+  margin-top: 36px;
+}
+
+/*
+  Phone: stacked, full width, 48px (§25). Two controls side by side at 360 leave the second one
+  under 44px of its own width, and a close that a thumb misses is a close that did not happen.
+  48px comes from `.btn.lv2-cta`'s own min-height; the text link is raised to match, and through
+  `.row` rather than on its own, so it outranks `.lv2-text-link`'s 44px whichever of the two
+  unlayered sheets the bundler emits second.
+*/
+@media (max-width: 767px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .cta {
+    width: 100%;
+  }
+  .row .link {
+    min-height: 48px;
+    justify-content: center;
+  }
+}
+
+.pricing {
+  margin: 8px 0 0;
+  color: var(--text-lo);
+}
+
+/*
+  A secondary line is still a reachable control: 44px, visibly underlined, focusable.
+
+  `gap` and not a space in the markup (D6): a leading space inside a flex item is collapsed away,
+  which is why this rendered as "See pricing→".
+*/
+.pricingLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--text-mid);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hairline-hi);
+}

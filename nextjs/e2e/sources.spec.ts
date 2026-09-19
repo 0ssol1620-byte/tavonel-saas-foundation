@@ -2,6 +2,9 @@ const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/te
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
+/* D2's five customer sections, read from the site's own table rather than typed into a test. */
+import { CUSTOMER_NAV } from "../lib/site-navigation";
+
 /*
   /sources, in a browser.
 
@@ -188,41 +191,62 @@ test("keeps the header's primary action reachable at the width the section row a
 });
 
 /*
-  A product surface, and still a product surface from three places.
+  A product surface, and still a product surface -- reachable with no menu open at all.
 
   The founder resolved (contract 4.2, RESOLVED A-3/B-5) that what a deployment can read is a
   product surface rather than a resources entry, and this spec enforced that as a flat top-level
-  link in `PRIMARY_NAV`. The 2026-09-11 IA redesign supersedes the *placement* half of that
-  resolution and keeps the substance: the bar is five items, so Sources is a Product panel item
-  now, and the compensation for losing the flat link is that it is also in the footer's Product
-  group -- reachable with no menu open at all -- and that the Product trigger itself carries
-  `aria-current` while a reader is on this page.
+  link in `PRIMARY_NAV`. The 2026-09-11 IA redesign superseded the *placement* half of that
+  resolution and this test then read the bar for an `Integrations` item that owned /sources.
 
-  What the resolution forbade has not changed: it is not a `/resources` tile, it is not two
-  clicks in from a hub, and its URL did not move.
+  LANDING V2 / D2 SUPERSEDED THAT IN TURN, and this assertion is the retarget. `CUSTOMER_NAV` is
+  Product / How it works / Resources / Docs / Pricing, so the bar has no /integrations link at
+  all and this test failed in four CI projects -- which is main's required Launch gate, because
+  Product QA runs every spec. `lib/site-navigation.ts` states the new arrangement and its reason:
+  no item in the five-link bar is the section /sources belongs to, so marking one of them current
+  on this page would tell a reader something false about where they are.
 
-  The desktop half sets its own viewport, because the section row does not exist below 1080px and
-  this file runs in every width project.
+  So what is asserted is what the resolution actually protects, under the IA that exists: the
+  page is one click from the footer's Product group with no menu open at all, no bar item claims
+  to own it, and its URL did not move. What the resolution forbade is still forbidden and still
+  checked -- it is not a /resources tile and it is not two clicks in from a hub.
+
+  NOT ASSERTED, deliberately: `lib/site-navigation.ts` also says /sources stays reachable "from
+  /integrations itself", and that page carries no link to it -- only a prose mention. Writing the
+  assertion would have failed; writing the link is a content change this lane was not asked to
+  make. The gap is in the round-3 report.
+
+  The desktop half sets its own viewport: the section row is hidden below 1250px (D2, see
+  `app/chrome-v2.css`) and this file runs in every width project.
 */
-test("is owned by Integrations on desktop and phone and remains directly reachable from the footer", async ({ page }) => {
+test("is reachable from the footer and /integrations, and no bar item claims to own it", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
 
-  // Sources is not another top-level choice: the customer-facing Integrations destination owns it.
-  const desktopConnect = page.locator('header.nav .one-path-primary-nav a[href="/integrations"]');
-  await expect(desktopConnect).toHaveText("Integrations");
-  await expect(desktopConnect).toHaveAttribute("aria-current", "page");
+  // The bar is the five customer sections, and /sources is not one of them -- nor is /integrations.
+  const bar = page.locator("header.nav .one-path-primary-nav");
+  await expect(bar.locator("a")).toHaveCount(CUSTOMER_NAV.length);
+  for (const item of CUSTOMER_NAV) await expect(bar.locator(`a[href="${item.href}"]`)).toHaveCount(1);
+  await expect(bar.locator('a[href="/integrations"]')).toHaveCount(0);
+  await expect(bar.locator('a[href="/sources"]')).toHaveCount(0);
+  /*
+    And none of the five is marked current here. `customerNavOwns` returns false for every bar
+    href on this path; a bar that highlighted one anyway would be the false-location defect the
+    navigation comment names.
+  */
+  await expect(bar.locator('a[aria-current="page"]')).toHaveCount(0);
 
-  // The footer, which needs no menu at all.
+  // The footer, which needs no menu at all, and the URL that did not move.
   await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
-  // Phone: the same three-choice customer IA, with Integrations marked current.
+  // Phone: the same five-choice customer IA, flat, and again nothing claiming this page.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("header.nav details.mobile-primary-nav > summary").click();
-  const mobileConnect = page.locator('header.nav details.mobile-primary-nav > nav a[href="/integrations"]');
-  await expect(mobileConnect).toHaveText("Integrations");
-  await expect(mobileConnect).toHaveAttribute("aria-current", "page");
+  const sheet = page.locator("header.nav details.mobile-primary-nav > nav");
+  for (const item of CUSTOMER_NAV) {
+    await expect(sheet.locator(`a.mobile-nav-direct[href="${item.href}"]`)).toHaveCount(1);
+  }
+  await expect(sheet.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
   await expect(page.locator("header.nav details.mobile-primary-nav details.mobile-nav-group")).toHaveCount(0);
 
   const sitemap = await page.request.get("/sitemap.xml");

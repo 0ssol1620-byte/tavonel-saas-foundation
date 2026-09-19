@@ -1,0 +1,130 @@
+/*
+  Scene 06's four rows (blueprint §16). Tokens only -- every colour and type size here is a custom
+  property declared in `app/tavonel.css` or `app/landing-v2.css`, so the scene is correct on
+  whichever ground D9 puts it on: `.lv2-paper` remaps --text-hi/--text-mid/--hairline and the
+  accents, and nothing below names a literal colour.
+
+  C3, 2026-09-19: the coverage matrix this sheet used to draw is gone -- the axis header, the
+  four-column track, the full/partial cells and the mint far end with it. It rendered as a
+  category scoreboard with no receipt behind a single mark (§16's ladder reading, §37's
+  perception), and the mint told a reader something was verified on a page where nothing is.
+  What is left is what a list of layers actually needs: a rule, a name, a sentence.
+*/
+
+/* ------------------------------------------------------------------ the link under the copy */
+
+.links {
+  margin: 28px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 28px;
+}
+.links > :global(.lv2-text-link) {
+  margin-top: 0;
+}
+
+/* ------------------------------------------------------------------------------- the four rows */
+
+.continuum {
+  margin: 36px 0 0;
+}
+
+.tracks {
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  border-top: 1px solid var(--hairline);
+  padding-block: 16px;
+}
+
+.layer {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text-hi);
+}
+
+.detail {
+  margin: 0;
+}
+
+.responsibility {
+  display: block;
+  margin: 8px 0 0;
+  font-size: var(--lv2-small);
+  line-height: 1.45;
+  color: var(--text-mid);
+  max-width: 62ch;
+}
+
+/*
+  The four stages, on the compiler's row only. They are that row's own description of its work,
+  not marks a reader can compare the three rows above against, so they are set as text with their
+  captions rather than as cells on an axis. The neutral ink is deliberate: no accent on this
+  scene says "better", and mint in particular means `verified`, which nothing here is.
+*/
+.stages {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px 20px;
+  margin: 14px 0 0;
+}
+
+@media (min-width: 560px) {
+  .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1200px) {
+  .stages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.stage {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-top: 1px solid var(--hairline);
+  padding-top: 8px;
+}
+
+.stageLabel {
+  font-family: var(--f-mono);
+  font-size: var(--lv2-meta);
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+
+/* BIND is the responsibility this product is named for; violet is the relation accent (D4). */
+.stage:nth-child(3) .stageLabel {
+  color: var(--relation);
+}
+
+.stageCaption {
+  font-size: var(--lv2-meta);
+  line-height: 1.35;
+  color: var(--text-lo);
+}
+
+/* ------------------------------------------------------------------------ the wide composition */
+
+@media (min-width: 768px) {
+  /*
+    One column ladder for every row, so the four layer names line up and the sentences share a
+    left edge. The label column is a fixed track rather than a fraction: the four nouns are short
+    and a fraction would move the whole list when a translation is longer.
+  */
+  .row {
+    display: grid;
+    grid-template-columns: 152px minmax(0, 1fr);
+    align-items: start;
+  }
+  .layer {
+    padding-right: 16px;
+  }
+  .responsibility {
+    margin-top: 0;
+  }
+}

@@ -1,6 +1,59 @@
 import { NextResponse } from "next/server";
 import { CSP_REPORTING_ENDPOINTS, cspReportOnly, generateCspNonce } from "@/lib/csp-report-only";
 import { cspEnforcedWithNonce, cspNonceEnforcedPath, readCspNonceEnforcement } from "@/lib/csp-policy";
+import {
+  LANDING_VARIANT_COOKIE,
+  LANDING_VARIANT_COOKIE_MAX_AGE,
+  LANDING_VARIANT_PATHS,
+  activeLandingExperiment,
+  landingVariantToPersist,
+  readCookieValue,
+} from "@/lib/landing-experiments";
+
+/*
+  D8's second reason for this file to exist, and it is off on every deployment today.
+
+  A landing A/B test needs the arm decided BEFORE the server renders the page, or the first view
+  every new visitor gets is the control and the sample is biased by exactly the readers who
+  bounce. Next 15 will not let a Server Component call `cookies().set()`, so the page cannot
+  assign its own arm, and a route handler called by a client beacon would still render the
+  control first. The edge is the one place left that can both write the cookie and hand the
+  render the value it just wrote -- so the assignment lives here and `app/page.tsx` only reads.
+
+  WHAT IT DOES WHEN NOTHING IS RUNNING, WHICH IS ALWAYS TODAY: nothing at all.
+  `activeLandingExperiment()` is null unless `NEXT_PUBLIC_LANDING_EXPERIMENT` names a test, so
+  this returns null, no cookie is written, and the response is the same `NextResponse.next()`
+  this file has always returned. Scope is the two entry pages, never the whole site: a functional
+  cookie that appeared on `/docs` would be a cookie about a page it cannot affect.
+*/
+function landingVariantResponse(request: Request & { nextUrl: URL }): NextResponse | null {
+  const experiment = activeLandingExperiment(process.env.NEXT_PUBLIC_LANDING_EXPERIMENT);
+  if (!experiment || !LANDING_VARIANT_PATHS.has(request.nextUrl.pathname)) return null;
+  const header = request.headers.get("cookie");
+  const assigned = landingVariantToPersist({
+    experiment,
+    cookie: readCookieValue(header, LANDING_VARIANT_COOKIE),
+    random: Math.random(),
+  });
+  if (!assigned) return null;
+  /*
+    Both halves, and both are needed. The rewritten request header is what lets the render that
+    this same response carries read the arm it was just given -- without it the first view is the
+    control and the assignment only takes effect on the second. The response cookie is what makes
+    it stick. `httpOnly` is deliberately NOT set: it is a functional preference, not a
+    credential, and a QA reader has to be able to see which arm they are in.
+  */
+  const headers = new Headers(request.headers);
+  headers.set("cookie", [header, `${LANDING_VARIANT_COOKIE}=${assigned}`].filter(Boolean).join("; "));
+  const response = NextResponse.next({ request: { headers } });
+  response.cookies.set(LANDING_VARIANT_COOKIE, assigned, {
+    maxAge: LANDING_VARIANT_COOKIE_MAX_AGE,
+    sameSite: "lax",
+    path: "/",
+    secure: true,
+  });
+  return response;
+}
 
 /*
   The only reason this file exists: a nonce has to be minted per response, and `next.config.mjs`
@@ -42,7 +95,8 @@ export function middleware(request: Request & { nextUrl: URL }) {
     which is the same commit that would make promoting them possible.
   */
   const observed = cspNonceEnforcedPath(request.nextUrl.pathname);
-  const response = NextResponse.next();
+  // Null on every deployment today, so this is `NextResponse.next()` exactly as it was.
+  const response = landingVariantResponse(request) ?? NextResponse.next();
   if (!observed) return response;
   const nonce = generateCspNonce();
   response.headers.set("Content-Security-Policy-Report-Only", cspReportOnly(nonce));

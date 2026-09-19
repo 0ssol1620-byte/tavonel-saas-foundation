@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import sitemap from "@/app/sitemap";
 import { exploreSampleDocuments } from "./explore-sample";
 import {
+  CUSTOMER_NAV,
   EXPLORE_CTA,
   FOOTER_GROUPS,
   FOOTER_LEGAL_ROW,
@@ -176,6 +177,35 @@ describe("the global menu's destinations", () => {
     for (const invented of ["Co., Ltd", "Inc.", "Republic of Korea", "governed by the laws"]) {
       expect(chrome, `the footer may not name ${invented} until the founder confirms it`).not.toContain(invented);
     }
+  });
+});
+
+/*
+  Landing V2, 2026-09-19 (blueprint §8, contract D2). The bar a reader actually sees.
+
+  Everything above this describes `NAV_GROUPS`, which is the 2026-09-11 IA model and is rendered
+  by nothing today -- `app/tavonel.css` records where its disclosures used to be. `CUSTOMER_NAV`
+  is the array both chromes map over, and until now it was checked only by
+  `lib/one-path-contract.test.ts`'s equality assertion, which cannot catch the two failures that
+  are silent in a browser: a bar link to a route the site does not publish, and a /ko header with
+  an English label in it because the Korean table was not extended with the bar.
+*/
+describe("the five destinations in the bar", () => {
+  it("offers no link the site cannot answer", () => {
+    for (const item of CUSTOMER_NAV) {
+      expect(SITEMAP_PATHS.has(item.href), `${item.href} is not in app/sitemap.ts`).toBe(true);
+    }
+  });
+
+  it("gives every one of them a Korean label, and names no route it does not carry", () => {
+    const hrefs = CUSTOMER_NAV.map((item) => item.href);
+    for (const href of hrefs) expect(KO_CHROME.nav[href], href).toBeTruthy();
+    expect(Object.keys(KO_CHROME.nav).sort()).toEqual([...hrefs].sort());
+  });
+
+  it("writes each label once, and points each destination at one item", () => {
+    expect(new Set(CUSTOMER_NAV.map((item) => item.label)).size).toBe(CUSTOMER_NAV.length);
+    expect(new Set(CUSTOMER_NAV.map((item) => item.href)).size).toBe(CUSTOMER_NAV.length);
   });
 });
 

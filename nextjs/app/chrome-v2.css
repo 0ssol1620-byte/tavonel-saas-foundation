@@ -1,0 +1,188 @@
+
+:root {
+  --chrome-gutter: clamp(20px, 3vw, 64px);
+  --chrome-measure: 1600px;
+}
+
+
+
+.chrome-v2-wrap {
+  width: min(var(--chrome-measure), calc(100% - 2 * var(--chrome-gutter)));
+  max-width: min(var(--chrome-measure), calc(100% - 2 * var(--chrome-gutter)));
+  margin-inline: auto;
+  padding-inline: 0;
+}
+.nav.chrome-v2-header {
+  height: 64px;
+  padding-block: 0;
+  padding-inline: max(var(--chrome-gutter), calc((100% - var(--chrome-measure)) / 2));
+  background: transparent;
+  border-bottom: 1px solid transparent;
+}
+.nav.chrome-v2-header[data-scrolled="1"] {
+  background: rgba(9, 13, 20, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 1249px) {
+  .nav > .one-path-primary-nav { display: none; }
+  .mobile-primary-nav.one-path-mobile-nav { display: block; }
+  .nav-signin.chrome-v2-signin { display: none; }
+}
+.nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; }
+@media (min-width: 1250px) {
+  .mobile-primary-nav.one-path-mobile-nav { display: none; }
+}
+.nav > .one-path-primary-nav { width: auto; min-width: 0; flex: 0 1 auto; gap: 10px; }
+@media (min-width: 1250px) {
+  .chrome-v2-header > .one-path-primary-nav { margin-left: 28px; }
+  .chrome-v2-header > .nav-actions { margin-left: auto; }
+}
+.wordmark .logomark { color: var(--text-mid); }
+.one-path-primary-nav .site-nav-direct {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-family: var(--f-sans);
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--text-mid);
+}
+@media (hover: hover) and (pointer: fine) {
+  .one-path-primary-nav .site-nav-direct:hover { color: var(--text-hi); }
+}
+.one-path-primary-nav .site-nav-direct[aria-current="page"] {
+  color: var(--text-hi);
+  text-decoration: underline;
+  text-decoration-color: var(--verified);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 7px;
+}
+.one-path-mobile-nav .mobile-nav-direct,
+.one-path-mobile-nav .mobile-nav-signin {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  font-family: var(--f-sans);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+.one-path-mobile-nav .mobile-nav-direct[aria-current="page"] {
+  color: var(--text-hi);
+  box-shadow: inset 2px 0 0 var(--verified);
+}
+.one-path-mobile-nav .mobile-nav-signin {
+  border-top: 1px solid var(--border-dark, var(--hairline));
+  color: var(--text-mid);
+}
+@media (hover: hover) and (pointer: fine) {
+  .one-path-mobile-nav .mobile-nav-signin:hover { color: var(--text-hi); }
+}
+.one-path-mobile-nav > summary {
+  min-width: 44px;
+  justify-content: center;
+  font: 500 var(--t-2, 13px) / 1.2 var(--f-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+@media (max-width: 400px) {
+  .one-path-mobile-nav > summary {
+    position: relative;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .one-path-mobile-nav > summary > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .one-path-mobile-nav > summary::before,
+  .one-path-mobile-nav > summary::after,
+  .one-path-mobile-nav[open] > summary::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    width: 16px;
+    height: 1.5px;
+    margin: 0;
+    background: currentColor;
+    color: var(--text-hi);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .one-path-mobile-nav > summary::before { transform: translateY(-5.5px); box-shadow: 0 5px 0 currentColor; }
+  .one-path-mobile-nav > summary::after { transform: translateY(4.5px); }
+  .one-path-mobile-nav[open] > summary::before { transform: rotate(45deg); box-shadow: none; }
+  .one-path-mobile-nav[open] > summary::after { transform: rotate(-45deg); }
+  @media (prefers-reduced-motion: reduce) {
+    .one-path-mobile-nav > summary::before,
+    .one-path-mobile-nav > summary::after { transition: none; }
+  }
+}
+footer.site.chrome-v2-footer {
+  border-top: 1px solid var(--border-dark, var(--hairline));
+}
+.chrome-v2-footer .site-footer-tagline {
+  font-family: var(--f-sans);
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: var(--text-lo);
+}
+.chrome-v2-footer .site-footer-groups a {
+  min-height: 44px;
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 0 0;
+  line-height: 1.25;
+}
+.chrome-v2-footer .site-footer-groups nav { gap: 0; }
+body .skip { min-height: 44px; display: inline-flex; align-items: center; }
+.chrome-v2-header .wordmark,
+.chrome-v2-footer .wordmark { display: flex; align-items: center; min-height: 44px; }
+.chrome-v2-footer .site-footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  line-height: 1.2;
+}
+.chrome-v2-footer .site-footer-legal-pair { display: inline-flex; align-items: center; gap: 4px; }
+.chrome-v2-footer .site-footer-legal a,
+.chrome-v2-footer .site-footer-legal button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Shared edges and legible navigation across public pages. */
+.chrome-v2-header .wordmark b, .chrome-v2-footer .wordmark b { font-family: var(--f-sans); font-size: 15px; font-weight: 650; letter-spacing: .12em; }
+.chrome-v2-footer .site-footer-groups a { font-size: 14px; }
+
+/* The header, public article grid and footer share one outer alignment. */
+.public-page main .shell,
+.pricing-page main .shell {
+  width: min(var(--chrome-measure), calc(100% - 2 * var(--chrome-gutter)));
+  max-width: var(--chrome-measure);
+  margin-inline: auto;
+  padding-inline: 0;
+}
+.public-page, .pricing-page { font-size: 16px; }
+
+/* A long Trust label needs its whole group width, not an overflowing half-cell. */
+.chrome-v2-footer .site-footer-groups a { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .chrome-v2-footer .site-footer-groups a[href="/subprocessors"] { grid-column: 1 / -1; }
+}

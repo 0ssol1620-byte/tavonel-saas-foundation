@@ -15,8 +15,20 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   page, rather than restated here against a page that no longer exists.
 */
 test("the homepage Verify frame opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
+  /*
+    Landing V2, round 4. Same claim, current scene -- and this is the second time the selector has
+    had to move, so it is worth writing down where the claim actually lives now.
+
+    The Verify frame lived in `#compile`, then in Scene 04. Scene 04's next action is not an
+    /explore deep link any more: D12 allows "the committed PDF or the explore deep link" and the
+    Evidence inspector chose the PDF (`record.hrefs.original`, opened at the page the region is
+    on), because the point of that scene is that the bytes are there to check. The landing still
+    reaches the Evidence ACT, from Scene 02: every proof tab carries "Open the source region" to
+    `/explore?act=evidence&evidence=<regionId>`. That link is what this test is about -- the
+    homepage's proof opens the sample on the real record behind it -- so it is asserted there.
+  */
   await page.goto("/");
-  const cta = page.locator("#compile").getByRole("link", { name: "Open the Verify view" }).last();
+  const cta = page.locator("#proof a[data-analytics=\"source-open\"]").first();
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();

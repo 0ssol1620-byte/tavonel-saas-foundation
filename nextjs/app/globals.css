@@ -23,6 +23,7 @@
 @layer reset, tokens, base, components, utilities, overrides;
 
 @import "./tavonel.css";
+@import "./wanted-sans-korean.css";
 @import "./product-polish.css";
 @import "./workspace-final-polish.css";
 @import "./workspace-no1.css";

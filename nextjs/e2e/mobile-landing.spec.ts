@@ -5,91 +5,21 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 const PHONE = ["360", "390"];
 const NARROW = ["360", "390", "768"];
 
-async function openHome(page) {
-  await page.goto("/");
-  await expect(page.getByTestId("one-path-hero-film")).toBeVisible();
-}
-
-
-test("the hero uses the approved encoded film instead of mounting a crushed live canvas", async ({ page }, testInfo) => {
-  test.skip(!NARROW.includes(testInfo.project.name), "the narrow encoded-film path is the risk under test");
-  await openHome(page);
-  const hero = page.getByTestId("one-path-hero-film");
-  await expect(hero.locator(".compile-film-sequence")).toHaveAttribute("data-film-renderer", "video-fallback");
-  await expect(hero.locator(".compile-film-live canvas")).toHaveCount(0);
-  const video = hero.locator(".compile-film-video");
-  await expect(video).toBeVisible();
-  // The player carries `src` on the <video> rather than a `<source>` child: one decoder, one
-  // element, and a stage change that actually swaps the cut. Same approved bytes.
-  await expect(video.locator("source")).toHaveCount(0);
-  // Landing replan, 2026-09-18: the hero plays the re-rendered master (the same 450 frames at a
-  // lower CRF) behind a poster at the size the hero actually paints it. On a narrow frame the
-  // player picks the 1440-wide encode of that master (`phoneSrc`), not the 2880-wide one.
-  await expect(video).toHaveAttribute("src", "/film/compile-cut-hq-1440.mp4");
-  await expect(video).toHaveAttribute("poster", "/film/poster-1-hero-2x.webp");
-});
-
 /*
-  G1-012 (2026-09-16). Below 900px the film pans instead of shrinking: the frame is a horizontal
-  scroll-snap container and the recording inside it keeps its 16:10 at the frame's full height,
-  so a phone reader sees one legible column at a time rather than a 370px thumbnail of four. What
-  is pinned is therefore the recording's shape and that the frame really scrolls -- the frame's
-  own box is now portrait on purpose. Above 900px the panes are `display: none` and the frame
-  itself is the 16:10 box, as before.
+  Landing V2 (contract D1, D13), amended by the founder 2026-09-20. The four film tests left
+  this file, and the film came back without them.
+
+  They measured the phone hero: the encoded-film path and its 1440-wide encode, the 16:10 pan
+  frame, the absence of a chip row and a tablist, and the reduced-motion poster with its explicit
+  Play control. Three of the four describe a composition that no longer exists even though the
+  film does -- the hero plays the four locked cuts in one framed pane rather than panning across
+  one, and `e2e/landing-v2.spec.ts` measures that pane, its controls and its reduced-motion
+  poster at 390 and at the reduced-motion project. They are not restored here, because a second
+  spec measuring the same frame is a second thing to keep in step.
+
+  What stays here is everything that was never about the film: the narrow overflow sweep, the
+  header row, the phone sheet, and the touch floor.
 */
-test("the hero film keeps its 16:10 source shape on a narrow screen", async ({ page }, testInfo) => {
-  test.skip(!NARROW.includes(testInfo.project.name), "the narrow frame is what is under test");
-  await openHome(page);
-  const viewport = page.getByTestId("one-path-hero-film").locator(".compile-film-viewport");
-  const measured = await viewport.evaluate((frame: HTMLElement) => {
-    const panes = frame.querySelector<HTMLElement>(".compile-film-panes");
-    const pans = !!panes && getComputedStyle(panes).display !== "none";
-    const box = (pans ? panes : frame).getBoundingClientRect();
-    return { pans, ratio: box.width / box.height, overflowX: getComputedStyle(frame).overflowX, scrollable: frame.scrollWidth > frame.clientWidth + 1 };
-  });
-  expect(measured.ratio).toBeGreaterThan(1.58);
-  expect(measured.ratio).toBeLessThan(1.62);
-  if (measured.pans) {
-    expect(measured.overflowX, "the panning frame must be a real scroller, not a clipped box").toBe("auto");
-    expect(measured.scrollable, "the recording is wider than the frame and can be panned").toBe(true);
-  }
-});
-
-/*
-  Landing replan, 2026-09-18. Three tests left this file with the things they measured.
-
-  The phone chip row (`.one-path-hero-film-steps`), the two-stage Works tablist and its
-  manual-hold state machine were all parts of the second player, which the replan removed: one
-  film, in the hero, and no tab anywhere on the page. `e2e/landing.spec.ts` asserts each of those
-  is absent, so nothing that was being guarded is now unguarded. What the phone still has to get
-  right -- the frame's shape, the overflow, the header row and the touch floor -- is below.
-
-  The tablist itself is not dead code: `CompileStagePlayer` still renders it wherever a caller
-  passes more than one stage, which `/film` does, and `lib/brand-copy.test.ts` pins the stage
-  strip and the player's `role="tab"` markup. What is gone is the landing's use of it.
-*/
-test("the landing offers no film tab and no chip row on a phone", async ({ page }, testInfo) => {
-  test.skip(!NARROW.includes(testInfo.project.name), "the phone composition is what the replan changed");
-  await openHome(page);
-  await expect(page.locator(".one-path-hero-film-steps")).toHaveCount(0);
-  await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
-  await expect(page.getByRole("tab")).toHaveCount(0);
-  await expect(page.locator("video")).toHaveCount(1);
-});
-
-test("reduced motion starts from a still and provides explicit playback", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "reduced-motion", "the project supplies prefers-reduced-motion");
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await openHome(page);
-  const hero = page.getByTestId("one-path-hero-film");
-  await expect(hero.locator(".compile-film-still")).toBeVisible();
-  await expect(hero.locator(".compile-film-video")).toHaveCount(0);
-  const play = hero.getByRole("button", { name: "Play the compilation film" });
-  await expect(play).toBeVisible();
-  await play.click();
-  await expect(hero.locator(".compile-film-video")).toBeVisible();
-  await expect(hero.getByRole("button", { name: "Pause the compilation film" })).toBeVisible();
-});
 
 test("nothing on the narrow landing is laid out outside the viewport", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "an overflow check needs a narrow viewport");
@@ -128,6 +58,7 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
 });
 
 test("the narrow header keeps brand, menu and commercial action inside one row", async ({ page }, testInfo) => {
+  // Landing V2: three things in this row, not four -- Sign in is a row in the sheet at this width.
   test.skip(!NARROW.includes(testInfo.project.name), "the collision risk is narrow-only");
   await page.goto("/");
   const boxes = await page.evaluate(() => {
@@ -147,7 +78,7 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
   expect(boxes.actions!.right).toBeLessThanOrEqual(boxes.viewport + 1);
 });
 
-test("the mobile menu exposes only the three customer choices plus the commercial action", async ({ page }, testInfo) => {
+test("the mobile menu exposes the five customer choices plus Sign in, and the action stays in the header", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
   await page.goto("/");
   const menu = page.locator("header.nav details.mobile-primary-nav");
@@ -155,11 +86,21 @@ test("the mobile menu exposes only the three customer choices plus the commercia
   const panel = menu.locator(":scope > nav");
   await expect(panel).toBeVisible();
   const direct = panel.locator("a.mobile-nav-direct");
-  await expect(direct).toHaveCount(3);
-  await expect(direct).toHaveText(["How it works", "Integrations", "Pricing"]);
-  // BQ-059: the header keeps the action at every width; the sheet is the three sections.
+  await expect(direct).toHaveCount(5);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
+  // BQ-059: the header keeps the action at every width; the sheet is the sections.
   await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
   await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
+  /*
+    Landing V2: Sign in moved the other way, and the two halves of that are one assertion each.
+
+    In the narrow row it was a fourth item behind a 109px filled button, which is why
+    `app/tavonel.css` had a rule hiding it outright on one commercial posture. It is the sheet's
+    last row now, with a 44px target, and the header row below the desktop switch is the wordmark,
+    the toggle and the action.
+  */
+  await expect(panel.locator("a.mobile-nav-signin")).toHaveCount(1);
+  await expect(page.locator("header .nav-actions .nav-signin")).toBeHidden();
   await expect(panel.locator("details.mobile-nav-group")).toHaveCount(0);
   const geometry = await panel.boundingBox();
   expect(geometry).not.toBeNull();
@@ -170,14 +111,25 @@ test("the mobile menu exposes only the three customer choices plus the commercia
   await expect(menu.locator(":scope > summary")).toBeFocused();
 });
 
-test("Integrations owns the Sources route and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
+/*
+  Landing V2: Integrations left the bar, so the page whose ownership is worth measuring changed.
+
+  /research is one of the five hub pages Resources speaks for and has no bar item of its own, so
+  the mark appears there only if `NAV_ALSO_OWNS` is wired up. /sources, which Integrations used to
+  own, is now owned by nothing in the bar -- it is a footer row -- and the sheet must not claim it.
+*/
+test("Resources owns the hub routes and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
-  await page.goto("/sources");
+  await page.goto("/research");
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
-  await expect(menu.getByRole("link", { name: "Integrations", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("link", { name: "Pricing", exact: true }).click({ noWaitAfter: true });
   await expect(menu.locator(":scope > nav")).toBeHidden();
+
+  await page.goto("/sources");
+  await menu.locator(":scope > summary").click();
+  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
 });
 
 test.describe("on a touch screen", () => {

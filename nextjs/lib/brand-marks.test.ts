@@ -95,7 +95,11 @@ describe("the logomark", () => {
 
   it("draws both copies in one ink, above the 3:1 a graphical object needs", () => {
     // BQ-131. `--text-mid` is #9AA3A8 (about 5.2:1 on the ground) in the nav and in the tab.
-    expect(read("app/one-path.css")).toContain(".wordmark .logomark { color: var(--text-mid); }");
+    // Landing V2: the chrome rules left `app/one-path.css` for `app/chrome-v2.css`, which is the
+    // sheet every public route's header is styled from now. Same declaration, same reason.
+    expect(read("app/chrome-v2.css")).toContain(".wordmark .logomark { color: var(--text-mid); }");
+    expect(read("app/one-path.css"), "the landing sheet must not keep a second copy of it")
+      .not.toContain(".wordmark .logomark");
     expect(favicon).toContain('stroke="#9AA3A8"');
     expect(favicon).not.toContain("#C8CED2");
   });

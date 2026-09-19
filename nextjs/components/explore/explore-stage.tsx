@@ -27,7 +27,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import Logomark from "@/components/logomark";
-import { trackFunnel } from "@/lib/funnel-events";
+import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
 import WorldAct from "./world-act";
@@ -183,6 +183,45 @@ export default function ExploreStage({ model, layout, change, answers, technical
     const frame = window.requestAnimationFrame(() => setSettled(true));
     return () => window.cancelAnimationFrame(frame);
   }, [enter, model.evidence, openRegion]);
+
+  useEffect(() => {
+    /*
+      D7 `world_explore_60s`: a minute actually spent reading this World.
+
+      §30 wants a signal that a reader engaged with the sample rather than glanced at it, and
+      `explore_entered` (which D7 keeps as `world_explore_start`) cannot tell those apart. A
+      plain 60-second timeout would count the minute a background tab spends on a laptop that
+      went to sleep, so what is counted is VISIBLE time: the timer stops when the document is
+      hidden, keeps what it had already earned, and resumes when the tab comes back. It fires
+      once per page session, which is `trackFunnelOnce`'s own scope, and carries no detail at
+      all -- not which act was open, not which question was asked.
+    */
+    let remaining = 60_000;
+    let startedAt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      if (timer !== undefined || remaining <= 0) return;
+      startedAt = Date.now();
+      timer = setTimeout(() => {
+        timer = undefined;
+        remaining = 0;
+        trackFunnelOnce("world_explore_60s");
+      }, remaining);
+    };
+    const stop = () => {
+      if (timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      remaining -= Date.now() - startedAt;
+    };
+    const onVisibility = () => (document.visibilityState === "visible" ? start() : stop());
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const closeAsk = useCallback(() => setAct(returnAct.current), []);
 
