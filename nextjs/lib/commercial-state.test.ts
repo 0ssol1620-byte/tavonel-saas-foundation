@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
-import { deploymentStateLine, isLiveCommerce, primaryCallToAction, readCommercialState } from "./commercial-state";
+import { isLiveCommerce, primaryCallToAction, readCommercialState } from "./commercial-state";
 
 const LIVE = {
   COMMERCIAL_MODE: "live",
@@ -72,9 +72,10 @@ describe("readCommercialState", () => {
     expect(primaryCallToAction({ ...LIVE, VERCEL_ENV: "production" }).label).toBe("Request access");
   });
 
-  it("states the deployment line from the same gate", () => {
-    const line = deploymentStateLine();
-    expect(line?.label).toBe("Public sample: open to read · Your own files: by arrangement");
-    expect(line?.title).toBe(activationPolicy.customerData.reason);
-  });
+  /*
+    The deployment-line test retired with `deploymentStateLine()` itself (2026-09-19, fix round
+    2). D2 removed that line from the header and nothing else ever called the function; the
+    surfaces that still state the gate verbatim -- /pricing, /security, /integrations, the /docs
+    first-run notes and Scene 09 -- are guarded where they render it, not here.
+  */
 });

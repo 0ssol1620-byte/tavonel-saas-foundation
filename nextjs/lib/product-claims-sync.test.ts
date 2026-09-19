@@ -53,7 +53,13 @@ function strip(source: string) {
 */
 const CLAIM_SURFACES = [
   "app/page.tsx",
-  "components/home-page-client.tsx",
+  /*
+    Landing V2, 2026-09-19. `components/home-page-client.tsx` is deleted; the claims a buyer
+    reads at `/` and `/ko` are in the copy deck, arranged by the composition. Both are listed,
+    because `read` takes a literal path and never follows an import.
+  */
+  "components/landing-v2/landing-page.tsx",
+  "lib/landing-v2-copy.ts",
   "components/pricing-page-client.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",

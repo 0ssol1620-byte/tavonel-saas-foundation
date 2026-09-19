@@ -340,10 +340,28 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
   corpus stops supporting the question -- the build stops rather than the page rendering an
   empty panel.
 */
+/*
+  F6, 2026-09-19: WHICH QUESTION LEADS, AND WHY THAT IS A PRESENTATION CHOICE.
+
+  Scene 02 opens on the first of these that has a committed region raster, and the passage it
+  quoted began "Americas Americas net sales increased ..." -- the filing's own section heading
+  immediately followed by the sentence under it, which is what this deployment emits for that
+  region and is not something a landing may rewrite (rule 7: the paragraph as printed). A reader
+  meeting the product's output for the first time reads a doubled word as a bug in the compiler.
+
+  So the order changed and nothing else did. The research-and-development question leads because
+  its passage opens on the table's own label -- "Operating expenses: Research and development
+  10,887 ..." -- with no repeated token. The set of three tabs is unchanged: the segment question
+  has no committed raster and is skipped either way, and the Board question's passage opens on a
+  DEF 14A page header, which is the artifact this ordering moves off the first tab.
+
+  The order is read by /explore as well, and by nothing else that ranks: chooseExploreEntryProof
+  keys off a set of cited ids and a 10-K preference, so the hero's entry region is unchanged.
+*/
 export const EXPLORE_SAMPLE_QUESTIONS = [
+  "What were operating expenses for research and development?",
   "What were Products and Services net sales in the quarter?",
   "What were net sales by reportable segment?",
-  "What were operating expenses for research and development?",
   "How does the Board oversee privacy and data security?",
 ] as const;
 

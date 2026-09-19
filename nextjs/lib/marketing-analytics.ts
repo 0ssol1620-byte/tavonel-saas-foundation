@@ -59,6 +59,25 @@ export const MARKETING_EVENTS = new Set([
   "hero_explore_clicked", "hero_start_clicked", "pricing_plan_viewed", "pricing_start_clicked",
   "source_category_viewed", "developer_mcp_started", "developer_api_started", "explore_entered",
   "explore_evidence_opened", "explore_change_opened", "explore_to_signup",
+  /*
+    D7's Landing V2 names. Every one of them is a click or a dwell on a public marketing page,
+    which is exactly what the consent prompt says is measured -- visits and clicks on public
+    pages -- so all fifteen are forwarded and none is an exception.
+
+    They are forwardable because of what their details cannot hold, not because of where they
+    fire: `proof_claim_switch` carries a tab position, `source_open` carries which scene the
+    reader opened a source from, and the rest carry nothing but the D8 arm. No question, no
+    filename, no region id and no excerpt reaches this module, and `FUNNEL_DETAIL_KEYS` is what
+    makes that structural rather than editorial.
+
+    `request_access_complete` fires beside `generate_lead` on the contact form and is listed for
+    the same reason that one is: the enquiry was sent, and nothing about the enquiry travels
+    with the name.
+  */
+  "hero_primary_click", "hero_secondary_click", "hero_demo_interact", "proof_claim_switch",
+  "source_open", "world_explore_60s", "integration_open", "trust_open", "pricing_open",
+  "request_access_start", "request_access_complete",
+  "scroll_scene_25", "scroll_scene_50", "scroll_scene_75", "scroll_scene_100",
 ]);
 
 export function publicPageLocation(path: string): string | null {

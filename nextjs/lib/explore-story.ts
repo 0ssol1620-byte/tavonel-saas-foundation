@@ -182,6 +182,21 @@ export const EXPLORE_COPY = {
   */
   entityDisclaimer:
     "Entity labels in this fixed sample come from a simple capitalised-token heuristic, not by a resolver. In the recorded evaluation, 3 of 16 baseline labels were true positives. Unreviewed entities are shown only as sample structure; Claims and page-bound evidence are the parts to judge here.",
+  /*
+    The same caveat in one sentence, for the one surface that has room for one (F3, 2026-09-19).
+
+    The hero prints its Entity chips in a 245px column beside the claim and the region they were
+    read from. The paragraph above -- 45 words carrying a measurement of its own -- was the
+    tallest block in that column and read there as a footnote rather than as a qualifier on the
+    two chips next to it. The long form stays exactly as it is on /explore, where the drawer that
+    prints it is ABOUT the measurement and the figure belongs beside its receipt.
+
+    Shortening a disclosure is only allowed while it still says the two things that make the chip
+    honest: the labels are a heuristic, and the parts to judge are the Claims and the evidence
+    bound to a page. Both are here, and nothing softer replaced them.
+  */
+  entityCaveatShort:
+    "Entity labels in this sample are heuristic; judge the Claims and their page-bound evidence.",
   /* BA-029: the exit names where it goes. It was an unlabelled X with this only as an aria-label. */
   closeLabel: "Back to TAVONEL",
   /*

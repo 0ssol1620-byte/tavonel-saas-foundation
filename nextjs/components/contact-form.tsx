@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { QUALIFICATION } from "@/lib/contact-qualification";
-import { trackFunnel } from "@/lib/funnel-events";
+import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
 
@@ -36,6 +36,18 @@ export default function ContactForm() {
       const topic = formData.get("topic");
       // Count only a received commercial inquiry; no form values enter analytics.
       if (eligibleLead && (topic === "sales" || topic === "partnership")) trackFunnel("generate_lead");
+      /*
+        D7 `request_access_complete`: the close of the access funnel `request_access_start`
+        opened, fired here beside `generate_lead` rather than folded into it.
+
+        Two names because they count two things. `generate_lead` is a COMMERCIAL enquiry and is
+        narrowed to the two topics that are one; this is a request that reached us, whatever the
+        reader chose in the topic list -- and /contact is the destination `ACCESS_CTA` sends
+        every "Request access" click on the site to, so narrowing it to sales would report most
+        of that funnel's completions as abandonment. The honeypot and timing gate is shared: a
+        submission that failed either is not a reader.
+      */
+      if (eligibleLead) trackFunnel("request_access_complete");
       form.reset();
       setState("sent");
     } catch (reason) {
@@ -45,7 +57,18 @@ export default function ContactForm() {
   }
 
   return (
-    <form className="contact-form" onSubmit={(event) => void submit(event)}>
+    <form
+      className="contact-form"
+      onSubmit={(event) => void submit(event)}
+      /*
+        D7 `request_access_start`: the reader began filling the form, which is the step between
+        arriving on /contact and sending it. React's synthetic focus event bubbles, so one
+        handler on the form covers every field without one per input, and `trackFunnelOnce`
+        keeps a reader who tabs through eleven fields from producing eleven rows. It carries no
+        detail: WHICH field was touched first is a fact about the reader, not about the funnel.
+      */
+      onFocus={() => trackFunnelOnce("request_access_start")}
+    >
       {/*
         G2-034. Which fields are required, before the submit rather than after it.
 

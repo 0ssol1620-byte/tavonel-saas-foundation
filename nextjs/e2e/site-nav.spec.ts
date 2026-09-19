@@ -1,12 +1,14 @@
 /**
- * The global menu, as a reader uses it: three destinations in the bar, the rest in the footer.
+ * The global menu, as a reader uses it: five destinations in the bar, the rest in the footer.
  *
  * The five questions below are the design document's own find-tasks (§12) and they are still why
  * this file exists. What changed is the IA that answers them. The 2026-09-17 brand-quality pass
  * deleted the per-section disclosure nav -- the `#site-nav-trigger-<section>` buttons, the
  * `#site-nav-<section>` panels and the phone's `details.mobile-nav-group` accordion -- in favour
- * of `CUSTOMER_NAV`'s three direct links at every width (How it works, Connect, Pricing) plus the
- * footer directory, which is the same markup on a phone and on a desktop. `app/tavonel.css`
+ * of `CUSTOMER_NAV`'s direct links at every width plus the footer directory, which is the same
+ * markup on a phone and on a desktop. Landing V2 (2026-09-19) took that list from three to five
+ * -- Product, How it works, Resources, Docs, Pricing -- which changes the count below and nothing
+ * about the shape of these scenarios. `app/tavonel.css`
  * carries the note where those rules used to be.
  *
  * So each find-task is asserted the way it was written -- by clicking to its answer from the home
@@ -83,8 +85,8 @@ const TASKS = [
   },
 ] as const;
 
-/** The three the header publishes, in the order `CUSTOMER_NAV` declares them. */
-const CUSTOMER_HREFS = ["/product", "/integrations", "/pricing"] as const;
+/** The five the header publishes, in the order `CUSTOMER_NAV` declares them. */
+const CUSTOMER_HREFS = ["/product", "/knowledge-compiler", "/resources", "/docs", "/pricing"] as const;
 
 const BAR = 'header.nav nav[aria-label="Sections"]';
 const SHEET = "header.nav details.mobile-primary-nav";
@@ -115,7 +117,7 @@ const DESKTOP: Scenario[] = [
     run: (page: Page) => followTrail(page, task.trail),
   })),
   {
-    name: "the bar publishes the three customer destinations and nothing else",
+    name: "the bar publishes the five customer destinations and nothing else",
     width: 1440,
     run: async (page) => {
       await page.goto("/");
@@ -139,19 +141,29 @@ const DESKTOP: Scenario[] = [
     /*
       The old file pinned `aria-current="true"` on a trigger. `customerNavOwns` sets "page" -- the
       value assistive technology acts on, and the reason the two CSS rules that styled "true"
-      never matched anything -- and /sources is owned by Connect, the row that carries it even
-      though the bar has no link with that page's name on it.
+      never matched anything.
+
+      /research is the case worth measuring rather than /resources itself: it is one of the five
+      pages the hub collects that have no bar item of their own, so the mark appears there only if
+      `NAV_ALSO_OWNS` is wired up, and that is exactly the kind of mapping that silently stops
+      covering a path. The second half is the failure path -- /sources lost its owner when
+      Integrations left the bar, and no item may claim it.
     */
     name: "the link that owns the page being read is marked, and no other is",
     width: 1440,
     run: async (page) => {
-      await page.goto("/sources");
-      await expect(page.locator(`${BAR} a[href="/integrations"]`)).toHaveAttribute("aria-current", "page");
-      await expect(page.locator(`${BAR} a[href="/pricing"]`)).not.toHaveAttribute("aria-current", "page");
+      await page.goto("/research");
+      await expect(page.locator(`${BAR} a[href="/resources"]`)).toHaveAttribute("aria-current", "page");
+      await expect(page.locator(`${BAR} a[href="/docs"]`)).not.toHaveAttribute("aria-current", "page");
       expect(
         await page.locator(`${BAR} a[aria-current]`).count(),
         "more than one bar link claims to be the page being read",
       ).toBe(1);
+      await page.goto("/sources");
+      expect(
+        await page.locator(`${BAR} a[aria-current]`).count(),
+        "a bar link claims /sources, which no item in the five-link bar owns",
+      ).toBe(0);
     },
   },
   {
@@ -177,7 +189,7 @@ const DESKTOP: Scenario[] = [
 
 const PHONE: Scenario[] = [
   {
-    name: "the phone sheet offers the same three destinations as the bar, flat",
+    name: "the phone sheet offers the same five destinations as the bar, flat",
     width: 390,
     touch: true,
     run: async (page) => {
@@ -187,6 +199,10 @@ const PHONE: Scenario[] = [
       await expect(rows).toHaveCount(CUSTOMER_HREFS.length);
       expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS]);
       await expect(page.locator(`${SHEET} details.mobile-nav-group`)).toHaveCount(0);
+      // Landing V2: Sign in is the sheet's last row at this width, and the access action is not
+      // in the sheet at all -- it is in the header, visible without opening anything.
+      await expect(page.locator(`${SHEET} > nav a.mobile-nav-signin`)).toHaveCount(1);
+      await expect(page.locator("header.nav .nav-actions .btn")).toBeVisible();
     },
   },
   {

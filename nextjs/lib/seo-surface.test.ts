@@ -572,8 +572,20 @@ describe("public surface: what is advertised is what is measured", () => {
     }
   });
 
+  /*
+    The root layout says `lang="en"`, so /ko has to say otherwise on the subtree it renders.
+
+    It used to say it through `app/ko/layout.tsx`, a wrapper whose whole body was
+    `<div lang="ko">`. That file was deleted on 2026-09-19: `LandingPage` already puts
+    `lang="ko"` on `.page`, so all the wrapper added was one more element between `body` and the
+    page -- which is why the landmark audit found `body > .page > header` on `/` and nothing on
+    `/ko`. The declaration is asserted where it is actually made.
+  */
   it("declares Korean on the subtree it renders", () => {
-    expect(readFileSync(join(appDirectory, "ko", "layout.tsx"), "utf8"), 'the /ko layout must carry lang="ko" -- the root layout says lang="en"').toMatch(/lang="ko"/);
+    expect(
+      readFileSync(join(appDirectory, "..", "components", "landing-v2", "landing-page.tsx"), "utf8"),
+      'the /ko composition must carry lang="ko" -- the root layout says lang="en"',
+    ).toMatch(/lang=\{korean \? "ko"/);
   });
 
   it("names itself and the English entry in its own hreflang set", () => {
@@ -789,7 +801,13 @@ describe("public surface: no process vocabulary in published copy", () => {
       "app/trust/page.tsx",
       "app/security/page.tsx",
       "app/refunds/page.tsx",
-      "app/ko/page.tsx",
+      /*
+        Landing V2, 2026-09-19. /ko carries no delegated value any more, so it carries no
+        provenance either -- the FD-02 activation fold left the entry page with the rest of the
+        pricing detail (§35: the plan conditions belong on the page that maintains them). The row
+        is removed rather than kept vacuous, and the loss is a reported one: those three Korean
+        sentences are published nowhere else on the site today.
+      */
       "components/pricing-page-client.tsx",
       "lib/docs-content.ts",
       "lib/cookbook-content.ts",

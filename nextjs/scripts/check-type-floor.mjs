@@ -37,9 +37,18 @@ const exceptions = JSON.parse(readFileSync(join(root, "lib/type-floor-exceptions
 const exemptSelectors = exceptions.selectors.map((entry) => entry.match);
 const exemptFiles = (exceptions.files ?? []).map((entry) => (typeof entry === "string" ? entry : entry.file));
 
+/*
+  ROUND3-P2: `playwright-report` and `test-results` join the skip list. They are gitignored build
+  output (.gitignore:97), so CI never walks them -- but every lane that runs Playwright and then
+  `pnpm check` got a false red from the trace viewer's own bundled CSS
+  (`playwright-report/trace/defaultSettingsView.*.css :root -> 10px`). The floor is a rule about
+  the type this repository ships, not about a vendored debugging tool's chrome.
+*/
+const SKIP_DIRS = new Set(["node_modules", ".next", "playwright-report", "test-results"]);
+
 function stylesheets(dir, found = []) {
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === ".next" || entry.startsWith(".")) continue;
+    if (SKIP_DIRS.has(entry) || entry.startsWith(".")) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) stylesheets(full, found);
     // `.tsx` too: an inline `style={{ fontSize: 11 }}` is a font-size the stylesheet grep cannot

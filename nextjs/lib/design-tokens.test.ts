@@ -156,7 +156,9 @@ describe("design token contract", () => {
   it("names the pipeline stages once, and the positioning line once", () => {
     expect(PIPELINE_STAGES.map((stage) => stage.key)).toEqual(["source", "read", "organize", "ready"]);
     expect(PIPELINE_STAGES.every((stage) => stage.ko.length > 0)).toBe(true);
-    expect(BRAND_LINE.headline).toBe("Bring your knowledge. TAVONEL makes it ready for AI.");
+    // D5 / blueprint §0: the founder's new headline, approved through the 2026-09-19 Landing V2
+    // design master blueprint. `lib/site-navigation.ts` carries the decision beside the constant.
+    expect(BRAND_LINE.headline).toBe("AI-ready knowledge. Traceable to every source.");
     expect(BRAND_LINE.descriptor).toBe("Knowledge compiled with a traceable path back to every source.");
   });
 

@@ -465,7 +465,10 @@ describe("no surface restates the format list", () => {
   const derivedSurfaces = [
     "nextjs/app/workspace/page.tsx",
     "nextjs/components/pipeline-board.tsx",
-    "nextjs/components/home-page-client.tsx",
+    // Landing V2 (2026-09-19) retired home-page-client.tsx; these two are the surfaces that now
+    // print the accepted formats, both through describeAcceptedFormats(CAPABILITY_MANIFEST).
+    "nextjs/components/landing-v2/hero-statement.tsx",
+    "nextjs/components/landing-v2/scenes/sources.tsx",
     "nextjs/lib/docs-content.ts",
     "nextjs/app/sources/page.tsx",
     "nextjs/components/source-capability-table.tsx",

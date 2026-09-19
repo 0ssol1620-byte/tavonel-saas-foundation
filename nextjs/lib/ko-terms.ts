@@ -37,6 +37,20 @@ export const KO_TERMS = {
   "connected source": "연결 소스",
   evidence: "근거",
   review: "검토",
+  /*
+    The compiler's own object vocabulary, added 2026-09-19 (design review C5).
+
+    Scene 03 on /ko rendered these chips with their ENGLISH labels while the scene below it called
+    the same thing 근거 and printed Korean field names -- one page, two names for one noun. Each
+    spelling is the literal translation and nothing more: 개체 is a thing that is named, 진술 is a
+    statement made (never 주장, which is a contention a reader would have to weigh), 관계 is a
+    relation, 검색 is the retrieval a lexical index performs. `evidence` and `revision` above
+    already carry the other two and are not respelled.
+  */
+  entity: "개체",
+  claim: "진술",
+  relation: "관계",
+  retrieval: "검색",
   // D9: the verb is "activate", never "promote", in English and here.
   activate: "활성화",
   candidate: "후보",

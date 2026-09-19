@@ -53,16 +53,33 @@
 
 .group > h2 { margin: 0; }
 
-.prose { margin: 0; color: var(--text-lo); font-size: 15px; line-height: 1.7; }
+/*
+  The prose paragraphs quote the same unbreakable tokens the code blocks do -- error codes like
+  SOURCE_EXCEEDS_PROCESSING_CEILING and header names like x-tavonel-source-idempotency-key are
+  written out in the sentence, not only inside a <code>. `anywhere` and not `break-word`, because
+  only `anywhere` lowers the element's MIN-CONTENT width, and min-content is what sized the grid
+  track that overflowed the document at 360px.
+*/
+.prose { margin: 0; min-width: 0; color: var(--text-lo); font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; }
 
+/*
+  360px, 11px of horizontal document overflow. An auto-placed grid item's implicit minimum is
+  min-content, so one unbreakable word in an operation's prose sized the single implicit track at
+  336px inside a 292px content box and pushed the whole page wider than the viewport. An explicit
+  `minmax(0, 1fr)` track plus `min-width: 0` on the items removes that floor; the text wraps
+  instead of being clipped, so nothing is hidden.
+*/
 .operation {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--hairline);
   border-radius: var(--r-paper-lg);
 }
+
+.operation > * { min-width: 0; }
 
 .signature {
   display: flex;

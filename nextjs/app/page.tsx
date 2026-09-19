@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
-import HomePageClient from "@/components/home-page-client";
-import { isLiveCommerce } from "@/lib/commercial-state";
+import { cookies } from "next/headers";
+import { preload } from "react-dom";
+import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
+import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
 import { BRAND_LINE } from "@/lib/site-navigation";
 
 /**
@@ -54,16 +55,66 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  // The hero poster is the homepage LCP resource. It is declared as a real <link> element, which
-  // React hoists into <head>, because `preload()` from react-dom never reached the shipped HTML
-  // here (audit MED-15, verified on the fixture build 2026-09-18: the only rel=preload in the
-  // document was a low-priority script). The poster is the re-rendered master's own frame at
-  // the size the hero paints it.
+/*
+  D8: the experiment arm, read on the server and never on the client.
+
+  This page is already `force-dynamic` for the commercial posture, so reading a cookie costs it
+  nothing it was not already paying, and it is what keeps the arm out of the first paint's
+  critical path: a client that decided the headline after hydration would flash the control arm
+  at every reader in the test. The cookie is WRITTEN in `middleware.ts`, which is the one place
+  in Next 15 that can set one for the response a Server Component is rendering.
+
+  With no experiment active this reads a cookie that is never set and returns the frozen default.
+*/
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = (await searchParams)?.[LANDING_VARIANT_QUERY];
+  const experiment = landingVariantState({
+    cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
+    query: Array.isArray(query) ? query[0] : query,
+  });
+  /*
+    Landing V2, 2026-09-19 (§27, contract rule 10). The LCP resource is the hero's READ strip.
+
+    It moved from the whole-page render to the region crop with the hero recomposition: the strip
+    is now the first and largest image on the page and the page render is a 200px thumbnail
+    beside it, so preloading the page would be preloading the smaller, later resource. One image
+    carries `fetchPriority="high"`, and it is this one.
+
+    It replaces the film poster, because this landing plays no video at all -- §27 bars an
+    autoplay video from being the LCP element, and §28 puts the hero in DOM and CSS. What is
+    preloaded is the exact resource the layout paints: the same `srcset` and the same `sizes`
+    the <img> carries, both from one constant, so the browser's candidate selection here and in
+    the element cannot disagree.
+
+    IT IS `react-dom`'s `preload()` AND NOT A <link> ELEMENT, WHICH REVERSES A CONTRACT RULE (F10).
+
+    Contract rule 10 says "a real <link> element, not react-dom preload()", and it says so
+    because audit MED-15 measured the helper never reaching the shipped HTML on the OLD landing
+    (fixture build 2026-09-18, where the document's only rel=preload was a low-priority script).
+    That page was a client component; this one is a server component, and React 19 flushes the
+    resource into the head as a real <link rel="preload"> in the served document. That is
+    verified rather than assumed: `e2e/landing-v2.spec.ts` counts it in the document the server
+    sends, not in the DOM after hydration.
+
+    What the element form could not do is be ONE preload. React hoists a <link rel="preload">
+    into the head as a resource and ALSO renders the element where it sits in the tree, so the
+    document carried two entries for one file (P3 QA round 2, P2-2) -- with `href` and, measured
+    on this build rather than assumed, without it too. The helper emits the hoisted one alone.
+  */
+  const hero = heroScene();
+  preload(hero.region.cropSrc, {
+    as: "image",
+    imageSrcSet: hero.region.cropSrcSet,
+    imageSizes: HERO_IMAGE_SIZES,
+    fetchPriority: "high",
+  });
   return (
     <>
-      <link rel="preload" as="image" href="/film/poster-1-hero-2x.webp" fetchPriority="high" />
-      <HomePageClient liveCommerce={isLiveCommerce()} formats={describeAcceptedFormats(CAPABILITY_MANIFEST)} />
+      <LandingPage experiment={experiment} />
     </>
   );
 }

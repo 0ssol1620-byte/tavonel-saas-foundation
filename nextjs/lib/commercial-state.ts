@@ -90,20 +90,33 @@ export function isLiveCommerce(env: Environment = process.env) {
   return readCommercialState(env).liveChargesEnabled && activationPolicy.customerData.enabled;
 }
 
-/**
- * The one-line deployment state the public header carries, or null when there is nothing to say.
- *
- * Two facts, in the order a reader needs them: what is open now, and what their own files require.
- * Both are read off `activationPolicy` rather than typed, and the long form -- the sentence
- * `/api/status`, `/security` and `/pricing` all serve -- is the tooltip.
- */
-export function deploymentStateLine(): { label: string; title: string } | null {
-  if (activationPolicy.customerData.enabled) return null;
-  return {
-    label: "Public sample: open to read · Your own files: by arrangement",
-    title: activationPolicy.customerData.reason,
-  };
-}
+/*
+  `deploymentStateLine()` WAS HERE, AND IT IS GONE. 2026-09-19, fix round 2.
+
+  It built the header's one-line deployment state. D2 took that line out of the bar (blueprint
+  §8, §35) on the stated premise that Scene 09 carries the gate sentence verbatim, and once the
+  Landing V2 chrome landed the function had no render caller anywhere in the tree -- a live
+  export whose only remaining trace of the decision was that nobody called it. Deleting it
+  changes nothing a reader sees; leaving it would let the next lane conclude the line was still
+  published somewhere.
+
+  WHERE THE GATE IS STILL STATED, so this is a record rather than a disappearance:
+  `activationPolicy.customerData.reason` renders verbatim on `/pricing`, `/security`,
+  `/integrations`, in the `/docs` first-run notes, and in Scene 09 of `/` and `/ko`.
+
+  WHERE IT WAS NO LONGER STATED, and what fix round 3 did about it. `/product`,
+  `/knowledge-compiler`, `/resources`, the `/docs` index, `/contact`, `/explore`, `/status` and
+  `/login` carried the gate only through the header line -- and `/contact` is the destination of
+  the landing's own access action. Contract rule 5 names the gate as shared chrome, so it went
+  back into the chrome: into `PublicSiteFooter`, not into the header D2 deliberately cleared. It
+  reads `activationPolicy.customerData.reason` verbatim, and `KO_CHROME.customerDataGate` -- its
+  one Korean translation, which the landing's own microtext also reads -- on `/ko`. It renders
+  only while `customerData.enabled` is false, which is the null this function used to return.
+
+  So every public route states the gate again, and the four surfaces above still state it in
+  their own context. What is still a founder's call is the hero's own wording, not whether the
+  deployment says what it does.
+*/
 
 /**
  * The primary call to action, which changes with commercial posture and nothing else.

@@ -5,8 +5,13 @@ import { usePathname } from "next/navigation";
 import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
 import { CUSTOMER_NAV, KO_CHROME, customerNavOwns } from "@/lib/site-navigation";
 
-/** Native disclosure works without JavaScript. Escape returns focus; Tab never gets trapped. */
-export default function MobilePrimaryNav({ korean = false }: { korean?: boolean }) {
+/**
+ * Native disclosure works without JavaScript. Escape returns focus; Tab never gets trapped.
+ *
+ * `signedIn` has the same meaning it has in the header: suppress Sign in for a reader who already
+ * is, rather than offering them a destination they have no use for.
+ */
+export default function MobilePrimaryNav({ korean = false, signedIn = false }: { korean?: boolean; signedIn?: boolean }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const pathname = usePathname();
   const close = useCallback(() => {
@@ -77,7 +82,26 @@ export default function MobilePrimaryNav({ korean = false }: { korean?: boolean 
           be behind a disclosure -- and the sheet drew it a second time, forty pixels below the
           first, so a reader who opened the menu was offered the same destination twice and the
           three sections it was meant to show were pushed down by it.
+
+          Landing V2, 2026-09-19 (contract D2). Still true of the access action, and Sign in now
+          moves the other way: it was in the header at every width, and below 400px the row was
+          wordmark + toggle + a 109px filled button + Sign in, which does not fit -- the reason
+          `app/tavonel.css` hid the link outright on one commercial posture and drew the toggle as
+          a bare icon. It is the sheet's last row instead, after the sections and clearly apart
+          from them, where it gets the 44px target it never had in the row. The action stays in
+          the header; this is a secondary destination, which is exactly what a disclosure is for.
+
+          It is rendered here rather than passed in as a link object because /login is the one
+          destination on this site that does not change with commercial posture: `SELF_SERVE_CTA`
+          also points at /login, but that is the access action wearing a different label, and
+          which of the two applies is `isLiveCommerce()`'s answer and not this component's. A
+          client component cannot ask that question -- the flags have no NEXT_PUBLIC_ prefix and
+          inline as `undefined` here (BA-232) -- so the sheet carries the one label that is true
+          in both postures and nothing else.
         */}
+        {signedIn ? null : (
+          <a className="mobile-nav-signin" href="/login" onClick={close}>{korean ? KO_CHROME.signIn : "Sign in"}</a>
+        )}
       </nav>
     </details>
   );

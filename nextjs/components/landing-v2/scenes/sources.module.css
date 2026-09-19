@@ -1,0 +1,303 @@
+/*
+  Scene 03's composition only (blueprint §13). Token-only, unlayered like every other module
+  sheet here, and deliberately small: everything that is not this scene's arrangement -- type,
+  ground, radius, focus, the evidence line, the source page -- is already in app/landing-v2.css
+  and is used from there.
+*/
+
+/* ---------------------------------------------------------------------------- the arrangement */
+
+/*
+  Phone and tablet: one column, top to bottom -- sources, compiler, objects -- which is the same
+  sentence read vertically. The horizontal composition starts at 900, the width below which the
+  founder rule keeps heavy scene visuals off the page anyway.
+*/
+.diagram {
+  display: grid;
+  /*
+    `minmax(0, 1fr)`, not the implicit `auto`, and that is the whole of QA round 4's WebKit fix.
+
+    An `auto` track is at least its content's min-content size, so a single-column grid whose
+    content cannot break small enough grows PAST its container instead of clipping or wrapping.
+    WebKit resolved the source rows wider than Chromium did and the Korean page scrolled sideways
+    by 23px at 390 and 53px at 360 -- the founder's phone band. Clamping the track at the bottom
+    is what makes the container the authority on width; the wrapping rules below then decide how
+    the text fits inside it. Every nested single-column list here gets the same floor for the
+    same reason.
+  */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  justify-items: stretch;
+}
+
+/* The stack and the object column are grid items: without this they size to their content too. */
+.stack,
+.objects { min-width: 0; }
+
+/*
+  THE HORIZONTAL COMPOSITION STARTS AT 1200, NOT 900 (D4 + D7).
+
+  It used to start at 900, which was wrong in both directions once `.lv2-split` grew a 5:7 tablet
+  band: at 1024 the visual column is about 527px, and five tracks inside it left the object column
+  55px wide -- narrower than one word of it. Above 1200 the same five tracks have room, and that
+  is also where D7 puts the object list in one column, which is what makes the outgoing fan's six
+  lines able to land on six rows.
+
+  NO COLUMN GAP, and that is the fix for "the lines connect nothing": the connector spans exactly
+  the distance between the two things it connects, so it starts at the stack's right edge and ends
+  at the compiler's left edge with no dead space at either end.
+
+  `--lv2-col-head` is the height of a column's label block (18px line + 14px margin). The
+  connectors are inset by it so their vertical span is the LIST's span rather than the column's,
+  and the compiler carries the same offset so the single converging endpoint lands on its middle.
+*/
+@media (min-width: 1200px) {
+  .diagram {
+    --lv2-col-head: 32px;
+    /* stack | connector | compiler | connector | objects. */
+    grid-template-columns:
+      minmax(0, 250px) minmax(40px, 0.45fr) minmax(0, 128px) minmax(40px, 0.45fr) minmax(0, 1.4fr);
+    align-items: stretch;
+    gap: 0;
+  }
+  /*
+    Both lists fill the height their column is given, with equal rows, so the evenly spaced
+    endpoints of the fan are the rows' own centres rather than an approximation of them.
+  */
+  .stack,
+  .objects {
+    align-self: stretch;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .stackList,
+  .objectList { grid-auto-rows: 1fr; align-content: stretch; }
+  .conn { padding-top: var(--lv2-col-head); }
+  .compiler { align-self: center; margin-top: var(--lv2-col-head); min-width: 0; }
+}
+
+/* --------------------------------------------------------------------------- the source stack */
+
+/*
+  A fixed 18px line, not the inherited 1.35 -- `--lv2-col-head` above is 18 + 14, and a label
+  block whose height depends on the rendered font would put the connectors half a line off the
+  lists they point at.
+*/
+.colLabel {
+  margin: 0 0 14px;
+  line-height: 18px;
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stackList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+/*
+  Preview then caption, side by side, so a long filename wraps in a column of its own.
+
+  D7 widened the caption column: at the old 212px stack the caption had about 104px, which is
+  eight mono characters, and `apple-2026-proxy-def14a-reference.pdf` could not reach a hyphen
+  before it ran out of line. The column is 250px now and the caption gets about 142px, which
+  holds the longest hyphen-delimited run this corpus has ("reference.pdf").
+*/
+.item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.itemMeta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+/*
+  The filename breaks on its own hyphens rather than running past the column.
+
+  The break opportunities are `<wbr>` elements the component inserts after every hyphen (D7), not
+  a wrapping mode: a mode strong enough to break this token would also break it mid-word, and one
+  weak enough to protect the word would let it push the document sideways -- the WebKit /ko defect
+  round 3 closed. `anywhere` stays underneath as the net for a name with no hyphen in it at all.
+*/
+.filename {
+  margin: 0;
+  color: var(--text-hi);
+  overflow-wrap: anywhere;
+}
+
+/*
+  The two metadata lines wrap rather than push, for the same reason the filename does: they carry
+  a form, an ISO date and a page position, and an ISO date is one unbreakable token in every
+  engine. `anywhere` (not `break-word`) because only `anywhere` also lowers the min-content size,
+  which is what the clamped tracks above are reading.
+*/
+.itemLine { margin: 0; color: var(--text-mid); overflow-wrap: anywhere; }
+.itemKind { margin: 0; color: var(--text-lo); overflow-wrap: anywhere; }
+
+.formatsLabel {
+  margin: 0 0 4px;
+  color: var(--text-mid);
+}
+
+/*
+  D10: the intake format run wraps at its commas and nowhere else.
+
+  `describeAcceptedFormats` returns "PDF, DOCX, ... or ZIP" -- short uppercase tokens separated by
+  ", ", which are the only break opportunities a line breaker finds in it once `anywhere` is off.
+  With `anywhere` on it could cut PDF between the D and the F, which is how a receipt starts
+  reading like a rendering fault.
+*/
+.formats {
+  margin: 0;
+  color: var(--text-lo);
+  overflow-wrap: normal;
+}
+
+/* ------------------------------------------------------------------------------ the connector */
+
+.conn {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+/* Vertical hairline while the scene is a column; see `.flow` for the horizontal composition. */
+.diagram .connLine {
+  margin: 0;
+  height: 30px;
+}
+
+/*
+  THE FLOW LINES, AND WHY THEY DO NOT ANIMATE.
+
+  They are drawn on the first paint and they stay drawn. §23 fixes motion to state changes, and a
+  line that appears because the reader scrolled is not one; the two mechanisms that could tie the
+  draw to the scroll position are a `view()` timeline (unevenly supported, and a full-page
+  screenshot -- the way this campaign checks the page -- does not scroll) and an
+  IntersectionObserver whose only output would be decoration. Static is also already what the
+  reduced-motion requirement asks the finished state to be, so there is one state here, not two.
+
+  The colour is the semantics (§5.2): blue leaving a source, violet leaving the compiler. Mint is
+  deliberately absent -- it means "verified" on this site, and nothing in this deterministic
+  public sample has been verified (`lib/visual-world-model.ts` states every object `candidate`).
+*/
+.flow { display: none; }
+
+@media (min-width: 1200px) {
+  .diagram .connLine { display: none; }
+  .flow {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 120px;
+    opacity: 0.7;
+  }
+  .flow path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+  }
+  .flowIn { color: var(--source); }
+  .flowOut { color: var(--relation); }
+}
+
+/* -------------------------------------------------------------------------------- the compiler */
+
+.compiler {
+  display: grid;
+  gap: 4px;
+  /* It is a block, not a band: in the single-column composition it keeps its own width. */
+  justify-self: center;
+  min-width: 132px;
+  justify-items: center;
+  padding: 18px 14px;
+  border: 1px solid var(--hairline-hi);
+  background: var(--ink-900);
+  text-align: center;
+}
+
+.compilerName {
+  margin: 0;
+  color: var(--text-hi);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.compilerRole {
+  margin: 0;
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* --------------------------------------------------------------------------- the object stack */
+
+/*
+  D7: SIX ROWS, NOT SIX CARDS.
+
+  It was a 2x3 grid of bordered panels about 106px wide -- a 13-character measure, which is a
+  feature grid rendered at the size of a chip, and the card-inside-a-card §7 cuts. A row is what
+  this actually is: the compiler's word for the object, in mono, and one line saying what it
+  holds. One column from 1200 up, where the fan's six lines end on six row edges; two columns in
+  the 768-1199 band, where the scene is stacked and a single column of six would be a long list
+  of short lines.
+*/
+.objectList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .objectList { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+}
+
+/* A UI object, not a database icon: the type's name and what it holds, on a rule. */
+.chip {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  min-width: 0;
+}
+
+.chipLabel {
+  margin: 0;
+  color: var(--text-hi);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chipNote { margin: 0; color: var(--text-mid); }
+
+/* ------------------------------------------------------------------------------- naming + next */
+
+/*
+  §2.4. The result is named after it has been shown, so this row sits below the whole split
+  rather than inside the text column, where a phone would put it above the visual.
+*/
+.foot {
+  margin-top: 36px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  max-width: 64ch;
+}
+
+/* The intake receipt reads as a caption; the naming line is the sentence the scene builds to. */
+.naming { margin: 18px 0 0; color: var(--text-hi); }
