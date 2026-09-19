@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STATE_WORD } from "@/components/explore/parallel-view";
-import { exploreChangeStory } from "./explore-change";
+import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-change";
 import { EXPLORE_SAMPLE_QUESTIONS } from "./explore-sample";
 import { LANDING_V2_AVIF } from "./landing-v2-assets";
 import {
@@ -114,8 +114,16 @@ describe("the Landing V2 proof scenes", () => {
   describe("Scene 05 recompile view", () => {
     it("restates the comparison without recomputing any part of it", () => {
       expect(view.counts).toEqual(exploreChangeStory.counts);
-      expect(view.beforeLabel).toBe(exploreChangeStory.before.label);
-      expect(view.afterLabel).toBe(exploreChangeStory.after.label);
+      /*
+        The baseline as two record fields, not as the typed label it used to be.
+
+        `exploreChangeStory.before.label` is a string literal; the view carries the baseline
+        document's own form and the year it was filed, so the scene can spell the snapshot in
+        either language and a moved baseline moves the printed label with it.
+      */
+      expect(view.before.form).toBe(exploreChangeBaselineDocument.form);
+      expect(view.before.year).toBe(exploreChangeBaselineDocument.filingDate.slice(0, 4));
+      expect(view.before.year).toMatch(/^\d{4}$/);
       expect(view.arrivals).toHaveLength(exploreChangeStory.arrivals.length);
       for (const [index, arrival] of view.arrivals.entries()) {
         const source = exploreChangeStory.arrivals[index];

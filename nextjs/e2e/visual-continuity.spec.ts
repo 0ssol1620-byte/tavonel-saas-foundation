@@ -31,7 +31,18 @@ test.describe("visual continuity — locked film side", () => {
       The three docs routes themselves are reachable and pinned elsewhere --
       `lib/docs-navigation.test.ts` owns the map, `e2e/docs-reading-layout.spec.ts` the pages.
     */
-    await expect(page.getByRole("tab")).toHaveCount(0);
+    /*
+      THE ABSENCE IS THE RETIRED STAGE, NOT THE ROLE (corrected round 4).
+
+      This asserted zero tabs anywhere on the entry page, which was a proxy for "the WORLD
+      landing stage has not come back" and stopped being one the moment blueprint §12 put a real
+      tablist in Scene 02 -- three grounded questions, each opening its own committed region. The
+      absence is asserted against the retired markup itself, and the tabs that do exist are
+      required to be that scene's rather than a stage wearing the role.
+    */
+    await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
+    await expect(page.getByRole("tablist")).toHaveCount(1);
+    await expect(page.locator("#proof").getByRole("tab")).toHaveCount(3);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);
   });

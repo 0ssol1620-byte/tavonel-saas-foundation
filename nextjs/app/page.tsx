@@ -54,7 +54,12 @@ export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   /*
-    Landing V2, 2026-09-19 (§27, contract rule 10). The LCP resource is the hero's source page.
+    Landing V2, 2026-09-19 (§27, contract rule 10). The LCP resource is the hero's READ strip.
+
+    It moved from the whole-page render to the region crop with the hero recomposition: the strip
+    is now the first and largest image on the page and the page render is a 200px thumbnail
+    beside it, so preloading the page would be preloading the smaller, later resource. One image
+    carries `fetchPriority="high"`, and it is this one.
 
     It replaces the film poster, because this landing plays no video at all -- §27 bars an
     autoplay video from being the LCP element, and §28 puts the hero in DOM and CSS. What is
@@ -72,8 +77,8 @@ export default function HomePage() {
       <link
         rel="preload"
         as="image"
-        href={hero.source.rasterSrc}
-        imageSrcSet={hero.source.rasterSrcSet}
+        href={hero.region.cropSrc}
+        imageSrcSet={hero.region.cropSrcSet}
         imageSizes={HERO_IMAGE_SIZES}
         fetchPriority="high"
       />

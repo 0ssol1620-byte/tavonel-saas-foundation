@@ -90,6 +90,16 @@
   /* Sign in is a row in the sheet at this width; see `components/mobile-primary-nav.tsx`. */
   .nav-signin.chrome-v2-signin { display: none; }
 }
+
+/*
+  The 44px floor is square, not just tall (QA round 4).
+
+  `tavonel.css` gives `.nav-signin` `min-height: 44px` and only adds `min-width` below 380px. The
+  Korean label is one short word -- 로그인 -- and measured 42x44 at 1440 and 1280: two pixels
+  short of the contract's touch floor in one language and not the other, which is exactly the
+  kind of gap a width-specific rule leaves. The floor belongs to the control, at every width.
+*/
+.nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }
 }
@@ -329,7 +339,26 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
   A box rather than two pixels of extra padding: `min-width` alone would leave the height at 18.
   The separators stay outside the controls (BQ-051 owns those), so the row still breaks between
   pairs and never before one.
+
+  AND THE ROW IS A FLEX ROW NOW, WHICH IS WHAT KEEPS THE 44px BOXES FROM INFLATING IT.
+
+  Round 3 measured the /integrations footer at 812px against a 760px ceiling on a 390x844 phone,
+  and these boxes were half of the reason (the deployment-gate paragraph, since removed, was the
+  other). As inline boxes in a paragraph, each 44px control makes the line box it sits in 44px
+  tall AND the paragraph's own leading still applies around it, so a three-line row cost well
+  over 132px. As flex items each wrapped line is exactly as tall as its tallest item, the gap is
+  declared rather than inherited from the font, and the controls keep every pixel of their target
+  size. `flex-wrap` plus the nowrap pairs preserves BQ-051's rule that a separator never leads a
+  line.
 */
+.chrome-v2-footer .site-footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  line-height: 1.2;
+}
+.chrome-v2-footer .site-footer-legal-pair { display: inline-flex; align-items: center; gap: 4px; }
 .chrome-v2-footer .site-footer-legal a,
 .chrome-v2-footer .site-footer-legal button {
   display: inline-flex;
@@ -340,20 +369,13 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
 /*
-  THE DEPLOYMENT GATE, BACK IN THE CHROME -- in the footer, not in the header D2 cleared.
+  THE DEPLOYMENT GATE IS NOT STYLED HERE BECAUSE IT IS NOT RENDERED HERE.
 
-  `deploymentStateLine()` was the only place `/product`, `/knowledge-compiler`, `/resources`, the
-  `/docs` index, `/contact`, `/explore`, `/status` and `/login` ever stated that compiling your
-  own files is not open in this deployment. D2 removed it from the bar on the premise that the
-  landing's Scene 09 carries the sentence verbatim, which it does -- for the two entry pages.
-  Eight routes lost it, and `/contact` is where the landing's own access action sends a reader.
-
-  It reads as small print above the copyright rather than as an announcement, which is the half
-  of D2 that stands: the fact belongs on the page, not in the position a reader takes for the
-  product's opening sentence.
+  `.site-footer-gate` was the footer's copy of `activationPolicy.customerData.reason`, added to
+  give back the routes that lost the header's state line. It broke two gates this repository
+  already enforces -- `e2e/explore.spec.ts` forbids "this deployment" on /explore, and
+  `e2e/public-layout-balance.spec.ts` caps the footer at 90% of a phone viewport -- so the
+  paragraph is gone from `components/public-site-chrome.tsx` and the rule with it. The fact is
+  still published verbatim on /pricing, /security, /integrations, in the /docs first-run notes
+  and in the landing's closing scene.
 */
-.chrome-v2-footer .site-footer-gate {
-  margin: 0 0 4px;
-  max-width: 78ch;
-  color: var(--text-lo);
-}

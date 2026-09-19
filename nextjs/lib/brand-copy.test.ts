@@ -317,8 +317,16 @@ function marketingPageFiles(directory = "app", found: string[] = []): string[] {
   visitor sees at `/`. What replaced them is the two route files, the composition, the two copy
   modules, and the hero's data module -- the last because every figure on this page comes out of
   it, and a barred phrase written into a label there would render on the page while every page
-  file stayed clean. The hero's components carry no copy of their own and the three primitives
-  are copy-free by contract (D10).
+  file stayed clean.
+
+  THIS IS NOT THE WHOLE OF THE LANDING'S COPY, AND IT IS NOT MEANT TO BE (corrected 2026-09-19).
+  It said the hero's components carried no copy of their own, which was true of the P0 skeleton.
+  Eight scene lanes have written since: `lib/landing-v2-sources.ts`, `-evidence.ts`,
+  `-recompile.ts`, `-hero-copy.ts` and four scene components each carry reader-facing strings in
+  both languages. They are swept where a reader meets them -- `lib/landing-v2-page.test.ts`
+  renders `/` and `/ko` and runs BARRED, OVERCLAIMS, RETIRED_NAMES, §20.2 and `koTermDrift` over
+  the rendered `<main>` -- because several of those components legitimately NAME a forbidden
+  phrase in a comment saying why it is not used, which a source sweep cannot tell from copy.
 */
 function landingSource(): string {
   return [
@@ -372,14 +380,19 @@ describe("public copy", () => {
   */
   it("composes the nine V2 scenes in §9's order, with no second instrument navigation", () => {
     const page = read("components/landing-v2/landing-page.tsx");
-    // The hero is written out; the other eight arrive as `<Scene scene={copy.<id>} …>`.
-    const rendered = [...page.matchAll(/<Scene scene=\{copy\.([a-z]+)\}/g)].map((match) => match[1]!);
-    expect(["hero", ...rendered]).toEqual([...LANDING_V2_SCENE_ORDER]);
+    /*
+      Every scene is handed its own half of the copy deck, and the order they are handed it in is
+      the order §9 sets. This used to read `<Scene scene={copy.<id>}>` -- the P0 skeleton's
+      generic shell -- which is gone now that scenes 02-09 are whole `<section>`s of their own
+      under `components/landing-v2/scenes/`. `lib/landing-v2-page.test.ts` pins the same order
+      against the rendered DOM; this holds it in the file that decides it.
+    */
+    const rendered = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map((match) => match[1]!);
+    expect(rendered).toEqual([...LANDING_V2_SCENE_ORDER]);
     expect(page).toContain('id="hero"');
     expect(page).toContain('data-scene="1"');
-    // The skip-target contract: a named, focusable landmark per scene.
+    // The skip-target contract, for the one scene this file still renders in full.
     expect(page).toContain("tabIndex={-1}");
-    expect(page).toContain("aria-labelledby={titleId}");
     expect(page).not.toContain('className="bar"');
     expect(page, "the phone jump nav went with the old landing").not.toContain("one-path-jump");
   });
@@ -1045,16 +1058,21 @@ describe("public copy", () => {
       World, compile, candidate and ontology. Two things can go wrong and both are still checked:
       a link to a page that does not exist, and a figure. The copy deck declares the three intake
       paths with a real destination each, and the landing itself reaches /sources and
-      /integrations from its scene actions.
+      /integrations from Scene 07's intake rows.
+
+      Those two destinations used to be read off `scene-actions.ts` as well. They are not there
+      any more: Scene 07 links each intake path from `copy.inbound`, so the deck below is the one
+      place that decides where "Files, folders and ZIP" sends a reader, and the assertion pairs
+      the deck's rows with the component that renders them instead of with a second table.
     */
     const deck = read("lib/landing-v2-copy.ts");
     expect(deck).toContain("Files, folders and ZIP");
     expect(deck).toContain('href: "/sources"');
     expect(deck).toContain('href: "/integrations"');
-    const actions = read("components/landing-v2/scene-actions.ts");
-    expect(actions, "the landing offers the format rules one click from the decision they qualify")
-      .toContain('href: "/sources"');
-    expect(actions).toContain('href: "/integrations"');
+    expect(
+      read("components/landing-v2/scenes/use.tsx"),
+      "the landing offers the format rules one click from the decision they qualify",
+    ).toContain("copy.inbound.map");
     // §9's order, read as positions.
     const page = read("components/landing-v2/landing-page.tsx");
     const order = ['id="hero"', "copy.proof", "copy.sources", "copy.trust", "copy.start"].map((id) => page.indexOf(id));

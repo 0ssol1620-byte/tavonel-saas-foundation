@@ -4,7 +4,6 @@ import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
-import { activationPolicy } from "@/lib/activation-policy";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
 import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, type SiteLink } from "@/lib/site-navigation";
@@ -139,32 +138,28 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
         */}
         <p className="fine site-footer-tagline">{korean ? KO_CHROME.tagline : BRAND_LINE.descriptor}</p>
         {/*
-          THE DEPLOYMENT GATE, STATED ON EVERY PUBLIC ROUTE AGAIN.
+          THE DEPLOYMENT GATE IS NOT IN THE CHROME. 2026-09-19, hero/chrome fix round.
 
-          D2 took `deploymentStateLine()` out of the header (blueprint §8, §35) on the premise
-          that the landing's Scene 09 carries the sentence verbatim. It does -- on `/` and `/ko`.
-          The header line was the only place `/product`, `/knowledge-compiler`, `/resources`, the
-          `/docs` index, `/contact`, `/explore`, `/status` and `/login` ever stated it, and
-          `/contact` is where the landing's own access action sends a reader. Contract rule 5
-          names the gate as shared chrome; after D2 only `/pricing`, `/security`, `/integrations`
-          and the `/docs` notes still carried it.
+          A previous round put `activationPolicy.customerData.reason` here, in the footer, to give
+          back the eight routes that lost it when D2 cleared the header line. The reasoning was
+          sound and the placement was not: the footer renders on every public route, and two gates
+          this repository already enforces say so.
 
-          The footer rather than the header, because the half of D2 that stands is *where* the
-          fact sits: an operations notice in the bar is the first thing a reader meets and reads
-          as the product's opening sentence (§2.1). Small print above the copyright is a fact a
-          reader finds when looking for facts.
+            e2e/explore.spec.ts (BA-028) forbids the phrase "this deployment" anywhere on
+            /explore -- that page's argument is that a reader can open the sample and check it,
+            and a sentence about what is closed contradicts the page it is printed on; and
 
-          `activationPolicy.customerData.reason` verbatim, never a second spelling of it -- and
-          `KO_CHROME.customerDataGate` is its one Korean translation, which the landing's own
-          microtext reads from as well. It renders only while the gate is closed: when
-          `customerData.enabled` turns true the sentence stops being true and disappears with it,
-          the way `deploymentStateLine()` returned null.
+            e2e/public-layout-balance.spec.ts caps the footer at 90% of a phone viewport. With the
+            gate paragraph the /integrations footer measured 812px against a 760px ceiling at
+            390x844 -- a bottom of page that is taller than the screen.
+
+          The fact itself is unchanged and still published verbatim, on the surfaces where a
+          reader is actually deciding: /pricing, /security, /integrations, the /docs first-run
+          notes, and the landing's own closing scene, which is what /contact's access action is
+          reached from. `KO_CHROME.customerDataGate` remains its one Korean translation for those
+          surfaces. Restoring it to shared chrome needs a placement that satisfies both gates
+          above, which is a design decision rather than a re-add.
         */}
-        {activationPolicy.customerData.enabled ? null : (
-          <p className="fine site-footer-gate" data-customer-data="arranged">
-            {korean ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason}
-          </p>
-        )}
         {/*
           BA-250: the row a procurement reader looks for. Copyright, the Korean entry and the
           security inbox -- the last two are pages and an address this site already publishes, so
@@ -182,7 +177,9 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
           <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}
-            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"}>{language.label}</Link>
+            {/* T1-014 again (ROUND3-P2): the one footer link that was missing the flag, so /ko
+                fired an RSC prefetch for `/` that the browser then aborted. */}
+            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"} prefetch={false}>{language.label}</Link>
           </span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}

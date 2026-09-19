@@ -1,0 +1,231 @@
+/*
+  Scene 03's composition only (blueprint §13). Token-only, unlayered like every other module
+  sheet here, and deliberately small: everything that is not this scene's arrangement -- type,
+  ground, radius, focus, the evidence line, the source page -- is already in app/landing-v2.css
+  and is used from there.
+*/
+
+/* ---------------------------------------------------------------------------- the arrangement */
+
+/*
+  Phone and tablet: one column, top to bottom -- sources, compiler, objects -- which is the same
+  sentence read vertically. The horizontal composition starts at 900, the width below which the
+  founder rule keeps heavy scene visuals off the page anyway.
+*/
+.diagram {
+  display: grid;
+  /*
+    `minmax(0, 1fr)`, not the implicit `auto`, and that is the whole of QA round 4's WebKit fix.
+
+    An `auto` track is at least its content's min-content size, so a single-column grid whose
+    content cannot break small enough grows PAST its container instead of clipping or wrapping.
+    WebKit resolved the source rows wider than Chromium did and the Korean page scrolled sideways
+    by 23px at 390 and 53px at 360 -- the founder's phone band. Clamping the track at the bottom
+    is what makes the container the authority on width; the wrapping rules below then decide how
+    the text fits inside it. Every nested single-column list here gets the same floor for the
+    same reason.
+  */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  justify-items: stretch;
+}
+
+/* The stack and the object column are grid items: without this they size to their content too. */
+.stack,
+.objects { min-width: 0; }
+
+@media (min-width: 900px) {
+  .diagram {
+    /* stack | connector | compiler | connector | objects, with the connectors as real gutters. */
+    grid-template-columns: minmax(0, 212px) minmax(40px, 0.5fr) minmax(0, 132px) minmax(40px, 0.5fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0 14px;
+  }
+  .stack,
+  .objects { align-self: start; }
+  .compiler { align-self: center; }
+}
+
+/* --------------------------------------------------------------------------- the source stack */
+
+.colLabel {
+  margin: 0 0 14px;
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stackList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+/* Preview then caption, side by side, so a long filename wraps in a column of its own. */
+.item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.itemMeta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* The filename breaks on its own hyphens rather than running past the column. */
+.filename {
+  margin: 0;
+  color: var(--text-hi);
+  overflow-wrap: anywhere;
+}
+
+/*
+  The two metadata lines wrap rather than push, for the same reason the filename does: they carry
+  a form, an ISO date and a page position, and an ISO date is one unbreakable token in every
+  engine. `anywhere` (not `break-word`) because only `anywhere` also lowers the min-content size,
+  which is what the clamped tracks above are reading.
+*/
+.itemLine { margin: 0; color: var(--text-mid); overflow-wrap: anywhere; }
+.itemKind { margin: 0; color: var(--text-lo); overflow-wrap: anywhere; }
+
+.formatsLabel {
+  margin: 22px 0 6px;
+  color: var(--text-mid);
+}
+
+.formats {
+  margin: 0;
+  color: var(--text-lo);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------------------ the connector */
+
+.conn {
+  display: grid;
+  place-items: center;
+}
+
+/* Vertical hairline while the scene is a column; see `.flow` for the horizontal composition. */
+.diagram .connLine {
+  margin: 0;
+  height: 30px;
+}
+
+/*
+  THE FLOW LINES, AND WHY THEY DO NOT ANIMATE.
+
+  They are drawn on the first paint and they stay drawn. §23 fixes motion to state changes, and a
+  line that appears because the reader scrolled is not one; the two mechanisms that could tie the
+  draw to the scroll position are a `view()` timeline (unevenly supported, and a full-page
+  screenshot -- the way this campaign checks the page -- does not scroll) and an
+  IntersectionObserver whose only output would be decoration. Static is also already what the
+  reduced-motion requirement asks the finished state to be, so there is one state here, not two.
+
+  The colour is the semantics (§5.2): blue leaving a source, violet leaving the compiler. Mint is
+  deliberately absent -- it means "verified" on this site, and nothing in this deterministic
+  public sample has been verified (`lib/visual-world-model.ts` states every object `candidate`).
+*/
+.flow { display: none; }
+
+@media (min-width: 900px) {
+  .diagram .connLine { display: none; }
+  .flow {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 120px;
+    opacity: 0.7;
+  }
+  .flow path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+  }
+  .flowIn { color: var(--source); }
+  .flowOut { color: var(--relation); }
+}
+
+/* -------------------------------------------------------------------------------- the compiler */
+
+.compiler {
+  display: grid;
+  gap: 4px;
+  /* It is a block, not a band: in the single-column composition it keeps its own width. */
+  justify-self: center;
+  min-width: 132px;
+  justify-items: center;
+  padding: 18px 14px;
+  border: 1px solid var(--hairline-hi);
+  background: var(--ink-900);
+  text-align: center;
+}
+
+.compilerName {
+  margin: 0;
+  color: var(--text-hi);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.compilerRole {
+  margin: 0;
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* --------------------------------------------------------------------------- the object stack */
+
+.objectList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 560px) {
+  .objectList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* A UI object, not a database icon: a panel with the type's name and what it holds. */
+.chip {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  background: var(--ink-850);
+}
+
+.chipLabel {
+  margin: 0;
+  color: var(--text-hi);
+  letter-spacing: 0.04em;
+}
+
+.chipNote { margin: 0; color: var(--text-mid); }
+
+/* ------------------------------------------------------------------------------- naming + next */
+
+/*
+  §2.4. The result is named after it has been shown, so this row sits below the whole split
+  rather than inside the text column, where a phone would put it above the visual.
+*/
+.foot {
+  margin-top: 48px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  max-width: 64ch;
+}
+
+.naming { margin: 0; color: var(--text-hi); }

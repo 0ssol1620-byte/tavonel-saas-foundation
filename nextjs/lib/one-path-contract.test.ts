@@ -74,14 +74,21 @@ describe("approved one-path experience", () => {
   it("orders the landing as the nine V2 scenes, with no film on the page", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "no decoder on the entry pages").toBeNull();
-    const scenes = [...page.matchAll(/<Scene scene=\{copy\.([a-z]+)\}/g)].map((match) => match[1]);
-    expect(["hero", ...scenes]).toEqual([
+    /*
+      The order is read off the copy deck each scene is handed -- the one decision the
+      composition still makes about all nine. It used to be read off `<Scene scene={copy.<id>}>`,
+      the generic shell the P0 skeleton rendered eight times; that shell is gone, because scenes
+      02-09 are now whole `<section>`s under `components/landing-v2/scenes/` that carry their own
+      landmark and their own next action. `lib/landing-v2-page.test.ts` holds the same order
+      against the rendered markup, which is the stronger half of this pair.
+    */
+    const scenes = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map((match) => match[1]);
+    expect(scenes).toEqual([
       "hero", "proof", "sources", "evidence", "recompile", "why", "use", "trust", "start",
     ]);
-    // Each section is a named, focusable landmark -- the skip-target contract the audit checks in
-    // a browser, pinned here so a refactor that never opens the page cannot lose it.
+    // The hero is still a named, focusable landmark here; the other eight are pinned in the
+    // render walk and in each scene's own guard, where the markup they own actually lives.
     expect(page).toContain("tabIndex={-1}");
-    expect(page).toContain("aria-labelledby={titleId}");
     expect(page).toContain('aria-labelledby="lv2-hero-title"');
     // The retired page's own landmarks, so none of them returns by copy-paste.
     for (const gone of ['id="top"', 'id="compile"', 'id="how-it-works"', 'id="connect"', "one-path-works-film", "one-path-film-note"]) {

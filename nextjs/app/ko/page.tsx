@@ -45,12 +45,12 @@ export default function KoreanEntryPage() {
   const hero = heroScene();
   return (
     <>
-      {/* 영문 페이지와 같은 LCP 리소스: 히어로가 그리는 원문 페이지 렌더, 같은 srcset과 sizes. */}
+      {/* 영문 페이지와 같은 LCP 리소스: 히어로가 그리는 READ 스트립(영역 크롭), 같은 srcset과 sizes. */}
       <link
         rel="preload"
         as="image"
-        href={hero.source.rasterSrc}
-        imageSrcSet={hero.source.rasterSrcSet}
+        href={hero.region.cropSrc}
+        imageSrcSet={hero.region.cropSrcSet}
         imageSizes={HERO_IMAGE_SIZES}
         fetchPriority="high"
       />

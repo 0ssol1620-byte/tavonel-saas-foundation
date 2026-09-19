@@ -29,11 +29,28 @@ import "./landing-v2.css";
  *
  * IBM Plex Mono is unchanged and carries the instrument voice — clocks, counts, state labels,
  * source locations.
+ *
+ * WHY `display: "optional"` ON THE TWO PRELOADED FACES (QA round 4, 2026-09-19).
+ * D3 asked for `swap`. `swap` paints the page in the fallback face and then repaints it in the
+ * real one, and a repaint that changes glyph widths changes line counts: QA measured /ko at CLS
+ * 0.2351 (1024) and 0.3059 (768) — one shift at ~322ms in which the hero support sentence lost a
+ * line and everything under it (the action row, the intake line, the whole demo) was pulled up
+ * 30px. That is six times the contract's 0.05 budget and above the CI Lighthouse gate, and
+ * reserving height does not fix it, because the box SHRINKS when the real face arrives.
+ * `optional` removes the second paint: the face is preloaded and used when it is ready inside
+ * the block period, and otherwise that one page view renders in the metric-adjusted fallback
+ * `next/font` already generates. `tavonel.css` made the same choice for Wanted Sans for the same
+ * reason. Contract rule 10 (CLS) outranks D3's spelling of this option.
+ *
+ * Instrument Serif keeps `swap`: it is `preload: false` by design, and an unpreloaded `optional`
+ * face would effectively never paint — which is not a font setting but a deletion of the accent.
+ * It sets two words of the English H1 only (/ko passes no accent phrase) and English measured
+ * 0.043 / 0.035, inside the budget.
  */
 const sans = Geist({
   subsets: ["latin"],
   variable: "--font-geist",
-  display: "swap",
+  display: "optional",
 });
 
 const serif = Instrument_Serif({
@@ -49,7 +66,7 @@ const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-mono",
-  display: "swap",
+  display: "optional",
 });
 
 /**

@@ -67,36 +67,36 @@
       "kind": "region",
       "outputs": [
         {
-          "bytes": 12538,
+          "bytes": 12981,
           "format": "avif",
-          "height": 157,
-          "sha256": "sha256:b329fe37138c96eb54f670eb775d38fa2cd61d439b5d95a089fd6371ee608cbc",
-          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1280.avif",
-          "width": 1280
+          "height": 162,
+          "sha256": "sha256:d3c2048d6d69c8a709bd56346b5fc60e10081bab5d910ba2e9241a3f6ee25936",
+          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.avif",
+          "width": 1317
         },
         {
-          "bytes": 15880,
+          "bytes": 17214,
           "format": "webp",
-          "height": 157,
-          "sha256": "sha256:aafd874bbc300857c399e204ad858a1e201921a03350fdac9bd3bf91b9ab0c3d",
-          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1280.webp",
-          "width": 1280
+          "height": 162,
+          "sha256": "sha256:6e556f6d9f4811ac10c0cd396a5e735215689d330d4e606ab17433ef32c6cd45",
+          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.webp",
+          "width": 1317
         },
         {
-          "bytes": 4682,
+          "bytes": 5336,
           "format": "avif",
-          "height": 79,
-          "sha256": "sha256:5e7a5000cc210dc7dc22bf4dfa71304d56c6b16229fd2a4894df688fffae5659",
-          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-640.avif",
-          "width": 640
+          "height": 87,
+          "sha256": "sha256:cd6756aa306beabb6e08f8e69a483a6f5eea7321316d07e40506501452e81061",
+          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-708.avif",
+          "width": 708
         },
         {
-          "bytes": 6166,
+          "bytes": 6856,
           "format": "webp",
-          "height": 79,
-          "sha256": "sha256:142ed326bbcaf175f921b85375b078e5c2f9908c3129b67119e31984d08d5b65",
-          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-640.webp",
-          "width": 640
+          "height": 87,
+          "sha256": "sha256:2781fe9d3f27415964ebbe0b1697a982301d5a827da5225b99f70ad152b8a10e",
+          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-708.webp",
+          "width": 708
         }
       ],
       "page": 4,

@@ -248,3 +248,39 @@ describe("app/layout.tsx fonts", () => {
     expect(layout).not.toMatch(/href=\{?["']https:\/\/fonts\.(googleapis|gstatic)\.com/);
   });
 });
+
+/*
+  ROUND3-P1. One measured figure may not carry two semantics on one page (§5.2).
+
+  `exploreChangeStory.counts` is printed twice -- in the hero's Recompile beat and again in Scene
+  05 -- and the two live in different stylesheets, so they drifted: the hero painted `rebuilt`
+  mint at rest while Scene 05 painted it amber. The colours are compared here rather than pinned
+  to a literal, because what matters is that the two agree, not which token they agree on.
+*/
+describe("the change counts mean the same thing in both places", () => {
+  const recompile = read("components/landing-v2/scenes/recompile.module.css");
+
+  /** The `color:` of the first rule whose selector list contains `selector`. */
+  function colourOf(css: string, selector: string): string {
+    for (const block of stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const heads = block[1].split(",").map((head) => head.trim());
+      if (!heads.includes(selector)) continue;
+      const colour = block[2].match(/(?:^|[;\s])color\s*:\s*([^;]+)/);
+      if (colour) return colour[1].trim();
+    }
+    throw new Error(`no color declared for ${selector}`);
+  }
+
+  it.each(["rebuilt", "added", "removed", "untouched"])("%s is one colour on the page", (key) => {
+    expect(colourOf(landing, `.lv2-count--${key} b`)).toBe(colourOf(recompile, `.${key} b`));
+  });
+
+  it("keeps --verified for the state the World actually records, not for a diff partition", () => {
+    for (const key of ["rebuilt", "added", "removed", "untouched"]) {
+      expect(colourOf(landing, `.lv2-count--${key} b`), `${key} claims the verified colour`)
+        .not.toContain("--verified");
+    }
+    // And no keyframe smuggles it back in for part of the loop.
+    expect(stripComments(landing)).not.toContain("lv2-b-rebuilt");
+  });
+});

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { landingV2Copy } from "../lib/landing-v2-copy";
 
 /*
   The ways in, checked where a visitor actually decides.
@@ -11,12 +12,14 @@ import { expect, test } from "@playwright/test";
   It read `#connect .one-path-source-options` (three cards and a fold), then the `In` column of
   the one surviving grid, and now the scenes themselves. Landing V2 (2026-09-19) gives Scene 03
   "Sources into a World" and Scene 07 "Bring it, use it" a headline, a paragraph and one next
-  action each; the in/out lists that will carry the three routes as rows are Scene 07's P2 visual
-  and are not built yet. So what is asserted is reachability and destination, plus the two things
-  this file has always also caught: a console error on the way, and sideways scroll.
+  action each.
 
-  When Scene 07's visual lands, the row-level assertions belong back here -- three rows, the
-  first following the commercial posture -- against `.lv2` markup rather than `.one-path-*`.
+  ROUND 4: Scene 07's in/out lists landed, and they are where the intake ROUTES live. `/sources`
+  is Scene 07's "Files, folders and ZIP" row; `/integrations` is its connector row. Scene 03's
+  own next action is `/explore?act=world` -- it shows what compiling those sources produces, and
+  it never linked `/sources`. So the selector moves to where the fact lives, which is this file's
+  one standing habit. What is asserted is reachability and destination, plus the two things this
+  file has always also caught: a console error on the way, and sideways scroll.
 */
 test("the entry page reaches every supported intake route, with no console error", async ({ page }) => {
   const errors: string[] = [];
@@ -25,14 +28,29 @@ test("the entry page reaches every supported intake route, with no console error
 
   await page.goto("/");
 
-  // Scene 03 hands the reader the format rules; Scene 07 hands them the connectors.
+  // Scene 03 shows what compiling the sources produces; Scene 07 carries the routes in.
   const sources = page.locator("section#sources");
   await sources.scrollIntoViewIfNeeded();
-  await expect(sources.locator('a[href="/sources"]')).toHaveCount(1);
+  await expect(sources.locator('a[href^="/explore"]')).toHaveCount(1);
 
   const use = page.locator("section#use");
   await use.scrollIntoViewIfNeeded();
-  await expect(use.locator('a[href="/integrations"]')).toHaveCount(1);
+  /*
+    ROUND3-P1: this asserted `toHaveCount(1)` on `/integrations` and got 2, because Landing V1 had
+    one connector row and Scene 07 has two -- the OAuth connectors and customer-run private
+    infrastructure -- and rule 7 (§17) requires both. They legitimately share a route, because
+    that route documents both. So the assertion is the IDENTITY of the rows, read from the copy
+    module, rather than a count that goes stale the next time the list grows.
+  */
+  const inbound = landingV2Copy(false).use.inbound;
+  for (const row of inbound) {
+    await expect(
+      use.getByRole("link", { name: row.label, exact: true }),
+      `Scene 07's "${row.label}" row`,
+    ).toHaveAttribute("href", row.href);
+  }
+  expect(inbound.map((row) => row.href), "the intake routes Scene 07 carries")
+    .toEqual(["/sources", "/integrations", "/integrations"]);
 
   // The commercial posture's own destination is on the page twice: the hero and the close.
   const access = page.locator('main a[href="/contact"], main a[href="/login"], main a[href="/workspace"]');

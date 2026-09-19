@@ -1,0 +1,254 @@
+/*
+  Scene 04's Evidence Grid (D9), and nothing else.
+
+  Token-only and small, per D10. Every colour, radius, motion duration and easing below reads a
+  custom property declared in `app/tavonel.css` or `app/landing-v2.css`; `.lv2-paper` has already
+  remapped the text and accent tokens for this ground, so the same markup would read correctly if
+  the ground alternation ever moved this scene to obsidian.
+*/
+
+.inspector {
+  display: grid;
+  gap: 32px;
+  margin-top: 48px;
+}
+
+/*
+  MOBILE IS PAGE FIRST, THEN THE RECORD (§25 / the lane's mobile rule).
+
+  The argument of this scene is "here is the thing, here is where it came from", and on a phone
+  the reader meets one screen at a time: the document with the box on it reads as evidence, and
+  the five fields under it read as what binds them. In the other order the fields are five lines
+  of metadata about something not yet on screen.
+*/
+.figure {
+  order: 1;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.connector { order: 2; }
+.record {
+  order: 3;
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------------------- the passage */
+
+.claim {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--hairline-hi);
+  /*
+    Transparent on the scene ground rather than a tone darker. --text-muted-paper measures
+    4.86:1 on --paper-50 and 4.48:1 on --paper-100, and the kind label above the passage is 13px
+    -- small text, so a darker panel would put a label two hundredths under AA for the sake of a
+    shade. The border does the separating.
+  */
+  background: transparent;
+  transition: border-color var(--motion-ui) var(--ease-ui);
+}
+.kind {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: var(--lv2-meta);
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+.excerpt {
+  margin: 0;
+  font-size: var(--lv2-body);
+  line-height: 1.55;
+  color: var(--text-hi);
+}
+
+/* ---------------------------------------------------------------------------- the five fields */
+
+/*
+  A definition list, not a table: five name/value pairs with no second axis. The grid is a fixed
+  term column so the values line up as they do in the product's own Evidence pane, and it
+  collapses to stacked rows on a phone where a 92px term column would leave a digest nine
+  characters wide.
+*/
+.fields {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+}
+.field {
+  display: grid;
+  gap: 2px;
+}
+.term {
+  margin: 0;
+  letter-spacing: 0.08em;
+  color: var(--text-lo);
+}
+.value {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  color: var(--text-hi);
+  /* A digest, a coordinate pair and a page count are read character by character. */
+  overflow-wrap: anywhere;
+}
+.unit { color: var(--text-lo); }
+
+@media (min-width: 560px) {
+  .field {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 16px;
+    align-items: baseline;
+  }
+}
+
+/* -------------------------------------------------------------------------------- the controls */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+.open { font-weight: 500; }
+
+/*
+  The secondary control. A hairline button rather than a second filled one (§29: one filled
+  control per viewport), at the 44px touch floor, and quieter than the link beside it so the
+  scene still has one next action rather than two equals.
+*/
+.copy {
+  min-height: 44px;
+  padding-inline: 16px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--lv2-small);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: border-color var(--motion-ui) var(--ease-ui), color var(--motion-ui) var(--ease-ui);
+}
+@media (hover: hover) and (pointer: fine) {
+  .copy:hover {
+    border-color: var(--text-on-paper);
+    color: var(--text-hi);
+  }
+}
+.announce {
+  font-size: var(--lv2-small);
+  line-height: 1.45;
+  color: var(--text-mid);
+}
+
+/* ------------------------------------------------------------------------------- the page side */
+
+.figure > :global(.lv2-page) {
+  width: 100%;
+  max-width: 440px;
+}
+.caption {
+  margin: 0;
+  max-width: 440px;
+  color: var(--text-mid);
+  transition: color var(--motion-ui) var(--ease-ui);
+}
+
+/* ------------------------------------------------------------------------- the connecting line */
+
+/*
+  `.lv2-line` is a 1px column 36px tall with a 40px indent, which is the stacked reading. On a
+  wide viewport the two halves sit side by side and the same hairline runs across the gutter
+  between them; `transform-origin` moves with it so the primitive's own draw still starts at the
+  source end.
+*/
+.connector {
+  margin-left: 40px;
+}
+
+/* ---------------------------------------------------------------------------- the wide layout */
+
+@media (min-width: 1000px) {
+  .inspector {
+    grid-template-columns: minmax(0, 6fr) 32px minmax(0, 5fr);
+    align-items: start;
+    column-gap: 0;
+  }
+  .record { order: 1; }
+  .connector {
+    order: 2;
+    width: 100%;
+    height: 1px;
+    margin-left: 0;
+    align-self: center;
+    transform-origin: left;
+  }
+  .figure {
+    order: 3;
+    justify-items: end;
+    justify-self: end;
+  }
+  .caption { text-align: right; }
+}
+
+/* =============================================================================================
+   THE SIGNATURE INTERACTION (§4.1, §14)
+   ============================================================================================= */
+
+/*
+  TWO NEUTRALISERS FIRST, AND THEY ARE NOT COSMETIC.
+
+  `app/landing-v2.css` binds `lv2-b-read` and `lv2-b-verify` to `.lv2-region` and
+  `.lv2-claim-state` with the shorthand -- duration included -- and those two rules are NOT
+  scoped to the hero's stage. Any other use of the primitives on this page therefore inherits the
+  hero's 16-second loop: the box on this page would vanish for the first 1.2s of every cycle and
+  the STATUS dot for the first 5.8s, on a scene that has no sequence and is far below the fold.
+  Two declarations at (0,2,0) stop it here without touching another lane's sheet. Reported as an
+  open issue: those two rules want `.lv2-demo-stage` in front of them.
+*/
+.inspector :global(.lv2-region),
+.inspector :global(.lv2-claim-state) {
+  animation: none;
+}
+
+/*
+  Hover or focus the record and the box on the page is ringed and its label reads in the source
+  colour; hover the page and the passage the box states is picked out. One relation, shown from
+  whichever end the reader is at.
+
+  `:has()` is the whole implementation and there is no JavaScript fallback, unlike the hero's.
+  The difference is what is lost without it: the hero's fallback drives a state that its
+  animation would otherwise overwrite, while this is a highlight over a scene that is already
+  complete and readable. An engine without `:has()` gets the record, the page, the box, the label
+  and both controls -- it gets no hover emphasis, which is a decoration, not the evidence.
+
+  FOCUS REACHES THIS FROM THE RECORD SIDE ONLY, and deliberately. The controls are the record's
+  focusable elements and focusing either runs the same state hovering the record does. The box on
+  the page is not a tab stop: it navigates nowhere, and a focusable element that does nothing is
+  a tab stop that owes the reader something it does not have (the argument `entity-node.tsx`
+  already makes). The page-to-passage direction is therefore pointer-only.
+*/
+.inspector:has(.record:hover) :global(.lv2-region),
+.inspector:has(.controls :is(a, button):focus-visible) :global(.lv2-region) {
+  outline: 2px solid var(--source);
+  outline-offset: 2px;
+}
+
+.inspector:has(.record:hover) .regionLabel,
+.inspector:has(.controls :is(a, button):focus-visible) .regionLabel {
+  color: var(--source);
+}
+
+.inspector:has(.figure:hover) .claim {
+  border-color: var(--source);
+}

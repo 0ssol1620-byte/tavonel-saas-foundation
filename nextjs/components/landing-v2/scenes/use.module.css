@@ -1,0 +1,93 @@
+/*
+  Scene 07 (blueprint §17). Token-only, and small on purpose: everything the sheet already owns
+  -- type scale, grounds, focus ring, the next-action link -- is used from `app/landing-v2.css`
+  and only the two lists and the pipeline between them are written here.
+
+  The composition is the blueprint's own drawing rather than a connector-logo wall: intake
+  columns above, one hub, output columns below. The strands are the only decoration, and they
+  exist only where the columns they point at exist -- below 900px the lists stack into one
+  column each and strands drawn against three columns would point at nothing, so the drawing is
+  removed rather than squashed (contract rule 12: no drawing below ~900px).
+*/
+
+.lists { display: grid; gap: 28px; }
+
+.group { margin: 0; }
+
+.groupLabel {
+  margin: 0 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-lo);
+  font-weight: 500;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .lists { gap: 0; }
+  .inRows { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+  .outRows { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+}
+
+.row {
+  position: relative;
+  border-top: 1px solid var(--hairline);
+  padding-top: 13px;
+}
+
+/*
+  Blue is source/location (§5.2), so the tick sits on the intake rows and nowhere else: an
+  outbound artifact is not a source. A row the deployment does not have keeps the plain hairline
+  -- `data-built="0"` is the copy deck's instruction to draw it monochrome, not a second colour.
+*/
+.row[data-in="1"][data-built="1"]::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline-start: 0;
+  width: 28px;
+  border-top: 1px solid var(--source);
+}
+
+/* 44px touch floor. The label is the link; the note under it is not a second tap target. */
+.rowLink {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-hi);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rowLink { transition: color var(--motion-ui) var(--ease-ui); }
+  .rowLink:hover { color: var(--source); }
+}
+
+.rowNote { margin: 4px 0 0; color: var(--text-mid); }
+
+/* -------------------------------------------------------------------- the pipeline */
+
+.pipe { display: none; }
+
+@media (min-width: 900px) {
+  .pipe {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 800 / 132;
+    margin-block: 26px;
+  }
+}
+
+.strandIn { fill: none; stroke: var(--source); stroke-width: 1; opacity: 0.55; }
+.strandOut { fill: none; stroke: var(--hairline-hi); stroke-width: 1; }
+.hub { fill: none; stroke: var(--hairline-hi); stroke-width: 1; }
+.hubLabel { fill: var(--text-hi); font: 12px var(--f-mono); letter-spacing: 0.08em; }

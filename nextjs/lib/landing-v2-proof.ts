@@ -1,8 +1,9 @@
-import { exploreChangeStory } from "./explore-change";
+import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-change";
 import { chooseExploreEntryProof, excerptPreview } from "./explore-entry-proof";
 import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import { buildExploreAnswerViews } from "./explore-story";
 import { landingV2PageImage, landingV2RegionImage } from "./landing-v2-assets";
+import { sourcePageQualifier } from "./source-page-rasters";
 import { toVisualWorldModel, type VisualState } from "./visual-world-model";
 
 /**
@@ -43,6 +44,29 @@ export const LANDING_V2_STATE_WORD: Record<VisualState, string> = {
   unresolved: "UNRESOLVED",
   dim: "UNCHANGED",
 };
+
+/**
+ * The Korean half of the same vocabulary (D12), keyed by the same `VisualState`.
+ *
+ * It lived in `lib/landing-v2-recompile.ts` and only Scene 05 read it, so /ko printed
+ * "PUBLISHED SAMPLE" in the hero and in the evidence inspector and "공개 샘플" four scenes
+ * below -- one state of one World, spelled two ways on one page, one of them in English on a
+ * page D12 requires to be a literal translation. The map belongs beside the English one, where
+ * every caller that has the state can reach it.
+ */
+export const LANDING_V2_STATE_WORD_KO: Record<VisualState, string> = {
+  current: "현재",
+  candidate: "공개 샘플",
+  changed: "변경됨",
+  affected: "영향 받음",
+  unresolved: "미해결",
+  dim: "그대로",
+};
+
+/** The state word in the language the page is written in. One call site shape, three call sites. */
+export function landingV2StateWord(state: VisualState, locale: "en" | "ko"): string {
+  return (locale === "ko" ? LANDING_V2_STATE_WORD_KO : LANDING_V2_STATE_WORD)[state];
+}
 
 /* --------------------------------------------------------------------------------- the shapes */
 
@@ -94,8 +118,23 @@ export type EvidenceRecord = {
 };
 
 export type RecompileView = {
-  beforeLabel: string;
-  afterLabel: string;
+  /*
+    The baseline snapshot as two measured fields, never as a label.
+
+    It used to be `beforeLabel` / `afterLabel`, passed through from `exploreChangeStory`, where
+    both are string literals typed in `lib/explore-change.ts` ("2025 Form 10-K", "... + four 2026
+    filings"). `RevisionBadge` marks what it is given `data-derived="1"`, so a hand-typed label
+    was printing inside a receipt marker: restate the baseline or add a filing whose baseline year
+    differs and the badge keeps saying 2025 with every guard green, because the page-level digit
+    walk skips the whole subtree of a `data-derived` element. It was also untranslated, which is
+    how /ko came to print "2025 Form 10-K" four scenes under the hero's "2025년 10-K".
+
+    The form and the year come off the baseline document record, exactly as `lib/landing-v2-hero.ts`
+    reads them, and the sentence around them is `recompile.snapshotBeforeFormat` /
+    `snapshotAfterFormat` in the page's own language, filled in the component. The count in the
+    after label is `arrivals.length` -- the same array the badge lists underneath it.
+  */
+  before: { form: string; year: string };
   arrivals: { documentId: string; form: string; filingDate: string; label: string; page: number; excerptPreview: string }[];
   /** A readable sample of the objects the arrivals reached -- never the whole list. */
   affectedSample: { id: string; label: string; labelTruncated: boolean; kind: string; state: VisualState; stateLabel: string }[];
@@ -197,6 +236,18 @@ export function buildEvidenceRecord(): EvidenceRecord {
   if (!region) throw new Error("landing_v2_proof_has_no_entry_proof");
   const document = exploreSampleDocuments.find((entry) => entry.documentId === region.sourceId);
   if (!document) throw new Error(`landing_v2_proof_source_record_missing: ${region.sourceId}`);
+  /*
+    ROUND3-P2. Scene 04 labels its next action "Open the original", and three of the five 2026
+    filings in this corpus are `reference_render` -- chromium prints of SEC HTML, not issuer
+    PDFs. It happens to be true today because `chooseExploreEntryProof` prefers the 10-K, which
+    is the issuer original; nothing pinned it, and that function's two fallbacks are free to land
+    on a 2026 filing. A scene whose subject is provenance fails rather than mislabels, the way
+    `buildHeroScene()` fails on a partially compiled source -- and the SOURCE row prints the
+    qualifier as well, so the reader is told which bytes the link opens.
+  */
+  if ((region.representationKind ?? "original") !== "original") {
+    throw new Error(`landing_v2_proof_region_is_not_an_original: ${region.id}`);
+  }
   const node = world.nodes.find(
     (item) => item.evidenceRefs[0] === region.id && item.kind !== "Evidence" && item.kind !== "Document",
   );
@@ -230,7 +281,8 @@ export function buildEvidenceRecord(): EvidenceRecord {
       /* The committed bytes the compiler read, opened at the page the region is on. */
       original: `${document.href}#page=${region.page}`,
     },
-    citation: `${source.form} · filed ${source.filingDate} · ${source.filename} · page ${source.page} of ${source.pageCount} · bbox ${region.bbox1000.join(",")} (per mille) · ${region.digest}`,
+    /* The representation travels with the citation: a pasted line says which bytes it points at. */
+    citation: `${source.form} · filed ${source.filingDate} · ${source.filename} (${sourcePageQualifier(source.representationKind)}) · page ${source.page} of ${source.pageCount} · bbox ${region.bbox1000.join(",")} (per mille) · ${region.digest}`,
   };
 }
 
@@ -265,9 +317,14 @@ export function buildRecompileView(): RecompileView {
       };
     });
 
+  const baselineFiled = exploreChangeBaselineDocument.filingDate;
+  if (!baselineFiled || !exploreChangeBaselineDocument.form) {
+    // Fail closed: a snapshot label with a blank year is a receipt that says nothing.
+    throw new Error("landing_v2_recompile_baseline_incomplete");
+  }
+
   return {
-    beforeLabel: exploreChangeStory.before.label,
-    afterLabel: exploreChangeStory.after.label,
+    before: { form: exploreChangeBaselineDocument.form, year: baselineFiled.slice(0, 4) },
     arrivals: exploreChangeStory.arrivals.map((arrival) => ({
       documentId: arrival.documentId,
       form: arrival.form,

@@ -1,5 +1,6 @@
 import { CAPABILITY_MANIFEST, describeAcceptedFormats } from "../../shared/capabilityManifest";
 import { activationPolicy } from "./activation-policy";
+import { TRAINING_DATA_CLAIM } from "./security-claims";
 import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 
 /**
@@ -396,16 +397,31 @@ const EN: LandingV2Copy = {
     headline: "Built for knowledge you cannot afford to misplace.",
     support: "Four things this deployment does, each written down where it can be checked.",
     /*
-      The four §18 proofs, each anchored to a row that already exists: the first is /security's
-      own control row, the second is what the Evidence scene above demonstrates, the third is
-      `activationPolicy.candidatePromotion.reason`, and the fourth is the two verifiers
-      /developers publishes for download.
+      The four §18 proofs, and where each one is backed.
+
+      ROUND3-P2 corrected this comment and two of the notes. Contract rule 7 calls all four "the
+      /security rows"; only the first is one. The other three are claims this site publishes
+      elsewhere, and two of them cited a receipt that was about something else:
+
+      1. training  -- /security's own control row, imported (`lib/security-claims.ts`).
+      2. evidence  -- what Scene 04 above demonstrates on real data: `buildEvidenceRecord()`
+                      refuses to build a record without the source version, page and region, and
+                      the scene prints all three. `lib/landing-v2-trust.test.ts` checks that.
+      3. review    -- the held-for-review mechanism, published in /contact's FAQ and on /trust.
+                      It used to print `activationPolicy.candidatePromotion.reason` ("Activation
+                      is always an explicit human decision"), which is the gate on promoting a
+                      candidate World to the active one -- a different mechanism from a per-object
+                      hold, so the note stated one thing and cited another.
+      4. portable  -- the export contract in `lib/docs-content.ts`: a download is signed at
+                      request time or refused with EXPORT_SIGNER_NOT_CONFIGURED, and there is no
+                      third outcome. The old note promised a signed package unconditionally, which
+                      is not what a deployment without a signer does.
     */
     proofs: [
-      { id: "training", label: "Your data is not training data", note: "Your documents are not used to train shared models. Models read your sources to compile your World, and for nothing else." },
+      { id: "training", label: TRAINING_DATA_CLAIM.label, note: TRAINING_DATA_CLAIM.body },
       { id: "evidence", label: "Evidence stays attached", note: "A published object carries the source version, page and region it was compiled from, and is not emitted without them." },
-      { id: "review", label: "Unverified knowledge is held for review", note: activationPolicy.candidatePromotion.reason },
-      { id: "portable", label: "Portable output, and a verifier you run", note: "A compiled World leaves as a signed package, and the verifiers that check the signature and the contents are published for download." },
+      { id: "review", label: "Unverified knowledge is held for review", note: "A passage that cannot be verified is held for review and surfaced as such, not published as if it were verified. Fail closed is a property of the compiler, not a setting." },
+      { id: "portable", label: "Portable output, and a verifier you run", note: "A download is signed at request time or refused; there is no unsigned archive. The verifiers that check the signature and the contents are published for download." },
     ],
     /* Only routes that exist. There is no /architecture on this site and none is invented. */
     links: [
@@ -574,8 +590,8 @@ const KO: LandingV2Copy = {
     proofs: [
       { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다." },
       { id: "evidence", label: "근거는 계속 붙어 있습니다", note: "게시된 객체는 그것이 컴파일된 원문 버전, 페이지, 영역을 함께 가지며, 그것이 없으면 게시되지 않습니다." },
-      { id: "review", label: "검증되지 않은 지식은 검토를 위해 보류됩니다", note: "활성화는 언제나 사람이 명시적으로 내리는 결정입니다." },
-      { id: "portable", label: "이식 가능한 결과물과 직접 실행하는 검증기", note: "컴파일된 World는 서명된 패키지로 나가며, 서명과 내용을 검사하는 검증기를 내려받을 수 있습니다." },
+      { id: "review", label: "검증되지 않은 지식은 검토를 위해 보류됩니다", note: "검증할 수 없는 구절은 검토를 위해 보류되고 그렇게 표시되며, 검증된 것처럼 게시되지 않습니다. 닫힌 상태로 실패하는 것은 컴파일러의 성질이며 설정이 아닙니다." },
+      { id: "portable", label: "이식 가능한 결과물과 직접 실행하는 검증기", note: "내려받기는 요청 시점에 서명되거나 거부되며, 서명되지 않은 아카이브는 없습니다. 서명과 내용을 검사하는 검증기를 내려받을 수 있습니다." },
     ],
     links: [
       { label: "보안", href: "/security" },

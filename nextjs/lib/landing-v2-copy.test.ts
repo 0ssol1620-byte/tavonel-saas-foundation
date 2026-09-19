@@ -48,7 +48,7 @@ export const LANDING_V2_FORBIDDEN: readonly string[] = [
 ];
 
 /** `lib/brand-copy.test.ts` BARRED, copied. A phrase added there belongs here in the same commit. */
-const BARRED = [
+export const BARRED = [
   "unlock your data",
   "second brain",
   "100% accurate",
@@ -68,10 +68,10 @@ const BARRED = [
 ];
 
 /** `lib/brand-copy.test.ts` OVERCLAIMS, copied. */
-const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
+export const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
 
 /** `lib/brand-copy.test.ts` RETIRED_NAMES, copied. Case-sensitive, as it is there. */
-const RETIRED_NAMES = [
+export const RETIRED_NAMES = [
   "Trust center",
   "Technical evidence",
   "Explore a World",
@@ -160,7 +160,14 @@ describe("the Landing V2 copy", () => {
 
   it("states the deployment gate in the deployment's own words (D5)", () => {
     expect(LANDING_V2_COPY.en.start.microtext).toBe(activationPolicy.customerData.reason);
-    expect(LANDING_V2_COPY.en.trust.proofs[2].note).toBe(activationPolicy.candidatePromotion.reason);
+    /*
+      ROUND3-P2: this used to pin trust proof #3 to `activationPolicy.candidatePromotion.reason`.
+      That string is the gate on promoting a candidate World to the active one; the proof above it
+      claims a per-object hold on unverified knowledge, which is a different mechanism -- the note
+      stated one thing and cited another. The proof's own guard now lives in
+      `landing-v2-trust.test.ts`, with the rest of the four; what this case is named for is the
+      DEPLOYMENT gate, and that is `start.microtext`.
+    */
     expect(LANDING_V2_COPY.ko.start.microtext.length).toBeGreaterThan(0);
   });
 
@@ -205,9 +212,13 @@ describe("the Landing V2 copy", () => {
 
     "Four things this deployment does, each written down where it can be checked." was a true
     sentence about the scene P2 will ship and a false one about the scene that is deployed, where
-    `Scene()` renders a heading, a paragraph and one link and nothing else. The four §18 proofs
-    are four label/note pairs and need no visual, so they are rendered from this round on -- and
-    this holds the word against the list in both languages, so neither half moves alone.
+    the P0 skeleton renders a heading, a paragraph and one link and nothing else. The four §18
+    proofs are four label/note pairs and need no visual, so they are rendered from this round on
+    -- and this holds the word against the list in both languages, so neither half moves alone.
+
+    The list moved with the P1/P2 integration: Scene 08 is now a whole `<section>` of its own
+    under `components/landing-v2/scenes/`, so that is the file the rendering half is read from.
+    `lib/landing-v2-trust.test.ts` counts the four in the rendered markup.
   */
   it("renders as many trust proofs as Scene 08 says it does (§18)", () => {
     for (const locale of ["en", "ko"] as const) {
@@ -215,10 +226,10 @@ describe("the Landing V2 copy", () => {
     }
     expect(LANDING_V2_COPY.en.trust.support.toLowerCase().startsWith("four")).toBe(true);
     const page = readFileSync(
-      join(import.meta.dirname, "..", "components", "landing-v2", "landing-page.tsx"),
+      join(import.meta.dirname, "..", "components", "landing-v2", "scenes", "trust.tsx"),
       "utf8",
     );
-    expect(page, "Scene 08 announces four proofs and renders none").toContain("copy.trust.proofs.map");
+    expect(page, "Scene 08 announces four proofs and renders none").toContain("copy.proofs.map");
   });
 
   it("frames §16 as different layers, not as a competitor being worse", () => {

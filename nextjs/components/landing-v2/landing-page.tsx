@@ -1,21 +1,29 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
-import HeroActions from "./hero-actions";
 import HeroCompilerDemo from "./hero-compiler-demo";
 import HeroStatement from "./hero-statement";
-import { HERO_PAGE_ALT, KO_EXPLORE_LABEL, SCENE_ACTIONS, WORKSPACE_LABEL } from "./scene-actions";
-import { activationPolicy } from "@/lib/activation-policy";
+import EvidenceScene from "./scenes/evidence";
+import ProofScene from "./scenes/proof";
+import RecompileScene from "./scenes/recompile";
+import SourcesScene from "./scenes/sources";
+import StartScene from "./scenes/start";
+import TrustScene from "./scenes/trust";
+import UseScene from "./scenes/use";
+import WhyScene from "./scenes/why";
+import { HERO_PAGE_ALT, KO_EXPLORE_LABEL, WORKSPACE_LABEL } from "./scene-actions";
 import { primaryCallToAction } from "@/lib/commercial-state";
-import {
-  landingV2Copy,
-  LANDING_V2_SCENE_ORDER,
-  type LandingV2Scene,
-  type LandingV2SceneId,
-} from "@/lib/landing-v2-copy";
+import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { buildHeroScene, type HeroScene } from "@/lib/landing-v2-hero";
-import { LANDING_V2_STATE_WORD } from "@/lib/landing-v2-proof";
-import { sourcePageLabel } from "@/lib/source-page-rasters";
+import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
+import {
+  buildEvidenceRecord,
+  buildProofTabs,
+  buildRecompileView,
+  landingV2StateWord,
+  type EvidenceRecord,
+  type ProofTab,
+  type RecompileView,
+} from "@/lib/landing-v2-proof";
+import { sourcePageQualifier } from "@/lib/source-page-rasters";
 import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
 
 /*
@@ -23,14 +31,20 @@ import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
 
   Nine scenes in §9's order, each one a named focusable landmark answering a single question, on
   the ground alternation D9 sets: obsidian hero, paper proof, and on down to an obsidian close.
-  The hero is built in full here; scenes 02-09 carry their final copy and one next action each,
-  and each is shaped so its visual drops into the second half of the split without the scene's
-  markup moving (P1/P2).
+
+  WHERE THE SCENES LIVE
+  The hero is built here because it is the only scene whose text column, action row and demo are
+  three separate components the page has to compose. Scenes 02-09 are each a whole `<section>` of
+  their own under `./scenes/`, and each one owns its id, its `data-scene` index (read from
+  `LANDING_V2_SCENE_ORDER`, never typed), its ground class and its one next action. This file
+  therefore no longer carries a generic `Scene()` shell: a shell that renders a heading and a link
+  is exactly what the eight scene lanes replaced, and keeping it would have left two places that
+  decide what a scene's landmark looks like.
 
   WHY THIS IS A SERVER COMPONENT
-  `buildHeroScene()` runs the collection compiler through `lib/explore-sample.ts`, which is
+  The data builders run the collection compiler through `lib/explore-sample.ts`, which is
   server-only. The old landing was a client component that took two scalars as props; this one
-  reads the compiled public World and hands the demo a flat, serializable projection of it. The
+  reads the compiled public World and hands each scene a flat, serializable projection of it. The
   two things that genuinely need a browser -- the session-aware action row and the demo's
   play/pause control -- are the two client components this file renders.
 
@@ -40,87 +54,50 @@ import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
   which is where it changes what a reader is offered.
 */
 
-/** What the hero image's `sizes` attribute says, shared with the preload in `app/page.tsx`. */
-export const HERO_IMAGE_SIZES = "(min-width: 1200px) 320px, (min-width: 768px) 420px, min(320px, 84vw)";
+/**
+ * What the hero's LCP image says in `sizes`, shared with the preload in `app/page.tsx`.
+ *
+ * It describes the READ STRIP since the 2026-09-19 recomposition, not the page render. The strip
+ * is the largest image the hero paints and the first one in it -- the whole-page render is a
+ * 200px thumbnail beside it now -- so it is the resource the two entry pages preload and the only
+ * one carrying `fetchPriority="high"`. Below 1200 the strip spans the wrap, so the value follows
+ * `--lv2-gutter`'s steps rather than a fixed pixel width.
+ *
+ * THE PHONE BRANCH IS DOUBLE THE COLUMN, AND THAT IS NOT A TYPO (QA round 4).
+ * Below 768 the strip is re-flowed as two stacked halves, each painting one END of the crop at
+ * the scale the desktop strip paints it (`SourceStrip`, and the `max-width: 767px` block in
+ * `app/landing-v2.css`). The picture is therefore twice the column wide even though the element
+ * is exactly the column wide. `calc(100vw - 40px)` described the element and made the browser
+ * fetch a 350px resource for a 700px painting -- a 2.00x upscale measured at 390 on the one
+ * raster that has to read as a real document. `sizes` states the painted width.
+ */
+export const HERO_IMAGE_SIZES =
+  "(min-width: 1200px) 668px, (min-width: 768px) calc(100vw - 64px), calc(200vw - 80px)";
 
 /*
-  The hero scene, read once per process rather than once per render.
+  The compiled World's projections, read once per process rather than once per render.
 
-  `/` and `/ko` are `force-dynamic` (the commercial posture has to be resolved per request), and
-  both this component and `app/page.tsx`'s preload need the same source raster. The World behind
-  `buildHeroScene()` is frozen at build time and the function is pure over it, so a module-level
-  memo is the whole of what is needed here -- not a cache with an invalidation story, because
-  there is nothing that can change it while the process lives.
+  `/` and `/ko` are `force-dynamic` (the commercial posture has to be resolved per request), so
+  without this the four builders would run the collection compiler on every request to the two
+  most-visited routes, and `app/page.tsx`'s preload would run the hero's a second time. The World
+  behind them is frozen at build time and every builder is pure over it, so a module-level memo is
+  the whole of what is needed -- not a cache with an invalidation story, because there is nothing
+  that can change it while the process lives. (`lib/landing-v2-sources.ts` already memoizes its
+  own, which is why Scene 03 is not in this table.)
 */
-let memo: HeroScene | undefined;
+let heroMemo: HeroScene | undefined;
 export function heroScene(): HeroScene {
-  return (memo ??= buildHeroScene());
+  return (heroMemo ??= buildHeroScene());
 }
 
-/*
-  D9's ground alternation, as data rather than as nine class names typed nine times. "paper" is
-  the light document layer (§5.1) and carries its own remapped accents; see `app/landing-v2.css`.
-*/
-const GROUND: Record<LandingV2SceneId, "obsidian" | "paper"> = {
-  hero: "obsidian",
-  proof: "paper",
-  sources: "obsidian",
-  evidence: "paper",
-  recompile: "obsidian",
-  why: "paper",
-  use: "obsidian",
-  trust: "paper",
-  start: "obsidian",
-};
-
-/**
- * One scene: eyebrow, heading, support, an optional qualifier, and one thing to do next.
- *
- * `visual` is the Editorial Split's second column (§7). While it is absent the text is a single
- * measured column rather than four-of-twelve with eight columns of nothing beside it, so the
- * P0 page reads as finished instead of as a layout waiting for an image.
- */
-function Scene({
-  scene,
-  index,
-  children,
-  visual,
-  serifAccent = false,
-}: {
-  scene: LandingV2Scene;
-  index: number;
-  children?: React.ReactNode;
-  visual?: React.ReactNode;
-  /** D3: the serif is allowed on the §16 manifesto line and nowhere else below the H1. */
-  serifAccent?: boolean;
-}) {
-  const id = scene.id;
-  const titleId = `lv2-${id}-title`;
-  const head = (
-    <div className="lv2-scene-head">
-      <p className="lv2-eyebrow lv2-meta">{scene.eyebrow}</p>
-      <h2 className="lv2-h2" id={titleId}>
-        <span className="lv2-h2-line">{scene.headline}</span>
-        {scene.headlineAccent ? (
-          <span className={`lv2-h2-line lv2-h2-accent${serifAccent ? " lv2-serif" : ""}`}>{scene.headlineAccent}</span>
-        ) : null}
-      </h2>
-      <p className="lv2-scene-support lv2-body-l">{scene.support}</p>
-      {scene.note ? <p className="lv2-scene-note lv2-small">{scene.note}</p> : null}
-      {children}
-    </div>
-  );
-  return (
-    <section
-      id={id}
-      data-scene={String(index)}
-      tabIndex={-1}
-      aria-labelledby={titleId}
-      className={`lv2-scene lv2-scene--proof lv2-${GROUND[id as LandingV2SceneId]}`}
-    >
-      <div className="lv2-wrap">{visual ? <div className="lv2-split">{head}{visual}</div> : head}</div>
-    </section>
-  );
+type ProofData = { tabs: ProofTab[]; record: EvidenceRecord; recompile: RecompileView };
+let proofMemo: ProofData | undefined;
+function proofData(): ProofData {
+  return (proofMemo ??= {
+    tabs: buildProofTabs(),
+    record: buildEvidenceRecord(),
+    recompile: buildRecompileView(),
+  });
 }
 
 export default function LandingPage({
@@ -133,8 +110,8 @@ export default function LandingPage({
 }) {
   const copy = landingV2Copy(korean);
   const scene = heroScene();
+  const proof = proofData();
   const locale = korean ? "ko" : "en";
-  const actionsFor = SCENE_ACTIONS[locale];
 
   /*
     The commercial posture, resolved on the server (BA-232). `primaryCallToAction()` chooses
@@ -150,14 +127,6 @@ export default function LandingPage({
     accessHref: access.href,
     workspaceLabel: WORKSPACE_LABEL[locale],
   };
-
-  const order = LANDING_V2_SCENE_ORDER;
-  const sceneIndex = (id: LandingV2SceneId) => order.indexOf(id) + 1;
-  const next = (id: Exclude<LandingV2SceneId, "hero" | "start">) => (
-    <Link className="lv2-text-link lv2-scene-next" href={actionsFor[id].href as Route} prefetch={false}>
-      {actionsFor[id].label}
-    </Link>
-  );
 
   return (
     <div className="page lv2" lang={korean ? "ko" : undefined}>
@@ -184,67 +153,32 @@ export default function LandingPage({
             <HeroCompilerDemo
               scene={scene}
               copy={copy}
-              stateLabel={LANDING_V2_STATE_WORD[scene.compiled.state]}
-              pageLabel={sourcePageLabel(scene.source.representationKind, korean)}
+              extra={landingV2HeroExtra(korean)}
+              /* D12: the state word in the page's own language, from the shared table. */
+              stateLabel={landingV2StateWord(scene.compiled.state, locale)}
+              /*
+                The qualifier, not the noun. The locator's metadata line already names the page
+                ("p.4 of 80"), so what it still owes a reader is whether that page is the issuer's
+                own PDF or a reference render of the filing's HTML -- which is exactly what
+                `sourcePageQualifier` returns and what `sourcePageLabel` puts a redundant noun in
+                front of.
+              */
+              pageLabel={sourcePageQualifier(scene.source.representationKind, korean)}
               pageAlt={HERO_PAGE_ALT[locale]}
               sizes={HERO_IMAGE_SIZES}
             />
           </div>
         </section>
 
-        {/* 02 Instant proof · 03 Sources into a World · 04 Evidence · 05 Recompile */}
-        <Scene scene={copy.proof} index={sceneIndex("proof")}>{next("proof")}</Scene>
-        <Scene scene={copy.sources} index={sceneIndex("sources")}>{next("sources")}</Scene>
-        <Scene scene={copy.evidence} index={sceneIndex("evidence")}>{next("evidence")}</Scene>
-        <Scene scene={copy.recompile} index={sceneIndex("recompile")}>
-          {/*
-            Rule 7. Dependency-aware recompilation is the compiler contract, not what this
-            deployment performs: the public sample is five complete compiles compared with one
-            another. The qualifier travels with the scene rather than being left to the scene's
-            future visual.
-          */}
-          <p className="lv2-scene-note lv2-small">{copy.recompile.contractNote}</p>
-          {next("recompile")}
-        </Scene>
-
-        {/* 06 Why a compiler. The §16 manifesto line is the second place D3 allows the serif. */}
-        <Scene scene={copy.why} index={sceneIndex("why")} serifAccent>
-          {next("why")}
-        </Scene>
-
-        {/* 07 Bring it, use it · 08 Trust */}
-        <Scene scene={copy.use} index={sceneIndex("use")}>{next("use")}</Scene>
-        <Scene scene={copy.trust} index={sceneIndex("trust")}>
-          {/*
-            The four proofs, rendered, because the sentence above them counts them.
-
-            Scene 08's support is "Four things this deployment does, each written down where it
-            can be checked." -- a sentence that was true of the scene P2 will ship and false of
-            the one that is deployed, where `Scene()` renders a heading and one link. `§18`'s
-            four proofs are four label/note pairs and need no visual to be read, so they are the
-            cheap half of making the copy true now rather than softening it and restoring it.
-
-            No figure reaches the page from here: the word "Four" is in the support sentence, and
-            `lib/landing-v2-copy.test.ts` holds the count of `trust.proofs` against it.
-          */}
-          <ul className="lv2-proof-list">
-            {copy.trust.proofs.map((proof) => (
-              <li key={proof.id} className="lv2-proof">
-                <p className="lv2-proof-label">{proof.label}</p>
-                <p className="lv2-proof-note lv2-small">{proof.note}</p>
-              </li>
-            ))}
-          </ul>
-          {next("trust")}
-        </Scene>
-
-        {/* 09 Final CTA. §19's microtext is `activationPolicy.customerData.reason`, verbatim. */}
-        <Scene scene={copy.start} index={sceneIndex("start")}>
-          <HeroActions {...heroActions} scene="9" />
-          <p className="lv2-scene-note lv2-small" data-customer-data={activationPolicy.customerData.enabled ? "open" : "arranged"}>
-            {copy.start.microtext}
-          </p>
-        </Scene>
+        {/* 02-09. Each scene is its own landmark; the order here is §9's and D9's. */}
+        <ProofScene locale={locale} copy={copy.proof} data={proof.tabs} />
+        <SourcesScene locale={locale} copy={copy.sources} />
+        <EvidenceScene locale={locale} copy={copy.evidence} data={proof.record} />
+        <RecompileScene locale={locale} copy={copy.recompile} data={proof.recompile} />
+        <WhyScene locale={locale} copy={copy.why} />
+        <UseScene locale={locale} copy={copy.use} />
+        <TrustScene locale={locale} copy={copy.trust} />
+        <StartScene locale={locale} copy={copy.start} actions={heroActions} />
       </main>
       <PublicSiteFooter korean={korean} />
     </div>

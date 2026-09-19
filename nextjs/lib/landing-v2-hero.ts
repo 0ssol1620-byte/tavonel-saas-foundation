@@ -136,34 +136,69 @@ export type HeroScene = {
 
 /* ------------------------------------------------------------------------------- the reading */
 
-/** The excerpt budget for the hero card. Long enough to be a quotation, short enough to be read. */
-const EXCERPT_LIMIT = 240;
+/**
+ * The excerpt budget for the hero card.
+ *
+ * 180 rather than 240 since the 2026-09-19 recomposition: the claim card is one block of a
+ * three-block stage now (~300px wide on §32's grid) instead of a panel spanning two columns, and
+ * a quotation that runs past about five lines there stops being read as a quotation and starts
+ * being read as body copy. Long enough to be a passage, short enough to be a card.
+ */
+const EXCERPT_LIMIT = 180;
 
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
 
 /**
- * Rank two candidate relations.
+ * Rank two candidate objects.
  *
- * Deterministic and stated: Topic, then Entity, then everything else; within a kind the more
- * connected node, then the id. So the same World always produces the same three, and a corpus
- * change moves them for a reason rather than by ordering luck.
+ * REWRITTEN 2026-09-19 WITH THE HERO RECOMPOSITION, AND TOPIC IS NOW EXCLUDED OUTRIGHT.
  *
- * Topic outranks Entity rather than tying with it, and the reason is published on /explore:
- * `EXPLORE_COPY.entityDisclaimer` records that the Entity labels in this fixed sample come from a
- * capitalised-token heuristic and that three of sixteen evaluated labels were true positives.
- * Ranked on degree alone the hero drew "Form", "Pro" and "Securities Exchange Act" -- the
- * heuristic's weakest output, presented as the product's structure. The compiled Topics are the
- * same World's own groupings and carry no such caveat.
+ * The previous ranking put Topic first, for a defensible reason: ranked on degree alone the hero
+ * drew "Form", "Pro" and "Securities Exchange Act", which is the Entity heuristic's weakest
+ * output presented as the product's structure. What it produced instead was three rows of
+ * `discusses_topic` -- and the production compiler contract this site publishes does not claim a
+ * topic edge as an emitted relation, so the beat showed the one kind of object the engine is not
+ * described as producing. Excluding a caveated object in favour of an unclaimed one is not an
+ * improvement.
+ *
+ * So the candidate set is Entity and Claim, and the quality problem is solved by a *binding*
+ * rather than by a kind: see `statedInPassage` below. Entity still outranks Claim because a
+ * sibling Claim of the same filing is another passage of the same page, which the card beside
+ * the chips is already showing.
  */
-const KIND_RANK: Record<string, number> = { Topic: 0, Entity: 1 };
+const KIND_RANK: Record<string, number> = { Entity: 0, Claim: 1 };
 
 function rankRelated(left: HeroRelated & { degree: number }, right: HeroRelated & { degree: number }) {
   return (
     (KIND_RANK[left.kind] ?? 2) - (KIND_RANK[right.kind] ?? 2) ||
     right.degree - left.degree ||
+    right.label.length - left.label.length ||
     left.id.localeCompare(right.id)
   );
+}
+
+/**
+ * Whether this object's own label is written, verbatim, inside the passage the hero is showing.
+ *
+ * This is the binding that makes a chip checkable rather than plausible. `evidenceRefs` cannot
+ * do it: `toVisualWorldModel` gives every object of a document a reference to every region of
+ * that document (1,805 of them include the hero's region), so "bound to this region" by refs is
+ * "somewhere in this filing". What a reader can verify by looking at the strip above the chips is
+ * that the words are there -- so the test is a case-sensitive, word-boundary occurrence of the
+ * label in the compiled passage itself.
+ *
+ * Case-sensitive on purpose. The extractor's labels are capitalised tokens; matching
+ * case-insensitively admits "Accessories" for the passage's "accessories", which is a different
+ * claim about what the compiler found.
+ */
+function statedInPassage(label: string, passage: string): boolean {
+  if (label.length < 4) return false;
+  const at = passage.indexOf(label);
+  if (at < 0) return false;
+  const before = passage[at - 1];
+  const after = passage[at + label.length];
+  return !(before && /[\p{L}\p{N}]/u.test(before)) && !(after && /[\p{L}\p{N}]/u.test(after));
 }
 
 export function buildHeroScene(): HeroScene {
@@ -222,27 +257,37 @@ export function buildHeroScene(): HeroScene {
   const preview = excerptPreview(compiledNode.label, EXCERPT_LIMIT);
 
   /*
-    The Structure beat's two or three neighbours.
+    The Structure beat's objects -- what the compiler bound to THIS region, not to this filing.
 
-    The compiled Claim carries exactly one relation in this World -- `supported_by`, to the
-    filing's Evidence node -- so a rule that read only its own edges would leave §11.2's Structure
-    beat with a single grey box. The candidate set is therefore the edges of the compiled object
-    AND the edges of the Document node the region belongs to, which are relations the compiler
-    emitted over this same filing (`discusses_topic`, `mentions_entity`). Every entry carries
-    `via` -- the node the relation actually leaves -- so the hero can say "10-K · filed
-    2025-10-31 — discusses topic → Finance" and never imply the Claim owns a relation it does not.
+    The compiled Claim carries exactly one relation in this World (`supported_by`, to the filing's
+    Evidence node), so the candidate set is the Document node's own edges, which are the relations
+    the compiler emitted over this filing. Two rules narrow the 1,018 of them to something a
+    reader can check against the strip above the chips:
+
+      Topic is excluded (see `KIND_RANK`), and
+      the object's label has to be written in the compiled passage itself (`statedInPassage`).
+
+    The second is what replaced ranking by degree. Degree alone drew "Form" and "Pro" -- labels
+    from elsewhere in an 80-page filing, presented beside a paragraph that does not contain them.
+    What survives both rules is an object whose name a reader can find in the strip with their
+    own eyes, which is the only kind of structure this hero has any business asserting.
+
+    `via` stays on every row: these relations leave the Document, never the Claim, and the markup
+    says so. A label that contains an already-chosen one is dropped -- "Business Company
+    Background The" over "Business" is the same match reported twice, at the extractor's expense.
   */
   const documentNode = world.nodes.find(
     (node) => node.kind === "Document" && node.evidenceRefs.includes(region.id),
   );
-  const anchors = [compiledNode, ...(documentNode ? [documentNode] : [])];
   const seen = new Set<string>();
   const candidates: (HeroRelated & { degree: number })[] = [];
-  for (const anchor of anchors) {
+  if (documentNode) {
     for (const edge of world.edges) {
-      if (edge.from !== anchor.id && edge.to !== anchor.id) continue;
-      const other: VisualNode | undefined = byId.get(edge.from === anchor.id ? edge.to : edge.from);
+      if (edge.from !== documentNode.id && edge.to !== documentNode.id) continue;
+      const other: VisualNode | undefined = byId.get(edge.from === documentNode.id ? edge.to : edge.from);
       if (!other || other.id === compiledNode.id || seen.has(other.id)) continue;
+      if (KIND_RANK[other.kind] === undefined) continue;
+      if (!statedInPassage(other.label, compiledNode.label)) continue;
       seen.add(other.id);
       candidates.push({
         id: other.id,
@@ -250,15 +295,21 @@ export function buildHeroScene(): HeroScene {
         kind: other.kind,
         predicate: edge.predicate,
         state: other.state,
-        via: anchor.label,
+        via: documentNode.label,
         degree: other.degree,
       });
     }
   }
-  const related: HeroRelated[] = candidates
-    .sort(rankRelated)
-    .slice(0, 3)
-    .map(({ degree: _degree, ...entry }) => entry);
+  const related: HeroRelated[] = [];
+  for (const candidate of candidates.sort(rankRelated)) {
+    if (related.length === 3) break;
+    if (related.some((taken) => taken.label.includes(candidate.label) || candidate.label.includes(taken.label))) {
+      continue;
+    }
+    const { degree: _degree, ...entry } = candidate;
+    related.push(entry);
+  }
+  if (related.length === 0) throw new Error(`landing_v2_hero_region_binds_no_object: ${region.id}`);
 
   /*
     The Use beat: the first prepared question whose leading citation sits on a page this

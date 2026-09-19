@@ -35,7 +35,13 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   const raster = page.locator("section#hero img.lv2-page-img");
   await expect(raster).toHaveCount(1);
   await expect(raster).toHaveAttribute("alt", /\S/);
-  await expect(page.locator("section#hero .lv2-region")).toHaveCount(1);
+  /*
+    Two, not one, since the hero was recomposed on 2026-09-19: the READ strip IS the region (its
+    outline is the box's own edge) and the page thumbnail beside it carries the same box drawn
+    where it sits on the filing. `e2e/landing-v2.spec.ts` counts the same two in the same
+    section; this file asserted one and the two specs contradicted each other for a round.
+  */
+  await expect(page.locator("section#hero .lv2-region")).toHaveCount(2);
   await expect(page.locator("section#hero .lv2-claim")).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
 });
 

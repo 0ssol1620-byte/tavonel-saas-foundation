@@ -1,0 +1,202 @@
+/*
+  Scene 02 -- the tab row and the Evidence Grid inside each panel (§12, §22).
+
+  Token-only and scoped to this scene. Everything the scene shares with the rest of the landing
+  -- the wrap, the type scale, the paper ground, `.lv2-page`, `.lv2-region`, `.lv2-line`,
+  `.lv2-text-link` -- is already in `app/landing-v2.css` and is not restated here.
+*/
+
+.tabs {
+  margin-top: 40px;
+}
+
+/*
+  The tab row.
+
+  ROUND3-P1: it used to be a horizontal scroller at every width. That kept the document from
+  scrolling sideways, but at 390 the row was 848px inside a 350px box, so tabs 2 and 3 sat off
+  screen with 85px of tab 2 as the only hint that this scene asks three questions at all. §25
+  says recompose, do not shrink, and the gate spec asserts every reachable control is inside the
+  viewport -- so below the grid breakpoint the three tabs stack as full-width rows instead. Above
+  it they fit side by side on one line and the scroller never engages.
+
+  The bottom padding is room for the focus ring: a 2px outline at 2px offset inside a scroll
+  container is clipped without it.
+*/
+.tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.tab {
+  /* Stacked below 900px, side by side above it -- see the media block under this rule. */
+  flex: 1 1 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--hairline);
+  /* A control is an instrument, not a document: `--r-inst` is the radius every button on this
+     site already has, and `--radius-sm` is the sheet-of-paper corner the two frames below use. */
+  border-radius: var(--r-inst);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: var(--lv2-small);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--motion-ui) var(--ease-ui), border-color var(--motion-ui) var(--ease-ui);
+}
+
+/* Order matters: this restores the one-line row above the grid breakpoint, so it sits AFTER the
+   base rule rather than before it -- the two carry the same specificity. */
+@media (min-width: 900px) {
+  .tablist {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .tab {
+    flex: 0 0 auto;
+    max-width: 34ch;
+  }
+}
+
+/*
+  The selected tab. Colour is not the carrier: `aria-selected` is on the element, the weight
+  changes, and the underline is a shape a reader sees without reading the blue. The 2px rule is
+  an inset shadow rather than a border so the button does not move by a pixel when it is chosen.
+*/
+.tab[aria-selected="true"] {
+  border-color: var(--source);
+  box-shadow: inset 0 -2px 0 0 var(--source);
+  color: var(--text-hi);
+  font-weight: 500;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tab:hover {
+    border-color: var(--hairline-hi);
+    color: var(--text-hi);
+  }
+}
+
+.panel {
+  margin-top: 28px;
+}
+
+/*
+  `hidden` has to win over the panel's own display. The UA rule is `[hidden] { display: none }`
+  at the same specificity as any class, so a panel that declared `display: grid` would render
+  all three at once; this states it rather than relying on order.
+*/
+.panel[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ the Evidence Grid (D9) */
+
+/*
+  Left the passage, right the page it was read from, the Evidence Line between them. One column
+  below 900px, where a 5-column quotation and a 7-column document are both too narrow to read.
+*/
+.grid {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: minmax(0, 5fr) 24px minmax(0, 7fr);
+    align-items: start;
+    gap: 24px 0;
+  }
+}
+
+.answer {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.label {
+  margin: 0;
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* A quotation, marked as one. The rule is a hairline, not an accent: the colours are spoken for. */
+.excerpt {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 2px solid var(--hairline-hi);
+  font-size: var(--lv2-body);
+  line-height: 1.55;
+  color: var(--text-hi);
+}
+
+.citation {
+  margin: 0;
+  color: var(--text-mid);
+}
+
+.open {
+  justify-self: start;
+}
+
+/*
+  The connector. `.lv2-line` is a vertical 1px column by default, which is the stacked layout;
+  from 900px up it runs from the passage to the document. Two class names deep so it wins over
+  the shared sheet's `.lv2-line` without depending on which stylesheet the build emits first.
+*/
+@media (min-width: 900px) {
+  .grid .line {
+    width: 100%;
+    height: 1px;
+    margin: 0;
+    align-self: center;
+    transform-origin: left;
+  }
+}
+
+.doc {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.frames {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .frames {
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  }
+}
+
+/*
+  The locator page is small on purpose -- it is there to show where on the sheet the box is, and
+  the crop beside it is where the text is read. A full page at column width on a phone is a grey
+  rectangle nobody can read, which is the screenshot-in-a-card §22 forbids.
+*/
+.pageCell {
+  display: block;
+  max-width: 240px;
+}
+
+.crop {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+}
+
+.nextRow {
+  margin: 28px 0 0;
+}

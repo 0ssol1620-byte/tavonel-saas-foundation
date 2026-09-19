@@ -3,8 +3,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-change";
 import { EXPLORE_SAMPLE_QUESTIONS, exploreSampleDocuments } from "./explore-sample";
+import { EXPLORE_COPY } from "./explore-story";
 import { LANDING_V2_COPY } from "./landing-v2-copy";
 import { buildHeroScene } from "./landing-v2-hero";
+import { LANDING_V2_HERO_EXTRA } from "./landing-v2-hero-copy";
 
 /*
   The hero is the one composition on this site that has to be true at a glance, so every figure
@@ -82,14 +84,14 @@ describe("the Landing V2 hero scene", () => {
   it("carries the compiled object that region states, with the World's own state", () => {
     expect(scene.compiled.kind).toBe("Claim");
     expect(scene.compiled.label.startsWith("Business Company Background")).toBe(true);
-    expect(scene.compiled.excerpt.length).toBeLessThanOrEqual(240);
+    expect(scene.compiled.excerpt.length).toBeLessThanOrEqual(180);
     // Not "verified". The sample World is a deterministic published sample, and the hero says
     // the state the World gives the object rather than the one the storyboard wanted (§11.3).
     expect(scene.compiled.state).toBe("candidate");
     expect(scene.compiled.evidenceCount).toBeGreaterThan(0);
   });
 
-  it("shows at most three real relations, each attributed to the node it leaves", () => {
+  it("shows at most three real objects, each attributed to the node its relation leaves", () => {
     expect(scene.related.length).toBeGreaterThan(0);
     expect(scene.related.length).toBeLessThanOrEqual(3);
     for (const relation of scene.related) {
@@ -99,14 +101,48 @@ describe("the Landing V2 hero scene", () => {
     }
     expect(new Set(scene.related.map((relation) => relation.id)).size).toBe(scene.related.length);
     /*
-      Topics, not heuristic Entities. `EXPLORE_COPY.entityDisclaimer` publishes that the Entity
-      labels in this sample come from a capitalised-token heuristic with three true positives out
-      of sixteen evaluated, and ranking on degree alone drew "Form" and "Pro" into the hero. If
-      this pin fails because an Entity came back, the ranking regressed -- not the corpus.
+      NO TOPIC, AND THE REPLACEMENT IS A BINDING RATHER THAN A KIND. 2026-09-19.
+
+      The previous pin required three Topics, for a defensible reason: ranking Entities on degree
+      alone drew "Form" and "Pro" -- the capitalised-token heuristic's weakest output, presented
+      as the product's structure. What it produced instead was three rows of `discusses_topic`,
+      and the production compiler contract this site publishes does not claim a topic edge as an
+      emitted relation, so the beat showed the one kind of object the engine is not described as
+      producing.
+
+      So the candidates are Entity and Claim, narrowed by a binding a reader can check with their
+      own eyes: the object's label has to be written, verbatim and case-sensitively, inside the
+      passage the hero's card is showing. That is what "objects bound to this region" means on the
+      page, and it is why these two rather than "Form".
     */
-    expect(scene.related.map((relation) => relation.kind)).toEqual(["Topic", "Topic", "Topic"]);
-    expect(scene.related.map((relation) => relation.label)).toEqual(["Governance", "Security", "Research"]);
-    expect(new Set(scene.related.map((relation) => relation.predicate))).toEqual(new Set(["discusses_topic"]));
+    expect(scene.related.map((relation) => relation.kind)).not.toContain("Topic");
+    expect(scene.related.map((relation) => relation.kind)).toEqual(["Entity", "Entity"]);
+    expect(scene.related.map((relation) => relation.label)).toEqual(["The Company", "Business"]);
+    expect(new Set(scene.related.map((relation) => relation.predicate))).toEqual(new Set(["mentions_entity"]));
+    // And the binding is real: every chip's label is in the passage beside it, spelled the same.
+    for (const relation of scene.related) {
+      expect(scene.compiled.label, `${relation.label} is not in the passage`).toContain(relation.label);
+    }
+    // The relations leave the filing, never the Claim, and every row says so.
+    expect(new Set(scene.related.map((relation) => relation.via))).toEqual(new Set(["10-K · filed 2025-10-31"]));
+  });
+
+  /*
+    BA-034, held at the point of publication rather than four scenes away.
+
+    The hero prints `exploreChangeStory.counts`, and the rule is that the engine that produced a
+    figure is named wherever the figure is. `lib/landing-v2-hero-copy.ts` carries that qualifier
+    in both languages -- the English one is `EXPLORE_COPY`'s own string rather than a second
+    spelling of it -- and the demo renders it under the counts in both the rotating beat and the
+    resting stack. Asserted against the component's source because it is markup, not data.
+  */
+  it("prints the engine qualifier wherever it prints the comparison counts", () => {
+    const demo = readFileSync(join(root, "components", "landing-v2", "hero-compiler-demo.tsx"), "utf8");
+    expect(demo).toContain("extra.countsQualifier");
+    for (const locale of ["en", "ko"] as const) {
+      expect(LANDING_V2_HERO_EXTRA[locale].countsQualifier.length).toBeGreaterThan(0);
+    }
+    expect(LANDING_V2_HERO_EXTRA.en.countsQualifier).toBe(EXPLORE_COPY.countsQualifier);
   });
 
   it("states the change counts the comparison measured, and nothing else", () => {

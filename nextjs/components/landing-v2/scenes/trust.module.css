@@ -1,0 +1,36 @@
+/*
+  Scene 08's two rows of links. Token-only, and small on purpose: everything else this scene
+  needs (`.lv2-proof-list`, `.lv2-proof`, `.lv2-text-link`) is already in `app/landing-v2.css`.
+*/
+
+/* The three §18 links on one line, wrapping to as many as the width allows. The 44px touch
+   floor comes from `.lv2-text-link`'s own min-height, so the row only supplies the gaps. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 28px;
+  margin: 32px 0 0;
+}
+
+/* The one next action (§39). Ink underline against the others' hairline -- hierarchy without a
+   second filled button and without spending an accent colour, whose meanings are taken. */
+.next {
+  text-decoration-color: currentColor;
+}
+
+.footnote {
+  margin: 4px 0 0;
+  color: var(--text-lo);
+}
+
+/* A footnote is still a reachable control: 44px, visibly underlined, focusable like any link. */
+.footnoteLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hairline-hi);
+}

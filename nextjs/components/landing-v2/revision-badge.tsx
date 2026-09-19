@@ -35,15 +35,27 @@ export default function RevisionBadge({
           {afterLabel}
         </span>
       </p>
-      <p className="lv2-revision-title lv2-meta">{arrivalsLabel}</p>
-      <ul className="lv2-revision-list">
-        {arrivals.map((arrival) => (
-          <li key={`${arrival.form}-${arrival.filingDate}`} className="lv2-meta" data-derived="1">
-            <i aria-hidden="true" />
-            {arrival.form} · {arrival.filingDate}
-          </li>
-        ))}
-      </ul>
+      {/*
+        An empty list renders the step alone, without a heading standing over nothing.
+
+        That is what the hero's resting composition asks for (2026-09-19): the rotating slot shows
+        the arrivals in full on the Change beat, and the step alone in the static state beneath
+        it, where the counts and the bound objects need the room more than a second copy of the
+        list does.
+      */}
+      {arrivals.length > 0 ? (
+        <>
+          <p className="lv2-revision-title lv2-meta">{arrivalsLabel}</p>
+          <ul className="lv2-revision-list">
+            {arrivals.map((arrival) => (
+              <li key={`${arrival.form}-${arrival.filingDate}`} className="lv2-meta" data-derived="1">
+                <i aria-hidden="true" />
+                {arrival.form} · {arrival.filingDate}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </div>
   );
 }

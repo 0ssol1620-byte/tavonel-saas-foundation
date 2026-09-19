@@ -57,7 +57,16 @@ const AVIF = { quality: 55, effort: 4 };
 const RENDER_SET = [
   // Hero -- the /explore entry proof: Apple's 2025 Form 10-K, page 4, Company Background.
   { file: "apple-2025-form-10-k-p004.webp", kind: "page", widths: [560, 840, 1120] },
-  { file: "apple-2025-form-10-k-p004.webp", kind: "region", bbox1000: [30, 291, 971, 380], widths: [640, 1280] },
+  /*
+    The hero's READ strip, 2026-09-19 recomposition. 708 and 1416 replace 640 and 1280.
+
+    The crop is no longer a detail beside the page -- it IS the hero's key visual, laid across the
+    full width of the demo stage (708 CSS px on §32's 1440 grid) so the filing's own words are
+    legible at about ten pixels a glyph. 1416 is the 2x of that, and it is also what a phone
+    needs: below 768 the same crop is re-flowed as two stacked halves, each full-bleed, so one
+    half is drawn from roughly 708 source pixels as well.
+  */
+  { file: "apple-2025-form-10-k-p004.webp", kind: "region", bbox1000: [30, 291, 971, 380], widths: [708, 1416] },
   // Scene 02 -- the three grounded questions whose cited region sits on a committed page.
   { file: "apple-2026-q1-10-q-reference-p019.webp", kind: "page", widths: [720, 1080] },
   { file: "apple-2026-q1-10-q-reference-p019.webp", kind: "region", bbox1000: [62, 621, 939, 667], widths: [560, 1120] },
