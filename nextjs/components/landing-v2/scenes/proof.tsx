@@ -12,7 +12,7 @@ import {
   type LandingV2ProofCopy,
 } from "@/lib/landing-v2-copy";
 import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
-import { buildProofTabs, type ProofTab } from "@/lib/landing-v2-proof";
+import { buildProofTabs, type ProofTab } from "@/lib/landing-v2-runtime";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
 
 /*

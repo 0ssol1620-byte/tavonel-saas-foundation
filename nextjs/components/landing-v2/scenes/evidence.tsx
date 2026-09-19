@@ -5,7 +5,7 @@ import EvidenceCopyCitation from "./evidence-copy-citation";
 import styles from "./evidence.module.css";
 import { LANDING_V2_SCENE_ORDER, type LandingV2EvidenceCopy, type LandingV2Locale } from "@/lib/landing-v2-copy";
 import { LANDING_V2_EVIDENCE_UI, evidenceLabels } from "@/lib/landing-v2-evidence";
-import { buildEvidenceRecord, landingV2StateWord, type EvidenceRecord } from "@/lib/landing-v2-proof";
+import { buildEvidenceRecord, landingV2StateWord, type EvidenceRecord } from "@/lib/landing-v2-runtime";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
 
 /*

@@ -1,0 +1,457 @@
+{
+  "schema": "tavonel.landing-public-proof.v1",
+  "tabs": [
+    {
+      "question": "What were operating expenses for research and development?",
+      "answerExcerpt": "Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443",
+      "answerTruncated": false,
+      "source": {
+        "form": "10-Q",
+        "filingDate": "2026-01-30",
+        "filename": "apple-2026-q1-10-q-reference.pdf",
+        "page": 4,
+        "pageCount": 30,
+        "digest": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "representationKind": "reference_render"
+      },
+      "region": {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-80ce9cad00306cf5d7cb85c911bdff20",
+        "bbox1000": [
+          64,
+          476,
+          932,
+          538
+        ]
+      },
+      "citationIndex": 0,
+      "citationCount": 3,
+      "rasters": {
+        "page": {
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-720.webp 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp 1080w",
+          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-720.avif 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.avif 1080w",
+          "width": 1080,
+          "height": 1398
+        },
+        "crop": {
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-1120.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-560.webp 560w, /landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-1120.webp 1120w",
+          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-560.avif 560w, /landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-1120.avif 1120w",
+          "width": 1120,
+          "height": 103
+        }
+      },
+      "openHref": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-80ce9cad00306cf5d7cb85c911bdff20"
+    },
+    {
+      "question": "What were Products and Services net sales in the quarter?",
+      "answerExcerpt": "Americas Americas net sales increased during the first quarter of 2026 compared to the same quarter in 2025 primarily due to higher net sales of iPhone and Services.",
+      "answerTruncated": false,
+      "source": {
+        "form": "10-Q",
+        "filingDate": "2026-01-30",
+        "filename": "apple-2026-q1-10-q-reference.pdf",
+        "page": 19,
+        "pageCount": 30,
+        "digest": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "representationKind": "reference_render"
+      },
+      "region": {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-b89dd34e25c1a4bdb8f4a277dcc4bb20",
+        "bbox1000": [
+          62,
+          621,
+          939,
+          667
+        ]
+      },
+      "citationIndex": 2,
+      "citationCount": 3,
+      "rasters": {
+        "page": {
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p019-1080.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-720.webp 720w, /landing/v2/apple-2026-q1-10-q-reference-p019-1080.webp 1080w",
+          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-720.avif 720w, /landing/v2/apple-2026-q1-10-q-reference-p019-1080.avif 1080w",
+          "width": 1080,
+          "height": 1398
+        },
+        "crop": {
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-1120.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-560.webp 560w, /landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-1120.webp 1120w",
+          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-560.avif 560w, /landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-1120.avif 1120w",
+          "width": 1120,
+          "height": 77
+        }
+      },
+      "openHref": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-b89dd34e25c1a4bdb8f4a277dcc4bb20"
+    },
+    {
+      "question": "How does the Board oversee privacy and data security?",
+      "answerExcerpt": "Table of Contents Summary Governance Directors Compensation Proposals Other Information Audit Committee Ron Sugar (Chair) Primary Responsibilities: Wanda Austin Monica Lozano ● Assist the Board in oversight and monitoring of Apple’s",
+      "answerTruncated": true,
+      "source": {
+        "form": "DEF 14A",
+        "filingDate": "2026-01-08",
+        "filename": "apple-2026-proxy-def14a-reference.pdf",
+        "page": 17,
+        "pageCount": 103,
+        "digest": "sha256:aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
+        "representationKind": "reference_render"
+      },
+      "region": {
+        "id": "evidence-5a70ec70f7b1a1726a25ed51a5dc716a:chunk-c4c371ac7a6bdf15dbc49c6fde1ae315",
+        "bbox1000": [
+          62,
+          40,
+          949,
+          521
+        ]
+      },
+      "citationIndex": 0,
+      "citationCount": 3,
+      "rasters": {
+        "page": {
+          "src": "/landing/v2/apple-2026-proxy-def14a-reference-p017-1080.webp",
+          "srcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-720.webp 720w, /landing/v2/apple-2026-proxy-def14a-reference-p017-1080.webp 1080w",
+          "avifSrcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-720.avif 720w, /landing/v2/apple-2026-proxy-def14a-reference-p017-1080.avif 1080w",
+          "width": 1080,
+          "height": 1398
+        },
+        "crop": {
+          "src": "/landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-1120.webp",
+          "srcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-560.webp 560w, /landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-1120.webp 1120w",
+          "avifSrcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-560.avif 560w, /landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-1120.avif 1120w",
+          "width": 1120,
+          "height": 786
+        }
+      },
+      "openHref": "/explore?act=evidence&evidence=evidence-5a70ec70f7b1a1726a25ed51a5dc716a%3Achunk-c4c371ac7a6bdf15dbc49c6fde1ae315"
+    }
+  ],
+  "record": {
+    "claim": {
+      "nodeId": "claim-50234777c50ace43957b7caa638b2fc7",
+      "kind": "Claim",
+      "label": "Business Company Background The Company designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services.",
+      "excerpt": "Business Company Background The Company designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services.",
+      "excerptTruncated": false
+    },
+    "status": {
+      "state": "candidate",
+      "label": "PUBLISHED SAMPLE"
+    },
+    "source": {
+      "form": "10-K",
+      "filingDate": "2025-10-31",
+      "filename": "apple-2025-form-10-k.pdf",
+      "page": 4,
+      "pageCount": 80,
+      "digest": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "representationKind": "original",
+      "officialHref": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000320193/c24e7a28-5254-4dfa-9447-62aaa3c24bb1.pdf",
+      "secHref": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
+    },
+    "region": {
+      "id": "evidence-0dffdde3c8def7d25da7d9eb4bd303d3:chunk-a511a0ea39e95b6dd5872ac3ef0115f1",
+      "bbox1000": [
+        30,
+        291,
+        971,
+        380
+      ],
+      "normalized": [
+        0.03,
+        0.291,
+        0.971,
+        0.38
+      ],
+      "normalizedLabel": "0.030, 0.291 → 0.971, 0.380",
+      "unit": "bbox, per mille of the page"
+    },
+    "version": {
+      "digest": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "short": "sha256:1085900…"
+    },
+    "rasters": {
+      "page": {
+        "src": "/landing/v2/apple-2025-form-10-k-p004-1120.webp",
+        "srcSet": "/landing/v2/apple-2025-form-10-k-p004-560.webp 560w, /landing/v2/apple-2025-form-10-k-p004-840.webp 840w, /landing/v2/apple-2025-form-10-k-p004-1120.webp 1120w",
+        "avifSrcSet": "/landing/v2/apple-2025-form-10-k-p004-560.avif 560w, /landing/v2/apple-2025-form-10-k-p004-840.avif 840w, /landing/v2/apple-2025-form-10-k-p004-1120.avif 1120w",
+        "width": 1120,
+        "height": 1450
+      },
+      "crop": {
+        "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.webp",
+        "srcSet": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-708.webp 708w, /landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.webp 1317w",
+        "avifSrcSet": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-708.avif 708w, /landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.avif 1317w",
+        "width": 1317,
+        "height": 162
+      }
+    },
+    "hrefs": {
+      "evidence": "/explore?act=evidence&evidence=evidence-0dffdde3c8def7d25da7d9eb4bd303d3%3Achunk-a511a0ea39e95b6dd5872ac3ef0115f1",
+      "original": "/explore-sample/apple-2025-form-10-k.pdf#page=4"
+    },
+    "citation": "10-K · filed 2025-10-31 · apple-2025-form-10-k.pdf (original PDF) · page 4 of 80 · bbox 30,291,971,380 (per mille) · sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab"
+  },
+  "recompile": {
+    "before": {
+      "form": "10-K",
+      "year": "2025"
+    },
+    "arrivals": [
+      {
+        "documentId": "apple-2026-proxy-def14a",
+        "form": "DEF 14A",
+        "filingDate": "2026-01-08",
+        "label": "DEF 14A · filed 2026-01-08",
+        "page": 48,
+        "excerptPreview": "The number of time-based RSUs granted to our named executive officers was determined by dividing the target time-based RSU value by the closing stock price on the date of grant. The target value of the time-based RSUs for each of our named"
+      },
+      {
+        "documentId": "apple-2026-q1-10-q",
+        "form": "10-Q",
+        "filingDate": "2026-01-30",
+        "label": "10-Q · filed 2026-01-30",
+        "page": 4,
+        "excerptPreview": "Operating income 50,852 42,832 Other income/(expense), net 150 (248) Income before provision for income taxes 51,002 42,584 Provision for income taxes 8,905 6,254 Net income $ 42,097 $ 36,330"
+      },
+      {
+        "documentId": "apple-2026-q2-10-q",
+        "form": "10-Q",
+        "filingDate": "2026-05-01",
+        "label": "10-Q · filed 2026-05-01",
+        "page": 4,
+        "excerptPreview": "Operating income 35,885 29,589 86,737 72,421 Other income/(expense), net (52) (279) 98 (527) Income before provision for income taxes 35,833 29,310 86,835 71,894 Provision for income taxes 6,255 4,530 15,160 10,784 Net income $ 29,578 $"
+      },
+      {
+        "documentId": "apple-2026-q3-10-q",
+        "form": "10-Q",
+        "filingDate": "2026-07-31",
+        "label": "10-Q · filed 2026-07-31",
+        "page": 4,
+        "excerptPreview": "Operating income 35,695 28,202 122,432 100,623 Other income/(expense), net 572 (171) 670 (698) Income before provision for income taxes 36,267 28,031 123,102 99,925 Provision for income taxes 6,478 4,597 21,638 15,381 Net income $ 29,789 $"
+      }
+    ],
+    "affectedSample": [
+      {
+        "id": "claim-0051692afb91b177162fda05db3ec4f8",
+        "label": "The summary expressly does not discuss the income tax laws of any state, municipality, or non-U.S.",
+        "labelTruncated": false,
+        "kind": "Claim",
+        "state": "candidate",
+        "stateLabel": "PUBLISHED SAMPLE"
+      },
+      {
+        "id": "claim-005547bf7aefe6bc53282d001b00b2aa",
+        "label": "Apple’s key governance documents, including our Corporate Governance Guidelines, are available at investor.apple.com/leadership-and-governance.",
+        "labelTruncated": false,
+        "kind": "Claim",
+        "state": "candidate",
+        "stateLabel": "PUBLISHED SAMPLE"
+      },
+      {
+        "id": "claim-007fadb646160a676a4ac91ffc589a81",
+        "label": "Wagner also brings Director since 2014 extensive financial expertise and experience in the highly regulated financial services industry.",
+        "labelTruncated": false,
+        "kind": "Claim",
+        "state": "candidate",
+        "stateLabel": "PUBLISHED SAMPLE"
+      },
+      {
+        "id": "claim-013c6e5b4716f6bfeca3dff6dfa3f5c8",
+        "label": "Other Public Company Boards: Current: Wayfair Inc.",
+        "labelTruncated": false,
+        "kind": "Claim",
+        "state": "candidate",
+        "stateLabel": "PUBLISHED SAMPLE"
+      }
+    ],
+    "counts": {
+      "rebuilt": 512,
+      "added": 3998,
+      "removed": 0,
+      "untouched": 1800
+    },
+    "equivalence": {
+      "state": "not_yet",
+      "reason": "Full-rebuild equivalence is a separate check the compiler core runs over a selective rebuild. Both sides of this comparison are complete compiles, so there is no selective result for it to compare."
+    },
+    "hrefs": {
+      "change": "/explore?act=change",
+      "contract": "/product/continuous-knowledge"
+    }
+  },
+  "sources": {
+    "stack": [
+      {
+        "documentId": "apple-form-10-k",
+        "filename": "apple-2025-form-10-k.pdf",
+        "form": "10-K",
+        "filingDate": "2025-10-31",
+        "page": 4,
+        "pageCount": 80,
+        "representationKind": "original",
+        "raster": {
+          "src": "/landing/v2/apple-2025-form-10-k-p004-1120.webp",
+          "srcSet": "/landing/v2/apple-2025-form-10-k-p004-560.webp 560w, /landing/v2/apple-2025-form-10-k-p004-840.webp 840w, /landing/v2/apple-2025-form-10-k-p004-1120.webp 1120w",
+          "width": 1120,
+          "height": 1450
+        }
+      },
+      {
+        "documentId": "apple-2026-proxy-def14a",
+        "filename": "apple-2026-proxy-def14a-reference.pdf",
+        "form": "DEF 14A",
+        "filingDate": "2026-01-08",
+        "page": 17,
+        "pageCount": 103,
+        "representationKind": "reference_render",
+        "raster": {
+          "src": "/landing/v2/apple-2026-proxy-def14a-reference-p017-1080.webp",
+          "srcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-720.webp 720w, /landing/v2/apple-2026-proxy-def14a-reference-p017-1080.webp 1080w",
+          "width": 1080,
+          "height": 1398
+        }
+      },
+      {
+        "documentId": "apple-2026-q1-10-q",
+        "filename": "apple-2026-q1-10-q-reference.pdf",
+        "form": "10-Q",
+        "filingDate": "2026-01-30",
+        "page": 4,
+        "pageCount": 30,
+        "representationKind": "reference_render",
+        "raster": {
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-720.webp 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp 1080w",
+          "width": 1080,
+          "height": 1398
+        }
+      }
+    ],
+    "acceptedFormats": "PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, JPG, PNG, TIF or GIF"
+  },
+  "sourcesCopy": {
+    "en": {
+      "stackLabel": "SOURCES COMPILED HERE",
+      "formatsLabel": "Accepted at upload",
+      "compilerLines": [
+        "TAVONEL",
+        "COMPILER"
+      ],
+      "objectsLabel": "OBJECTS",
+      "objects": [
+        {
+          "id": "entities",
+          "label": "Entities",
+          "note": "The named things a source refers to."
+        },
+        {
+          "id": "claims",
+          "label": "Claims",
+          "note": "What a source states, in the words it printed."
+        },
+        {
+          "id": "relations",
+          "label": "Relations",
+          "note": "How one object reaches another, with the predicate kept."
+        },
+        {
+          "id": "evidence",
+          "label": "Evidence",
+          "note": "The file, the page and the region a passage was read from."
+        },
+        {
+          "id": "versions",
+          "label": "Versions",
+          "note": "Which version of which source an object is bound to."
+        },
+        {
+          "id": "retrieval",
+          "label": "Retrieval",
+          "note": "What an Ask returns, with the regions it cites."
+        }
+      ],
+      "naming": "What comes out is a Compiled World.",
+      "next": {
+        "label": "See the World view",
+        "href": "/explore?act=world"
+      },
+      "alt": {
+        "original": "A page of the original filing, as the compiler read it.",
+        "reference": "A reference render of the filing page, as the compiler read it."
+      },
+      "pageOfFormat": "p.{page} of {pageCount}"
+    },
+    "ko": {
+      "stackLabel": "여기서 컴파일한 원문",
+      "formatsLabel": "업로드에서 허용하는 형식",
+      "compilerLines": [
+        "TAVONEL",
+        "컴파일러"
+      ],
+      "objectsLabel": "객체",
+      "objects": [
+        {
+          "id": "entities",
+          "label": "개체",
+          "note": "원문이 가리키는 이름 있는 대상입니다."
+        },
+        {
+          "id": "claims",
+          "label": "진술",
+          "note": "원문이 인쇄한 문장 그대로 진술한 내용입니다."
+        },
+        {
+          "id": "relations",
+          "label": "관계",
+          "note": "한 객체가 다른 객체에 닿는 방식이며, 술어가 함께 남습니다."
+        },
+        {
+          "id": "evidence",
+          "label": "근거",
+          "note": "문단을 읽어 온 파일과 페이지와 영역입니다."
+        },
+        {
+          "id": "versions",
+          "label": "버전",
+          "note": "객체가 어느 원문의 어느 버전에 묶여 있는지입니다."
+        },
+        {
+          "id": "retrieval",
+          "label": "검색",
+          "note": "Ask가 돌려주는 내용과 그것이 인용한 영역입니다."
+        }
+      ],
+      "naming": "나오는 것이 Compiled World입니다.",
+      "next": {
+        "label": "World 뷰 보기",
+        "href": "/explore?act=world"
+      },
+      "alt": {
+        "original": "컴파일러가 읽은 그대로의 원본 공시 페이지입니다.",
+        "reference": "컴파일러가 읽은 그대로의 공시 페이지 기준 렌더입니다."
+      },
+      "pageOfFormat": "{pageCount}쪽 중 {page}쪽"
+    }
+  },
+  "stateWords": {
+    "en": {
+      "current": "CURRENT",
+      "candidate": "PUBLISHED SAMPLE",
+      "changed": "CHANGED",
+      "affected": "AFFECTED",
+      "unresolved": "UNRESOLVED",
+      "dim": "UNCHANGED"
+    },
+    "ko": {
+      "current": "현재",
+      "candidate": "공개 샘플",
+      "changed": "변경됨",
+      "affected": "영향 받음",
+      "unresolved": "미해결",
+      "dim": "그대로"
+    }
+  }
+}

@@ -29,3 +29,26 @@ test("every source has matching upright typography, not a substituted italic fac
   expect(typography.weight).toBe(typography.parentWeight);
   expect(typography.synthesis).toBe(typography.parentSynthesis);
 });
+
+test("footer labels use their own cells without clipped or escaping text", async ({ page }) => {
+  await page.goto("/product");
+  await page.locator("footer.site").scrollIntoViewIfNeeded();
+  const violations = await page.locator("footer.site .site-footer-groups a").evaluateAll(links =>
+    links.flatMap(link => {
+      const box = link.getBoundingClientRect();
+      return link.scrollWidth > link.clientWidth + 1 || box.height < 44
+        ? [{ text: link.textContent, scroll: link.scrollWidth, width: link.clientWidth, height: box.height }] : [];
+    }));
+  expect(violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.locator('footer.site a[href="/subprocessors"]')).toBeVisible();
+});
+
+test("the first developer request remains keyboard reachable on a narrow screen", async ({ page }) => {
+  await page.goto("/developers");
+  const sample = page.getByRole("region", { name: "First API request example" });
+  await expect(sample).toHaveAttribute("tabindex", "0");
+  await sample.focus();
+  await expect(sample).toBeFocused();
+  await expect(sample.locator("code")).not.toHaveText("");
+});

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import RevisionBadge from "../revision-badge";
 import { LANDING_V2_SCENE_ORDER, type LandingV2RecompileCopy } from "@/lib/landing-v2-copy";
-import { landingV2StateWord, type RecompileView } from "@/lib/landing-v2-proof";
+import { landingV2StateWord, type RecompileView } from "@/lib/landing-v2-runtime";
 import { RECOMPILE_ACTIONS, RECOMPILE_COUNTS_QUALIFIER } from "@/lib/landing-v2-recompile";
 import styles from "./recompile.module.css";
 

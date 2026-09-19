@@ -180,3 +180,9 @@ body .skip { min-height: 44px; display: inline-flex; align-items: center; }
   padding-inline: 0;
 }
 .public-page, .pricing-page { font-size: 16px; }
+
+/* A long Trust label needs its whole group width, not an overflowing half-cell. */
+.chrome-v2-footer .site-footer-groups a { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .chrome-v2-footer .site-footer-groups a[href="/subprocessors"] { grid-column: 1 / -1; }
+}

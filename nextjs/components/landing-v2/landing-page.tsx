@@ -20,7 +20,7 @@ import {
   type EvidenceRecord,
   type ProofTab,
   type RecompileView,
-} from "@/lib/landing-v2-proof";
+} from "@/lib/landing-v2-runtime";
 import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
 import { landingVariantState, type LandingVariantState } from "@/lib/landing-experiments";
 

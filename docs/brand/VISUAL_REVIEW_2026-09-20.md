@@ -45,3 +45,22 @@ Production completion requires: exact-head CI green, normal protected-branch mer
 ## Intentionally unchanged
 
 Customer-data activation remains closed. Selective-recompilation authority and benchmark claims are not promoted. No original film or public-source asset is replaced; no source text, count or geometry is fabricated. No generated imagery, stock decoration, customer logo or invented testimonial is introduced.
+
+## V21 — deployed first-request cost
+
+The first deployed-preview full audit timed out on the phone home request. A separate three-navigation probe returned HTTP 200 each time but measured 27,142 / 407 / 220 ms to DOMContentLoaded; the first response's HTML did not arrive until 26,945 ms. This was a server-side first-request issue, not a reason to increase the browser timeout or weaken CSP.
+
+The runtime previously imported modules which compile the frozen public corpus at module scope. A small committed projection now supplies landing facts, while every build re-derives and compares every field using the original compiler-backed builders. Runtime access and experiment policy remain dynamic. The implementation and regeneration procedure are documented in the canonical design record. New-deployment measurements are required before making a production speed claim.
+
+## V22 — 360px footer regression found by full CI
+
+The enlarged footer typography exposed a nested mobile-grid defect that the 390/1440 audit missed. On Linux, the Subprocessors label's text extended 3px past the page even though its anchor's bounding box stayed inside. On Windows this appeared as 1px; it was not merely harmless rounding. Removing the footer in a diagnostic DOM removed the overflow, while removing the header did not.
+
+The long label now occupies the group's full row, other footer labels may wrap, and all retain at least 44px touch height. A regression checks each link's text scroll width, not just its rectangle. The full public audit now includes 360px as well as 390 and 1440. Three historical chrome color/alignment assertions were updated to the revised palette and fluid measure; the transparency/40px scroll transition, keyboard behavior and geometry guards remain enforced.
+
+The failed CI attempt on 637003c remains part of the audit history. It must not be described as an all-green release. The next revision requires a fresh complete CI run before merge.
+
+
+## V23 — developer code sample keyboard access
+
+The expanded 360px audit found a second focus defect on /developers: its first API request code sample becomes horizontally scrollable at this width without being keyboard reachable. The preformatted example now has a tab stop and an accessible name. Its code and copy button are unchanged. This finding was not present at the earlier 390/1440 audit widths, which is why the 360px expansion remains in the final audit.

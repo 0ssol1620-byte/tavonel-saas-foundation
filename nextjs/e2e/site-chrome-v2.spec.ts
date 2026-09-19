@@ -145,7 +145,7 @@ test.describe("at 1440", () => {
       on the retry, then 0.77. The threshold and the toggle were never the flake; the stopwatch
       was. This waits for the transition to land on the declared value instead.
     */
-    await expect(header).toHaveCSS("background-color", "rgba(8, 9, 11, 0.78)");
+    await expect(header).toHaveCSS("background-color", "rgba(9, 13, 20, 0.94)");
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(header).toHaveAttribute("data-scrolled", "0");
@@ -154,19 +154,21 @@ test.describe("at 1440", () => {
   /*
     D9: the wordmark shares the landing content's left edge.
 
-    72px at 1440 is both the blueprint's outer margin and, at this width, what
-    `max(gutter, (100% - 1296) / 2)` resolves to. The logo's own box starts at the padding edge,
+    The shared edge follows the current fluid gutter and maximum content measure, not
+    a historical hard-coded 72px value. The logo's own box starts at the padding edge,
     so this measures the box rather than the ink.
   */
-  test("starts the wordmark on the 1296/72 content edge", async ({ page }) => {
+  test("aligns the wordmark and footer on the shared fluid content edge", async ({ page }) => {
     await page.goto("/product");
+    const width = page.viewportSize()!.width;
+    const edge = Math.max(Math.min(Math.max(width * .03, 20), 64), (width - 1600) / 2);
     const wordmark = await page.locator(`${HEADER} .wordmark`).first().boundingBox();
     expect(wordmark).not.toBeNull();
-    expect(Math.abs((wordmark?.x ?? 0) - 72), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);
+    expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);
 
     const footer = await page.locator("footer.site .chrome-v2-wrap").boundingBox();
     expect(footer, "the footer has no V2 measure").not.toBeNull();
-    expect(Math.abs((footer?.x ?? 0) - 72), `footer x ${footer?.x}`).toBeLessThanOrEqual(1);
+    expect(Math.abs((footer?.x ?? 0) - edge), `footer x ${footer?.x}`).toBeLessThanOrEqual(1);
   });
 
   test("fits the whole row inside the viewport with no horizontal overflow", async ({ page }) => {
@@ -245,7 +247,7 @@ test.describe("at 390", () => {
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
     // Retried, for the transition reason in the desktop test above.
-    await expect(header).toHaveCSS("background-color", "rgba(8, 9, 11, 0.78)");
+    await expect(header).toHaveCSS("background-color", "rgba(9, 13, 20, 0.94)");
   });
 
   test("does not scroll sideways with the sheet open", async ({ page }) => {

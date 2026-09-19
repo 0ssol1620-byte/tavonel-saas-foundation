@@ -9,7 +9,7 @@ import {
   SOURCES_COPY,
   sourcesScene,
   type SourcesSceneData,
-} from "@/lib/landing-v2-sources";
+} from "@/lib/landing-v2-runtime";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
 
 /*
