@@ -29,7 +29,7 @@ const MODULE_SHEETS = readdirSync(new URL(`../${SCENE_DIR}`, import.meta.url))
 /** Every stylesheet this lane owns: the landing's shared sheet plus each scene's module sheet. */
 const SHEETS = ["app/landing-v2.css", ...MODULE_SHEETS];
 
-/** The 16-second hero timeline: 14 seconds of storyboard and a 2-second hold (§11.2, D11). */
+/** The 16-second hero timeline: seven beats of two seconds and a 2-second hold (§11.2, D11). */
 const LOOP_SECONDS = 16;
 /** §11.2 is written to a tenth of a second; the lane measures the built sheet against it at 0.2. */
 const TOLERANCE = 0.2;
@@ -118,48 +118,78 @@ const landingBlocks = blocks(landing);
 /* ================================================================================== §11.2 storyboard */
 
 /*
-  The storyboard, as the blueprint writes it, in seconds. Every row names the element the beat
-  belongs to, the keyframe that drives it, and the property whose value says the element is "on".
+  The storyboard, in seconds. Every row names the element the beat belongs to, the keyframe that
+  drives it, and the property whose value says the element is at full emphasis.
 
-  `window` is when that element is fully in its beat state. Two shapes appear, and both are the
-  blueprint's: an element that ARRIVES over its beat (the page rises through 0.0-1.2s and is
-  simply there afterwards, so its window opens at the beat's END) and an element that HOLDS for
-  its beat and then goes (the captions, the slot's four panels, the coordinate label).
+  REWRITTEN FOR F2 (2026-09-19), AND THE SHAPE OF IT CHANGED WITH THE HERO.
+
+  §11.2's eight uneven beats were the timing of a sequence that REVEALED its objects: four of them
+  took turns in one rotating slot, so each had a start and an end and the panel after it took the
+  cell. Nothing is revealed now -- every object is on screen from the first frame and its beat
+  brings it from `--lv2-rest` to full -- so a beat has a start and no end, and the eight uneven
+  windows became seven even ones: two seconds each, then a two-second hold at full emphasis.
+
+  Seven because the Use beat left with the answer panel it narrated. Even because there is no
+  longer a reason for one beat to be longer than another: the old lengths were how long a panel
+  needed to be readable, and the panels do not take turns any more.
+
+  `window` is when the element is at full emphasis. Two shapes, both intended: an element that
+  ARRIVES at its beat and stays (every emphasis keyframe, and the two lines, whose draw finishes at
+  the beat's END) and a one-instant event (the dot's single swell).
 */
 const STORYBOARD: { beat: string; keyframe: string; property: string; on: string; window: [number, number | null] }[] = [
-  // 0.0-1.2 Source arrives -- the strip and the thumbnail rise together and stay.
-  { beat: "source", keyframe: "lv2-b-source", property: "opacity", on: "1", window: [1.2, null] },
-  // 1.2-2.4 Read -- the box on the page, and the line that reaches it.
-  { beat: "read/region", keyframe: "lv2-b-read", property: "opacity", on: "1", window: [2.4, null] },
-  { beat: "read/line", keyframe: "lv2-b-read-line", property: "transform", on: "scaleY(1)", window: [2.4, null] },
-  // 2.4-4.0 Compile -- the line draws down, the claim arrives bound to it.
-  { beat: "compile/line", keyframe: "lv2-b-claim-line", property: "transform", on: "scaleY(1)", window: [4.0, null] },
-  { beat: "compile/claim", keyframe: "lv2-b-compile", property: "opacity", on: "1", window: [4.0, null] },
-  // 4.0-5.8 Structure -- the objects bound to the region. Held through Verify: see the note below.
-  { beat: "structure", keyframe: "lv2-slot-structure", property: "opacity", on: "1", window: [4.0, 7.2] },
-  // 5.8-7.2 Verify -- the state the World gives the object, one dot pulse, and the coordinate.
-  { beat: "verify/state", keyframe: "lv2-b-verify", property: "opacity", on: "1", window: [5.8, null] },
-  { beat: "verify/pulse", keyframe: "lv2-b-pulse", property: "transform", on: "scale(1.9)", window: [6.12, 6.12] },
-  { beat: "verify/coordinate", keyframe: "lv2-b-coordinate", property: "opacity", on: "1", window: [5.8, 7.2] },
-  // 7.2-9.5 Change, 9.5-11.5 Recompile, 11.5-14 Use, then the 2-second hold.
-  { beat: "change", keyframe: "lv2-slot-change", property: "opacity", on: "1", window: [7.2, 9.5] },
-  { beat: "recompile", keyframe: "lv2-slot-recompile", property: "opacity", on: "1", window: [9.5, 11.5] },
-  { beat: "use", keyframe: "lv2-slot-use", property: "opacity", on: "1", window: [11.5, 14.0] },
-  { beat: "hold", keyframe: "lv2-slot-hold", property: "opacity", on: "1", window: [14.0, 16.0] },
+  // 0-2 Source: the strip and the thumbnail come to full strength together.
+  { beat: "source", keyframe: "lv2-e-source", property: "opacity", on: "1", window: [0.0, null] },
+  // 2-4 Read: the box brightens, pulses once on the page, and the line is drawn to it.
+  { beat: "read/region", keyframe: "lv2-e-region", property: "opacity", on: "1", window: [2.0, null] },
+  { beat: "read/pulse", keyframe: "lv2-e-region-fill", property: "opacity", on: "0.22", window: [2.64, 2.64] },
+  { beat: "read/line", keyframe: "lv2-b-read-line", property: "transform", on: "scaleY(1)", window: [4.0, null] },
+  // 4-6 Compile: the line draws down and the claim comes to full strength.
+  { beat: "compile/claim", keyframe: "lv2-e-claim", property: "opacity", on: "1", window: [4.0, null] },
+  { beat: "compile/line", keyframe: "lv2-b-claim-line", property: "transform", on: "scaleY(1)", window: [6.0, null] },
+  // 6-8 Structure: the objects the compiler bound to the region.
+  { beat: "structure", keyframe: "lv2-e-nodes", property: "opacity", on: "1", window: [6.0, null] },
+  // 8-10 Verify: the state the World gives the object, one dot pulse, and the coordinate.
+  { beat: "verify/state", keyframe: "lv2-e-verify", property: "opacity", on: "1", window: [8.0, null] },
+  { beat: "verify/pulse", keyframe: "lv2-b-pulse", property: "transform", on: "scale(1.9)", window: [8.32, 8.32] },
+  { beat: "verify/coordinate", keyframe: "lv2-e-coordinate", property: "opacity", on: "1", window: [8.0, null] },
+  // 10-12 Change, 12-14 Recompile, then the 2-second hold at full emphasis.
+  { beat: "change", keyframe: "lv2-e-arrivals", property: "opacity", on: "1", window: [10.0, null] },
+  { beat: "recompile", keyframe: "lv2-e-counts", property: "opacity", on: "1", window: [12.0, null] },
 ];
 
-/** The 8 narration captions, one per §11.2 beat, in order. */
+/** Every keyframe that carries an object from `--lv2-rest` to full emphasis (F2). */
+const EMPHASIS = STORYBOARD.filter((row) => row.keyframe.startsWith("lv2-e-") && row.on === "1").map(
+  (row) => row.keyframe,
+);
+
+/** The 7 narration captions, one per beat, in order. */
 const CAPTION_BEATS: [number, number][] = [
-  [0.0, 1.2],
-  [1.2, 2.4],
-  [2.4, 4.0],
-  [4.0, 5.8],
-  [5.8, 7.2],
-  [7.2, 9.5],
-  [9.5, 11.5],
+  [0.0, 2.0],
+  [2.0, 4.0],
+  [4.0, 6.0],
+  [6.0, 8.0],
+  [8.0, 10.0],
+  [10.0, 12.0],
   // The last caption describes the composed hero, so it holds through the 2-second pause.
-  [11.5, 16.0],
+  [12.0, 16.0],
 ];
+
+/** The [from, to) stretches, in percent, over which a keyframe's value is actually changing. */
+function movingRanges(stops: Stop[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 1; i < stops.length; i += 1) {
+    const before = stops[i - 1]!;
+    const after = stops[i]!;
+    const properties = new Set([...before.declarations.keys(), ...after.declarations.keys()]);
+    let changes = false;
+    for (const property of properties) {
+      if (before.declarations.get(property) !== after.declarations.get(property)) changes = true;
+    }
+    if (changes && after.percent > before.percent) out.push([before.percent, after.percent]);
+  }
+  return out;
+}
 
 /** The maximal stretch, in seconds, over which `property` holds the value `on`. */
 function onWindow(name: string, property: string, on: string): [number, number] {
@@ -171,7 +201,7 @@ function onWindow(name: string, property: string, on: string): [number, number] 
 }
 
 describe("the hero storyboard matches §11.2", () => {
-  it("is one 16-second loop: 14 seconds of beats and a 2-second hold", () => {
+  it("is one 16-second loop: seven beats of two seconds and a 2-second hold", () => {
     const timeline = landingBlocks.find((rule) => rule.body.includes("animation-iteration-count: infinite"));
     expect(timeline?.body).toContain(`animation-duration: ${LOOP_SECONDS}s`);
     expect(timeline?.body).toContain("animation-iteration-count: infinite");
@@ -209,6 +239,30 @@ describe("the hero storyboard matches §11.2", () => {
     }
   });
 
+  /*
+    F2's hold, measured rather than asserted by a comment: after the last beat opens, no emphasis
+    keyframe changes again, and every one of them ends at full. That pair is what makes the last
+    two seconds the complete composition and what makes the reduced-motion collapse land on it.
+  */
+  it("holds every object at full emphasis through the last two seconds", () => {
+    const holdStartsAt = (14 / LOOP_SECONDS) * 100;
+    for (const name of EMPHASIS) {
+      const stops = landingKeyframes.get(name)!;
+      const last = stops[stops.length - 1]!;
+      expect(last.percent, `@keyframes ${name} does not reach 100%`).toBe(100);
+      expect(last.declarations.get("opacity"), `@keyframes ${name} does not end at full`).toBe("1");
+      const moves = movingRanges(stops).filter(([, to]) => to > holdStartsAt);
+      expect(moves, `@keyframes ${name} is still moving inside the hold`).toEqual([]);
+      // And it starts visible: F2 allows no object on this stage to begin the loop at zero.
+      expect(stops[0]!.declarations.get("opacity"), `@keyframes ${name} starts hidden`).toBe("var(--lv2-rest)");
+    }
+    // The resting emphasis itself, declared once and above F2's floor of 0.55.
+    const rest = landing.match(/--lv2-rest:\s*([\d.]+)/);
+    expect(rest, "--lv2-rest is declared").toBeTruthy();
+    expect(Number(rest![1]), "the resting emphasis is below F2's floor").toBeGreaterThanOrEqual(0.55);
+    expect(Number(rest![1]), "the resting emphasis is not a reduced one").toBeLessThan(1);
+  });
+
   it("pulses the state dot exactly once", () => {
     const stops = landingKeyframes.get("lv2-b-pulse")!;
     const swells = stops.filter((stop) => /scale\(/.test(stop.declarations.get("transform") ?? ""));
@@ -242,22 +296,6 @@ describe("the hero storyboard matches §11.2", () => {
 
 /* ============================================================== §23.2: at most three things at once */
 
-/** The [from, to) stretches, in percent, over which a keyframe's value is actually changing. */
-function movingRanges(stops: Stop[]): [number, number][] {
-  const out: [number, number][] = [];
-  for (let i = 1; i < stops.length; i += 1) {
-    const before = stops[i - 1]!;
-    const after = stops[i]!;
-    const properties = new Set([...before.declarations.keys(), ...after.declarations.keys()]);
-    let changes = false;
-    for (const property of properties) {
-      if (before.declarations.get(property) !== after.declarations.get(property)) changes = true;
-    }
-    if (changes && after.percent > before.percent) out.push([before.percent, after.percent]);
-  }
-  return out;
-}
-
 describe("§23: at most three objects move at the same time", () => {
   /*
     THE READING OF THE RULE, STATED SO IT IS NOT QUIETLY RE-READ LATER.
@@ -275,8 +313,8 @@ describe("§23: at most three objects move at the same time", () => {
   }));
 
   it("binds every beat to an element", () => {
-    // Nine stage elements, eight captions, four slot beats and the resting stack.
-    expect(bindings.length).toBe(22);
+    // Thirteen stage elements (F2 gave the objects their own cells) and seven captions.
+    expect(bindings.length).toBe(20);
   });
 
   it("never has a fourth element in motion", () => {

@@ -110,25 +110,22 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
             <li key={proof.id} className="lv2-proof">
               {/*
                 C4: the proof's own label is the link to where it is written down. The support
-                line above says "each written down where it can be checked" and, until this
+                line above says "each written down where it can be checked" and, until that
                 round, three of the four had nowhere to go. A link on the label rather than a
                 fourth row of "read more" links: the claim and its receipt are one thing.
 
-                Except where that page is the scene's own next action (P3 QA round 1). The
-                `review` proof is written down on /trust, which is the Trust Center link below
-                it; linking the label there too would put the reader's one next step on the page
-                twice. The proof keeps its destination in the copy deck either way, so
-                `lib/landing-v2-trust.test.ts` still checks that every proof names a route this
-                site publishes -- what moves is only where the anchor is.
+                ALL FOUR ARE LINKS NOW, IN ONE STYLE (F7, 2026-09-19). P3 QA round 1 left the
+                `review` proof as plain text because its destination was /trust, which is also
+                this scene's one next action, and two anchors to one route is a reader choosing
+                twice between identical links. What that bought was a scene where one proof in
+                four looked different for a reason nothing on the page explains. So the route
+                moved instead of the markup: /contact publishes the same sentence in the FAQ D6
+                moved there, every proof is an `lv2-inline-link`, and no destination is twice.
               */}
               <p className="lv2-proof-label">
-                {proof.href === NEXT_HREF ? (
-                  proof.label
-                ) : (
-                  <Link className="lv2-inline-link" href={proof.href as Route} prefetch={false}>
-                    {proof.label}
-                  </Link>
-                )}
+                <Link className="lv2-inline-link" href={proof.href as Route} prefetch={false}>
+                  {proof.label}
+                </Link>
               </p>
               <p className="lv2-proof-note lv2-small">{proof.note}</p>
             </li>

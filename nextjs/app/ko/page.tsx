@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { preload } from "react-dom";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
 import DocumentLangKo from "./document-lang";
@@ -59,17 +60,17 @@ export default async function KoreanEntryPage({
     query: Array.isArray(query) ? query[0] : query,
   });
   const hero = heroScene();
+  /* 영문 페이지와 같은 LCP 리소스: 히어로가 그리는 READ 스트립(영역 크롭), 같은 srcset과 sizes.
+     F10: 엘리먼트가 아니라 react-dom의 preload()다 — 엘리먼트로 두면 React가 head에 호이스트한
+     사본과 제자리에 렌더한 원본이 함께 나와 같은 리소스를 두 번 프리로드한다. */
+  preload(hero.region.cropSrc, {
+    as: "image",
+    imageSrcSet: hero.region.cropSrcSet,
+    imageSizes: HERO_IMAGE_SIZES,
+    fetchPriority: "high",
+  });
   return (
     <>
-      {/* 영문 페이지와 같은 LCP 리소스: 히어로가 그리는 READ 스트립(영역 크롭), 같은 srcset과 sizes. */}
-      <link
-        rel="preload"
-        as="image"
-        href={hero.region.cropSrc}
-        imageSrcSet={hero.region.cropSrcSet}
-        imageSizes={HERO_IMAGE_SIZES}
-        fetchPriority="high"
-      />
       <LandingPage korean experiment={experiment}>
         <DocumentLangKo />
         <BreadcrumbJsonLd trail={[{ name: "한국어 안내", path: "/ko" }]} />

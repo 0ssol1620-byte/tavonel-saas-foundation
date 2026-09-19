@@ -118,7 +118,7 @@ export type LandingV2HeroCopy = LandingV2Scene & {
   pageOfFormat: string;
   /** The label over the demo, and the words its beats are announced with. */
   demoLabel: string;
-  beats: { source: string; read: string; compile: string; structure: string; verify: string; change: string; recompile: string; use: string };
+  beats: { source: string; read: string; compile: string; structure: string; verify: string; change: string; recompile: string };
   playLabel: string;
   pauseLabel: string;
 };
@@ -236,7 +236,7 @@ const EN: LandingV2Copy = {
     headline: BRAND_LINE.headline,
     headlineExperiment: {
       b: "Compile your knowledge.",
-      c: "Turn your files into knowledge your AI can trust.",
+      c: "Knowledge your AI can trust, traced to the source.",
     },
     /*
       C1, 2026-09-19. It read "Connect the files and systems you already have", and neither half
@@ -252,7 +252,13 @@ const EN: LandingV2Copy = {
     pageOfFormat: "p.{page} of {pageCount}",
     demoLabel: "What the compiler does with one page",
     /*
-      The eight beats of the hero demo (§11.2), adapted to what this World actually holds.
+      The seven beats of the hero demo (§11.2), adapted to what this World actually holds.
+
+      SEVEN, NOT EIGHT (F2/F4, 2026-09-19). The hero lost its rotating slot, and the Use beat's
+      answer panel went with it: every object the hero shows is on screen at once now, and a
+      fourth prepared question in a 245px column restated Scene 02, which runs three of them
+      with their real citations at a size where the passage can be read. A caption with nothing
+      on the stage to narrate is worse than one caption fewer.
 
       Two of them say something different from the storyboard, and both changes are the same
       rule. §11.2 narrates "1 source change detected" and a version step v1 → v2; nothing in the
@@ -270,7 +276,6 @@ const EN: LandingV2Copy = {
       verify: "Every object carries the state the World gives it.",
       change: "Later filings arrive on top of it.",
       recompile: "The World is compiled again, and the comparison says what moved.",
-      use: "A question is answered out of the source, with the region it came from.",
     },
     playLabel: "Play the compile sequence",
     pauseLabel: "Pause the compile sequence",
@@ -454,7 +459,8 @@ const EN: LandingV2Copy = {
       2. evidence  -- what Scene 04 above demonstrates on real data: `buildEvidenceRecord()`
                       refuses to build a record without the source version, page and region, and
                       the scene prints all three. `lib/landing-v2-trust.test.ts` checks that.
-      3. review    -- the held-for-review mechanism, published in /contact's FAQ and on /trust.
+      3. review    -- the held-for-review mechanism, published in /contact's FAQ (the proof links
+                      there since F7; /trust is the scene's next action and may not be linked twice).
                       It used to print `activationPolicy.candidatePromotion.reason` ("Activation
                       is always an explicit human decision"), which is the gate on promoting a
                       candidate World to the active one -- a different mechanism from a per-object
@@ -473,7 +479,18 @@ const EN: LandingV2Copy = {
     proofs: [
       { id: "training", label: TRAINING_DATA_CLAIM.label, note: TRAINING_DATA_CLAIM.body, href: "/security" },
       { id: "evidence", label: "Evidence stays attached", note: "A published object carries the source version, page and region it was compiled from, and is not emitted without them.", href: "/evidence" },
-      { id: "review", label: "Unverified knowledge is held for review", note: "A passage that cannot be verified is held for review and surfaced as such, not published as if it were verified. Fail closed is a property of the compiler, not a setting.", href: "/trust" },
+      /*
+        F7, 2026-09-19: the receipt moved from /trust to /contact, and the note did not change.
+
+        Every proof on this scene is a link to the page its sentence is written down on, and this
+        one pointed at /trust -- which is also the scene's one next action, so the scene rendered
+        two anchors to the same destination and the `review` label had to be left unlinked to
+        avoid it. That made one of four proofs look different from the other three for a reason a
+        reader cannot see. /contact publishes this exact sentence in the FAQ that D6 moved there,
+        word for word (`app/contact/page.tsx`), so it is the other page where the claim is
+        written down rather than a second-best destination.
+      */
+      { id: "review", label: "Unverified knowledge is held for review", note: "A passage that cannot be verified is held for review and surfaced as such, not published as if it were verified. Fail closed is a property of the compiler, not a setting.", href: "/contact" },
       { id: "portable", label: "Portable output, and a verifier you run", note: "A download is signed at request time or refused; there is no unsigned archive. The verifiers that check the signature and the contents are published for download.", href: "/docs/exports" },
     ],
     /* Only routes that exist. There is no /architecture on this site and none is invented. */
@@ -508,7 +525,7 @@ const KO: LandingV2Copy = {
     /* D12: the literal translation of each arm. The subject is dropped, as the deck does. */
     headlineExperiment: {
       b: "지식을 컴파일하세요.",
-      c: "파일을 AI가 신뢰할 수 있는 지식으로 바꾸세요.",
+      c: "AI가 신뢰할 수 있는 지식, 원문까지 추적됩니다.",
     },
     support:
       "이미 가지고 있는 파일을 가져오세요. TAVONEL은 그것을 AI가 사용할 수 있고, 직접 검증할 수 있는 구조화된 버전 관리 지식으로 컴파일합니다.",
@@ -526,7 +543,6 @@ const KO: LandingV2Copy = {
       verify: "모든 객체는 World가 부여한 상태를 가지고 있습니다.",
       change: "이후의 공시 문서가 그 위에 도착합니다.",
       recompile: "World를 다시 컴파일하고, 비교 결과가 무엇이 움직였는지 말해 줍니다.",
-      use: "질문에 원문으로 답하고, 그 답을 읽어 온 영역을 함께 보여 줍니다.",
     },
     playLabel: "컴파일 과정 재생",
     pauseLabel: "컴파일 과정 일시정지",
@@ -648,7 +664,7 @@ const KO: LandingV2Copy = {
     proofs: [
       { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다.", href: "/security" },
       { id: "evidence", label: "근거는 계속 붙어 있습니다", note: "게시된 객체는 그것이 컴파일된 원문 버전, 페이지, 영역을 함께 가지며, 그것이 없으면 게시되지 않습니다.", href: "/evidence" },
-      { id: "review", label: "검증되지 않은 지식은 검토를 위해 보류됩니다", note: "검증할 수 없는 구절은 검토를 위해 보류되고 그렇게 표시되며, 검증된 것처럼 게시되지 않습니다. 닫힌 상태로 실패하는 것은 컴파일러의 성질이며 설정이 아닙니다.", href: "/trust" },
+      { id: "review", label: "검증되지 않은 지식은 검토를 위해 보류됩니다", note: "검증할 수 없는 구절은 검토를 위해 보류되고 그렇게 표시되며, 검증된 것처럼 게시되지 않습니다. 닫힌 상태로 실패하는 것은 컴파일러의 성질이며 설정이 아닙니다.", href: "/contact" },
       { id: "portable", label: "이식 가능한 결과물과 직접 실행하는 검증기", note: "내려받기는 요청 시점에 서명되거나 거부되며, 서명되지 않은 아카이브는 없습니다. 서명과 내용을 검사하는 검증기를 내려받을 수 있습니다.", href: "/docs/exports" },
     ],
     links: [

@@ -39,7 +39,6 @@ export type FunnelEvent =
   | "signed_in"
   | "checkout_opened"
   | "checkout_completed"
-  | "scene_reached"
   | "cta_clicked"
   | "source_filter_changed"
   /*
@@ -260,9 +259,13 @@ export function trackFunnelOnce(event: FunnelEvent, detail?: FunnelDetail) {
   trackFunnel(event, detail);
 }
 
-let deepestScene = 0;
-export function trackSceneDepth(scene: number) {
-  if (!Number.isFinite(scene) || scene <= deepestScene) return;
-  deepestScene = scene;
-  trackFunnel("scene_reached", { scene: String(scene) });
-}
+/*
+  `trackSceneDepth` and its `scene_reached` event were deleted on 2026-09-19 (F9).
+
+  Nothing called either of them. The landing's depth signal is the four `scroll_scene_*`
+  quartiles that `components/landing-v2/landing-analytics.tsx` actually fires, and this wrapper
+  was the one place in the module that named an event itself -- which is why the guard in
+  `funnel-events.test.ts` had to read this file's body to see a call site at all. A declared
+  event with no control is a column that will always read zero, and `film_stage_selected` was
+  deleted for the same reason before it.
+*/

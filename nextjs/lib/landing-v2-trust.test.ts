@@ -98,6 +98,14 @@ describe("landing scene 08 -- trust", () => {
     // 3. The per-object hold, NOT the activation gate that this note used to print.
     expect(review.note).not.toBe(activationPolicy.candidatePromotion.reason);
     expect(review.note).toContain("held for review");
+    /*
+      F7: and the page it links to is the one that publishes this sentence. /contact's FAQ answers
+      "what happens to a passage that cannot be verified" in these words, so the link is the
+      receipt rather than a nearby page. Read out of the route itself, not pinned as a string.
+    */
+    expect(review.href).toBe("/contact");
+    const contact = readFileSync(new URL("../app/contact/page.tsx", import.meta.url), "utf8");
+    expect(contact).toContain("It is held for review and surfaced as such, not published as if it were verified.");
 
     /*
       4. The export contract in `lib/docs-content.ts`: signed at request time or refused with
@@ -113,6 +121,9 @@ describe("landing scene 08 -- trust", () => {
   it.each(LOCALES)("%s offers one next action, the Trust Center", (locale) => {
     const html = render(locale);
     expect(html.match(/data-scene-next="trust"/g)).toHaveLength(1);
+    // F7: exactly one terminal action, and the four proofs are not competing with it.
+    expect(html.match(/class="lv2-text-link/g)).toHaveLength(1);
+    expect(html.match(/class="lv2-inline-link"/g), "every proof is a link, in one style").toHaveLength(4);
     // The marked action and the route it leads to are one element.
     expect(html).toMatch(/<a[^>]*href="\/trust"[^>]*data-scene-next="trust"|data-scene-next="trust"[^>]*href="\/trust"/);
   });
@@ -131,7 +142,14 @@ describe("landing scene 08 -- trust", () => {
     const html = render(locale);
     const copy = landingV2Copy(locale === "ko").trust;
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    const allowed = ["/security", "/trust", "/subprocessors", "/status", "/evidence", "/docs/exports"];
+    /*
+      §18 names five routes; two more are here because a proof's receipt is where the sentence is
+      actually written down (contract §18's list is extended, and the traceability doc records
+      it): /docs/exports carries the export contract the `portable` proof states, and /contact
+      carries the held-for-review FAQ answer the `review` proof states, word for word. Neither is
+      invented -- both are routes in `app/` -- and an invented one still fails here.
+    */
+    const allowed = ["/security", "/trust", "/subprocessors", "/status", "/evidence", "/docs/exports", "/contact"];
     for (const href of hrefs) expect(allowed, `trust scene links ${href}`).toContain(href);
     for (const proof of copy.proofs) {
       expect(allowed, `proof "${proof.id}" points at ${proof.href}`).toContain(proof.href);

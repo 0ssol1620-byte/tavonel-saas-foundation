@@ -84,10 +84,13 @@ const clientEvents = unionMembers("FunnelEvent");
 const serverEvents = unionMembers("ServerFunnelEvent");
 
 /*
-  The union's own lines are struck out of the corpus and the rest of the module is kept. The
-  declaration is not a call site; `trackSceneDepth`, three functions further down, is -- it is the
-  only wrapper that names an event itself, and dropping the whole file would make `scene_reached`
-  look dead when what it actually has is one indirection.
+  The union's own lines are struck out of the corpus and the rest of the module is kept.
+
+  The declaration is not a call site. The module body used to hold one -- `trackSceneDepth`, which
+  named `scene_reached` itself -- and F9 deleted both for having no caller of their own, so today
+  nothing in this file fires an event. The body stays in the corpus anyway: the next wrapper that
+  names an event would otherwise read as dead, and the strike-out below is what keeps a name from
+  matching its own declaration either way.
 */
 const callSites = ["../app", "../components", "../lib"]
   .flatMap((path) => sourceFiles(resolve(import.meta.dirname, path)))
@@ -134,12 +137,14 @@ describe("every declared funnel event has a control that fires it", () => {
 
   /*
     Both halves of the corpus, named. Without the strike-out every event passes by matching its
-    own declaration; without the module body `scene_reached` fails for having a wrapper.
+    own declaration; with the module body a wrapper that names an event is still a call site.
   */
   it("reads the module body but not the union that declares the names", () => {
-    expect(callSites.includes("trackFunnel(\"scene_reached\""), "the module body is not in the corpus, so a wrapper's event reads as dead").toBe(true);
+    expect(callSites.includes("export function trackFunnelOnce"), "the module body is not in the corpus, so a wrapper's event would read as dead").toBe(true);
     expect(callSites.includes("| \"cta_clicked\""), "the union is in the corpus, so every name matches its own declaration").toBe(false);
-    expect(callSites.includes("\"film_stage_selected\""), "a name deleted for having no caller is back in the tree").toBe(false);
+    for (const gone of ["film_stage_selected", "scene_reached"]) {
+      expect(callSites.includes(`"${gone}"`), `${gone} was deleted for having no caller and is back in the tree`).toBe(false);
+    }
   });
 });
 
@@ -167,7 +172,10 @@ const routeHandlers = sourceFiles(resolve(import.meta.dirname, "../app/api"))
 */
 const BROWSER_EVENTS_BEFORE_THE_SERVER_HALF = [
   "generate_lead", "login_reached_with_intent", "signed_in", "checkout_opened", "checkout_completed",
-  "scene_reached", "cta_clicked", "source_filter_changed", "hero_explore_clicked", "hero_start_clicked",
+  /* `scene_reached` was here until F9 (2026-09-19). It is dropped rather than kept, because the
+     rule this list encodes is "a column somebody is already reading" and this one never had a
+     caller to write a row: the landing's depth signal is `scroll_scene_25..100`. */
+  "cta_clicked", "source_filter_changed", "hero_explore_clicked", "hero_start_clicked",
   "pricing_plan_viewed", "pricing_start_clicked", "source_category_viewed", "developer_mcp_started",
   "developer_api_started", "explore_entered", "explore_object_selected", "explore_evidence_opened",
   "explore_change_opened", "explore_ask_used", "explore_to_signup", "workspace_first_source_added",
@@ -178,7 +186,7 @@ const BROWSER_EVENTS_BEFORE_THE_SERVER_HALF = [
 
 describe("server funnel events", () => {
   it("renames, redefines and drops none of the browser events", () => {
-    expect(BROWSER_EVENTS_BEFORE_THE_SERVER_HALF).toHaveLength(29);
+    expect(BROWSER_EVENTS_BEFORE_THE_SERVER_HALF).toHaveLength(28);
     for (const event of BROWSER_EVENTS_BEFORE_THE_SERVER_HALF) {
       expect(clientEvents, `${event} left the browser union -- a column somebody reads went to zero`).toContain(event);
     }

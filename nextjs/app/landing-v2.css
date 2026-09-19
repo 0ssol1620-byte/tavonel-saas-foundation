@@ -97,6 +97,20 @@
   */
   --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
 
+  /*
+    The hero demo's resting emphasis (F2), and the number is a contrast measurement.
+
+    F2 sets the floor at 0.55: every object is on screen from the first frame and the sequence
+    only brightens it. The ceiling is WCAG: these blocks are text, and an ancestor's opacity
+    multiplies into the text's contrast where no automated sweep can see it, because the sweep
+    reads `getComputedStyle().color`. The quietest text in the demo is --text-lo (#8b959b) on
+    --ink-950, which measures 6.48:1 at full strength. Blended against that ground it passes 4.5:1
+    down to about 0.80 and fails below it -- 0.78 is 4.30:1 and 0.55 is 2.66:1. So the resting
+    state is 0.85 (4.92:1), the highest number that is still visibly a step below 1 and the lowest
+    that keeps every de-emphasised sentence readable for the twelve seconds before its beat.
+  */
+  --lv2-rest: 0.85;
+
   color: var(--text-hi);
   font-family: var(--f-sans);
 }
@@ -565,8 +579,11 @@
   /*
     A clamped text track rather than an `fr` share, and the clamp is measured.
 
-    600 at 1440 is 42% of the 1296 measure, which is §32's and D11's text:visual ratio, and the
-    demo takes the remaining 668. D1 widened this track to 752 so that a 72px headline would hold
+    600 at 1440 is 46% of the 1296 measure and the demo takes the remaining 668, which with this
+    28px gap is 46:54. §32 and D11 write the ratio as 42:58, and this row used to claim 600 WAS
+    42% -- it is not, and the difference is a decision rather than an arithmetic slip: 42% of 1296
+    is 544px, and this headline sets in three lines at that width. The campaign lead settled it on
+    2026-09-19 -- a two-line headline first, the ratio second -- and 46:54 is what a visitor sees. D1 widened this track to 752 so that a 72px headline would hold
     its longer sentence on one line, and that inverted the ratio to 58:42: measured at 1440, the
     headline's full stop landed at x~800 against a demo starting at x~845, and the thumbnail's
     metadata folded to four lines with empty ground beside it. Of the two numbers that could not
@@ -630,14 +647,64 @@
 .lv2-demo { min-width: 0; }
 
 /*
-  Below 1200 the stage is a column in beat order: the region that was read, where it sits on the
-  filing, what was compiled out of it, and the objects and comparisons around it. That is §25's
-  vertical narrative and it is also the DOM order -- so the desktop arrangement further down is a
-  set of grid areas laid over a document that already reads correctly without them.
+  THE PHONE STAGE (< 768), AND WHY IT IS THREE TRACKS RATHER THAN ONE (F4, 2026-09-19).
+
+  Six objects stacked one per row measured 1,384px of content at 390 before the text column above
+  them, which is two viewports of hero on the surface contract rule 12 makes part of done. Six
+  tracks let each row take the split its own content wants, and each split below was measured at
+  390 rather than chosen: a thumbnail beside a paragraph wants 2:4 (at 3:3 the locator is bigger
+  than it needs and the claim sets 20 characters wide), and the chips beside the arrivals want 4:2
+  (at 4:2 the snapshot step wraps to fifteen lines in a 107px column -- 441px of hero for four
+  filing dates). The DOM order stays §25's vertical narrative either way: the region that was
+  read, where it sits on the filing, what was compiled out of it, the objects bound to it, what
+  arrived later and what the recompile compared.
+
+  ROW GAP IS ZERO AND THE LOWER ROWS CARRY THEIR OWN MARGIN. Each block in the row under the strip
+  begins with its own Evidence Line, and a line that stops 14px short of the thing it points at is
+  not a connector -- so the seam between row 1 and row 2 has to be the line's, not the grid's.
 */
-.lv2-demo-stage { position: relative; display: grid; gap: 18px; }
+.lv2-demo-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "read     read     read    read     read     read"
+    "locator  locator  claim   claim    claim    claim"
+    "nodes    nodes    nodes   nodes    arrivals arrivals"
+    "counts   counts   counts  counts   counts   counts";
+  align-items: start;
+  column-gap: 14px;
+  row-gap: 0;
+}
+.lv2-read { grid-area: read; }
+.lv2-locator { grid-area: locator; }
+.lv2-claim-block { grid-area: claim; }
+/* Scoped to the stage's own children: `.lv2-nodes`, `.lv2-revision` and `.lv2-counts` are D10
+   primitives and Scene 05 renders two of them in a layout of its own. */
+.lv2-demo-stage > .lv2-nodes { grid-area: nodes; }
+.lv2-demo-stage > .lv2-revision { grid-area: arrivals; max-width: none; }
+.lv2-demo-stage > .lv2-counts { grid-area: counts; }
+/* The seam the zero row-gap leaves out, on the rows that have no Evidence Line to draw. */
+.lv2-demo-stage > .lv2-revision,
+.lv2-demo-stage > .lv2-counts { margin-top: 18px; }
+@media (max-width: 767px) {
+  /* The objects sit in row 3 here and in row 2 at desktop, so their seam is width-dependent. */
+  .lv2-demo-stage > .lv2-nodes { margin-top: 18px; }
+}
 
 .lv2-demo-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+/*
+  F4: no sequence below 768, so no narration and no play/pause control.
+
+  A control that cannot start anything is a 44px target that lies, and seven captions describing
+  beats that will not play are seven sentences about a picture that is already complete. Hidden
+  rather than conditionally rendered: the first frame is the server's (§27), and a control whose
+  presence depended on a client-side width read would arrive after first paint or not at all.
+  `display: none` also takes it out of the tab order, so the phone's keyboard path is honest.
+*/
+@media (max-width: 767px) {
+  .lv2-demo-foot { display: none; }
+}
 
 /*
   The eight beats as text, stacked in one slot with one visible at a time. The stack is what keeps
@@ -662,8 +729,9 @@
   list-style: none;
 }
 .lv2-demo-caption { position: absolute; inset: 0; margin: 0; color: var(--text-mid); opacity: 0; }
-/* The last beat is the resting state: it is what is on screen through the two-second hold. */
-.lv2-cap-8 { opacity: 1; }
+/* The last beat is the resting state: it is what is on screen through the two-second hold, what
+   a paused loop shows, and -- since F5 -- the whole of the reduced-motion narration. */
+.lv2-cap-7 { opacity: 1; }
 
 .lv2-demo-control {
   order: -1;
@@ -888,83 +956,32 @@
 .lv2-claim-state i { width: 6px; height: 6px; border-radius: var(--r-full); background: currentColor; }
 .lv2-claim-text { font-size: 14px; line-height: 1.55; color: var(--text-mid); }
 
-/* ------------------------------------------------------------------------------ the ROTATING slot
+/* ------------------------------------------------------------------- the objects, in own cells
 
-  One box, four beats, and a static stack under them.
+  THERE IS NO SLOT ANY MORE (F2, 2026-09-19).
 
-  Below 1200 there is no rotation at all: the four beats are in flow and additive, because a beat
-  that fades out on a phone takes a sentence away from someone who is still reading it (§25). The
-  static stack is hidden there, since it would restate three of the four.
+  Four of the six objects used to live in one rotating box: Structure, Change, Recompile and Use
+  shared a grid cell with a static stack, one legible at a time. Three measurements ended it.
 
-  At 1200 and up the beats are absolutely positioned over the stack and only one is legible at a
-  time, so the slot cannot overlap anything -- including itself. The stack is what the reader sees
-  through the loop's two-second hold and under reduced motion: the snapshot step, the comparison
-  with its engine qualifier, and the objects bound to the region. That is everything §43's key
-  visual needs, with nothing on top of anything else.
+    - The cell was as tall as the tallest of the five (469px at 1440) for all sixteen seconds and
+      showed that panel for three of them, which is where the hero's empty ground came from.
+    - The resting stack and the beats restated each other, so the objects had to be hidden from
+      the stack at >=1200 -- and that hiding is what broke `e2e/landing-v2.spec.ts:553`. The spec
+      was right; the composition that hid the row it asserted was the defect (F1).
+    - At t=0 the fold showed a strip, a thumbnail and about 450px of nothing.
+
+  So each object is a grid cell of its own, in flow, painted from the first frame, and the
+  sequence decides only which one is EMPHASISED. Every height below is the height of real content
+  at that width: there is no reservation and nothing can paint over anything.
+
+  The snapshot step loses its chrome because the border belonged to a panel that floated over
+  other panels; in its own cell beside the counts it is a row of metadata with a list under it.
+  Measured on the phone the chrome cost more than it said: 32px of padding out of a 168px cell,
+  which pushed the step's own label to three lines. Dropped here rather than in `RevisionBadge`,
+  which Scene 05 also renders (D10: the primitive is shared, this landing's composition is not).
 */
-.lv2-slot { position: relative; display: grid; align-content: start; }
-.lv2-slot-static { display: grid; gap: 14px; align-content: start; }
-/*
-  D3: the beats are an overlay at every width now, not only at 1200 and up. See the animation
-  bindings near the end of this file for why the phone stopped being additive.
-*/
-/*
-  The beats share ONE grid cell with the static stack rather than being taken out of flow -- at
-  every width now (P3 QA round 1). Same result on screen, one beat legible at a time over a stack
-  that outlives them, but the slot's height is the tallest of the five, so a beat that runs longer
-  than the resting stack (the Change beat, with its four arrivals) cannot paint over the caption
-  row underneath. `position: absolute` at 1200 and up made the slot's box the stack's height and
-  let everything taller than it overflow; a grid cell cannot do that.
-*/
-.lv2-slot-static,
-.lv2-slot-beat {
-  grid-area: 1 / 1;
-}
-.lv2-slot-beat {
-  display: grid;
-  align-content: start;
-  opacity: 0;
-  pointer-events: none;
-}
-/*
-  A beat is only reachable while the sequence is held. Four stacked panels are four sets of links
-  in the same box; letting an invisible one take a click or a tab stop would be a keyboard trap
-  made of decoration. When the loop is paused -- by the control, by hover or by focus -- the beat
-  on screen is the one that answers.
-*/
-.lv2-demo[data-playing="0"] .lv2-slot-beat,
-.lv2-demo:hover .lv2-slot-beat,
-.lv2-demo:focus-within .lv2-slot-beat { pointer-events: auto; }
-
-@media (min-width: 1200px) {
-  /*
-    The resting stack is a summary, not four panels stacked.
-
-    The snapshot step reads as a line here rather than as a bordered panel -- the panel belongs to
-    the Change beat, where the four arrivals hang under it. Dropping its chrome and letting the
-    step wrap inline is what keeps the stack inside the slot's height instead of pushing the stage,
-    and the whole hero, past a viewport again.
-  */
-  .lv2-slot-static .lv2-revision { padding: 0; border: 0; background: none; }
-  .lv2-slot-static .lv2-revision-step { display: flex; flex-wrap: wrap; gap: 0 6px; }
-
-  /*
-    THE RESTING STACK DOES NOT RESTATE THE OBJECTS AT DESKTOP (P3 QA round 1).
-
-    Measured at 1440, in a 215px column: the snapshot step is 53px, the comparison with its
-    qualifier and its contract note is 373px, and the bound objects with their caveat are another
-    469px -- 922px of resting content in a hero whose whole second row has 538px before it runs
-    past the fold. The objects are the Structure beat's own panel and they are on screen for 3.2
-    seconds of every loop; restating them in the two-second hold as well is the duplication that
-    made the column overflow. Without them the stack is 439px, the slot takes the Structure beat's
-    469px as its height, and the hero measures 900 at 1440 in both engines.
-
-    Reduced motion is the exception and it is the one that matters: nothing rotates there, so the
-    stack is the only place the objects can appear, and the block at the end of this file puts
-    them back. §26 asks for the complete static state and that is where it is owed.
-  */
-  .lv2-slot-static .lv2-nodes { display: none; }
-}
+.lv2-demo-stage > .lv2-revision { padding: 0; border: 0; background: none; }
+.lv2-demo-stage > .lv2-revision .lv2-revision-step { display: flex; flex-wrap: wrap; gap: 0 6px; }
 
 /* --------------------------------------------------------------------------- the snapshot step */
 
@@ -1071,21 +1088,8 @@
 .lv2-node-via { color: var(--text-lo); }
 .lv2-node-rel { color: var(--relation); font-weight: 400; }
 
-/* ---------------------------------------------------------------------------------- the answer */
-
-.lv2-ask {
-  display: grid;
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--ink-900);
-}
-.lv2-ask-q { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-hi); }
-.lv2-ask-cite { margin: 0; color: var(--source); }
-
 /* ============================================================================================
-   THE DESKTOP COMPOSITION (>= 1200) -- §11.1's three blocks and one rotating slot
+   THE DESKTOP COMPOSITION (>= 768) -- §11.1's blocks, each in its own cell
    ============================================================================================ */
 
 /*
@@ -1094,59 +1098,48 @@
   any font fallback, and the 1440 screenshot stops being the only thing that knows whether the
   hero is correct. §39's gate is "text overlap 0"; a grid cannot produce one.
 
-  THE ARRANGEMENT
-    row 1, full width    the READ strip -- the region, readable
-    row 2, three tracks   the LOCATOR (where it is), the CLAIM (what came out of it) and the
-                          rotating SLOT (what the compiler did next)
+  THE ARRANGEMENT (F2)
+    row 1, full width   the READ strip -- the region, readable
+    row 2, three tracks the LOCATOR (where it is), the CLAIM (what came out of it) and the NODES
+                        (what the compiler bound to it)
+    row 3, two cells    the ARRIVALS (what landed later) and the COUNTS (what the recompile
+                        compared), compact
 
-  THE HEIGHT, AND THE FRAME THAT IS NOT THERE ANY MORE (P3 QA round 1).
+  THE BAND FROM 768 TO 1199 IS THIS COMPOSITION TOO, and that is a change. It used to render the
+  phone stack at desktop width, which is the defect `.lv2-split` already records for the scenes
+  below; the hero's grid is fraction-based, so at 704px of wrap the same three tracks come out at
+  166/231/247 and the arrangement holds without a band of its own.
 
-  This block used to set `aspect-ratio: 708 / 600` for §32's proportion with `min-height:
-  fit-content` as the escape hatch, on the reading that the ratio was "a floor on the frame, never
-  a cap on the content". Measured in Chromium it was a cap: at 1440 the stage box was 566px while
-  the slot's resting stack measured 922px, so 464px of it painted over the caption row and past the
-  hero, and the reduced-motion screenshot showed two sentences crossing. At 1280 the overhang was
-  709px and it reached into Scene 02 -- with the stack at opacity 0 for fourteen of every sixteen
-  seconds, carrying links nobody could see.
+  THE HEIGHT. There is no frame and no aspect-ratio. An earlier round set `aspect-ratio: 708/600`
+  with `min-height: fit-content` as an escape hatch, on the reading that the ratio was "a floor on
+  the frame, never a cap on the content"; measured, it was a cap, and 464px of the slot painted
+  over the caption row. §32's proportion survives as the COLUMN widths (668 at 1440) rather than
+  as a box, and the height is what the composition needs -- which is now the same number as the
+  content, because nothing reserves anything.
 
-  There is no frame now. The stage is a grid and its height is its rows', which is the only shape
-  that cannot produce the overlap §39 puts at zero. §32's proportion survives as the COLUMN widths
-  (668 at 1440) rather than as a box, and the height is what the composition needs -- 576px at 1440,
-  ten more than the ratio drew and, unlike it, the same number the content occupies.
-
-  The row gap is zero on purpose: each block in row 2 begins with its own Evidence Line, and a
-  line that does not touch the strip above it means nothing.
+  The row gap between the strip and row 2 is zero on purpose: each block there begins with its own
+  Evidence Line, and a line that does not touch the strip above it means nothing. Row 3 carries
+  its own margin instead (see the base rules further up).
 */
-@media (min-width: 1200px) {
+@media (min-width: 768px) {
   .lv2-demo-stage {
     /*
-      165 : 260 : 215 of the 640 the two gaps leave at 1440, not §11.1's 200 : 300 : 190.
+      165 : 230 : 245 of the 640 the two gaps leave at 1440.
 
-      The slot is the track that decides the stage's height -- it holds the resting stack (the
-      snapshot step and the comparison with its qualifier and contract note) and, stacked in the
-      same cell, the four beats, all set in 13px mono. The thumbnail is the block that needs
-      width least: it is a locator, not a reading surface.
-
-      215px is not generous and the column is what makes the slot the tallest track: at 1440 the
-      Structure beat measures 469px there. Below 1440 it is worse -- 177px at 1280 and 151px at
-      1200 -- and the hero grows past a viewport at those widths rather than overlapping, which
-      is the better of the two failures but is still one. Reported, not hidden.
+      Measured, in this order. The thumbnail is the block that needs width least -- it is a
+      locator, not a reading surface -- and 165 is where its metadata line stops folding to five
+      lines. The objects need the most: their two chips carry a mono line each and the F3 caveat
+      under them, and at 215 those set in three lines and four; at 245 they set in two and three,
+      which is 56px of hero. The claim takes what is left, and at 230 its 180-character passage
+      sets in seven lines of about 29 characters -- a quotation, not a column of body copy.
     */
-    grid-template-columns: minmax(0, 165fr) minmax(0, 260fr) minmax(0, 215fr);
-    grid-template-rows: auto auto;
+    grid-template-columns: minmax(0, 165fr) minmax(0, 230fr) minmax(0, 245fr);
     grid-template-areas:
-      "read    read  read"
-      "locator claim slot";
-    align-items: start;
-    align-content: start;
-    column-gap: 14px;
-    row-gap: 0;
+      "read     read   read"
+      "locator  claim  nodes"
+      "arrivals counts counts";
   }
-  .lv2-read { grid-area: read; }
-  .lv2-locator { grid-area: locator; max-width: none; }
-  .lv2-claim-block { grid-area: claim; }
-  .lv2-slot { grid-area: slot; }
-
+  .lv2-locator { max-width: none; }
   /*
     §22: a 1-2 degree perspective, on the page thumbnail only. Any more and a real document starts
     to look like a rendering of one, which is what §21 exists to prevent. The strip is never
@@ -1160,11 +1153,13 @@
    ============================================================================================ */
 
 /*
-  Percentages are seconds over sixteen. Every element's base style is its finished state and its
-  keyframes hide it and bring it back, which is what makes the reduced-motion collapse at the top
-  of this file land on a composed hero rather than on an empty one. The rotating slot is the one
-  place that needs a second element rather than a cleverer keyframe -- four beats cannot share a
-  resting frame -- so the stack's base is visible and the beats' base is not.
+  Percentages are seconds over sixteen, and the fourteen are seven beats of two.
+
+  Every element's base style is its FINISHED state and its keyframes take it back to
+  `--lv2-rest` and return it. That is what makes the reduced-motion collapse at the top of this
+  file land on a composed hero rather than on an empty one -- and, since F2 removed the rotating
+  slot, there is no longer any element whose base style is hidden, so the collapse lands on
+  exactly the state the loop's two-second hold shows.
 */
 /*
   EVERY BINDING BELOW IS SCOPED TO `.lv2-demo`, AND THAT IS NOT TIDINESS.
@@ -1180,47 +1175,62 @@
   descendant of `.lv2-demo`, so `animation-play-state: paused` on `.lv2-demo *` reaches all of
   them. An animation outside this subtree would have no control, no hover pause and no observer.
 */
+/*
+  F4: THE SEQUENCE EXISTS AT 768 AND UP, AND NOWHERE ELSE.
+
+  Below it the hero is the static complete composition -- every object at full strength, no
+  rotation, no narration row and no control. The whole of that decision is this one query: with no
+  binding inside it, every element on the phone renders its base style, which is its finished
+  state. `hero-compiler-demo.tsx` reads the same width before it creates the IntersectionObserver,
+  so the phone pays for no scroll callback either.
+*/
+@media (min-width: 768px) {
 .lv2-demo .lv2-read,
 .lv2-demo .lv2-locator,
 .lv2-demo .lv2-read-label,
 .lv2-demo .lv2-region,
+.lv2-demo .lv2-locator .lv2-region::before,
 .lv2-demo .lv2-line,
 .lv2-demo .lv2-claim,
 .lv2-demo .lv2-claim-state,
 .lv2-demo .lv2-claim-state i,
-.lv2-demo .lv2-slot-static,
-.lv2-demo .lv2-slot-beat,
+.lv2-demo .lv2-nodes,
+.lv2-demo .lv2-revision,
+.lv2-demo .lv2-counts,
 .lv2-demo .lv2-demo-caption {
   animation-duration: 16s;
   animation-iteration-count: infinite;
   animation-timing-function: var(--ease-scene);
 }
 
-/* 0.0-1.2s -- the filing arrives: the region and the page it was cut from, together. */
-.lv2-demo .lv2-read { animation-name: lv2-b-source; }
-.lv2-demo .lv2-locator { animation-name: lv2-b-source; }
-/* 1.2-2.4s -- the box is drawn, on the strip and on the page at once. */
-.lv2-demo .lv2-region { animation-name: lv2-b-read; }
+/* 0-2s Source: the strip and the page it was cut from come to full strength together. */
+.lv2-demo .lv2-read { animation-name: lv2-e-source; }
+.lv2-demo .lv2-locator { animation-name: lv2-e-source; }
+/* 2-4s Read: the box brightens on both, pulses once on the page, and the line is drawn to it. */
+.lv2-demo .lv2-region { animation-name: lv2-e-region; }
+.lv2-demo .lv2-locator .lv2-region::before { animation-name: lv2-e-region-fill; }
 .lv2-demo .lv2-line--locator { animation-name: lv2-b-read-line; }
-/* 2.4-4.0s -- the line draws down from the strip, then the claim arrives bound to it. */
+/* 4-6s Compile: the line draws down from the strip and the claim comes to full strength. */
 .lv2-demo .lv2-line--claim { animation-name: lv2-b-claim-line; }
-.lv2-demo .lv2-claim { animation-name: lv2-b-compile; }
+.lv2-demo .lv2-claim { animation-name: lv2-e-claim; }
+/* 6-8s Structure: the objects the compiler bound to that region. */
+.lv2-demo .lv2-nodes { animation-name: lv2-e-nodes; }
 /*
-  5.8-7.2s -- the state the World gives the object, the one pulse that says it was just read off
-  the record, and the coordinate that locates it.
+  8-10s Verify: the state the World gives the object, one pulse that says it was just read off the
+  record, and the coordinate that locates it.
 
-  THE STATE USED TO FADE IN OVER 1.4 SECONDS, which is the whole beat: a state word that takes a
-  beat to become legible is not a state change, it is a dissolve. §11.2 asks for the dot to PULSE
-  ONCE here. So the pair arrives at motion-fast speed and the dot swells once, 360ms, and stops --
-  `lv2-b-pulse` holds `transform: none` for the other 15.6 seconds, so it is a single event on
-  the timeline rather than a heartbeat. Under reduced motion the collapse to 1ms lands on the base
-  style, which is the dot at rest: no pulse, same composed hero.
+  THE STATE USED TO FADE IN OVER THE WHOLE BEAT, which is not a state change, it is a dissolve.
+  §11.2 asks for the dot to PULSE ONCE here. So the pair arrives at motion-fast speed and the dot
+  swells once, 360ms, and stops -- `lv2-b-pulse` holds `transform: none` for the other 15.6
+  seconds, so it is a single event on the timeline rather than a heartbeat.
 */
-.lv2-demo .lv2-claim-state { animation-name: lv2-b-verify; }
+.lv2-demo .lv2-claim-state { animation-name: lv2-e-verify; }
 .lv2-demo .lv2-claim-state i { animation-name: lv2-b-pulse; }
-.lv2-demo .lv2-read-label { animation-name: lv2-b-coordinate; }
-/* ROUND3-P1: the 9.5-11.5s amber-to-mint cross on `rebuilt` is gone. It painted a `candidate`
-   object's count in the verified colour for most of the loop -- see `.lv2-count--rebuilt` above. */
+.lv2-demo .lv2-read-label { animation-name: lv2-e-coordinate; }
+/* 10-12s Change: the filings that arrived on top of the baseline. */
+.lv2-demo .lv2-revision { animation-name: lv2-e-arrivals; }
+/* 12-14s Recompile: the comparison between the two complete compiles. Then the 2-second hold. */
+.lv2-demo .lv2-counts { animation-name: lv2-e-counts; }
 
 .lv2-demo .lv2-cap-1 { animation-name: lv2-cap-1; }
 .lv2-demo .lv2-cap-2 { animation-name: lv2-cap-2; }
@@ -1229,92 +1239,74 @@
 .lv2-demo .lv2-cap-5 { animation-name: lv2-cap-5; }
 .lv2-demo .lv2-cap-6 { animation-name: lv2-cap-6; }
 .lv2-demo .lv2-cap-7 { animation-name: lv2-cap-7; }
-.lv2-demo .lv2-cap-8 { animation-name: lv2-cap-8; }
-
-/*
-  One at a time in one box, over the stack that outlives them -- at EVERY width (D3).
-
-  It used to be additive below 1200: the four beats arrived one after another and each one stayed,
-  on the argument that a phone should not take a sentence away from someone still reading it. The
-  measured cost of that argument was a hero 2,525px tall at 390 -- three viewports, on the surface
-  the founder checks first -- because four beats in flow is four beats' worth of height. D3 makes
-  the phone read exactly like the desktop instead: the same rotation, the same resting stack, the
-  same one caption at a time. A reader who wants to hold a beat still has the pause control, the
-  hover and the focus, which is what §23 asks for and what "additive" was standing in for.
-*/
-.lv2-demo .lv2-slot-beat--structure { animation-name: lv2-slot-structure; }
-.lv2-demo .lv2-slot-beat--change { animation-name: lv2-slot-change; }
-.lv2-demo .lv2-slot-beat--recompile { animation-name: lv2-slot-recompile; }
-.lv2-demo .lv2-slot-beat--use { animation-name: lv2-slot-use; }
-.lv2-demo .lv2-slot-static { animation-name: lv2-slot-hold; }
+}
 
 /*
   §23: the loop never disturbs reading, and it never runs for nobody.
 
   It stops while a pointer is over the demo, while focus is inside it, whenever the reader says
-  so, and whenever less than a quarter of the demo is on screen -- `data-offscreen` is written by
-  the IntersectionObserver in `hero-compiler-demo.tsx`. One mechanism for all four, so they cannot
-  disagree about whether the sequence is running.
+  so, and whenever no part of the demo is on screen -- `data-offscreen` is written by the
+  IntersectionObserver in `hero-compiler-demo.tsx`. One mechanism for all four, so they cannot
+  disagree about whether the sequence is running. Left outside the 768 query deliberately: a rule
+  that pauses animations that do not exist costs nothing and cannot fall out of step with them.
 */
 .lv2-demo[data-playing="0"] *,
 .lv2-demo[data-offscreen="1"] *,
 .lv2-demo:hover *,
 .lv2-demo:focus-within * { animation-play-state: paused; }
 
-@keyframes lv2-b-source { 0% { opacity: 0; transform: translateY(12px); } 7.5%, 100% { opacity: 1; transform: none; } }
-@keyframes lv2-b-read { 0%, 7.5% { opacity: 0; } 15%, 100% { opacity: 1; } }
-@keyframes lv2-b-read-line { 0%, 7.5% { transform: scaleY(0); } 15%, 100% { transform: scaleY(1); } }
-@keyframes lv2-b-claim-line { 0%, 15% { transform: scaleY(0); } 25%, 100% { transform: scaleY(1); } }
-@keyframes lv2-b-compile { 0%, 15% { opacity: 0; transform: scale(0.985); } 25%, 100% { opacity: 1; transform: scale(1); } }
-@keyframes lv2-b-verify { 0%, 36.25% { opacity: 0; } 37.125%, 100% { opacity: 1; } }
+/* ------------------------------------------------------------------------------- the keyframes */
+
+/*
+  EVERY OBJECT RESTS AT `--lv2-rest` AND ITS BEAT TAKES IT TO 1, WHERE IT STAYS.
+
+  Two consequences, and both are the point. The hold from 14s to 16s is the whole hero at full
+  strength rather than one surviving panel, so a screenshot at any instant is a complete
+  composition; and the base style of every element is opacity 1, so the reduced-motion collapse at
+  the top of this file lands exactly on the hold state with no second stack to stand in for it.
+
+  Each rise takes --motion-fast (140ms = 0.875% of sixteen seconds) at the START of its beat, so
+  the beat's caption and the object it names move together rather than a quarter of a second
+  apart. The captions rise over 1% and fall over 1%, which keeps at most three things in motion at
+  any instant (§23.2) even where a line is being drawn through the handover.
+*/
+@keyframes lv2-e-source { 0% { opacity: var(--lv2-rest); } 0.875%, 100% { opacity: 1; } }
+@keyframes lv2-e-region { 0%, 12.5% { opacity: var(--lv2-rest); } 13.375%, 100% { opacity: 1; } }
+/* The one swell §11.2 asks for on the box, taken in the middle of the Read beat so it does not
+   share an instant with the region's own rise or with the line being drawn to it. */
+@keyframes lv2-e-region-fill { 0%, 15% { opacity: 0.06; } 16.5% { opacity: 0.22; } 18%, 100% { opacity: 0.06; } }
+@keyframes lv2-b-read-line { 0%, 12.5% { transform: scaleY(0); } 25%, 100% { transform: scaleY(1); } }
+@keyframes lv2-b-claim-line { 0%, 25% { transform: scaleY(0); } 37.5%, 100% { transform: scaleY(1); } }
+@keyframes lv2-e-claim { 0%, 25% { opacity: var(--lv2-rest); } 25.875%, 100% { opacity: 1; } }
+@keyframes lv2-e-nodes { 0%, 37.5% { opacity: var(--lv2-rest); } 38.375%, 100% { opacity: 1; } }
+@keyframes lv2-e-verify { 0%, 50% { opacity: var(--lv2-rest); } 50.875%, 100% { opacity: 1; } }
 /* One swell, 360ms, at the top of the Verify beat -- and `transform: none` for the rest of the
    loop, so the dot is read once and never becomes a pulsing ornament (§23: movement = state
    change). It is a `transform`, so it costs no layout and no repaint of the card around it. */
-@keyframes lv2-b-pulse { 0%, 37.125% { transform: none; } 38.25% { transform: scale(1.9); } 39.375%, 100% { transform: none; } }
-/*
-  The coordinate reads on the Verify beat and is quiet the rest of the loop (§4.1).
-
-  It rises WITH the state word rather than 0.28s behind it: §11.2 asks for the source region and
-  the page metadata to highlight together, and a label that arrives late reads as a second event
-  on a beat that has only one. Same 140ms, so the two are one movement of two elements.
-*/
-@keyframes lv2-b-coordinate { 0%, 36.25% { opacity: 0; } 37.125%, 44.125% { opacity: 1; } 45%, 100% { opacity: 0; } }
-
-/*
-  The four beats of the slot, one at a time, each fully gone before the next begins to rise.
-
-  THE CROSS GAP IS 140ms (0.875% of sixteen seconds), NOT 240ms.
-
-  It used to be 1.5%, which put every slot beat 0.24s behind the storyboard: Structure reached
-  full opacity at 4.24s against §11.2's 4.0s, and Change, Recompile and Use each inherited the
-  same lateness. 0.24s is outside the +-0.2s this lane measures against, and the four errors do
-  not cancel -- they are all in the same direction, so a caption and the panel it describes drift
-  apart by a quarter of a second at every handover. --motion-fast is 140ms and that is what a
-  panel swap should cost anyway; the sequence stays strictly sequential, so two beats are still
-  never legible at once. `lib/landing-v2-motion.test.ts` recomputes every start from this sheet.
-*/
-@keyframes lv2-slot-structure { 0%, 25% { opacity: 0; } 25.875%, 44.125% { opacity: 1; } 45%, 100% { opacity: 0; } }
-@keyframes lv2-slot-change { 0%, 45% { opacity: 0; } 45.875%, 58.5% { opacity: 1; } 59.375%, 100% { opacity: 0; } }
-@keyframes lv2-slot-recompile { 0%, 59.375% { opacity: 0; } 60.25%, 71% { opacity: 1; } 71.875%, 100% { opacity: 0; } }
-@keyframes lv2-slot-use { 0%, 71.875% { opacity: 0; } 72.75%, 86.625% { opacity: 1; } 87.5%, 100% { opacity: 0; } }
-/* The hold: the static stack is the resting composition, and it is also the base style. */
-@keyframes lv2-slot-hold { 0%, 87.5% { opacity: 0; } 88.375%, 100% { opacity: 1; } }
+@keyframes lv2-b-pulse { 0%, 50.875% { transform: none; } 52% { transform: scale(1.9); } 53.125%, 100% { transform: none; } }
+/* §4.1's coordinate reads with the state word rather than behind it: §11.2 asks for the source
+   region and the page metadata to highlight together, and a label that arrives late reads as a
+   second event on a beat that has only one. */
+@keyframes lv2-e-coordinate { 0%, 50% { opacity: var(--lv2-rest); } 50.875%, 100% { opacity: 1; } }
+@keyframes lv2-e-arrivals { 0%, 62.5% { opacity: var(--lv2-rest); } 63.375%, 100% { opacity: 1; } }
+@keyframes lv2-e-counts { 0%, 75% { opacity: var(--lv2-rest); } 75.875%, 100% { opacity: 1; } }
 
 /*
   The captions: sequential windows with a gap, so two sentences are never legible at once.
 
   Each caption reaches zero at the instant the next begins to rise. The earlier shape faded one
   out while the other faded in, which put both at half opacity over the same lines for a fifth of
-  a second -- the defect a reader reads as a smear.
+  a second -- the defect a reader reads as a smear. Seven now, not eight: the Use beat left with
+  the answer panel (see `hero-compiler-demo.tsx`), and the seventh holds through the 2-second
+  hold because it is the one that describes the composed hero.
 */
-@keyframes lv2-cap-1 { 0%, 6.5% { opacity: 1; } 7.5%, 100% { opacity: 0; } }
-@keyframes lv2-cap-2 { 0%, 7.5% { opacity: 0; } 8.5%, 14% { opacity: 1; } 15%, 100% { opacity: 0; } }
-@keyframes lv2-cap-3 { 0%, 15% { opacity: 0; } 16%, 24% { opacity: 1; } 25%, 100% { opacity: 0; } }
-@keyframes lv2-cap-4 { 0%, 25% { opacity: 0; } 26%, 35.25% { opacity: 1; } 36.25%, 100% { opacity: 0; } }
-@keyframes lv2-cap-5 { 0%, 36.25% { opacity: 0; } 37.25%, 44% { opacity: 1; } 45%, 100% { opacity: 0; } }
-@keyframes lv2-cap-6 { 0%, 45% { opacity: 0; } 46%, 58.375% { opacity: 1; } 59.375%, 100% { opacity: 0; } }
-@keyframes lv2-cap-7 { 0%, 59.375% { opacity: 0; } 60.375%, 70.875% { opacity: 1; } 71.875%, 100% { opacity: 0; } }
-@keyframes lv2-cap-8 { 0%, 71.875% { opacity: 0; } 72.875%, 100% { opacity: 1; } }
+@keyframes lv2-cap-1 { 0%, 11.5% { opacity: 1; } 12.5%, 100% { opacity: 0; } }
+@keyframes lv2-cap-2 { 0%, 12.5% { opacity: 0; } 13.5%, 24% { opacity: 1; } 25%, 100% { opacity: 0; } }
+@keyframes lv2-cap-3 { 0%, 25% { opacity: 0; } 26%, 36.5% { opacity: 1; } 37.5%, 100% { opacity: 0; } }
+@keyframes lv2-cap-4 { 0%, 37.5% { opacity: 0; } 38.5%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes lv2-cap-5 { 0%, 50% { opacity: 0; } 51%, 61.5% { opacity: 1; } 62.5%, 100% { opacity: 0; } }
+@keyframes lv2-cap-6 { 0%, 62.5% { opacity: 0; } 63.5%, 74% { opacity: 1; } 75%, 100% { opacity: 0; } }
+@keyframes lv2-cap-7 { 0%, 75% { opacity: 0; } 76%, 100% { opacity: 1; } }
 
 /* ============================================================================================
    THE SIGNATURE INTERACTION (§4.1)
@@ -1353,38 +1345,32 @@
 
 /*
   The block at the top of this file collapses every animation here to 1ms and one iteration, and a
-  finished animation with the default fill mode reverts each element to its base style -- which is
-  the composed hero: the strip with its box and its coordinate, the page, the claim, and the
-  slot's static stack. The four rotating beats revert to hidden, which is correct at desktop
-  widths: their content is in that stack. Below 1200 their base is visible and the stack is the
-  one that is not rendered, so the same rule produces the same complete state either way.
+  finished animation with the default fill mode reverts each element to its base style. Since F2
+  that base style is the HOLD STATE -- the strip with its box and its coordinate, the page, the
+  claim, the objects bound to it, the arrivals and the comparison, every one of them at full
+  strength -- so reduced motion and the last two seconds of the loop are the same picture, and
+  this block has almost nothing left to say.
 
-  THE CAPTION STACK IS ALL EIGHT AGAIN (P3 QA round 1; D3 reversed).
+  THE CAPTION IS THE FINAL SENTENCE ALONE (F5), AND THAT IS A REVERSAL.
 
-  D3 collapsed this to `.lv2-cap-8` alone, on the argument that the complete state of a sequence
-  is its last beat and that the list cost 151px of hero at 1440. Measured, what that produced was
-  one legible sentence out of eight for the only audience whose DEFAULT rendering this is: seven
-  captions at opacity 0, describing seven beats that are not going to play. §26 and §39 both ask
-  for a static COMPLETE state, and a transcript of eight sentences is exactly the alternative §26
-  names when movement is what carries the information. The 151px is the price of it, and §26 is
-  where the blueprint already agreed to pay -- the hero is allowed to grow here, and the 1440
-  viewport bound in `e2e/landing-v2.spec.ts` does not run on this project.
+  Two earlier rounds argued this both ways. D3 collapsed the stack to the last caption; P3 QA
+  round 1 restored all eight, on the ground that seven captions at opacity 0 left a reader who is
+  not being shown the sequence with one sentence out of eight. Both were right about a hero whose
+  OBJECTS were rotating: when four panels take turns, the transcript is the only place the whole
+  story exists, and §26 names exactly that substitution.
 
-  The same reasoning restores the objects to the slot's resting stack. At desktop widths they are
-  hidden from it because the Structure beat shows them (see the 1200 block above); here nothing
-  rotates, so the stack is the only place they can be, and leaving them out would publish the
-  compiled claim without the objects bound to it.
+  That hero is gone. Every object the sequence used to reveal is now on screen at once, at full
+  strength, for this reader as for every other -- so the complete static state §26 asks for is the
+  composition itself, and six more sentences describing a picture the reader is already looking at
+  cost 151px of hero to restate it. The last caption stays because it is the one written about the
+  composed state.
 
-  The stage's height is its content's at every width now, so neither of these can overlap what is
-  under it -- which is the other half of what this round found: the resting stack was overflowing
-  a 566px frame by 464px and crossing the caption row.
+  The stage's height is its content's at every width, so nothing here can overlap what is under
+  it. What remains is the thumbnail's perspective, which is a motion-adjacent flourish §22 allows
+  and §26 does not.
 */
 @media (prefers-reduced-motion: reduce) {
-  .lv2-demo-foot { align-items: flex-start; }
   .lv2-locator .lv2-page { transform: none; }
-  .lv2-demo-captions { position: static; min-height: 0; display: grid; gap: 6px; }
-  .lv2-demo-caption { position: static; inset: auto; opacity: 1; }
-  .lv2-slot-static .lv2-nodes { display: grid; }
 }
 
 /* ============================================================================================

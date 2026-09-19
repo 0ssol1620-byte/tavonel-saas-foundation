@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { preload } from "react-dom";
 import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
 import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
 import { BRAND_LINE } from "@/lib/site-navigation";
@@ -89,21 +90,30 @@ export default async function HomePage({
     the <img> carries, both from one constant, so the browser's candidate selection here and in
     the element cannot disagree.
 
-    Still a real <link> element rather than react-dom's `preload()`: audit MED-15 measured that
-    the helper never reached the shipped HTML on this route (fixture build 2026-09-18, where the
-    document's only rel=preload was a low-priority script).
+    IT IS `react-dom`'s `preload()` AND NOT A <link> ELEMENT, WHICH REVERSES A CONTRACT RULE (F10).
+
+    Contract rule 10 says "a real <link> element, not react-dom preload()", and it says so
+    because audit MED-15 measured the helper never reaching the shipped HTML on the OLD landing
+    (fixture build 2026-09-18, where the document's only rel=preload was a low-priority script).
+    That page was a client component; this one is a server component, and React 19 flushes the
+    resource into the head as a real <link rel="preload"> in the served document. That is
+    verified rather than assumed: `e2e/landing-v2.spec.ts` counts it in the document the server
+    sends, not in the DOM after hydration.
+
+    What the element form could not do is be ONE preload. React hoists a <link rel="preload">
+    into the head as a resource and ALSO renders the element where it sits in the tree, so the
+    document carried two entries for one file (P3 QA round 2, P2-2) -- with `href` and, measured
+    on this build rather than assumed, without it too. The helper emits the hoisted one alone.
   */
   const hero = heroScene();
+  preload(hero.region.cropSrc, {
+    as: "image",
+    imageSrcSet: hero.region.cropSrcSet,
+    imageSizes: HERO_IMAGE_SIZES,
+    fetchPriority: "high",
+  });
   return (
     <>
-      <link
-        rel="preload"
-        as="image"
-        href={hero.region.cropSrc}
-        imageSrcSet={hero.region.cropSrcSet}
-        imageSizes={HERO_IMAGE_SIZES}
-        fetchPriority="high"
-      />
       <LandingPage experiment={experiment} />
     </>
   );

@@ -269,9 +269,35 @@ test.describe("structure", () => {
       .locator('link[rel="preload"][as="image"]')
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("imagesrcset")));
     expect(preloaded, "the READ strip is preloaded by its own srcset").toContain(await strip.getAttribute("srcset"));
+    /*
+      F10: ONE image preload in the document, not two.
+
+      React 19 keys an image preload by its `imagesrcset`/`imagesizes` pair and hoists it into the
+      head; an element that also carried `href` registered under a second key, so the built
+      document held two preloads for one file (P3 QA round 2, P2-2). `app/page.tsx` drops the
+      `href` -- a responsive preload is selected from `imagesrcset` alone -- and this is the
+      assertion that keeps the duplicate from coming back through the source.
+
+      MEASURED ON THE SERVED DOCUMENT AND ON THE HEAD, which is where a preload does its work.
+      React renders the same element again on the client, in place, and a <link rel=preload>
+      appended to the body after load preloads nothing that is not already fetched -- so counting
+      every node in the DOM would be counting a no-op and would fail for the wrong reason.
+    */
+    const served = await (await page.request.get(page.url())).text();
+    expect(
+      (served.match(/rel="preload"[^>]*as="image"/g) ?? []).length,
+      "the served document preloads the hero raster more than once",
+    ).toBe(1);
+    expect(await page.locator(`head link[rel="preload"][as="image"]`).count(), "one preload in the head").toBe(1);
   });
 
-  test("the demo has exactly one control, and it meets the touch floor", async ({ page }) => {
+  test("the demo has exactly one control, and it meets the touch floor", async ({ page }, testInfo) => {
+    /*
+      F4: below 768 there is no sequence, so there is no control -- a play button that cannot
+      start anything is a 44px target that lies. The phone projects assert the static composition
+      instead, in "at 390" further down.
+    */
+    test.skip(Number(testInfo.project.name) <= 767, "the phone hero has no sequence and no control");
     await page.goto("/");
     const controls = page.locator(`${DEMO} button`);
     await expect(controls).toHaveCount(1);
@@ -336,10 +362,13 @@ test.describe("structure", () => {
   */
   test("shows one beat caption at a time", async ({ page }, testInfo) => {
     /*
-      Not under reduced motion, where all eight are a list on purpose (§26): a reader who is not
-      being shown the sequence is owed the whole story at once. That state has its own test below.
+      Not under reduced motion, where the last caption alone stands (§26, F5): every object the
+      other six narrate is on screen at full strength there, so the transcript has nothing left to
+      substitute for. That state has its own test below. Not on a phone either, where F4 hides the
+      narration row with the sequence it describes.
     */
-    test.skip(testInfo.project.name === "reduced-motion", "the reduced-motion state is a list");
+    test.skip(testInfo.project.name === "reduced-motion", "the reduced-motion state is the last caption");
+    test.skip(Number(testInfo.project.name) <= 767, "the phone hero has no sequence and no narration row");
     await page.goto("/");
     for (let sample = 0; sample < 5; sample += 1) {
       const legible = await page
@@ -355,12 +384,20 @@ test.describe("structure", () => {
 
     Its own element carries the region outline (the strip IS the box), the locator carries the
     same box drawn on the whole page, and the claim card is what was compiled out of it. §43's
-    three parts, present at every width.
+    three parts, present at every width -- and since F2 so are the other three objects, each in a
+    grid cell of its own rather than taking turns in a rotating slot.
   */
   for (const path of ["/", "/ko"]) {
     test(`${path} shows the strip, the page it is on, the claim and the slot`, async ({ page }) => {
       await page.goto(path);
-      for (const selector of [".lv2-read", ".lv2-locator", ".lv2-claim-block .lv2-claim", ".lv2-slot"]) {
+      for (const selector of [
+        ".lv2-read",
+        ".lv2-locator",
+        ".lv2-claim-block .lv2-claim",
+        ".lv2-demo-stage > .lv2-nodes",
+        ".lv2-demo-stage > .lv2-revision",
+        ".lv2-demo-stage > .lv2-counts",
+      ]) {
         await expect(page.locator(selector), `${selector} is missing from the stage`).toHaveCount(1);
       }
       await expect(page.locator(".lv2-region--strip")).toHaveCount(1);
@@ -558,9 +595,10 @@ test.describe("at 1440", () => {
     }
 
     /*
-      The counts are rendered twice -- once as the Recompile beat, once in the slot's resting
-      stack -- so both instances are checked rather than the first. Each carries its own noun,
-      its own qualifier, and a list that names the heading it belongs to.
+      The counts are rendered ONCE since F2 -- they have a grid cell of their own instead of a
+      turn in a rotating slot -- and this walks every instance rather than the first, which is
+      what catches a second copy coming back. Each carries its own noun, its own qualifier, and a
+      list that names the heading it belongs to.
     */
     const titles = page.locator(".lv2-counts-title");
     const count = await titles.count();
@@ -575,7 +613,20 @@ test.describe("at 1440", () => {
     const notes = page.locator(".lv2-counts-note");
     expect(await notes.count(), "BA-034: the engine is named with every printing of the figures").toBe(count);
     for (const text of await notes.allInnerTexts()) expect(text.trim().length).toBeGreaterThan(0);
-    await expect(page.locator(".lv2-slot-static .lv2-counts-note")).toBeVisible();
+    await expect(page.locator(".lv2-counts-note")).toBeVisible();
+    /*
+      F2: and every object is painted from the first frame rather than waiting for its beat. The
+      sequence changes emphasis, not presence, so a screenshot at any instant of the loop holds
+      the whole composition -- which is also why `vias.first()` above is a fair assertion again.
+    */
+    for (const selector of [".lv2-node", ".lv2-counts", ".lv2-revision", ".lv2-claim", ".lv2-read"]) {
+      const opacity = await page.locator(`#hero ${selector}`).first().evaluate((node) => {
+        let value = 1;
+        for (let n: Element | null = node; n; n = n.parentElement) value *= Number(getComputedStyle(n).opacity);
+        return value;
+      });
+      expect(opacity, `${selector} is below F2's resting emphasis at this instant`).toBeGreaterThanOrEqual(0.55);
+    }
   });
 
   test("runs the signature interaction from the keyboard", async ({ page }) => {
@@ -648,25 +699,33 @@ test.describe("at 1440", () => {
 });
 
 /*
-  The phone composition (§25). A vertical narrative, not a scaled desktop demo: the source page,
-  the evidence line and the compiled claim in the order the beats run, with the control still
-  present and every reachable thing inside the viewport.
+  The phone composition (§25, F4). A vertical narrative, not a scaled desktop demo -- and not a
+  sequence either: below 768 the hero is the static complete composition, every object painted at
+  full strength on the first frame, with no rotation, no narration row and no play/pause control.
+  What is checked here is that all six objects are present and readable, that the strip is
+  re-flowed rather than shrunk, and that every reachable control clears the touch floor inside the
+  viewport.
 */
 test.describe("at 390", () => {
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name !== "390", "the phone composition");
   });
 
-  test("recomposes the hero as a column rather than shrinking it", async ({ page }) => {
+  test("renders the hero as the static complete composition, with no sequence", async ({ page }) => {
     await page.goto("/");
     const stage = page.locator(".lv2-demo-stage");
     await expect(stage).toHaveCount(1);
-    // In flow, not absolutely positioned: the desktop composition is a layer over this order.
     expect(await stage.evaluate((node) => getComputedStyle(node).display)).toBe("grid");
+    /*
+      All six objects, in the order §25's vertical narrative reads them: the region that was read,
+      where it sits on the filing, what was compiled out of it, the objects bound to it, what
+      arrived later, and what the recompile compared. The grid pairs two of those rows sideways so
+      the hero is not three viewports tall, but the DOM order is the narrative either way.
+    */
     const order = await stage.evaluate((node) =>
       [...node.children].map((child) => child.className.toString().split(" ")[0]),
     );
-    expect(order).toEqual(["lv2-read", "lv2-locator", "lv2-claim-block", "lv2-slot"]);
+    expect(order).toEqual(["lv2-read", "lv2-locator", "lv2-claim-block", "lv2-nodes", "lv2-revision", "lv2-counts"]);
     /*
       The strip is re-flowed as two halves rather than shrunk to six-pixel glyphs, and the halves
       are two elements of the same resource -- no scroller, no drag.
@@ -679,39 +738,47 @@ test.describe("at 390", () => {
       expect(box!.height, "a half of the strip is too short to read").toBeGreaterThan(40);
     }
     /*
-      The slot rotates here exactly as it does at desktop (D3), and this assertion moved with that
-      decision rather than being relaxed around it.
-
-      It used to read "the beats are additive on a phone": each of the four arrived and stayed, in
-      flow, and the resting stack was `display: none` because it would have restated three of
-      them. The measured cost of four panels in flow was a hero 2,525px tall at 390 -- three
-      viewports on the surface contract rule 12 makes part of done -- so D3 gave the phone the
-      same rotation, the same resting stack and the same one-caption-at-a-time as 1440. A reader
-      who wants to hold a beat still has the pause control, the hover and the focus, which is what
-      §23 asks for and what "additive" was standing in for.
-
-      What the assertion is now: the stack is rendered (it is the resting composition), and the
-      four beats share its grid cell rather than being taken out of flow -- so the slot is as tall
-      as the tallest of the five and none of them can paint over the caption row below.
+      F4: STATIC AND COMPLETE. No beat rotates here, so nothing is at reduced emphasis and
+      nothing is waiting for a turn -- every object is painted at full strength on the first
+      frame, which is the state a reader who never scrolls back is owed.
     */
-    expect(await page.locator(".lv2-slot-static").evaluate((node) => getComputedStyle(node).display)).toBe("grid");
-    for (const beat of ["structure", "change", "recompile", "use"]) {
+    for (const selector of [
+      ".lv2-read",
+      ".lv2-region--strip",
+      ".lv2-locator",
+      ".lv2-claim",
+      ".lv2-demo-stage > .lv2-nodes",
+      ".lv2-demo-stage > .lv2-revision",
+      ".lv2-demo-stage > .lv2-counts",
+    ]) {
+      const target = page.locator(selector).first();
+      await expect(target, `${selector} is missing from the phone composition`).toBeVisible();
       expect(
-        await page.locator(`.lv2-slot-beat--${beat}`).evaluate((node) => getComputedStyle(node).position),
-        `the ${beat} beat is positioned rather than sharing the slot's cell`,
-      ).toBe("static");
+        await target.evaluate((node) => Number(getComputedStyle(node).opacity)),
+        `${selector} is not at full strength`,
+      ).toBe(1);
     }
+    // And the objects' own rows are readable, not only present.
+    await expect(page.locator(".lv2-node-via").first()).toBeVisible();
+    await expect(page.locator(".lv2-counts-note")).toBeVisible();
+    await expect(page.locator(".lv2-nodes-caveat")).toBeVisible();
+    /*
+      No play/pause control, because there is no sequence for it to control (F4). Asserted on what
+      a reader can reach rather than on the DOM: the element is hidden by the stylesheet, which
+      also takes it out of the tab order.
+    */
+    const controls = await page
+      .locator(".lv2-demo button")
+      .evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length > 0).length);
+    expect(controls, "the phone hero renders a control for a sequence it does not run").toBe(0);
+    await expect(page.locator(".lv2-demo-foot")).toBeHidden();
     /*
       Every REACHABLE control clears the touch floor and sits inside the viewport.
 
-      "Reachable" is the word the contract uses and round 4 is why it is now enforced rather than
-      assumed: the unscoped list caught four controls at 0x0 -- two `.lv2-node` links inside
-      `DIV.lv2-slot-static`, which this very test asserts is `display: none` fifteen lines above,
-      and two links inside `[hidden]` tab panels. A control with no box is not a small target; it
-      is not a target, and no pointer or keyboard reaches it. `getClientRects()` is the browser's
-      own answer to that question -- it is empty for `display: none` and for a `[hidden]` subtree
-      and non-empty for everything a reader can hit -- so nothing here is filtered by a class
-      name, and a control that becomes visible is measured on the run it becomes visible.
+      "Reachable" is the word the contract uses, and `getClientRects()` is the browser's own
+      answer to it: empty for a `display: none` subtree and for a `[hidden]` tab panel, non-empty
+      for everything a pointer or a keyboard can hit. Nothing here is filtered by a class name, so
+      a control that becomes visible is measured on the run it becomes visible.
     */
     const boxes = await page.locator("main a[href], main button").evaluateAll((nodes) =>
       nodes
@@ -764,12 +831,13 @@ test.describe("with reduced motion", () => {
     await expect(control).toHaveCount(1);
     await expect(control).toBeVisible();
     /*
-      The composed state. The stylesheet collapses every animation to 1ms and one iteration, and a
-      finished animation reverts each element to its base style -- which is written as the
-      finished frame. At this width (1440) that is the strip with its box and its coordinate, the
-      page it sits on, the compiled claim, and the slot's resting stack: the snapshot step, the
-      comparison with its engine qualifier, and the objects bound to the region. The four
-      rotating beats revert to hidden, which is correct -- their content is in that stack.
+      The composed state, which since F2 is the same picture as the loop's two-second hold.
+
+      The stylesheet collapses every animation to 1ms and one iteration, and a finished animation
+      reverts each element to its base style -- which is written as the finished frame. With no
+      rotating slot left, there is no element whose base is hidden: the strip with its box and its
+      coordinate, the page it sits on, the compiled claim, the objects bound to the region, the
+      arrivals and the comparison with its engine qualifier are all painted, all at full strength.
     */
     for (const selector of [
       ".lv2-read",
@@ -777,23 +845,33 @@ test.describe("with reduced motion", () => {
       ".lv2-read-label",
       ".lv2-locator",
       ".lv2-claim",
-      ".lv2-slot-static .lv2-revision",
-      ".lv2-slot-static .lv2-counts",
-      ".lv2-slot-static .lv2-counts-note",
-      ".lv2-slot-static .lv2-nodes",
+      ".lv2-demo-stage > .lv2-nodes",
+      ".lv2-demo-stage > .lv2-revision",
+      ".lv2-demo-stage > .lv2-counts",
+      ".lv2-counts-note",
+      ".lv2-nodes-caveat",
     ]) {
-      await expect(page.locator(selector).first(), `${selector} is in the composed state`).toBeVisible();
+      const target = page.locator(selector).first();
+      await expect(target, `${selector} is in the composed state`).toBeVisible();
+      expect(
+        await target.evaluate((node) => Number(getComputedStyle(node).opacity)),
+        `${selector} is not at full emphasis`,
+      ).toBe(1);
     }
-    // Nothing is stacked on top of it: the rotating beats are not painted at rest.
-    const beatsShowing = await page
-      .locator(".lv2-slot-beat")
-      .evaluateAll((nodes) => nodes.filter((node) => Number(getComputedStyle(node).opacity) > 0.05).length);
-    expect(beatsShowing, "a rotating beat is painted over the resting stack").toBe(0);
-    // All eight beat captions are readable at once, as a list rather than as a stack of one.
+    /*
+      F5: the narration is the FINAL sentence and nothing else.
+
+      Two earlier rounds argued this both ways, and both were right about a hero whose objects
+      took turns: when four panels rotate, the transcript is the only place the whole story
+      exists. That hero is gone -- every object the other six sentences describe is on screen
+      above, at full strength -- so the complete static state §26 asks for is the composition
+      itself, and the last caption is the one written about it.
+    */
     const captions = page.locator(".lv2-demo-caption");
-    await expect(captions).toHaveCount(8);
+    await expect(captions).toHaveCount(7);
     const opacities = await captions.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).opacity));
-    expect(new Set(opacities), "every beat is legible under reduced motion").toEqual(new Set(["1"]));
+    expect(opacities.filter((value) => Number(value) > 0.05), "one caption reads, and it is the last").toHaveLength(1);
+    expect(Number(opacities[opacities.length - 1]), "the caption that reads is the final beat").toBe(1);
     /*
       And the hero's document is not tilted: §22's perspective is a motion-adjacent flourish.
 

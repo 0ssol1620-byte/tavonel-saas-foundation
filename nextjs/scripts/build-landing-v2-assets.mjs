@@ -37,9 +37,20 @@ const pagesDir = join(root, "public", "explore-sample", "pages");
 const outDir = join(root, "public", "landing", "v2");
 const publicPrefix = "/landing/v2";
 
-const SHARP_PATH =
-  "D:/tvdetail-0910/nextjs/node_modules/.pnpm/sharp@0.35.4_@types+node@24.13.3/node_modules/sharp";
-const sharp = createRequire(import.meta.url)(SHARP_PATH);
+/*
+  sharp, resolved rather than hard-coded (F11, 2026-09-19).
+
+  This line used to be an absolute path into one machine's pnpm store, which meant the generator
+  ran on exactly one checkout and failed on every other with a module-not-found that says nothing
+  about why. `node_modules` here is a junction to a shared tree (contract rule 1: never install),
+  and a junction resolves like a directory -- so the ordinary resolver finds sharp through it.
+
+  `LANDING_V2_SHARP_PATH` is the escape hatch for a machine where it does not: a checkout whose
+  `node_modules` is missing, or a store laid out somewhere the resolver will not follow. It takes
+  a path and is used verbatim, so an operator can point at the store directly.
+*/
+const require_ = createRequire(import.meta.url);
+const sharp = require_(process.env.LANDING_V2_SHARP_PATH || require_.resolve("sharp"));
 
 /** Encoder settings, fixed so the output bytes are a function of the input bytes alone. */
 const WEBP = { quality: 80, effort: 6 };

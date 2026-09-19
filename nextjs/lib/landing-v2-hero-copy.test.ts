@@ -16,8 +16,15 @@ import { koTermDrift } from "./ko-terms";
 
 const root = join(import.meta.dirname, "..");
 
-/** The two entries that are published receipts rather than sentences this lane wrote. */
-const IMPORTED_DISCLOSURES: (keyof LandingV2HeroExtraCopy)[] = ["countsQualifier", "entityDisclaimer"];
+/*
+  The one entry that is a published receipt rather than a sentence this lane wrote.
+
+  `entityDisclaimer` used to be here too, because /explore's paragraph carries its own measured
+  figure. F3 (2026-09-19) points the hero at `EXPLORE_COPY.entityCaveatShort` instead -- the same
+  caveat in one sentence, with the figure left on /explore beside its receipt -- so the hero's
+  copy of it has no digit in it and is swept by the no-figure rule like everything else here.
+*/
+const IMPORTED_DISCLOSURES: (keyof LandingV2HeroExtraCopy)[] = ["countsQualifier"];
 
 describe("the Landing V2 hero copy", () => {
   it("offers both languages, and the same keys in each", () => {
@@ -53,32 +60,38 @@ describe("the Landing V2 hero copy", () => {
 
   it("imports the published disclosures rather than respelling them", () => {
     expect(LANDING_V2_HERO_EXTRA.en.countsQualifier).toBe(EXPLORE_COPY.countsQualifier);
-    expect(LANDING_V2_HERO_EXTRA.en.entityDisclaimer).toBe(EXPLORE_COPY.entityDisclaimer);
-    /*
-      The Korean counterpart carries the SAME figures, re-derived from the same receipt.
+    expect(LANDING_V2_HERO_EXTRA.en.entityDisclaimer).toBe(EXPLORE_COPY.entityCaveatShort);
+    // And the module reads them rather than holding a copy of the English text.
+    const source = readFileSync(join(root, "lib", "landing-v2-hero-copy.ts"), "utf8");
+    expect(source).toContain("EXPLORE_COPY.countsQualifier");
+    expect(source).toContain("EXPLORE_COPY.entityCaveatShort");
+  });
 
-      The English sentence is imported by reference and `lib/corpus-and-entity-honesty.test.ts`
-      holds it to `entity-extraction-eval.json`. The Korean is a hand translation, so the figures
-      in it are typed characters -- and the page's digit walk cannot see them, because they ride
-      in a `title` attribute and `undeclaredText` strips attributes with the tags. Typing the pair
-      into this test would only move the hand-copy one file along: the figure already moved once
-      (3 of 15 -> 3 of 16, 2026-09-06, gap-matrix row D7-01), and the next re-derivation has to
-      fail here rather than ship a Korean sentence stating a measurement nobody re-read.
-    */
+  /*
+    F3: THE SHORT CAVEAT IS SHORTER, NOT WEAKER, AND THE LONG ONE KEEPS ITS FIGURE.
+
+    /explore's paragraph is where the measurement is published, and `corpus-and-entity-honesty`
+    holds it to `entity-extraction-eval.json`; that pin is re-read here so the pair cannot drift
+    while the hero quotes the short form. What the short form owes is the two facts that make an
+    Entity chip honest -- the labels are a heuristic, and the parts to judge are the Claims and
+    their page-bound evidence -- in a sentence a 245px column can hold. 18 words is the bound the
+    campaign lead set; the Korean is the literal translation of it and states no figure either.
+  */
+  it("states the caveat short without softening it", () => {
     const evaluation = JSON.parse(readFileSync(join(root, "lib", "entity-extraction-eval.json"), "utf8")) as {
       baseline: { truePositives: number; candidates: number };
     };
     const { truePositives, candidates } = evaluation.baseline;
     expect(EXPLORE_COPY.entityDisclaimer).toContain(`${truePositives} of ${candidates}`);
-    // Korean counts the set first, then the hits: "기준 이름 N개 중 M개".
-    expect(
-      LANDING_V2_HERO_EXTRA.ko.entityDisclaimer,
-      "the KO disclaimer states a pair the evaluation does not",
-    ).toContain(`${candidates}개 중 ${truePositives}개`);
-    // And the module reads them rather than holding a copy of the English text.
-    const source = readFileSync(join(root, "lib", "landing-v2-hero-copy.ts"), "utf8");
-    expect(source).toContain("EXPLORE_COPY.countsQualifier");
-    expect(source).toContain("EXPLORE_COPY.entityDisclaimer");
+    const short = EXPLORE_COPY.entityCaveatShort;
+    expect(short.split(/\s+/).length, "the hero caveat is one sentence, not a paragraph").toBeLessThanOrEqual(18);
+    expect(short).toMatch(/heuristic/i);
+    expect(short).toMatch(/claims/i);
+    expect(short).toMatch(/evidence/i);
+    for (const locale of ["en", "ko"] as const) {
+      expect(/\d/.test(LANDING_V2_HERO_EXTRA[locale].entityDisclaimer), `${locale} caveat states a figure`).toBe(false);
+      expect(LANDING_V2_HERO_EXTRA[locale].entityDisclaimer).toMatch(/Claim|휴리스틱|heuristic/i);
+    }
   });
 
   it("is Korean on the Korean side, and keeps the site's vocabulary", () => {
@@ -100,9 +113,9 @@ describe("the Landing V2 hero copy", () => {
       for (const slot of ["{form}", "{filingDate}"]) {
         expect(LANDING_V2_HERO_EXTRA[locale].filedFormat, `${locale} filed line drops ${slot}`).toContain(slot);
       }
-      for (const slot of ["{form}", "{page}"]) {
-        expect(LANDING_V2_HERO_EXTRA[locale].askCitationFormat, `${locale} citation drops ${slot}`).toContain(slot);
-      }
+      /* `askCitationFormat` left with the Use beat's answer panel (F2): the hero has no
+         citation line of its own any more, and a format nothing fills is a string to keep in
+         step for nothing. */
     }
   });
 });
