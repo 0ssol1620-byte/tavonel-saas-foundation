@@ -41,7 +41,14 @@ test.describe("visual continuity — locked film side", () => {
       required to be that scene's rather than a stage wearing the role.
     */
     await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
-    await expect(page.getByRole("tablist")).toHaveCount(1);
+    /*
+      Founder decision 2026-09-20: the hero shows the four locked compile cuts again (centred
+      statement, films below), so the stage player's tablist is back beside Scene 02's. Two
+      tablists, and the hero one carries exactly the four cuts -- cut 4 included, by that decision.
+      The retired One-Path markup (.one-path-world-stage, one-path-works-film) still stays out.
+    */
+    await expect(page.getByRole("tablist")).toHaveCount(2);
+    await expect(page.locator("#hero").getByRole("tab")).toHaveCount(4);
     await expect(page.locator("#proof").getByRole("tab")).toHaveCount(3);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);
