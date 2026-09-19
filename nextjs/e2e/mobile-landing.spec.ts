@@ -6,17 +6,16 @@ const PHONE = ["360", "390"];
 const NARROW = ["360", "390", "768"];
 
 /*
-  Landing V2, 2026-09-19 (contract D1, D13). The four film tests left this file with the film.
+  Landing V2 (contract D1, D13), amended by the founder 2026-09-20. The four film tests left
+  this file, and the film came back without them.
 
   They measured the phone hero: the encoded-film path and its 1440-wide encode, the 16:10 pan
   frame, the absence of a chip row and a tablist, and the reduced-motion poster with its explicit
-  Play control. The entry pages play no film now -- the hero is DOM and CSS over a committed
-  raster (§28) -- so none of the four has a subject. What replaced each of them is in
-  `e2e/landing-v2.spec.ts`: the phone composition is a column rather than a shrunken desktop
-  demo, and reduced motion leaves a composed hero with an explicit control still on it.
-
-  The player itself is not dead code and is still pinned by `lib/brand-copy.test.ts`; it simply
-  has no caller on the entry pages.
+  Play control. Three of the four describe a composition that no longer exists even though the
+  film does -- the hero plays the four locked cuts in one framed pane rather than panning across
+  one, and `e2e/landing-v2.spec.ts` measures that pane, its controls and its reduced-motion
+  poster at 390 and at the reduced-motion project. They are not restored here, because a second
+  spec measuring the same frame is a second thing to keep in step.
 
   What stays here is everything that was never about the film: the narrow overflow sweep, the
   header row, the phone sheet, and the touch floor.

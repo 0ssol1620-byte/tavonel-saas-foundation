@@ -389,6 +389,11 @@ export default function CompileStagePlayer({
             width={1440}
             height={900}
             alt={`${active.label} — ${active.line}`}
+            /* The landing's poster is the LCP element again (founder decision 2026-09-20), and
+               `lib/landing-v2-page.test.ts` holds every image on the entry pages to a declared box
+               and an off-main-thread decode. Unconditional: a poster that blocks the parser while
+               it decodes costs the same on /film as it does on /. */
+            decoding="async"
             fetchPriority={priorityPoster ? "high" : undefined}
             loading={priorityPoster ? "eager" : undefined}
           />
@@ -439,7 +444,14 @@ export default function CompileStagePlayer({
       {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}
       {!compact ? <div className="compile-film-caption">
         <p>{videoError ? text.errorLong : active.line}</p>
-        <span className="compile-film-progress" aria-hidden="true">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
+        {/*
+          `data-derived` because both halves of this counter are read rather than typed: the
+          position is the player's own index and the total is `stages.length`. The landing's
+          figure walk (`e2e/landing-v2.spec.ts`, `lib/landing-v2-page.test.ts`) accepts a digit on
+          the entry pages only inside an element that declares it was measured, and contract rule
+          4's other half is satisfied too -- the figure is printed with its denominator.
+        */}
+        <span className="compile-film-progress" aria-hidden="true" data-derived="1">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
       </div> : null}
     </div>
   );

@@ -1,5 +1,5 @@
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
-import HeroCompilerDemo from "./hero-compiler-demo";
+import HeroFilm from "./hero-film";
 import HeroStatement from "./hero-statement";
 import LandingAnalytics from "./landing-analytics";
 import EvidenceScene from "./scenes/evidence";
@@ -10,21 +10,17 @@ import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
 import UseScene from "./scenes/use";
 import WhyScene from "./scenes/why";
-import { HERO_PAGE_ALT, KO_EXPLORE_LABEL, WORKSPACE_LABEL } from "./scene-actions";
+import { KO_EXPLORE_LABEL, WORKSPACE_LABEL } from "./scene-actions";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
-import { buildHeroScene, type HeroScene } from "@/lib/landing-v2-hero";
-import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
 import {
   buildEvidenceRecord,
   buildProofTabs,
   buildRecompileView,
-  landingV2StateWord,
   type EvidenceRecord,
   type ProofTab,
   type RecompileView,
 } from "@/lib/landing-v2-proof";
-import { sourcePageQualifier } from "@/lib/source-page-rasters";
 import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
 import { landingVariantState, type LandingVariantState } from "@/lib/landing-experiments";
 
@@ -56,42 +52,16 @@ import { landingVariantState, type LandingVariantState } from "@/lib/landing-exp
   which is where it changes what a reader is offered.
 */
 
-/**
- * What the hero's LCP image says in `sizes`, shared with the preload in `app/page.tsx`.
- *
- * It describes the READ STRIP since the 2026-09-19 recomposition, not the page render. The strip
- * is the largest image the hero paints and the first one in it -- the whole-page render is a
- * 200px thumbnail beside it now -- so it is the resource the two entry pages preload and the only
- * one carrying `fetchPriority="high"`. Below 1200 the strip spans the wrap, so the value follows
- * `--lv2-gutter`'s steps rather than a fixed pixel width.
- *
- * THE PHONE BRANCH IS DOUBLE THE COLUMN, AND THAT IS NOT A TYPO (QA round 4).
- * Below 768 the strip is re-flowed as two stacked halves, each painting one END of the crop at
- * the scale the desktop strip paints it (`SourceStrip`, and the `max-width: 767px` block in
- * `app/landing-v2.css`). The picture is therefore twice the column wide even though the element
- * is exactly the column wide. `calc(100vw - 40px)` described the element and made the browser
- * fetch a 350px resource for a 700px painting -- a 2.00x upscale measured at 390 on the one
- * raster that has to read as a real document. `sizes` states the painted width.
- */
-export const HERO_IMAGE_SIZES =
-  "(min-width: 1200px) 668px, (min-width: 768px) calc(100vw - 64px), calc(200vw - 80px)";
-
 /*
   The compiled World's projections, read once per process rather than once per render.
 
   `/` and `/ko` are `force-dynamic` (the commercial posture has to be resolved per request), so
-  without this the four builders would run the collection compiler on every request to the two
-  most-visited routes, and `app/page.tsx`'s preload would run the hero's a second time. The World
-  behind them is frozen at build time and every builder is pure over it, so a module-level memo is
-  the whole of what is needed -- not a cache with an invalidation story, because there is nothing
-  that can change it while the process lives. (`lib/landing-v2-sources.ts` already memoizes its
-  own, which is why Scene 03 is not in this table.)
+  without this the three builders would run the collection compiler on every request to the two
+  most-visited routes. The World behind them is frozen at build time and every builder is pure
+  over it, so a module-level memo is the whole of what is needed -- not a cache with an
+  invalidation story, because there is nothing that can change it while the process lives.
+  (`lib/landing-v2-sources.ts` already memoizes its own, which is why Scene 03 is not here.)
 */
-let heroMemo: HeroScene | undefined;
-export function heroScene(): HeroScene {
-  return (heroMemo ??= buildHeroScene());
-}
-
 type ProofData = { tabs: ProofTab[]; record: EvidenceRecord; recompile: RecompileView };
 let proofMemo: ProofData | undefined;
 function proofData(): ProofData {
@@ -122,7 +92,6 @@ export default function LandingPage({
   children?: React.ReactNode;
 }) {
   const copy = landingV2Copy(korean);
-  const scene = heroScene();
   const proof = proofData();
   const locale = korean ? "ko" : "en";
 
@@ -154,15 +123,24 @@ export default function LandingPage({
         */}
         <LandingAnalytics variant={experiment.tracked} />
 
-        {/* 01 Hero (§10, §11, §32). Text : visual 42 : 58, asymmetric, no film and no video. */}
+        {/*
+          01 Hero -- FOUNDER DECISION 2026-09-20: one centered statement, then one visual.
+
+          This is the reference pattern, not §11.1's asymmetric split: the competitor captures in
+          `reports/landing-v2-0919/compare/` all open with a centered block and put the product
+          picture under it, and the founder asked for the same shape with the four compile films
+          back as the picture. `lv2-scene--full` is gone with the split -- a hero that is a
+          statement plus a film is taller than a viewport by construction, and a `min-height` that
+          reserved one would only add ground between the two.
+        */}
         <section
           id="hero"
           data-scene="1"
           tabIndex={-1}
           aria-labelledby="lv2-hero-title"
-          className="lv2-scene lv2-scene--full lv2-obsidian lv2-hero"
+          className="lv2-scene lv2-obsidian lv2-hero"
         >
-          <div className="lv2-wrap lv2-hero-grid">
+          <div className="lv2-wrap">
             <HeroStatement
               copy={copy.hero}
               titleId="lv2-hero-title"
@@ -176,23 +154,7 @@ export default function LandingPage({
               */
               actions={{ ...heroActions, scene: "1", ctaOrderVariant: experiment.ctaOrderVariant }}
             />
-            <HeroCompilerDemo
-              scene={scene}
-              copy={copy}
-              extra={landingV2HeroExtra(korean)}
-              /* D12: the state word in the page's own language, from the shared table. */
-              stateLabel={landingV2StateWord(scene.compiled.state, locale)}
-              /*
-                The qualifier, not the noun. The locator's metadata line already names the page
-                ("p.4 of 80"), so what it still owes a reader is whether that page is the issuer's
-                own PDF or a reference render of the filing's HTML -- which is exactly what
-                `sourcePageQualifier` returns and what `sourcePageLabel` puts a redundant noun in
-                front of.
-              */
-              pageLabel={sourcePageQualifier(scene.source.representationKind, korean)}
-              pageAlt={HERO_PAGE_ALT[locale]}
-              sizes={HERO_IMAGE_SIZES}
-            />
+            <HeroFilm korean={korean} />
           </div>
         </section>
 

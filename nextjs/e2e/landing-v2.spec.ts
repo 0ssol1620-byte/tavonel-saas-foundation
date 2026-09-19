@@ -34,29 +34,19 @@ const SCENES = ["hero", "proof", "sources", "evidence", "recompile", "why", "use
 /** D5: the H1 is this string and no other, rendered from `BRAND_LINE.headline`. */
 const HEADLINE = "AI-ready knowledge. Traceable to every source.";
 
-const DEMO = ".lv2-demo";
+/** The hero's visual since 2026-09-20: the four locked cuts, in the site's one film player. */
+const FILM = "#hero .compile-film-sequence";
 
-/**
- * Wait until D11's entry animation has finished moving the hero demo's blocks.
- *
- * "The source arrives, rises 12px" is a transform on two grid children, and a transformed grid
- * child CAN overlap the row below it while it is still travelling: round 4 sampled
- * `matrix(1,0,0,1,0,3.09)` at t~200ms, and the same two boxes touch exactly (bottom 307, top 307)
- * from t=400ms to the end of the 14s loop. Measuring geometry immediately after `goto` therefore
- * measures the animation, not the layout. This waits for the thing under test to exist rather
- * than sleeping a guessed number of milliseconds.
- */
-async function settledHero(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll("#hero .lv2-demo-stage > *")].every((node) => {
-        const transform = getComputedStyle(node).transform;
-        return transform === "none" || transform === "matrix(1, 0, 0, 1, 0, 0)";
-      }),
-    undefined,
-    { timeout: 5_000 },
-  );
-}
+/** The first cut's poster, which the player server-renders and both entry pages preload. */
+const HERO_POSTER = "/film/poster-1-hero-2x.webp";
+
+/** Every cut the strip has to be able to reach, in `COMPILE_STAGES` order. */
+const CUTS = [
+  "/film/compile-cut-hq.mp4",
+  "/film/compile-cut-2.mp4",
+  "/film/compile-cut-3.mp4",
+  "/film/compile-cut-4.mp4",
+] as const;
 
 /**
  * Text nodes inside `main`, each with the nearest ancestor that declares it was measured.
@@ -231,81 +221,138 @@ test.describe("structure", () => {
     expect(painted, "one filled control in the hero").toBe(1);
   });
 
-  test("the hero paints real source rasters and no video anywhere on the page", async ({ page }) => {
+  /*
+    FOUNDER DECISION 2026-09-20. The hero plays the four locked cuts, and §27's rule still holds.
+
+    This asserted the opposite until today -- two committed rasters, no <video> and no <canvas> --
+    because §27 bars an autoplay video from being the LCP element and §28 puts the hero in DOM and
+    CSS. The founder replaced that hero with a centered statement over the films the previous
+    landing played, so what is checked is the shape that keeps §27 true anyway: the element that
+    paints above the fold is the poster, an <img> the player server-renders with its box declared,
+    and the preload names that same file. The decoder starts later, on intersection.
+  */
+  test("the hero paints the film's poster first, and preloads that poster once", async ({ page }) => {
     await page.goto("/");
     /*
-      Two rasters and one preload, which is the recomposition's shape.
+      Read off the SERVED document rather than the settled DOM, because the poster is the first
+      frame and only the first frame.
 
-      The READ strip is the region crop, first and largest, and it is the LCP candidate and the
-      only image carrying `fetchPriority="high"`. The page thumbnail beside it is where that strip
-      sits on the filing. Both are committed derivatives, both declare their size so the page
-      cannot shift when they decode, and both name what they are.
+      `CompileStagePlayer` renders the <img> while the film is out of view and swaps the decoder
+      in when its IntersectionObserver fires, so on a 1440 page that mounts the film above the
+      fold the element is gone within a second of load. That is the correct behaviour and it is
+      also why asserting it in the browser measured a race: what the LCP measurement sees is the
+      frame the server sent, and this is that frame.
     */
-    const strip = page.locator("section#hero img.lv2-read-img--a");
-    const thumbnail = page.locator("section#hero img.lv2-page-img");
-    await expect(strip).toHaveCount(1);
-    await expect(thumbnail).toHaveCount(1);
-    for (const image of [strip, thumbnail]) {
-      expect(await image.getAttribute("src")).toMatch(/^\/landing\/v2\/.+\.webp$/);
-      expect(await image.getAttribute("srcset")).toContain("w");
-      expect(Number(await image.getAttribute("width"))).toBeGreaterThan(0);
-      expect(Number(await image.getAttribute("height"))).toBeGreaterThan(0);
-      expect((await image.getAttribute("alt"))?.trim().length, "the image says what it is").toBeGreaterThan(0);
-      expect(await image.evaluate((node: HTMLImageElement) => node.naturalWidth), "the raster decoded")
-        .toBeGreaterThan(0);
-    }
-    // The strip's alt names the filing it was cut from, without stating a figure (rule 4).
-    expect((await strip.getAttribute("alt")) ?? "").toMatch(/filing/i);
-    expect((await strip.getAttribute("alt")) ?? "").not.toMatch(/\d/);
-    // §27: no autoplay video is the LCP element, because there is no video at all.
-    await expect(page.locator("video")).toHaveCount(0);
+    const response = await page.request.get(page.url());
+    const served = await response.text();
+    const tag = served.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
+    expect(tag, "the server sends the hero with no poster").toContain(HERO_POSTER);
+    expect(tag, "the poster declares its box").toMatch(/ width="[1-9]\d*"/);
+    expect(tag).toMatch(/ height="[1-9]\d*"/);
+    expect(tag, "the poster is the LCP candidate").toMatch(/fetchpriority="high"/i);
+    const alt = tag.match(/ alt="([^"]*)"/)?.[1] ?? "";
+    expect(alt.trim().length, "the poster says what it is").toBeGreaterThan(0);
+    // Contract rule 4: alt text carries no figure, because nothing in it has a receipt.
+    expect(alt).not.toMatch(/\d/);
+    // The bytes behind it are really there; a poster that 404s is a blank first paint.
+    expect((await page.request.get(HERO_POSTER)).status(), "the poster does not resolve").toBe(200);
+    // §28 still holds for everything this lane draws: no canvas anywhere on the entry page.
     await expect(page.locator("canvas")).toHaveCount(0);
-    // Exactly one image is told to load first, and it is the one the preload names.
-    const prioritised = await page
-      .locator("section#hero img")
-      .evaluateAll((nodes) => nodes.filter((node) => node.getAttribute("fetchpriority") === "high").length);
-    expect(prioritised, "one image carries fetchPriority=high").toBe(1);
-    const preloaded = await page
-      .locator('link[rel="preload"][as="image"]')
-      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("imagesrcset")));
-    expect(preloaded, "the READ strip is preloaded by its own srcset").toContain(await strip.getAttribute("srcset"));
     /*
-      F10: ONE image preload in the document, not two.
+      ONE preload for that file, in exactly one place -- and the place is the response header.
 
-      React 19 keys an image preload by its `imagesrcset`/`imagesizes` pair and hoists it into the
-      head; an element that also carried `href` registered under a second key, so the built
-      document held two preloads for one file (P3 QA round 2, P2-2). `app/page.tsx` drops the
-      `href` -- a responsive preload is selected from `imagesrcset` alone -- and this is the
-      assertion that keeps the duplicate from coming back through the source.
+      F10 was written after MED-15 measured `react-dom`'s `preload()` never reaching the shipped
+      HTML, and the fix it prescribed -- a real <link> element -- has its own failure: React keys
+      an image preload and hoists it, so an element that also carried `href` registered under a
+      second key and the document held two preloads for one file (P3 round 2, P2-2).
 
-      MEASURED ON THE SERVED DOCUMENT AND ON THE HEAD, which is where a preload does its work.
-      React renders the same element again on the client, in place, and a <link rel=preload>
-      appended to the body after load preloads nothing that is not already fetched -- so counting
-      every node in the DOM would be counting a no-op and would fail for the wrong reason.
+      What the helper does on THIS build, measured rather than assumed: React 19's Fizz sends an
+      image preload as a `Link` response header whenever the hint carries no `imageSrcSet` and the
+      header budget has room, and falls back to the head element when it does not. The hero's
+      poster is one locked file at one size, so there is no srcset and it takes the header path --
+      which is the earlier of the two forms, since it arrives with the response rather than after
+      the parser reaches the head. Both places are counted, and the total has to be one.
     */
-    const served = await (await page.request.get(page.url())).text();
-    expect(
-      (served.match(/rel="preload"[^>]*as="image"/g) ?? []).length,
-      "the served document preloads the hero raster more than once",
-    ).toBe(1);
-    expect(await page.locator(`head link[rel="preload"][as="image"]`).count(), "one preload in the head").toBe(1);
+    const headerPreloads = (response.headers()["link"] ?? "")
+      .split(/,(?=\s*<)/)
+      .filter((entry) => /rel=preload/i.test(entry) && /as="?image"?/i.test(entry));
+    const documentPreloads = served.match(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g) ?? [];
+    expect(headerPreloads.length + documentPreloads.length, "one image preload, in one place").toBe(1);
+    expect([...headerPreloads, ...documentPreloads][0], "the preload is the poster the layout paints")
+      .toContain(HERO_POSTER);
   });
 
-  test("the demo has exactly one control, and it meets the touch floor", async ({ page }, testInfo) => {
-    /*
-      F4: below 768 there is no sequence, so there is no control -- a play button that cannot
-      start anything is a 44px target that lies. The phone projects assert the static composition
-      instead, in "at 390" further down.
-    */
-    test.skip(Number(testInfo.project.name) <= 767, "the phone hero has no sequence and no control");
+  /*
+    All four cuts are reachable, and the strip is how a reader reaches them.
+
+    A hero that quietly fell back to the single cut the previous landing played would look correct
+    in a screenshot and lose three quarters of what the founder asked for, so the tab strip is
+    counted and each tab is asserted to name a stage. The sources themselves are read off the
+    player's own element as it advances rather than out of the markup, in the autoplay test below.
+  */
+  test("offers all four locked cuts from one strip", async ({ page }) => {
     await page.goto("/");
-    const controls = page.locator(`${DEMO} button`);
-    await expect(controls).toHaveCount(1);
-    const box = await controls.boundingBox();
-    expect(box?.height ?? 0, "44px touch floor").toBeGreaterThanOrEqual(44);
-    // It says which state it is in, in words, and reports that state to assistive technology.
-    await expect(controls).toHaveAttribute("aria-pressed", /true|false/);
-    expect((await controls.innerText()).trim().length, "the control is labelled in words").toBeGreaterThan(0);
+    const tabs = page.locator(`${FILM} [role="tab"]`);
+    await expect(tabs).toHaveCount(CUTS.length);
+    for (const label of await tabs.allInnerTexts()) {
+      expect(label.trim().length, "a stage tab with no name").toBeGreaterThan(0);
+      expect(label, "a stage label states a figure").not.toMatch(/\d/);
+    }
+    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+    // One tabpanel, named by the selected tab, so the strip is a real tablist rather than buttons.
+    const panel = page.locator(`${FILM} [role="tabpanel"]`);
+    await expect(panel).toHaveCount(1);
+    expect(await panel.getAttribute("aria-labelledby")).toBe(await tabs.first().getAttribute("id"));
+  });
+
+  /*
+    §11.3 and contract rule 7: the film may not be on this page without its note.
+
+    The cuts draw a ruled table, section-and-line labels and `.csv` sources, and this deployment
+    emits none of the three -- it emits the paragraph as it was printed, the page it was read from
+    and the box it sat in. The note is asserted as VISIBLE TEXT under the film rather than as a
+    string in a module: a disclosure that only a test can see is not a disclosure.
+  */
+  for (const path of ["/", "/ko"]) {
+    test(`${path} prints the directed-film note under the hero film`, async ({ page }) => {
+      await page.goto(path);
+      const note = page.locator("#hero .lv2-film-note");
+      await expect(note).toHaveCount(1);
+      await expect(note).toBeVisible();
+      const text = await note.innerText();
+      expect(text, "the note stops naming the .csv source").toContain(".csv");
+      expect(text.trim().length, "the note is a sentence, not a label").toBeGreaterThan(80);
+      const film = await page.locator(`${FILM}`).boundingBox();
+      const box = await note.boundingBox();
+      expect(box!.y, "the note sits under the film it qualifies").toBeGreaterThan(film!.y);
+    });
+  }
+
+  /*
+    Every control the film offers is reachable and clears the touch floor, at every width.
+
+    Unlike the compiler demo this replaced, the film's controls exist on a phone too: the strip is
+    the only way to reach a cut directly on a touch screen, and the motion control is WCAG 2.2.2's
+    stop for an autoplay that runs well past five seconds. So this is not width-scoped.
+  */
+  test("gives the film a motion control and four stage tabs, all at the touch floor", async ({ page }) => {
+    await page.goto("/");
+    const motion = page.locator(`${FILM} .compile-film-motion-control`);
+    await expect(motion).toHaveCount(1);
+    await expect(motion).toBeVisible();
+    // It reports its state to assistive technology and names itself in words.
+    await expect(motion).toHaveAttribute("aria-pressed", /true|false/);
+    expect((await motion.getAttribute("aria-label"))?.trim().length, "the control is named").toBeGreaterThan(0);
+    for (const control of [motion, page.locator(`${FILM} [role="tab"]`)]) {
+      const boxes = await control.evaluateAll((nodes) =>
+        nodes.map((node) => node.getBoundingClientRect()).map((box) => ({ w: box.width, h: box.height })),
+      );
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const box of boxes) {
+        expect(box.h, "44px touch floor").toBeGreaterThanOrEqual(44);
+        expect(box.w, "44px touch floor").toBeGreaterThanOrEqual(44);
+      }
+    }
   });
 
   for (const path of ["/", "/ko"]) {
@@ -316,92 +363,68 @@ test.describe("structure", () => {
   }
 
   /*
-    §39: "text overlap 0", measured instead of screenshotted, at every width the suite runs.
+    §39's "text overlap 0", over the hero as it is now.
 
-    The first hero composition positioned its seven panels as percentages of a fixed box, which is
-    a technique that cannot know how tall its own content is: four pairs intersected at 1440, the
-    worst of them 216x89. The stage is a grid of four blocks now and a grid cannot overlap -- this
-    is what says so on every run, and what will catch the next percentage someone reaches for.
-    Not width-scoped, because the arrangement changes at 1200 and 768 and each of those is a new
-    chance to overlap; both locales, because the Korean labels are longer.
+    This used to sweep every pair of blocks in the compiler demo's grid, because the composition
+    before it positioned seven panels as percentages of a fixed box and four pairs intersected at
+    1440. The hero is a centered block over a film frame now, so what can still collide is the
+    statement and the frame under it -- and the Korean block, which is taller, is the one that
+    would do it first. Both locales, every width, measured rather than screenshotted.
   */
   for (const path of ["/", "/ko"]) {
-    test(`${path} lays the hero demo out with nothing on top of anything else`, async ({ page }) => {
+    test(`${path} keeps the hero statement clear of the film under it`, async ({ page }) => {
       await page.goto(path);
-      /* At rest. D11's entry lifts two blocks 12px and lands them; mid-flight they overlap by
-         design, and the premise here -- "a grid cannot overlap" -- is about the layout. */
-      await settledHero(page);
-      const collisions = await page.locator(`${DEMO} .lv2-demo-stage > *`).evaluateAll((nodes) => {
-        const boxes = nodes.map((node) => ({ name: node.className.toString().split(" ")[0], box: node.getBoundingClientRect() }));
-        const found: string[] = [];
-        for (let a = 0; a < boxes.length; a += 1) {
-          for (let b = a + 1; b < boxes.length; b += 1) {
-            const one = boxes[a]!.box;
-            const two = boxes[b]!.box;
-            // A shared edge is not an overlap; a shared pixel of area is.
-            const width = Math.min(one.right, two.right) - Math.max(one.left, two.left);
-            const height = Math.min(one.bottom, two.bottom) - Math.max(one.top, two.top);
-            if (width > 1 && height > 1) {
-              found.push(`${boxes[a]!.name} x ${boxes[b]!.name} ${Math.round(width)}x${Math.round(height)}`);
-            }
-          }
-        }
-        return found;
-      });
-      expect(collisions, "blocks of the hero demo intersect").toEqual([]);
+      const text = await page.locator("#hero .lv2-hero-text").boundingBox();
+      const film = await page.locator(FILM).boundingBox();
+      expect(text && film).toBeTruthy();
+      expect(Math.round(film!.y), "the film overlaps the statement above it")
+        .toBeGreaterThanOrEqual(Math.round(text!.y + text!.height));
     });
   }
 
   /*
-    One caption at a time, sampled while the sequence is held.
+    The hero's own elements, and then every image on the page.
 
-    The round-1 shape faded one caption out while the next faded in, which put two sentences at
-    half opacity over the same lines. The windows are sequential with a gap now, so the invariant
-    holds at every instant of the timeline rather than at most of them -- which is why sampling
-    at arbitrary moments is a fair test of it.
-  */
-  test("shows one beat caption at a time", async ({ page }, testInfo) => {
-    /*
-      Not under reduced motion, where the last caption alone stands (§26, F5): every object the
-      other six narrate is on screen at full strength there, so the transcript has nothing left to
-      substitute for. That state has its own test below. Not on a phone either, where F4 hides the
-      narration row with the sequence it describes.
-    */
-    test.skip(testInfo.project.name === "reduced-motion", "the reduced-motion state is the last caption");
-    test.skip(Number(testInfo.project.name) <= 767, "the phone hero has no sequence and no narration row");
-    await page.goto("/");
-    for (let sample = 0; sample < 5; sample += 1) {
-      const legible = await page
-        .locator(".lv2-demo-caption")
-        .evaluateAll((nodes) => nodes.filter((node) => Number(getComputedStyle(node).opacity) > 0.05).length);
-      expect(legible, "two beat captions are legible at once").toBeLessThanOrEqual(1);
-      await page.waitForTimeout(700);
-    }
-  });
-
-  /*
-    The strip is the hero's key visual, so it is the one image that may not be decorative.
-
-    Its own element carries the region outline (the strip IS the box), the locator carries the
-    same box drawn on the whole page, and the claim card is what was compiled out of it. §43's
-    three parts, present at every width -- and since F2 so are the other three objects, each in a
-    grid cell of its own rather than taking turns in a rotating slot.
+    §2.5's rule for the hero is one H1, one to two sentences of support, one visual, one primary
+    action and one secondary. That is what is counted here -- the centered block's five parts and
+    the one visual under it -- because the defect the founder named was a hero with more than one
+    of each.
   */
   for (const path of ["/", "/ko"]) {
-    test(`${path} shows the strip, the page it is on, the claim and the slot`, async ({ page }) => {
+    test(`${path} shows one statement and one visual, and no more`, async ({ page }) => {
       await page.goto(path);
-      for (const selector of [
-        ".lv2-read",
-        ".lv2-locator",
-        ".lv2-claim-block .lv2-claim",
-        ".lv2-demo-stage > .lv2-nodes",
-        ".lv2-demo-stage > .lv2-revision",
-        ".lv2-demo-stage > .lv2-counts",
-      ]) {
-        await expect(page.locator(selector), `${selector} is missing from the stage`).toHaveCount(1);
-      }
-      await expect(page.locator(".lv2-region--strip")).toHaveCount(1);
-      await expect(page.locator(".lv2-locator-meta")).toBeVisible();
+      const hero = page.locator("section#hero");
+      await expect(hero.locator("h1")).toHaveCount(1);
+      await expect(hero.locator(".lv2-hero-support")).toHaveCount(1);
+      await expect(hero.locator(".lv2-hero-intake")).toHaveCount(1);
+      await expect(hero.locator(".lv2-eyebrow")).toHaveCount(1);
+      await expect(hero.locator(".compile-film-sequence")).toHaveCount(1);
+      /*
+        One visual: the film's frame, and no second picture competing with it. Counted as "no
+        image that is not the film's own poster", because the poster is swapped for the decoder
+        once the film is in view -- so a fixed count of 1 is a race, and a count of 0 would let a
+        second raster back in.
+      */
+      await expect(hero.locator("img:not(.compile-film-still)")).toHaveCount(0);
+      expect(await hero.locator("img").count(), "a second picture competes with the film")
+        .toBeLessThanOrEqual(1);
+      /*
+        And the block really is centered, measured from paint. `text-align` is inherited by five
+        children from one wrapper, so reading the wrapper is reading the decision.
+      */
+      const centered = await hero.locator(".lv2-hero-text").evaluate((node) => {
+        const style = getComputedStyle(node);
+        const box = node.getBoundingClientRect();
+        const parent = node.parentElement!.getBoundingClientRect();
+        return {
+          align: style.textAlign,
+          left: box.left - parent.left,
+          right: parent.right - box.right,
+        };
+      });
+      expect(centered.align).toBe("center");
+      expect(Math.abs(centered.left - centered.right), "the statement is not centered in its wrap")
+        .toBeLessThanOrEqual(2);
       // Every image on the page declares its size and says what it is.
       const images = await page.locator("main img").evaluateAll((nodes) =>
         nodes.map((node) => ({
@@ -524,163 +547,113 @@ for (const entry of AUDITED) {
 }
 
 /*
-  The §32 composition, at the width it is drawn against, as the 2026-09-19 recomposition sets it.
+  The hero at the width it is drawn against, as the founder's 2026-09-20 decision sets it.
 
-  Text 600, gap 28, visual 668 inside the 1296 measure: the text column starts on the wrap's left
-  edge and the visual ends on its right one. The text column grew from §32's 520 because the H1
-  has to be the largest type on the page and that headline needs about 575px at 56px; the visual
-  gave up the 40px, keeping §32's 708:600 proportion and losing its absolute width.
+  One centered block on a 760px measure inside the 1296 wrap, then the film frame under it. §32's
+  42:58 split and its 600px text track went with the compiler demo; what replaced them is the
+  pattern the competitor captures in `reports/landing-v2-0919/compare/` all use, and the numbers
+  below are that pattern's: the block is centered to within a pixel, it ends high enough that the
+  film's top third is above the fold, and the whole hero stays inside 1.3 viewports.
 */
 test.describe("at 1440", () => {
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "the 1440 grid");
   });
 
-  test("lays the hero out on the shared measure, inside one viewport", async ({ page }) => {
+  test("centers the statement on the shared measure and puts the film under it", async ({ page }) => {
     await page.goto("/");
     const text = await page.locator(".lv2-hero-text").boundingBox();
-    const demo = await page.locator(DEMO).boundingBox();
-    expect(text && demo).toBeTruthy();
-    expect(Math.round(text!.x), "the text column starts on the wrap's left edge").toBe(72);
-    expect(Math.round(text!.width), "the recomposed text width").toBe(600);
-    expect(Math.round(demo!.x), "the visual's left edge").toBe(700);
-    expect(Math.round(demo!.width), "the visual takes the rest of the measure").toBe(668);
-    expect(Math.round(demo!.x + demo!.width), "and ends on the wrap's right edge").toBe(1368);
-    // The wordmark shares that left edge (D9), which is the whole point of the measure.
+    const film = await page.locator("#hero .compile-film-viewport").boundingBox();
+    expect(text && film).toBeTruthy();
+    // C1: a 760 measure, centered in the 1296 wrap (72px gutters at >=1440).
+    expect(Math.round(text!.width), "the statement's measure").toBeLessThanOrEqual(760);
+    expect(Math.round(text!.x + text!.width / 2), "the statement is off centre").toBe(720);
+    expect(Math.round(film!.x + film!.width / 2), "the film is off centre").toBe(720);
+    /*
+      C2: the film PANE is capped at 1120 and never reaches outside the wrap. The pane is the
+      frame that holds the recording -- the tab strip, the caption and the directed-film note are
+      siblings of it, and the note is deliberately set on its own longer measure, so measuring the
+      block that contains all four would be measuring the note's line length.
+    */
+    expect(Math.round(film!.width), "the film pane is wider than its cap").toBeLessThanOrEqual(1120);
+    expect(Math.round(film!.x), "the film reaches outside the wrap").toBeGreaterThanOrEqual(72);
+    // The wordmark shares the wrap's left edge (D9), which is what the measure is drawn against.
     const wordmark = await page.locator("header.nav .wordmark").boundingBox();
     expect(Math.round(wordmark!.x)).toBe(72);
   });
 
   /*
-    D9's hero canvas, which round 3 measured at 145vh and escalated.
+    C1's vertical rhythm and C6's height bound, in both languages.
 
-    min(900px, 100vh) at 1440x900 is 900, and the header is `position: fixed` so the hero owns the
-    whole fold. Eight pixels of tolerance for sub-pixel rounding of a clamped type scale, and not
-    a line more: the point of the bound is that the compiled claim, the region it came from and
-    the comparison are all in the first screen.
+    The statement has to end high enough that the film's top third is above the fold -- that is
+    what makes the first screen a sentence and a picture rather than a sentence -- and the hero as
+    a whole has to stay inside 1.3 viewports so the page below it is still reachable by scrolling
+    rather than by scrolling twice. The Korean block is the taller of the two and is measured at
+    the same bounds rather than at relaxed ones.
   */
   for (const path of ["/", "/ko"]) {
-    test(`${path} keeps the hero inside the first viewport`, async ({ page }) => {
+    test(`${path} lands the statement above the fold and the hero inside 1.3 viewports`, async ({ page }) => {
       await page.goto(path);
-      const hero = await page.locator("section#hero").boundingBox();
       const viewport = page.viewportSize()!.height;
-      expect(Math.round(hero!.height), `hero ${hero!.height}px against a ${viewport}px viewport`)
-        .toBeLessThanOrEqual(viewport + 8);
-      // And the payoff is in it: the claim card's bottom edge is above the fold.
-      const claim = await page.locator(".lv2-claim").boundingBox();
-      expect(Math.round(claim!.y + claim!.height), "the compiled claim is below the fold")
+      const text = await page.locator(".lv2-hero-text").boundingBox();
+      expect(Math.round(text!.y + text!.height), "the statement runs past C1's y=560")
+        .toBeLessThanOrEqual(600);
+      const film = await page.locator(FILM).boundingBox();
+      expect(film!.y, "the film starts below the fold").toBeLessThan(viewport);
+      expect(film!.y + film!.height / 3, "less than the film's top third is above the fold")
         .toBeLessThanOrEqual(viewport);
+      const hero = await page.locator("section#hero").boundingBox();
+      expect(Math.round(hero!.height), `hero ${hero!.height}px against a ${viewport}px viewport`)
+        .toBeLessThanOrEqual(Math.round(viewport * 1.3));
     });
   }
 
   /*
-    Two things a reader has to be able to finish reading, both of which an earlier overlap hid.
+    §23's other half: an autoplay loop does not run for a reader who has scrolled past it.
 
-    The origin of each relation (`entity-node.tsx`: the candidates are the filing's own edges, so
-    a row that does not say which node it leaves reads as the compiled claim's), and the noun and
-    the engine over the comparison figures -- contract rule 4's "shown with what they count" and
-    BA-034's "named where the figure is printed", neither of which a state word alone satisfies.
+    `CompileStagePlayer` holds an IntersectionObserver over its own frame and, once the frame
+    leaves the viewport, does something stronger than pausing: it renders the poster again and
+    UNMOUNTS the decoder, so a reader two viewports down is not paying for a video element at all.
+    That is why this counts the element rather than reading `paused` on it -- polling a detached
+    node measures nothing, and "no decoder" is the guarantee worth pinning.
   */
-  test("states each relation's origin, what the figures count, and which engine counted", async ({ page }) => {
+  test("closes the film once the hero is off screen, and restarts it on return", async ({ page }) => {
     await page.goto("/");
-    const vias = page.locator(".lv2-node-via");
-    expect(await vias.count(), "every object row names the node its relation leaves").toBeGreaterThan(0);
-    expect(await vias.count()).toBe(await page.locator(".lv2-node").count());
-    for (const text of await vias.allInnerTexts()) expect(text.trim().length).toBeGreaterThan(0);
-    await expect(vias.first()).toBeVisible();
-    // Never the topic edge: the production compiler contract does not claim it as an emission.
-    for (const text of await page.locator(".lv2-node-rel").allInnerTexts()) {
-      expect(text.toLowerCase(), "the hero shows a relation the engine is not described as emitting")
-        .not.toContain("topic");
-    }
-
-    /*
-      The counts are rendered ONCE since F2 -- they have a grid cell of their own instead of a
-      turn in a rotating slot -- and this walks every instance rather than the first, which is
-      what catches a second copy coming back. Each carries its own noun, its own qualifier, and a
-      list that names the heading it belongs to.
-    */
-    const titles = page.locator(".lv2-counts-title");
-    const count = await titles.count();
-    expect(count, "the comparison is headed wherever it is printed").toBeGreaterThan(0);
-    for (let index = 0; index < count; index += 1) {
-      const title = titles.nth(index);
-      // A noun, not a figure: the label says what is counted and never states a count itself.
-      expect((await title.innerText()).trim()).not.toMatch(/\d/);
-      const list = page.locator(".lv2-counts-list").nth(index);
-      expect(await list.getAttribute("aria-labelledby")).toBe(await title.getAttribute("id"));
-    }
-    const notes = page.locator(".lv2-counts-note");
-    expect(await notes.count(), "BA-034: the engine is named with every printing of the figures").toBe(count);
-    for (const text of await notes.allInnerTexts()) expect(text.trim().length).toBeGreaterThan(0);
-    await expect(page.locator(".lv2-counts-note")).toBeVisible();
-    /*
-      F2: and every object is painted from the first frame rather than waiting for its beat. The
-      sequence changes emphasis, not presence, so a screenshot at any instant of the loop holds
-      the whole composition -- which is also why `vias.first()` above is a fair assertion again.
-    */
-    for (const selector of [".lv2-node", ".lv2-counts", ".lv2-revision", ".lv2-claim", ".lv2-read"]) {
-      const opacity = await page.locator(`#hero ${selector}`).first().evaluate((node) => {
-        let value = 1;
-        for (let n: Element | null = node; n; n = n.parentElement) value *= Number(getComputedStyle(n).opacity);
-        return value;
-      });
-      expect(opacity, `${selector} is below F2's resting emphasis at this instant`).toBeGreaterThanOrEqual(0.55);
-    }
-  });
-
-  test("runs the signature interaction from the keyboard", async ({ page }) => {
-    await page.goto("/");
-    const claim = page.locator("#hero .lv2-claim");
-    await expect(claim).toHaveCount(1);
-    /*
-      Scoped to the hero, and that is the fix round 4 asked for rather than a looser number.
-
-      The two regions here are the strip (which IS the box) and the thumbnail (where that box is
-      on the page). Page-wide the selector now matches six, because Scenes 02 and 04 draw the
-      same primitive on their own rasters exactly as D10 asked them to -- so an unscoped count
-      was measuring the other lanes' work and contradicting `e2e/evidence-first.spec.ts`, which
-      counts the same two in the same hero.
-    */
-    const regions = page.locator("#hero .lv2-region");
-    await expect(regions).toHaveCount(2);
-    await claim.focus();
-    /*
-      §4.1. Focusing the compiled object rings the region it was read from and draws the lines to
-      it in full. Measured from paint, because the CSS does this with `:has()` and the attribute
-      the JavaScript fallback writes -- and which of the two ran is not the thing under test.
-    */
-    await expect(regions.first()).toHaveCSS("outline-width", "2px");
-    await expect(regions.nth(1)).toHaveCSS("outline-width", "2px");
-    const drawn = await page.locator(".lv2-line").first().evaluate((node) => getComputedStyle(node).transform);
-    expect(["none", "matrix(1, 0, 0, 1, 0, 0)"], "the evidence line is drawn in full while the claim is focused")
-      .toContain(drawn);
-    // And the coordinate label reads, with its unit stated beside it.
-    const label = page.locator(".lv2-read-label");
-    await expect(label).toContainText("SOURCE ·");
-    await expect(label).toBeVisible();
-    await expect(page.locator(".lv2-read-unit")).toContainText("per mille");
+    const video = page.locator(`${FILM} video`);
+    await expect(video).toHaveCount(1);
+    await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(false);
+    await page.evaluate(() => window.scrollTo(0, window.innerHeight * 3));
+    await expect(video, "the decoder outlives the hero").toHaveCount(0);
+    await expect(page.locator("#hero img.compile-film-still"), "no poster in the closed frame")
+      .toHaveCount(1);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(video).toHaveCount(1);
+    await expect
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.paused), { timeout: 10_000 })
+      .toBe(false);
   });
 
   /*
-    §23's other half: the loop does not run for a reader who has scrolled past it.
+    The strip really changes the cut, and it does it without tearing down the decoder.
 
-    `hero-compiler-demo.tsx` writes `data-offscreen` from an IntersectionObserver and the
-    stylesheet pauses on it through the same rule the control uses. Two viewports down is well
-    past a hero that fits in one.
+    BQ-130: swapping <source> children of a live element does nothing, so the four cuts once
+    shared a frame that only ever played the first one; keying the element per stage fixed that
+    and aborted the fetch in flight on every advance. `src` on the element itself does both, and
+    this is what says so from the browser rather than from the source.
   */
-  test("stops the sequence once the hero is off screen, and restarts it on return", async ({ page }) => {
+  test("changes the cut when a stage is chosen, on one decoder", async ({ page }) => {
     await page.goto("/");
-    const demo = page.locator(DEMO);
-    await expect(demo).toHaveAttribute("data-offscreen", "0");
-    await page.evaluate(() => window.scrollTo(0, window.innerHeight * 2));
-    await expect(demo).toHaveAttribute("data-offscreen", "1");
-    expect(
-      await page.locator(".lv2-claim").evaluate((node) => getComputedStyle(node).animationPlayState),
-      "the sequence keeps running out of view",
-    ).toBe("paused");
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await expect(demo).toHaveAttribute("data-offscreen", "0");
+    const video = page.locator(`${FILM} video`);
+    const first = await video.evaluate((node: HTMLVideoElement) => node.currentSrc);
+    expect(CUTS.some((cut) => first.endsWith(cut)), `${first} is not one of the locked cuts`).toBe(true);
+    await page.locator(`${FILM} [role="tab"]`).nth(2).click();
+    await expect
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentSrc), { timeout: 10_000 })
+      .not.toBe(first);
+    const second = await video.evaluate((node: HTMLVideoElement) => node.currentSrc);
+    expect(CUTS.some((cut) => second.endsWith(cut)), `${second} is not one of the locked cuts`).toBe(true);
+    // Still one decoder: the element survived the change rather than being remounted.
+    await expect(page.locator(`${FILM} video`)).toHaveCount(1);
   });
 
   test("reaches the hero's actions from the skip link in a bounded number of stops", async ({ page }) => {
@@ -699,86 +672,39 @@ test.describe("at 1440", () => {
 });
 
 /*
-  The phone composition (§25, F4). A vertical narrative, not a scaled desktop demo -- and not a
-  sequence either: below 768 the hero is the static complete composition, every object painted at
-  full strength on the first frame, with no rotation, no narration row and no play/pause control.
-  What is checked here is that all six objects are present and readable, that the strip is
-  re-flowed rather than shrunk, and that every reachable control clears the touch floor inside the
-  viewport.
+  The phone hero (§25, contract rule 12). The same two parts, stacked, at the viewport's measure.
+
+  There is no separate phone composition to check any more -- the desktop hero is already one
+  column -- so what a phone needs checking for is what a phone breaks: the film pane taking the
+  full width instead of a desktop cap, every reachable control still at 44px and inside the
+  viewport, and the whole hero inside 1.5 viewports so the page below it is one scroll away.
 */
 test.describe("at 390", () => {
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name !== "390", "the phone composition");
   });
 
-  test("renders the hero as the static complete composition, with no sequence", async ({ page }) => {
+  test("stacks the statement over a full-width film, inside 1.5 viewports", async ({ page }) => {
     await page.goto("/");
-    const stage = page.locator(".lv2-demo-stage");
-    await expect(stage).toHaveCount(1);
-    expect(await stage.evaluate((node) => getComputedStyle(node).display)).toBe("grid");
-    /*
-      All six objects, in the order §25's vertical narrative reads them: the region that was read,
-      where it sits on the filing, what was compiled out of it, the objects bound to it, what
-      arrived later, and what the recompile compared. The grid pairs two of those rows sideways so
-      the hero is not three viewports tall, but the DOM order is the narrative either way.
-    */
-    const order = await stage.evaluate((node) =>
-      [...node.children].map((child) => child.className.toString().split(" ")[0]),
-    );
-    expect(order).toEqual(["lv2-read", "lv2-locator", "lv2-claim-block", "lv2-nodes", "lv2-revision", "lv2-counts"]);
-    /*
-      The strip is re-flowed as two halves rather than shrunk to six-pixel glyphs, and the halves
-      are two elements of the same resource -- no scroller, no drag.
-    */
-    const halves = page.locator(".lv2-read-img");
-    await expect(halves).toHaveCount(2);
-    expect(await halves.nth(0).getAttribute("src")).toBe(await halves.nth(1).getAttribute("src"));
-    for (let index = 0; index < 2; index += 1) {
-      const box = await halves.nth(index).boundingBox();
-      expect(box!.height, "a half of the strip is too short to read").toBeGreaterThan(40);
-    }
-    /*
-      F4: STATIC AND COMPLETE. No beat rotates here, so nothing is at reduced emphasis and
-      nothing is waiting for a turn -- every object is painted at full strength on the first
-      frame, which is the state a reader who never scrolls back is owed.
-    */
-    for (const selector of [
-      ".lv2-read",
-      ".lv2-region--strip",
-      ".lv2-locator",
-      ".lv2-claim",
-      ".lv2-demo-stage > .lv2-nodes",
-      ".lv2-demo-stage > .lv2-revision",
-      ".lv2-demo-stage > .lv2-counts",
-    ]) {
-      const target = page.locator(selector).first();
-      await expect(target, `${selector} is missing from the phone composition`).toBeVisible();
-      expect(
-        await target.evaluate((node) => Number(getComputedStyle(node).opacity)),
-        `${selector} is not at full strength`,
-      ).toBe(1);
-    }
-    // And the objects' own rows are readable, not only present.
-    await expect(page.locator(".lv2-node-via").first()).toBeVisible();
-    await expect(page.locator(".lv2-counts-note")).toBeVisible();
-    await expect(page.locator(".lv2-nodes-caveat")).toBeVisible();
-    /*
-      No play/pause control, because there is no sequence for it to control (F4). Asserted on what
-      a reader can reach rather than on the DOM: the element is hidden by the stylesheet, which
-      also takes it out of the tab order.
-    */
-    const controls = await page
-      .locator(".lv2-demo button")
-      .evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length > 0).length);
-    expect(controls, "the phone hero renders a control for a sequence it does not run").toBe(0);
-    await expect(page.locator(".lv2-demo-foot")).toBeHidden();
+    const text = await page.locator("#hero .lv2-hero-text").boundingBox();
+    const film = await page.locator(FILM).boundingBox();
+    expect(text && film).toBeTruthy();
+    expect(Math.round(film!.y), "the film overlaps the statement")
+      .toBeGreaterThanOrEqual(Math.round(text!.y + text!.height));
+    // The pane takes the wrap rather than a desktop cap, and stays inside the viewport.
+    expect(film!.width, "the film is narrower than the phone's wrap").toBeGreaterThan(320);
+    expect(Math.round(film!.x + film!.width), "the film reaches past the viewport").toBeLessThanOrEqual(390);
+    const viewport = page.viewportSize()!.height;
+    const hero = await page.locator("section#hero").boundingBox();
+    expect(Math.round(hero!.height), `hero ${hero!.height}px against a ${viewport}px viewport`)
+      .toBeLessThanOrEqual(Math.round(viewport * 1.5));
     /*
       Every REACHABLE control clears the touch floor and sits inside the viewport.
 
-      "Reachable" is the word the contract uses, and `getClientRects()` is the browser's own
-      answer to it: empty for a `display: none` subtree and for a `[hidden]` tab panel, non-empty
-      for everything a pointer or a keyboard can hit. Nothing here is filtered by a class name, so
-      a control that becomes visible is measured on the run it becomes visible.
+      "Reachable" is the word the contract uses and `getClientRects()` is the browser's own answer
+      to it: empty for a `display: none` subtree and for a `[hidden]` tab panel, non-empty for
+      everything a pointer or a keyboard can hit. Nothing here is filtered by class name, so a
+      control that becomes visible is measured on the run it becomes visible.
     */
     const boxes = await page.locator("main a[href], main button").evaluateAll((nodes) =>
       nodes
@@ -798,8 +724,10 @@ test.describe("at 390", () => {
 });
 
 /*
-  Reduced motion (§26, contract rule 8): nothing travels, the control is still there, and the
-  reader is given the complete state rather than the last frame of a sequence they never saw.
+  Reduced motion (§26, contract rule 8): nothing plays by itself, and the reader is not shown an
+  empty frame instead. The film holds its poster, the stage labels and the caption are still
+  there, and the control is present and says "play" -- the preference bars AUTOplay, not play, so
+  a reader who asks for it gets the film rather than a permanently frozen picture.
 */
 test.describe("with reduced motion", () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -807,79 +735,45 @@ test.describe("with reduced motion", () => {
     /*
       THE PROJECT SETS `reducedMotion: "reduce"` AND IT DOES NOT ARRIVE. Emulate it on the page.
 
-      `playwright.config.ts` declares the option on this project's context, which is the
-      documented way, and in this installation of @playwright/test 1.62.0 the page still reports
+      `playwright.config.ts` declares the option on this project's context, which is the documented
+      way, and in this installation of @playwright/test 1.62.0 the page still reports
       `prefers-reduced-motion: no-preference`. Round 2 opened the same build with the raw
-      `playwright` library under `reducedMotion: "reduce"` and all five assertions below passed,
-      while the same assertions under the test runner failed on the first --
-      `.lv2-demo[data-playing="0"]` matched nothing, because the component's own `matchMedia`
-      read the query correctly and was told there was no preference.
-
-      So this gate was green over a product that had never been put in the state it gates, in
-      CI's Launch job as well as here, and the product was right the whole time. `emulateMedia`
-      sets the emulation per page instead of per context and is idempotent with the project
-      option, so it is correct whether or not the installation is ever repaired -- and repairing
-      it means changing a dependency, which rule 1 of this campaign forbids outright.
+      `playwright` library under `reducedMotion: "reduce"` and every assertion passed, while the
+      same assertions under the test runner failed on the first -- the component's own
+      `matchMedia` read the query correctly and was told there was no preference. So this gate was
+      green over a product that had never been put in the state it gates. `emulateMedia` sets the
+      emulation per page instead of per context and is idempotent with the project option, so it
+      is correct whether or not the installation is ever repaired -- and repairing it means
+      changing a dependency, which rule 1 of this campaign forbids outright.
     */
     await page.emulateMedia({ reducedMotion: "reduce" });
   });
 
-  test("stops the sequence, keeps the control, and shows the whole story at once", async ({ page }) => {
+  test("holds the poster, keeps the control, and starts nothing by itself", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator(`${DEMO}[data-playing="0"]`)).toHaveCount(1);
-    const control = page.locator(`${DEMO} button`);
-    await expect(control).toHaveCount(1);
+    // The still, not the decoder: no <video> is mounted at all until a reader asks for one.
+    const poster = page.locator("#hero img.compile-film-still");
+    await expect(poster).toBeVisible();
+    expect(await poster.getAttribute("src")).toBe(HERO_POSTER);
+    await expect(page.locator(`${FILM} video`)).toHaveCount(0);
+    /*
+      The control is present in the one state that most needs it, and it offers PLAY.
+
+      film-01: the button used to be rendered only when reduced motion was off, which inverted it
+      -- the two states where a still stands in for an unstarted film were the two with no way to
+      start it. WCAG 2.2.2 allows a visitor-initiated play; the preference bars autoplay.
+    */
+    const control = page.locator(`${FILM} .compile-film-motion-control`);
     await expect(control).toBeVisible();
-    /*
-      The composed state, which since F2 is the same picture as the loop's two-second hold.
-
-      The stylesheet collapses every animation to 1ms and one iteration, and a finished animation
-      reverts each element to its base style -- which is written as the finished frame. With no
-      rotating slot left, there is no element whose base is hidden: the strip with its box and its
-      coordinate, the page it sits on, the compiled claim, the objects bound to the region, the
-      arrivals and the comparison with its engine qualifier are all painted, all at full strength.
-    */
-    for (const selector of [
-      ".lv2-read",
-      ".lv2-region--strip",
-      ".lv2-read-label",
-      ".lv2-locator",
-      ".lv2-claim",
-      ".lv2-demo-stage > .lv2-nodes",
-      ".lv2-demo-stage > .lv2-revision",
-      ".lv2-demo-stage > .lv2-counts",
-      ".lv2-counts-note",
-      ".lv2-nodes-caveat",
-    ]) {
-      const target = page.locator(selector).first();
-      await expect(target, `${selector} is in the composed state`).toBeVisible();
-      expect(
-        await target.evaluate((node) => Number(getComputedStyle(node).opacity)),
-        `${selector} is not at full emphasis`,
-      ).toBe(1);
-    }
-    /*
-      F5: the narration is the FINAL sentence and nothing else.
-
-      Two earlier rounds argued this both ways, and both were right about a hero whose objects
-      took turns: when four panels rotate, the transcript is the only place the whole story
-      exists. That hero is gone -- every object the other six sentences describe is on screen
-      above, at full strength -- so the complete static state §26 asks for is the composition
-      itself, and the last caption is the one written about it.
-    */
-    const captions = page.locator(".lv2-demo-caption");
-    await expect(captions).toHaveCount(7);
-    const opacities = await captions.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).opacity));
-    expect(opacities.filter((value) => Number(value) > 0.05), "one caption reads, and it is the last").toHaveLength(1);
-    expect(Number(opacities[opacities.length - 1]), "the caption that reads is the final beat").toBe(1);
-    /*
-      And the hero's document is not tilted: §22's perspective is a motion-adjacent flourish.
-
-      Scoped: `.lv2-page` is the shared source-page primitive and eight of them are on the page
-      now (Scenes 02, 03 and 04 each render it), which made an unscoped `evaluate` a strict-mode
-      violation rather than a failed assertion. The subject is the hero's stage.
-    */
-    expect(await page.locator("#hero .lv2-page").first().evaluate((node) => getComputedStyle(node).transform)).toBe("none");
+    await expect(control).toHaveAttribute("data-control", "play");
+    // And the film's own words are still on the page: the four stage labels and the caption.
+    await expect(page.locator(`${FILM} [role="tab"]`)).toHaveCount(CUTS.length);
+    const caption = page.locator(`${FILM} .compile-film-caption p`);
+    await expect(caption).toBeVisible();
+    expect((await caption.innerText()).trim().length, "the caption is empty").toBeGreaterThan(0);
+    // The statement under it is unchanged: reduced motion removes movement, not content.
+    await expect(page.locator("#hero .lv2-hero-text h1")).toBeVisible();
+    await expect(page.locator("#hero .lv2-film-note")).toBeVisible();
   });
 });
 

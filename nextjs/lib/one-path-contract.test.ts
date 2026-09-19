@@ -61,19 +61,27 @@ describe("approved one-path experience", () => {
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
   /*
-    Landing V2, 2026-09-19 (D1, D9, §9). Five sections became nine, and the film left the page.
+    Landing V2 (D1, D9, §9), amended by the founder 2026-09-20. Nine scenes, and the film is back.
 
     What this used to pin -- one decoder in the hero, the Hero → Compile → Why → Sources → Start
-    order, and the sentence separating the directed film from what a compile emits -- described a
-    page that no longer exists. The rule it was written for is unchanged and is what is asserted
-    here: the landing runs one ordered story, every scene is a named focusable landmark, and
-    nothing on the page is a recreation that has to be disclosed as one. The film note went with
-    the film; §21 and contract rule 2 now allow the entry pages only committed real rasters and
-    vector UI drawn from real World data, which is a stronger guarantee than a disclosure.
+    order, and the sentence separating the directed film from what a compile emits -- described
+    the five-section replan. Two of the three are true again in a different shape: the hero plays
+    the four locked cuts through ONE player, and the note that separates a directed film from what
+    a compile emits is beside it (§11.3, contract rule 7). The ordering rule is unchanged: the
+    landing runs one ordered story and every scene is a named focusable landmark.
+
+    The decoder is counted on the composition AND on the frame that mounts it, because "one
+    decoder" is the invariant and it is the one a second hand-rolled <video> would break. The
+    composition owns the scene order; `components/landing-v2/hero-film.tsx` owns the film.
   */
-  it("orders the landing as the nine V2 scenes, with no film on the page", () => {
+  it("orders the landing as the nine V2 scenes, with exactly one decoder in the hero", () => {
     const page = text("components/landing-v2/landing-page.tsx");
-    expect(page.match(/<CompileStagePlayer/g), "no decoder on the entry pages").toBeNull();
+    expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
+    const film = text("components/landing-v2/hero-film.tsx");
+    expect(film.match(/<CompileStagePlayer/g), "the hero mounts one player").toHaveLength(1);
+    expect(film, "and routes it to the locked recordings rather than the live canvases")
+      .toContain("preferVideo");
+    expect(film, "with the note §11.3 requires beside it").toContain("filmNote");
     /*
       The order is read off the copy deck each scene is handed -- the one decision the
       composition still makes about all nine. It used to be read off `<Scene scene={copy.<id>}>`,
@@ -112,19 +120,26 @@ describe("approved one-path experience", () => {
   */
   it("names the film and its controls in the language of the page they are on", () => {
     /*
-      Landing V2, 2026-09-19. /ko plays no film, so the half of this that counted its players is
-      gone and the half that is a fact about the component stays.
-
       BQ-013 was the real defect: the player kept the tablist name, the three control names and
       the decoder-failure sentence in English whatever page it was on. None of that is visible
       marketing copy, which is why it survived every copy pass; all of it is the accessible name
-      of a control. The wiring is still there and is still the thing worth guarding -- a film that
-      stops taking the locale fails here, on whichever route grows one next.
+      of a control.
+
+      Amended 2026-09-20: /ko plays the four cuts again, and it reaches them the way the English
+      page does -- through the shared composition, with `korean` passed down. So the page file
+      itself still mounts no player, and the locale now has to travel two ways: into the player's
+      own control names (unchanged, below) and into the four stage labels and captions, which are
+      a Korean table joined to `COMPILE_STAGES` by position rather than a second stage list with its
+      own `src` and `poster` -- the landing-01 defect that painted a blank panel on /ko.
     */
     const ko = text("app/ko/page.tsx");
-    expect(ko.match(/<CompileStagePlayer/g), "the Korean entry page plays no film").toBeNull();
+    expect(ko.match(/<CompileStagePlayer/g), "the Korean entry page mounts its own player").toBeNull();
     expect(ko, "the Korean film may not reuse the English stage labels verbatim")
       .not.toContain("const KO_WORK_STAGES");
+    const film = text("components/landing-v2/hero-film.tsx");
+    expect(film, "the film takes the locale").toContain("korean={korean}");
+    expect(film, "and the Korean captions are copy, joined by position")
+      .toContain("LANDING_V2_FILM_STAGES_KO");
     const player = text("components/compile-stage-player.tsx");
     for (const wired of ["aria-label={text.stages}", "FILM_CONTROL_LABEL_KO[control]", "{text.error}", "text.errorLong"]) {
       expect(player, `${wired} must read the locale, not a literal`).toContain(wired);

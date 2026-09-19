@@ -11,6 +11,7 @@ import {
   type LandingV2Locale,
   type LandingV2ProofCopy,
 } from "@/lib/landing-v2-copy";
+import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
 import { buildProofTabs, type ProofTab } from "@/lib/landing-v2-proof";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
 
@@ -208,6 +209,21 @@ export default function Scene({
         />
 
         {copy.note ? <p className="lv2-scene-note lv2-small">{copy.note}</p> : null}
+
+        {/*
+          The Entity caveat, which this scene inherited on 2026-09-20 rather than wrote.
+
+          /explore publishes a measured precision for the capitalised-token heuristic that names
+          the Entities of this fixed sample, and contract rule 7 requires that caveat to stand
+          wherever the landing shows one of those labels. It used to stand under the hero's entity
+          chips; the founder's centered hero has no chips, and the World this scene opens still
+          has the Entities in it -- so the sentence moves to the first scene that links into that
+          World rather than leaving the page with the composition that happened to print it.
+
+          It is `EXPLORE_COPY.entityCaveatShort`, imported through the campaign's copy module in
+          both languages: the same disclosure, not a shorter second spelling of it.
+        */}
+        <p className="lv2-scene-note lv2-small">{landingV2HeroExtra(locale === "ko").entityDisclaimer}</p>
 
         <p className={styles.nextRow}>
           <Link

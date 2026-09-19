@@ -1,5 +1,6 @@
 /*
-  Landing V2 (blueprint 2026-09-19). Landing-only rules: the nine scenes, the hero demo, the evidence primitives.
+  Landing V2 (blueprint 2026-09-19, hero amended by the founder 2026-09-20). Landing-only rules:
+  the nine scenes, the centered hero and its film frame, and the shared evidence primitives.
   Unlayered on purpose, like one-path.css: it must win over the layered system sheets. Token-only colours.
 
   Everything here is scoped under `.lv2`, the landing root element, for one reason: this sheet
@@ -57,6 +58,12 @@
     stops at 56 -- two pixels of slack kept rather than spent. Below 768 the measure is the
     viewport: 40px sets it in four lines at 390 and 360, and 34-38px in three.
 
+    THE MEASURE IS 760 SINCE THE FOUNDER'S CENTERED HERO (2026-09-20) AND THE STEPS DID NOT MOVE.
+    A wider measure can only set the same string in fewer lines, so every step above stays inside
+    its own cap; what it buys is slack rather than a larger display. Raising the clamp on the
+    strength of that would be a measurement this lane has not made, and an assumed em advance is
+    what put this scale wrong twice already.
+
     §6's 64-92px Display XL is still unreachable in a 600px column, and is still recorded as
     overridden by §6's own 2.2-line cap and §39's hierarchy rule rather than as an oversight.
   */
@@ -98,24 +105,18 @@
   --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
 
   /*
-    The hero demo's resting emphasis (F2), and the number is a contrast measurement.
-
-    F2 sets the floor at 0.55: every object is on screen from the first frame and the sequence
-    only brightens it. The ceiling is WCAG: these blocks are text, and an ancestor's opacity
-    multiplies into the text's contrast where no automated sweep can see it, because the sweep
-    reads `getComputedStyle().color`. The quietest text in the demo is --text-lo (#8b959b) on
-    --ink-950, which measures 6.48:1 at full strength. Blended against that ground it passes 4.5:1
-    down to about 0.80 and fails below it -- 0.78 is 4.30:1 and 0.55 is 2.66:1. So the resting
-    state is 0.85 (4.92:1), the highest number that is still visibly a step below 1 and the lowest
-    that keeps every de-emphasised sentence readable for the twelve seconds before its beat.
+    `--lv2-rest` was declared here: the resting emphasis of the hero demo's sixteen-second
+    sequence, set at 0.85 because that is where --text-lo stops clearing 4.5:1 against --ink-950
+    once an ancestor's opacity multiplies into it. The demo and its sequence left the hero with
+    the founder's 2026-09-20 decision, and a token nothing reads is a measured number waiting to
+    be reused for something it was not measured for.
   */
-  --lv2-rest: 0.85;
 
   color: var(--text-hi);
   font-family: var(--f-sans);
 }
 
-/* Mobile scale (§6). One block, one breakpoint: the hero is recomposed below 768, not shrunk. */
+/* Mobile scale (§6). One block, one breakpoint: the hero stacks below 768, it is not shrunk. */
 @media (max-width: 767px) {
   .lv2 {
     /*
@@ -145,8 +146,9 @@
 @media (min-width: 1200px) {
   .lv2 {
     --lv2-gutter: 48px;
-    /* The desktop display, against the 600px text track below: measured at two lines up to 58px
-       and at three from 60px, so 56 is the step and its slack is measured rather than assumed. */
+    /* The desktop display, measured against a 600px track at two lines up to 58px and at three
+       from 60px, so 56 is the step. The centered block is 760 wide, which is slack on the same
+       measurement rather than a reason to raise the clamp. */
     --lv2-display: clamp(44px, 3.9vw, 56px);
   }
 }
@@ -527,88 +529,70 @@
 .lv2 .btn.lv2-cta { min-height: 48px; padding-inline: 22px; }
 .lv2-paper .btn { color: var(--paper-50); }
 
+
 /* ============================================================================================
-   HERO (§10, §11, §32, §43, D11) -- recomposed 2026-09-19
+   HERO (§10, §32) -- FOUNDER DECISION 2026-09-20: one centered statement, then one visual
    ============================================================================================ */
 
 /*
-  THE COMPOSITION, AND THE ONE §32 NUMBER THAT DID NOT SURVIVE.
+  WHAT THIS REPLACES, AND WHY IT IS NOT §11.1'S SPLIT ANY MORE.
 
-  §32 draws the 1440 hero as a 520px text column and a 708px visual inside the 1296 measure. The
-  first implementation built exactly that, and the QA round measured the consequence: the H1 at
-  the size a 520 measure allows (45px) was SMALLER than every section H2 below it (54px), so the
-  page's most important line was its third-largest. §2.5 and §39 both make hierarchy a gate, and
-  a hierarchy that inverts at the top of the page is not a detail.
+  §11.1 draws the hero as a 42:58 split with a compiled-object composition in the right-hand
+  column, and this sheet built it: a region strip, a page locator, a claim card, two entity chips,
+  the arrivals and the comparison counts, each in its own grid cell, narrated by seven rotating
+  captions over a 16-second timeline. Every one of those objects was real and every figure in it
+  had a receipt, and it still failed the only test that matters at the top of a page -- the
+  founder read it and could not tell what it said. §2.5's own rule is the diagnosis: a premium
+  page is not one with less information, it is one with a clear hierarchy, and nine text blocks at
+  one weight in one column have none.
 
-  The measurement that settles it, read off the rendered page rather than guessed: in Geist at
-  this tracking "Traceable to every source." advances 10.21em and "AI-ready knowledge." 8.97em
-  (ink extents from the 1440 QA capture, where the H1 set at 45.36px and the longer line measured
-  463px). A 56px headline therefore needs about 575px of measure to stay on one line, and §6's
-  2.2-line cap plus §11.1's own two-line drawing require it to.
+  So the hero is the shape every reference site in `reports/landing-v2-0919/compare/` uses. One
+  centered block -- eyebrow, headline, support, two actions, the intake line -- and then one
+  visual under it, full width and unexplained. The visual is the four locked compile films, which
+  the previous landing played and which the founder asked for back.
 
-  The text column is 600 and the visual takes the rest -- 668 at 1440, not 708. That is 42:58, the
-  ratio §32 and D11 draw; the visual gives up 40px of absolute width and the headline gets the
-  measure it needs. Of the two numbers that could not both hold, §32's ratio is the one a visitor
-  reads as the shape of the page, and the display size is the one that gave way.
-
-  Below 1200 the two stack: the text takes the full measure and the demo lays its three blocks
-  across it. There is no band where the desktop stage is simply smaller (§25).
+  THE MEASURE IS 760, NOT THE 600 THE SPLIT NEEDED.
+  A centered block reads as one column, so its measure is set by the headline rather than by a
+  grid track. 760px holds "Traceable to every source." on one line at the 56px display this scale
+  clamps to (the line wants about 575px; see the note over `--lv2-display`), which is what keeps
+  the H1 at two lines and the largest type on the page. The support and the intake line sit inside
+  it at their own measures so the block is not a 760px wall of text.
 */
-.lv2-hero { padding-block: 96px 56px; }
-.lv2-hero-grid { display: grid; gap: 40px; align-items: start; }
+.lv2-hero { padding-block: 88px 40px; }
 
 @media (min-width: 768px) {
-  .lv2-hero { padding-block: 128px 72px; }
+  .lv2-hero { padding-block: 112px 48px; }
+}
+@media (min-width: 1200px) {
+  /*
+    120 rather than §32's content top of 170. That number was measured against a two-column hero
+    whose visual had to start high enough to be read beside the text; here everything below the
+    block is the film, and C1 asks the block to END by about y=560 at 1440x900 so the film's top
+    third is above the fold. 120 + the block's own 360 lands it at about 480.
+  */
+  .lv2-hero { padding-block: 120px 56px; }
 }
 
 /*
-  Content height below the desktop composition, deliberately.
-
-  `.lv2-scene--full` reserves min(900px, 100vh) for the hero, which is right when the hero is two
-  columns and wrong when it is one: at 1024 the stacked composition is already taller than a
-  viewport, and a floor under it only adds emptiness at the bottom. Two classes deep so it beats
-  the shell rule without `!important`.
+  The centered block. `text-align: center` is on the wrapper, so every child inherits it and each
+  one carries only its own measure -- there is no per-element alignment to keep in step.
 */
-@media (max-width: 1199px) {
-  .lv2-hero.lv2-scene--full { min-height: 0; }
+.lv2-hero-text {
+  max-width: 760px;
+  margin-inline: auto;
+  text-align: center;
 }
-
-@media (min-width: 1200px) {
-  /* Content top 170 (§32), including the 64px fixed bar this hero sits under. */
-  .lv2-hero { padding-block: 170px 24px; }
-  /*
-    A clamped text track rather than an `fr` share, and the clamp is measured.
-
-    600 at 1440 is 46% of the 1296 measure and the demo takes the remaining 668, which with this
-    28px gap is 46:54. §32 and D11 write the ratio as 42:58, and this row used to claim 600 WAS
-    42% -- it is not, and the difference is a decision rather than an arithmetic slip: 42% of 1296
-    is 544px, and this headline sets in three lines at that width. The campaign lead settled it on
-    2026-09-19 -- a two-line headline first, the ratio second -- and 46:54 is what a visitor sees. D1 widened this track to 752 so that a 72px headline would hold
-    its longer sentence on one line, and that inverted the ratio to 58:42: measured at 1440, the
-    headline's full stop landed at x~800 against a demo starting at x~845, and the thumbnail's
-    metadata folded to four lines with empty ground beside it. Of the two numbers that could not
-    both hold, §32's composition is the one a visitor reads as the shape of the page; the display
-    size is the one that gave way, and it gave way to a measurement rather than to an assumption.
-
-    An `fr` share would have handed the text 475px at 1200 -- 45px less than the sentence needs --
-    and put the headline on three lines at one width, so the track is clamped instead.
-  */
-  .lv2-hero-grid { grid-template-columns: clamp(520px, 43vw, 600px) minmax(0, 1fr); gap: 28px; }
-}
-
-.lv2-hero-text { min-width: 0; }
 
 /*
   The H1, at the size the hierarchy needs and in the measure that size needs.
 
   `--lv2-display` carries the size (see the top of this file); this element carries the optical
-  settings, which step per breakpoint because tracking that reads as tight at 56px reads as
-  broken at 36px. 22ch is the measure below the desktop composition, where the text spans the
-  full wrap and a 960px line of 40px type would be one long line instead of two short ones; above
-  1200 the grid column is the measure and this cap would only fight it.
+  settings, which step per breakpoint because tracking that reads as tight at 56px reads as broken
+  at 36px. 22ch is the cap below the desktop step, where the viewport rather than the block is the
+  measure; above 1200 the 760px block is the measure and this cap would only fight it.
 */
 .lv2-hero-h1 {
-  margin: 0;
+  margin: 0 auto;
   font-size: var(--lv2-display);
   line-height: 1.04;
   letter-spacing: -0.03em;
@@ -625,264 +609,155 @@
    corrected here rather than by choosing a rounder number for the headline. */
 .lv2-hero-h1 .lv2-serif { font-size: 1.04em; line-height: 0.9; }
 
-/* §6's body measure, 58-72ch, taken over §32's 500px: a 52-character line is not a paragraph. */
+/* §6's body measure, taken over §32's 500px: a 52-character line is not a paragraph. Centred on
+   the block rather than filling it, so the support reads as one sentence under the headline. */
 .lv2-hero-support {
-  margin: 24px 0 0;
+  margin: 22px auto 0;
   font-size: 19px;
   line-height: 30px;
-  max-width: 60ch;
+  max-width: 56ch;
   color: var(--text-mid);
 }
 
-/* §32: CTA row mt32 h48, meta row mt24. */
-.lv2-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin-top: 32px; }
+/* §32: CTA row mt32 h48, meta row mt24. Centred with the block, and the two controls stay side
+   by side until the viewport is too narrow for them (`flex-wrap`). */
+.lv2-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 28px;
+  margin-top: 32px;
+}
 /* D10: commas are the only break points in the run; the connector clause is one phrase. */
-.lv2-hero-intake { margin: 24px 0 0; color: var(--text-lo); max-width: 60ch; overflow-wrap: normal; }
+.lv2-hero-intake {
+  margin: 24px auto 0;
+  color: var(--text-lo);
+  max-width: 60ch;
+  overflow-wrap: normal;
+}
 .lv2-hero-intake-tail { white-space: nowrap; }
 
 /* ============================================================================================
-   HERO DEMO (§11.1, §22, §28, §43, D11) -- DOM and CSS, no canvas, no video, no SVG
+   THE HERO FILM (§11.3, contract rules 3 and 7) -- the four locked cuts, under the statement
    ============================================================================================ */
 
-.lv2-demo { min-width: 0; }
+/*
+  `components/landing-v2/hero-film.tsx` mounts the site's one film player; every rule the player
+  itself needs is already in `app/tavonel.css`, which loads on every route. What is here is only
+  the landing's frame around it, and there are three things in that frame.
+
+  THE WIDTH IS CAPPED BY THE VIEWPORT'S HEIGHT, NOT ONLY BY ITS WIDTH.
+  The frame keeps the cuts' own 1440x900, so its height is its width over 1.6 -- and at 1120px
+  that is 700px of film under a 360px block of text, which is a hero of about 1.6 viewports on the
+  commonest laptop. C6 caps it at 1.3. A width cap alone cannot express that, because the thing
+  being bounded is the sum of a fixed block and a ratio, so the cap is written in the unit the
+  bound is in: `100svh` minus what the statement, the note and the padding take, times the film's
+  own ratio. `svh` rather than `vh` so a phone's retracting toolbar does not resize the film under
+  the reader. The 520px floor is what stops a short window from shrinking the film to a thumbnail,
+  and `min(100%, ...)` keeps it inside the wrap at every width.
+
+  The 545px subtrahend is MEASURED, not estimated: on the built server at 1440x900 the English
+  hero spends 120px of top padding, 390px of statement, 40px of gap to the film, 46px of tab
+  strip, 32px of the sequence gaps, 21px of caption, 73px of note and 56px of bottom padding --
+  everything except the frame itself. It is re-derived, not nudged, whenever that chrome changes.
+
+  IT IS THE CUTS' RATIO AND NOT 16:9. The films are 1440x900 and their bytes are locked
+  (`lib/locked-film-assets.json`). A 16:9 frame over a 16:10 recording either crops the top and
+  bottom of a cut that composes to its own edges, or pillarboxes it -- so the frame takes the
+  shape of what is in it. Reported as a deliberate deviation rather than silently met.
+
+  THE TAB IS 44px AT EVERY WIDTH. `app/tavonel.css` raises the stage tabs to the touch floor only
+  under `(pointer: coarse)`, which is a real device and not the 390px project this campaign's QA
+  runs. A tab that is 40px tall under a thumb is 40px tall whatever the pointer reports, so the
+  floor is unconditional here.
+*/
+.lv2-film {
+  margin-top: 40px;
+  --lv2-film-w: 1120px;
+}
+@media (min-width: 768px) {
+  .lv2-film { margin-top: 56px; }
+}
+@media (min-width: 900px) {
+  .lv2-film { --lv2-film-w: min(1120px, max(520px, calc((100svh - 545px) * 1.6))); }
+}
+
+.lv2-film .compile-film-sequence { gap: 16px; }
+.lv2-film .compile-film-stages,
+.lv2-film .compile-film-viewport,
+.lv2-film .compile-film-caption {
+  width: min(100%, var(--lv2-film-w));
+  margin-inline: auto;
+}
+.lv2-film .compile-film-stages button { min-height: 44px; }
+/*
+  `min-height` is cleared because `app/tavonel.css` sets `clamp(430px, 52vw, 850px)` on this box
+  for the retired landing's full-bleed frame; with the aspect ratio doing the work here, a floor
+  taller than the ratio's height would letterbox the cut inside its own frame.
+*/
+.lv2-film .compile-film-viewport {
+  min-height: 0;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-md);
+  background: var(--ink-900);
+  /*
+    `app/one-path.css` turns this frame into a horizontal scroller below 900px (G1-012): the
+    retired landing sized the recording off the frame's HEIGHT there and panned across it, because
+    the live canvas draws a fixed four-column stage that a 350px frame crushes rather than
+    shrinks. The rules that made the recording overflow went with that landing; what is left is a
+    scroll container with nothing in it that is wider than itself -- a scrollbar gutter, a
+    swipe that does nothing, and a snap axis on a box with one pane.
+
+    This hero plays a RECORDING at every width, so it has no crushing to avoid: the cut scales
+    down whole and stays legible as a film. The frame is a frame again, and the four snap targets
+    the pan needed are hidden with the scrolling they were targets for.
+  */
+  overflow: hidden;
+}
+.lv2-film .compile-film-panes { display: none; }
+.lv2-film .compile-film-caption p { color: var(--text-mid); }
 
 /*
-  THE PHONE STAGE (< 768), AND WHY IT IS THREE TRACKS RATHER THAN ONE (F4, 2026-09-19).
-
-  Six objects stacked one per row measured 1,384px of content at 390 before the text column above
-  them, which is two viewports of hero on the surface contract rule 12 makes part of done. Six
-  tracks let each row take the split its own content wants, and each split below was measured at
-  390 rather than chosen: a thumbnail beside a paragraph wants 2:4 (at 3:3 the locator is bigger
-  than it needs and the claim sets 20 characters wide), and the chips beside the arrivals want 4:2
-  (at 4:2 the snapshot step wraps to fifteen lines in a 107px column -- 441px of hero for four
-  filing dates). The DOM order stays §25's vertical narrative either way: the region that was
-  read, where it sits on the filing, what was compiled out of it, the objects bound to it, what
-  arrived later and what the recompile compared.
-
-  ROW GAP IS ZERO AND THE LOWER ROWS CARRY THEIR OWN MARGIN. Each block in the row under the strip
-  begins with its own Evidence Line, and a line that stops 14px short of the thing it points at is
-  not a connector -- so the seam between row 1 and row 2 has to be the line's, not the grid's.
+  The sentence that separates a directed film from what a compile emits (§11.3, contract rule 7).
+  It is the film's own footnote, so it is set at metadata weight and sits with the frame rather
+  than under the page.
 */
-.lv2-demo-stage {
+.lv2-film-note {
+  margin: 14px auto 0;
+  max-width: 96ch;
+  color: var(--text-lo);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ============================================================================================
+   THE EVIDENCE PRIMITIVES (§4.1, §22, D10) -- shared by Scenes 02, 03, 04 and 05
+   ============================================================================================ */
+
+/*
+  These four were written for the hero and outlived it. They are the design primitives D10 asks
+  for -- token-only, copy-free, positioned by their caller -- and the proof scenes render every
+  one of them, so the rules stay here as base rules with no hero modifiers left on them.
+*/
+.lv2-page {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-areas:
-    "read     read     read    read     read     read"
-    "locator  locator  claim   claim    claim    claim"
-    "nodes    nodes    nodes   nodes    arrivals arrivals"
-    "counts   counts   counts  counts   counts   counts";
-  align-items: start;
-  column-gap: 14px;
-  row-gap: 0;
-}
-.lv2-read { grid-area: read; }
-.lv2-locator { grid-area: locator; }
-.lv2-claim-block { grid-area: claim; }
-/* Scoped to the stage's own children: `.lv2-nodes`, `.lv2-revision` and `.lv2-counts` are D10
-   primitives and Scene 05 renders two of them in a layout of its own. */
-.lv2-demo-stage > .lv2-nodes { grid-area: nodes; }
-.lv2-demo-stage > .lv2-revision { grid-area: arrivals; max-width: none; }
-.lv2-demo-stage > .lv2-counts { grid-area: counts; }
-/* The seam the zero row-gap leaves out, on the rows that have no Evidence Line to draw. */
-.lv2-demo-stage > .lv2-revision,
-.lv2-demo-stage > .lv2-counts { margin-top: 18px; }
-@media (max-width: 767px) {
-  /* The objects sit in row 3 here and in row 2 at desktop, so their seam is width-dependent. */
-  .lv2-demo-stage > .lv2-nodes { margin-top: 18px; }
-}
-
-.lv2-demo-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-/*
-  F4: no sequence below 768, so no narration and no play/pause control.
-
-  A control that cannot start anything is a 44px target that lies, and seven captions describing
-  beats that will not play are seven sentences about a picture that is already complete. Hidden
-  rather than conditionally rendered: the first frame is the server's (§27), and a control whose
-  presence depended on a client-side width read would arrive after first paint or not at all.
-  `display: none` also takes it out of the tab order, so the phone's keyboard path is honest.
-*/
-@media (max-width: 767px) {
-  .lv2-demo-foot { display: none; }
-}
-
-/*
-  The eight beats as text, stacked in one slot with one visible at a time. The stack is what keeps
-  the row height constant while the sentence changes; the reduced-motion block at the end of this
-  file unstacks it into a list, which is the complete state §26 asks for when movement is what
-  carries the information.
-
-  Two of its own lines are reserved, not three: the captions are one sentence each and the widest
-  of them sets in two lines in the narrowest row this foot has. Reserving the box in the
-  captions' own units rather than in the inherited ones is what made the 1440 layout shift zero
-  (CLS 0.02 in an earlier round, sources OL.lv2-demo-captions and LI.lv2-demo-caption).
-*/
-.lv2-demo-captions {
-  position: relative;
-  flex: 1 1 260px;
-  min-width: 0;
-  font-size: var(--lv2-small);
-  line-height: 1.45;
-  min-height: calc(2 * 1.45em);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.lv2-demo-caption { position: absolute; inset: 0; margin: 0; color: var(--text-mid); opacity: 0; }
-/* The last beat is the resting state: it is what is on screen through the two-second hold, what
-   a paused loop shows, and -- since F5 -- the whole of the reduced-motion narration. */
-.lv2-cap-7 { opacity: 1; }
-
-.lv2-demo-control {
-  order: -1;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid var(--hairline-hi);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-hi);
-  font-family: var(--f-mono);
-  font-size: var(--lv2-meta);
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: border-color var(--motion-ui) var(--ease-ui);
-}
-@media (hover: hover) and (pointer: fine) {
-  .lv2-demo-control:hover { border-color: var(--source); }
-}
-/* Two bars while it is playing (press to pause), one triangle while it is paused. Shape, not
-   colour, and the label beside it says the same thing in words. */
-.lv2-demo-control-glyph {
-  width: 10px;
-  height: 11px;
-  border-left: 3px solid currentColor;
-  border-right: 3px solid currentColor;
-}
-.lv2-demo[data-playing="0"] .lv2-demo-control-glyph {
-  width: 0;
-  height: 0;
-  border-left: 9px solid currentColor;
-  border-right: 0;
-  border-block: 6px solid transparent;
-}
-
-/* ------------------------------------------------------------------------------ the READ strip */
-
-/*
-  §22 and §43's key visual: the region itself, at the size its own words can be read.
-
-  The strip is the committed crop of the exact per-mille box the compiler stored, so the outline
-  around it is not drawn over a page -- it IS the box, which is why `SourceStrip` passes the whole
-  image as the region. The fill sits at the quiet end of §22's 4-7% band because here the wash
-  covers the thing being read rather than marking it out on a page.
-*/
-.lv2-read { margin: 0; display: grid; gap: 8px; }
-.lv2-read-frame {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: block;
   overflow: hidden;
   border-radius: var(--r-paper-lg);
-  background: var(--paper-50);
   box-shadow: var(--lv2-paper-shadow);
 }
-.lv2-read-img { display: block; width: 100%; height: auto; }
-.lv2-read-img--b { display: none; }
-.lv2-region--strip::before { opacity: 0.04; }
-
-/*
-  The phone re-flow, and why it is two elements rather than a scroller.
-
-  The crop is about eight times wider than it is tall. Across 350px that is six-pixel glyphs -- a
-  picture of a document instead of a document -- and both alternatives are worse: a horizontally
-  scrollable strip is a drag-only interaction unless it is also a focus stop, and shrinking the
-  region to fit throws away the one thing the hero exists for. So the crop is re-flowed as two
-  stacked halves, each showing one end of the same line at the scale the desktop strip shows it.
-
-  HOW THE HALF IS TAKEN, AND WHY IT IS NOT `width: 200%` ANY MORE (QA round 4).
-  It used to be: each element was laid out at twice the column and the frame clipped it. That
-  made the element itself 680px wide inside a 350px viewport, which `e2e/overflow-audit.spec.ts`
-  fails by design -- its rule is per element and it exempts only `overflow-x: auto/scroll`,
-  because "hidden is what turns a defect invisible". It also broke the resolution: `sizes`
-  resolved to the COLUMN width, so the browser fetched a 350px-wide resource and the layout
-  painted it at 700px, a 2.00x upscale on the one raster that has to read as a real document.
-
-  The half is taken by the painting rather than by the box now. The element is the column wide,
-  `aspect-ratio` gives it half the crop's shape (`--lv2-read-half-ar`, written by `SourceStrip`
-  from the derivative's own intrinsic size, so the ratio cannot drift from the bytes), and
-  `object-fit: cover` + `object-position` paints the left or the right end of the crop inside it.
-  Same picture, same scale, and the element is inside the viewport. `HERO_IMAGE_SIZES` states the
-  doubled width below 768 so the resource the browser picks is the one that is painted.
-*/
-@media (max-width: 767px) {
-  .lv2-read-frame { row-gap: 3px; }
-  .lv2-read-img {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    aspect-ratio: var(--lv2-read-half-ar);
-    object-fit: cover;
-    object-position: 0% 50%;
-  }
-  .lv2-read-img--b { display: block; object-position: 100% 50%; }
-}
-
-/*
-  §4.1's coordinate label: a receipt a reader calls up, not a permanent caption.
-
-  It reads on the Verify beat and whenever a compiled object is hovered or focused (the signature
-  rules further down), and it holds its place in the layout the rest of the time so nothing moves
-  when it appears. Under reduced motion it is simply there, which is the base style.
-*/
-.lv2-read-label {
-  margin: 0;
-  justify-self: end;
-  text-align: right;
-  color: var(--text-mid);
-  /* The signature's label step, at the same speed Scene 02 and Scene 04 run it (§4.1). */
-  transition: color var(--motion-ui) var(--ease-ui);
-}
-.lv2-read-unit { color: var(--text-lo); }
-
-/* -------------------------------------------------------------------------------- the LOCATOR */
-
-/*
-  Where that strip is on the filing: the whole page, small, with the same box drawn on it, and one
-  line of metadata under it. The hairline is the Evidence Line between the strip and the box on
-  that thumbnail -- it reaches the box itself, not the page's edge (§4.1).
-
-  `container-type: inline-size` is what lets the line below say "down to the box" as a fraction of
-  the RENDERED page: the thumbnail is this container's full width, so `100cqw` times the raster's
-  own aspect ratio is the page's height at any width -- nothing measured at runtime, no number
-  typed into this sheet.
-
-  Row gap 0, with the caption carrying the space it used to get from the gap: a line that stops
-  8px short of the thing it points at is not a connector.
-*/
-.lv2-locator { margin: 0; display: grid; row-gap: 0; justify-items: stretch; max-width: 220px; container-type: inline-size; }
-.lv2-locator-meta { margin-top: 8px; color: var(--text-mid); }
-
-.lv2-page { position: relative; display: block; overflow: hidden; border-radius: var(--r-paper-lg); box-shadow: var(--lv2-paper-shadow); }
 .lv2-page-img { display: block; width: 100%; height: auto; }
 
 /* §22: 1px Source Blue on the box, a 4-7% fill behind it, and nothing else drawn on the page. */
 .lv2-region { position: absolute; border: 1px solid var(--source); border-radius: 2px; }
 .lv2-region::before { content: ""; position: absolute; inset: 0; background: var(--source); opacity: 0.06; }
 
-/* ------------------------------------------------------------------------- the evidence lines */
-
 /*
   §4.1. One hairline, one meaning: a compiled object came from a source region. It is a 1px column
   rather than an SVG path because a `<span>` with a background scales correctly at every width
   without a viewBox to keep in step with the layout around it, and `scaleY` from the top is the
-  whole of the "draw".
-
-  Two of them on this stage, and each says a different true thing. The locator's runs from the
-  outlined box on the thumbnail up to the strip ("this strip is that box"); the claim's runs from
-  the strip's right end down into the card ("this card was compiled out of it").
+  whole of the "draw". The caller positions it and says which relation it carries.
 */
 .lv2-line {
   display: block;
@@ -893,100 +768,8 @@
   transform-origin: top;
 }
 .lv2-line--relation { background: var(--relation); }
-/*
-  The hero's two, and they are the modifiers rather than the base because the base is shared: the
-  Evidence, Proof and Sources scenes all draw their own connector from `.lv2-line` and take its
-  36px column as given. 18px is the stage's row gap here -- the line spans exactly the distance
-  between the strip and the block it reaches, and a line that overshoots is a line that means
-  something else.
 
-  THE LOCATOR'S LINE GOES ONTO THE BOX (round 3 design review).
-  It used to be exactly the 18px of gap, which made it a tick floating between two things and
-  touching neither. Now it runs from the strip down THROUGH the thumbnail to the top edge of the
-  outlined region, at the region's own horizontal centre -- the three fractions come from the same
-  `bbox1000` the outline is drawn from (`hero-compiler-demo.tsx` writes them as custom properties),
-  so the line cannot point somewhere the box is not.
-
-  `margin-bottom` gives the extra length back to the layout, so the row is still the 18px the
-  composition was measured with and the thumbnail does not move; `z-index` puts the hairline over
-  the raster it crosses, which is otherwise painted after it.
-*/
-.lv2-line--locator {
-  position: relative;
-  z-index: 1;
-  justify-self: start;
-  height: calc(18px + 100cqw * var(--lv2-page-ar) * var(--lv2-region-top));
-  margin-bottom: calc(-100cqw * var(--lv2-page-ar) * var(--lv2-region-top));
-  margin-left: calc((100% - 1px) * var(--lv2-region-midx));
-  margin-right: 0;
-}
-.lv2-line--claim { height: 18px; margin-left: 0; justify-self: end; margin-right: 28px; }
-
-/* ------------------------------------------------------------------------- the compiled claim */
-
-.lv2-claim-block { display: grid; align-content: start; }
-
-.lv2-claim {
-  display: grid;
-  gap: 10px;
-  padding: 16px 18px;
-  border: 1px solid var(--hairline-hi);
-  border-radius: var(--radius-md);
-  background: var(--ink-900);
-  color: var(--text-hi);
-  text-decoration: none;
-  transition: border-color var(--motion-ui) var(--ease-ui);
-}
-@media (hover: hover) and (pointer: fine) {
-  .lv2-claim:hover { border-color: var(--source); }
-}
-.lv2-claim-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; color: var(--text-lo); }
-.lv2-claim-kind { text-transform: uppercase; letter-spacing: 0.08em; }
-/*
-  The dot takes its colour from the state, not from the tone of the sentence around it.
-  `candidate` is this deterministic public sample's state -- PUBLISHED SAMPLE -- and it is
-  deliberately NOT mint: §5.2 fixes mint to "verified", and a sample nobody has verified painted
-  in the verified colour is the exact drift the semantic table exists to stop. Colour is never the
-  carrier either: the dot is beside the word, and the word is the World's own.
-*/
-.lv2-claim-state { display: inline-flex; align-items: center; gap: 7px; color: var(--text-mid); }
-.lv2-claim-state[data-state="current"] { color: var(--verified); }
-.lv2-claim-state[data-state="changed"] { color: var(--changed); }
-.lv2-claim-state[data-state="unresolved"] { color: var(--unresolved); }
-.lv2-claim-state i { width: 6px; height: 6px; border-radius: var(--r-full); background: currentColor; }
-.lv2-claim-text { font-size: 14px; line-height: 1.55; color: var(--text-mid); }
-
-/* ------------------------------------------------------------------- the objects, in own cells
-
-  THERE IS NO SLOT ANY MORE (F2, 2026-09-19).
-
-  Four of the six objects used to live in one rotating box: Structure, Change, Recompile and Use
-  shared a grid cell with a static stack, one legible at a time. Three measurements ended it.
-
-    - The cell was as tall as the tallest of the five (469px at 1440) for all sixteen seconds and
-      showed that panel for three of them, which is where the hero's empty ground came from.
-    - The resting stack and the beats restated each other, so the objects had to be hidden from
-      the stack at >=1200 -- and that hiding is what broke `e2e/landing-v2.spec.ts:553`. The spec
-      was right; the composition that hid the row it asserted was the defect (F1).
-    - At t=0 the fold showed a strip, a thumbnail and about 450px of nothing.
-
-  So each object is a grid cell of its own, in flow, painted from the first frame, and the
-  sequence decides only which one is EMPHASISED. Every height below is the height of real content
-  at that width: there is no reservation and nothing can paint over anything.
-
-  The snapshot step loses its chrome because the border belonged to a panel that floated over
-  other panels; in its own cell beside the counts it is a row of metadata with a list under it.
-  Measured on the phone the chrome cost more than it said: 32px of padding out of a 168px cell,
-  which pushed the step's own label to three lines. Dropped here rather than in `RevisionBadge`,
-  which Scene 05 also renders (D10: the primitive is shared, this landing's composition is not).
-*/
-.lv2-demo-stage > .lv2-revision { padding: 0; border: 0; background: none; }
-.lv2-demo-stage > .lv2-revision .lv2-revision-step { display: flex; flex-wrap: wrap; gap: 0 6px; }
-
-/* --------------------------------------------------------------------------- the snapshot step */
-
-/* The measure stays on the base rule: the Recompile scene renders this primitive too, and the
-   hero's slot is narrower than 300 at every width, so it constrains the panel on its own. */
+/* The snapshot step and the filings that arrived on top of it -- Scene 05's panel (D10). */
 .lv2-revision {
   display: grid;
   gap: 8px;
@@ -1004,374 +787,6 @@
 /* Amber is the arrival colour (§5.2); the form and the date beside it are what it means. */
 .lv2-revision-list li { display: flex; align-items: center; gap: 8px; color: var(--changed); }
 .lv2-revision-list i { width: 5px; height: 5px; background: currentColor; flex: none; }
-
-/* ----------------------------------------------------------------------- the comparison counts */
-
-/*
-  Each figure printed with the noun that says what it counts (contract rule 4), and the engine
-  that produced them printed under the group (BA-034). `removed` reaches the page only when it is
-  not zero: a zero with a state word under it reads as a result rather than as an absence.
-
-  Rebuilt crosses from amber to mint over its beat, because that is the state change the
-  comparison reports; added is mint, and untouched is grey because it is not a state change.
-*/
-.lv2-counts { display: grid; gap: 8px; }
-/* The noun the figures count, above them. Without it they are numbers of nothing. */
-.lv2-counts-title { margin: 0; color: var(--text-lo); text-transform: uppercase; letter-spacing: 0.08em; }
-.lv2-counts-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
-  gap: 10px 16px;
-}
-.lv2-count { display: grid; gap: 2px; }
-.lv2-count b { font-size: 20px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums; }
-.lv2-count span { color: var(--text-lo); }
-/*
-  ROUND3-P1. One measured figure, one semantic colour, on the whole page.
-
-  `exploreChangeStory.counts.rebuilt` is printed here and again in Scene 05. The hero used to
-  paint it mint at rest and cross it to mint from amber for one twelfth of the loop, so at first
-  paint, during the hold, while paused, in every screenshot and permanently under reduced motion
-  (where the sheet collapses the animation to 1ms and the element reverts to its base style) the
-  same number was mint here and amber four scenes down. §5.2 bars a semantic colour meaning two
-  things, and mint is `verified` in the D4 table while every object in this World is `candidate`
-  ("PUBLISHED SAMPLE") -- which is exactly the rule `scenes/recompile.tsx` states in its own
-  header and obeys. So the rest colour is the changed colour, and the keyframe is gone.
-
-  `added` loses mint for the same reason: a partition of a diff is not something anything
-  verified. `--verified` stays where the data really does record it, on `data-state="current"`.
-  `lib/landing-v2-tokens.test.ts` pins these against Scene 05's sheet so they cannot drift apart.
-*/
-.lv2-count--rebuilt b { color: var(--changed); }
-.lv2-count--added b { color: var(--text-hi); }
-.lv2-count--removed b { color: var(--text-mid); }
-.lv2-count--untouched b { color: var(--text-mid); }
-/* BA-034: the engine is named where the figure is printed, not four scenes further down. */
-.lv2-counts-note { margin: 0; color: var(--text-lo); }
-/* The method under the engine: same voice, one step quieter, and it wraps to the counts' measure. */
-.lv2-counts-contract { margin: 6px 0 0; color: var(--text-lo); max-width: 62ch; }
-
-/* --------------------------------------------------------------------------- the bound objects */
-
-/*
-  The objects the compiler bound to this region. The caption under them says what they are and
-  whose emission they are, which is the honest form of a beat drawn from a fixed sample -- and the
-  Entity labels carry /explore's heuristic caveat in their own title as well.
-*/
-.lv2-nodes { display: grid; gap: 8px; }
-.lv2-nodes-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.lv2-nodes-note { margin: 0; color: var(--text-lo); }
-/* ROUND3-P1: /explore's own Entity caveat, printed rather than hidden in a title attribute. */
-.lv2-nodes-caveat { margin: 0; color: var(--text-lo); max-width: 62ch; }
-
-/* Violet down the edge is the relation (§5.2); the predicate is spelled in words on every row. */
-.lv2-node {
-  display: grid;
-  gap: 3px;
-  padding: 9px 12px;
-  border: 1px solid var(--hairline);
-  border-left: 2px solid var(--relation);
-  border-radius: var(--radius-sm);
-  background: var(--ink-850);
-  text-decoration: none;
-  transition: border-color var(--motion-ui) var(--ease-ui);
-}
-@media (hover: hover) and (pointer: fine) {
-  .lv2-node:hover { border-color: var(--relation); }
-}
-.lv2-node-label { font-size: 14px; line-height: 1.35; font-weight: 500; color: var(--text-hi); }
-.lv2-node-meta { color: var(--text-lo); }
-/* Which node the relation leaves. It reads quieter than the predicate but it is on every row. */
-.lv2-node-via { color: var(--text-lo); }
-.lv2-node-rel { color: var(--relation); font-weight: 400; }
-
-/* ============================================================================================
-   THE DESKTOP COMPOSITION (>= 768) -- §11.1's blocks, each in its own cell
-   ============================================================================================ */
-
-/*
-  A grid, and the reason it is a grid is the reason two earlier rounds overlapped: rows and
-  columns size to their content, so the arrangement holds for any excerpt length, any locale and
-  any font fallback, and the 1440 screenshot stops being the only thing that knows whether the
-  hero is correct. §39's gate is "text overlap 0"; a grid cannot produce one.
-
-  THE ARRANGEMENT (F2)
-    row 1, full width   the READ strip -- the region, readable
-    row 2, three tracks the LOCATOR (where it is), the CLAIM (what came out of it) and the NODES
-                        (what the compiler bound to it)
-    row 3, two cells    the ARRIVALS (what landed later) and the COUNTS (what the recompile
-                        compared), compact
-
-  THE BAND FROM 768 TO 1199 IS THIS COMPOSITION TOO, and that is a change. It used to render the
-  phone stack at desktop width, which is the defect `.lv2-split` already records for the scenes
-  below; the hero's grid is fraction-based, so at 704px of wrap the same three tracks come out at
-  166/231/247 and the arrangement holds without a band of its own.
-
-  THE HEIGHT. There is no frame and no aspect-ratio. An earlier round set `aspect-ratio: 708/600`
-  with `min-height: fit-content` as an escape hatch, on the reading that the ratio was "a floor on
-  the frame, never a cap on the content"; measured, it was a cap, and 464px of the slot painted
-  over the caption row. §32's proportion survives as the COLUMN widths (668 at 1440) rather than
-  as a box, and the height is what the composition needs -- which is now the same number as the
-  content, because nothing reserves anything.
-
-  The row gap between the strip and row 2 is zero on purpose: each block there begins with its own
-  Evidence Line, and a line that does not touch the strip above it means nothing. Row 3 carries
-  its own margin instead (see the base rules further up).
-*/
-@media (min-width: 768px) {
-  .lv2-demo-stage {
-    /*
-      165 : 230 : 245 of the 640 the two gaps leave at 1440.
-
-      Measured, in this order. The thumbnail is the block that needs width least -- it is a
-      locator, not a reading surface -- and 165 is where its metadata line stops folding to five
-      lines. The objects need the most: their two chips carry a mono line each and the F3 caveat
-      under them, and at 215 those set in three lines and four; at 245 they set in two and three,
-      which is 56px of hero. The claim takes what is left, and at 230 its 180-character passage
-      sets in seven lines of about 29 characters -- a quotation, not a column of body copy.
-    */
-    grid-template-columns: minmax(0, 165fr) minmax(0, 230fr) minmax(0, 245fr);
-    grid-template-areas:
-      "read     read   read"
-      "locator  claim  nodes"
-      "arrivals counts counts";
-  }
-  .lv2-locator { max-width: none; }
-  /*
-    §22: a 1-2 degree perspective, on the page thumbnail only. Any more and a real document starts
-    to look like a rendering of one, which is what §21 exists to prevent. The strip is never
-    tilted -- it is there to be read.
-  */
-  .lv2-locator .lv2-page { transform: perspective(1600px) rotateY(-1.6deg); }
-}
-
-/* ============================================================================================
-   THE SEQUENCE (§11.2) -- one 16s timeline, 14s of beats and a 2s hold
-   ============================================================================================ */
-
-/*
-  Percentages are seconds over sixteen, and the fourteen are seven beats of two.
-
-  Every element's base style is its FINISHED state and its keyframes take it back to
-  `--lv2-rest` and return it. That is what makes the reduced-motion collapse at the top of this
-  file land on a composed hero rather than on an empty one -- and, since F2 removed the rotating
-  slot, there is no longer any element whose base style is hidden, so the collapse lands on
-  exactly the state the loop's two-second hold shows.
-*/
-/*
-  EVERY BINDING BELOW IS SCOPED TO `.lv2-demo`, AND THAT IS NOT TIDINESS.
-
-  `.lv2-region`, `.lv2-line`, `.lv2-claim` and `.lv2-claim-state` are D10 PRIMITIVES, and
-  Scene 02 and Scene 04 render three of them far below the fold. Unscoped, those scenes inherited
-  this stage's 16-second loop: Scene 02's box on the page vanished for the first 1.2s of every
-  cycle and faded back over the next 1.2s, on a scene that has no sequence at all. Scene 04 had
-  already worked around it locally (`animation: none` in its own sheet); Scene 02 had not, and
-  nothing would have told anyone. The loop belongs to the demo, so the demo is what names it.
-
-  It is also what makes the pause rule below complete: every animation on this landing is now a
-  descendant of `.lv2-demo`, so `animation-play-state: paused` on `.lv2-demo *` reaches all of
-  them. An animation outside this subtree would have no control, no hover pause and no observer.
-*/
-/*
-  F4: THE SEQUENCE EXISTS AT 768 AND UP, AND NOWHERE ELSE.
-
-  Below it the hero is the static complete composition -- every object at full strength, no
-  rotation, no narration row and no control. The whole of that decision is this one query: with no
-  binding inside it, every element on the phone renders its base style, which is its finished
-  state. `hero-compiler-demo.tsx` reads the same width before it creates the IntersectionObserver,
-  so the phone pays for no scroll callback either.
-*/
-@media (min-width: 768px) {
-.lv2-demo .lv2-read,
-.lv2-demo .lv2-locator,
-.lv2-demo .lv2-read-label,
-.lv2-demo .lv2-region,
-.lv2-demo .lv2-locator .lv2-region::before,
-.lv2-demo .lv2-line,
-.lv2-demo .lv2-claim,
-.lv2-demo .lv2-claim-state,
-.lv2-demo .lv2-claim-state i,
-.lv2-demo .lv2-nodes,
-.lv2-demo .lv2-revision,
-.lv2-demo .lv2-counts,
-.lv2-demo .lv2-demo-caption {
-  animation-duration: 16s;
-  animation-iteration-count: infinite;
-  animation-timing-function: var(--ease-scene);
-}
-
-/* 0-2s Source: the strip and the page it was cut from come to full strength together. */
-.lv2-demo .lv2-read { animation-name: lv2-e-source; }
-.lv2-demo .lv2-locator { animation-name: lv2-e-source; }
-/* 2-4s Read: the box brightens on both, pulses once on the page, and the line is drawn to it. */
-.lv2-demo .lv2-region { animation-name: lv2-e-region; }
-.lv2-demo .lv2-locator .lv2-region::before { animation-name: lv2-e-region-fill; }
-.lv2-demo .lv2-line--locator { animation-name: lv2-b-read-line; }
-/* 4-6s Compile: the line draws down from the strip and the claim comes to full strength. */
-.lv2-demo .lv2-line--claim { animation-name: lv2-b-claim-line; }
-.lv2-demo .lv2-claim { animation-name: lv2-e-claim; }
-/* 6-8s Structure: the objects the compiler bound to that region. */
-.lv2-demo .lv2-nodes { animation-name: lv2-e-nodes; }
-/*
-  8-10s Verify: the state the World gives the object, one pulse that says it was just read off the
-  record, and the coordinate that locates it.
-
-  THE STATE USED TO FADE IN OVER THE WHOLE BEAT, which is not a state change, it is a dissolve.
-  §11.2 asks for the dot to PULSE ONCE here. So the pair arrives at motion-fast speed and the dot
-  swells once, 360ms, and stops -- `lv2-b-pulse` holds `transform: none` for the other 15.6
-  seconds, so it is a single event on the timeline rather than a heartbeat.
-*/
-.lv2-demo .lv2-claim-state { animation-name: lv2-e-verify; }
-.lv2-demo .lv2-claim-state i { animation-name: lv2-b-pulse; }
-.lv2-demo .lv2-read-label { animation-name: lv2-e-coordinate; }
-/* 10-12s Change: the filings that arrived on top of the baseline. */
-.lv2-demo .lv2-revision { animation-name: lv2-e-arrivals; }
-/* 12-14s Recompile: the comparison between the two complete compiles. Then the 2-second hold. */
-.lv2-demo .lv2-counts { animation-name: lv2-e-counts; }
-
-.lv2-demo .lv2-cap-1 { animation-name: lv2-cap-1; }
-.lv2-demo .lv2-cap-2 { animation-name: lv2-cap-2; }
-.lv2-demo .lv2-cap-3 { animation-name: lv2-cap-3; }
-.lv2-demo .lv2-cap-4 { animation-name: lv2-cap-4; }
-.lv2-demo .lv2-cap-5 { animation-name: lv2-cap-5; }
-.lv2-demo .lv2-cap-6 { animation-name: lv2-cap-6; }
-.lv2-demo .lv2-cap-7 { animation-name: lv2-cap-7; }
-}
-
-/*
-  §23: the loop never disturbs reading, and it never runs for nobody.
-
-  It stops while a pointer is over the demo, while focus is inside it, whenever the reader says
-  so, and whenever no part of the demo is on screen -- `data-offscreen` is written by the
-  IntersectionObserver in `hero-compiler-demo.tsx`. One mechanism for all four, so they cannot
-  disagree about whether the sequence is running. Left outside the 768 query deliberately: a rule
-  that pauses animations that do not exist costs nothing and cannot fall out of step with them.
-*/
-.lv2-demo[data-playing="0"] *,
-.lv2-demo[data-offscreen="1"] *,
-.lv2-demo:hover *,
-.lv2-demo:focus-within * { animation-play-state: paused; }
-
-/* ------------------------------------------------------------------------------- the keyframes */
-
-/*
-  EVERY OBJECT RESTS AT `--lv2-rest` AND ITS BEAT TAKES IT TO 1, WHERE IT STAYS.
-
-  Two consequences, and both are the point. The hold from 14s to 16s is the whole hero at full
-  strength rather than one surviving panel, so a screenshot at any instant is a complete
-  composition; and the base style of every element is opacity 1, so the reduced-motion collapse at
-  the top of this file lands exactly on the hold state with no second stack to stand in for it.
-
-  Each rise takes --motion-fast (140ms = 0.875% of sixteen seconds) at the START of its beat, so
-  the beat's caption and the object it names move together rather than a quarter of a second
-  apart. The captions rise over 1% and fall over 1%, which keeps at most three things in motion at
-  any instant (§23.2) even where a line is being drawn through the handover.
-*/
-@keyframes lv2-e-source { 0% { opacity: var(--lv2-rest); } 0.875%, 100% { opacity: 1; } }
-@keyframes lv2-e-region { 0%, 12.5% { opacity: var(--lv2-rest); } 13.375%, 100% { opacity: 1; } }
-/* The one swell §11.2 asks for on the box, taken in the middle of the Read beat so it does not
-   share an instant with the region's own rise or with the line being drawn to it. */
-@keyframes lv2-e-region-fill { 0%, 15% { opacity: 0.06; } 16.5% { opacity: 0.22; } 18%, 100% { opacity: 0.06; } }
-@keyframes lv2-b-read-line { 0%, 12.5% { transform: scaleY(0); } 25%, 100% { transform: scaleY(1); } }
-@keyframes lv2-b-claim-line { 0%, 25% { transform: scaleY(0); } 37.5%, 100% { transform: scaleY(1); } }
-@keyframes lv2-e-claim { 0%, 25% { opacity: var(--lv2-rest); } 25.875%, 100% { opacity: 1; } }
-@keyframes lv2-e-nodes { 0%, 37.5% { opacity: var(--lv2-rest); } 38.375%, 100% { opacity: 1; } }
-@keyframes lv2-e-verify { 0%, 50% { opacity: var(--lv2-rest); } 50.875%, 100% { opacity: 1; } }
-/* One swell, 360ms, at the top of the Verify beat -- and `transform: none` for the rest of the
-   loop, so the dot is read once and never becomes a pulsing ornament (§23: movement = state
-   change). It is a `transform`, so it costs no layout and no repaint of the card around it. */
-@keyframes lv2-b-pulse { 0%, 50.875% { transform: none; } 52% { transform: scale(1.9); } 53.125%, 100% { transform: none; } }
-/* §4.1's coordinate reads with the state word rather than behind it: §11.2 asks for the source
-   region and the page metadata to highlight together, and a label that arrives late reads as a
-   second event on a beat that has only one. */
-@keyframes lv2-e-coordinate { 0%, 50% { opacity: var(--lv2-rest); } 50.875%, 100% { opacity: 1; } }
-@keyframes lv2-e-arrivals { 0%, 62.5% { opacity: var(--lv2-rest); } 63.375%, 100% { opacity: 1; } }
-@keyframes lv2-e-counts { 0%, 75% { opacity: var(--lv2-rest); } 75.875%, 100% { opacity: 1; } }
-
-/*
-  The captions: sequential windows with a gap, so two sentences are never legible at once.
-
-  Each caption reaches zero at the instant the next begins to rise. The earlier shape faded one
-  out while the other faded in, which put both at half opacity over the same lines for a fifth of
-  a second -- the defect a reader reads as a smear. Seven now, not eight: the Use beat left with
-  the answer panel (see `hero-compiler-demo.tsx`), and the seventh holds through the 2-second
-  hold because it is the one that describes the composed hero.
-*/
-@keyframes lv2-cap-1 { 0%, 11.5% { opacity: 1; } 12.5%, 100% { opacity: 0; } }
-@keyframes lv2-cap-2 { 0%, 12.5% { opacity: 0; } 13.5%, 24% { opacity: 1; } 25%, 100% { opacity: 0; } }
-@keyframes lv2-cap-3 { 0%, 25% { opacity: 0; } 26%, 36.5% { opacity: 1; } 37.5%, 100% { opacity: 0; } }
-@keyframes lv2-cap-4 { 0%, 37.5% { opacity: 0; } 38.5%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-@keyframes lv2-cap-5 { 0%, 50% { opacity: 0; } 51%, 61.5% { opacity: 1; } 62.5%, 100% { opacity: 0; } }
-@keyframes lv2-cap-6 { 0%, 62.5% { opacity: 0; } 63.5%, 74% { opacity: 1; } 75%, 100% { opacity: 0; } }
-@keyframes lv2-cap-7 { 0%, 75% { opacity: 0; } 76%, 100% { opacity: 1; } }
-
-/* ============================================================================================
-   THE SIGNATURE INTERACTION (§4.1)
-   ============================================================================================ */
-
-/*
-  Hover or focus a compiled object and the lines to its source are drawn in full, the region it
-  was read from is ringed -- on the strip and on the page at once -- and the mono label naming
-  that region reads in the source colour. Hovering also pauses the loop (the rule above), so the
-  reader is looking at a held frame rather than at a beat that is about to move.
-
-  `:has()` is the implementation; `[data-signature="1"]` is the same state written by
-  `hero-compiler-demo.tsx` for engines without it, and that file registers no listener at all
-  where `:has()` is supported. `!important` is load-bearing here for the only reason it ever is:
-  an author declaration outranks a running animation, and these properties are animated.
-*/
-.lv2-demo:has(:is(.lv2-claim, .lv2-node):is(:hover, :focus-visible)) .lv2-line,
-.lv2-demo[data-signature="1"] .lv2-line { transform: scaleY(1) !important; }
-
-.lv2-demo:has(:is(.lv2-claim, .lv2-node):is(:hover, :focus-visible)) .lv2-region,
-.lv2-demo[data-signature="1"] .lv2-region {
-  opacity: 1 !important;
-  outline: 2px solid var(--source);
-  outline-offset: 2px;
-}
-
-.lv2-demo:has(:is(.lv2-claim, .lv2-node):is(:hover, :focus-visible)) .lv2-read-label,
-.lv2-demo[data-signature="1"] .lv2-read-label {
-  opacity: 1 !important;
-  color: var(--source);
-}
-
-/* ============================================================================================
-   REDUCED MOTION (§26) -- the complete state, stated
-   ============================================================================================ */
-
-/*
-  The block at the top of this file collapses every animation here to 1ms and one iteration, and a
-  finished animation with the default fill mode reverts each element to its base style. Since F2
-  that base style is the HOLD STATE -- the strip with its box and its coordinate, the page, the
-  claim, the objects bound to it, the arrivals and the comparison, every one of them at full
-  strength -- so reduced motion and the last two seconds of the loop are the same picture, and
-  this block has almost nothing left to say.
-
-  THE CAPTION IS THE FINAL SENTENCE ALONE (F5), AND THAT IS A REVERSAL.
-
-  Two earlier rounds argued this both ways. D3 collapsed the stack to the last caption; P3 QA
-  round 1 restored all eight, on the ground that seven captions at opacity 0 left a reader who is
-  not being shown the sequence with one sentence out of eight. Both were right about a hero whose
-  OBJECTS were rotating: when four panels take turns, the transcript is the only place the whole
-  story exists, and §26 names exactly that substitution.
-
-  That hero is gone. Every object the sequence used to reveal is now on screen at once, at full
-  strength, for this reader as for every other -- so the complete static state §26 asks for is the
-  composition itself, and six more sentences describing a picture the reader is already looking at
-  cost 151px of hero to restate it. The last caption stays because it is the one written about the
-  composed state.
-
-  The stage's height is its content's at every width, so nothing here can overlap what is under
-  it. What remains is the thumbnail's perspective, which is a motion-adjacent flourish §22 allows
-  and §26 does not.
-*/
-@media (prefers-reduced-motion: reduce) {
-  .lv2-locator .lv2-page { transform: none; }
-}
 
 /* ============================================================================================
    KOREAN (D12) -- the one typographic difference between the two entry pages

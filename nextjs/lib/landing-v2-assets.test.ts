@@ -8,7 +8,6 @@ import {
   landingV2PageImage,
   landingV2RegionImage,
 } from "./landing-v2-assets";
-import { buildHeroScene } from "./landing-v2-hero";
 import { buildEvidenceRecord, buildProofTabs } from "./landing-v2-proof";
 import pagesManifest from "@/public/explore-sample/pages/pages.manifest.json";
 
@@ -24,9 +23,15 @@ import pagesManifest from "@/public/explore-sample/pages/pages.manifest.json";
 
 const PUBLIC = join(import.meta.dirname, "..", "public");
 
-/** The lane's ceilings: nothing over 220 KB, and the hero's 840px page under 120 KB. */
+/**
+ * The lane's ceiling: nothing this landing sends is over 220 KB.
+ *
+ * The second ceiling here was the hero's own -- its 840px page render under 120 KB -- and it went
+ * with the hero it was written for (founder decision 2026-09-20: the hero is a centered statement
+ * over the four locked films, and it paints no page raster at all). Every derivative left is
+ * below the fold in Scenes 02, 03 and 04, where the shared ceiling is the right one.
+ */
 const MAX_BYTES = 220 * 1024;
-const HERO_840_MAX_BYTES = 120 * 1024;
 
 describe("the Landing V2 derivatives", () => {
   it("was cut from committed rasters whose digests still match", () => {
@@ -60,11 +65,6 @@ describe("the Landing V2 derivatives", () => {
         expect(output.bytes, `${output.src} is over the ceiling`).toBeLessThanOrEqual(MAX_BYTES);
       }
     }
-    const hero = buildHeroScene();
-    const heroPage = landingV2PageImage(hero.source.digest, hero.source.page);
-    const at840 = heroPage?.outputs.find((output) => output.width === 840 && output.format === "webp");
-    expect(at840, "the hero page has no 840px WebP").toBeDefined();
-    expect(at840!.bytes).toBeLessThanOrEqual(HERO_840_MAX_BYTES);
   });
 
   it("offers a WebP source set, and an AVIF one when the encoder produced it", () => {
@@ -81,15 +81,16 @@ describe("the Landing V2 derivatives", () => {
 
   /*
     The render set is a literal list in a plain-Node script and the selection lives in
-    TypeScript, so this is the join that keeps the two from drifting: every region the hero and
-    the proof scenes resolve to must have a derivative. A page added to the World without a
-    render fails here rather than rendering a missing image on the landing.
+    TypeScript, so this is the join that keeps the two from drifting: every region the proof
+    scenes resolve to must have a derivative. A page added to the World without a render fails
+    here rather than rendering a missing image on the landing.
+
+    The hero's own region left this list on 2026-09-20 with `lib/landing-v2-hero.ts`: the hero is a
+    centered statement over the four locked films now and resolves no region of its own.
   */
-  it("covers every region the hero and the proof scenes resolve to", () => {
-    const hero = buildHeroScene();
+  it("covers every region the proof scenes resolve to", () => {
     const record = buildEvidenceRecord();
     const wanted: [string, string, number, readonly number[]][] = [
-      ["hero", hero.source.digest, hero.source.page, hero.region.bbox1000],
       ["evidence record", record.source.digest, record.source.page, record.region.bbox1000],
       ...buildProofTabs().map(
         (tab) => [`tab: ${tab.question}`, tab.source.digest, tab.source.page, tab.region.bbox1000] as [string, string, number, readonly number[]],

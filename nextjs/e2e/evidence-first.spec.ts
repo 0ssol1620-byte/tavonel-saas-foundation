@@ -1,22 +1,23 @@
 import { expect, test } from "@playwright/test";
 
 /*
-  What the landing offers as evidence, after Landing V2 (2026-09-19).
+  What the landing offers as evidence, after the founder's 2026-09-20 hero decision.
 
-  This file has now been retargeted twice at the same question, and the question has not moved:
-  what does the entry page hold up as proof, and does that proof open something that actually
-  answers? The first answer was an interactive Apple SEC passage rendered on the landing
+  This file has now been retargeted three times at the same question, and the question has not
+  moved: what does the entry page hold up as proof, and does that proof open something that
+  actually answers? The first answer was an interactive Apple SEC passage rendered on the landing
   (`#proof [data-proof-variant="canonical"]`); the founder moved it off on 2026-09-18 and three
-  screenshots of the live /explore route took its place; V2 goes one step further back and puts
-  the real thing in the hero -- a committed render of a real filing page with the region it was
-  read from drawn on it, the compiled object that region states beside it, and a link into the
-  Evidence act that holds both.
+  screenshots of the live /explore route took its place; Landing V2 put the real thing in the hero
+  -- a committed render of a real filing page with the region it was read from drawn on it. The
+  hero is a centered statement over the four locked compile films now, so the proof is one scroll
+  down, in Scene 02: three prepared questions this public World answers, each with the passage the
+  retriever scored, the page and box it was read from, and a link into the Evidence act.
 
-  So the subject changes and the standard does not. The page may make no proof-shaped claim of
-  its own (`[data-proof-variant]` is still asserted absent, so the block cannot drift back onto
-  the landing unnoticed), and every /explore link it does offer has to resolve -- checked against
-  the server rather than by clicking, because a 404 behind a picture of the product is the
-  failure this file exists to catch.
+  So the subject moves and the standard does not. The page may make no proof-shaped claim of its
+  own (`[data-proof-variant]` is still asserted absent, so the block cannot drift back onto the
+  landing unnoticed), and every /explore link it does offer has to resolve -- checked against the
+  server rather than by clicking, because a 404 behind a picture of the product is the failure
+  this file exists to catch.
 
   The interactive block itself is still exercised where it lives: `e2e/explore.spec.ts` on
   /explore, and `e2e/public-composition.spec.ts` on the five solution pages.
@@ -29,20 +30,22 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await expect(page.locator("[data-source-sheet]")).toHaveCount(0);
 
   /*
-    The evidence the page does offer: a real page render, the region it was read from as the
-    coordinates the compiler stored, and the compiled object as a link into the record.
+    The evidence the page does offer: a real page render with the region the compiler stored drawn
+    on it, and the passage read from that region, in the scene under the hero.
   */
-  const raster = page.locator("section#hero img.lv2-page-img");
-  await expect(raster).toHaveCount(1);
-  await expect(raster).toHaveAttribute("alt", /\S/);
+  const raster = page.locator("section#proof img.lv2-page-img");
+  expect(await raster.count(), "the proof scene renders no source page").toBeGreaterThan(0);
+  await expect(raster.first()).toHaveAttribute("alt", /\S/);
+  expect(await page.locator("section#proof .lv2-region").count(), "no region is drawn on it")
+    .toBeGreaterThan(0);
+  await expect(page.locator('section#proof a[href^="/explore?act=evidence&evidence="]').first())
+    .toBeVisible();
   /*
-    Two, not one, since the hero was recomposed on 2026-09-19: the READ strip IS the region (its
-    outline is the box's own edge) and the page thumbnail beside it carries the same box drawn
-    where it sits on the filing. `e2e/landing-v2.spec.ts` counts the same two in the same
-    section; this file asserted one and the two specs contradicted each other for a round.
+    And the hero holds up the film instead, under the sentence that says what a compile emits.
+    §11.3: a directed film may stand on this page only with that disclosure beside it.
   */
-  await expect(page.locator("section#hero .lv2-region")).toHaveCount(2);
-  await expect(page.locator("section#hero .lv2-claim")).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
+  await expect(page.locator("section#hero .compile-film-sequence")).toHaveCount(1);
+  await expect(page.locator("section#hero .lv2-film-note")).toBeVisible();
 });
 
 test("every /explore link on the landing opens a route that resolves", async ({ page, request }) => {
@@ -51,7 +54,7 @@ test("every /explore link on the landing opens a route that resolves", async ({ 
     [...new Set(nodes.map((node) => node.getAttribute("href")!))],
   );
   // The bare route the hero's primary action and the Instant proof scene both open, plus the
-  // hero demo's deep links into the acts that hold what it is showing.
+  // proof and recompile scenes' deep links into the acts that hold what they are showing.
   expect(hrefs, "the landing offers the Explore route itself").toContain("/explore");
   expect(hrefs.some((href) => href.startsWith("/explore?act=evidence")), "and the record behind the claim").toBe(true);
   expect(hrefs.some((href) => href.startsWith("/explore?act=world")), "and the World the objects live in").toBe(true);
@@ -68,7 +71,7 @@ test("the hero and every scene below it fit the viewport at the active product-Q
 
   const hero = page.locator("section#hero");
   const title = page.locator("h1#lv2-hero-title");
-  const demo = page.locator(".lv2-demo");
+  const demo = page.locator("section#hero .compile-film-sequence");
   await expect(hero).toBeVisible();
   await expect(title).toBeVisible();
   await expect(demo).toBeVisible();
@@ -95,8 +98,10 @@ test("Korean visitors get the same story and the same route behind it", async ({
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   // The same nine scenes, and the same real source page behind the same claim.
   await expect(page.locator("main > section[data-scene]")).toHaveCount(9);
-  await expect(page.locator("section#hero img.lv2-page-img")).toHaveCount(1);
-  await expect(page.locator("section#hero .lv2-claim")).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
+  expect(await page.locator("section#proof img.lv2-page-img").count()).toBeGreaterThan(0);
+  await expect(page.locator('section#proof a[href^="/explore?act=evidence&evidence="]').first())
+    .toBeVisible();
+  await expect(page.locator("section#hero .compile-film-sequence")).toHaveCount(1);
   await expect(page.getByRole("link", { name: "공개 Compiled World 열기" }).first()).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

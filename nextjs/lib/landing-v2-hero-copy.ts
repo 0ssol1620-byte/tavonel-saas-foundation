@@ -1,64 +1,73 @@
 import { EXPLORE_COPY } from "./explore-story";
 
 /**
- * The words the recomposed hero needs that the campaign's copy deck does not carry.
+ * The words the Landing V2 hero needs that the campaign's copy deck does not carry.
  *
  * `lib/landing-v2-copy.ts` belongs to the copy lane and is closed to this one, so the strings the
- * 2026-09-19 hero recomposition introduced live here instead of being typed into a component. The
- * rules that govern that module govern this one, and `landing-v2-hero-copy.test.ts` enforces
- * both: no figure is typed into a sentence (every digit reaches the page through
- * `lib/landing-v2-hero.ts`, inside an element marked `data-derived`), and the Korean half is a
- * literal translation of the English above it rather than a second claim (D12).
+ * hero introduces live here instead of being typed into a component. The rules that govern that
+ * module govern this one, and `landing-v2-hero-copy.test.ts` enforces both: no figure is typed
+ * into a sentence, and the Korean half is a literal translation of the English above it rather
+ * than a second claim (D12).
  *
- * One entry is not written here at all. `countsQualifier` is `EXPLORE_COPY`'s own sentence,
- * imported verbatim -- BA-034 requires the engine to be named wherever those comparison figures
- * are published, and a second spelling of that qualifier would be a second, weaker disclosure. It
- * carries a figure of its own, which is why the guard exempts it by name: it is a receipt about a
- * measurement, not a sentence this lane wrote.
+ * REWRITTEN 2026-09-20 FOR THE FOUNDER'S CENTERED HERO. The compiler-demo composition -- the
+ * region strip, the page locator, the claim card, the entity chips, the arrivals and the
+ * comparison counts -- is off the hero, and the five strings only it rendered went with it
+ * (`filedFormat`, `readStripAlt`, `boundObjectsCaption`, `countsQualifier`). What the hero needs
+ * now is one sentence, and it is the one sentence the four locked films may not be shown without.
  *
- * `entityDisclaimer` is /explore's too, and since F3 (2026-09-19) it is the SHORT form --
- * `EXPLORE_COPY.entityCaveatShort`, declared beside the long paragraph rather than derived from
- * it. The hero prints the caveat under two chips in a 245px column; the 45-word paragraph was the
- * tallest block in that column and read there as a footnote. It carries no figure, so unlike the
- * qualifier it is swept by the no-digit rule like everything else in this file.
+ * `entityDisclaimer` stays and moves with the objects it qualifies: /explore's own short caveat,
+ * imported rather than respelled, printed as a footnote on Scene 02. Contract rule 7 keeps it on
+ * the page once; the hero is simply no longer where it belongs.
  */
 
 export type LandingV2HeroExtraCopy = {
-  /** The filing line under the page thumbnail: the form, then the date it was filed. */
-  filedFormat: string;
-  /** Alt text for the READ strip. Carries no figure (contract rule 4). */
-  readStripAlt: string;
-  /** What the chips beside the claim are, stated as the sample's compiler emits them. */
-  boundObjectsCaption: string;
-  /** BA-034: the engine that produced the comparison figures, printed beside them. */
-  countsQualifier: string;
-  /** The Entity caveat in one sentence, printed under the chips and carried as their title. */
+  /**
+   * §11.3 / contract rule 7, under the hero film.
+   *
+   * The four cuts draw a ruled table, section-and-line labels and `.csv` sources, and this
+   * deployment emits none of the three: it emits the paragraph as it was printed, the page it was
+   * read from and the box it sat in. This is the previous landing's own sentence, kept as it was
+   * published except for its closing clause, which pointed at three /explore frames the page no
+   * longer carries. A film that runs ahead of the deployment is allowed on the page only with it.
+   */
+  filmNote: string;
+  /** /explore's Entity caveat in one sentence, printed once on the page (Scene 02's footnote). */
   entityDisclaimer: string;
 };
 
 export const LANDING_V2_HERO_EXTRA: Record<"en" | "ko", LandingV2HeroExtraCopy> = {
   en: {
-    filedFormat: "{form} · filed {filingDate}",
-    readStripAlt: "The region of the original filing page this Compiled World was read from.",
-    /*
-      C7: it read "objects bound to this region, ..." -- lowercase, with no count in front of the
-      noun, so on screen it was a sentence with a word missing. It is a caption, not a fragment of
-      one, so it is capitalised and stopped. No count is added: a figure here would need its own
-      receipt and a `data-derived` wrapper to say something the list beside it already shows.
-    */
-    boundObjectsCaption: "Objects bound to this region, as this sample's compiler emits them.",
-    countsQualifier: EXPLORE_COPY.countsQualifier,
+    filmNote:
+      "A directed film, not a screen recording: the ruled table, the section-and-line labels and the .csv sources in it run ahead of this deployment. What a compile emits today is the paragraph as it was printed, the page it was read from and the box it sat in.",
     entityDisclaimer: EXPLORE_COPY.entityCaveatShort,
   },
   ko: {
-    filedFormat: "{form} · {filingDate} 제출",
-    readStripAlt: "이 Compiled World를 읽어 온 원본 공시 문서 페이지의 해당 영역입니다.",
-    boundObjectsCaption: "이 영역에 묶인 객체들이며, 이 샘플의 컴파일러가 내보내는 그대로입니다.",
-    countsQualifier: "이 저장소의 TypeScript 컬렉션 컴파일러가 내보내는 그대로입니다",
-    /* F3: the literal translation of `EXPLORE_COPY.entityCaveatShort`, with no figure in it. */
+    filmNote:
+      "제품 흐름을 설명하는 연출 영상이며 실제 화면 녹화가 아닙니다. 영상 속 격자로 그린 표, 절·행 번호 위치, .csv 원문은 현재 배포보다 앞서 있습니다. 지금 컴파일이 내보내는 것은 인쇄된 그대로의 문단과 그것을 읽어 온 페이지·영역입니다.",
+    /* The literal translation of `EXPLORE_COPY.entityCaveatShort`, with no figure in it. */
     entityDisclaimer: "이 샘플의 개체 이름은 휴리스틱입니다. 여기서 판단할 부분은 Claim과 페이지에 묶인 근거입니다.",
   },
 };
+
+/**
+ * The Korean label and caption for each of the four locked cuts, in `COMPILE_STAGES` order.
+ *
+ * Only the two strings a reader sees are here. The `src`, `phoneSrc` and `poster` of every stage
+ * stay in `lib/compile-stages.ts`, so a locale can never point at a different film -- which is
+ * exactly the defect landing-01 opened, when /ko built its stage table by spreading the list out
+ * of the "use client" player module and got client references instead of values for `src` and
+ * `poster`.
+ *
+ * Stages 2 and 3 are the strings /ko already published for these two cuts (recovered from commit
+ * `d4c8a48`). Stages 1 and 4 are literal translations of `COMPILE_STAGES[0]` and `[3]`, which /ko
+ * never had a Korean spelling for: the previous landing played one cut rather than four.
+ */
+export const LANDING_V2_FILM_STAGES_KO: readonly { label: string; line: string }[] = [
+  { label: "파일", line: "원본 페이지에서 추출된 내용과 연결된 지식까지." },
+  { label: "정리", line: "관련 정보를 연결된 지식 구조로 정리합니다." },
+  { label: "업데이트", line: "바뀐 원문과 그 영향을 받는 지식을 함께 보여줍니다." },
+  { label: "AI에서 사용", line: "어시스턴트·편집기·터미널이 같은 지식과 같은 인용을 사용합니다." },
+];
 
 /** The hero's own copy, in the language the page is written in. */
 export function landingV2HeroExtra(korean?: boolean): LandingV2HeroExtraCopy {

@@ -335,7 +335,16 @@ function landingSource(): string {
     read("components/landing-v2/landing-page.tsx"),
     read("components/landing-v2/scene-actions.ts"),
     read("lib/landing-v2-copy.ts"),
-    read("lib/landing-v2-hero.ts"),
+    /*
+      `lib/landing-v2-hero.ts` was the sixth surface here. It resolved the region, the compiled
+      object and the entity chips the §11.1 hero drew, and it was deleted on 2026-09-20 with that
+      hero (founder decision: a centered statement over the four locked films). What the walk
+      reads in its place is the two files the new hero is made of -- the film frame and the
+      campaign’s own copy module -- so the barred-phrase, overclaim and figure sweeps still cover
+      every string the entry pages put on screen that the copy deck does not own.
+    */
+    read("components/landing-v2/hero-film.tsx"),
+    read("lib/landing-v2-hero-copy.ts"),
   ].join("\n");
 }
 
@@ -422,31 +431,54 @@ describe("public copy", () => {
   });
 
   /*
-    Landing V2, 2026-09-19 (§27, §28, D1). The entry pages play no film.
+    REVERSED BY THE FOUNDER, 2026-09-20. The entry pages play the four locked films again.
 
-    This used to pin which cut the landing reached for. The answer is now none: §27 bars an
-    autoplay video from being the LCP element and §28 puts the hero in DOM and CSS, so the hero
-    is a real source page with a real compiled object beside it and there is no decoder on the
-    page at all. The four locked cuts are byte-for-byte untouched and are still checked, in
-    `lib/one-path-contract.test.ts`; what changes is that the landing no longer reaches for any
-    of them, the poster included.
+    This row asserted the opposite until today, and the reasoning behind it was sound: §27 bars
+    an autoplay video from being the LCP element, §28 puts the hero in DOM and CSS, and the V2
+    hero was a real source page with a real compiled object beside it. The founder overruled it
+    after seeing the result, verbatim: "경쟁 웹사이트들을 레퍼런스로 우리도 통일해줘. 중앙 정렬하고
+    비주얼은 그다음에 보여주되 그전에 있던 4개 비디오 영상이 더 낫지않나? 너가 마지막에 우측에 만든
+    비주얼은 너가 봐도 텍스트가 너무 많아서 무슨말인지 모르겠지않아?"
+
+    So what is pinned is the reverse, and it is pinned rather than deleted because both halves
+    of the decision are load-bearing and neither is readable off the markup:
+
+      - the hero reaches for ALL FOUR cuts, through the one player. A hero that quietly fell
+        back to the single cut the previous landing played would look correct in a screenshot
+        and lose three quarters of what was asked for.
+      - §27's rule is still kept. What paints above the fold is the poster, an <img> the player
+        server-renders; the decoder starts on intersection. The preload names that poster, which
+        is why it is asserted on the two entry pages rather than anywhere else.
+
+    The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
+    every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("puts no film, and no film asset, on the entry pages", () => {
+  it("plays the four locked films on the entry pages, with the poster as the painted frame", () => {
     const page = landingSource();
+    expect(page, "the hero mounts the one film player").toContain("CompileStagePlayer");
+    expect(page, "and takes the whole locked stage list rather than one cut").toContain("COMPILE_STAGES");
     for (const asset of [
       "/film/compile-cut-hq.mp4",
       "/film/compile-cut-hq-1440.mp4",
       "/film/poster-1-hero-2x.webp",
-      "/film/poster-1.webp",
-      "/film/poster-1-hero.webp",
-      "/film/compile-cut.mp4",
+    ]) {
+      expect(page, `${asset} is the hero cut's own encode`).toContain(asset);
+    }
+    /* Cuts 2-4 and their posters are reached through the stage list, never respelled here. */
+    const stages = read("lib/compile-stages.ts");
+    for (const asset of [
       "/film/compile-cut-2.mp4",
       "/film/compile-cut-3.mp4",
       "/film/compile-cut-4.mp4",
+      "/film/poster-2.webp",
+      "/film/poster-3.webp",
+      "/film/poster-4.webp",
     ]) {
-      expect(page, `${asset} is not a landing asset any more`).not.toContain(asset);
+      expect(stages, `${asset} left the stage list`).toContain(asset);
     }
-    expect(page, "and the stage player is not on the entry pages").not.toContain("CompileStagePlayer");
+    // §27: the LCP element is the poster the player paints, and it is the one image preloaded.
+    expect(read("app/page.tsx"), "the hero poster is what the entry page preloads").toContain("HERO_FILM_POSTER");
+    expect(read("app/ko/page.tsx"), "and /ko preloads the same one").toContain("HERO_FILM_POSTER");
   });
 
   /*
@@ -494,7 +526,7 @@ describe("public copy", () => {
       "app/page.tsx",
       "app/ko/page.tsx",
       "components/landing-v2/landing-page.tsx",
-      "components/landing-v2/hero-compiler-demo.tsx",
+      "components/landing-v2/hero-film.tsx",
     ]) {
       // Comments in these files discuss the <video> element by name, so the check is run
       // against the source with comments stripped -- otherwise it fails on its own rationale.
@@ -657,27 +689,27 @@ describe("public copy", () => {
   });
 
   /*
-    Landing V2, 2026-09-19. Nine scenes, and the source proof is in the hero itself.
+    Nine scenes, and the source proof is one scroll below the hero rather than inside it.
 
-    The replan's answer to "where is the proof" was three screenshots of /explore under the film.
-    The V2 answer is one step earlier: the hero is a committed render of a real filing page with
-    the region it was read from drawn on it, the compiled object beside it, and a link into the
-    Evidence act of the route that holds both. So what is asserted is that the hero reaches the
-    real thing rather than a picture of it, and the jargon half of the rule is unchanged -- no
-    locator vocabulary is taught to a first-time reader.
+    The replan's answer to "where is the proof" was three screenshots of /explore under the film;
+    the V2 answer put a committed render of a real filing page in the hero itself. The founder's
+    2026-09-20 decision moves it once more: the hero is a centered statement over the four locked
+    films, and Scene 02 immediately under it is the proof -- three prepared questions this public
+    World answers, each with the passage the retriever scored and the page and box it was read
+    from, each opening the Evidence act of the route that holds both.
+
+    So the assertion follows the proof rather than the hero. What it still owes is unchanged:
+    the page reaches the real record rather than a picture of it, every figure on it declares
+    that it was measured, and no locator vocabulary is taught to a first-time reader.
 
     `LANDING_FRAMES` still exists and its hrefs are still checked: the frames are real captures
     of the live route and a later scene may use them. They are simply not on the entry pages.
   */
-  it("reaches original-source proof from the hero without teaching locator jargon", () => {
-    const demo = read("components/landing-v2/hero-compiler-demo.tsx");
-    expect(demo, "the compiled object opens the evidence behind it").toContain("scene.links.evidence");
-    /* §4.1's label is assembled in this component now -- the copy deck's format filled with the
-       record's coordinates -- so that /ko stops printing it in English. */
-    expect(demo, "and the region it was read from is named on the page").toContain("regionLabelFormat");
-    expect(demo, "from the coordinates the compiler stored").toContain("region.coordinates");
-    expect(demo, "every figure in the hero declares that it was measured").toContain('data-derived="1"');
-    expect(read("lib/landing-v2-hero.ts"), "the deep link is the product's own URL shape")
+  it("reaches original-source proof from the page without teaching locator jargon", () => {
+    const proof = read("components/landing-v2/scenes/proof.tsx");
+    expect(proof, "the quoted passage opens the evidence behind it").toContain("tab.openHref");
+    expect(proof, "every figure in the proof declares that it was measured").toContain('data-derived="1"');
+    expect(read("lib/landing-v2-proof.ts"), "the deep link is the product's own URL shape")
       .toContain("/explore?act=evidence&evidence=");
     for (const href of Object.values(LANDING_FRAMES).map((frame) => frame.href)) {
       expect(href, "every frame opens the live route it is a screenshot of").toMatch(/^\/explore/);

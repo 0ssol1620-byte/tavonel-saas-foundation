@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { preload } from "react-dom";
-import LandingPage, { HERO_IMAGE_SIZES, heroScene } from "@/components/landing-v2/landing-page";
+import { HERO_FILM_POSTER } from "@/components/landing-v2/hero-film";
+import LandingPage from "@/components/landing-v2/landing-page";
 import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
 import { BRAND_LINE } from "@/lib/site-navigation";
 
@@ -77,18 +78,19 @@ export default async function HomePage({
     query: Array.isArray(query) ? query[0] : query,
   });
   /*
-    Landing V2, 2026-09-19 (§27, contract rule 10). The LCP resource is the hero's READ strip.
+    FOUNDER DECISION 2026-09-20: the LCP resource is the hero film's poster again.
 
-    It moved from the whole-page render to the region crop with the hero recomposition: the strip
-    is now the first and largest image on the page and the page render is a 200px thumbnail
-    beside it, so preloading the page would be preloading the smaller, later resource. One image
-    carries `fetchPriority="high"`, and it is this one.
+    The centered hero paints one image above the fold -- `poster-1-hero-2x.webp`, the first frame
+    of cut 1 at the size the frame paints it. `CompileStagePlayer` renders that poster on the
+    server and swaps in the decoder only after the film is in view, so the poster is what the LCP
+    measurement actually sees whether or not the video ever plays. It carries
+    `fetchPriority="high"` there (`priorityPoster`), and this is the preload that matches it.
 
-    It replaces the film poster, because this landing plays no video at all -- §27 bars an
-    autoplay video from being the LCP element, and §28 puts the hero in DOM and CSS. What is
-    preloaded is the exact resource the layout paints: the same `srcset` and the same `sizes`
-    the <img> carries, both from one constant, so the browser's candidate selection here and in
-    the element cannot disagree.
+    §27 bars an autoplay VIDEO from being the LCP element, and it still is not one: the element
+    that paints is an <img>. The film starts after it, on intersection.
+
+    No `imageSrcSet`/`imageSizes`: the poster is one locked file at one size, so a candidate list
+    would be a list of one and `sizes` would describe a choice the browser does not have.
 
     IT IS `react-dom`'s `preload()` AND NOT A <link> ELEMENT, WHICH REVERSES A CONTRACT RULE (F10).
 
@@ -105,13 +107,7 @@ export default async function HomePage({
     document carried two entries for one file (P3 QA round 2, P2-2) -- with `href` and, measured
     on this build rather than assumed, without it too. The helper emits the hoisted one alone.
   */
-  const hero = heroScene();
-  preload(hero.region.cropSrc, {
-    as: "image",
-    imageSrcSet: hero.region.cropSrcSet,
-    imageSizes: HERO_IMAGE_SIZES,
-    fetchPriority: "high",
-  });
+  preload(HERO_FILM_POSTER, { as: "image", fetchPriority: "high" });
   return (
     <>
       <LandingPage experiment={experiment} />

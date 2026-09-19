@@ -126,18 +126,24 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     };
 
     /*
-      `hero_demo_interact` -- once per page session, whichever way the reader touched the demo.
+      `hero_demo_interact` -- once per page session, whichever way the reader touched the visual.
 
-      The triggers are the play/pause control and the two §4.1 signature objects, on pointer and
-      on keyboard focus alike, because the interaction the hero is built around is reachable both
-      ways and an event that counted only the mouse would report the keyboard path as unused.
-      `trackFunnelOnce` is what keeps a reader who sweeps a pointer across the stage from
-      producing a hundred rows of it.
+      RETARGETED 2026-09-20 with the founder's centered hero. The triggers were the compiler
+      demo's play/pause control and its two §4.1 signature objects; that demo is off the hero, and
+      what is under the statement now is the four-cut film. The event keeps its name and its
+      meaning -- "this reader did something with the hero's visual instead of scrolling past it"
+      -- and its triggers are the film's own controls: the four stage tabs and the motion control.
+      Renaming it would have broken the one column in the funnel that measures hero engagement,
+      for a change that did not change what is being counted.
+
+      Pointer and keyboard focus alike, because both controls are reachable both ways and an event
+      that counted only the mouse would report the keyboard path as unused. `trackFunnelOnce` is
+      what keeps a reader who sweeps a pointer across the strip from producing a hundred rows.
     */
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest(".lv2-demo-control, .lv2-demo .lv2-claim, .lv2-demo .lv2-node")) {
+      if (target.closest("#hero .compile-film-stages button, #hero .compile-film-motion-control")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

@@ -257,14 +257,19 @@ describe("app/layout.tsx fonts", () => {
 });
 
 /*
-  ROUND3-P1. One measured figure may not carry two semantics on one page (§5.2).
+  ROUND3-P1, NARROWED 2026-09-20: the comparison figures are printed in ONE place now.
 
-  `exploreChangeStory.counts` is printed twice -- in the hero's Recompile beat and again in Scene
-  05 -- and the two live in different stylesheets, so they drifted: the hero painted `rebuilt`
-  mint at rest while Scene 05 painted it amber. The colours are compared here rather than pinned
-  to a literal, because what matters is that the two agree, not which token they agree on.
+  `exploreChangeStory.counts` used to be printed twice -- in the hero demo's Recompile beat and
+  again in Scene 05 -- in two stylesheets, and the two drifted: the hero painted `rebuilt` mint at
+  rest while Scene 05 painted it amber, which is one measured figure carrying two semantics on
+  one page (§5.2). The founder's centered hero has no counts in it at all, so the drift has no
+  second surface to happen on and the comparison of the two sheets has nothing left to compare.
+
+  What survives is the half that was never about the hero: mint is `verified` in the D4 table, and
+  a partition of a diff is not something anything verified. Scene 05 is where those four figures
+  are published, so Scene 05's own sheet is what is held to it.
 */
-describe("the change counts mean the same thing in both places", () => {
+describe("the change counts claim no state the World does not record", () => {
   const recompile = read("components/landing-v2/scenes/recompile.module.css");
 
   /** The `color:` of the first rule whose selector list contains `selector`. */
@@ -278,16 +283,15 @@ describe("the change counts mean the same thing in both places", () => {
     throw new Error(`no color declared for ${selector}`);
   }
 
-  it.each(["rebuilt", "added", "removed", "untouched"])("%s is one colour on the page", (key) => {
-    expect(colourOf(landing, `.lv2-count--${key} b`)).toBe(colourOf(recompile, `.${key} b`));
-  });
-
   it("keeps --verified for the state the World actually records, not for a diff partition", () => {
     for (const key of ["rebuilt", "added", "removed", "untouched"]) {
-      expect(colourOf(landing, `.lv2-count--${key} b`), `${key} claims the verified colour`)
+      expect(colourOf(recompile, `.${key} b`), `${key} claims the verified colour`)
         .not.toContain("--verified");
     }
-    // And no keyframe smuggles it back in for part of the loop.
-    expect(stripComments(landing)).not.toContain("lv2-b-rebuilt");
+  });
+
+  it("prints the comparison on one surface, so there is no second spelling to drift", () => {
+    expect(stripComments(landing), "the landing sheet paints comparison counts again")
+      .not.toContain("lv2-count--");
   });
 });
