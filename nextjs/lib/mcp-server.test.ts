@@ -274,7 +274,9 @@ describe("arguments are hostile until checked", () => {
 
   it("bounds the search limit", () => {
     const tool = TOOLS.find((entry: { name: string }) => entry.name === "search_world")!;
-    expect(() => validateInput(tool, { collectionId: COLLECTION, query: "torque", limit: 500 })).toThrow("1 to 50");
+    expect(tool.inputSchema.properties.limit?.maximum).toBe(25);
+    expect(validateInput(tool, { collectionId: COLLECTION, query: "torque", limit: 25 }).limit).toBe(25);
+    expect(() => validateInput(tool, { collectionId: COLLECTION, query: "torque", limit: 26 })).toThrow("1 to 25");
   });
 
   it("refuses an unknown tool without calling anything", async () => {
@@ -287,6 +289,13 @@ describe("arguments are hostile until checked", () => {
 });
 
 describe("failure reaches the agent intact", () => {
+  it("refuses a malformed 2xx body instead of presenting it as product data", async () => {
+    const { handle } = server({ "*": { code: "SEARCH_EMPTY" } });
+    const result = await callTool(handle, "search_world", { collectionId: COLLECTION, query: "bearing torque" });
+    expect(result.isError).toBe(true);
+    expect(result.text).toBe("API_SUCCESS_SCHEMA_INVALID: search_world");
+  });
+
   it("hands back the API's own code rather than a paraphrase", async () => {
     const { handle } = server({ "*": { code: "ACTIVE_WORLD_NOT_FOUND" } }, 404);
     const result = await callTool(handle, "get_world", { collectionId: COLLECTION });

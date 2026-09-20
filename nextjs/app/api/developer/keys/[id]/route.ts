@@ -16,7 +16,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   }
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "API_KEY_ID_INVALID" }, { status: 400, headers: NO_STORE });
-  const result = await revokeDeveloperApiKey(auth.principal.workspaceKey, auth.principal.userId, id);
-  if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "API_KEY_NOT_FOUND" ? 404 : 503, headers: NO_STORE });
+  const result = await revokeDeveloperApiKey(auth.principal.workspaceKey, auth.principal.userId, auth.principal.authorizationRevision, id);
+  if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "API_KEY_NOT_FOUND" ? 404 : result.code === "AUTHORIZATION_CHANGED_RETRY" ? 403 : 503, headers: NO_STORE });
   return new NextResponse(null, { status: 204, headers: NO_STORE });
 }

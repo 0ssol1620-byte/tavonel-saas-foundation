@@ -54,8 +54,8 @@ export const activationPolicy = {
     It deliberately avoids the word "qualification", which the A-6 rule in
     `activation-policy.test.ts` treats as a promise of a public receipt.
   */
-  cdr: { enabled: true, reason: "Quarantine source objects are sanitized by an IAM-only PDFium and ClamAV service on Google Cloud Run (Seoul, asia-northeast3) before anything downstream reads them. The production Worker uses short-lived workload identity, refuses redirects, and stores only digest-bound immutable PDFs for downstream reading." },
-  ocrGpu: { enabled: true, reason: "GPU OCR is open, with scale-to-zero and candidate-only review controls enforced." },
+  cdr: { enabled: true, reason: "Sources remain isolated in tenant-scoped quarantine while they are sanitized. Downstream processing reads only the resulting immutable PDF, which is bound to its content digest." },
+  ocrGpu: { enabled: true, reason: "Scanned pages are read by OCR. Extracted results remain candidates until a person explicitly activates the World." },
   candidatePromotion: { enabled: false, reason: "Activation is always an explicit human decision." },
   /*
     BA-118. This one string renders on /pricing, /security, /status, /login and /workspace, so the

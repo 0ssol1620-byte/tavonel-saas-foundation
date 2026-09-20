@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tavonel.com/schemas/home-task-study.v1.1.json",
+  "title": "TAVONEL B33 home task study record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "protocol_version",
+    "status",
+    "prepared_at",
+    "route",
+    "locales",
+    "verification_plan",
+    "participant_count",
+    "participants",
+    "aggregate_results",
+    "founder_visual_review"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "tavonel.home_task_study.v1.1" },
+    "study_id": { "const": "B33_HOME_OUTCOME_IA" },
+    "protocol_version": { "const": "1.1" },
+    "status": { "enum": ["PREPARED_NOT_RUN", "IN_PROGRESS", "COMPLETE"] },
+    "prepared_at": { "type": "string", "format": "date-time" },
+    "route": { "const": "/" },
+    "locales": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "allOf": [
+        { "contains": { "const": "en" } },
+        { "contains": { "const": "ko" } }
+      ],
+      "items": { "enum": ["en", "ko"] }
+    },
+    "verification_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["viewport_widths_px", "reduced_motion"],
+      "properties": {
+        "viewport_widths_px": {
+          "const": [1920, 1440, 1280, 1024, 768, 390, 360]
+        },
+        "reduced_motion": { "const": true }
+      }
+    },
+    "participant_count": { "type": "integer", "minimum": 0 },
+    "participants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/participant" }
+    },
+    "aggregate_results": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/aggregateResults" }
+      ]
+    },
+    "founder_visual_review": { "const": "FOUNDER VISUAL REVIEW REQUIRED" }
+  },
+  "$defs": {
+    "sessionContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "viewport_width_px",
+        "reduced_motion",
+        "input_mode",
+        "build_id",
+        "network_profile"
+      ],
+      "properties": {
+        "locale": { "enum": ["en", "ko"] },
+        "viewport_width_px": { "type": "integer", "minimum": 320 },
+        "reduced_motion": { "type": "boolean" },
+        "input_mode": { "enum": ["pointer", "keyboard", "touch"] },
+        "build_id": { "type": "string", "minLength": 1 },
+        "network_profile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "comprehensionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "response_verbatim",
+        "outcome_identified",
+        "verification_mechanism_identified",
+        "moderator_prompted",
+        "observer_notes"
+      ],
+      "properties": {
+        "response_verbatim": { "type": ["string", "null"] },
+        "outcome_identified": { "type": ["boolean", "null"] },
+        "verification_mechanism_identified": { "type": ["boolean", "null"] },
+        "moderator_prompted": { "type": ["boolean", "null"] },
+        "observer_notes": { "type": ["string", "null"] }
+      }
+    },
+    "proofEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reached_path",
+        "proof_item_id",
+        "source_document_id",
+        "source_page_number",
+        "source_region_ref",
+        "source_region_opened",
+        "observer_notes"
+      ],
+      "properties": {
+        "reached_path": {
+          "oneOf": [
+            { "type": "string", "pattern": "^/(explore|evidence)([?#].*)?$" },
+            { "type": "null" }
+          ]
+        },
+        "proof_item_id": { "type": ["string", "null"] },
+        "source_document_id": { "type": ["string", "null"] },
+        "source_page_number": { "type": ["integer", "null"], "minimum": 1 },
+        "source_region_ref": { "type": ["string", "null"] },
+        "source_region_opened": { "type": ["boolean", "null"] },
+        "observer_notes": { "type": ["string", "null"] }
+      }
+    },
+    "comprehensionTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "time_limit_seconds", "elapsed_seconds", "outcome", "evidence"],
+      "properties": {
+        "task_id": { "const": "COMPREHENSION_30S" },
+        "time_limit_seconds": { "const": 30 },
+        "elapsed_seconds": { "type": ["number", "null"], "minimum": 0 },
+        "outcome": { "enum": ["PASS", "FAIL", "NOT_ATTEMPTED"] },
+        "evidence": { "$ref": "#/$defs/comprehensionEvidence" }
+      }
+    },
+    "proofTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "time_limit_seconds", "elapsed_seconds", "outcome", "evidence"],
+      "properties": {
+        "task_id": { "const": "PROOF_VERIFICATION_2M" },
+        "time_limit_seconds": { "const": 120 },
+        "elapsed_seconds": { "type": ["number", "null"], "minimum": 0 },
+        "outcome": { "enum": ["PASS", "FAIL", "NOT_ATTEMPTED"] },
+        "evidence": { "$ref": "#/$defs/proofEvidence" }
+      }
+    },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "participant_id",
+        "segment",
+        "consent_recorded",
+        "started_at",
+        "completed_at",
+        "session_context",
+        "tasks"
+      ],
+      "properties": {
+        "participant_id": { "type": "string", "minLength": 1 },
+        "segment": { "type": "string", "minLength": 1 },
+        "consent_recorded": { "const": true },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": {
+          "oneOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ]
+        },
+        "session_context": { "$ref": "#/$defs/sessionContext" },
+        "tasks": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": { "task_id": { "const": "COMPREHENSION_30S" } },
+                "required": ["task_id"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": { "task_id": { "const": "PROOF_VERIFICATION_2M" } },
+                "required": ["task_id"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ],
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/comprehensionTask" },
+              { "$ref": "#/$defs/proofTask" }
+            ]
+          }
+        }
+      }
+    },
+    "countSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass_count", "fail_count", "not_attempted_count"],
+      "properties": {
+        "pass_count": { "type": "integer", "minimum": 0 },
+        "fail_count": { "type": "integer", "minimum": 0 },
+        "not_attempted_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "aggregateResults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "participant_count",
+        "completed_session_count",
+        "comprehension",
+        "proof_verification",
+        "limitations"
+      ],
+      "properties": {
+        "participant_count": { "type": "integer", "minimum": 1 },
+        "completed_session_count": { "type": "integer", "minimum": 0 },
+        "comprehension": { "$ref": "#/$defs/countSet" },
+        "proof_verification": { "$ref": "#/$defs/countSet" },
+        "limitations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "incomplete_session_count",
+            "not_attempted_task_count",
+            "observed_fail_count",
+            "notes"
+          ],
+          "properties": {
+            "incomplete_session_count": { "type": "integer", "minimum": 0 },
+            "not_attempted_task_count": { "type": "integer", "minimum": 0 },
+            "observed_fail_count": { "type": "integer", "minimum": 0 },
+            "notes": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

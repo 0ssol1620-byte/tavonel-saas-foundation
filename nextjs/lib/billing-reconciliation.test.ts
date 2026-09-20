@@ -51,6 +51,10 @@ const source = {
   estimatedPages: 3,
 };
 
+function futureExpiry(minutes = 10) {
+  return new Date(Date.now() + minutes * 60_000).toISOString();
+}
+
 /** The same bytes Paddle would redeliver: one webhook body, reused verbatim. */
 function allowanceWebhookBody() {
   return JSON.stringify({
@@ -133,7 +137,7 @@ describe("O04 retry after a transient failure", () => {
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       documentId: source.documentId,
       state: "reserved",
-      expiresAt: "2026-09-11T07:10:00Z",
+      expiresAt: futureExpiry(),
       reservedCredits: 12,
       maximumCredits: 18,
       billingSource: "paid",
@@ -156,7 +160,7 @@ describe("O04 retry after a transient failure", () => {
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       documentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       state: "reserved",
-      expiresAt: "2026-09-11T07:10:00Z",
+      expiresAt: futureExpiry(),
       reservedCredits: 12,
       maximumCredits: 18,
       billingSource: "paid",
@@ -295,6 +299,9 @@ describe("O04 ledger guards that live only in SQL", () => {
     expect(allowance).toContain("on conflict do nothing");
     expect(allowance).toContain("if inserted_count = 1 then");
     expect(allowance).toContain("'duplicate_transaction'");
+    expect(allowance).toContain("where kind = 'allowance'");
+    expect(allowance).toContain("on public.foundation_credit_ledger (transaction_id)");
+    expect(allowance).toContain("for update");
   });
 
   it("holds one reservation per document and replays rather than re-deducting", () => {

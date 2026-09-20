@@ -16,6 +16,10 @@ describe("Foundation compute ledger", () => {
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
   }
 
+  function futureExpiry(minutes = 10) {
+    return new Date(Date.now() + minutes * 60_000).toISOString();
+  }
+
   it.each([
     ["foundation_studio_subscription_required", "STUDIO_SUBSCRIPTION_REQUIRED"],
     ["foundation_billing_hold", "BILLING_HOLD"],
@@ -35,7 +39,7 @@ describe("Foundation compute ledger", () => {
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       documentId: base.documentId,
       state: "reserved",
-      expiresAt: "2026-08-29T12:10:00Z",
+      expiresAt: futureExpiry(),
       reservedCredits: 12,
       maximumCredits: 18,
       billingSource,
@@ -62,7 +66,7 @@ describe("Foundation compute ledger", () => {
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       documentId: base.documentId,
       state: "reserved",
-      expiresAt: "2026-08-29T12:10:00Z",
+      expiresAt: futureExpiry(),
       reservedCredits: 12,
       maximumCredits: 18,
       billingSource: "paid",
@@ -98,6 +102,47 @@ describe("Foundation compute ledger", () => {
       actualCredits: 12,
       reasonCode: "OCR_COMPLETED",
     })).resolves.toMatchObject({ ok: true, result: { status: "duplicate" } });
+  });
+
+  it.each([
+    [new Date(Date.now() - 1_000).toISOString(), "expired"],
+    [new Date(Date.now() + 16 * 60_000).toISOString(), "outside the ledger TTL"],
+  ])("refuses a reservation receipt whose capability is %s", async (expiresAt) => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      documentId: base.documentId,
+      state: "reserved",
+      expiresAt,
+      reservedCredits: 12,
+      maximumCredits: 18,
+      billingSource: "paid",
+      idempotentReplay: false,
+    }), { status: 200 })));
+    await expect(reserveFoundationCompute(base)).resolves.toEqual({
+      ok: false,
+      code: "COMPUTE_RESERVATION_RECEIPT_INVALID",
+    });
+  });
+
+  it.each([
+    [{ state: "released", settledCredits: 12, billingSource: "paid" }, "state"],
+    [{ state: "settled", settledCredits: 11, billingSource: "paid" }, "credits"],
+    [{ state: "settled", settledCredits: 12, billingSource: "unknown" }, "billing source"],
+  ])("refuses a processed settlement receipt with mismatched %s", async (receipt) => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      status: "processed",
+      reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      ...receipt,
+    }), { status: 200 })));
+    await expect(settleFoundationCompute({
+      workspaceKey: base.workspaceKey,
+      documentId: base.documentId,
+      outcome: "settled",
+      actualCredits: 12,
+      reasonCode: "OCR_COMPLETED",
+    })).resolves.toEqual({ ok: false, code: "COMPUTE_SETTLEMENT_RECEIPT_INVALID" });
   });
 
   /*
@@ -167,7 +212,7 @@ describe("Foundation compute ledger", () => {
       status: "processed",
       reservationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       state: "operator_review",
-      settledCredits: 2,
+      settledCredits: 12,
       billingSource: "trial",
     }), { status: 200 })));
     await expect(settleFoundationCompute({

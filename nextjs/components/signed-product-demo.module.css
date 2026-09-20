@@ -1,0 +1,128 @@
+.demo {
+  --demo-ink: var(--text-on-paper, #142034);
+  --demo-muted: var(--text-muted-paper, #4f5d70);
+  --demo-paper: var(--paper, #f4f0e7);
+  --demo-line: color-mix(in srgb, var(--demo-ink) 16%, transparent);
+  --demo-blue: var(--source-ink, #2259ce);
+  --demo-cyan: var(--verified-ink, #1a6d51);
+  --text-hi: var(--demo-ink);
+  --text-mid: var(--demo-muted);
+  --text-lo: var(--demo-muted);
+  color: var(--demo-ink);
+  background: var(--demo-paper);
+}
+
+/*
+  The shared public chrome is authored for the dark site ground. On this route it sits over the
+  paper opening, so inheriting its dark-ground text tokens made the wordmark and navigation nearly
+  white on warm paper. Keep the route-specific paper face through the scrolled state as well;
+  otherwise the same ink would become unreadable when the shared header switched to dark glass.
+*/
+:global(.public-page):has(.demo) :global(.chrome-v2-header) {
+  --ground: var(--paper, #f4f1ea);
+  --g1: var(--paper-50, #f4f5f7);
+  --text-hi: var(--text-on-paper, #142034);
+  --text-mid: var(--text-muted-paper, #4f5d70);
+  --text-lo: var(--text-muted-paper, #4f5d70);
+  --hairline: var(--border-paper, rgba(10, 12, 14, 0.12));
+  --hairline-hi: var(--border-paper-hi, rgba(10, 12, 14, 0.24));
+}
+
+:global(.public-page):has(.demo) :global(.chrome-v2-header[data-scrolled="1"]) {
+  background: color-mix(in srgb, var(--paper, #f4f1ea) 94%, transparent);
+  border-bottom-color: var(--border-paper, rgba(10, 12, 14, 0.12));
+}
+
+.hero,
+.story { width: min(1180px, calc(100% - 48px)); margin-inline: auto; }
+
+.hero { padding: clamp(112px, 15vw, 190px) 0 72px; }
+.disclosure {
+  margin: 0 0 32px;
+  padding: 12px 16px;
+  border: 1px solid var(--demo-ink);
+  font: 700 12px/1.4 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: .12em;
+}
+.heroGrid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr); gap: 48px; align-items: end; }
+.eyebrow, .stepHeading p, .state {
+  margin: 0 0 10px;
+  color: var(--demo-muted);
+  font: 700 12px/1.35 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.hero h1 { max-width: 10ch; margin: 0; font-size: clamp(54px, 8vw, 112px); font-weight: 520; line-height: .92; letter-spacing: -.055em; text-wrap: balance; }
+.lede { max-width: 32ch; margin: 0; font-size: clamp(18px, 2vw, 24px); line-height: 1.45; }
+.boundary { max-width: 76ch; margin: 36px 0 0; color: var(--demo-muted); font-size: 13px; line-height: 1.65; }
+
+.story { margin-bottom: 120px; padding: 0; list-style: none; border-top: 1px solid var(--demo-line); }
+.step { display: grid; grid-template-columns: minmax(240px, .36fr) minmax(0, 1fr); gap: clamp(32px, 6vw, 90px); padding: clamp(52px, 7vw, 92px) 0; border-bottom: 1px solid var(--demo-line); }
+.stepHeading { display: grid; grid-template-columns: 42px 1fr; gap: 16px; align-content: start; }
+.stepHeading > span { color: var(--demo-blue); font: 700 12px/1 var(--font-mono, ui-monospace, monospace); }
+.stepHeading h2 { max-width: 15ch; margin: 0; font-size: clamp(27px, 3vw, 42px); font-weight: 520; line-height: 1.02; letter-spacing: -.035em; }
+
+.sources { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--demo-line); }
+.sources li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid var(--demo-line); }
+.sources a, .evidence a, .exportRecord > a { color: var(--demo-ink); font-weight: 650; text-underline-offset: 4px; }
+.sources small { color: var(--demo-muted); text-align: right; }
+.demo code { overflow-wrap: anywhere; font-family: var(--font-mono, ui-monospace, monospace); font-size: .88em; }
+
+.change { display: grid; grid-template-columns: 1fr auto 1fr; gap: 22px; align-items: center; padding: 28px 0; border-block: 1px solid var(--demo-line); }
+.change div { display: grid; gap: 8px; }
+.change span, .meta, .coordinates { color: var(--demo-muted); font: 600 12px/1.5 var(--font-mono, ui-monospace, monospace); letter-spacing: .06em; }
+.change del, .change ins { font-size: clamp(24px, 3vw, 40px); text-decoration-thickness: 1px; text-underline-offset: 5px; }
+.change ins { color: var(--demo-blue); text-decoration: none; }
+.arrow { font-size: 22px !important; color: var(--demo-blue) !important; }
+.meta { margin-top: 18px; }
+
+.facing { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--demo-line); }
+.facing > section { min-width: 0; padding: clamp(24px, 4vw, 42px); }
+.facing > section + section { border-left: 1px solid var(--demo-line); }
+.facing h3 { margin: 0 0 24px; font-size: clamp(22px, 2.4vw, 32px); font-weight: 560; line-height: 1.15; }
+.facing dl, .exportRecord dl { margin: 0; }
+.facing dl div, .exportRecord dl div { display: grid; grid-template-columns: minmax(100px, .36fr) minmax(0, 1fr); gap: 16px; padding: 11px 0; border-top: 1px solid var(--demo-line); }
+.facing dt, .exportRecord dt { color: var(--demo-muted); font-size: 12px; }
+.facing dd, .exportRecord dd { min-width: 0; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.facing blockquote { margin: 0 0 30px; padding-left: 18px; border-left: 2px solid var(--demo-cyan); font-size: 18px; line-height: 1.5; }
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin: 24px 0 0; padding: 0; list-style: none; color: var(--demo-muted); font-size: 12px; }
+
+.activation { display: grid; gap: 14px; padding: clamp(28px, 5vw, 54px); color: #f7f4ec; background: var(--demo-ink); }
+.activation p { display: flex; gap: 12px; align-items: center; margin: 0; font-size: 16px; font-weight: 700; letter-spacing: .06em; }
+.activation code { font-size: clamp(18px, 2.7vw, 31px); }
+.activation small { color: color-mix(in srgb, #fff 66%, transparent); }
+.activeDot { width: 9px; height: 9px; border-radius: 50%; background: #74d19b; }
+
+.answer { white-space: pre-line; line-height: 1.65; }
+.evidence { background: color-mix(in srgb, var(--demo-cyan) 7%, transparent); }
+.evidence blockquote { margin-bottom: 18px; }
+.coordinates { margin: 0 0 22px; }
+
+.exportRecord { border-top: 2px solid var(--demo-ink); }
+.verified { margin: 0 0 26px; font-size: clamp(18px, 2.4vw, 28px); font-weight: 620; line-height: 1.2; }
+.verified span { display: inline-grid; width: 28px; height: 28px; margin-right: 10px; place-items: center; color: #fff; background: var(--demo-cyan); border-radius: 50%; font-size: 15px; }
+.exportRecord .boundary { margin: 24px 0; }
+
+@media (max-width: 900px) {
+  .heroGrid, .step { grid-template-columns: 1fr; }
+  .hero h1 { max-width: 12ch; }
+  .stepHeading h2 { max-width: 22ch; }
+}
+
+@media (max-width: 767px) {
+  .hero, .story { width: min(100% - 28px, 620px); }
+  .hero { padding-top: 96px; }
+  .hero h1 { font-size: clamp(48px, 15vw, 70px); }
+  .facing { grid-template-columns: 1fr; }
+  .facing > section + section { border-top: 1px solid var(--demo-line); border-left: 0; }
+  .sources li { grid-template-columns: 1fr; gap: 6px; }
+  .sources small { text-align: left; }
+  .change { grid-template-columns: 1fr; }
+  .arrow { transform: rotate(90deg); justify-self: start; }
+  .checks { grid-template-columns: 1fr; }
+  .facing dl div, .exportRecord dl div { grid-template-columns: 1fr; gap: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo *, .demo *::before, .demo *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

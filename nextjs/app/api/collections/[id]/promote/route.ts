@@ -35,6 +35,7 @@ export const maxDuration = 60;
 
 const NO_STORE = { "Cache-Control": "no-store" };
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(
   request: Request,
@@ -61,8 +62,10 @@ export async function POST(
     );
   }
   let body: {
+    operationId?: unknown;
     manifestDigest?: unknown;
     expectedCurrentManifest?: unknown;
+    expectedCurrentRevision?: unknown;
     reason?: unknown;
   };
   try {
@@ -73,6 +76,7 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
+  const operationId = typeof body.operationId === "string" ? body.operationId : "";
   const manifestDigest =
     typeof body.manifestDigest === "string" ? body.manifestDigest : "";
   const expectedCurrentManifest =
@@ -81,12 +85,21 @@ export async function POST(
       : typeof body.expectedCurrentManifest === "string"
         ? body.expectedCurrentManifest
         : undefined;
+  const expectedCurrentRevision =
+    typeof body.expectedCurrentRevision === "number"
+      ? body.expectedCurrentRevision
+      : Number.NaN;
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
   if (
+    !UUID.test(operationId) ||
     !SHA256.test(manifestDigest) ||
     expectedCurrentManifest === undefined ||
     (expectedCurrentManifest !== null &&
       !SHA256.test(expectedCurrentManifest)) ||
+    !Number.isSafeInteger(expectedCurrentRevision) ||
+    (expectedCurrentManifest === null
+      ? expectedCurrentRevision !== 0
+      : expectedCurrentRevision <= 0) ||
     reason.length < 8 ||
     reason.length > 500
   ) {
@@ -258,6 +271,7 @@ export async function POST(
   });
 
   const promoted = await promoteFoundationCandidate({
+    operationId,
     workspaceKey: membership.workspaceId,
     collectionId: id,
     manifestDigest,
@@ -266,13 +280,23 @@ export async function POST(
     coreOutputSha256: stored.coreExecution.receipt.outputSha256,
     actorUserId: user.id,
     expectedCurrentManifest,
+    expectedCurrentRevision,
     reason,
   });
   if (!promoted.ok) {
+    const status =
+      promoted.code === "ACTIVE_WORLD_CONFLICT" ||
+      promoted.code === "WORLD_TRANSITION_IDEMPOTENCY_CONFLICT" ||
+      promoted.code === "WORLD_VERSION_BINDING_CONFLICT"
+        ? 409
+        : promoted.code === "WORLD_TRANSITION_FORBIDDEN" ||
+            promoted.code === "AUTHORIZATION_CHANGED_RETRY"
+          ? 403
+          : 503;
     return NextResponse.json(
       { code: promoted.code },
       {
-        status: promoted.code === "ACTIVE_WORLD_CONFLICT" ? 409 : 503,
+        status,
         headers: NO_STORE,
       }
     );

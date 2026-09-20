@@ -214,12 +214,13 @@ const baseInput = () => ({
 });
 
 describe("retrieval pipeline orchestration", () => {
-  it("does not send blocked source text to the reranker", async () => {
+  it("does not let tombstoned source text reappear through search or reach the reranker", async () => {
     sourceBlocked = true;
     const input = baseInput();
     const rerank = vi.spyOn(input.reranker, "rerank");
     expect(await runRetrievalPipeline(input)).toEqual({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     expect(rerank).not.toHaveBeenCalled();
+    expect(requests.some(request => request.url.includes("foundation_retrieval_units"))).toBe(true);
   });
   it("refuses context when access changes while the reranker runs", async () => {
     const input = baseInput();

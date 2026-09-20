@@ -20,6 +20,19 @@ export async function recordConnectorDocumentBinding(input: {
     native_id: input.nativeId, provider_revision: input.revision, document_id: identity.documentId,
     content_sha256: input.contentSha256, byte_length: input.byteLength, mime_type: input.mimeType };
   try {
+    // The database keeps logical-source tombstones forever. Check before attempting an
+    // insert so a provider re-listing cannot recreate a deleted source under a new revision.
+    // A trigger in the deletion migration repeats this check in the same transaction; this
+    // RPC is the early, stable product error rather than the only enforcement boundary.
+    const allowed = await supabaseAdminRequest(config, "/rest/v1/rpc/connector_source_import_allowed", {
+      method: "POST",
+      body: JSON.stringify({ p_workspace_key: input.workspaceKey, p_source_id: identity.sourceId }),
+    });
+    if (!allowed.ok) return { ok: false, code: "CONNECTOR_BINDING_GUARD_UNAVAILABLE" };
+    const decision: unknown = await allowed.json();
+    if (decision !== true) {
+      return { ok: false, code: decision === false ? "SOURCE_TOMBSTONED" : "CONNECTOR_BINDING_GUARD_UNAVAILABLE" };
+    }
     const write = await supabaseAdminRequest(config, "/rest/v1/connector_document_bindings", {
       method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify([row]),
     });

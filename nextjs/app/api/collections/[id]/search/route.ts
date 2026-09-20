@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
-import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import {
-  buildProductionRetrievalProfile,
-  createProductionEmbedderAdapter,
-  createProductionRerankerAdapter,
-  readRetrievalRuntimeEnv,
+  selectProductionRetrievalRuntime,
 } from "@/lib/retrieval-runtime-config";
 import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
 import { getFoundationActiveWorld, getWorldFreshness } from "@/lib/world-store";
+import {
+  attemptedRetrievalModelRoles,
+  attemptedRetrievalModelRolesOnFailure,
+  buildPublicRetrievalRoute,
+  persistRetrievalModelAttempt,
+} from "@/lib/model-attempt-receipt";
 
 // POST /v1/collections/{id}/search -- evidence-rich candidates, no generated prose.
 //
@@ -73,8 +76,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // A missing GPU runtime is a degradation, not a failure: the pipeline falls back to
   // lexical + structure and reports it in `degradations`, so the caller can tell a
   // full-pipeline result from a degraded one instead of silently receiving weaker retrieval.
-  const runtimeEnv = readRetrievalRuntimeEnv();
-  const profile = buildProductionRetrievalProfile(auth.principal.workspaceKey);
+  const runtime = selectProductionRetrievalRuntime(auth.principal.workspaceKey);
 
   const result = await runRetrievalPipeline({
     workspaceKey: auth.principal.workspaceKey,
@@ -82,13 +84,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     worldManifestDigest: active.world.manifestDigest,
     worldStateId: active.world.worldStateId,
     question: query,
-    profile,
-    embedder: runtimeEnv ? createProductionEmbedderAdapter(runtimeEnv) : null,
-    reranker: runtimeEnv ? createProductionRerankerAdapter(runtimeEnv) : null,
+    profile: runtime.profile,
+    embedder: runtime.embedder,
+    reranker: runtime.reranker,
     contextLimit: requestedLimit,
   });
 
   if (!result.ok) {
+    const attemptedRoles = attemptedRetrievalModelRolesOnFailure(runtime, result.code);
+    const persisted = await persistRetrievalModelAttempt({
+      endpoint: "search", workspaceKey: auth.principal.workspaceKey, collectionId: id,
+      worldManifestDigest: active.world.manifestDigest, query,
+      modelRoute: runtime.decision, attemptedRoles, degradations: [],
+      execution: { outcome: "failed", failureClass: "downstream_failure" },
+    });
+    if (!persisted.ok) {
+      return NextResponse.json({ code: persisted.code }, { status: 503, headers: NO_STORE });
+    }
     /*
       A 409 here has exactly one cause worth explaining -- there is no compiled index for this
       active world -- and until now the response was the bare code. Search has no fallback, so
@@ -103,6 +115,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           worldManifestDigest: active.world.manifestDigest,
         })
       : null;
+    const authorizedNow = await revalidateFoundationAuthorization(
+      request, auth.principal, "ask:read", "observer",
+    );
+    if (!authorizedNow.ok) {
+      return NextResponse.json(
+        { code: authorizedNow.code },
+        { status: authorizedNow.status, headers: NO_STORE },
+      );
+    }
     return NextResponse.json(
       {
         code: result.code,
@@ -118,6 +139,36 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     );
   }
 
+  const attemptedRoles = attemptedRetrievalModelRoles(runtime, result.diagnostics);
+  const persisted = await persistRetrievalModelAttempt({
+    endpoint: "search",
+    workspaceKey: auth.principal.workspaceKey,
+    collectionId: id,
+    worldManifestDigest: active.world.manifestDigest,
+    query,
+    modelRoute: runtime.decision,
+    attemptedRoles,
+    degradations: result.diagnostics.degradations,
+  });
+  if (!persisted.ok) {
+    return NextResponse.json({ code: persisted.code }, { status: 503, headers: NO_STORE });
+  }
+  const publicRoute = buildPublicRetrievalRoute(attemptedRoles, result.diagnostics.degradations);
+
+  const freshness = await getWorldFreshness(auth.principal.workspaceKey, id);
+  // Retrieval and freshness can both cross process or provider boundaries. Re-resolve the
+  // session/API key, workspace membership and product access after those awaits so a revocation
+  // that lands while search is running cannot receive the completed evidence packet.
+  const authorizedNow = await revalidateFoundationAuthorization(
+    request, auth.principal, "ask:read", "observer",
+  );
+  if (!authorizedNow.ok) {
+    return NextResponse.json(
+      { code: authorizedNow.code },
+      { status: authorizedNow.status, headers: NO_STORE },
+    );
+  }
+
   return NextResponse.json(
     {
       code: result.packet.items.length > 0 ? "SEARCH_RESULTS" : "SEARCH_EMPTY",
@@ -130,13 +181,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       retrievalPath: "compiled-retrieval-v1",
       // What did not run. A missing embedder degrades this to lexical + structure, and a
       // reranker outage degrades it to the fused order; both are named rather than silent.
-      degradations: result.diagnostics.degradations,
+      degradations: publicRoute.degradationClasses,
       activeWorld: {
         manifestDigest: active.world.manifestDigest,
         revision: active.world.revision,
         worldStateId: active.world.worldStateId,
       },
-      freshness: await getWorldFreshness(auth.principal.workspaceKey, id),
+      freshness,
       // The packet itself is the contract every surface shares (§20). It is returned whole
       // rather than reshaped per endpoint, so /search, /ask, MCP and the CLI cannot drift
       // into four subtly different evidence formats.
@@ -151,7 +202,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         fusedCandidates: result.diagnostics.fusedCandidateCount,
         rerankerApplied: result.diagnostics.rerankerApplied,
         gateRejections: result.diagnostics.gateRejections,
-        degradations: result.diagnostics.degradations,
+        routeClass: publicRoute.routeClass,
+        degradations: publicRoute.degradationClasses,
       },
     },
     { headers: NO_STORE },

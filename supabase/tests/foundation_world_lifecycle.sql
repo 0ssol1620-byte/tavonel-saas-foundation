@@ -11,9 +11,9 @@ select ok((select relrowsecurity from pg_class where oid = 'public.foundation_wo
 select ok(not has_table_privilege('anon', 'public.foundation_active_worlds', 'select'), 'anonymous clients cannot read active worlds');
 select ok(not has_table_privilege('authenticated', 'public.foundation_world_versions', 'select'), 'authenticated clients cannot bypass lifecycle API');
 select ok(not has_function_privilege('authenticated', 'public.promote_foundation_candidate(text,text,text,text,text,text,uuid,text,text)', 'execute'), 'authenticated clients cannot promote directly');
-select ok(has_function_privilege('service_role', 'public.promote_foundation_candidate(text,text,text,text,text,text,uuid,text,text)', 'execute'), 'service role can promote');
+select ok(not has_function_privilege('service_role', 'public.promote_foundation_candidate(text,text,text,text,text,text,uuid,text,text)', 'execute'), 'legacy digest-only promotion RPC is closed to service role');
 select ok(not has_function_privilege('authenticated', 'public.rollback_foundation_world(text,text,text,text,uuid,text)', 'execute'), 'authenticated clients cannot roll back directly');
-select ok(has_function_privilege('service_role', 'public.rollback_foundation_world(text,text,text,text,uuid,text)', 'execute'), 'service role can roll back');
+select ok(not has_function_privilege('service_role', 'public.rollback_foundation_world(text,text,text,text,uuid,text)', 'execute'), 'legacy digest-only rollback RPC is closed to service role');
 -- Red from the first rehearsal run until 0053, and never flipped to make the suite green: 0007:68-71
 -- revokes only from public, anon and authenticated and then grants select to service_role, so
 -- service_role kept the UPDATE that Supabase's default privileges had already handed it (the run's

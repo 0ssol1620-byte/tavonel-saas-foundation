@@ -14,12 +14,10 @@ import { landingV2Copy } from "../lib/landing-v2-copy";
   "Sources into a World" and Scene 07 "Bring it, use it" a headline, a paragraph and one next
   action each.
 
-  ROUND 4: Scene 07's in/out lists landed, and they are where the intake ROUTES live. `/sources`
-  is Scene 07's "Files, folders and ZIP" row; `/integrations` is its connector row. Scene 03's
-  own next action is `/explore?act=world` -- it shows what compiling those sources produces, and
-  it never linked `/sources`. So the selector moves to where the fact lives, which is this file's
-  one standing habit. What is asserted is reachability and destination, plus the two things this
-  file has always also caught: a console error on the way, and sideways scroll.
+  ROUND 5: the home page now leads with outcomes. Scene 07's three rows open the public sample,
+  its evidence record, and the public sample again; source intake remains available from the
+  footer and the dedicated source pages. This assertion follows the current decision surface
+  while still catching drift between rendered labels and their declared destinations.
 */
 test("the entry page reaches every supported intake route, with no console error", async ({ page }) => {
   const errors: string[] = [];
@@ -49,8 +47,8 @@ test("the entry page reaches every supported intake route, with no console error
       `Scene 07's "${row.label}" row`,
     ).toHaveAttribute("href", row.href);
   }
-  expect(inbound.map((row) => row.href), "the intake routes Scene 07 carries")
-    .toEqual(["/sources", "/integrations", "/integrations"]);
+  expect(inbound.map((row) => row.href), "the outcome routes Scene 07 carries")
+    .toEqual(["/explore", "/evidence", "/explore"]);
 
   // The commercial posture's own destination is on the page twice: the hero and the close.
   const access = page.locator('main a[href="/contact"], main a[href="/login"], main a[href="/workspace"]');

@@ -226,7 +226,7 @@ export type LandingV2Copy = {
 const EN: LandingV2Copy = {
   hero: {
     id: "hero",
-    eyebrow: "THE KNOWLEDGE COMPILER",
+    eyebrow: "WHAT YOU LEAVE WITH",
     /*
       Imported, never retyped. `BRAND_LINE.headline` is a founder-approved public claim and the
       nav lane owns the string; a landing that spelled it a second time would be the sixth
@@ -283,8 +283,8 @@ const EN: LandingV2Copy = {
 
   proof: {
     id: "proof",
-    eyebrow: "REAL OUTPUT · PUBLIC COMPILED WORLD",
-    headline: "Don’t take our word for it.",
+    eyebrow: "TRY A FINISHED RESULT",
+    headline: "Check the result before the promise.",
     /*
       §12's own sentence is "Open the source behind the answer.", written for the scene with the
       three claim tabs and the region raster beside them. Those land in P1. Until they do, that
@@ -308,9 +308,9 @@ const EN: LandingV2Copy = {
 
   sources: {
     id: "sources",
-    eyebrow: "SOURCES INTO A WORLD",
-    headline: "Bring the mess.",
-    headlineAccent: "Keep the meaning.",
+    eyebrow: "BRING YOUR SOURCES",
+    headline: "See what the intake accepts.",
+    headlineAccent: "See what it preserves.",
     /*
       C2, 2026-09-19. "Documents, spreadsheets, decks and scans come in" stated an intake range
       this World has never run: the sample is five SEC filings, all PDF. The accepted-format list
@@ -325,8 +325,8 @@ const EN: LandingV2Copy = {
 
   evidence: {
     id: "evidence",
-    eyebrow: "EVIDENCE IS THE PRODUCT",
-    headline: "Every answer has a way back.",
+    eyebrow: "VERIFY ONE ANSWER",
+    headline: "Follow it back to the page.",
     support:
       "Every published object stays bound to the source version, page and region it came from.",
     fields: {
@@ -344,7 +344,7 @@ const EN: LandingV2Copy = {
 
   recompile: {
     id: "recompile",
-    eyebrow: "WHEN THE SOURCES MOVE",
+    eyebrow: "CHECK WHAT CHANGED",
     /*
       D5 / rule 7. §15 asks for "TAVONEL does not blindly rebuild everything. It tracks what
       depends on the changed source and recompiles the affected knowledge." -- which describes
@@ -382,11 +382,11 @@ const EN: LandingV2Copy = {
 
   why: {
     id: "why",
-    eyebrow: "WHY A COMPILER",
-    headline: "A parser reads files.",
-    headlineAccent: "A compiler keeps what connects them.",
+    eyebrow: "UNDERSTAND THE CONTRACT",
+    headline: "Keep the result connected",
+    headlineAccent: "to the source that supports it.",
     support:
-      "Reading a document, structuring what is in it, binding every object to the region it came from, and keeping those bindings as the sources move are four different responsibilities. They tend to live in four different layers.",
+      "Reading, structuring, binding evidence, and maintaining change are different layers of work. The Knowledge Compiler keeps them connected in one inspectable result.",
     /* §16's continuum, left to right. Labels are stages of work, never a scoreboard. */
     stages: [
       { id: "read", label: "READ", caption: "text and layout" },
@@ -409,44 +409,44 @@ const EN: LandingV2Copy = {
       comparison to be useful: text, chunks, nodes, and a binding.
     */
     layers: [
-      { id: "parser", label: "Parser", responsibility: "Keeps the text and the layout it read off the file." },
-      { id: "retrieval", label: "Retrieval index", responsibility: "Keeps chunks of text it can find again at question time." },
-      { id: "graph", label: "Graph database", responsibility: "Keeps nodes and edges that something upstream produced." },
-      { id: "compiler", label: "Knowledge Compiler", responsibility: "Keeps every object bound to the source version, page and region it came from, across all four stages." },
+      { id: "parser", label: "Document parser", responsibility: "Recover the text and layout from the source." },
+      { id: "retrieval", label: "Retrieval layer", responsibility: "Turn passages into objects that can be found and used." },
+      { id: "graph", label: "Evidence graph", responsibility: "Keep each object linked to the version, page, and region that supports it." },
+      { id: "compiler", label: "Knowledge Compiler", responsibility: "Compile the four stages into one versioned result whose evidence remains inspectable." },
     ],
-    manifesto: "A compiler keeps what connects them.",
+    manifesto: "to the source that supports it.",
   },
 
   use: {
     id: "use",
-    eyebrow: "BRING IT · USE IT",
-    headline: "One way in.",
-    headlineAccent: "Every way out.",
+    eyebrow: "CHOOSE YOUR NEXT TASK",
+    headline: "Start with the result.",
+    headlineAccent: "Then inspect what matters.",
     support:
-      "Sources arrive through one intake path, whatever they came from. What is compiled leaves in the shapes your systems already read.",
-    inLabel: "In",
-    outLabel: "Out",
+      "Use the public World to understand the result, its evidence, and its changes before deciding whether to bring your own sources.",
+    inLabel: "Inspect the result",
+    outLabel: "Decide whether it fits",
     /*
       Rule 7. Only what is built is listed as built; `built: false` is the component's instruction
       to draw the row monochrome. Nothing here names a connector this deployment does not have.
     */
     inbound: [
-      { id: "files", label: "Files, folders and ZIP", note: "Uploaded directly; an archive is expanded before upload.", href: "/sources", built: true },
-      { id: "cloud", label: "Google Drive, Dropbox, OneDrive and SharePoint", note: "Read-only connections you authorize.", href: "/integrations", built: true },
-      { id: "private", label: "Your own infrastructure", note: "A mounted file server or object storage read by an agent you run.", href: "/integrations", built: true },
+      { id: "result", label: "Read a finished World", note: "Open the public sample and inspect the compiled objects it contains.", href: "/explore", built: true },
+      { id: "answer", label: "Verify an answer", note: "Follow a citation to the source page and region that supports it.", href: "/evidence", built: true },
+      { id: "change", label: "Inspect a change", note: "Compare two complete compiles and see which objects moved.", href: "/explore", built: true },
     ],
     outbound: [
-      { id: "mcp", label: "AI over MCP", note: "Reach a compiled World from an assistant.", href: "/docs/mcp", built: true },
-      { id: "api", label: "API", note: "Query objects, evidence and versions over HTTP.", href: "/docs/world-api", built: true },
-      { id: "artifacts", label: "Retrieval artifacts", note: "The chunks and bindings a retriever needs, exported.", href: "/docs/exports", built: true },
-      { id: "package", label: "Signed portable package", note: "Take the compiled World away and check it offline.", href: "/developers", built: true },
+      { id: "sources", label: "Check accepted sources", note: "Review the current intake formats and their stated limits.", href: "/sources", built: true },
+      { id: "contract", label: "Read the compiler contract", note: "See which behavior is available and which remains qualified.", href: "/product/continuous-knowledge", built: true },
+      { id: "boundary", label: "Review the trust boundary", note: "Check the controls and the deployment states the site publishes.", href: "/trust", built: true },
+      { id: "access", label: "Discuss your sources", note: "Use the access path only after the public result answers your questions.", href: "/contact", built: true },
     ],
   },
 
   trust: {
     id: "trust",
-    eyebrow: "TRUST",
-    headline: "Built for knowledge you cannot afford to misplace.",
+    eyebrow: "CHECK THE BOUNDARIES",
+    headline: "Read what this deployment actually does.",
     support: "Four things this deployment does, each written down where it can be checked.",
     /*
       The four §18 proofs, and where each one is backed.
@@ -505,9 +505,9 @@ const EN: LandingV2Copy = {
 
   start: {
     id: "start",
-    eyebrow: "START",
-    headline: "Bring your knowledge.",
-    headlineAccent: "Leave with something your AI can trust.",
+    eyebrow: "CHOOSE THE NEXT STEP",
+    headline: "Inspect the public result.",
+    headlineAccent: "Bring your sources when it fits.",
     support: "Read a finished Compiled World first. Bring your own sources when you are ready.",
     /* D5: the gate sentence is the deployment's own, verbatim, not a paraphrase of it. */
     microtext: activationPolicy.customerData.reason,
@@ -519,7 +519,7 @@ const EN: LandingV2Copy = {
 const KO: LandingV2Copy = {
   hero: {
     id: "hero",
-    eyebrow: "지식 컴파일러",
+    eyebrow: "얻게 되는 결과",
     /* A literal translation of `BRAND_LINE.headline`, not a second claim. */
     headline: "AI가 바로 사용할 수 있는 지식. 모든 원문까지 추적됩니다.",
     /* D12: the literal translation of each arm. The subject is dropped, as the deck does. */
@@ -550,8 +550,8 @@ const KO: LandingV2Copy = {
 
   proof: {
     id: "proof",
-    eyebrow: "실제 결과 · 공개 Compiled World",
-    headline: "말만 믿지 마세요.",
+    eyebrow: "완성된 결과 확인하기",
+    headline: "약속보다 결과를 먼저 확인하세요.",
     support: "완성된 Compiled World를 열어, 모든 답 뒤에 있는 원문을 직접 읽어 보세요.",
     tabsLabel: "이 Compiled World에서 답한 질문",
     answerLabel: "원문에서",
@@ -562,9 +562,9 @@ const KO: LandingV2Copy = {
 
   sources: {
     id: "sources",
-    eyebrow: "원문에서 World로",
-    headline: "그대로 가져오세요.",
-    headlineAccent: "의미는 그대로 남습니다.",
+    eyebrow: "가지고 있는 원문 가져오기",
+    headline: "무엇을 받는지 확인하세요.",
+    headlineAccent: "무엇을 남기는지도 확인하세요.",
     support:
       "문서, 스프레드시트, 발표자료, 스캔본을 업로드에서 허용합니다. 나오는 것은 구조화되고 근거에 묶인 World입니다.",
     note: "허용되는 모든 원문은 PDF로 정제해 같은 방식으로 읽으므로, 문단마다 페이지와 영역이 남습니다.",
@@ -572,8 +572,8 @@ const KO: LandingV2Copy = {
 
   evidence: {
     id: "evidence",
-    eyebrow: "근거가 곧 제품입니다",
-    headline: "모든 답에는 돌아가는 길이 있습니다.",
+    eyebrow: "답 하나 검증하기",
+    headline: "답에서 원문 페이지로 돌아가세요.",
     support: "게시된 모든 객체는 그것이 나온 원문 버전, 페이지, 영역에 계속 묶여 있습니다.",
     fields: {
       status: "상태",
@@ -589,7 +589,7 @@ const KO: LandingV2Copy = {
 
   recompile: {
     id: "recompile",
-    eyebrow: "원문이 움직일 때",
+    eyebrow: "무엇이 바뀌었는지 확인하기",
     headline: "새 원문이 도착하면,",
     headlineAccent: "지식을 다시 컴파일합니다.",
     support:
@@ -614,11 +614,11 @@ const KO: LandingV2Copy = {
 
   why: {
     id: "why",
-    eyebrow: "왜 컴파일러인가",
-    headline: "파서는 파일을 읽습니다.",
-    headlineAccent: "컴파일러는 그것들을 잇는 것을 지킵니다.",
+    eyebrow: "제품의 계약 이해하기",
+    headline: "결과를 뒷받침하는 원문과",
+    headlineAccent: "계속 연결해 둡니다.",
     support:
-      "문서를 읽는 일, 그 안의 내용을 구조화하는 일, 모든 객체를 나온 영역에 묶는 일, 원문이 바뀌어도 그 연결을 유지하는 일은 서로 다른 네 가지 책임입니다. 대개 서로 다른 계층에 있습니다.",
+      "읽기, 구조화, 근거 연결, 변경에 따른 유지는 서로 다른 작업 층입니다. 지식 컴파일러는 이를 확인 가능한 하나의 결과로 이어 둡니다.",
     stages: [
       { id: "read", label: "읽기", caption: "텍스트와 레이아웃" },
       { id: "structure", label: "구조화", caption: "개체와 주장" },
@@ -626,40 +626,40 @@ const KO: LandingV2Copy = {
       { id: "maintain", label: "유지", caption: "버전과 의존 관계" },
     ],
     layers: [
-      { id: "parser", label: "파서", responsibility: "파일에서 읽어 낸 텍스트와 레이아웃을 가지고 있습니다." },
-      { id: "retrieval", label: "검색 색인", responsibility: "질문 시점에 다시 찾을 수 있는 텍스트 조각을 가지고 있습니다." },
-      { id: "graph", label: "그래프 데이터베이스", responsibility: "앞 단계가 만들어 준 노드와 간선을 가지고 있습니다." },
-      { id: "compiler", label: "지식 컴파일러", responsibility: "네 단계 전부에 걸쳐, 모든 객체를 그것이 나온 원문 버전과 페이지와 영역에 묶어 둡니다." },
+      { id: "parser", label: "문서 파서", responsibility: "원문에서 텍스트와 레이아웃을 읽어 냅니다." },
+      { id: "retrieval", label: "검색 계층", responsibility: "문단을 찾아서 사용할 수 있는 객체로 만듭니다." },
+      { id: "graph", label: "근거 그래프", responsibility: "각 객체를 뒷받침하는 원문 버전, 페이지, 영역에 묶습니다." },
+      { id: "compiler", label: "지식 컴파일러", responsibility: "네 단계를 하나의 버전 관리 결과로 컴파일하고 근거를 계속 확인할 수 있게 둡니다." },
     ],
-    manifesto: "컴파일러는 그것들을 잇는 것을 지킵니다.",
+    manifesto: "계속 연결해 둡니다.",
   },
 
   use: {
     id: "use",
-    eyebrow: "가져오기 · 사용하기",
-    headline: "들어오는 길은 하나.",
-    headlineAccent: "나가는 길은 모두.",
+    eyebrow: "다음 과업 선택하기",
+    headline: "결과부터 확인하세요.",
+    headlineAccent: "그다음 필요한 것을 살펴보세요.",
     support:
-      "원문이 어디에서 왔든 하나의 반입 경로로 들어옵니다. 컴파일된 결과는 이미 쓰고 있는 시스템이 읽는 형태로 나갑니다.",
-    inLabel: "들어오기",
-    outLabel: "나가기",
+      "직접 가진 원문을 가져올지 결정하기 전에 공개 World에서 결과, 근거, 변경 내용을 확인하세요.",
+    inLabel: "결과 살펴보기",
+    outLabel: "적합한지 판단하기",
     inbound: [
-      { id: "files", label: "파일, 폴더, ZIP", note: "직접 업로드하며, 압축 파일은 업로드 전에 풀립니다.", href: "/sources", built: true },
-      { id: "cloud", label: "Google Drive, Dropbox, OneDrive, SharePoint", note: "직접 승인하는 읽기 전용 연결입니다.", href: "/integrations", built: true },
-      { id: "private", label: "직접 운영하는 인프라", note: "직접 운영하는 에이전트가 읽는 마운트된 파일 서버 또는 오브젝트 스토리지입니다.", href: "/integrations", built: true },
+      { id: "result", label: "완성된 World 읽기", note: "공개 샘플을 열어 그 안의 컴파일된 객체를 살펴봅니다.", href: "/explore", built: true },
+      { id: "answer", label: "답 검증하기", note: "인용을 따라 답을 뒷받침하는 원문 페이지와 영역을 확인합니다.", href: "/evidence", built: true },
+      { id: "change", label: "변경 내용 살펴보기", note: "두 번의 전체 컴파일을 비교해 어떤 객체가 움직였는지 확인합니다.", href: "/explore", built: true },
     ],
     outbound: [
-      { id: "mcp", label: "MCP로 AI에서", note: "어시스턴트에서 Compiled World에 접근합니다.", href: "/docs/mcp", built: true },
-      { id: "api", label: "API", note: "객체, 근거, 버전을 HTTP로 조회합니다.", href: "/docs/world-api", built: true },
-      { id: "artifacts", label: "검색용 아티팩트", note: "검색기에 필요한 청크와 연결을 내보냅니다.", href: "/docs/exports", built: true },
-      { id: "package", label: "서명된 이식 가능 패키지", note: "컴파일된 World를 가져가서 오프라인에서 검증합니다.", href: "/developers", built: true },
+      { id: "sources", label: "허용 원문 확인하기", note: "현재 반입 형식과 공개된 제한을 확인합니다.", href: "/sources", built: true },
+      { id: "contract", label: "컴파일러 계약 읽기", note: "사용 가능한 동작과 아직 조건이 붙은 동작을 구분합니다.", href: "/product/continuous-knowledge", built: true },
+      { id: "boundary", label: "신뢰 경계 살펴보기", note: "사이트가 공개한 통제와 배포 상태를 확인합니다.", href: "/trust", built: true },
+      { id: "access", label: "가지고 있는 원문 논의하기", note: "공개 결과를 확인한 뒤 접근 경로를 이용합니다.", href: "/contact", built: true },
     ],
   },
 
   trust: {
     id: "trust",
-    eyebrow: "신뢰와 보안",
-    headline: "잃어버려서는 안 되는 지식을 위해 만들었습니다.",
+    eyebrow: "경계 확인하기",
+    headline: "이 배포판이 실제로 하는 일을 읽어 보세요.",
     support: "이 배포판이 실제로 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
     proofs: [
       { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다.", href: "/security" },
@@ -678,9 +678,9 @@ const KO: LandingV2Copy = {
 
   start: {
     id: "start",
-    eyebrow: "시작하기",
-    headline: "지식을 가져오세요.",
-    headlineAccent: "AI가 신뢰할 수 있는 결과를 가지고 나가세요.",
+    eyebrow: "다음 단계 선택하기",
+    headline: "공개 결과를 살펴보세요.",
+    headlineAccent: "맞는다면 직접 가진 원문을 가져오세요.",
     support: "먼저 완성된 Compiled World를 읽어 보세요. 준비되면 직접 가진 원문을 가져오시면 됩니다.",
     /*
       The English microtext is `activationPolicy.customerData.reason` verbatim; this is its one

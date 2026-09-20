@@ -18,7 +18,7 @@ import {
   validatePromotableCollectionArtifact,
   validateReviewableCollectionArtifact,
 } from "./collection-download";
-import { createExportSigner, verifyExportSignature } from "./export-signing";
+import { createExportSigner, verifyExportSignature, type ExportTrustStore } from "./export-signing";
 
 function input(documentId: string, versionKey: string, text: string): CollectionOcrInput {
   const workspaceId = "pilot-download";
@@ -77,6 +77,16 @@ function exportSigningMaterial() {
   const privateKeyPkcs8DerBase64 = privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");
   return {
     signer: createExportSigner({ keyId: "foundation-test-2026", privateKeyPkcs8DerBase64 })!,
+    publicKeySpkiDer: createPublicKey(privateKey).export({ format: "der", type: "spki" }),
+  };
+}
+
+function keys() {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  return {
+    privateKeyPkcs8DerBase64: privateKey
+      .export({ format: "der", type: "pkcs8" })
+      .toString("base64"),
     publicKeySpkiDer: createPublicKey(privateKey).export({ format: "der", type: "spki" }),
   };
 }
@@ -195,6 +205,58 @@ describe("Foundation collection package download", () => {
     expect(JSON.parse(strFromU8(entries["manifest/ai-entrypoint.json"]))).toEqual(expect.objectContaining({
       authoritativeUse: "blocked_pending_review",
     }));
+  });
+
+  it("verifies a v2 archive offline through an external rotation/revocation trust store", () => {
+    const source = completedArtifact();
+    const artifact = validateDownloadableCollectionArtifact(source, source.collectionId)!;
+    const material = keys();
+    const publicKeySpkiSha256 = `sha256:${createHash("sha256").update(material.publicKeySpkiDer).digest("hex")}`;
+    const signer = createExportSigner({
+      keyId: "foundation-export-current",
+      keyVersion: 2,
+      privateKeyPkcs8DerBase64: material.privateKeyPkcs8DerBase64,
+      notBefore: "2026-09-01T00:00:00.000Z",
+      expiresAt: "2027-09-01T00:00:00.000Z",
+      issuedAt: "2026-09-20T00:00:00.000Z",
+    })!;
+    const trust: ExportTrustStore = {
+      schemaVersion: "tavonel.export_trust.v2",
+      minimumSignatureVersion: 2,
+      activeKeyId: signer.keyId,
+      keys: [{
+        keyId: signer.keyId,
+        keyVersion: 2,
+        algorithm: "Ed25519",
+        status: "active",
+        notBefore: "2026-09-01T00:00:00.000Z",
+        expiresAt: "2027-09-01T00:00:00.000Z",
+        publicKeySpkiDerBase64: material.publicKeySpkiDer.toString("base64"),
+        publicKeySpkiSha256,
+      }],
+    };
+    const signed = buildSignedCollectionZip(artifact, signer);
+    const archivePath = join(tmpdir(), `tavonel-export-v2-${randomUUID()}.zip`);
+    const trustPath = join(tmpdir(), `tavonel-export-trust-${randomUUID()}.json`);
+    writeFileSync(archivePath, signed.archive);
+    writeFileSync(trustPath, `${JSON.stringify(trust, null, 2)}\n`);
+    try {
+      const verifier = resolve(import.meta.dirname, "../scripts/verify-signed-export.mjs");
+      const accepted = spawnSync(process.execPath, [verifier, "--archive", archivePath, "--trust-store", trustPath], { encoding: "utf8" });
+      expect(accepted.status, accepted.stderr).toBe(0);
+      const revokedPath = join(tmpdir(), `tavonel-export-revoked-${randomUUID()}.json`);
+      try {
+        writeFileSync(revokedPath, `${JSON.stringify({ ...trust, keys: [{ ...trust.keys[0], status: "revoked" }] }, null, 2)}\n`);
+        const revoked = spawnSync(process.execPath, [verifier, "--archive", archivePath, "--trust-store", revokedPath], { encoding: "utf8" });
+        expect(revoked.status).toBe(1);
+        expect(revoked.stderr).toContain("key lifecycle policy");
+      } finally {
+        unlinkSync(revokedPath);
+      }
+    } finally {
+      unlinkSync(archivePath);
+      unlinkSync(trustPath);
+    }
   });
 
   /*

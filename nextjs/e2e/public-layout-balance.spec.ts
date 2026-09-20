@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const ROUTES = [
+  "/enterprise",
   "/integrations",
   "/docs",
   "/docs/quickstart",
@@ -73,7 +74,9 @@ test("integration marketing copy uses access modes instead of beta badges", asyn
 */
 test("odd two-column record grids do not expose an empty placeholder cell", async ({ page }) => {
   let exercised = 0;
-  for (const route of ["/security", "/status", "/subprocessors"] as const) {
+  // `/security` now uses a narrative controls list so public assurance does not expose an
+  // implementation inventory. The two actual record grids remain the geometry fixtures.
+  for (const route of ["/status", "/subprocessors"] as const) {
     await page.goto(route);
     const grid = page.locator(route === "/subprocessors" ? ".processor-list" : ".status-list").last();
     const geometry = await grid.evaluate((element) => {
@@ -109,8 +112,11 @@ test("the public footer stays compact and fully painted on narrow screens", asyn
     const intersects = (a: DOMRect, b: DOMRect) =>
       Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
       && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
-    const overlapCount = navs.flatMap((nav, index) =>
+    const navOverlapCount = navs.flatMap((nav, index) =>
       navs.slice(index + 1).filter((candidate) => intersects(nav.getBoundingClientRect(), candidate.getBoundingClientRect())),
+    ).length;
+    const linkOverlapCount = links.flatMap((link, index) =>
+      links.slice(index + 1).filter((candidate) => intersects(link.getBoundingClientRect(), candidate.getBoundingClientRect())),
     ).length;
 
     return {
@@ -118,15 +124,34 @@ test("the public footer stays compact and fully painted on narrow screens", asyn
       footerHeight: element.getBoundingClientRect().height,
       groupHeight: group.getBoundingClientRect().height,
       linkHeights: links.map((link) => link.getBoundingClientRect().height),
-      overlapCount,
+      navOverlapCount,
+      linkOverlapCount,
     };
   });
 
-  expect(result.overlapCount).toBe(0);
+  expect(result.navOverlapCount).toBe(0);
+  expect(result.linkOverlapCount).toBe(0);
   expect(result.groupHeight).toBeGreaterThan(100);
   if ((page.viewportSize()?.width ?? 0) <= 480) {
     expect(result.columns).toBe(2);
     expect(result.footerHeight).toBeLessThan((page.viewportSize()?.height ?? 844) * 0.9);
     expect(result.linkHeights.every((height) => height >= 43.99)).toBe(true);
+  }
+});
+
+test("enterprise jump links keep separate touch targets", async ({ page }) => {
+  await page.goto("/enterprise");
+  const links = page.getByRole("navigation", { name: "On this page" }).getByRole("link");
+  const geometry = await links.evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: rect.height };
+  }));
+
+  expect(geometry.length).toBeGreaterThanOrEqual(3);
+  if ((page.viewportSize()?.width ?? 0) <= 1079) {
+    expect(geometry.every((item) => item.height >= 43.99)).toBe(true);
+  }
+  for (let index = 1; index < geometry.length; index += 1) {
+    expect(geometry[index].top).toBeGreaterThanOrEqual(geometry[index - 1].bottom - 1);
   }
 });

@@ -26,18 +26,18 @@ describe("developer credential store", () => {
     configure();
     let persisted: Record<string, unknown> | null = null;
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      if (String(input).includes("foundation_api_keys")) {
+      if (String(input).includes("create_foundation_api_key_authorized")) {
         persisted = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        return Response.json([{
+        return Response.json({
           key_id: keyId,
           name: "Agent",
-          key_prefix: persisted.key_prefix,
+          key_prefix: persisted.p_key_prefix,
           scopes: ["documents:read"],
           created_at: "2026-08-30T00:00:00Z",
           expires_at: null,
           last_used_at: null,
           revoked_at: null,
-        }]);
+        });
       }
       return new Response(null, { status: 201 });
     }));
@@ -45,6 +45,7 @@ describe("developer credential store", () => {
     const created = await createDeveloperApiKey({
       workspaceKey,
       userId,
+      authorizationRevision: 7,
       name: "Agent",
       scopes: ["documents:read"],
       expiresAt: null,
@@ -56,43 +57,27 @@ describe("developer credential store", () => {
     expect(persisted).not.toBeNull();
     const persistedRecord = persisted as unknown as Record<string, unknown>;
     expect(persistedRecord).not.toHaveProperty("token");
-    expect(persistedRecord.token_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(persistedRecord.p_token_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(persistedRecord.p_authorization_revision).toBe(7);
     expect(JSON.stringify(persistedRecord)).not.toContain(created.token);
   });
 
-  it("revokes a newly inserted key when its durable audit write fails", async () => {
+  it("fails closed when atomic creation observes a changed authority epoch", async () => {
     configure();
-    const requests: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, method: init?.method ?? "GET", body: String(init?.body ?? "") });
-      if (url.includes("foundation_api_keys") && init?.method === "POST") {
-        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-        return Response.json([{
-          key_id: keyId,
-          name: "Agent",
-          key_prefix: body.key_prefix,
-          scopes: ["documents:read"],
-          created_at: "2026-08-30T00:00:00Z",
-          expires_at: null,
-          last_used_at: null,
-          revoked_at: null,
-        }]);
-      }
-      if (url.includes("foundation_developer_audit_events")) return Response.json({}, { status: 503 });
-      return Response.json([]);
+      expect(String(input)).toContain("create_foundation_api_key_authorized");
+      expect(JSON.parse(String(init?.body))).toHaveProperty("p_authorization_revision", 7);
+      return Response.json({ message: "api_key_authorization_changed" }, { status: 409 });
     }));
 
     await expect(createDeveloperApiKey({
       workspaceKey,
       userId,
+      authorizationRevision: 7,
       name: "Agent",
       scopes: ["documents:read"],
       expiresAt: null,
-    })).resolves.toEqual({ ok: false, code: "DEVELOPER_AUDIT_WRITE_FAILED" });
-    const compensation = requests.find((request) => request.url.includes(`key_id=eq.${keyId}`) && request.method === "PATCH");
-    expect(compensation).toBeTruthy();
-    expect(JSON.parse(compensation!.body)).toHaveProperty("revoked_at");
+    })).resolves.toEqual({ ok: false, code: "AUTHORIZATION_CHANGED_RETRY" });
   });
 
   it("authenticates by digest and consumes the database rate counter", async () => {
@@ -111,6 +96,7 @@ describe("developer credential store", () => {
           scopes: ["documents:read"],
           expires_at: null,
           revoked_at: null,
+          authorization_revision: 7,
         }]);
       }
       return Response.json([]);
@@ -147,6 +133,7 @@ describe("developer credential store", () => {
     const result = await rotateDeveloperApiKey({
       workspaceKey,
       userId,
+      authorizationRevision: 7,
       oldKeyId: keyId,
       name: "Rotated agent",
       scopes: ["documents:read"],
@@ -158,6 +145,7 @@ describe("developer credential store", () => {
     expect(result.token).toMatch(/^tvnl_live_[A-Za-z0-9_-]{12}_[A-Za-z0-9_-]{43}$/);
     expect(requestBody).not.toHaveProperty("p_new_token");
     expect(requestBody?.p_new_token_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(requestBody?.p_authorization_revision).toBe(7);
     expect(JSON.stringify(requestBody)).not.toContain(result.token);
   });
 });

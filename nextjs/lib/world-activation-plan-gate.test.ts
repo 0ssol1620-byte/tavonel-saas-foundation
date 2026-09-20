@@ -96,7 +96,13 @@ function signedIn(plan: Plan | null, role: Role) {
 }
 
 function promoteRequest() {
-  const body = JSON.stringify({ manifestDigest: digest, expectedCurrentManifest: null, reason: "activation gate test" });
+  const body = JSON.stringify({
+    operationId: "11111111-1111-4111-8111-111111111111",
+    manifestDigest: digest,
+    expectedCurrentManifest: null,
+    expectedCurrentRevision: 0,
+    reason: "activation gate test",
+  });
   return promoteRoute(
     new Request("https://tavonel.com/api/collections/x/promote", {
       method: "POST",
@@ -108,7 +114,13 @@ function promoteRequest() {
 }
 
 function rollbackRequest() {
-  const body = JSON.stringify({ targetManifestDigest: target, expectedCurrentManifest: digest, reason: "activation gate test" });
+  const body = JSON.stringify({
+    operationId: "22222222-2222-4222-8222-222222222222",
+    targetManifestDigest: target,
+    expectedCurrentManifest: digest,
+    expectedCurrentRevision: 1,
+    reason: "activation gate test",
+  });
   return rollbackRoute(
     new Request("https://tavonel.com/api/collections/x/world/rollback", {
       method: "POST",

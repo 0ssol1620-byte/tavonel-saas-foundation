@@ -1809,8 +1809,10 @@ export default function WorkspacePage() {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          operationId: crypto.randomUUID(),
           manifestDigest: collectionResult.manifestDigest,
           expectedCurrentManifest: activeWorld?.manifestDigest ?? null,
+          expectedCurrentRevision: activeWorld?.revision ?? 0,
           reason: reviewReason.trim(),
         }),
       });
@@ -1843,8 +1845,10 @@ export default function WorkspacePage() {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          operationId: crypto.randomUUID(),
           targetManifestDigest,
           expectedCurrentManifest: activeWorld.manifestDigest,
+          expectedCurrentRevision: activeWorld.revision,
           reason: rollbackReason.trim(),
         }),
       });

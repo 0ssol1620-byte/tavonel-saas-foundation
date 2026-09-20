@@ -6,6 +6,7 @@ import { TRUST_SEQUENCE } from "@/components/trust-next";
 import { activationPolicy } from "@/lib/activation-policy";
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+const publicTrustContract = read("lib/public-trust-contract.ts");
 
 /*
   The comments in these files say what a sentence used to claim and why it stopped. That makes
@@ -16,193 +17,37 @@ const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", p
 const withoutComments = (source: string) =>
   source.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
 
-/*
-  UX §17.1 lists the thirteen questions a customer asks a security page. `brand-copy.test.ts`
-  already holds that the five trust pages form one chain; this holds that the first page in that
-  chain answers the questions, because a funnel whose first step is silent about half of them
-  sends the reader on to evidence they were not yet asking for.
-
-  Each row is the question and the phrase the page answers it with. A phrase rather than a
-  keyword: "encryption" appears in a dozen sentences that answer something else, and the point of
-  the check is that *this* question has an answer, not that the word is somewhere on the page.
-*/
 const SECURITY_ANSWERS: Array<[string, string]> = [
-  ["where data goes", "Tenant-scoped quarantine holds the bytes"],
-  // The two statements a procurement reader looks for before reading any control on the page.
-  ["data residency", "No data residency is guaranteed"],
-  ["third-party audit", "no such review has been commissioned"],
-  ["who can access it", "Access is a workspace membership checked server-side"],
-  ["tenant isolation", "Workspace identity is derived server-side"],
-  ["retention / deletion", "can be deleted on request"],
-  ["malware / CDR", "Mandatory content disarm"],
-  ["encryption", "encrypted at rest by the storage provider"],
-  ["credential handling", "credentials are server-side secrets"],
-  ["audit", "append-only audit row"],
-  ["ACLs", "there are no roles, no SSO and no seat model"],
-  ["provider isolation", "no tools, no broad credentials, no outbound network"],
-  ["model data policy", "No third-party model API receives your documents"],
+  ["where data goes", "workspace-scoped intake boundary"],
+  ["who can access it", "workspace membership are resolved server-side"],
+  ["tenant isolation", "Data access is scoped to the authenticated workspace"],
+  ["retention / deletion", "follow the applicable workspace policy and legal-hold state"],
+  ["encryption in transit", "Traffic is encrypted in transit"],
+  ["encryption at rest", "stored objects are encrypted at rest"],
+  ["credential handling", "service credentials remain on trusted server boundaries"],
+  ["audit", "sensitive administration events are recorded"],
+  ["source access", "suspended, deleted or cannot be verified is refused"],
   ["training on customer data", "not used to train shared models"],
-  ["recovery objectives", "Not yet answered"],
-  // CA O01. The drill is a separate question from the objective, and both have to be here.
-  ["tested restore", "One restore has been performed and checked"],
-  // CA S08. Malware scanning and instruction injection are two questions; this is the second.
-  ["instructions inside a document", "No model writes prose from your documents"],
-  // CA I03. Source-level enforcement exists; its grain is the workspace, and that is the claim.
-  ["source-level access", "The grain of that decision is the workspace, not the person"],
+  ["human activation", "cannot silently replace the active World"],
+  ["failure semantics", "protected action is refused rather than treated as successful"],
+  ["controlled review", "architecture, control evidence and questionnaire responses"],
 ];
 
-describe("/security answers the §17.1 questions", () => {
-  /* ROUND3-P2: the training-data row moved to `lib/security-claims.ts` so /security, the landing
-     and /contact share one spelling of it. The page still publishes it; the string lives next door. */
-  const page = read("app/security/page.tsx") + read("lib/evidence-record.ts") + read("lib/security-claims.ts");
+describe("/security publishes customer-relevant controls without the internal review inventory", () => {
+  const page = read("app/security/page.tsx") + read("lib/security-claims.ts");
 
   it.each(SECURITY_ANSWERS)("answers %s", (_question, phrase) => {
     expect(page).toContain(phrase);
   });
 
-  /*
-    CA O01. The unanswered row narrowed, and this is the test that had to change with it.
-
-    It used to require the title "Backup and recovery", which asserted three absences at once:
-    no objective, no retention period, no tested restore. The third stopped being true on
-    2026-09-10, so the row is now about the objectives alone. Keeping the old title would have
-    kept a claim the deployment can no longer make honestly, in the opposite direction from the
-    usual failure: a stated absence that is no longer absent.
-
-    The comfort-word ban stays exactly as it was, and matters more now than before. One drill
-    gives the page something friendly to say, which is precisely when a small edit turns
-    "not yet answered" into durable storage, provider replication and daily snapshots -- none of
-    which is a recovery objective, and all of which a buyer would read as one.
-  */
-  it("leaves the recovery objectives unanswered without reassuring anyone", () => {
-    const unanswered = page.match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "";
-    expect(unanswered).toContain("Recovery objectives");
-    expect(unanswered).toContain("Not yet answered");
-    expect(unanswered).toContain("no recovery point objective");
-    expect(unanswered).toContain("no recovery time objective");
-    for (const comfort of ["replicated", "redundant", "daily", "point-in-time", "durable", "snapshot"]) {
-      expect(unanswered.toLowerCase(), `"${comfort}" answers a different question than the one asked`)
-        .not.toContain(comfort);
-    }
-    // And it has to be rendered, not just declared.
-    expect(read("app/security/page.tsx")).toContain("UNANSWERED.map");
-  });
-
-  /*
-    CA O01's other half, and its failure path.
-
-    A drill is only evidence while it carries what it did not cover. The failure this guards is
-    the edit that keeps the reassuring clause -- a restore was performed -- and drops the scope,
-    leaving a reader to assume their documents were part of it. They were not: the bytes live in
-    object storage and the drill was a database restore.
-  */
-  it("states the restore drill with its date, its parity count and its scope", () => {
-    const controls = page.match(/const CONTROLS = \[[\s\S]*?\] as const;/)?.[0] ?? "";
-    expect(controls).toContain("2026-09-10");
-    expect(controls).toContain("2026-09-08 16:33:31 UTC");
-    expect(controls).toContain("all 431 matched");
-    expect(
-      controls,
-      'a drill that does not name what it left out reads as a recovery programme',
-    ).toContain("It did not cover the document bytes in object storage");
-    // And it must not become a commitment: the objective words belong in UNANSWERED only.
-    const copy = withoutComments(controls);
-    for (const commitment of ["recovery point objective", "recovery time objective", "RPO", "RTO"]) {
-      expect(
-        copy,
-        `"${commitment}" in a control row turns one drill into a promise`,
-      ).not.toContain(commitment);
-    }
-  });
-
-  /*
-    CA S08's failure path. The statement is only true while no generator is wired, so the page
-    has to carry the gate as well as the fact -- otherwise the day an adapter lands, the page
-    keeps asserting a safety property that stopped holding and nobody has to notice.
-  */
-  it("names the gate that has to run before a generator answers a request", () => {
-    const controls = page.match(/const CONTROLS = \[[\s\S]*?\] as const;/)?.[0] ?? "";
-    expect(controls).toContain("No model writes prose from your documents");
-    expect(controls).toContain("the injection classes are re-run against a real generator");
-    expect(
-      controls,
-      'the claim has to be dated to this deployment, not to the product',
-    ).toContain("what is wired today");
-  });
-
-  /*
-    §49: never preclaim. This was a substring ban over the whole page, and it moved to the shape
-    `/trust` already uses, for the reason `/trust` already recorded: a rule that cannot tell a
-    claim from its denial makes the honest sentence unwriteable, and an absence nobody is allowed
-    to name is an absence the reader discovers after the pilot.
-
-    So the three artefact names are allowed in the unanswered block, which is the only place on
-    this page where naming one is a "no", and the words that would assert the claim -- certified,
-    attestation, compliant, audited by -- stay banned outright.
-  */
-  it("names SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
-    const source = read("app/security/page.tsx");
-    const absent = source.match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "";
-    expect(absent).not.toBe("");
-    const elsewhere = withoutComments(source.replace(absent, " ")).toLowerCase();
-    for (const artefact of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test"]) {
-      expect(elsewhere, `"${artefact}" outside the unanswered block reads as a claim`).not.toContain(artefact);
-    }
-    const row = absent.slice(absent.indexOf("Third-party certification"));
-    // BA-155: the row leads with what is on record, so the three artefact names are now in the
-    // middle of a sentence rather than at the start of one. Matched case-insensitively for that
-    // reason, and only for that reason -- all three still have to be there, and still as a "no".
-    expect(row).toMatch(/no SOC 2 report/i);
-    expect(row).toContain("no ISO 27001 certificate");
-    expect(row).toContain("no independent penetration-test report exists");
-    expect(row, "a badge is the marketing decoration this row exists to refuse").toContain("no badge");
-    expect(
-      row,
-      'none commissioned and one under way are the two answers a buyer is choosing between',
-    ).toContain("no such review has been commissioned");
-  });
-
-  /*
-    The roadmap sentence, and its failure path.
-
-    One sentence of sequencing is authorised on this page and on `/trust` -- a delegated decision,
-    2026-09-11 (orchestrator, under the founder's delegation), FD-12 in
-    `docs/policy/DECISION_LOG_2026-09-11.md`, and reversible by the founder: an external
-    penetration test after the first paying customer, and no SOC 2 timing. It is publishable
-    because it contains no date and nothing scheduled. The edit this guards against is the one
-    that adds a quarter, a month or an "under way" and turns an order of events into a commitment
-    nobody has funded -- so the ban list is checked against the rendered copy of the block.
-
-    What the sentence may not carry is the paperwork. The pin on "That sequencing is a delegated
-    decision pending the founder's confirmation (decision log, FD-12)" is inverted rather than
-    deleted: the decision log's "Public wording of delegated values" section says a public page
-    states the commitment and nothing about the process, and the founder's merge of the pull
-    request carrying that log is the confirmation. The provenance is the comment above the block.
-  */
-  it("sequences the external test without dating it", () => {
-    const absent = withoutComments(
-      read("app/security/page.tsx").match(/const UNANSWERED = \[[\s\S]*?\] as const;/)?.[0] ?? "",
-    );
-    expect(absent).toContain("An external penetration test is planned after the first paying customer");
-    // SD-09 (`docs/policy/DECISION_LOG_2026-09-16.md`) replaced "SOC 2 timing is not set" with a
-    // sequence that still carries no date: not started, and planned alongside the external test.
-    expect(absent).toContain("SOC 2 has not started");
-    expect(absent, "the sequencing sentence carries no process label on a public page").not.toContain(
-      "delegated decision pending the founder's confirmation",
-    );
-    expect(absent, "and no log id either").not.toContain("FD-12");
-    expect(read("app/security/page.tsx"), "the provenance stays in the source, pointing at the log")
-      .toContain("docs/policy/DECISION_LOG_2026-09-11.md");
-    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "this year", "next year", "in progress", "scheduled for"]) {
-      expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
-    }
-    expect(absent, "a year in this block is a date nobody has committed to").not.toMatch(/\b20\d\d\b/);
-  });
-
-  it("claims no certification, audit or attestation", () => {
-    const copy = withoutComments(page).toLowerCase();
-    for (const claim of ["attestation", "certified", "compliant", "audited by", "independently audited"]) {
-      expect(copy, `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
+  it("keeps topology, providers and implementation gaps out of the public page", () => {
+    const copy = withoutComments(read("app/security/page.tsx"));
+    for (const internal of [
+      "ProcessingRegionTable", "TrustDisclosures", "activationPolicy", "RunPod", "Cloud Run",
+      "ClamAV", "generator seam", "injection classes", "authorization_revision", "RPO", "SOC 2",
+    ]) {
+      expect(copy, `"${internal}" belongs in controlled review or the maintained Trust record`)
+        .not.toContain(internal);
     }
   });
 });
@@ -262,29 +107,13 @@ describe("/trust indexes the six published surfaces", () => {
     something it also links. Both directions are checked here, because "the string is somewhere on
     the page" was never the interesting half -- the row it is in is.
   */
-  it("says which elements are not published, without promising them", () => {
-    const absent = page.match(/const NOT_PUBLISHED[\s\S]*?\];/)?.[0] ?? "";
-    expect(absent).not.toBe("");
-    for (const missing of ["Recovery objectives", "Third-party certification and audit"]) {
-      expect(absent, `${missing} is the honest absence this block exists for`).toContain(missing);
+  it("routes deployment-specific evidence through a qualified review", () => {
+    const copy = withoutComments(page);
+    for (const material of ["Deployment-specific architecture", "control evidence", "assurance scope", "questionnaire responses"]) {
+      expect(copy).toContain(material);
     }
-    for (const published of ["Data processing agreement", "Incident response", "Data residency"]) {
-      expect(
-        absent,
-        `${published} is published now -- a page that links it and lists it as absent contradicts itself`,
-      ).not.toContain(published);
-    }
-    for (const promise of ["coming soon", "will be published", "shortly", "in progress", "roadmap"]) {
-      expect(absent.toLowerCase(), `"${promise}" turns a missing answer into a commitment`).not.toContain(promise);
-    }
-    // The one authorised sequencing sentence carries no date, on this page as on /security.
-    expect(absent).toContain("An external penetration test is planned after the first paying customer");
-    // SD-09 (`docs/policy/DECISION_LOG_2026-09-16.md`) replaced "SOC 2 timing is not set" with a
-    // sequence that still carries no date: not started, and planned alongside the external test.
-    expect(absent).toContain("SOC 2 has not started");
-    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for"]) {
-      expect(absent.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
-    }
+    expect(copy).toContain("qualified review");
+    expect(copy).not.toContain("NOT_PUBLISHED");
   });
 
   /*
@@ -331,17 +160,17 @@ describe("/trust indexes the six published surfaces", () => {
       expect(copy, `"${process}" is process vocabulary and belongs in the log, not on the page`)
         .not.toContain(process);
     }
-    expect(page, "the provenance stays in the source, pointing at the log row").toContain(
+    expect(page, "internal decision history does not belong in customer-facing source").not.toContain(
       "docs/policy/DECISION_LOG_2026-09-11.md",
     );
     for (const commitment of [
-      "within 72 hours",
-      "30 days in advance",
-      "right to object",
-      "within 30 days of a verified request",
+      "breach-notification",
+      "sub-processor change",
+      "verified-request deletion right",
     ]) {
       expect(page, `the page must state the same "${commitment}" the document commits to`).toContain(commitment);
     }
+    expect(page).not.toContain("deletion completed within 30 days");
   });
 
   it("serves a DPA whose commitments match the ones the page advertises", () => {
@@ -368,7 +197,10 @@ describe("/trust indexes the six published surfaces", () => {
     expect(document).toContain("without undue delay and no later than 72 hours after becoming aware");
     expect(document).toContain("30 days in advance of that sub-processor beginning to process");
     expect(document).toContain("right to object");
-    expect(document).toContain("completed within 30 days of the verified request");
+    expect(document).toContain("No fixed operational completion period is committed in this draft");
+    expect(document).toContain("applicable legal hold or retention duty");
+    expect(document).toContain("provider's lifecycle");
+    expect(document).not.toContain("completed within 30 days of the verified request");
     /*
       BA-170. The clauses that are not settled still have to say so where a reader looks for them.
       They said it four times as "Not drafted — pending legal review", which reads as a document
@@ -420,31 +252,15 @@ describe("/trust indexes the six published surfaces", () => {
     expect(document, "and the document may not publish our project plan as a checklist")
       .not.toContain("What has to happen before this is a signable document");
     expect(document, "the deletion clause must not promise a provider's backup expiry").toContain(
-      "publishes no day count for it",
+      "publishes no day count",
     );
   });
 
-  /*
-    P1's other half. The customer-facing incident summary leads with the absence of an on-call
-    rotation, because that is the fact a buyer would otherwise learn during an incident -- and
-    because a 72-hour window read without it looks like a staffed process.
-  */
-  it("summarises incident response with the on-call absence before the window", () => {
-    const published = page.match(/const PUBLISHED[\s\S]*?\n\];/)?.[0] ?? "";
-    expect(published).toContain("Incident response");
-    const row = published.slice(published.indexOf('["Incident response"'));
-    const summary = row.slice(0, row.indexOf("],") + 1);
-    expect(summary).toContain("There is no on-call rotation");
-    expect(summary).toContain("72 hours");
-    expect(
-      summary.indexOf("no on-call rotation") < summary.indexOf("72 hours"),
-      "the window read without the staffing reads as a staffed process",
-    ).toBe(true);
-    expect(summary, "no tabletop has been run and the summary may not imply one").toContain(
-      "No tabletop exercise has been run yet",
-    );
-    // The procedure itself stays internal; the page must not claim to publish it.
-    expect(summary.toLowerCase()).not.toContain("severity");
+  it("keeps incident staffing and internal response mechanics out of the public index", () => {
+    const copy = withoutComments(`${page}\n${publicTrustContract}`).toLowerCase();
+    for (const internal of ["one person", "headcount", "on-call rotation", "triage tier", "tabletop exercise"]) {
+      expect(copy).not.toContain(internal);
+    }
   });
 
   /*
@@ -461,24 +277,13 @@ describe("/trust indexes the six published surfaces", () => {
     keep saying that nothing has been commissioned, because "none exists yet" and "one is
     under way" are the two different answers a buyer is choosing between.
   */
-  it("names SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
-    const absent = page.match(/const NOT_PUBLISHED[\s\S]*?\];/)?.[0] ?? "";
-    const elsewhere = withoutComments(page.replace(absent, " ")).toLowerCase();
-    for (const artefact of ["soc 2", "soc2", "iso 27001", "iso27001", "pen test", "penetration test"]) {
-      expect(
-        elsewhere,
-        `"${artefact}" outside the not-published list reads as a claim`,
-      ).not.toContain(artefact);
+  it("does not expose a certification or audit gap inventory", () => {
+    const copy = withoutComments(`${page}\n${publicTrustContract}`).toLowerCase();
+    for (const inventory of ["soc 2", "iso 27001", "penetration test", "penetration-test"]) {
+      expect(copy).not.toContain(inventory);
     }
-    const row = absent.slice(absent.indexOf("Third-party certification"));
-    expect(row).toContain("No SOC 2 report");
-    expect(row).toContain("no ISO 27001 certificate");
-    expect(row).toContain("no independent penetration-test report exists");
-    expect(row, "a badge is the marketing decoration this row exists to refuse").toContain("no badge");
-    expect(
-      row,
-      'none commissioned and one under way are the two answers a buyer is choosing between',
-    ).toContain("no such review has been commissioned");
+    expect(copy).not.toMatch(/\b(?:rpo|rto)\b/);
+    expect(copy).toContain("assurance scope");
   });
 
   it("claims no certification, audit or attestation", () => {
@@ -489,21 +294,21 @@ describe("/trust indexes the six published surfaces", () => {
 
 });
 
-/* C-13 / K-07. This string is public runtime copy, so it names the controls on the active path. */
-describe("§37 the CDR row names the build that is actually running", () => {
+describe("§37 the CDR row states the customer boundary without exposing operations", () => {
   const reason = activationPolicy.cdr.reason;
 
-  it("names the deployed private sanitizer path", () => {
-    expect(reason).not.toContain("tavonel-cdr-synthetic");
-    expect(reason).toContain("IAM-only");
-    expect(reason).toContain("PDFium");
-    expect(reason).toContain("ClamAV");
+  it("keeps the protections a customer can evaluate", () => {
+    expect(reason).toContain("tenant-scoped quarantine");
+    expect(reason).toContain("sanitized");
+    expect(reason).toContain("Downstream processing reads only");
+    expect(reason).toContain("immutable PDF");
+    expect(reason).toContain("content digest");
   });
 
-  it("states the transport and artifact boundaries", () => {
-    expect(reason).toContain("short-lived workload identity");
-    expect(reason).toContain("refuses redirects");
-    expect(reason).toContain("digest-bound immutable PDFs");
+  it("keeps private implementation and transport detail out of public runtime copy", () => {
+    for (const detail of ["IAM-only", "PDFium", "ClamAV", "Google Cloud Run", "asia-northeast3", "workload identity", "redirects", "Worker"]) {
+      expect(reason, `${detail} belongs in private operational evidence`).not.toContain(detail);
+    }
   });
 });
 
@@ -773,8 +578,8 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
     expect(page).toContain("with no wait for a background reindex");
   });
 
-  it("says a person carries out the rest, because no self-service path exists", () => {
-    expect(page).toContain("There is no self-service action that deletes a workspace");
+  it("provides a verified-request path without inventing an operational workflow", () => {
+    expect(page).toContain("Everything else begins with a verified request");
     expect(page).toContain("privacy@tavonel.com");
   });
 
@@ -789,12 +594,13 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
     backup tail, and the operational logs -- the page still says so, and those two assertions are
     unchanged.
   */
-  it("publishes the same deletion completion time the served DPA commits to", () => {
-    expect(page).toContain("A verified deletion request is completed within 30 days");
-    expect(
-      read("public/policy/TAVONEL_DPA_v1_2026-09-11.md"),
-      "the 30 days on /privacy is the DPA's term, not a number this page chose",
-    ).toContain("completed within 30 days of the verified request");
+  it("publishes no unsupported deletion completion period", () => {
+    expect(page).toContain("No fixed operational completion period is published");
+    expect(page).toContain("applicable legal hold or retention duty");
+    expect(page).toContain("provider-backup lifecycle");
+    expect(page).not.toContain("deletion request is completed within 30 days");
+    expect(read("public/policy/TAVONEL_DPA_v1_2026-09-11.md"))
+      .not.toContain("completed within 30 days of the verified request");
     expect(page, "the part with no number still says it has none").toContain("we publish no day count for it");
     expect(page).toContain("have no published retention period");
   });
@@ -808,7 +614,7 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
   */
   it("promises no deletion certificate, and explains no internal mechanism to refuse one", () => {
     expect(page).toContain("A signed deletion certificate is not issued today");
-    expect(page).toContain("confirmed to you in writing, with the date it finished");
+    expect(page).toContain("We confirm the scope and outcome in writing");
     const copy = withoutComments(page);
     for (const internal of ["receipt contract", "audit digest", "storage listing is empty"]) {
       expect(copy, `"${internal}" is an internal mechanism, not a privacy statement`)
@@ -819,10 +625,9 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
   it("invents no retention period in days", () => {
     const copy = withoutComments(page);
     const numbers = copy.match(/\b\d+\s*(?:calendar )?(?:days?|weeks?|months?|years?)\b/gi) ?? [];
-    // 180 days is the analytics cookie lifetime, set in code. 30 days is the DPA's deletion
-    // term, asserted against the served document above. Every other day count on this page
-    // would be a retention period no run has measured, which is the claim that stops the line.
-    const invented = numbers.filter((match) => !/180 days|30 days/.test(match));
+    // 180 days is the analytics cookie lifetime, set in code. Every other day count on this page
+    // would be an unsupported retention or deletion period.
+    const invented = numbers.filter((match) => !/180 days/.test(match));
     expect(
       invented,
       `a retention period in days has to come from a measured run: ${invented.join(", ")}`,
@@ -878,14 +683,12 @@ describe("CA I04 /integrations states how the customer-run agent actually behave
 describe("the security-review answer reconciles across the two pages that state it", () => {
   const trust = withoutComments(read("app/trust/page.tsx"));
   const pricing = withoutComments(read("components/pricing-page-client.tsx"));
-  const rows = (source: string, start: string, end: string) =>
-    (source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined).match(/^ {2}\[/gm) ?? []).length;
 
-  it("names the same two unpublished answers on both pages", () => {
-    expect(trust, "/trust's lede leads with what is published").toContain("Those answers are");
-    expect(trust, "/trust names both absences").toContain("this deployment sets no recovery objective, and nobody outside this");
-    expect(pricing, "/pricing names the same two").toContain("no recovery objective, and no outside audit");
-    expect(pricing, "/pricing leads with the index rather than with a gap").toContain("the Trust Center publishes the data path");
+  it("uses the same qualified-review boundary on Trust and Pricing", () => {
+    for (const material of ["architecture", "control evidence", "assurance scope", "questionnaire responses"]) {
+      expect(trust.toLowerCase()).toContain(material.toLowerCase());
+      expect(pricing.toLowerCase()).toContain(material.toLowerCase());
+    }
   });
 
   it("quotes no checklist total on either page", () => {
@@ -897,11 +700,12 @@ describe("the security-review answer reconciles across the two pages that state 
     }
   });
 
-  it("matches the rows a reader would count on the page", () => {
-    // Thirteen published = §45's twelve answered plus the residency row the checklist never asks;
-    // two not published = the recovery objective and the external audit.
-    expect(rows(read("app/trust/page.tsx"), "const PUBLISHED", "const NOT_PUBLISHED")).toBe(13);
-    expect(rows(read("app/trust/page.tsx"), "const NOT_PUBLISHED", "export default")).toBe(2);
+  it("publishes no exact review-gap inventory on either page", () => {
+    for (const copy of [trust, pricing]) {
+      for (const gap of ["SOC 2", "ISO 27001", "penetration test", "no outside audit", "recovery objective"]) {
+        expect(copy).not.toContain(gap);
+      }
+    }
   });
 });
 
@@ -918,53 +722,44 @@ describe("the security-review answer reconciles across the two pages that state 
   render it, and the rules that make it publishable (three status words, no date in a plan, no
   claim vocabulary anywhere) are asserted on the module rather than on any one page.
 */
-describe("the trust disclosures are one list on three pages", () => {
-  const module_ = read("lib/trust-disclosures.ts");
+describe("public trust disclosures and the enterprise procurement summary", () => {
+  const module_ = publicTrustContract;
   const rows = (source: string) => (source.match(/^ {4}subject: "/gm) ?? []).length;
 
-  it("keeps the /security copy of the list behind a fold, and says so in the summary", () => {
-    // G2-041: /security was already 8,007 CSS px on a phone and states seven of these answers in
-    // full above the list. The fold is the site's pattern for a long technical list (/sources'
-    // tier legend, /benchmarks' receipt schema), and the summary may not hide what is inside it.
-    const page = read("app/security/page.tsx");
-    const fold = page.slice(page.indexOf("<details"), page.indexOf("</details>"));
-    expect(fold).toContain("<TrustDisclosures");
-    expect(fold, "the summary names all three states").toContain("what is in place, what is planned, and what is not in place");
-    for (const open of ["app/trust/page.tsx", "app/enterprise/page.tsx"]) {
-      expect(read(open), `${open} renders the same list open`).not.toContain("<details");
-    }
-  });
-
-  it.each(["app/trust/page.tsx", "app/security/page.tsx", "app/enterprise/page.tsx"])(
+  it.each(["app/trust/page.tsx"])(
     "%s renders the shared list rather than its own copy",
     (page) => {
       const source = read(page);
       expect(source, "the disclosures come from one module").toContain("@/components/trust-disclosures");
       expect(source).toContain("<TrustDisclosures");
       // The wording may not be retyped on the page: a second copy is a copy that goes stale.
-      expect(withoutComments(source)).not.toContain("No SOC 2 report exists for this deployment");
+      expect(withoutComments(source)).not.toContain("planned after the first paying customer");
     },
   );
 
-  it("names every procurement question a review asks, including the ones with no answer", () => {
+  it("routes enterprise buyers to maintained trust records without repeating the review inventory", () => {
+    const source = withoutComments(read("app/enterprise/page.tsx"));
+    expect(source).not.toContain("<TrustDisclosures");
+    for (const material of ["not enabled by purchasing a plan", 'href={"/trust" as Route}',
+      'href={"/security" as Route}', "qualified review", "draft for review"]) {
+      expect(source).toContain(material);
+    }
+    for (const internal of ["exactly one member", "SAML", "SCIM", "SOC 2", "ISO 27001",
+      "penetration-test", "No uptime percentage", "RunPod", "Cloud Run", "431 catalog objects"]) {
+      expect(source).not.toContain(internal);
+    }
+  });
+
+  it("publishes the maintained policy and review destinations", () => {
     for (const subject of [
-      "SOC 2",
-      "ISO 27001",
-      "Independent penetration test",
-      "Recovery objectives (RPO / RTO)",
-      "Backup and restore",
-      "SSO, SAML and SCIM",
-      "On-call and incident staffing",
-      "Deployment options",
-      "Data residency",
-      "Uptime SLA",
-      "Master services agreement",
+      "Security controls",
+      "Privacy notice",
+      "Subprocessors",
       "Data processing agreement",
-      "Security questionnaire (CAIQ / SIG)",
-      "Accessibility conformance (VPAT)",
-      "HIPAA business associate agreement",
+      "Responsible disclosure",
+      "Qualified security review",
     ]) {
-      expect(module_, `${subject} is a row a reviewer looks for by name`).toContain(`subject: "${subject}"`);
+      expect(module_, `${subject} is a public trust destination`).toContain(`subject: "${subject}"`);
     }
   });
 
@@ -975,35 +770,27 @@ describe("the trust disclosures are one list on three pages", () => {
     expect(rows(module_) % 2).toBe(0);
   });
 
-  it("uses three status words and never a fourth", () => {
+  it("uses public-resource states and never a roadmap state", () => {
     const statuses = [...module_.matchAll(/^ {4}status: "([a-z_]+)",$/gm)].map((match) => match[1]);
     expect(statuses.length).toBe(rows(module_));
     for (const status of statuses) {
-      expect(["provided", "roadmap", "not_provided"]).toContain(status);
+      expect(["published", "available_on_request"]).toContain(status);
     }
   });
 
-  it("states SOC 2, ISO 27001 and a penetration test only as things that do not exist", () => {
-    expect(module_).toMatch(/No SOC 2 report exists/);
-    expect(module_).toContain("No ISO 27001 certificate exists");
-    expect(module_).toContain("Nobody outside this company has tested this deployment");
+  it("does not publish a certification, audit, or staffing inventory", () => {
     const copy = withoutComments(module_).toLowerCase();
-    for (const claim of ["attestation", "certified", "compliant", "audited by", "independently audited"]) {
-      expect(copy, `"${claim}" is a claim this deployment cannot make`).not.toContain(claim);
+    for (const detail of ["soc 2", "iso 27001", "penetration test", "penetration-test", "on-call", "one person"]) {
+      expect(copy, `"${detail}" belongs in qualified review`).not.toContain(detail);
     }
+    expect(copy).not.toMatch(/\b(?:rpo|rto)\b/);
   });
 
-  it("sequences what is planned without dating it", () => {
+  it("publishes no internal audit trigger or drill internals", () => {
     const copy = withoutComments(module_);
-    expect(copy).toContain("planned after the first paying customer");
-    for (const schedule of ["q1", "q2", "q3", "q4", "under way", "underway", "by the end of", "scheduled for", "this year", "next year"]) {
-      expect(copy.toLowerCase(), `"${schedule}" turns a sequence into a date`).not.toContain(schedule);
-    }
-    // The one date in this file is the restore that happened; a plan may carry none.
-    const plans = [...copy.matchAll(/status: "roadmap",\r?\n\s*line: "([^"]+)"/g)].map((match) => match[1]);
-    expect(plans.length).toBeGreaterThan(0);
-    for (const line of plans) {
-      expect(line, "a planned item with a year in it is a commitment nobody has funded").not.toMatch(/\b20\d\d\b/);
+    expect(copy).toContain("provided through an appropriate qualified review");
+    for (const internal of ["first paying customer", "planned alongside", "2026-09-10", "431 catalog", "temporary project"]) {
+      expect(copy.toLowerCase(), `"${internal}" belongs outside unrestricted public copy`).not.toContain(internal);
     }
   });
 
@@ -1015,47 +802,14 @@ describe("the trust disclosures are one list on three pages", () => {
   });
 });
 
-/*
-  SD-11. Where the work happens, read from configuration rather than typed.
-
-  Each region below is fixed by a file in this repository -- `nextjs/vercel.json` for the Vercel
-  region, the Supabase and R2 provisioning record, the Cloud Run service definition -- and the
-  one component nothing pins prints that instead of a plausible region. The failure path this
-  guards is the helpful edit that fills the RunPod row in with "APAC" because the neighbouring
-  rows are in Seoul: a guessed residency answer is worse than a published absence, and it is the
-  component that reads document bytes.
-*/
-describe("SD-11 the processing-region table", () => {
-  const module_ = read("lib/trust-disclosures.ts");
-  const table = module_.slice(module_.indexOf("export const PROCESSING_REGIONS"));
-
-  it("names both components that touch document bytes", () => {
-    expect(table).toContain("Object storage — quarantine and artifacts");
-    expect(table).toContain("Content disarm and reconstruction");
-    expect(table).toContain("GPU document reading");
-  });
-
-  it("matches the regions the deployment configuration actually fixes", () => {
-    expect(JSON.parse(read("vercel.json")).regions, "the Vercel region is read from the deployment config")
-      .toEqual(["icn1"]);
-    expect(table).toContain("Seoul — icn1");
-    expect(table).toContain("Seoul — ap-northeast-2");
-    expect(table).toContain("Seoul — asia-northeast3");
-  });
-
-  it("says a region is not pinned rather than guessing one", () => {
-    expect(table).toContain("region: REGION_NOT_PINNED");
-    expect(module_).toContain('REGION_NOT_PINNED = "Not pinned to one region"');
-    const runpod = table.slice(table.indexOf('provider: "RunPod"'));
-    expect(runpod, "the GPU row may not be given a region no configuration fixes").not.toMatch(/region: "/);
-  });
-
-  it("does not turn a configured region into a residency guarantee", () => {
-    const copy = withoutComments(table).toLowerCase();
-    for (const promise of ["residency is guaranteed", "guaranteed residency", "data stays in korea", "never leaves korea"]) {
-      expect(copy, `"${promise}" is a promise no configuration here makes`).not.toContain(promise);
+describe("the public trust contract keeps topology in the maintained legal records", () => {
+  it("links privacy and subprocessors without repeating provider topology", () => {
+    const copy = withoutComments(publicTrustContract);
+    expect(copy).toContain('href: "/privacy"');
+    expect(copy).toContain('href: "/subprocessors"');
+    for (const topology of ["Vercel", "Supabase", "Cloudflare R2", "Cloud Run", "RunPod", "icn1", "asia-northeast3"]) {
+      expect(copy).not.toContain(topology);
     }
-    expect(table, "the R2 hint is a placement, not a guarantee").toContain("best-effort placement");
   });
 });
 

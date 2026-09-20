@@ -752,14 +752,10 @@ describe("public copy", () => {
       click from the decision they qualify.
     */
     expect(source, "the fold and its grid are on /sources now").not.toContain("one-path-source-options");
-    /*
-      The three ways in are declared rather than laid out as three cards (§35 bars the repeated
-      card grid), so the guard follows them into the copy deck: each is a row with a real
-      destination, and the ampersand became the word the rest of the site writes.
-    */
-    expect(source).toContain("Files, folders and ZIP");
-    expect(source).toContain('href: "/integrations"');
+    /* The outcome-led entry keeps format detail one click away instead of repeating it on /home. */
+    expect(source).toContain("Check accepted sources");
     expect(source).toContain('href: "/sources"');
+    expect(read("app/sources/page.tsx")).toContain('<Link href="/integrations">Integrations</Link>');
     expect(read("lib/docs-content.ts"), "and the ZIP fact travels with the format list")
       .toContain("A ZIP archive is expanded before upload");
     expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
@@ -1092,15 +1088,14 @@ describe("public copy", () => {
       paths with a real destination each, and the landing itself reaches /sources and
       /integrations from Scene 07's intake rows.
 
-      Those two destinations used to be read off `scene-actions.ts` as well. They are not there
-      any more: Scene 07 links each intake path from `copy.inbound`, so the deck below is the one
-      place that decides where "Files, folders and ZIP" sends a reader, and the assertion pairs
-      the deck's rows with the component that renders them instead of with a second table.
+      Scene 07 links its decision rows from `copy.outbound`, so the deck below is the one place
+      that decides where "Check accepted sources" sends a reader. Format detail stays on the
+      source page rather than being repeated on the outcome-led home page.
     */
     const deck = read("lib/landing-v2-copy.ts");
-    expect(deck).toContain("Files, folders and ZIP");
+    expect(deck).toContain("Check accepted sources");
     expect(deck).toContain('href: "/sources"');
-    expect(deck).toContain('href: "/integrations"');
+    expect(read("app/sources/page.tsx")).toContain('<Link href="/integrations">Integrations</Link>');
     expect(
       read("components/landing-v2/scenes/use.tsx"),
       "the landing offers the format rules one click from the decision they qualify",

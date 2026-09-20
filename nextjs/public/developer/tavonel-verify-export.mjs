@@ -101,7 +101,7 @@ function inspectCentralDirectory(archive) {
     totalUncompressed += uncompressedSize;
     if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) throw new Error("archive expands beyond 64 MiB verification limit");
     if (localOffset >= centralOffset) throw new Error("ZIP entry data lies outside the archive");
-    found.push({ path, method, compressedSize, uncompressedSize, localOffset });
+    found.push({ path, flags, method, compressedSize, uncompressedSize, localOffset });
     offset += recordLength;
   }
   if (offset !== centralEnd) throw new Error("ZIP central directory has trailing data");
@@ -152,6 +152,11 @@ function extractEntries(archive, entries) {
     }
     const nameLength = archive.readUInt16LE(header + 26);
     const extraLength = archive.readUInt16LE(header + 28);
+    if (archive.readUInt16LE(header + 6) !== entry.flags || archive.readUInt16LE(header + 8) !== entry.method) {
+      throw new Error(`ZIP local and central metadata disagree for ${entry.path}`);
+    }
+    const localPath = archive.subarray(header + 30, header + 30 + nameLength).toString("utf8");
+    if (localPath !== entry.path) throw new Error(`ZIP local and central paths disagree for ${entry.path}`);
     const start = header + 30 + nameLength + extraLength;
     const end = start + entry.compressedSize;
     if (end > archive.byteLength) throw new Error(`ZIP entry data is truncated for ${entry.path}`);
@@ -177,14 +182,17 @@ function parseArguments(values) {
   }
   const archive = args.get("archive");
   const trustedFingerprint = args.get("trusted-fingerprint")?.toLowerCase();
-  return archive && SHA256.test(trustedFingerprint ?? "") ? { archive, trustedFingerprint } : null;
+  const trustStore = args.get("trust-store");
+  return archive && ((trustedFingerprint && SHA256.test(trustedFingerprint)) || trustStore)
+    ? { archive, trustedFingerprint, trustStore }
+    : null;
 }
 
 const options = parseArguments(process.argv.slice(2));
 if (!options) {
   // Named from argv so the published download and the repository script each print the command
   // the reader actually has, rather than one of them printing a path that does not exist there.
-  fail(`usage: node ${basename(process.argv[1] ?? "verify-signed-export.mjs")} --archive <package.zip> --trusted-fingerprint sha256:<64 hex>`);
+  fail(`usage: node ${basename(process.argv[1] ?? "verify-signed-export.mjs")} --archive <package.zip> (--trusted-fingerprint sha256:<64 hex> | --trust-store <trust.json>)`);
 } else {
   try {
     const archivePath = resolve(options.archive);
@@ -196,16 +204,46 @@ if (!options) {
     if (!entries[MANIFEST_PATH] || !entries[SIGNATURE_PATH]) throw new Error("signed manifest files are missing");
 
     const manifestBytes = entries[MANIFEST_PATH];
-    const manifest = JSON.parse(Buffer.from(manifestBytes).toString("utf8"));
-    const receipt = JSON.parse(Buffer.from(entries[SIGNATURE_PATH]).toString("utf8"));
+    const manifestText = Buffer.from(manifestBytes).toString("utf8");
+    const receiptText = Buffer.from(entries[SIGNATURE_PATH]).toString("utf8");
+    const manifest = JSON.parse(manifestText);
+    const receipt = JSON.parse(receiptText);
+    if (`${JSON.stringify(manifest, null, 2)}\n` !== manifestText) throw new Error("manifest JSON is not canonical");
+    if (`${JSON.stringify(receipt, null, 2)}\n` !== receiptText) throw new Error("signature receipt JSON is not canonical");
     if (manifest.schemaVersion !== "tavonel.signed_export_manifest.v1") throw new Error("manifest schema is unsupported");
-    if (receipt.schemaVersion !== "tavonel.export_signature.v1" || receipt.algorithm !== "Ed25519") {
+    if (!["tavonel.export_signature.v1", "tavonel.export_signature.v2"].includes(receipt.schemaVersion)
+      || receipt.algorithm !== "Ed25519") {
       throw new Error("signature schema or algorithm is unsupported");
     }
     const publicKeyDer = Buffer.from(receipt.publicKeySpkiDerBase64, "base64");
     if (publicKeyDer.toString("base64") !== receipt.publicKeySpkiDerBase64) throw new Error("public key is not canonical Base64");
     const fingerprint = digest(publicKeyDer);
-    if (fingerprint !== receipt.publicKeySpkiSha256 || fingerprint !== options.trustedFingerprint) {
+    if (fingerprint !== receipt.publicKeySpkiSha256) throw new Error("public key fingerprint does not match receipt");
+    if (options.trustStore) {
+      const trust = JSON.parse(await readFile(resolve(options.trustStore), "utf8"));
+      if (trust.schemaVersion !== "tavonel.export_trust.v2" || trust.minimumSignatureVersion !== 2
+        || !Array.isArray(trust.keys) || receipt.schemaVersion !== "tavonel.export_signature.v2") {
+        throw new Error("trust store rejects a signature downgrade");
+      }
+      const matchingKeys = trust.keys.filter((candidate) => candidate?.keyId === receipt.keyId
+        && candidate?.keyVersion === receipt.keyVersion);
+      const key = matchingKeys.length === 1 ? matchingKeys[0] : null;
+      const issuedAt = Date.parse(receipt.issuedAt);
+      const signatureExpiresAt = Date.parse(receipt.expiresAt);
+      const canonicalInstant = (value) => typeof value === "string"
+        && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+        && new Date(value).toISOString() === value;
+      if (!key || key.status === "revoked" || key.algorithm !== "Ed25519"
+        || key.publicKeySpkiSha256 !== fingerprint || key.publicKeySpkiDerBase64 !== receipt.publicKeySpkiDerBase64
+        || receipt.signatureScope !== "tavonel.signed_export_manifest.v1"
+        || !Number.isSafeInteger(receipt.keyVersion) || receipt.keyVersion < 1
+        || !canonicalInstant(receipt.issuedAt) || !canonicalInstant(receipt.expiresAt)
+        || !canonicalInstant(key.notBefore) || !canonicalInstant(key.expiresAt)
+        || !Number.isFinite(issuedAt) || !Number.isFinite(signatureExpiresAt)
+        || issuedAt < Date.parse(key.notBefore) || issuedAt >= Date.parse(key.expiresAt)
+        || signatureExpiresAt <= issuedAt || signatureExpiresAt > Date.parse(key.expiresAt)
+        || Date.now() >= signatureExpiresAt) throw new Error("signature key lifecycle policy rejected the archive");
+    } else if (fingerprint !== options.trustedFingerprint) {
       throw new Error("public key fingerprint does not match the trusted fingerprint");
     }
     if (digest(manifestBytes) !== receipt.signedPayloadSha256) throw new Error("manifest digest does not match receipt");
@@ -214,7 +252,19 @@ if (!options) {
       throw new Error("signature is not canonical Ed25519 bytes");
     }
     const publicKey = createPublicKey({ key: publicKeyDer, format: "der", type: "spki" });
-    if (publicKey.asymmetricKeyType !== "ed25519" || !verify(null, manifestBytes, publicKey, signature)) {
+    const signedBytes = receipt.schemaVersion === "tavonel.export_signature.v2"
+      ? Buffer.concat([Buffer.from(`${JSON.stringify({
+        schemaVersion: receipt.schemaVersion,
+        algorithm: receipt.algorithm,
+        signatureScope: receipt.signatureScope,
+        keyId: receipt.keyId,
+        keyVersion: receipt.keyVersion,
+        issuedAt: receipt.issuedAt,
+        expiresAt: receipt.expiresAt,
+        signedPayloadSha256: receipt.signedPayloadSha256,
+      })}\n`, "utf8"), manifestBytes])
+      : manifestBytes;
+    if (publicKey.asymmetricKeyType !== "ed25519" || !verify(null, signedBytes, publicKey, signature)) {
       throw new Error("Ed25519 signature verification failed");
     }
     if (!Array.isArray(manifest.files) || manifest.files.length === 0 || manifest.files.length > MAX_ENTRIES - 2) {

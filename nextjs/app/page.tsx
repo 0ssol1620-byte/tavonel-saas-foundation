@@ -27,7 +27,7 @@ import { BRAND_LINE } from "@/lib/site-navigation";
 */
 export const metadata: Metadata = {
   title: `TAVONEL — ${BRAND_LINE.descriptor}`,
-  description: "TAVONEL is the Knowledge Compiler for AI: every compiled result keeps a traceable path back to the page it was read from. A public Compiled World is open to read in full today.",
+  description: "Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.",
   alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
   openGraph: {
     title: BRAND_LINE.headline,

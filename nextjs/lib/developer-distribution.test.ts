@@ -31,7 +31,7 @@ describe("developer distribution", () => {
     const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
     const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
     const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
-    expect(channel.version).toBe("2026.9.11.1");
+    expect(channel.version).toBe("2026.9.20.1");
     expect(channel.apiVersion).toBe(1);
     expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
     expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
@@ -77,6 +77,46 @@ describe("developer distribution", () => {
     expect(child.status).toBe(0);
     expect(child.stdout).toContain("node tavonel-cli.mjs documents");
     expect(child.stdout).toContain("node tavonel-cli.mjs connections");
+  });
+
+  it("reads the versioned public status contract without credentials", async () => {
+    const status = {
+      schemaVersion: "tavonel.public_status.v2",
+      service: { name: "TAVONEL", state: "not_assessed", commercialMode: "pilot" },
+      availableActions: {},
+      checkedAt: "2026-09-20T00:00:00.000Z",
+      evidenceFreshness: { basis: "configuration_snapshot", operationalProbe: "not_included" },
+    };
+    const server = createServer((request, response) => {
+      if (request.url !== "/api/status/v2") {
+        response.writeHead(404).end();
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(status));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server did not bind a TCP port");
+    try {
+      const child = spawn(process.execPath, [developerAsset("tavonel-cli.mjs"), "status"], {
+        env: { ...process.env, TAVONEL_API_KEY: "", TAVONEL_BASE_URL: `http://127.0.0.1:${address.port}` },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
+      child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
+      const exitCode = await new Promise<number | null>((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", resolve);
+      });
+
+      expect(exitCode, stderr).toBe(0);
+      expect(JSON.parse(stdout)).toEqual(status);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it("labels archive and manifest digests independently after a download", async () => {

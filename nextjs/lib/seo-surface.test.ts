@@ -796,10 +796,8 @@ describe("public surface: no process vocabulary in published copy", () => {
     Not vacuous, in the direction that matters: the provenance has to still exist somewhere in the
     source, or this ban would be satisfied by deleting it rather than by moving it into a comment.
   */
-  it("keeps the provenance in the source of the surfaces that carry a delegated value", () => {
+  it("keeps the provenance beside each source that owns a delegated value", () => {
     for (const path of [
-      "app/trust/page.tsx",
-      "app/security/page.tsx",
       "app/refunds/page.tsx",
       /*
         Landing V2, 2026-09-19. /ko carries no delegated value any more, so it carries no
@@ -814,7 +812,7 @@ describe("public surface: no process vocabulary in published copy", () => {
       "lib/support-targets.ts",
     ]) {
       const source = readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
-      expect(source, `${path} renders a delegated value and must cite the log row`)
+      expect(source, `${path} owns a delegated value and must cite the log row`)
         .toContain("docs/policy/DECISION_LOG_2026-09-11.md");
       expect(source, `${path} must name the row it came from`).toMatch(/FD-\d\d/);
     }

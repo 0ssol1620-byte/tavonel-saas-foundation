@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       pkceVerifierReference: verifierReference,
       redirectUri: runtime.redirectUri,
       requestedScopes: runtime.scopes,
+      authorizationRevision: auth.principal.authorizationRevision,
     });
     if (!stored.ok) {
       await deleteOAuthSecret(broker, verifierReference).catch(() => undefined);

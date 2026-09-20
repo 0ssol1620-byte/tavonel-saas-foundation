@@ -60,7 +60,7 @@ describe("createProductionEmbedderAdapter / createProductionRerankerAdapter", ()
   const env = { embedderUrl: "https://embed.api.runpod.ai", rerankerUrl: "https://rerank.api.runpod.ai", apiKey: "test-key" };
 
   it("builds an embedder adapter whose declared identity matches the production profile", () => {
-    const adapter = createProductionEmbedderAdapter(env);
+    const adapter = createProductionEmbedderAdapter(env, "pilot-proof");
     const profile = buildProductionRetrievalProfile("pilot-proof");
     expect(adapter.identity()).toEqual({
       provider: profile.embedding.provider,
@@ -72,7 +72,7 @@ describe("createProductionEmbedderAdapter / createProductionRerankerAdapter", ()
   });
 
   it("builds a reranker adapter whose declared identity matches the production profile", () => {
-    const adapter = createProductionRerankerAdapter(env);
+    const adapter = createProductionRerankerAdapter(env, "pilot-proof");
     const profile = buildProductionRetrievalProfile("pilot-proof");
     expect(adapter.identity()).toEqual({
       provider: profile.reranker?.provider,

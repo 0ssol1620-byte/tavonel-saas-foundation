@@ -16,9 +16,10 @@ const markOAuthConnectionReauthorizationRequired = vi.fn<(...args: any[]) => any
 const listOAuthSourcePage = vi.fn<(...args: any[]) => any>();
 const importSourceObject = vi.fn<(...args: any[]) => any>();
 const suspendConnectorSource = vi.fn<(...args: any[]) => any>();
+const requestConnectorSourceDeletion = vi.fn<(...args: any[]) => any>();
 const loadConnectorSyncPage = vi.fn<(...args: any[]) => any>();
 vi.mock("./connector-sync-page", () => ({ loadConnectorSyncPage }));
-vi.mock("./connector-source-access", () => ({ suspendConnectorSource }));
+vi.mock("./connector-source-access", () => ({ requestConnectorSourceDeletion, suspendConnectorSource }));
 const refreshOAuthAccessToken = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ accessToken: "at-1" }));
 const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientSecretReference: "vault://client" }));
 const readOAuthSecretBrokerConfig = vi.fn<(...args: any[]) => any>(() => ({ kind: "vault" }));
@@ -57,6 +58,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   loadConnectorSyncPage.mockImplementation(async (_job, _worker, _cursor, _offset, list) => list());
   suspendConnectorSource.mockResolvedValue({ ok: true });
+  requestConnectorSourceDeletion.mockResolvedValue({ ok: true, receiptId: `sha256:${"d".repeat(64)}`, replayed: false, held: false });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
   getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
   markOAuthConnectionReauthorizationRequired.mockResolvedValue({ ok: true });
@@ -104,9 +106,32 @@ describe("cursor safety", () => {
     const result = await runSourceImportBatch({ ...JOB, cursorToken,
       payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-1",
       { fetcher: async () => Response.json({ changes: [{ fileId: "gone", removed: true }], newStartPageToken: "new" }) });
-    expect(result).toEqual({ ok: false, code: "SOURCE_LIFECYCLE_REVIEW_REQUIRED" });
+    expect(result.ok).toBe(true);
     expect(suspendConnectorSource).toHaveBeenCalledWith(expect.objectContaining({ nativeId: "gone", provider: "google_drive" }));
+    expect(requestConnectorSourceDeletion).toHaveBeenCalledWith(expect.objectContaining({ nativeId: "gone", reason: "provider_inaccessible" }));
     expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "succeeded", itemsSeen: 1, itemsDone: 0 });
+  });
+
+  it("acknowledges a durably tombstoned source held from physical purge", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("held"), kind: "deleted" }], cursor: "next", complete: true });
+    requestConnectorSourceDeletion.mockResolvedValue({ ok: true, receiptId: `sha256:${"d".repeat(64)}`,
+      replayed: false, held: true });
+    const result = await runSourceImportBatch(JOB, "worker-1");
+    expect(result.ok).toBe(true);
+    expect(suspendConnectorSource).toHaveBeenCalledOnce();
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "succeeded", itemsSeen: 1 });
+  });
+
+  it("retries an unknown hold state without advancing the cursor", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("unknown"), kind: "deleted" }], cursor: "next", complete: false });
+    requestConnectorSourceDeletion.mockResolvedValue({ ok: false, code: "SOURCE_LEGAL_HOLD_STATE_UNKNOWN" });
+    const result = await runSourceImportBatch(JOB, "worker-1");
+    expect(result).toEqual({ ok: false, code: "SOURCE_LEGAL_HOLD_STATE_UNKNOWN" });
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toEqual({
+      outcome: "retry", errorCode: "SOURCE_LEGAL_HOLD_STATE_UNKNOWN",
+    });
     expect(completeJobBatch.mock.calls.at(-1)![3]).not.toHaveProperty("cursorToken");
   });
 
@@ -132,18 +157,21 @@ describe("cursor safety", () => {
       cursor: "next", complete: true,
     });
     const result = await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1");
-    expect(result).toEqual({ ok: false, code: "SOURCE_LIFECYCLE_REVIEW_REQUIRED" });
-    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(importSourceObject).toHaveBeenCalledTimes(SYNC_IMPORT_LIMIT);
+    expect(requestConnectorSourceDeletion).toHaveBeenCalledWith(expect.objectContaining({ nativeId: "removed" }));
     expect(completeJobBatch).toHaveBeenCalledExactlyOnceWith(JOB.workspaceKey, JOB.jobId, "worker-1", {
-      outcome: "failed", errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",
+      outcome: "progress", itemsSeen: SYNC_IMPORT_LIMIT, itemsDone: SYNC_IMPORT_LIMIT,
+      cursorToken: expect.stringContaining("tavonel-sync-v1:"),
     });
   });
 
   it("surfaces failure to persist the lifecycle stop without committing progress", async () => {
     listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("gone"), kind: "deleted" }], cursor: "next", complete: false });
-    completeJobBatch.mockResolvedValue({ ok: false, code: "JOB_LEASE_LOST" });
-    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "JOB_LEASE_LOST" });
+    requestConnectorSourceDeletion.mockResolvedValue({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
     expect(importSourceObject).not.toHaveBeenCalled();
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: "SOURCE_DELETION_WRITE_FAILED" });
     expect(completeJobBatch.mock.calls[0][3]).not.toHaveProperty("cursorToken");
   });
 

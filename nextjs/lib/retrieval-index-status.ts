@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { CollectionCandidateArtifact } from "./collection-compiler";
 import { compileRetrievalArtifacts } from "./retrieval-compile";
 import type { RetrievalProfile } from "./retrieval-profile";
-import { buildProductionRetrievalProfile, createProductionEmbedderAdapter, readRetrievalRuntimeEnv } from "./retrieval-runtime-config";
+import { buildProductionRetrievalProfile, selectProductionRetrievalRuntime } from "./retrieval-runtime-config";
 import { createCompileRun, ensureRetrievalProfile, findLatestRun } from "./retrieval-store";
 
 /*
@@ -169,7 +169,7 @@ export async function ensureRetrievalIndexForActiveWorld(
     return recordRefusal(input, profile, input.actorUserId, ARTIFACT_UNREADABLE);
   }
 
-  const runtimeEnv = readRetrievalRuntimeEnv();
+  const runtime = selectProductionRetrievalRuntime(input.workspaceKey);
   let result: Awaited<ReturnType<typeof compileRetrievalArtifacts>>;
   try {
     result = await compileRetrievalArtifacts({
@@ -179,7 +179,7 @@ export async function ensureRetrievalIndexForActiveWorld(
       artifact,
       profile,
       actorUserId: input.actorUserId,
-      embedder: runtimeEnv ? createProductionEmbedderAdapter(runtimeEnv) : null,
+      embedder: runtime.embedder,
     });
   } catch {
     // A throw here is a malformed artifact reaching a pure compiler, or a transport that did

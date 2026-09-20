@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { failureClasses } from "../../shared/uskcEnums";
+import { isKeyInsideWorkspacePrefix, WORKSPACE_ID_PATTERN } from "./immutable-keys";
 
 export const FOUNDATION_R2_BUCKET = "tavonel-saas-foundation-quarantine";
 export const SYNTHETIC_PREFIX = "synthetic/";
@@ -49,6 +50,49 @@ export function assertFoundationQuarantineKey(bucket: string, workspaceKey: stri
   const expected = `quarantine/${workspaceKey}/${documentId}/source`;
   if (key !== expected || key.includes("..") || key.includes("//")) return "QUARANTINE_OBJECT_KEY_REQUIRED";
   return null;
+}
+
+export function assertFoundationDeletionKey(bucket: string, workspaceKey: string, key: string) {
+  if (bucket !== FOUNDATION_R2_BUCKET) return "BUCKET_NOT_FOUNDATION";
+  if (!WORKSPACE_ID_PATTERN.test(workspaceKey) || !key || key.length > 1024 || key.includes("..") ||
+      key.includes("\\") || key.includes("//") || key.startsWith("/")) return "SOURCE_DELETION_KEY_INVALID";
+  const quarantinePrefix = `quarantine/${workspaceKey}/`;
+  if (!key.startsWith(quarantinePrefix) && !isKeyInsideWorkspacePrefix(workspaceKey, key)) {
+    return "SOURCE_DELETION_KEY_OUTSIDE_WORKSPACE";
+  }
+  return null;
+}
+
+/** HEAD one tenant-scoped source object before the durable delete-start transition. */
+export async function inspectFoundationSourceObject(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  key: string,
+  now = new Date(),
+): Promise<{ ok: true; exists: boolean } | { ok: false; code: string }> {
+  const blocked = assertFoundationDeletionKey(env.bucket, workspaceKey, key);
+  if (blocked) return { ok: false, code: blocked };
+  const head = await signedS3Response(env, "HEAD", key, undefined, now);
+  if (!head) return { ok: false, code: "SOURCE_DELETE_HEAD_FAILED" };
+  if (head.status === 404) return { ok: true, exists: false };
+  if (head.status !== 200) return { ok: false, code: "SOURCE_DELETE_HEAD_FAILED" };
+  return { ok: true, exists: true };
+}
+
+/** DELETE after begin_source_deletion_object durably records irreversible intent. */
+export async function deleteFoundationSourceObject(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  key: string,
+  now = new Date(),
+): Promise<{ ok: true; alreadyAbsent: boolean } | { ok: false; code: string }> {
+  const blocked = assertFoundationDeletionKey(env.bucket, workspaceKey, key);
+  if (blocked) return { ok: false, code: blocked };
+  const removed = await signedS3Response(env, "DELETE", key, undefined, now);
+  if (!removed) return { ok: false, code: "SOURCE_DELETE_FAILED" };
+  if (removed.status === 404) return { ok: true, alreadyAbsent: true };
+  if (removed.status !== 200 && removed.status !== 204) return { ok: false, code: "SOURCE_DELETE_FAILED" };
+  return { ok: true, alreadyAbsent: false };
 }
 
 export function authorizeSyntheticCanary(headerValue: string | null, token: string | undefined) {

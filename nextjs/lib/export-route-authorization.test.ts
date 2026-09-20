@@ -72,6 +72,14 @@ describe.each([["direct", direct], ["v1", versioned]] as const)("%s export autho
     expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     expect(mocks.release).toHaveBeenCalled();
   });
+  it("does not let a tombstoned source reappear through a freshly signed export", async () => {
+    mocks.sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await run();
+    expect(response.status).toBe(403);
+    expect(response.headers.get("content-type")).not.toBe("application/zip");
+    expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(mocks.signer).not.toHaveBeenCalled();
+  });
   it.each(["load", "release"] as const)("refuses access revoked during %s without returning archive bytes", async (boundary) => {
     let reached!: () => void;
     let resume!: () => void;

@@ -1,0 +1,18 @@
+{
+  "$schema": "./b33-home-task-study.schema.json",
+  "schema": "tavonel.home_task_study.v1.1",
+  "study_id": "B33_HOME_OUTCOME_IA",
+  "protocol_version": "1.1",
+  "status": "PREPARED_NOT_RUN",
+  "prepared_at": "2026-09-20T00:00:00.000Z",
+  "route": "/",
+  "locales": ["en", "ko"],
+  "verification_plan": {
+    "viewport_widths_px": [1920, 1440, 1280, 1024, 768, 390, 360],
+    "reduced_motion": true
+  },
+  "participant_count": 0,
+  "participants": [],
+  "aggregate_results": null,
+  "founder_visual_review": "FOUNDER VISUAL REVIEW REQUIRED"
+}

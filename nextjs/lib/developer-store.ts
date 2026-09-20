@@ -111,56 +111,59 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
   }
 }
 
-export async function createDeveloperApiKey(input: { workspaceKey: string; userId: string; name: string; scopes: DeveloperScope[]; expiresAt: string | null }) {
+export async function createDeveloperApiKey(input: { workspaceKey: string; userId: string; authorizationRevision: number; name: string; scopes: DeveloperScope[]; expiresAt: string | null }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
   const prefix = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(9)));
   const secret = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const token = `tvnl_live_${prefix}_${secret}`;
   try {
-    const response = await supabaseAdminRequest(config, "/rest/v1/foundation_api_keys?select=key_id,name,key_prefix,scopes,created_at,expires_at,last_used_at,revoked_at", {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/create_foundation_api_key_authorized", {
       method: "POST",
-      headers: { Prefer: "return=representation" },
       body: JSON.stringify({
-        workspace_key: input.workspaceKey,
-        name: input.name,
-        key_prefix: prefix,
-        token_sha256: await tokenSha256(token),
-        scopes: input.scopes,
-        created_by: input.userId,
-        expires_at: input.expiresAt,
+        p_workspace_key: input.workspaceKey,
+        p_name: input.name,
+        p_key_prefix: prefix,
+        p_token_sha256: await tokenSha256(token),
+        p_scopes: input.scopes,
+        p_expires_at: input.expiresAt,
+        p_actor_user_id: input.userId,
+        p_authorization_revision: input.authorizationRevision,
       }),
     });
-    if (!response.ok) return { ok: false as const, code: "API_KEY_CREATE_FAILED" };
-    const key = parseApiKey(((await response.json()) as Array<Record<string, unknown>>)[0] ?? {});
-    if (!key) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
-    if (!await insertAudit(input.workspaceKey, "api_key_created", key.keyId, { userId: input.userId }, { scopes: input.scopes })) {
-      await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?key_id=eq.${key.keyId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ revoked_at: new Date().toISOString() }),
-      }).catch(() => undefined);
-      return { ok: false as const, code: "DEVELOPER_AUDIT_WRITE_FAILED" };
+    const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) {
+      const message = typeof body.message === "string" ? body.message : "";
+      return { ok: false as const, code: message.includes("api_key_authorization_changed") ? "AUTHORIZATION_CHANGED_RETRY" : "API_KEY_CREATE_FAILED" };
     }
+    const key = parseApiKey(body);
+    if (!key) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
     return { ok: true as const, key, token };
   } catch {
     return { ok: false as const, code: "API_KEY_CREATE_FAILED" };
   }
 }
 
-export async function revokeDeveloperApiKey(workspaceKey: string, userId: string, keyId: string) {
+export async function revokeDeveloperApiKey(workspaceKey: string, userId: string, authorizationRevision: number, keyId: string) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
-  const query = new URLSearchParams({ key_id: `eq.${keyId}`, workspace_key: `eq.${workspaceKey}`, revoked_at: "is.null" });
   try {
-    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/revoke_foundation_api_key_authorized", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: workspaceKey,
+        p_key_id: keyId,
+        p_actor_user_id: userId,
+        p_authorization_revision: authorizationRevision,
+      }),
     });
-    if (!response.ok) return { ok: false as const, code: "API_KEY_REVOKE_FAILED" };
-    const rows = await response.json() as Array<Record<string, unknown>>;
-    if (rows.length === 0) return { ok: false as const, code: "API_KEY_NOT_FOUND" };
-    if (!await insertAudit(workspaceKey, "api_key_revoked", keyId, { userId })) return { ok: false as const, code: "DEVELOPER_AUDIT_WRITE_FAILED" };
+    const body = await response.json().catch(() => ({})) as { message?: unknown };
+    if (!response.ok) {
+      const message = typeof body.message === "string" ? body.message : "";
+      if (message.includes("api_key_authorization_changed")) return { ok: false as const, code: "AUTHORIZATION_CHANGED_RETRY" };
+      if (message.includes("api_key_not_found")) return { ok: false as const, code: "API_KEY_NOT_FOUND" };
+      return { ok: false as const, code: "API_KEY_REVOKE_FAILED" };
+    }
     return { ok: true as const };
   } catch {
     return { ok: false as const, code: "API_KEY_REVOKE_FAILED" };
@@ -170,6 +173,7 @@ export async function revokeDeveloperApiKey(workspaceKey: string, userId: string
 export async function rotateDeveloperApiKey(input: {
   workspaceKey: string;
   userId: string;
+  authorizationRevision: number;
   oldKeyId: string;
   name: string;
   scopes: DeveloperScope[];
@@ -192,11 +196,13 @@ export async function rotateDeveloperApiKey(input: {
         p_new_scopes: input.scopes,
         p_new_expires_at: input.expiresAt,
         p_actor_user_id: input.userId,
+        p_authorization_revision: input.authorizationRevision,
       }),
     });
     const row = await response.json().catch(() => ({})) as Record<string, unknown>;
     if (!response.ok) {
       const message = typeof row.message === "string" ? row.message : "";
+      if (message.includes("api_key_authorization_changed")) return { ok: false as const, code: "AUTHORIZATION_CHANGED_RETRY" };
       return { ok: false as const, code: message.includes("api_key_rotation_source_invalid") ? "API_KEY_NOT_FOUND" : "API_KEY_ROTATE_FAILED" };
     }
     if (typeof row.keyId !== "string" || typeof row.keyPrefix !== "string" || typeof row.name !== "string" || !Array.isArray(row.scopes) || typeof row.createdAt !== "string") {
@@ -260,7 +266,7 @@ export async function authenticateDeveloperApiKey(token: string) {
   const config = readSupabaseAdminConfig();
   if (!match || !config) return { ok: false as const, code: "API_KEY_INVALID" };
   const query = new URLSearchParams({
-    select: "key_id,workspace_key,created_by,scopes,expires_at,revoked_at",
+    select: "key_id,workspace_key,created_by,scopes,expires_at,revoked_at,authorization_revision",
     key_prefix: `eq.${match[1]}`,
     token_sha256: `eq.${await tokenSha256(token)}`,
     limit: "1",
@@ -269,7 +275,7 @@ export async function authenticateDeveloperApiKey(token: string) {
     const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`);
     if (!response.ok) return { ok: false as const, code: "API_KEY_INVALID" };
     const row = ((await response.json()) as Array<Record<string, unknown>>)[0];
-    if (!row || row.revoked_at || typeof row.key_id !== "string" || typeof row.workspace_key !== "string" || typeof row.created_by !== "string" || !Array.isArray(row.scopes)) return { ok: false as const, code: "API_KEY_INVALID" };
+    if (!row || row.revoked_at || typeof row.key_id !== "string" || typeof row.workspace_key !== "string" || typeof row.created_by !== "string" || !Array.isArray(row.scopes) || !Number.isSafeInteger(row.authorization_revision) || Number(row.authorization_revision) < 1) return { ok: false as const, code: "API_KEY_INVALID" };
     if (typeof row.expires_at === "string" && Date.parse(row.expires_at) <= Date.now()) return { ok: false as const, code: "API_KEY_EXPIRED" };
     return {
       ok: true as const,
@@ -279,6 +285,7 @@ export async function authenticateDeveloperApiKey(token: string) {
         workspaceKey: row.workspace_key,
         userId: row.created_by,
         scopes: row.scopes as DeveloperScope[],
+        authorizationRevision: Number(row.authorization_revision),
       },
     };
   } catch {

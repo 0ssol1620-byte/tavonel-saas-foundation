@@ -5,7 +5,7 @@ import { getOAuthConnectionSecretReference, markOAuthConnectionReauthorizationRe
 import { completeJobBatch, type ClaimedJob } from "./job-store";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { importSourceObject } from "./source-import";
-import { suspendConnectorSource } from "./connector-source-access";
+import { requestConnectorSourceDeletion, suspendConnectorSource } from "./connector-source-access";
 import { loadConnectorSyncPage } from "./connector-sync-page";
 import { listGoogleDriveLifecyclePage } from "./google-drive-lifecycle";
 
@@ -207,7 +207,6 @@ export async function runSourceImportBatch(
     return { ok: false, code: "SOURCE_CURSOR_STALE" };
   }
 
-  const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
   // A removal may also mean lost access. Until source identity and revocation are
   // durably connected, consuming it as an unsupported file would lose the event.
   // Inspect the remaining page before admitting bytes or advancing any checkpoint.
@@ -217,22 +216,39 @@ export async function runSourceImportBatch(
         connectionId: job.oauthConnectionId, provider: binding.provider, nativeId: item.nativeId });
       if (!suspended.ok) {
         const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-          outcome: "failed", errorCode: suspended.code,
+          outcome: "retry", errorCode: suspended.code,
         });
         return { ok: false, code: reported.ok ? suspended.code : reported.code };
       }
+      const deleted = await requestConnectorSourceDeletion({
+        workspaceKey: job.workspaceKey,
+        connectionId: job.oauthConnectionId,
+        provider: binding.provider,
+        nativeId: item.nativeId,
+        reason: "removalReason" in item && item.removalReason === "removed_or_inaccessible"
+          ? "provider_inaccessible"
+          : "provider_deleted",
+      });
+      if (!deleted.ok) {
+        const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+          outcome: "retry", errorCode: deleted.code,
+        });
+        return { ok: false, code: reported.ok ? deleted.code : reported.code };
+      }
     }
-    const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-      outcome: "failed",
-      errorCode: "SOURCE_LIFECYCLE_REVIEW_REQUIRED",
-    });
-    return { ok: false, code: reported.ok ? "SOURCE_LIFECYCLE_REVIEW_REQUIRED" : reported.code };
   }
+  const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
   const skipped: Array<{ nativeId: string; code: string }> = [];
   let imported = 0;
   let processed = 0;
 
   for (const item of batch) {
+    if (item.kind === "deleted") {
+      // Suspension and the legal-hold-gated tombstone were committed in the pre-pass above.
+      // Counting the event advances the durable page offset without ever treating it as bytes.
+      processed += 1;
+      continue;
+    }
     const outcome = await importSourceObject(
       {
         workspaceKey: job.workspaceKey,

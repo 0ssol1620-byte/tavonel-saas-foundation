@@ -1224,13 +1224,27 @@
     .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 480px) {
-    .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin: 14px 0 4px; }
+    .site-footer-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin: 8px 0 4px; }
     .site-footer-groups nav {
       display: grid;
+      /*
+        The outer grid supplies two group columns and each group keeps two short-link columns so
+        the footer stays below one phone screen. Labels that cannot read cleanly in roughly 75px
+        span the group below; this keeps the compact layout without painting words into a
+        neighbouring group.
+      */
       grid-template-columns: repeat(2, minmax(0, 1fr));
       align-content: start;
-      gap: 0 6px;
+      gap: 0 10px;
     }
+    .site-footer-groups nav a:is(
+      [href="/integrations"],
+      [href="/sources"],
+      [href="/knowledge-compiler"],
+      [href="/developers"],
+      [href="/changelog"],
+      [href="/subprocessors"]
+    ) { grid-column: 1 / -1; }
     .site-footer-groups nav:last-child {
       grid-column: 1 / -1;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1247,7 +1261,8 @@
     /* `body footer.site`, not `footer.site`: the base rule further down the file ties a bare
        `footer.site` on specificity and wins on order, which is how this block sat here doing
        nothing while the footer measured 797px against the 759.6px budget. */
-    body footer.site { padding-top: 26px; padding-bottom: calc(var(--bar) + 22px); }
+    body footer.site { padding-top: 12px; padding-bottom: calc(var(--bar) + 6px); }
+    .chrome-v2-footer .chrome-v2-wrap { gap: 8px; }
     /* The landing footer (`.one-path-footer`) takes the same numbers from one-path.css: that sheet
        is unlayered and this one is layered, so no selector written here can reach it. */
     .compile-film-viewport { max-height: calc(100svh - 260px); }

@@ -69,6 +69,12 @@
   .toc .link:hover { color: var(--text-hi); }
 }
 
-@media (pointer: coarse) {
-  .toc .link { min-height: 44px; display: flex; align-items: center; }
+@media (pointer: coarse), (max-width: 1079px) {
+  /*
+    Running-text links gain a negative block margin in the shared coarse-pointer rule so their
+    enlarged hit area does not reflow a paragraph. These links are grid rows rather than running
+    text: inheriting that compensation collapsed adjacent 44px targets into one another on a
+    360px screen. Keep the full target and let each row occupy its measured space.
+  */
+  .toc .link { min-height: 44px; display: flex; align-items: center; margin-block: 0; }
 }

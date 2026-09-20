@@ -55,6 +55,7 @@ export async function GET(request: Request, context: { params: Promise<{ provide
       grantedScopes: tokens.grantedScopes,
       clientSecretReference: runtime.clientSecretReference,
       refreshTokenReference,
+      authorizationRevision: authorization.authorizationRevision,
     });
     if (!created.ok) {
       await deleteOAuthSecret(broker, refreshTokenReference).catch(() => undefined);
