@@ -65,10 +65,10 @@ begin
   end if;
 
   v_payload_sha256 := 'sha256:' || pg_catalog.encode(
-    public.digest(pg_catalog.convert_to(p_evaluation::text, 'UTF8'), 'sha256'), 'hex'
+    extensions.digest(pg_catalog.convert_to(p_evaluation::text, 'UTF8'), 'sha256'), 'hex'
   );
   v_evaluation_key := 'sha256:' || pg_catalog.encode(
-    public.digest(
+    extensions.digest(
       pg_catalog.convert_to(
         'tavonel.operational_sli_alert_evaluation.v1' || pg_catalog.chr(10) ||
         to_char(p_window_started_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),

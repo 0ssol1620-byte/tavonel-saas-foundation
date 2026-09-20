@@ -89,7 +89,7 @@ security definer
 set search_path = ''
 as $$
   select 'sha256:' || pg_catalog.encode(
-    public.digest(
+    extensions.digest(
       pg_catalog.convert_to(
         pg_catalog.jsonb_build_object(
           'operationId', p_operation_id,
@@ -415,7 +415,7 @@ begin
   ) returning event_id into v_event_id;
 
   v_receipt_sha256 := 'sha256:' || pg_catalog.encode(
-    public.digest(
+    extensions.digest(
       pg_catalog.convert_to(
         pg_catalog.jsonb_build_object(
           'operationId', p_operation_id,

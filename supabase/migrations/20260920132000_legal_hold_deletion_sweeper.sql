@@ -133,7 +133,7 @@ create or replace function public.reject_tombstoned_connector_binding()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare v_deletion_id text;
 begin
-  v_deletion_id := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(
+  v_deletion_id := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     'tavonel.source_deletion.v1' || pg_catalog.chr(10) || new.workspace_key || pg_catalog.chr(10) || new.source_id,
     'UTF8'), 'sha256'), 'hex');
   -- Serialize with request_connector_source_deletion. Without the matching lock an import can
@@ -210,7 +210,7 @@ begin
     or p_object_sha256 !~ '^sha256:[a-f0-9]{64}$' then
     raise exception 'SOURCE_DELETION_OBJECT_INVALID';
   end if;
-  v_deletion_id := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(
+  v_deletion_id := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     'tavonel.source_deletion.v1' || pg_catalog.chr(10) || p_workspace_key || pg_catalog.chr(10) || p_source_id,
     'UTF8'), 'sha256'), 'hex');
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_deletion_id, 0));
@@ -313,7 +313,7 @@ begin
     or p_reason is null or p_reason not in ('provider_deleted', 'provider_inaccessible') then
     raise exception 'SOURCE_DELETION_INPUT_INVALID';
   end if;
-  v_deletion_id := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(
+  v_deletion_id := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     'tavonel.source_deletion.v1' || pg_catalog.chr(10) || p_workspace_key || pg_catalog.chr(10) || p_source_id,
     'UTF8'), 'sha256'), 'hex');
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_deletion_id, 0));
@@ -379,8 +379,8 @@ begin
   v_payload := pg_catalog.jsonb_build_object('schemaVersion', 'tavonel.source_deletion_receipt.v1',
     'deletionId', v_deletion_id, 'workspaceKey', p_workspace_key, 'sourceId', p_source_id,
     'action', 'tombstoned', 'reason', p_reason);
-  v_payload_sha256 := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(v_payload::text, 'UTF8'), 'sha256'), 'hex');
-  v_receipt_id := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(
+  v_payload_sha256 := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(v_payload::text, 'UTF8'), 'sha256'), 'hex');
+  v_receipt_id := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     'tavonel.source_deletion_receipt.v1' || pg_catalog.chr(10) || v_deletion_id || pg_catalog.chr(10) || 'tombstoned',
     'UTF8'), 'sha256'), 'hex');
   insert into public.source_deletion_receipts
@@ -549,8 +549,8 @@ begin
     'deletionId', p_deletion_id, 'workspaceKey', v_object.workspace_key, 'sourceId', v_object.source_id,
     'action', 'object_purged', 'objectKey', p_object_key, 'objectSha256', p_object_sha256,
     'objectAlreadyAbsent', p_object_already_absent);
-  v_payload_sha256 := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(v_payload::text, 'UTF8'), 'sha256'), 'hex');
-  v_receipt_id := 'sha256:' || pg_catalog.encode(public.digest(pg_catalog.convert_to(
+  v_payload_sha256 := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(v_payload::text, 'UTF8'), 'sha256'), 'hex');
+  v_receipt_id := 'sha256:' || pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     'tavonel.source_deletion_receipt.v1' || pg_catalog.chr(10) || p_deletion_id || pg_catalog.chr(10) || p_object_key,
     'UTF8'), 'sha256'), 'hex');
   update public.source_deletion_objects set purged_at = clock_timestamp(),
