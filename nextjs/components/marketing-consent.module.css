@@ -16,9 +16,8 @@
   the RunPod row on /subprocessors, the submit region on /contact and body copy on seven more
   pages. Reserved space at the bottom only works if the thing occupying it is *at* the bottom.
 
-  So there is one surface at both widths now: a full-width bar docked to the bottom edge, one row
-  high, with `body` padding equal to its height while it is up. It overlaps nothing at any scroll
-  position, because it is not over the page -- the page ends above it.
+  The surface now lives before the public page in document flow. It reads as a compact privacy
+  notice, moves away with the page, and cannot cover the hero, a plan action or a safe-area inset.
 
   G1-024 capped the phone height at 56px, and BQ-054 is where that cap stops being worth its
   price: it only held because the sentence was set at 11px, under the site's 12px floor, on the
@@ -32,36 +31,40 @@
   font: inherit;
 }
 
-/*
-  Docked to the bottom edge, full width, one row.
-
-  It used to sit `var(--bar)` above the bottom -- 46px, reserved for the landing page's fixed
-  instrument bar. That bar is gone (`brand-copy.test.ts` fails if it returns), so what the offset
-  reserved was a 46px strip of page visible *under* a bar that is supposed to be docked: the one
-  detail that makes a system notice read as a floating advert. BQ-054: bottom is 0.
-*/
 .panel {
-  position: fixed;
-  inset: auto 0 0 0;
-  z-index: 55;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(clamp(16px, 4vw, 32px), env(safe-area-inset-right))
+    8px
+    max(clamp(16px, 4vw, 32px), env(safe-area-inset-left));
+  border-bottom: 1px solid var(--hairline-hi);
+  background: var(--g1);
+}
+
+.inner {
   display: flex;
   align-items: center;
   gap: 16px;
+  width: min(100%, 1280px);
+  margin-inline: auto;
   min-height: 60px;
-  padding: 8px clamp(16px, 4vw, 32px);
-  border: 1px solid var(--hairline-hi);
-  border-width: 1px 0 0;
-  background: var(--ground);
 }
 
 /*
-  Nothing on the page hides behind the bar while it is up.
-
-  `:has()` rather than a class toggled from the component: the bar's own markup is the only
-  signal, so the padding cannot outlive it or be forgotten when the choice is made. The value is
-  the bar's height, which this file now fixes rather than guessing at how the sentence wrapped.
+  The public header is normally fixed at the viewport edge. While this notice is present, make
+  that header sticky in its page wrapper instead: it begins after the notice, follows it out of
+  view, and then resumes its usual pinned position. The negative block margin preserves the
+  existing 64px hero/header composition; sticky positioning otherwise adds a second 64px spacer
+  that every public route already accounts for in its first section.
 */
-:global(body):has(.panel) { padding-bottom: 76px; }
+:global(body):has(.panel) :global(header.nav) {
+  position: sticky;
+  top: 0;
+  margin-bottom: -64px;
+}
 
 .panel p {
   flex: 1 1 auto;
@@ -197,16 +200,21 @@
     the footer's own links -- ends up underneath it.
   */
   .panel {
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      12px
+      max(12px, env(safe-area-inset-left));
+  }
+  .inner {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
     min-height: 0;
-    padding: 10px clamp(12px, 3vw, 20px) 12px;
   }
   .panel p { font-size: 12px; line-height: 1.4; }
   .panel p a { padding-block: 15px; margin-block: -15px; } /* 12px type: 16.8px line + 30px = 46.8px, above the 44px floor */
   .actions { gap: 8px; }
   .actions button { flex: 1 1 0; justify-content: center; padding: 10px; font-size: 12px; }
-  :global(body):has(.panel) { padding-bottom: 136px; }
   .floating { inset: auto auto 8px 0.5rem; }
 }

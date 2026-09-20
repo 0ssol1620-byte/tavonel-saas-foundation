@@ -36,9 +36,8 @@ const hrefsOf = (locator: ReturnType<Page["locator"]>) =>
   locator.evaluateAll((elements) => elements.map((element) => element.getAttribute("href")));
 
 /*
-  The consent banner is fixed to the bottom of the viewport and never overlaps the header, so
-  nothing here dismisses it. What would need dismissing is a control it covers; every control
-  this file touches is in the top 64px or in a sheet that hangs from it.
+  The consent notice precedes the header in document flow and never overlays it, so nothing here
+  dismisses it. Header-height assertions measure the bar itself, independent of its page offset.
 */
 
 test.describe("at 1440", () => {

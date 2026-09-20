@@ -177,10 +177,12 @@ export default function MarketingConsent() {
     return <button className={`${styles.settings} ${styles.floating}`} onClick={() => setEditing(true)}>{copy.settings}</button>;
   }
   return <section className={styles.panel} aria-label={copy.region}>
-    <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
-    <div className={styles.actions}>
-      <button onClick={() => choose(false)}>{copy.refuse}</button>
-      <button onClick={() => choose(true)}>{copy.allow}</button>
+    <div className={styles.inner}>
+      <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
+      <div className={styles.actions}>
+        <button onClick={() => choose(false)}>{copy.refuse}</button>
+        <button onClick={() => choose(true)}>{copy.allow}</button>
+      </div>
     </div>
   </section>;
 }
