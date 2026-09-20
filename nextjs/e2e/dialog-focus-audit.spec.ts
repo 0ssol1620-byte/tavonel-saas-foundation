@@ -86,7 +86,7 @@ test.describe("the workspace command palette", () => {
 
   test("opens, takes focus, and closes on Escape", async ({ page }) => {
     await page.goto("/workspace", { waitUntil: "domcontentloaded" });
-    const opener = page.getByRole("button", { name: /Search \/ Command/ });
+    const opener = page.getByRole("button", { name: "Search workspace commands" });
     await expect(opener).toBeVisible();
     await opener.click();
 
@@ -99,7 +99,7 @@ test.describe("the workspace command palette", () => {
 
   test("traps Tab and returns focus to its opener", async ({ page }) => {
     await page.goto("/workspace", { waitUntil: "domcontentloaded" });
-    const opener = page.getByRole("button", { name: /Search \/ Command/ });
+    const opener = page.getByRole("button", { name: "Search workspace commands" });
     await opener.click();
     await expect(page.getByRole("dialog", { name: "Workspace command palette" })).toBeVisible();
 
