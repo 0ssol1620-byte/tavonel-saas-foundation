@@ -1,3 +1,5 @@
+import mark from "@/lib/brand-mark.json";
+
 /**
  * LOCUS: a source page with its corner cut, and the one box on it that a compiled sentence can
  * point back to.
@@ -19,7 +21,7 @@ export default function Logomark({ size = 20 }: { size?: number }) {
   return (
     <svg
       className="logomark"
-      viewBox="0 0 24 24"
+      viewBox={mark.viewBox}
       width={size}
       height={size}
       fill="none"
@@ -27,10 +29,7 @@ export default function Logomark({ size = 20 }: { size?: number }) {
       strokeLinecap="square"
       aria-hidden="true"
     >
-      {/* The page. The corner is cut at 35 degrees, not the conventional 45. */}
-      <path d="M4.5 3.5H14.5L19.5 7V20.5H4.5Z" strokeWidth={2.5} />
-      {/* The evidence box, drawn as its bottom-left corner: the locus on the page. */}
-      <path d="M9.5 12V16H15" strokeWidth={2} />
+      {mark.paths.map(path => <path key={path.d} d={path.d} strokeWidth={path.strokeWidth} />)}
     </svg>
   );
 }

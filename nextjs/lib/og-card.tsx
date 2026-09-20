@@ -30,6 +30,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 import { BRAND_LINE } from "./site-navigation";
+import mark from "./brand-mark.json";
 
 export const alt = `TAVONEL share card — ${BRAND_LINE.descriptor}`;
 export const size = { width: 1200, height: 630 };
@@ -88,9 +89,8 @@ function evidenceFrame(): string {
 export function OgLogomark({ size: px = 48 }: { size?: number }) {
   // LOCUS, the same two paths as components/logomark.tsx. One ink, fully solid.
   return (
-    <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke={INK} strokeLinecap="square">
-      <path d="M4.5 3.5H14.5L19.5 7V20.5H4.5Z" strokeWidth={2.5} />
-      <path d="M9.5 12V16H15" strokeWidth={2} />
+    <svg width={px} height={px} viewBox={mark.viewBox} fill="none" stroke={INK} strokeLinecap="square">
+      {mark.paths.map(path => <path key={path.d} d={path.d} strokeWidth={path.strokeWidth} />)}
     </svg>
   );
 }

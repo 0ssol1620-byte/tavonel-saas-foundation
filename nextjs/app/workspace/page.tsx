@@ -30,6 +30,7 @@ import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
 import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
+import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
@@ -1996,6 +1997,7 @@ export default function WorkspacePage() {
     reviewCount,
     activeRevision: activeWorld?.revision ?? null,
     compileErrorCode: compileJob?.errorCode ?? null,
+    compileJobState: compileJob?.state ?? null,
     blockedSourceCount: compileJob?.blocked.length ?? 0,
     hasGroundedAnswer: askResult?.status === "grounded",
     hasAiConnection: aiConnectionTaken,
@@ -2042,10 +2044,10 @@ export default function WorkspacePage() {
     travel together so Home never shows a progress row without its picture or a picture without
     its counts.
   */
-  const compileBlock = compileJob || pipelineRows.length > 0 ? (
+  const compileBlock = compileJob || hasActiveSourceWork(pipelineRows) ? (
     <div className="workspace-compile-block">
-      {compileJob || pipelineRows.length > 0 ? (
-        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} />
+      {compileJob || hasActiveSourceWork(pipelineRows) ? (
+        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} resultId={compileJob?.collectionId ?? null} />
       ) : null}
       {compileJob ? (
         <CompileJobPanel
@@ -2146,7 +2148,7 @@ export default function WorkspacePage() {
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
               <div>
-                <h2 id="workspace-attention-title">{attentionItems.length === 1 ? "1 thing needs a decision" : `${attentionItems.length} things need a decision`}</h2>
+                <h2 id="workspace-attention-title">Needs attention</h2>
                 <ul className="workspace-attention-items">
                   {attentionItems.map((item) => (
                     <li key={item.id}>

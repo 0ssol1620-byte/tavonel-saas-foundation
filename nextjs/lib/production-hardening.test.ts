@@ -80,10 +80,10 @@ describe("2026-09-05 production hardening", () => {
   it("shows the real four-stage lifecycle as soon as a durable compile exists", () => {
     const workspace = read("app/workspace/page.tsx");
     const stage = read("components/compile-stage.tsx");
-    expect(workspace).toContain("compileJob || pipelineRows.length > 0");
+    expect(workspace).toContain("compileJob || hasActiveSourceWork(pipelineRows)");
     expect(stage).toContain("state?: CompileState | null");
     // Four chapters, and a position in them taken from the job record.
-    expect(stage).toContain("const STAGE_OF_STATE: Record<CompileState, number>");
+    expect(read("lib/compile-stage-view.ts")).toContain("const POSITION: Record<CompileState, number>");
     expect(stage).toContain("PIPELINE_STAGES.forEach((stage, i)");
     expect(stage).toContain('stopped ? "STOPPED" : "WAITING"');
   });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import EvidenceLine from "../evidence-line";
+import EvidenceConnector from "../evidence-connector";
 import SourcePage from "../source-page";
 import { HERO_PAGE_ALT, SCENE_ACTIONS } from "../scene-actions";
 import ProofTabs from "./proof-tabs";
@@ -63,7 +63,7 @@ const TITLE_ID = "lv2-proof-title";
   wrap), split into a 200px locator page and the crop that fills the rest. Below 900 the grid is
   one column and both frames are the column's width.
 */
-const PAGE_SIZES = "(min-width: 900px) 200px, min(240px, 62vw)";
+const PAGE_SIZES = "(min-width: 900px) 240px, min(240px, 62vw)";
 /* Concrete lengths only: `sizes` is parsed before the cascade exists, so `var(--lv2-gutter)`
    in it is an invalid entry the browser drops -- the gutters are written out instead. */
 const CROP_SIZES = "(min-width: 1200px) 520px, (min-width: 900px) 44vw, (min-width: 768px) calc(100vw - 64px), calc(100vw - 40px)";
@@ -90,11 +90,12 @@ function Panel({
 }) {
   const { source, rasters } = tab;
   return (
-    <div className={styles.grid}>
+    <div className={styles.grid} data-evidence-pair>
+      <EvidenceConnector />
       <div className={styles.answer}>
         <p className={`lv2-meta ${styles.label}`}>{copy.answerLabel}</p>
         {/* The region's own text. A quotation cut short says so; the flag travels with it. */}
-        <blockquote className={styles.excerpt} data-derived="1">
+        <blockquote className={styles.excerpt} data-derived="1" data-evidence-origin>
           {tab.answerExcerpt}
           {tab.answerTruncated ? "…" : ""}
         </blockquote>
@@ -120,7 +121,7 @@ function Panel({
       </div>
 
       {/* §4.1: one hairline, and the markup on either side of it says what the two ends are. */}
-      <EvidenceLine className={styles.line} />
+
 
       <figure className={styles.doc}>
         <figcaption className={`lv2-meta ${styles.label}`}>{copy.sourceLabel}</figcaption>

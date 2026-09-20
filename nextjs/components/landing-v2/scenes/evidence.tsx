@@ -1,4 +1,4 @@
-import EvidenceLine from "../evidence-line";
+import EvidenceConnector from "../evidence-connector";
 import SourcePage from "../source-page";
 import { HERO_PAGE_ALT } from "../scene-actions";
 import EvidenceCopyCitation from "./evidence-copy-citation";
@@ -67,30 +67,6 @@ export default function Scene({
     `title` carries the full digest: the VERSION row shows a truncation, and a truncation that is
     the only copy of a value is not a receipt.
   */
-  /*
-    §4.1's line has to REACH the box, and where the box is on the page is data, not a guess.
-
-    ROUND3-P1 measured the old composition: the connector lived in a 32px gutter track while the
-    page raster was pushed to the far right of its column, so the line stopped 135px short and
-    read as a dash floating in the margin. The geometry below is what closes that gap, and every
-    number in it is read off the record:
-
-      --lv2-region-left  the box's left edge as a fraction of the page width, so the line can
-                         overrun the page's edge by exactly that much and stop ON the box
-      --lv2-region-mid   the box's vertical centre as a fraction of the page height, so the line
-                         sits at the region's middle rather than at the column's
-      --lv2-page-ar      the committed raster's own height/width, which turns the rendered page
-                         width into a rendered page height without measuring anything at runtime
-
-    A style ATTRIBUTE, not a <style> element: CSP is `style-src-elem 'self'` (rule 9).
-  */
-  const [regionLeft, regionTop, , regionBottom] = record.region.normalized;
-  const geometry = {
-    "--lv2-region-left": `${regionLeft}`,
-    "--lv2-region-mid": `${(regionTop + regionBottom) / 2}`,
-    "--lv2-page-ar": `${record.rasters.page.height / record.rasters.page.width}`,
-  } as React.CSSProperties;
-
   const fields: { key: string; term: string; value: string; title?: string; unit?: string }[] = [
     /* D12: the World's own state word, in the page's language (round 4: it was English on /ko). */
     { key: "status", term: copy.fields.status, value: landingV2StateWord(record.status.state, locale) },
@@ -125,13 +101,14 @@ export default function Scene({
           <p className="lv2-scene-support lv2-body-l">{copy.support}</p>
         </div>
 
-        <div className={styles.inspector}>
+        <div className={styles.inspector} data-evidence-pair>
+          <EvidenceConnector minWidth={1000} />
           {/*
             The record. The passage first, because it is what a reader came to check, then the
             five fields that bind it to a place in a file.
           */}
           <div className={styles.record}>
-            <div className={`${styles.claim} lv2-panel`}>
+            <div className={`${styles.claim} lv2-panel`} data-evidence-origin>
               {/* The World's own kind for this object. Not a heading this page chose. */}
               <p className={styles.kind}>{record.claim.kind}</p>
               <p className={styles.excerpt}>
@@ -193,8 +170,7 @@ export default function Scene({
             phone the same two elements stack (column-reverse: the page reads first) and the line
             is the vertical hairline between the page above and the record below, touching both.
           */}
-          <div className={styles.source} style={geometry}>
-            <EvidenceLine className={styles.connector} />
+          <div className={styles.source}>
 
             <figure className={styles.figure}>
               <SourcePage

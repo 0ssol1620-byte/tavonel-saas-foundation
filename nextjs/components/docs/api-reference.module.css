@@ -146,3 +146,11 @@
 /* The site's one disclosure marker, the same +/- the contact fold and the workspace use. */
 .examples > summary::before { content: "+"; font: 12px var(--f-mono); }
 .examples[open] > summary::before { content: "−"; }
+
+/* Scan the complete endpoint index without scrolling through every error payload. */
+.operationDetails { min-width: 0; border-top: 1px solid var(--hairline); }
+.operationDetails > summary { min-height: 44px; padding: 10px 0; cursor: pointer; font: 500 14px/1.5 var(--f-sans); color: var(--text-hi); overflow-wrap: anywhere; }
+.operationDetails > summary span { margin-left: 12px; color: var(--text-mid); font: 12px/1.6 var(--f-mono); }
+.operationDetails > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 12px; }
+.operationDetails > div > * { min-width: 0; }
+.operationDetails > summary:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 4px; }

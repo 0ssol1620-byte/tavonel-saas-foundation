@@ -1,4 +1,5 @@
 import type { WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import type { CompileState } from "./compile-job-store";
 
 /*
   One derivation of "what is true about this workspace, and what should be said about it".
@@ -29,6 +30,8 @@ export type WorkspaceStateInput = {
   activeRevision: number | null;
   /** Terminal error code of the last compile job, when it stopped. */
   compileErrorCode: string | null;
+  /** The selected durable run may be complete even while its result has not loaded. */
+  compileJobState?: CompileState | null;
   /** Sources the compile refused to read. */
   blockedSourceCount: number;
   /** A grounded answer has come back from the Active World in this session. */
@@ -72,7 +75,8 @@ export function deriveWorkspaceMode(input: WorkspaceStateInput): WorkspaceMode {
     input.documentCount === 0 &&
     !input.hasCandidate &&
     input.activeRevision === null &&
-    input.activityCount === 0;
+    input.activityCount === 0 &&
+    input.compileJobState == null;
   return untouched ? "new" : "returning";
 }
 
@@ -149,14 +153,42 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     };
   }
 
+  // Do not invite an accidental duplicate compile just because the result payload is absent.
+  if (input.compileJobState === "ready" && !input.hasCandidate) {
+    return { mode, stateTitle: "Compilation finished.",
+      stateDescription: "Open the saved run to inspect its result. Completion does not activate knowledge for AI use.",
+      nextAction: { label: "View compile runs", surface: "runs" } };
+  }
+  if (input.compileJobState === "review_required") {
+    return { mode, stateTitle: "This compile needs review.",
+      stateDescription: "Processing is paused for a decision. Open the run details to inspect the evidence before continuing.",
+      nextAction: { label: "View compile runs", surface: "runs" } };
+  }
+  if (input.compileJobState === "cancelled") {
+    return { mode, stateTitle: "The selected compile was cancelled.",
+      stateDescription: "This run is no longer processing. Your stored sources remain in Knowledge; inspect the run before trying again.",
+      nextAction: { label: "View compile runs", surface: "runs" } };
+  }
+  if (input.compileJobState === "failed") {
+    return { mode, stateTitle: "The last compile stopped.",
+      stateDescription: "The run did not finish. Inspect its recorded status before retrying; no error detail was provided.",
+      nextAction: { label: "Open activity", surface: "activity" } };
+  }
+
   if (input.readyDocumentCount > 0) {
     return {
       mode,
       stateTitle: `${input.readyDocumentCount} source${input.readyDocumentCount === 1 ? " is" : "s are"} ready to compile.`,
       stateDescription:
-        "Choose the ready sources you want in the candidate, then compile. Nothing becomes active until you review and approve it.",
+        "Choose which ready sources to compile. Review and activate the result when it is finished.",
       nextAction: { label: "Choose sources to compile", surface: "sources" },
     };
+  }
+
+  if (input.operatorReviewCount > 0) {
+    return { mode, stateTitle: "Your sources need review.",
+      stateDescription: `${input.operatorReviewCount} ${input.operatorReviewCount === 1 ? "source needs" : "sources need"} a decision before reading can continue.`,
+      nextAction: { label: "Open sources needing review", surface: "sources" } };
   }
 
   return {

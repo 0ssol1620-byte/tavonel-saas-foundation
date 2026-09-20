@@ -85,10 +85,11 @@ describe("workspace compile floor and ceiling", () => {
     stay true is a branch in a client component and a selector in a sheet no DOM test reads.
   */
   it("reserves the aspect-ratio frame only while a run is playing", () => {
-    expect(compileStage).toContain("const framed = reached > 0 || (state !== null && STARTING.includes(state));");
+    expect(compileStage).toContain('const framed = hasVisual && view.visual !== "sources" && drawable;');
     expect(compileStage).toContain('data-framed={framed ? "true" : "false"}');
     // Idle it carries its own drawn height, and the sheet stops reserving a ratio.
-    expect(compileStage).toContain("style={framed || !drawable ? undefined : { height: idleHeight }}");
+    expect(compileStage).toContain('{hasVisual ? <canvas');
+    expect(compileStage).toContain('className="compile-stage-status" role="status"');
     expect(workspaceCss).toContain('.compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }');
   });
 
@@ -104,7 +105,7 @@ describe("workspace compile floor and ceiling", () => {
     expect(compileStage).not.toMatch(/(?:fillStyle|strokeStyle) = "(?:#|rgb)/);
     expect(compileStage).toContain("const computed = window.getComputedStyle(section)");
     // A stage that has been passed stays passed: position is the max of observation and record.
-    expect(compileStage).toContain("Math.max(observed, state ? STAGE_OF_STATE[state] : 0)");
+    expect(compileStage).toContain("deriveCompileStageView(rows, reading, world, state, resultId)");
     expect(compileStage).toContain("const done = settled || i < current;");
     // A canvas with no context reports itself instead of painting nothing.
     expect(compileStage).toContain("setDrawable(false)");

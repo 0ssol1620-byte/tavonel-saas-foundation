@@ -7,6 +7,7 @@ import { displayName, type DocumentNames } from "@/lib/document-names";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import type { CompileState } from "@/lib/compile-job-store";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
+import { deriveCompileStageView } from "@/lib/compile-stage-view";
 
 /*
   The compile, played as chapters.
@@ -31,28 +32,6 @@ import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
     so now, and the status line that was screen-reader-only becomes the visible one.
 */
 
-const STAGE_OF_STATE: Record<CompileState, number> = {
-  draft: 0,
-  preflight: 0,
-  awaiting_confirmation: 0,
-  uploading: 0,
-  sanitizing: 0,
-  reading: 1,
-  structuring: 2,
-  resolving: 2,
-  building_world: 3,
-  review_required: 3,
-  ready: 3,
-  failed: 0,
-  cancelled: 0,
-};
-
-const STOPPED: readonly CompileState[] = ["failed", "cancelled"];
-/* A run that has started but has not yet produced a page. The frame is reserved for these too, so
-   the panel does not resize under the reader one beat after they press compile. */
-const STARTING: readonly CompileState[] = ["uploading", "sanitizing"];
-
-/** Token names read off the mounted element, so the canvas cannot hold a second palette. */
 const TOKENS = ["--ground", "--g1", "--g2", "--g3", "--hairline", "--hairline-hi", "--text-hi", "--text-mid", "--text-lo", "--verified", "--changed", "--failed", "--paper"] as const;
 /* Type comes off the element too, or the canvas paints in a different family from the panel it
    sits in. A font token's fallback is a stack, not a colour, so it carries its own. */
@@ -103,12 +82,13 @@ function place(index: number, total: number): { x: number; y: number } {
   return { x: 0.5 + radius * 0.46 * Math.cos(angle), y: 0.5 + radius * 0.46 * Math.sin(angle) };
 }
 
-export default function CompileStage({ rows, reading = {}, names = {}, world = null, state = null }: {
+export default function CompileStage({ rows, reading = {}, names = {}, world = null, state = null, resultId = null }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
   world?: WorldReadModel | null;
   state?: CompileState | null;
+  resultId?: string | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -125,27 +105,16 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     and during a local run the reverse is true. Taking the maximum of the two is what keeps a
     finished stage finished.
   */
-  const hasPage = Object.values(reading).some((item) => (item.pages?.length ?? 0) > 0);
-  const hasStructure = Object.values(reading).some((item) => (item.regionsFound ?? 0) > 0 || item.pages.some((page) => page.boxes.some((box) => Boolean(box.text))));
-  const hasWorld = Boolean(world && world.objects.length > 0);
-  const observed = hasWorld ? 3 : hasStructure ? 2 : hasPage ? 1 : 0;
-  const stopped = state !== null && STOPPED.includes(state);
-  const reached = stopped ? observed : Math.max(observed, state ? STAGE_OF_STATE[state] : 0);
-  const settled = state === "ready";
-  /*
-    D39. The 16:9 frame is space reserved for a picture: a page raster, the extracted text, the
-    World. Before any of that exists the pane draws a tab strip and one line per source, and the
-    reserved frame left 490px of black under it at 1440 (workspace-01). Reserve the frame while a
-    run is playing; idle, take the height of what is actually drawn.
-
-    The geometry below is `draw()`'s: 12px pad, the 46px strip, a 10px gap, the pane's 52px header,
-    22px a row and a 14px tail. Capped so a long list does not grow without end -- past the cap the
-    pane scrolls its own window, as it already does inside the reserved frame.
-  */
-  const framed = reached > 0 || (state !== null && STARTING.includes(state));
+  const view = deriveCompileStageView(rows, reading, world, state, resultId);
+  const reached = view.position;
+  const settled = view.tone === "ready";
+  const stopped = view.tone === "stopped";
+  const hasVisual = view.visual !== "none";
+  const framed = hasVisual && view.visual !== "sources" && drawable;
   const idleHeight = 132 + Math.min(Math.max(rows.length, 1), 8) * 22;
 
   useEffect(() => {
+    if (!hasVisual) return;
     const canvas = canvasRef.current;
     const section = sectionRef.current;
     const context = canvas?.getContext("2d");
@@ -267,7 +236,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     };
 
     const drawWorld = (x: number, y: number, w: number, h: number, model: WorldReadModel) => {
-      pane(x, y, w, h, PIPELINE_STAGES[3].label, `${model.objects.length} objects`);
+      pane(x, y, w, h, view.finalLabel, `${model.objects.length} objects`);
       const ox = x + 14; const oy = y + 44; const gw = w - 28; const gh = h - 58;
       const total = model.objects.length;
       const points = model.objects.map((object, index) => ({ object, at: place(index, total) }));
@@ -297,16 +266,17 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       const stepW = w / PIPELINE_STAGES.length;
       PIPELINE_STAGES.forEach((stage, i) => {
         const done = settled || i < current;
-        const active = !settled && i === current;
+        const active = view.tone === "active" && i === current;
+        const needsReview = view.tone === "attention" && i === current;
         const cx = x + stepW * i + stepW / 2;
-        context.fillStyle = stopped && i === current ? colour["--failed"] : active ? colour["--verified"] : done ? colour["--text-mid"] : colour["--text-lo"];
+        context.fillStyle = stopped && i === current ? colour["--failed"] : needsReview ? colour["--changed"] : active ? colour["--verified"] : done ? colour["--text-mid"] : colour["--text-lo"];
         context.beginPath();
         context.arc(cx, y + 11, active ? 4 : 3, 0, Math.PI * 2);
         context.fill();
         context.font = sans(12, active ? 600 : 500);
         context.fillStyle = active ? colour["--text-hi"] : done ? colour["--text-mid"] : colour["--text-lo"];
         context.textAlign = "center";
-        context.fillText(stage.label, cx, y + 31);
+        context.fillText(i === 3 ? (width < 540 ? (settled ? "AI ready" : "Activate") : view.finalLabel) : stage.label, cx, y + 31);
         if (active) {
           context.fillStyle = colour["--verified"];
           context.fillRect(x + stepW * i + 8, y + 40, Math.max(10, stepW - 16), 2);
@@ -317,11 +287,12 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
 
     const draw = () => {
       const { rows: list, reading: readMap, names: nameMap, world: model } = stateRef.current;
+      if (width <= 0 || height <= 0) return;
       colour = readPalette();
       context.fillStyle = colour["--ground"];
       context.fillRect(0, 0, width, height);
       const focus = focusOf(list, readMap);
-      const progress = focus ? readMap[focus.id] : undefined;
+      const progress = view.progressId ? readMap[view.progressId] : undefined;
       const pad = 12;
       const stripH = 46;
 
@@ -338,7 +309,12 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       const paneW = width - pad * 2;
       const paneH = height - paneY - pad;
       if (paneH < 40) return;
-      const waiting = (label: string) => pane(pad, paneY, paneW, paneH, label, stopped ? "STOPPED" : "WAITING");
+      const waiting = (label: string) => {
+        pane(pad, paneY, paneW, paneH, label, stopped ? "STOPPED" : "WAITING");
+        context.font = sans(14); context.fillStyle = colour["--text-mid"];
+        wrap(context, "The preview is not available yet. The current run state and next steps are shown above.", paneW - 40)
+          .forEach((line, index) => context.fillText(line, pad + 20, paneY + 64 + index * 20));
+      };
       if (reached === 0) drawSources(pad, paneY, paneW, paneH, list, focus, nameMap);
       else if (reached === 1) {
         if (progress?.pages?.length) drawPage(pad, paneY, paneW, paneH, progress);
@@ -351,25 +327,36 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       else waiting(PIPELINE_STAGES[3].label);
     };
 
-    layout(); draw();
-    const onResize = () => { layout(); draw(); };
+    let frame = 0;
+    let disposed = false;
+    const onResize = () => {
+      if (!frame && !disposed) frame = requestAnimationFrame(() => { frame = 0; layout(); draw(); });
+    };
+    const observer = new ResizeObserver(onResize);
+    observer.observe(canvas); observer.observe(section);
+    void document.fonts.ready.then(onResize);
+    onResize();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [names, reading, rows, state, world, reached, settled, stopped]);
+    return () => { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", onResize); };
+  }, [names, reading, rows, state, world, reached, settled, stopped, hasVisual, view.finalLabel, view.progressId, view.tone]);
 
   const observedPages = Object.values(reading).reduce((sum, item) => sum + (item.pages?.length ?? 0), 0);
   const observedRegions = Object.values(reading).reduce((sum, item) => sum + (item.regionsFound ?? 0), 0);
 
   return (
     <section className="compile-stage" aria-label="Live compilation view" ref={sectionRef} data-stage={PIPELINE_STAGES[reached].key}
-      data-framed={framed ? "true" : "false"} style={framed || !drawable ? undefined : { height: idleHeight }}>
-      <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable} />
-      <p className={drawable ? "sr-only" : "compile-stage-text"} role="status">
-        {world
-          ? `${rows.length} sources, ${observedPages} observed pages, ${observedRegions} observed regions, ${world.objects.length} compiled objects, and ${world.relations.length} persisted relations.`
-          : `${rows.length} sources. ${observedPages > 0 ? `${observedPages} pages have been read.` : "Reading has not produced a page yet."}${state ? ` Durable compile state: ${state}.` : ""}`}
-        {drawable ? "" : " This browser did not give the compile view a drawing surface, so the run is reported in text only."}
-      </p>
+      data-tone={view.tone} data-visual={view.visual} data-framed={framed ? "true" : "false"}>
+      <div className="compile-stage-status" role="status">
+        <strong>{view.title}</strong>
+        <p>{view.detail}</p>
+      </div>
+      {hasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
+        style={!framed ? { height: idleHeight } : undefined} /> : null}
+      {hasVisual ? <p className="compile-stage-summary" data-sensitive="content">
+        {rows.length} sources · {observedPages} observed pages · {observedRegions} observed regions
+        {world && view.visual === "world" ? ` · ${world.objects.length} compiled objects · ${world.relations.length} recorded relations` : ""}
+        {drawable ? "" : " The visual is unavailable in this browser; the run details remain available below."}
+      </p> : null}
     </section>
   );
 }

@@ -1,3 +1,5 @@
+import { isSourceRegionBox } from "@/lib/source-region-box";
+
 /*
   The Source Region (blueprint §4.1, §22), as a design primitive.
 
@@ -25,8 +27,8 @@ export default function SourceRegion({
   /** The accessible name of the box, e.g. the assembled `SOURCE · 10-K · p.4 · [...]` string. */
   label?: string;
 }) {
+  if (!isSourceRegionBox(bbox1000)) return null;
   const [x0, y0, x1, y1] = bbox1000;
-  if ([x0, y0, x1, y1].some((value) => typeof value !== "number")) return null;
   return (
     <span
       className={`lv2-region ${className}`.trim()}

@@ -15,7 +15,8 @@ import { describe, expect, it } from "vitest";
 */
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const mark = read("components/logomark.tsx");
-const favicon = read("app/icon.svg");
+const favicon = read("public/brand/locus-v2.svg");
+const geometry = JSON.parse(read("lib/brand-mark.json")) as { viewBox: string; paths: Array<{ d: string; strokeWidth: number }> };
 const shareCard = read("lib/og-card.tsx");
 
 const PAGE = "M4.5 3.5H14.5L19.5 7V20.5H4.5Z";
@@ -30,8 +31,8 @@ describe("the logomark", () => {
   });
 
   it("draws the page with its corner cut at the site's own diagonal", () => {
-    expect(mark).toContain(PAGE);
-    expect(mark).toContain("strokeWidth={2.5}");
+    expect(geometry.paths[0]).toEqual({ d: PAGE, strokeWidth: 2.5 });
+    expect(mark).toContain("mark.paths.map");
     // (14.5,3.5) -> (19.5,7): 35 degrees, the -34 family the design master owns, not a 45 file icon.
     const degrees = (Math.atan2(7 - 3.5, 19.5 - 14.5) * 180) / Math.PI;
     expect(degrees).toBeGreaterThan(33);
@@ -39,8 +40,8 @@ describe("the logomark", () => {
   });
 
   it("draws the evidence box as one corner, clear of every page edge", () => {
-    expect(mark).toContain(BOX);
-    expect(mark).toContain("strokeWidth={2}");
+    expect(geometry.paths[1]).toEqual({ d: BOX, strokeWidth: 2 });
+    expect(mark).toContain("strokeWidth={path.strokeWidth}");
     // Ink clearance to the page's inner edges must survive 16px: >= 2.25 units = 1.5px.
     const inner = { left: 4.5 + 1.25, right: 19.5 - 1.25, bottom: 20.5 - 1.25 };
     expect(9.5 - 1 - inner.left).toBeGreaterThanOrEqual(2.25);
@@ -49,7 +50,7 @@ describe("the logomark", () => {
   });
 
   it("has two elements, two stroke weights and no opacity", () => {
-    expect(mark.match(/<path/g)).toHaveLength(2);
+    expect(geometry.paths).toHaveLength(2);
     expect(mark).not.toMatch(/opacity=/);
     expect(favicon).not.toContain("opacity");
     expect(shareCard.slice(shareCard.indexOf("OgLogomark"), shareCard.indexOf("renderOgCard"))).not.toContain("opacity");
@@ -62,32 +63,21 @@ describe("the logomark", () => {
     expect(favicon).not.toContain("#7be0be");
   });
 
-  it("keeps the favicon the same mark as the nav", () => {
-    // Same two paths, scaled 24 -> 32 (x 4/3). A favicon that drifts is a second logo.
-    for (const [nav, tab] of [
-      [4.5, 6],
-      [14.5, 19.3],
-      [19.5, 26],
-      [20.5, 27.3],
-      [9.5, 12.7],
-      [16, 21.3],
-      [15, 20],
-    ] as const) {
-      expect(Math.abs(nav * (32 / 24) - tab), `${nav} -> ${tab}`).toBeLessThan(0.15);
-      expect(favicon).toContain(String(tab));
+  it("keeps tab and navigation geometry identical without independently rounded paths", () => {
+    expect(favicon).toContain(`viewBox="${geometry.viewBox}"`);
+    for (const path of geometry.paths) {
+      expect(favicon).toContain(`d="${path.d}"`);
+      expect(favicon).toContain(`stroke-width="${path.strokeWidth}"`);
     }
-    // chrome-15: scaled about the tile centre so the glyph fills the tile, and pinned so it
-    // cannot quietly go back to 1 -- or through the tile edge (the mark is 20 wide at 24 -> 26.7 at 32).
-    const scale = Number(favicon.match(/translate\(16 16\) scale\(([\d.]+)\)/)?.[1]);
-    expect(scale, "the glyph is scaled to the tile").toBeGreaterThan(1.1);
-    expect(scale * 26.7 + 3.3, "and stays inside the tile").toBeLessThan(34);
+    expect(read("public/icon.svg")).toBe(favicon);
+    expect(read("app/layout.tsx")).toContain('/brand/locus-v2.svg');
   });
 
   it("draws the same mark on the share cards, from the same geometry", () => {
     expect(shareCard.match(/<rect/g)).toBeNull();
     expect(shareCard).not.toContain("Cell lit");
-    expect(shareCard).toContain(PAGE);
-    expect(shareCard).toContain(BOX);
+    expect(shareCard).toContain('import mark from "./brand-mark.json"');
+    expect(shareCard).toContain("mark.paths.map");
     // The root card is the same `ogCard` as the other twenty-nine, not a second drawing.
     expect(read("app/opengraph-image.tsx")).toContain("ogCard(BRAND_LINE.headline");
     expect(read("app/opengraph-image.tsx")).not.toContain("ImageResponse");
@@ -108,6 +98,9 @@ describe("the logomark", () => {
     // `app/icon.tsx` drew the retired cream/teal tile and Next served it as `/icon` alongside
     // `app/icon.svg`. Two icon files at one route segment is two brands on one tab.
     expect(existsSync(join(process.cwd(), "app/icon.tsx"))).toBe(false);
-    expect(existsSync(join(process.cwd(), "app/icon.svg"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "app/icon.svg"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "public/brand/locus-v2.svg"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "public/favicon.ico"))).toBe(true);
+    expect(read("app/layout.tsx")).toContain("/brand/locus-v2-32.png");
   });
 });

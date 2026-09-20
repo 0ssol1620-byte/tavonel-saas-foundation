@@ -277,7 +277,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
             tall as the block; at 390 the five are a single column rather than a 2+2+1 grid with
             three different heights.
           */}
-          <ol className={`solution-flow ${styles.flow}`}>
+          <ol className={`solution-flow ${styles.flow}`} tabIndex={0} aria-labelledby="solution-flow-title">
             {solution.flow.map((item, index) => (
               <li key={item} className={styles.flowStep}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
