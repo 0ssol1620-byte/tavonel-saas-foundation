@@ -2147,7 +2147,7 @@ export default function WorkspacePage() {
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
               <div>
-                <h2 id="workspace-attention-title">{attentionItems.length === 1 ? "1 thing needs a decision" : `${attentionItems.length} things need a decision`}</h2>
+                <h2 id="workspace-attention-title">Needs attention</h2>
                 <ul className="workspace-attention-items">
                   {attentionItems.map((item) => (
                     <li key={item.id}>

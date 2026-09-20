@@ -67,7 +67,8 @@ for (const state of ['ready', 'review_required', 'failed', 'cancelled']) test(`a
   const job = { jobId, state, documentsTotal: 1, documentsReady: 1, collectionId: null, documentIds: [document.documentId], blocked: [], blockedResolution: null, errorCode: state === 'failed' ? 'TEST_RUN_FAILURE' : null };
   await installWorkspaceRoutes(page, { documents: [document], jobs: [job] });
   await page.route(`**/api/compile-jobs/${jobId}/events**`, route => route.fulfill({ contentType: 'text/event-stream', body: sseFrames([{ ...job, sequence: 1, eventType: 'state_changed' }]) }));
-  await page.goto('/workspace');
+  // Open the saved job URL; settled jobs are not automatically resumed.
+  await page.goto(`/workspace?job=${jobId}`);
   const stage = page.locator('.compile-stage');
   await expect(stage).toBeVisible();
   await expect(stage).toHaveAttribute('data-visual', 'none');
@@ -137,5 +138,32 @@ test('source endpoints stay attached after a width change, without a page reload
       await expect(page.locator('#evidence [data-connected="true"]')).toBeVisible();
       await expect.poll(async () => (await connectionErrors(page, '#evidence [data-evidence-pair]')).end).toBeLessThan(2);
     } else await expect(page.locator('#evidence .lv2-evidence-connector')).toBeHidden();
+  }
+});
+
+test('API reference is scannable while endpoint contracts stay reachable by keyboard', async ({ page }) => {
+  await page.goto('/api');
+  const operations = page.locator('article[id]');
+  await expect(operations).toHaveCount(33);
+  const operation = operations.first();
+  const details = operation.locator('details').first();
+  await expect(details).not.toHaveAttribute('open');
+  const summary = details.locator(':scope > summary');
+  await summary.focus(); await page.keyboard.press('Enter');
+  await expect(details).toHaveAttribute('open', '');
+  await expect(details.getByText('Responses', { exact: true })).toBeVisible();
+  await summary.focus(); await page.keyboard.press('Enter');
+  await expect(details).not.toHaveAttribute('open');
+  expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThan(30000);
+});
+
+test('solution flow remains keyboard-scrollable at the tablet breakpoint', async ({ page }) => {
+  await page.setViewportSize({width:768,height:900});
+  for (const route of ['/solutions/knowledge-graph','/solutions/source-grounded-assistants']) {
+    await page.goto(route);
+    const flow = page.locator('.solution-flow');
+    await expect(flow).toHaveAttribute('tabindex', '0');
+    await flow.focus(); await expect(flow).toBeFocused();
+    await expect(flow).toHaveAttribute('aria-labelledby', 'solution-flow-title');
   }
 });

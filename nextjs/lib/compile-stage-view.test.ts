@@ -39,3 +39,7 @@ describe("compile-stage state and payload integrity", () => {
     expect(deriveCompileStageView([row()], { "unrelated": progress }, null, "reading").visual).toBe("none");
   });
 });
+
+it("fails closed on an unknown server state rather than indexing a missing chapter", () => {
+  expect(deriveCompileStageView([], {}, null, "future_state" as CompileState)).toMatchObject({ position: 0, visual: "none", tone: "attention" });
+});

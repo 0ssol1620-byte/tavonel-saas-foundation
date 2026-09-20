@@ -23,3 +23,7 @@ Full public route and authenticated-fixture surface audits are recorded separate
 The customerData and candidatePromotion gates, migrations, locked film bytes and original sources are not changed.
 
 Release is pending exact-head CI, preview review and final production verification at the time of this implementation record.
+
+## Broader audit findings
+The four-width public audit found keyboard-inaccessible horizontally scrollable solution flows at 768px on knowledge-graph and source-grounded-assistants. The ordered flows now receive keyboard focus and their existing heading supplies the accessible name. The API reference measured 53,081px at 1440px with all response descriptions open; full endpoint contracts are retained in native keyboard-operable disclosures while signatures, summaries and anchor targets remain visible.
+The misleading group count “1 thing needs a decision” above 44 held sources is replaced by “Needs attention”; the facts line continues to report actual source counts. Unknown server lifecycle states now have an explicit fail-closed explanation.

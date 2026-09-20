@@ -24,6 +24,10 @@ export type CompileStageView = {
 };
 
 export function deriveCompileStageView(rows: readonly PipelineRow[], reading: Record<string, OcrProgress>, world: { world: Pick<WorldReadModel["world"], "id" | "status">; objects: readonly unknown[] } | null, state: CompileState | null, resultId: string | null = null): CompileStageView {
+  if (state !== null && !Object.prototype.hasOwnProperty.call(POSITION, state)) {
+    return { position: 0, title: "Run state unavailable", detail: "The server returned an unrecognized run state. Refresh the run details before taking another action.",
+      tone: "attention", visual: "none", progressId: null, finalLabel: "Review & activate" };
+  }
   const sourceIds = new Set(rows.map(row => row.id));
   const observations = Object.entries(reading).filter(([id]) => sourceIds.has(id));
   const page = observations.find(([, value]) => value.pages.length > 0);

@@ -154,7 +154,7 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
       mode,
       stateTitle: `${input.readyDocumentCount} source${input.readyDocumentCount === 1 ? " is" : "s are"} ready to compile.`,
       stateDescription:
-        "Choose the ready sources you want in the candidate, then compile. Nothing becomes active until you review and approve it.",
+        "Choose which ready sources to compile. Review and activate the result when it is finished.",
       nextAction: { label: "Choose sources to compile", surface: "sources" },
     };
   }

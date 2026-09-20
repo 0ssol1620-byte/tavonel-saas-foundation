@@ -86,6 +86,12 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
       <h3 className={styles.summary}>{endpoint.summary}</h3>
       {endpoint.description ? <p className={styles.prose}>{withMarks(endpoint.description)}</p> : null}
 
+      <details className={styles.operationDetails}>
+        <summary aria-label={`Details for ${endpoint.method} ${endpoint.path}`}>
+          Parameters, request and responses
+          <span>{endpoint.responses.map(response => response.status).join(" · ")}</span>
+        </summary>
+        <div>
       {endpoint.parameters.length > 0 ? (
         <>
           <p className={styles.label}>Parameters</p>
@@ -169,6 +175,8 @@ function Operation({ endpoint }: { endpoint: ReferenceEndpoint }) {
           ) : null}
         </div>
       ))}
+        </div>
+      </details>
     </article>
   );
 }
