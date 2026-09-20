@@ -120,6 +120,25 @@ const METRIC_LABEL: Record<string, string> = {
 
 const metricLabel = (metric: string) => METRIC_LABEL[metric] ?? metric;
 
+const GDP_PDF_ARMS = [
+  [
+    "Native PDF",
+    "The provider receives the native PDF and the benchmark prompt, with no added context.",
+  ],
+  [
+    "Compiled context",
+    "The same native PDF and prompt are paired with TAVONEL's sealed compiled context. This is the primary comparison with Native PDF.",
+  ],
+  [
+    "Fixed retrieval",
+    "The same compiled corpus is queried through a fixed embedder and reranker, then cited evidence is passed to the same target model.",
+  ],
+  [
+    "Adaptive routing",
+    "The same corpus and query pass through a sealed eligible routing policy. The receipt records the chosen candidate and, where available, its control counterfactual or shadow run.",
+  ],
+] as const;
+
 export default function BenchmarksPage() {
   const records = qualifiedBenchmarkRecords();
 
@@ -157,10 +176,9 @@ export default function BenchmarksPage() {
                 condition for a row arriving is a forward statement rather than a confession.
               */}
               <p className={styles.state}>
-                <b>This page is the protocol, not a scoreboard.</b> It defines
-                what a knowledge-compilation result has to carry before anyone — including us —
-                may publish it as a number. A result appears here with its digests, its
-                denominator and the failures the run produced, or it does not appear.
+                The qualification contract defines what a knowledge-compilation result has to
+                carry: a frozen configuration, corpus and output digests, a named denominator,
+                published failures, and reproducible scoring material.
               </p>
               {/*
                 B07's label is right that an absence with nothing said about it reads as an
@@ -175,26 +193,38 @@ export default function BenchmarksPage() {
               */}
 
               {/*
-                G2-012. A page called Benchmarks, reached from "Verify and compare", contained
-                rules for comparison and nothing to compare, and there was nowhere on this site a
-                prospect could see a measured result. The protocol is right and stays; what was
-                missing is the answer to the question the reader arrived with.
+                G2-012. This block publishes a reproducible GDP.pdf evaluation design without
+                implying that a run has happened. The external corpus and reference harness are
+                linked directly; the four arms hold the corpus, prompts, models and rubric fixed.
 
-                What this block may contain is fixed by SD-04: the two research measurements that
-                are already published with their denominators and their receipts, each linked to
-                the bytes its digest is of. An internal comparison measured under conditions this
-                protocol does not pin is not a result and does not appear here.
-
-                Dates come from the receipts rather than from a constant somebody has to
-                remember to move.
+                The supporting research below remains derived from the evidence registry, with
+                dates and downloadable receipts carried by each record.
               */}
-              <h2 className={styles.sectionTitle}>What exists today</h2>
+              <h2 className={styles.sectionTitle}>GDP.pdf evaluation design</h2>
               <p className={styles.para}>
-                No run has yet qualified under the protocol above, so the Results table below is
-                empty and says so by being absent. What has been measured and published is two
-                research findings, each with the population it was measured over and a receipt you
-                can download and hash. A figure produced under conditions this protocol does not
-                pin is not a result, and it is not published as one.
+                GDP.pdf is a public set of 100 held-out tasks across ten professional domains. Our
+                planned evaluation keeps the corpus, prompts, target models, and scoring rubric
+                fixed across four arms. Results will be published here only with a qualified run
+                receipt.
+              </p>
+              <p className={styles.para}>
+                Review the{" "}
+                <a href="https://huggingface.co/datasets/surgeai/GDP.pdf">public dataset</a>{" "}
+                and <a href="https://github.com/surge-ai/gdp-pdf">reference harness</a>.
+              </p>
+              <div className="chain">
+                {GDP_PDF_ARMS.map(([title, body]) => (
+                  <article className="link" key={title}>
+                    <h3>{title}</h3>
+                    <p>{body}</p>
+                  </article>
+                ))}
+              </div>
+
+              <h2 className={styles.sectionTitle}>Published supporting research</h2>
+              <p className={styles.para}>
+                These findings remain scoped to the population and question named in each
+                downloadable receipt.
               </p>
               <div className="chain">
                 {EVIDENCE.filter((entry) => entry.receipt).map((entry) => (
@@ -325,8 +355,8 @@ export default function BenchmarksPage() {
               </div>
 
               {/*
-                The results table exists only when there is a result. Rendering the header of an
-                empty table would be a page about an absence; the absence has one sentence, above.
+                The results table exists only when there is a qualified record. The evaluation
+                design above carries no score and does not need a placeholder table.
               */}
               {records.length > 0 ? (
                 <>

@@ -356,6 +356,10 @@ begin
   if p_email is distinct from '0ssol1620@gmail.com' or p_workspace_key is distinct from v_expected then
     raise exception 'founder_test_reset_target_invalid';
   end if;
+  -- Share the write-fence lock domain before checking live work. A compile writer that won the
+  -- lock must commit before this check, and a writer that lost it cannot race the reset state.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('founder-test-reset:'||p_workspace_key,0));
   if (select count(*) from auth.users where id=p_user_id and lower(email)=p_email) <> 1 then
     raise exception 'founder_test_reset_auth_identity_mismatch';
   end if;
@@ -383,19 +387,22 @@ begin
     raise exception 'founder_test_reset_legal_hold_state_invalid';
   end if;
   if exists(select 1 from public.enterprise_governance_policies
-            where organization_id=v_org and legal_hold_enabled) then
+             where organization_id=v_org and legal_hold_enabled) then
     raise exception 'founder_test_reset_legal_hold_active';
   end if;
+  -- Every non-terminal compile is active regardless of heartbeat age. Lock the matching rows so
+  -- they cannot transition underneath the assertion before the caller seals/finalizes the reset.
+  perform 1 from public.foundation_compile_jobs
+    where workspace_key=p_workspace_key
+      and state not in ('ready','failed','cancelled')
+    for update;
+  if found then raise exception 'founder_test_reset_active_work_refused'; end if;
   if exists(select 1 from public.foundation_operation_leases
-            where workspace_key=p_workspace_key and state='running' and expires_at>clock_timestamp())
+             where workspace_key=p_workspace_key and state='running' and expires_at>clock_timestamp())
      or exists(select 1 from public.foundation_jobs
-            where workspace_key=p_workspace_key and state in ('queued','leased'))
-     or exists(select 1 from public.foundation_compile_jobs
-            where workspace_key=p_workspace_key
-              and state not in ('ready','failed','cancelled')
-              and updated_at>clock_timestamp()-interval '30 minutes')
+             where workspace_key=p_workspace_key and state in ('queued','leased'))
      or exists(select 1 from public.foundation_intake_admissions
-            where workspace_key=p_workspace_key and expires_at>clock_timestamp())
+             where workspace_key=p_workspace_key and expires_at>clock_timestamp())
      or exists(select 1 from public.foundation_retrieval_compile_runs
             where workspace_key=p_workspace_key and status in ('pending','running'))
      or exists(select 1 from public.foundation_compute_reservations

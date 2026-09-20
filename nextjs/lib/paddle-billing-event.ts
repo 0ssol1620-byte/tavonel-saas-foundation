@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { findOfferByPriceId, type BillingOfferCode } from "./billing-catalog";
-import { verifyCheckoutBinding } from "./billing-binding";
+import { authenticateCheckoutBinding, isCheckoutBindingFresh } from "./billing-binding";
 
 const EVENT_ID = /^evt_[a-z0-9]{26}$/;
 const TRANSACTION_ID = /^txn_[a-z0-9]{26}$/;
@@ -28,17 +28,25 @@ type CommonAction = {
   payloadSha256: string;
 };
 
+type CheckoutAuthorization = {
+  checkoutBindingNonce: string;
+  checkoutBindingIssuedAt: string;
+  checkoutBindingPolicyVersion: string;
+  checkoutBindingFresh: boolean;
+};
+
 export type PaddleBillingAction =
-  | (CommonAction & {
+  | (CommonAction & CheckoutAuthorization & {
       action: "purchase";
       userId: string;
       workspaceId: string;
       offerCode: BillingOfferCode;
       transactionId: string;
+      subscriptionId: string | null;
       customerId: string;
       creditDelta: number;
     })
-  | (CommonAction & {
+  | (CommonAction & CheckoutAuthorization & {
       action: "subscription";
       userId: string;
       workspaceId: string;
@@ -48,12 +56,13 @@ export type PaddleBillingAction =
       subscriptionStatus: string;
       subscriptionCancelAt: string | null;
     })
-  | (CommonAction & {
+  | (CommonAction & CheckoutAuthorization & {
       action: "allowance";
       userId: string;
       workspaceId: string;
       offerCode: BillingOfferCode;
       transactionId: string;
+      subscriptionId: string;
       customerId: string;
       creditDelta: number;
     })
@@ -107,44 +116,58 @@ export function parsePaddleBillingAction(
   const { data, common } = envelope;
 
   if (common.eventType === "transaction.completed") {
-    const binding = verifyCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
+    const binding = authenticateCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
     const transactionId = typeof data.id === "string" ? data.id : "";
     const customerId = typeof data.customer_id === "string" ? data.customer_id : "";
+    const subscriptionId = typeof data.subscription_id === "string" ? data.subscription_id : "";
     const prices = itemPriceIds(data);
     if (!binding) return { ...common, action: "ignored", reason: "binding_invalid" };
     if (!TRANSACTION_ID.test(transactionId) || !CUSTOMER_ID.test(customerId) || prices.length !== 1) {
       return { ...common, action: "ignored", reason: "transaction_contract_invalid" };
     }
     const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.code !== binding.tavonel_offer_code || offer.saleChannel !== "self_serve") {
+    if (!offer || offer.code !== binding.tavonel_offer_code) {
       return { ...common, action: "ignored", reason: "transaction_price_not_allowed" };
     }
+    if (offer.kind === "subscription" && !SUBSCRIPTION_ID.test(subscriptionId)) {
+      return { ...common, action: "ignored", reason: "transaction_subscription_binding_invalid" };
+    }
+    const checkoutAuthorization = {
+      checkoutBindingNonce: binding.tavonel_nonce,
+      checkoutBindingIssuedAt: binding.tavonel_issued_at,
+      checkoutBindingPolicyVersion: binding.tavonel_policy_version,
+      checkoutBindingFresh: isCheckoutBindingFresh(binding, new Date(common.occurredAt)),
+    };
     if (offer.kind === "subscription") {
       return {
         ...common,
+        ...checkoutAuthorization,
         action: "allowance",
         userId: binding.tavonel_user_id,
         workspaceId: binding.tavonel_workspace_id,
         offerCode: offer.code,
         transactionId,
+        subscriptionId,
         customerId,
         creditDelta: offer.credits,
       };
     }
     return {
       ...common,
+      ...checkoutAuthorization,
       action: "purchase",
       userId: binding.tavonel_user_id,
       workspaceId: binding.tavonel_workspace_id,
       offerCode: offer.code,
       transactionId,
+      subscriptionId: SUBSCRIPTION_ID.test(subscriptionId) ? subscriptionId : null,
       customerId,
       creditDelta: offer.credits,
     };
   }
 
   if (SUBSCRIPTION_EVENTS.has(common.eventType)) {
-    const binding = verifyCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
+    const binding = authenticateCheckoutBinding(data.custom_data, env.FOUNDATION_BILLING_HMAC);
     const subscriptionId = typeof data.id === "string" ? data.id : "";
     const customerId = typeof data.customer_id === "string" ? data.customer_id : "";
     const status = typeof data.status === "string" ? data.status : "";
@@ -167,12 +190,15 @@ export function parsePaddleBillingAction(
       return { ...common, action: "ignored", reason: "subscription_contract_invalid" };
     }
     const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.kind !== "subscription" || offer.code !== binding.tavonel_offer_code
-      || offer.saleChannel !== "self_serve") {
+    if (!offer || offer.kind !== "subscription" || offer.code !== binding.tavonel_offer_code) {
       return { ...common, action: "ignored", reason: "subscription_price_not_allowed" };
     }
     return {
       ...common,
+      checkoutBindingNonce: binding.tavonel_nonce,
+      checkoutBindingIssuedAt: binding.tavonel_issued_at,
+      checkoutBindingPolicyVersion: binding.tavonel_policy_version,
+      checkoutBindingFresh: isCheckoutBindingFresh(binding, new Date(common.occurredAt)),
       action: "subscription",
       userId: binding.tavonel_user_id,
       workspaceId: binding.tavonel_workspace_id,

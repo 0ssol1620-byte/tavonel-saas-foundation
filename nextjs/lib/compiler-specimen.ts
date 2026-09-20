@@ -11,6 +11,12 @@ export const COMPILER_SPECIMEN_SOURCE = {
   excerpt:
     "Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443",
   question: "What were operating expenses for research and development?",
+  statement: "Condensed consolidated statements of operations",
+  unit: "USD millions",
+  currentPeriod: "Dec 27, 2025",
+  priorPeriod: "Dec 28, 2024",
+  currentValue: "10,887",
+  priorValue: "8,268",
 } as const;
 
 export const COMPILER_SPECIMEN_STAGES = [

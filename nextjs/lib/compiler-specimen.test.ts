@@ -7,6 +7,9 @@ import {
   nextCompilerStage,
 } from "./compiler-specimen";
 import publicSample from "./explore-sample.w4.inputs.json";
+import landingSnapshot from "./landing-v2-snapshot.json";
+import landingAssets from "@/public/landing/v2/manifest.json";
+import pageAssets from "@/public/explore-sample/pages/pages.manifest.json";
 
 describe("homepage compiler specimen", () => {
   it("uses the five-stage Knowledge Compiler sequence", () => {
@@ -39,12 +42,43 @@ describe("homepage compiler specimen", () => {
       entry => entry.regionId === COMPILER_SPECIMEN_SOURCE.regionId
     );
     expect(document?.inputSha256).toBe(COMPILER_SPECIMEN_SOURCE.digest);
+    expect(document?.text).toContain(
+      "(In millions, except number of shares"
+    );
+    expect(document?.text).toContain(
+      `Research and development ${COMPILER_SPECIMEN_SOURCE.currentValue} ${COMPILER_SPECIMEN_SOURCE.priorValue}`
+    );
     expect(region).toMatchObject({
       pageNumber1: COMPILER_SPECIMEN_SOURCE.page,
       bbox1000: [...COMPILER_SPECIMEN_SOURCE.bbox1000],
       text: COMPILER_SPECIMEN_SOURCE.excerpt,
       authority: "official",
     });
+
+    const snapshot = landingSnapshot.tabs.find(
+      tab => tab.source.digest === COMPILER_SPECIMEN_SOURCE.digest && tab.source.page === COMPILER_SPECIMEN_SOURCE.page
+    );
+    expect(snapshot?.region.bbox1000).toEqual([...COMPILER_SPECIMEN_SOURCE.bbox1000]);
+    expect(snapshot?.answerExcerpt).toBe(COMPILER_SPECIMEN_SOURCE.excerpt);
+    expect(snapshot?.rasters.crop).toMatchObject({ width: 1120, height: 103 });
+
+    const page = pageAssets.pages.find(
+      entry => entry.sourceSha256 === COMPILER_SPECIMEN_SOURCE.digest && entry.page === COMPILER_SPECIMEN_SOURCE.page
+    );
+    expect(page?.regions.some(entry =>
+      entry.bbox1000.join(",") === COMPILER_SPECIMEN_SOURCE.bbox1000.join(",")
+    )).toBe(true);
+
+    const derivative = landingAssets.entries.find(entry =>
+      entry.kind === "region" &&
+      entry.page === COMPILER_SPECIMEN_SOURCE.page &&
+      "bbox1000" in entry &&
+      entry.bbox1000?.join(",") === COMPILER_SPECIMEN_SOURCE.bbox1000.join(",")
+    );
+    expect(derivative?.outputs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ format: "avif", width: 1120, height: 103, sha256: "sha256:06c98d7a69382521dee9fed1915670c6a3e80ed529624efbcc571bdbb11e542d" }),
+      expect.objectContaining({ format: "webp", width: 1120, height: 103, sha256: "sha256:22f00db6dcb867a01bb281c6232e3cb58e8bc3d31ab48a24923e7adfdd2e1647" }),
+    ]));
   });
 
   it("plays once and terminates on Intelligence", () => {
@@ -107,11 +141,27 @@ describe("homepage compiler specimen", () => {
     expect(component).toContain("IntersectionObserver");
     expect(component).toContain("intersectionRatio >= 0.4");
     expect(component).toContain('document.addEventListener("visibilitychange"');
+    expect(component).toContain("apple-2026-q1-10-q-reference-p004-1080.avif");
+    expect(component).toContain("apple-2026-q1-10-q-reference-p004-r64-476-932-538-1120.avif");
+    for (const selector of [
+      "sourceAsset",
+      "fullPage",
+      "regionCrop",
+      "sourceCaption",
+      "pageComposition",
+      "structureComposition",
+      "evidenceComposition",
+      "knowledgeComposition",
+      "intelligenceComposition",
+    ]) {
+      expect(component, `${selector} must be rendered`).toContain(`styles.${selector}`);
+      expect(css, `${selector} must be styled`).toMatch(new RegExp(`\\.${selector}\\b`));
+    }
     expect(component).not.toMatch(/aria-live|role=["']status/);
     expect(css).toMatch(
       /@media \(max-width: 767px\)[\s\S]*?\.stage\s*\{[\s\S]*?min-height:\s*44px/
     );
     expect(css).toMatch(/\.specimen\s*\{[\s\S]*?min-width:\s*0/);
-    expect(css).toMatch(/\.fact dd\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.addressGrid b\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
   });
 });

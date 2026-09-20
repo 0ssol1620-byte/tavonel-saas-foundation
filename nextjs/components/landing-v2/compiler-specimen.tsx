@@ -56,34 +56,130 @@ const COPY = {
   },
 } as const;
 
-function stageFacts(index: number) {
-  if (index === 0)
-    return [
-      ["Document", source.filename],
-      ["Page", `${source.page} / ${source.pageCount}`],
-    ];
-  if (index === 1)
-    return [
-      ["Region", source.regionId],
-      ["Box", source.bbox1000.join(", ")],
-    ];
-  if (index === 2)
-    return [
-      ["Passage", source.excerpt],
-      ["Version", source.digest],
-    ];
-  if (index === 3)
-    return [
-      ["Knowledge", source.excerpt],
-      ["Source", source.regionId],
-    ];
-  return [
-    ["Question", source.question],
-    [
-      "Citation",
-      `${source.form} · ${source.filename} · page ${source.page} · ${source.regionId}`,
-    ],
-  ];
+function SourceSheet({ index }: { index: number }) {
+  return (
+    <div className={styles.sourceViewport} data-camera-stage={index} aria-label={`Source page ${source.page}`}>
+      <picture className={`${styles.sourceAsset} ${styles.fullPage}`}>
+        <source
+          type="image/avif"
+          srcSet="/landing/v2/apple-2026-q1-10-q-reference-p004-720.avif 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.avif 1080w"
+          sizes="(max-width: 767px) calc(100vw - 72px), 430px"
+        />
+        <source
+          type="image/webp"
+          srcSet="/landing/v2/apple-2026-q1-10-q-reference-p004-720.webp 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp 1080w"
+          sizes="(max-width: 767px) calc(100vw - 72px), 430px"
+        />
+        <img
+          data-source-image="page"
+          src="/explore-sample/pages/apple-2026-q1-10-q-reference-p004.webp"
+          alt="Apple quarterly filing page showing the condensed consolidated statements of operations"
+          width="1080"
+          height="1398"
+          loading="lazy"
+          decoding="async"
+        />
+      </picture>
+      <picture className={`${styles.sourceAsset} ${styles.regionCrop}`}>
+        <source
+          type="image/avif"
+          srcSet="/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-560.avif 560w, /landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-1120.avif 1120w"
+          sizes="(max-width: 767px) calc(100vw - 72px), 430px"
+        />
+        <source
+          type="image/webp"
+          srcSet="/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-560.webp 560w, /landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-1120.webp 1120w"
+          sizes="(max-width: 767px) calc(100vw - 72px), 430px"
+        />
+        <img
+          data-source-image="region"
+          src="/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-560.webp"
+          alt="Exact operating expenses table region from the same filing page"
+          width="1120"
+          height="103"
+          loading="lazy"
+          decoding="async"
+        />
+      </picture>
+      <span className={styles.region} aria-hidden="true" />
+      <p className={styles.sourceCaption} data-derived="1">
+        {index === 0 ? `Page ${source.page} · original render` : `${source.regionId} · exact crop`}
+      </p>
+    </div>
+  );
+}
+
+function StageComposition({ index }: { index: number }) {
+  if (index === 0) {
+    return (
+      <div className={styles.pageComposition} data-stage-composition="page">
+        <p className={styles.compositionLabel}>Original page · unchanged</p>
+        <p className={styles.compositionLead}>One filing page enters before interpretation.</p>
+        <dl className={styles.compactLedger}>
+          <div><dt>File</dt><dd data-derived="1">{source.filename}</dd></div>
+          <div><dt>Page</dt><dd data-derived="1">{source.page} of {source.pageCount}</dd></div>
+        </dl>
+      </div>
+    );
+  }
+  if (index === 1) {
+    return (
+      <div className={styles.structureComposition} data-stage-composition="structure">
+        <p className={styles.compositionLabel}>Located table region</p>
+        <div className={styles.cellMap}>
+          <span className={styles.rowName}>Research and development</span>
+          <span className={styles.cell} data-derived="1" data-critical-value="structured-current">{source.currentValue}</span>
+          <span className={styles.cell} data-derived="1">{source.priorValue}</span>
+        </div>
+        <div className={styles.coordinateRow}>
+          <span>row · operating_expenses.r_and_d</span>
+          <span data-derived="1">bbox · {source.bbox1000.join(" / ")}</span>
+        </div>
+      </div>
+    );
+  }
+  if (index === 2) {
+    return (
+      <div className={styles.evidenceComposition} data-stage-composition="evidence">
+        <p className={styles.compositionLabel}>Evidence address</p>
+        <blockquote data-derived="1">{source.excerpt}</blockquote>
+        <div className={styles.addressGrid}>
+          <span>document</span><b data-derived="1">{source.id}</b>
+          <span>page</span><b data-derived="1">{source.page}</b>
+          <span>region</span><b data-derived="1">{source.regionId}</b>
+          <span>version</span><b data-derived="1">{source.digest}</b>
+        </div>
+      </div>
+    );
+  }
+  if (index === 3) {
+    return (
+      <div className={styles.knowledgeComposition} data-stage-composition="knowledge">
+        <p className={styles.compositionLabel}>Reusable knowledge object</p>
+        <div className={styles.knowledgeObject}>
+          <span className={styles.objectType}>Operating expense</span>
+          <strong>Research and development</strong>
+          <span className={styles.objectValue} data-derived="1" data-critical-value="knowledge-current">{source.currentValue}</span>
+          <span className={styles.objectUnit} data-derived="1">{source.unit} · {source.currentPeriod}</span>
+        </div>
+        <div className={styles.sourceTether}>
+          <span aria-hidden="true" />
+          <p data-derived="1">Grounded in {source.regionId}</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.intelligenceComposition} data-stage-composition="intelligence">
+      <p className={styles.compositionLabel}>Grounded answer</p>
+      <p className={styles.question}>{source.question}</p>
+      <p className={styles.answer}>
+        <strong data-derived="1" data-critical-value="answer-current">{source.currentValue}</strong>
+        <span data-derived="1">{source.unit} · {source.currentPeriod}</span>
+      </p>
+      <p className={styles.citation} data-derived="1">↗ {source.filename} · page {source.page} · {source.regionId}</p>
+    </div>
+  );
 }
 
 export default function CompilerSpecimen({
@@ -189,7 +285,12 @@ export default function CompilerSpecimen({
 
   const active = COMPILER_SPECIMEN_STAGES[index];
   return (
-    <div className={styles.specimen} data-compiler-specimen ref={specimen}>
+    <div
+      className={styles.specimen}
+      data-compiler-specimen
+      data-playing={playing}
+      ref={specimen}
+    >
       <div
         className={styles.rail}
         role="tablist"
@@ -231,35 +332,17 @@ export default function CompilerSpecimen({
       </div>
       <div
         className={styles.canvas}
+        data-stage={active.id}
         id="compiler-stage-panel"
         role="tabpanel"
         aria-labelledby={`compiler-stage-${active.id}`}
       >
-        <div className={styles.page} aria-hidden="true">
-          <p className={styles.pageHeader} data-derived="1">
-            Apple Inc. · Form {source.form} · page {source.page}
-          </p>
-          <div className={styles.pageRule} />
-          <div className={styles.pageLines}>
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
-          <span className={styles.region} />
-        </div>
+        <SourceSheet index={index} />
         <div className={styles.output}>
           <p className={styles.eyebrow}>{active.label}</p>
           <p className={styles.title}>{copy.titles[index]}</p>
           <p className={styles.body}>{copy.bodies[index]}</p>
-          <dl className={styles.facts}>
-            {stageFacts(index).map(([term, value]) => (
-              <div className={styles.fact} key={term}>
-                <dt>{term}</dt>
-                <dd data-derived="1">{value}</dd>
-              </div>
-            ))}
-          </dl>
+          <StageComposition key={active.id} index={index} />
         </div>
       </div>
     </div>

@@ -49,7 +49,10 @@ describe("founder test reset migration", () => {
     expect(sql).toContain("audit_evidence_disposition text not null default 'ARCHIVED'");
     expect(sql).toContain("foundation_operation_leases");
     expect(sql).toContain("state in ('queued','leased')");
-    expect(sql).toMatch(/from public\.foundation_compile_jobs[\s\S]*state not in \('ready','failed','cancelled'\)[\s\S]*updated_at>clock_timestamp\(\)-interval '30 minutes'/i);
+    const assertions = functionBody("founder_test_reset_assertions");
+    expect(assertions).toContain("'founder-test-reset:'||p_workspace_key");
+    expect(assertions).toMatch(/perform 1 from public\.foundation_compile_jobs[\s\S]*state not in \('ready','failed','cancelled'\)[\s\S]*for update/i);
+    expect(assertions).not.toMatch(/foundation_compile_jobs[\s\S]{0,200}updated_at/i);
     expect(sql).toContain("founder_test_reset_write_fenced");
     expect(sql).toContain("founder_reset_fence_intake");
     expect(sql).toContain("prepare_founder_test_reset");
@@ -72,7 +75,8 @@ describe("founder test reset migration", () => {
     expect(sql.indexOf("archive_founder_test_reset_evidence(p_reset_id")).toBeLessThan(sql.indexOf("delete from public.gpu_job_reservations"));
     expect(sql.indexOf("delete from public.gpu_job_reservations")).toBeLessThan(sql.indexOf("delete from public.sanitization_proofs"));
     expect(service).toContain("RESET_OBJECTS_REMAIN_AFTER_DELETE");
-    expect(service).toContain("drainFounderResetObjects(signer, workspaceKey, deleted)");
+    expect(service).toContain("drainFounderResetObjects(signer, workspaceKey, r2Keys, deleted)");
+    expect(service).toContain("FOUNDER_TEST_RESET_R2_MANIFEST_DRIFT");
     expect(service).toContain("RESET_OBJECTS_REAPPEARED_AFTER_FINALIZE");
   });
 

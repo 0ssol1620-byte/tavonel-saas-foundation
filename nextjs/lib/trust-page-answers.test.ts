@@ -816,20 +816,18 @@ describe("the public trust contract keeps topology in the maintained legal recor
 /*
   G2-012 / SD-04. A page called Benchmarks with nothing to compare.
 
-  The protocol was the honest thing to publish and it is not the thing a reader arrived for:
-  "Verify and compare" led to rules for comparison and no measured result anywhere on the site.
-  What may fill that gap is fixed -- the two research findings already published with their
-  denominators and their receipts -- and what may not is an internal comparison measured under
-  conditions this protocol does not pin.
+  The page now names the planned GDP.pdf evaluation, its four controlled arms, and the public
+  source material needed to reproduce it. It also retains the two supporting research findings
+  already published with their denominators and receipts.
 
   So the block is derived from the same record /research/notes renders, and the guard is that a
   score cannot be typed into it. A figure that arrives as a literal on this page is a figure with
   no receipt behind it, which is the one thing this page exists to refuse.
 */
-describe("G2-012 /benchmarks says what exists today", () => {
+describe("G2-012 /benchmarks publishes the GDP.pdf evaluation design", () => {
   const page = read("app/benchmarks/page.tsx");
   const block = withoutComments(
-    page.slice(page.indexOf("What exists today"), page.indexOf("The eight metric families")),
+    page.slice(page.indexOf("GDP.pdf evaluation design"), page.indexOf("The eight metric families")),
   );
 
   it("links the published receipts rather than describing them", () => {
@@ -838,8 +836,16 @@ describe("G2-012 /benchmarks says what exists today", () => {
     expect(block).toContain("Download the receipt");
   });
 
-  it("says the results table is empty because nothing has qualified", () => {
-    expect(block).toContain("No run has yet qualified under the protocol above");
+  it("defines a public four-arm evaluation without presenting a result", () => {
+    expect(block).toContain("100 held-out tasks across ten professional domains");
+    expect(block).toContain("GDP_PDF_ARMS.map");
+    expect(page).toContain('"Native PDF"');
+    expect(page).toContain('"Compiled context"');
+    expect(page).toContain('"Fixed retrieval"');
+    expect(page).toContain('"Adaptive routing"');
+    expect(block).toContain("only with a qualified run");
+    expect(block).toContain("https://huggingface.co/datasets/surgeai/GDP.pdf");
+    expect(block).toContain("https://github.com/surge-ai/gdp-pdf");
   });
 
   it("publishes no figure that is not on a receipt", () => {

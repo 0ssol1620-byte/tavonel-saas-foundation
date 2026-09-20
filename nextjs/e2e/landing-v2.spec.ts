@@ -153,6 +153,10 @@ test.describe("lower CompilerSpecimen explanation", () => {
         `compiler-stage-${COMPILER_SPECIMEN_STAGES[index]!.id}`,
       );
       await expect(sourceIdentity).toHaveText(new RegExp(COMPILER_SPECIMEN_SOURCE.id));
+      await expect(specimen.locator("[data-stage-composition]")).toHaveAttribute(
+        "data-stage-composition",
+        COMPILER_SPECIMEN_STAGES[index]!.id,
+      );
     }
 
     await tabs.nth(2).click();
@@ -182,6 +186,41 @@ test.describe("lower CompilerSpecimen explanation", () => {
     await expect(tabs.last()).toBeFocused();
   });
 
+  test("moves from the actual page render to its exact region crop", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "1440", "one desktop browser verifies the camera contract");
+    await page.goto("/");
+    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const tabs = specimen.getByRole("tab");
+    await specimen.scrollIntoViewIfNeeded();
+    const pageAsset = specimen.locator('[data-source-image="page"]');
+    const regionAsset = specimen.locator('[data-source-image="region"]');
+    const fullFrame = pageAsset.locator("..");
+    const cropFrame = regionAsset.locator("..");
+    await expect(pageAsset).toHaveJSProperty("complete", true);
+    await expect(regionAsset).toHaveJSProperty("complete", true);
+    expect(await pageAsset.evaluate(node => (node as HTMLImageElement).currentSrc)).toContain(
+      "apple-2026-q1-10-q-reference-p004-",
+    );
+    expect(await regionAsset.evaluate(node => (node as HTMLImageElement).currentSrc)).toContain(
+      "apple-2026-q1-10-q-reference-p004-r64-476-932-538-",
+    );
+    await expect(fullFrame).toHaveCSS("opacity", "1");
+    await expect(cropFrame).toHaveCSS("opacity", "0");
+    const pageTransform = await fullFrame.evaluate(node => getComputedStyle(node).transform);
+    const stagedCropTransform = await cropFrame.evaluate(node => getComputedStyle(node).transform);
+
+    await tabs.nth(1).click();
+    await expect(fullFrame).toHaveCSS("opacity", "0");
+    await expect(cropFrame).toHaveCSS("opacity", "1");
+    await expect(cropFrame).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+    const structureTransform = await cropFrame.evaluate(node => getComputedStyle(node).transform);
+    await tabs.nth(2).click();
+    const evidenceTransform = await cropFrame.evaluate(node => getComputedStyle(node).transform);
+    expect(pageTransform).not.toBe("none");
+    expect(stagedCropTransform).not.toBe(structureTransform);
+    expect(evidenceTransform).toBe(structureTransform);
+  });
+
   test("manual selection pauses playback and remains paused after leaving and returning", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "one desktop browser settles the finite timer contract");
     await page.goto("/");
@@ -190,6 +229,10 @@ test.describe("lower CompilerSpecimen explanation", () => {
     await specimen.scrollIntoViewIfNeeded();
     await tabs.nth(2).click();
     await expect(specimen.getByRole("button", { name: "Play" })).toBeVisible();
+    await expect(specimen.locator('[data-source-image="page"]').locator("..")).toHaveCSS(
+      "transition-duration",
+      "0s",
+    );
     await page.waitForTimeout(2_850);
     expect(await selectedStage(page)).toBe(2);
     await page.locator("section#s5").scrollIntoViewIfNeeded();
@@ -260,6 +303,43 @@ test.describe("responsive and reduced-motion parity", () => {
         .filter(item => item.height < 43.99),
     );
     expect(short).toEqual([]);
+  });
+
+  test("each stage keeps source values inside its phone viewport", async ({ page }, testInfo) => {
+    test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
+    await page.goto("/");
+    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const tabs = specimen.getByRole("tab");
+    await specimen.scrollIntoViewIfNeeded();
+
+    for (let index = 0; index < COMPILER_SPECIMEN_STAGES.length; index += 1) {
+      await tabs.nth(index).click();
+      const clipped = await specimen.locator("[data-critical-value]").evaluateAll(nodes =>
+        nodes.flatMap(node => {
+          const boundary = node.closest("[data-camera-stage], [data-stage-composition]");
+          if (!boundary) return [node.textContent?.trim() ?? "unknown"];
+          const value = node.getBoundingClientRect();
+          const box = boundary.getBoundingClientRect();
+          return value.left < box.left - 1 || value.right > box.right + 1
+            ? [node.textContent?.trim() ?? "unknown"]
+            : [];
+        }),
+      );
+      expect(clipped, `${COMPILER_SPECIMEN_STAGES[index]!.label} clips a critical value`).toEqual([]);
+      const sourceFrame = specimen.locator("[data-camera-stage]");
+      const sourceClipping = await sourceFrame.locator("picture").evaluateAll((nodes, boundary) => {
+        const frame = (boundary as Element).getBoundingClientRect();
+        return nodes.flatMap(node => {
+          if (Number.parseFloat(getComputedStyle(node).opacity) < 0.5) return [];
+          const box = node.getBoundingClientRect();
+          const image = node.querySelector("img");
+          return box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1 || getComputedStyle(image!).objectFit !== "contain"
+            ? [image?.getAttribute("data-source-image") ?? "unknown"]
+            : [];
+        });
+      }, await sourceFrame.elementHandle());
+      expect(sourceClipping, `${COMPILER_SPECIMEN_STAGES[index]!.label} clips the active source asset`).toEqual([]);
+    }
   });
 
   test("reduced motion keeps every stage selectable and starts static", async ({ page }, testInfo) => {

@@ -48,14 +48,20 @@ function prepared(value: Record<string, unknown>): PreparedReset {
 }
 
 async function drainFounderResetObjects(
-  signer: NonNullable<ReturnType<typeof readR2SignerEnv>>, workspaceKey: string, deleted: Set<string>,
+  signer: NonNullable<ReturnType<typeof readR2SignerEnv>>, workspaceKey: string,
+  sealedKeys: readonly string[], deleted: Set<string>,
 ) {
+  const sealed = new Set(sealedKeys);
   for (let pass = 0; pass < 5; pass += 1) {
     const listed = await listFounderResetObjects(signer, workspaceKey);
     if (!listed.ok) throw new Error(listed.code);
-    if (listed.keys.length === 0) return;
-    for (let offset = 0; offset < listed.keys.length; offset += 8) {
-      const batch = listed.keys.slice(offset, offset + 8);
+    if (listed.keys.some((key) => !sealed.has(key))) {
+      throw new Error("FOUNDER_TEST_RESET_R2_MANIFEST_DRIFT");
+    }
+    const remaining = listed.keys.filter((key) => sealed.has(key));
+    if (remaining.length === 0) return;
+    for (let offset = 0; offset < remaining.length; offset += 8) {
+      const batch = remaining.slice(offset, offset + 8);
       const removed = await Promise.all(batch.map((key) => deleteFounderResetObject(signer, workspaceKey, key)));
       const failed = removed.find((result) => !result.ok);
       if (failed && !failed.ok) throw new Error(failed.code);
@@ -128,7 +134,7 @@ export async function executeFounderTestReset(
   if (!signer) throw new Error("FOUNDER_TEST_RESET_R2_NOT_CONFIGURED");
   const deleted = new Set<string>();
   if (phase === "sealed") {
-    await drainFounderResetObjects(signer, workspaceKey, deleted);
+    await drainFounderResetObjects(signer, workspaceKey, r2Keys, deleted);
     await rpc("finalize_founder_test_reset", {
       p_reset_id: resetId, p_email: FOUNDER_TEST_RESET_EMAIL, p_user_id: user.id,
       p_workspace_key: workspaceKey, p_manifest_digest: expectedDigest,
@@ -139,12 +145,15 @@ export async function executeFounderTestReset(
     if (phase === "completed") {
       const afterCompletion = await listFounderResetObjects(signer, workspaceKey);
       if (!afterCompletion.ok) throw new Error(afterCompletion.code);
+      if (afterCompletion.keys.some((key) => !new Set(r2Keys).has(key))) {
+        throw new Error("FOUNDER_TEST_RESET_R2_MANIFEST_DRIFT");
+      }
       if (afterCompletion.keys.length === 0) {
         return { resetId, workspaceKey, deletedObjectCount: deleted.size, dbCounts: db.dbCounts };
       }
       throw new Error("RESET_OBJECTS_REAPPEARED_AFTER_FINALIZE");
     }
-    await drainFounderResetObjects(signer, workspaceKey, deleted);
+    await drainFounderResetObjects(signer, workspaceKey, r2Keys, deleted);
     await rpc("complete_founder_test_reset", {
       p_reset_id: resetId, p_email: FOUNDER_TEST_RESET_EMAIL, p_user_id: user.id,
       p_workspace_key: workspaceKey, p_manifest_digest: expectedDigest,

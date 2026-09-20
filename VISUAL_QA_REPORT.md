@@ -61,6 +61,24 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+## 2026-09-21 — Original-source compiler specimen and mobile film inspection
+
+The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
+
+The four byte-locked 2880×1800 hero films remain the title-adjacent product film. At 390px and 360px, the player starts as a focused inspection surface with two-axis pan, stage-specific initial camera positions, and an explicit `Fit full frame` / `Focus details` control. Reduced motion remains a still poster until Play is selected.
+
+Verification:
+
+- Compiler specimen captures: 20 states at 1440, 390, 360, and reduced motion; 20/20 source frames stayed horizontally contained. Evidence: `goal-staging/compiler-specimen-proof`.
+- Hero mobile captures: 12 focused/full-frame/reduced-motion states at 390 and 360. Evidence: `goal-staging/hero-mobile-proof`.
+- Full Playwright before the final paused-transition correction: 1,445 passed, 440 intended skips, one reproducible paused-transition failure, and one retry-only source-manifest read. The paused-transition correction then passed its exact focused test.
+- Final production prebuild after that correction passed `check`, all 345 Vitest files / 4,941 tests, and the 143-page Next.js build.
+- Lighthouse launch budgets passed. Enforced medians: `/` 0.94/1.00/1.00/1.00, `/privacy` 0.98/1.00/1.00/1.00, `/security` 0.98/1.00/1.00/1.00, `/pricing` 0.98/1.00/1.00/1.00, `/explore` 0.95/1.00/1.00/1.00. Login and callback SEO remain measured-only at 0.66.
+
+This is local final-tree evidence. Exact-head CI, immutable preview inspection, and founder aesthetic acceptance remain required before merge or production deployment.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
 ## 2026-09-20 — Homepage film and compiler-specimen composition candidate
 
 The homepage candidate now keeps the four-cut HeroFilm directly below the headline in `#s1` and

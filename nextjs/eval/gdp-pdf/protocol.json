@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "tavonel.gdp_pdf.protocol.v1",
+  "benchmarkId": "surgeai/GDP.pdf",
+  "dataset": {
+    "repository": "https://huggingface.co/datasets/surgeai/GDP.pdf",
+    "revision": "400e411fc344b1b8dd2a51e70a7ecdf469c05b3c",
+    "split": "test",
+    "expectedTaskCount": 100,
+    "dataParquetLfsSha256": "sha256:2ba18b4facc482a3520a6a6763f0294b0f8f3369f9cf4375b17af8fc0e025704",
+    "redistribution": "disabled",
+    "trainingUse": "prohibited"
+  },
+  "upstreamHarness": {
+    "repository": "https://github.com/surge-ai/gdp-pdf",
+    "revision": "7a72a514a6ab19c90babb00adc817e4ae86b9c1b",
+    "gitTreeSha1": "a42fa6bc7f6f95a32e6edb0ccb35de1759302cb3",
+    "scorerGitBlobSha1": "eaea0e0b462431b901ec516aef546bb8794784b6",
+    "usage": "reference_only_no_code_copied"
+  },
+  "officialComparableCondition": {
+    "epochs": 5,
+    "tools": "disabled",
+    "judgeModelAlias": "google/gemini-3.5-flash",
+    "criterionScoring": "independent_binary",
+    "headlineMetric": "all_criteria_pass_mean_pass_at_1",
+    "diagnosticMetric": "mean_fraction_of_criteria_passed"
+  },
+  "arms": {
+    "native_pdf": "question plus the original PDF, with no tools or additional context",
+    "compiled_context_pdf": "question plus the original PDF and the sealed deterministic compiled context",
+    "fixed_control_retrieval_rerank": "question plus a context packet from one sealed fixed retrieval and rerank profile",
+    "adaptive_router": "question plus the same context-packet contract selected by the sealed adaptive policy"
+  },
+  "failurePolicy": {
+    "subjectFailure": "zero_score_and_keep_in_denominator",
+    "adapterFailure": "zero_score_keep_in_denominator_and_block_promotion",
+    "judgeFailure": "zero_score_keep_in_denominator_and_block_promotion"
+  }
+}

@@ -27,6 +27,14 @@ const LIVE_FILMS = [
 const STAGE_MS = FILM_DURATION * 1_000;
 
 /*
+  The first readable pane for each locked cut on a phone. Files opens on the source inventory,
+  Read opens on the compiled Markdown, Updates opens on the changed-source diff, and Use with AI
+  opens on the grounded assistant. The values select existing quarter-frame snap points; they do
+  not crop or alter the film and the visitor can pan through all four panes or restore full fit.
+*/
+const MOBILE_FOCUS_PANE = [0, 1, 0, 0] as const;
+
+/*
   Where the live canvas is allowed to run, and why it is a width rule.
 
   The four cuts are not responsive drawings. Each composes a fixed stage in absolute pixels --
@@ -140,6 +148,21 @@ export const FILM_CONTROL_LABEL_KO: Record<FilmControl, string> = {
 const FILM_ERROR = "This browser could not play the film. The poster remains visible.";
 const FILM_ERROR_KO = "이 브라우저에서는 영상을 재생할 수 없습니다. 대표 이미지는 그대로 표시됩니다.";
 
+const MOBILE_FILM_VIEW = {
+  en: {
+    focus: "Focus details",
+    fit: "Fit full frame",
+    focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame.",
+    fittedHint: "Full frame · Focus details to inspect small type.",
+  },
+  ko: {
+    focus: "세부 내용 확대",
+    fit: "전체 화면 보기",
+    focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요.",
+    fittedHint: "전체 화면 · 작은 글자는 세부 내용 확대에서 확인하세요.",
+  },
+} as const;
+
 export const FILM_TEXT = {
   en: { stages: "Compilation stages", error: FILM_ERROR, errorLong: `${FILM_ERROR.slice(0, -1)}; try another stage or inspect the public sample.` },
   ko: { stages: "컴파일 단계", error: FILM_ERROR_KO, errorLong: `${FILM_ERROR_KO} 다른 단계를 선택하거나 공개 샘플을 확인해 보세요.` },
@@ -180,6 +203,7 @@ export default function CompileStagePlayer({
   const [ended, setEnded] = useState(false);
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
+  const [mobileFilmFit, setMobileFilmFit] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
@@ -213,6 +237,7 @@ export default function CompileStagePlayer({
   */
   const [held, setHeld] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   /*
     Route-level compositions may supply a narrowed stage list. Rendering must remain fail-safe if
@@ -247,6 +272,16 @@ export default function CompileStagePlayer({
   }, []);
 
   useEffect(() => { onStageChange?.(active, index); }, [active, index, onStageChange]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !narrow || mobileFilmFit) return;
+    const frame = window.requestAnimationFrame(() => {
+      const pane = MOBILE_FOCUS_PANE[index] ?? 0;
+      viewport.scrollTo({ left: Math.round((viewport.scrollWidth / 4) * pane), top: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [index, mobileFilmFit, narrow]);
 
   const go = useCallback((next: number) => {
     const wrapped = ((next % stages.length) + stages.length) % stages.length;
@@ -365,7 +400,7 @@ export default function CompileStagePlayer({
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012), so it may not also change the
        stage -- the tab strip above stays the way to do that. */
-    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0}>
+    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={MOBILE_FOCUS_PANE[index] ?? 0}>
       {!compact ? <div className="compile-film-stages" role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
           <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
@@ -387,7 +422,7 @@ export default function CompileStagePlayer({
         Above 900px they are `display: none` and the frame does not scroll, so the desktop
         composition is exactly what it was.
       */}
-      <div className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact && !narrow ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
+      <div ref={viewportRef} className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact && !narrow ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
         <div className="compile-film-panes" aria-hidden="true"><span /><span /><span /><span /></div>
         {still ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -454,6 +489,25 @@ export default function CompileStagePlayer({
         >
           <FilmControlMark control={control} />
         </button>
+      </div>
+
+      <div className="compile-film-mobile-tools">
+        <button
+          type="button"
+          className="compile-film-focus-control"
+          aria-controls={panelId}
+          aria-pressed={!mobileFilmFit}
+          onClick={() => setMobileFilmFit(value => !value)}
+        >
+          {mobileFilmFit
+            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
+            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
+        </button>
+        <p aria-live="polite">
+          {mobileFilmFit
+            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].fittedHint
+            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].focusedHint}
+        </p>
       </div>
 
       {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}

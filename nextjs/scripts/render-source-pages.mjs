@@ -54,6 +54,8 @@ const PAGES = [
 const REGIONS = [
   { file: "apple-2025-form-10-k.pdf", page: 4, bbox1000: [30, 291, 971, 380] },
   { file: "apple-2026-q1-10-q-reference.pdf", page: 4, bbox1000: [188, 174, 813, 224] },
+  // CompilerSpecimen: the operating-expenses row carried through all five homepage stages.
+  { file: "apple-2026-q1-10-q-reference.pdf", page: 4, bbox1000: [64, 476, 932, 538] },
   { file: "apple-2026-q1-10-q-reference.pdf", page: 19, bbox1000: [62, 392, 939, 584] },
   { file: "apple-2026-proxy-def14a-reference.pdf", page: 11, bbox1000: [62, 40, 949, 518] },
   { file: "apple-2026-proxy-def14a-reference.pdf", page: 17, bbox1000: [62, 40, 949, 521] },

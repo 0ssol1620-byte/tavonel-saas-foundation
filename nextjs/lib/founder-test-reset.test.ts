@@ -27,6 +27,7 @@ const RESET_ID = "22222222-2222-4222-8222-222222222222";
 const DB_DIGEST = `sha256:${"a".repeat(64)}`;
 const COUNTS = { documents: 1 };
 const KEY = "quarantine/pilot-1111111111114111/source";
+const FRESH_KEY = "quarantine/pilot-1111111111114111/fresh-after-seal";
 
 function response(value: unknown) {
   return new Response(JSON.stringify(value), { status: 200, headers: { "content-type": "application/json" } });
@@ -118,7 +119,25 @@ describe("founder test reset service", () => {
     mocks.listObjects.mockReset().mockResolvedValue({ ok: true, keys: [KEY] });
 
     await expect(executeFounderTestReset(USER, RESET_ID, prepared.manifestDigest))
-      .rejects.toThrow("RESET_OBJECTS_REAPPEARED_AFTER_FINALIZE");
+      .rejects.toThrow("FOUNDER_TEST_RESET_R2_MANIFEST_DRIFT");
+
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    expect(mocks.adminRequest.mock.calls.map((call) => rpcName(call[1]))).toEqual([
+      "inspect_founder_test_reset",
+    ]);
+  });
+
+  it("stops pending verification on a fresh key without deleting any current object", async () => {
+    mocks.adminRequest.mockResolvedValue(response({ resetId: RESET_ID, dbManifestDigest: DB_DIGEST, dbCounts: COUNTS }));
+    mocks.listObjects.mockResolvedValue({ ok: true, keys: [KEY] });
+    const prepared = await prepareFounderTestReset(USER);
+    mocks.adminRequest.mockClear();
+    mocks.adminRequest.mockResolvedValue(response({ resetId: RESET_ID, state: "db_finalized_pending_object_verify",
+      dbManifestDigest: DB_DIGEST, dbCounts: COUNTS, manifestDigest: prepared.manifestDigest, r2Keys: [KEY] }));
+    mocks.listObjects.mockReset().mockResolvedValue({ ok: true, keys: [KEY, FRESH_KEY] });
+
+    await expect(executeFounderTestReset(USER, RESET_ID, prepared.manifestDigest))
+      .rejects.toThrow("FOUNDER_TEST_RESET_R2_MANIFEST_DRIFT");
 
     expect(mocks.deleteObject).not.toHaveBeenCalled();
     expect(mocks.adminRequest.mock.calls.map((call) => rpcName(call[1]))).toEqual([
