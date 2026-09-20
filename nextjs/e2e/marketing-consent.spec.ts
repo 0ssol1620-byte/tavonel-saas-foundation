@@ -7,6 +7,9 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   page.on("request", request => {
     if (/google-analytics\.com|googletagmanager\.com/.test(request.url())) googleRequests.push(request.url());
   });
+  const serverResponse = await page.request.get("/");
+  expect(await serverResponse.text(), "the server must reserve consent geometry before hydration")
+    .toContain('aria-label="Optional analytics"');
   await page.goto("/");
   const panel = page.getByRole("region", { name: "Optional analytics" });
   await expect(panel).toBeVisible();

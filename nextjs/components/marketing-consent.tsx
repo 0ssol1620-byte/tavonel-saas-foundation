@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   CONSENT_ANCHOR_ATTRIBUTE,
@@ -86,7 +86,13 @@ export default function MarketingConsent() {
   // this component needs to know about it is whether it is there.
   const [anchored, setAnchored] = useState(false);
 
-  useEffect(() => {
+  /*
+    The server and the first client render reserve the prompt's real document-flow geometry.
+    Read a stored choice in the layout phase so a returning reader loses that reservation before
+    the browser paints; a first-time reader keeps the same box the server sent. Using a passive
+    effect here inserted the whole notice after first paint and shifted every public route.
+  */
+  useLayoutEffect(() => {
     try { setConsent(readConsent(window.localStorage)); } catch { /* storage denied: ask, do not collect */ }
     setReady(true);
     const sync = () => {
@@ -165,7 +171,9 @@ export default function MarketingConsent() {
     if (!allowed && document.getElementById("tavonel-google-tag")) window.location.reload();
   }
 
-  const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
+  const surface = !ready && location && !navOpen
+    ? "prompt"
+    : consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
   if (surface === "nothing") return null;
   /*
     G1-033. After a choice the reopen control is the footer's, so this draws nothing -- unless the
