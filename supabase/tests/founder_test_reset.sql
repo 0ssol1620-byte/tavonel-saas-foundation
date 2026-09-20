@@ -25,6 +25,8 @@ select ok(
 
 select ok(
   pg_get_functiondef('public.guard_founder_test_reset_workspace_write()'::regprocedure)
+    like '%founder_test_reset_lock_workspaces%'
+  and pg_get_functiondef('public.founder_test_reset_lock_workspaces(text,text)'::regprocedure)
     like '%founder-test-reset:%',
   'compile writers share the founder reset advisory lock domain'
 );
