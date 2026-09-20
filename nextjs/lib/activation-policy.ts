@@ -70,7 +70,7 @@ export const activationPolicy = {
     repository -- `activationPolicy` is one deployment-wide boolean -- so it would have described
     a mechanism the code does not have.
   */
-  customerData: { enabled: false, reason: "Compiling your own files is not open in this deployment yet. A completed public Compiled World is open to read in full today, and intake for your own sources is arranged with us." },
+  customerData: { enabled: false, reason: "Customer-data compilation remains closed until every security precondition has current production evidence and an exact-workspace approval receipt." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

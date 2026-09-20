@@ -60,48 +60,37 @@ describe("approved one-path experience", () => {
     expect(data.length).toBe(bytes);
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
-  /*
-    Landing V2 (D1, D9, §9), amended by the founder 2026-09-20. Nine scenes, and the film is back.
-
-    What this used to pin -- one decoder in the hero, the Hero → Compile → Why → Sources → Start
-    order, and the sentence separating the directed film from what a compile emits -- described
-    the five-section replan. Two of the three are true again in a different shape: the hero plays
-    the four locked cuts through ONE player, and the note that separates a directed film from what
-    a compile emits is beside it (§11.3, contract rule 7). The ordering rule is unchanged: the
-    landing runs one ordered story and every scene is a named focusable landmark.
-
-    The decoder is counted on the composition AND on the frame that mounts it, because "one
-    decoder" is the invariant and it is the one a second hand-rolled <video> would break. The
-    composition owns the scene order; `components/landing-v2/hero-film.tsx` owns the film.
-  */
-  it("orders the landing as the nine V2 scenes, with exactly one decoder in the hero", () => {
+  it("orders the landing as film, explanation, proof, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    const film = text("components/landing-v2/hero-film.tsx");
-    expect(film.match(/<CompileStagePlayer/g), "the hero mounts one player").toHaveLength(1);
-    expect(film, "and routes it to the locked recordings rather than the live canvases")
-      .toContain("preferVideo");
-    expect(film, "with the note §11.3 requires beside it").toContain("filmNote");
-    /*
-      The order is read off the copy deck each scene is handed -- the one decision the
-      composition still makes about all nine. It used to be read off `<Scene scene={copy.<id>}>`,
-      the generic shell the P0 skeleton rendered eight times; that shell is gone, because scenes
-      02-09 are now whole `<section>`s under `components/landing-v2/scenes/` that carry their own
-      landmark and their own next action. `lib/landing-v2-page.test.ts` holds the same order
-      against the rendered markup, which is the stronger half of this pair.
-    */
-    const scenes = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map((match) => match[1]);
-    expect(scenes).toEqual([
-      "hero", "proof", "sources", "evidence", "recompile", "why", "use", "trust", "start",
-    ]);
-    // The hero is still a named, focusable landmark here; the other eight are pinned in the
-    // render walk and in each scene's own guard, where the markup they own actually lives.
+    expect(page).toContain("<HeroFilm");
+    expect(page).toContain("<CompilerSpecimen");
+    const order = [
+      'id="s1"',
+      "<HeroFilm",
+      'id="s2"',
+      "<CompilerSpecimen",
+      "<ProofScene",
+      "<RecompileScene",
+      "<TrustScene",
+      "<StartScene",
+    ].map(token => page.indexOf(token));
+    expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
     expect(page).toContain("tabIndex={-1}");
     expect(page).toContain('aria-labelledby="lv2-hero-title"');
-    // The retired page's own landmarks, so none of them returns by copy-paste.
     for (const gone of ['id="top"', 'id="compile"', 'id="how-it-works"', 'id="connect"', "one-path-works-film", "one-path-film-note"]) {
       expect(page, `${gone} belongs to the retired landing`).not.toContain(gone);
     }
+    const film = text("components/landing-v2/hero-film.tsx");
+    expect(film).toContain('src: "/film/compile-cut.mp4"');
+    expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
+    expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
+    expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
+    expect(film).toContain("preferVideo priorityPoster");
+    expect(film, "internal recreation disclaimers do not belong on the customer route")
+      .not.toContain("landingV2HeroExtra");
+    expect(film).not.toContain("lv2-film-note");
+    expect(text("lib/landing-v2-hero-copy.ts")).not.toContain("filmNote");
   });
 
   /*
@@ -168,17 +157,12 @@ describe("approved one-path experience", () => {
     }
     expect(text("components/compile-stage-player.tsx"), "the strip may not live in the client module again")
       .not.toContain("export const COMPILE_STAGES");
-    /*
-      Landing V2, 2026-09-19. Neither entry page reads the table any more, because neither plays
-      a film. The rule -- a server component reads the stages from a plain module, never back out
-      of the "use client" player, where every export arrives as a reference rather than a value --
-      is asserted where it can still be broken: the table is a plain module, and the player does
-      not re-export it.
-    */
+    /* The server-side HeroFilm reads the stage table from a plain module. The entry pages share
+       LandingPage and must not duplicate or mutate that table themselves. */
     expect(text("lib/compile-stages.ts"), "the table stays a plain module a server component can read")
       .not.toMatch(/^\s*["']use client["']/m);
     for (const page of ["app/page.tsx", "app/ko/page.tsx"]) {
-      expect(text(page), `${page} plays no film and must not import the stage table`)
+      expect(text(page), `${page} must not duplicate the shared HeroFilm stage table`)
         .not.toContain('from "@/lib/compile-stages"');
     }
   });

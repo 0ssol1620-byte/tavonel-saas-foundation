@@ -3,6 +3,8 @@ import { runRetrievalPipeline } from "./retrieval-pipeline";
 import { buildBgeM3BaselineProfile } from "./retrieval-profile";
 import type { EmbedderAdapter } from "./embedder-adapter";
 import type { RerankerAdapter } from "./reranker-adapter";
+import { ADAPTIVE_ROUTER_SCHEMA, type AdaptiveRouterDecision } from "./adaptive-router";
+import { contentAddressedRetrievalProfileIdentity } from "./retrieval-profile-identity";
 
 // Drives the REAL orchestrator (retrieval-pipeline.ts) end to end. Every stage below is
 // production code -- expandedTokens, reciprocalRankFusion, rankByStructuralOverlap,
@@ -75,6 +77,7 @@ type Scenario = {
 let scenario: Scenario;
 let sourceBlocked = false;
 let requests: Array<{ url: string; body: unknown }>;
+let profileRows: Array<{ id: string }>;
 
 function jsonResponse(payload: unknown, ok = true) {
   return {
@@ -105,6 +108,7 @@ beforeEach(() => {
     failLexicalRpc: false,
   };
   requests = [];
+  profileRows = [{ id: PROFILE.id }];
 
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_".padEnd(48, "x"));
@@ -121,6 +125,9 @@ beforeEach(() => {
     }
     if (href.includes("/rpc/search_foundation_retrieval_units_dense")) {
       return jsonResponse(scenario.denseIds.map((id) => ({ unit_id: id, distance: 0.1 })));
+    }
+    if (href.includes("/foundation_retrieval_profiles")) {
+      return jsonResponse(profileRows);
     }
     if (href.includes("/foundation_retrieval_compile_runs")) {
       return jsonResponse(scenario.runRows);
@@ -214,6 +221,99 @@ const baseInput = () => ({
 });
 
 describe("retrieval pipeline orchestration", () => {
+  it("passes an adaptive request-scoped lifecycle only to real model invocations", async () => {
+    const input = baseInput();
+    const profileIdentity = contentAddressedRetrievalProfileIdentity(PROFILE);
+    const routeDecision: AdaptiveRouterDecision = {
+      schemaVersion: ADAPTIVE_ROUTER_SCHEMA,
+      kind: "execute",
+      reason: "adaptive_canary",
+      policyId: "11111111-1111-4111-8111-111111111111",
+      policyVersion: "revision-1",
+      canaryBucket: 1,
+      execution: {
+        identity: { provider: "huggingface", model: "BAAI/bge-m3", revision: PROFILE.embedding.revision,
+          endpointId: "endpoint-1" },
+        capabilities: ["retrieval"], region: "us", retentionDays: 0,
+        price: { observedAt: "2026-09-20T12:00:00.000Z", estimatedCostUsdMicros: 10 },
+        estimatedLatencyMs: 100, circuit: "closed",
+        index: { status: "ready", retrievalProfile: profileIdentity },
+      },
+      shadowEvaluation: null,
+      assessments: [{ candidateKey: `sha256:${"a".repeat(64)}`, eligible: true, failures: [] }],
+    };
+    const embed = vi.spyOn(input.embedder, "embedQuery");
+    const result = await runRetrievalPipeline({
+      ...input,
+      routerDecision: routeDecision,
+      modelAttempt: {
+        endpoint: "search",
+        modelRoute: {
+          schemaVersion: "retrieval-model-route/v1",
+          evaluatedAt: "2026-09-20T12:00:00.000Z",
+          registrySource: "TAVONEL_RETRIEVAL_MODEL_REGISTRY_JSON",
+          selections: [], fallbacks: [], router: routeDecision,
+        },
+        controlPlaneLineage: {
+          policyId: "11111111-1111-4111-8111-111111111111", policyVersion: "revision-1",
+          policyRevision: 1, rolloutRevision: 2,
+          assignmentId: "22222222-2222-4222-8222-222222222222",
+          policyDigest: `sha256:${"1".repeat(64)}`, evidenceDigest: `sha256:${"2".repeat(64)}`,
+          scopeDigest: `sha256:${"3".repeat(64)}`, assignmentDigest: `sha256:${"4".repeat(64)}`,
+          thresholdsDigest: `sha256:${"5".repeat(64)}`, indexStateDigest: `sha256:${"6".repeat(64)}`,
+          controlId: `sha256:${"a".repeat(64)}`,
+        },
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(embed).toHaveBeenCalledOnce();
+    expect(embed.mock.calls[0]?.[1]?.attemptLifecycle).toMatchObject({
+      admit: expect.any(Function), recordTerminal: expect.any(Function),
+    });
+  });
+
+  it("rejects a routed index from another profile before store or provider access", async () => {
+    const input = baseInput();
+    const embed = vi.spyOn(input.embedder, "embedQuery");
+    const routeDecision: AdaptiveRouterDecision = {
+      schemaVersion: ADAPTIVE_ROUTER_SCHEMA,
+      kind: "execute",
+      reason: "adaptive_canary",
+      policyId: "policy-1",
+      policyVersion: "revision-1",
+      canaryBucket: 1,
+      execution: {
+        identity: { provider: "runpod", model: "challenger", revision: "rev-2", endpointId: "endpoint-2" },
+        capabilities: ["retrieval"], region: "us", retentionDays: 0,
+        price: { observedAt: "2026-09-20T12:00:00.000Z", estimatedCostUsdMicros: 10 },
+        estimatedLatencyMs: 100, circuit: "closed",
+        index: {
+          status: "ready",
+          retrievalProfile: { id: PROFILE.id, digest: `sha256:${"f".repeat(64)}` },
+        },
+      },
+      shadowEvaluation: null,
+      assessments: [],
+    };
+    expect(await runRetrievalPipeline({ ...input, routerDecision: routeDecision })).toEqual({
+      ok: false,
+      code: "RETRIEVAL_ROUTE_PROFILE_MISMATCH",
+    });
+    expect(requests).toHaveLength(0);
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it("requires the stored profile digest before selecting a compile run", async () => {
+    profileRows = [];
+    const input = baseInput();
+    const embed = vi.spyOn(input.embedder, "embedQuery");
+    expect(await runRetrievalPipeline(input)).toEqual({ ok: false, code: "RETRIEVAL_PROFILE_NOT_FOUND" });
+    const profileRead = requests.find((request) => request.url.includes("foundation_retrieval_profiles"));
+    expect(decodeURIComponent(profileRead?.url ?? "")).toContain(`profile_digest=eq.${PROFILE.profileDigest}`);
+    expect(requests.some((request) => request.url.includes("foundation_retrieval_compile_runs"))).toBe(false);
+    expect(embed).not.toHaveBeenCalled();
+  });
+
   it("does not let tombstoned source text reappear through search or reach the reranker", async () => {
     sourceBlocked = true;
     const input = baseInput();

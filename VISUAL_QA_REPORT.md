@@ -61,6 +61,45 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+## 2026-09-20 — Homepage film and compiler-specimen composition candidate
+
+The homepage candidate now keeps the four-cut HeroFilm directly below the headline in `#s1` and
+moves the deterministic five-stage CompilerSpecimen into its own explanatory landmark, `#s2`.
+Proof, recompile, trust, and start follow as `#s3` through `#s6`. The public recreation disclaimer
+was removed from the hero. English and Korean entry routes preload the committed first poster.
+
+Focused verification ran against a fresh Next.js production build on a dedicated local port:
+
+- focused Vitest contracts: **5 files, 308 passed, 0 failed**;
+- strict TypeScript: passed;
+- Next.js production build: passed, including all 143 static-generation steps;
+- homepage Playwright matrix: **95 passed, 49 intentional project-specific skips, 0 failed** across
+  `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, and reduced motion;
+- mobile landing regression at `768`, `390`, and `360`: **24 passed, 6 intentional skips, 0 failed**;
+- evidence-first entry-page contract at `1440`: **4 passed, 0 failed**;
+- the production-hardening file's landing continuity test passed as part of a focused run; that run
+  reported 7 passes and 2 unrelated project-specific skips before one stale evidence-link assertion
+  was corrected, then the complete evidence-first file passed 4/4;
+- `git diff --check`: no whitespace errors (line-ending conversion warnings only).
+
+The first production-build attempt reached page-data collection and failed with transient missing-
+module errors for two routes while the shared checkout was active. The immediate full rerun compiled,
+typechecked, generated all 143 static pages, and completed successfully; only the successful build
+served the browser checks above.
+
+The homepage matrix asserts six ordered named landmarks, unique IDs and valid in-page targets, the
+HeroFilm/CompilerSpecimen separation, the committed high-resolution poster, desktop and phone film
+source selection, five selectable compiler stages, one source identity through all stages, roving
+keyboard selection, manual pause persistence, offscreen and hidden-document suspension, reduced-
+motion parity, mobile 44px controls, and zero horizontal overflow for `/` and `/ko` at every required
+width.
+
+This evidence proves the local production candidate's DOM, interaction, responsive, motion, and
+asset-selection contracts. It does not include a founder visual pass, cross-browser launch matrix,
+new screenshot census, Lighthouse rerun, deployed-byte validation, or live customer-account proof.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
 ## 2026-09-20 — Final public-route matrix and `/demo` paper contrast repair
 
 The frozen local production candidate was inspected on `/`, `/enterprise`, `/security`, `/trust`,

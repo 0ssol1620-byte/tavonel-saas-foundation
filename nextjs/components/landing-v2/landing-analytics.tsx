@@ -7,7 +7,7 @@ import type { LandingVariant } from "@/lib/landing-experiments";
 /*
   D7 / §30: every Landing V2 funnel event, fired from one place.
 
-  WHY ONE COMPONENT AND NOT FIFTEEN HANDLERS. Eight of the nine scenes are server components that
+  WHY ONE COMPONENT AND NOT MANY HANDLERS. Most scenes are server components that
   ship no JavaScript at all; that is the reason the page's first paint is the server's and the
   route's JS budget is what it is. Putting an `onClick` on the links that matter would turn four
   of those scenes into client components to fire an event each. So the scenes stay server-side
@@ -143,7 +143,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#hero .compile-film-stages button, #hero .compile-film-motion-control")) {
+      if (target.closest("#s1 .compile-film-sequence button, #s2 [data-compiler-specimen] button")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };
@@ -155,9 +155,9 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     /*
       Scroll depth as scene depth, not as pixels.
 
-      §9 fixes nine scenes, so a reader's progress through this page is which scene they reached:
-      scene 1 is 0% and scene 9 is 100%, which puts the three interior quartiles exactly on
-      scenes 3, 5 and 7 -- `(index) / (count - 1)`. That is a truer measurement than a fraction
+      The entry fixes five beats, so a reader's progress is which beat they reached:
+      the hero is 0% and the close is 100%, with the three interior beats at the quartiles by
+      `(index) / (count - 1)`. That is a truer measurement than a fraction
       of `scrollHeight`, because the page is about 9,000px on a desktop and about 24,000px on a
       phone, and "half way down" is a different chapter in each.
 

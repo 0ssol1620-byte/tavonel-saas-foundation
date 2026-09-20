@@ -53,7 +53,10 @@ export default function AuthCallbackPage() {
         }
         return;
       }
-      const body = await bootstrap.json().catch(() => null) as { code?: unknown } | null;
+      const body = await bootstrap.json().catch(() => null) as {
+        code?: unknown;
+        access?: { source?: unknown; billingExempt?: unknown };
+      } | null;
       if (cancelled) return;
       if (!bootstrap.ok) {
         setFailureCode(typeof body?.code === "string" ? body.code : `HTTP_${bootstrap.status}`);
@@ -65,6 +68,7 @@ export default function AuthCallbackPage() {
       // that has forgotten it. Owner access never reaches checkout, while an existing paid user
       // can still resume a checkout intent deliberately started before sign-in.
       const resume = takeCheckoutIntent();
+      const ownerBillingExempt = body?.access?.source === "owner" && body.access.billingExempt === true;
       /*
         WG-056/084. The same repair for the other thing a reader declares before signing in.
         Both intents are taken -- consumed once, whichever one wins -- so neither can surface on a
@@ -80,10 +84,10 @@ export default function AuthCallbackPage() {
       // destination it is. `mode` is the destination, not the account: nothing here identifies
       // who signed in, and the event does not fire on any of the three failure phases.
       trackFunnel("signed_in", {
-        mode: resume ? "resume-checkout" : resumeRecipe ? "resume-recipe" : "workspace",
+        mode: resume && !ownerBillingExempt ? "resume-checkout" : resumeRecipe ? "resume-recipe" : "workspace",
       });
       window.location.replace(
-        resume ? `/workspace?checkout=${resume}`
+        resume && !ownerBillingExempt ? `/workspace?checkout=${resume}`
           : resumeRecipe ? resumeRecipe.returnTo
             : "/workspace",
       );

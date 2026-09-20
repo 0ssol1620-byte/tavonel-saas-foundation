@@ -12,11 +12,11 @@ export const RUNPOD_RERANKER_REQUEST_TIMEOUT_MS = 30_000;
 type RerankRank = { index: number; score: number };
 
 // Validates the response is well-formed (every index in range, no duplicates, finite
-// scores) before trusting it enough to map back to candidate ids -- a candidate missing
-// from the response is not an error here, it is rerankWithFallback's job (reranker-
-// adapter.ts) to notice a partial response and degrade to the RRF-fused order.
+// scores) before trusting it enough to map back to candidate ids. A partial response is
+// invalid here so the governed model-attempt outcome cannot record a false success; the
+// caller still degrades safely to the RRF-fused order on this adapter error.
 function qualifyRerankResponse(payload: unknown, candidateCount: number): RerankRank[] | null {
-  if (!Array.isArray(payload) || payload.length < 1 || payload.length > candidateCount) return null;
+  if (!Array.isArray(payload) || payload.length !== candidateCount) return null;
   const seen = new Set<number>();
   for (const entry of payload) {
     if (

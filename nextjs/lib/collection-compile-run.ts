@@ -1,4 +1,5 @@
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
+import type { CustomerDataGateDecision } from "../../shared/customerDataGate";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
@@ -11,6 +12,7 @@ import {
   revisionCompileEnabled,
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
+import { readVerifiedCustomerDataGateDecision } from "./customer-data-gate-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
@@ -72,6 +74,16 @@ export async function runCollectionCompile(
   const coreV2 = readProductCoreV2Env();
   const coreV1 = coreV2 ? null : readCoreRuntimeEnv();
   if (!coreV2 && !coreV1) return { ok: false, status: 503, code: "CORE_NOT_CONFIGURED", payload: {} };
+
+  // Every object reached through this workspace path is customer data. The public activation flag
+  // controls whether intake is advertised; it is never an authorization substitute. Require the
+  // exact durable workspace receipt before reading R2, including for already queued jobs.
+  if (!coreV2) {
+    return { ok: false, status: 503, code: "CUSTOMER_DATA_CORE_V2_REQUIRED", payload: {} };
+  }
+  const gate = await readVerifiedCustomerDataGateDecision(workspaceId, workspaceId);
+  if (!gate.ok) return { ok: false, status: 503, code: gate.code, payload: {} };
+  let customerDataGate: CustomerDataGateDecision = gate.decision;
 
   const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
   if (!listed.ok) return { ok: false, status: 503, code: listed.code, payload: {} };
@@ -215,7 +227,19 @@ export async function runCollectionCompile(
   let artifact: CollectionCandidateArtifact;
   let coreExecution: CollectionCompileSuccess["coreExecution"];
   if (coreV2) {
-    const compiled = await dispatchProductCoreV2(coreV2, workspaceId, verifiedInputs, new Date(), previousActiveWorld);
+    const currentGate = await readVerifiedCustomerDataGateDecision(workspaceId, workspaceId);
+    if (!currentGate.ok) {
+      return { ok: false, status: 503, code: currentGate.code, payload: {} };
+    }
+    customerDataGate = currentGate.decision;
+    const compiled = await dispatchProductCoreV2(
+      coreV2,
+      workspaceId,
+      verifiedInputs,
+      new Date(),
+      previousActiveWorld,
+      customerDataGate,
+    );
     if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
     if (compiled.result.status === "rejected") {
       return {

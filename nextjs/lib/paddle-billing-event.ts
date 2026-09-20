@@ -116,7 +116,7 @@ export function parsePaddleBillingAction(
       return { ...common, action: "ignored", reason: "transaction_contract_invalid" };
     }
     const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.code !== binding.tavonel_offer_code) {
+    if (!offer || offer.code !== binding.tavonel_offer_code || offer.saleChannel !== "self_serve") {
       return { ...common, action: "ignored", reason: "transaction_price_not_allowed" };
     }
     if (offer.kind === "subscription") {
@@ -167,7 +167,8 @@ export function parsePaddleBillingAction(
       return { ...common, action: "ignored", reason: "subscription_contract_invalid" };
     }
     const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.kind !== "subscription" || offer.code !== binding.tavonel_offer_code) {
+    if (!offer || offer.kind !== "subscription" || offer.code !== binding.tavonel_offer_code
+      || offer.saleChannel !== "self_serve") {
       return { ...common, action: "ignored", reason: "subscription_price_not_allowed" };
     }
     return {

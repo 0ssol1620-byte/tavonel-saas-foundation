@@ -6,8 +6,13 @@ import { activationPolicy } from "./activation-policy";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
 import { LANDING_FRAMES } from "./landing-frames";
-import { LANDING_V2_SCENE_ORDER } from "./landing-v2-copy";
-import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, PRODUCT_NOUNS, SELF_SERVE_CTA } from "./site-navigation";
+import {
+  ACCESS_CTA,
+  BRAND_LINE,
+  EXPLORE_CTA,
+  PRODUCT_NOUNS,
+  SELF_SERVE_CTA,
+} from "./site-navigation";
 
 /**
  * SPEC 13.3 -- phrases the product may not use, enforced.
@@ -284,7 +289,11 @@ const BARRED = [
  * recompilation and knowledge architecture at length; it is not allowed to say they ship. The
  * status grid labels both "Direction" for exactly this reason.
  */
-const OVERCLAIMS = ["generally available", "production-ready", "fully automated ontology"];
+const OVERCLAIMS = [
+  "generally available",
+  "production-ready",
+  "fully automated ontology",
+];
 
 function read(surface: string): string {
   return readFileSync(join(root, surface), "utf8");
@@ -297,10 +306,16 @@ function read(surface: string): string {
  * a surface a first-time reader meets. Everything else under `app/` is.
  */
 function marketingPageFiles(directory = "app", found: string[] = []): string[] {
-  for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+  for (const entry of readdirSync(join(root, directory), {
+    withFileTypes: true,
+  })) {
     const path = `${directory}/${entry.name}`;
     if (entry.isDirectory()) {
-      if (["api", "workspace", "dev", "auth"].includes(entry.name) && directory === "app") continue;
+      if (
+        ["api", "workspace", "dev", "auth"].includes(entry.name) &&
+        directory === "app"
+      )
+        continue;
       marketingPageFiles(path, found);
     } else if (entry.name === "page.tsx") {
       found.push(path);
@@ -349,17 +364,20 @@ function landingSource(): string {
 }
 
 describe("public copy", () => {
-  it.each(COPY_SURFACES)("keeps every barred phrase out of %s", (surface) => {
+  it.each(COPY_SURFACES)("keeps every barred phrase out of %s", surface => {
     const source = read(surface).toLowerCase();
     for (const phrase of BARRED) {
       expect(source, `SPEC 13.3 bars "${phrase}"`).not.toContain(phrase);
     }
   });
 
-  it.each(COPY_SURFACES)("makes no readiness overclaim in %s", (surface) => {
+  it.each(COPY_SURFACES)("makes no readiness overclaim in %s", surface => {
     const source = read(surface).toLowerCase();
     for (const phrase of OVERCLAIMS) {
-      expect(source, `"${phrase}" asserts a readiness this deployment has not established`).not.toContain(phrase);
+      expect(
+        source,
+        `"${phrase}" asserts a readiness this deployment has not established`
+      ).not.toContain(phrase);
     }
   });
 
@@ -379,31 +397,34 @@ describe("public copy", () => {
   });
 
   /*
-    Landing V2, 2026-09-19 (D9, §9). Five sections became nine, and the rule is the one it always
-    was: every scene is a named focusable landmark, in one declared order, and the page carries no
-    second instrument navigation of its own.
+    The homepage is six deliberate beats: hero film, compiler specimen, proof, change, trust, and close.
+    Each remains a named focusable landmark and the page carries no second instrument navigation.
 
     The order is read off the composition rather than off a count of `data-scene` attributes,
-    because eight of the nine are rendered by one component from one table -- which is the half
-    that used to be the defect, when a reordered translation was only caught in a screenshot.
+    The rendered DOM test holds the same order in both locales.
   */
-  it("composes the nine V2 scenes in §9's order, with no second instrument navigation", () => {
+  it("composes the six homepage beats in order, with no second instrument navigation", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     /*
-      Every scene is handed its own half of the copy deck, and the order they are handed it in is
-      the order §9 sets. This used to read `<Scene scene={copy.<id>}>` -- the P0 skeleton's
-      generic shell -- which is gone now that scenes 02-09 are whole `<section>`s of their own
-      under `components/landing-v2/scenes/`. `lib/landing-v2-page.test.ts` pins the same order
-      against the rendered DOM; this holds it in the file that decides it.
+      Each surviving beat is handed its own copy, and the order here is the order a reader gets.
+      `lib/landing-v2-page.test.ts` pins the same order against both rendered locales.
     */
-    const rendered = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map((match) => match[1]!);
-    expect(rendered).toEqual([...LANDING_V2_SCENE_ORDER]);
-    expect(page).toContain('id="hero"');
+    const rendered = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map(
+      match => match[1]!
+    );
+    expect(rendered).toEqual(["hero", "proof", "recompile", "trust", "start"]);
+    for (const removed of ["sources", "evidence", "why", "use"]) {
+      expect(page).not.toContain(`copy={copy.${removed}}`);
+    }
+    expect(page).toContain('id="s1"');
+    expect(page).toContain('id="s2"');
     expect(page).toContain('data-scene="1"');
     // The skip-target contract, for the one scene this file still renders in full.
     expect(page).toContain("tabIndex={-1}");
     expect(page).not.toContain('className="bar"');
-    expect(page, "the phone jump nav went with the old landing").not.toContain("one-path-jump");
+    expect(page, "the phone jump nav went with the old landing").not.toContain(
+      "one-path-jump"
+    );
   });
   /*
     The lock, re-derived three times, and moved once more here.
@@ -417,16 +438,26 @@ describe("public copy", () => {
     without repeating it.
   */
   it("keeps the brand line the hero is written from, and writes it in no second place", () => {
-    expect(BRAND_LINE.headline).toBe("AI-ready knowledge. Traceable to every source.");
-    expect(BRAND_LINE.descriptor).toBe("Knowledge compiled with a traceable path back to every source.");
-    expect(read("lib/landing-v2-copy.ts"), "the copy deck imports the headline rather than typing it")
-      .toContain("headline: BRAND_LINE.headline");
+    expect(BRAND_LINE.headline).toBe(
+      "AI-ready knowledge. Traceable to every source."
+    );
+    expect(BRAND_LINE.descriptor).toBe(
+      "Knowledge compiled with a traceable path back to every source."
+    );
+    expect(
+      read("lib/landing-v2-copy.ts"),
+      "the copy deck imports the headline rather than typing it"
+    ).toContain("headline: BRAND_LINE.headline");
     const hero = read("components/landing-v2/hero-statement.tsx");
-    expect(hero, "the H1 is a rendering of the constant, not a copy of it")
-      .toContain("copy.headline.split(");
+    expect(
+      hero,
+      "the H1 is a rendering of the constant, not a copy of it"
+    ).toContain("copy.headline.split(");
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     const page = landingSource().replace(/\{?\/\*[\s\S]*?\*\/\}?/g, "");
-    expect(page, "a numbered section kicker is not a section name").not.toMatch(/0\d \/ /);
+    expect(page, "a numbered section kicker is not a section name").not.toMatch(
+      /0\d \/ /
+    );
     expect(page).not.toContain("evidence back to the page");
   });
 
@@ -453,32 +484,18 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("plays the four locked films on the entry pages, with the poster as the painted frame", () => {
+  it("opens with the four-cut HeroFilm and moves the deterministic specimen below it", () => {
     const page = landingSource();
-    expect(page, "the hero mounts the one film player").toContain("CompileStagePlayer");
-    expect(page, "and takes the whole locked stage list rather than one cut").toContain("COMPILE_STAGES");
-    for (const asset of [
-      "/film/compile-cut-hq.mp4",
-      "/film/compile-cut-hq-1440.mp4",
-      "/film/poster-1-hero-2x.webp",
-    ]) {
-      expect(page, `${asset} is the hero cut's own encode`).toContain(asset);
-    }
-    /* Cuts 2-4 and their posters are reached through the stage list, never respelled here. */
-    const stages = read("lib/compile-stages.ts");
-    for (const asset of [
-      "/film/compile-cut-2.mp4",
-      "/film/compile-cut-3.mp4",
-      "/film/compile-cut-4.mp4",
-      "/film/poster-2.webp",
-      "/film/poster-3.webp",
-      "/film/poster-4.webp",
-    ]) {
-      expect(stages, `${asset} left the stage list`).toContain(asset);
-    }
-    // §27: the LCP element is the poster the player paints, and it is the one image preloaded.
-    expect(read("app/page.tsx"), "the hero poster is what the entry page preloads").toContain("HERO_FILM_POSTER");
-    expect(read("app/ko/page.tsx"), "and /ko preloads the same one").toContain("HERO_FILM_POSTER");
+    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
+    expect(page).toContain('id="s1"');
+    expect(page).toContain('id="s2"');
+    expect(page).toContain("CompilerSpecimen");
+    expect(read("components/landing-v2/compiler-specimen.tsx")).not.toContain(
+      "<video"
+    );
+    expect(read("app/page.tsx")).toContain("HERO_FILM_POSTER");
+    expect(read("app/ko/page.tsx")).toContain("HERO_FILM_POSTER");
+    expect(read("components/landing-v2/hero-film.tsx")).not.toContain("lv2-film-note");
   });
 
   /*
@@ -491,12 +508,18 @@ describe("public copy", () => {
     const home = read("app/page.tsx");
     expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.descriptor}`");
     expect(home).toContain("title: BRAND_LINE.headline");
-    expect(home, "the home exception does not write its own positioning sentence")
-      .not.toContain("Make your knowledge ready for AI");
-    expect(read("app/layout.tsx"), "the inherited fallback follows the site pattern")
-      .toContain('title: "Knowledge Compiler for AI — TAVONEL"');
+    expect(
+      home,
+      "the home exception does not write its own positioning sentence"
+    ).not.toContain("Make your knowledge ready for AI");
+    expect(
+      read("app/layout.tsx"),
+      "the inherited fallback follows the site pattern"
+    ).toContain('title: "Knowledge Compiler for AI — TAVONEL"');
     for (const file of ["app/explore/page.tsx", "app/contact/page.tsx"]) {
-      const titles = [...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g)].map((match) => match[1]!);
+      const titles = [
+        ...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g),
+      ].map(match => match[1]!);
       expect(titles.length, `${file} declares a title`).toBeGreaterThan(0);
       for (const title of titles) expect(title, file).toMatch(/ — TAVONEL$/);
     }
@@ -533,21 +556,34 @@ describe("public copy", () => {
       const source = read(file)
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "");
-      expect(source, `${file} must not hand-roll a <video>`).not.toMatch(/<video[\s>]/);
-      expect(source, `${file} must not inline an aspect ratio`).not.toContain("aspectRatio");
+      expect(source, `${file} must not hand-roll a <video>`).not.toMatch(
+        /<video[\s>]/
+      );
+      expect(source, `${file} must not inline an aspect ratio`).not.toContain(
+        "aspectRatio"
+      );
     }
     const player = read("components/compile-stage-player.tsx");
-    expect(player, "the player owns exactly one <video> template").toMatch(/<video/);
+    expect(player, "the player owns exactly one <video> template").toMatch(
+      /<video/
+    );
     /*
       BQ-130. The guard moved with the mechanism it guards, and the mechanism is unchanged: one
       decoder, open on the active cut, not remounted per stage -- which is what cancelled
       `compile-cut-2.mp4` mid-fetch on every advance. Read as a shape rather than as a literal,
       because the element takes a narrow-screen encode when the stage declares one.
     */
-    expect(player, "the one decoder plays the active stage and nothing else")
-      .toMatch(/<video[^>]*\ssrc=\{[^}]*active\.src\}/);
-    expect(player, "and is not remounted per stage, which aborted the fetch in flight")
-      .not.toContain("<video key=");
+    expect(
+      player,
+      "the one decoder plays the active stage and nothing else"
+    ).toContain("src={videoSrc}");
+    expect(player).toContain(
+      "const preferredVideoSrc = narrow && active.phoneSrc ? active.phoneSrc : active.src"
+    );
+    expect(
+      player,
+      "and is not remounted per stage, which aborted the fetch in flight"
+    ).not.toContain("<video key=");
   });
 
   /*
@@ -569,17 +605,32 @@ describe("public copy", () => {
       because the uppercase list it used to assert went on passing after the change -- the commit
       note above `COMPILE_STAGES` quotes the old names.
     */
-    const player = read("components/compile-stage-player.tsx").replace(/\/\*[\s\S]*?\*\//g, "");
+    const player = read("components/compile-stage-player.tsx").replace(
+      /\/\*[\s\S]*?\*\//g,
+      ""
+    );
     const strip = read("lib/compile-stages.ts");
-    for (const stage of [`label: "Files"`, `label: "Updates"`, `label: "Use with AI"`]) {
+    for (const stage of [
+      `label: "Files"`,
+      `label: "Updates"`,
+      `label: "Use with AI"`,
+    ]) {
       expect(strip, `the stage strip must offer ${stage}`).toContain(stage);
     }
-    expect(strip, "the one stage that is a pipeline stage takes its name from the constant")
-      .toContain("label: PIPELINE_STAGES[2].label");
-    expect(strip, "and the strip is not set in the instrument voice any more")
-      .not.toContain(`label: "ORGANIZE"`);
-    expect(player, "stages must be selectable, not decorative").toContain('role="tab"');
-    expect(player, "reduced motion gets stills and no timer").toContain("prefers-reduced-motion");
+    expect(
+      strip,
+      "the one stage that is a pipeline stage takes its name from the constant"
+    ).toContain("label: PIPELINE_STAGES[2].label");
+    expect(
+      strip,
+      "and the strip is not set in the instrument voice any more"
+    ).not.toContain(`label: "ORGANIZE"`);
+    expect(player, "stages must be selectable, not decorative").toContain(
+      'role="tab"'
+    );
+    expect(player, "reduced motion gets stills and no timer").toContain(
+      "prefers-reduced-motion"
+    );
   });
 
   /*
@@ -597,7 +648,10 @@ describe("public copy", () => {
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
     expect(landing).not.toContain("FACTS");
     expect(landing).not.toContain("NEEDS REVIEW");
-    expect(landing, "the demo fixture must not reach the landing page").not.toContain("demo-world");
+    expect(
+      landing,
+      "the demo fixture must not reach the landing page"
+    ).not.toContain("demo-world");
   });
 
   /*
@@ -621,7 +675,12 @@ describe("public copy", () => {
   */
   it("ships the compile cuts at 2x so HiDPI screens do not upscale them", () => {
     const film = join(root, "public", "film");
-    for (const name of ["compile-cut", "compile-cut-2", "compile-cut-3", "compile-cut-4"]) {
+    for (const name of [
+      "compile-cut",
+      "compile-cut-2",
+      "compile-cut-3",
+      "compile-cut-4",
+    ]) {
       const file = join(film, `${name}.mp4`);
       expect(existsSync(file), `${name}.mp4 is missing`).toBe(true);
       /*
@@ -646,7 +705,10 @@ describe("public copy", () => {
 
   it("gives every film stage a poster file that actually exists", () => {
     // Landing V2: the posters are the stage table's and the player's now. The landing names none.
-    const page = [read("lib/compile-stages.ts"), read("components/compile-stage-player.tsx")].join("\n");
+    const page = [
+      read("lib/compile-stages.ts"),
+      read("components/compile-stage-player.tsx"),
+    ].join("\n");
     /*
       Match the path wherever it is written, not only in a JSX attribute.
 
@@ -654,12 +716,16 @@ describe("public copy", () => {
       the stage table and passed through as `poster={stage.poster}`, so an attribute-shaped
       regex found none of them and the check silently had nothing to assert.
     */
-    const posters = [...page.matchAll(/["'](\/film\/poster-[^"']+)["']/g)].map((match) => match[1]!);
-    expect(posters.length, "every stage names a poster").toBeGreaterThanOrEqual(4);
+    const posters = [...page.matchAll(/["'](\/film\/poster-[^"']+)["']/g)].map(
+      match => match[1]!
+    );
+    expect(posters.length, "every stage names a poster").toBeGreaterThanOrEqual(
+      4
+    );
     for (const poster of posters) {
       expect(
         existsSync(join(root, "public", poster)),
-        `${poster} is referenced but missing from public/`,
+        `${poster} is referenced but missing from public/`
       ).toBe(true);
     }
   });
@@ -684,7 +750,9 @@ describe("public copy", () => {
       "components/reading-demo.tsx",
       "lib/demo-reading.ts",
     ]) {
-      expect(existsSync(join(root, orphan)), `${orphan} renders nowhere`).toBe(false);
+      expect(existsSync(join(root, orphan)), `${orphan} renders nowhere`).toBe(
+        false
+      );
     }
   });
 
@@ -707,12 +775,22 @@ describe("public copy", () => {
   */
   it("reaches original-source proof from the page without teaching locator jargon", () => {
     const proof = read("components/landing-v2/scenes/proof.tsx");
-    expect(proof, "the quoted passage opens the evidence behind it").toContain("tab.openHref");
-    expect(proof, "every figure in the proof declares that it was measured").toContain('data-derived="1"');
-    expect(read("lib/landing-v2-proof.ts"), "the deep link is the product's own URL shape")
-      .toContain("/explore?act=evidence&evidence=");
-    for (const href of Object.values(LANDING_FRAMES).map((frame) => frame.href)) {
-      expect(href, "every frame opens the live route it is a screenshot of").toMatch(/^\/explore/);
+    expect(proof, "the quoted passage opens the evidence behind it").toContain(
+      "tab.openHref"
+    );
+    expect(
+      proof,
+      "every figure in the proof declares that it was measured"
+    ).toContain('data-derived="1"');
+    expect(
+      read("lib/landing-v2-proof.ts"),
+      "the deep link is the product's own URL shape"
+    ).toContain("/explore?act=evidence&evidence=");
+    for (const href of Object.values(LANDING_FRAMES).map(frame => frame.href)) {
+      expect(
+        href,
+        "every frame opens the live route it is a screenshot of"
+      ).toMatch(/^\/explore/);
     }
     expect(landingSource()).not.toContain("Exact bbox");
   });
@@ -721,7 +799,9 @@ describe("public copy", () => {
     /* Moved 2026-09-17 with BQ-083: the chapter names are no longer four mono-caps literals in
        this file, they are the shared pipeline vocabulary. What this guards is unchanged --
        the authenticated stage draws the visitor's own run. */
-    expect(stage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
+    expect(stage).toContain(
+      'import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"'
+    );
     // The landing fixture must never be pasted into the authenticated surface: no import of
     // the demo world, and no census figure. (The file may name them in prose to say so.)
     expect(stage).not.toMatch(/from ["']@\/lib\/demo-world["']/);
@@ -736,8 +816,12 @@ describe("public copy", () => {
     const source = landingSource();
     const workspace = read("app/workspace/page.tsx");
     expect(source).not.toContain('<span className="st">BETA</span>');
-    expect(source).not.toContain('<span className="st">ENTERPRISE-ASSISTED</span>');
-    expect(source).not.toContain("Provider qualification and last-tested evidence stay visible on Integrations.");
+    expect(source).not.toContain(
+      '<span className="st">ENTERPRISE-ASSISTED</span>'
+    );
+    expect(source).not.toContain(
+      "Provider qualification and last-tested evidence stay visible on Integrations."
+    );
     expect(source).not.toContain("The ZIP archive itself is never compiled");
     /*
       BA-009's two facts -- the archive is expanded in the browser, and only the manifest's
@@ -751,26 +835,44 @@ describe("public copy", () => {
       destination rather than a promise, with `/sources` among them so the format rules stay one
       click from the decision they qualify.
     */
-    expect(source, "the fold and its grid are on /sources now").not.toContain("one-path-source-options");
+    expect(source, "the fold and its grid are on /sources now").not.toContain(
+      "one-path-source-options"
+    );
     /* The outcome-led entry keeps format detail one click away instead of repeating it on /home. */
     expect(source).toContain("Check accepted sources");
     expect(source).toContain('href: "/sources"');
-    expect(read("app/sources/page.tsx")).toContain('<Link href="/integrations">Integrations</Link>');
-    expect(read("lib/docs-content.ts"), "and the ZIP fact travels with the format list")
-      .toContain("A ZIP archive is expanded before upload");
-    expect(workspace).not.toContain('{ name: "Google Drive", availability: "Beta" }');
-    expect(workspace).toContain('{ name: "Google Drive", availability: "Read-only" }');
-    expect(workspace).toContain('{ name: "File Server", availability: "Assisted setup" }');
+    expect(read("app/sources/page.tsx")).toContain(
+      '<Link href="/integrations">Integrations</Link>'
+    );
+    expect(
+      read("lib/docs-content.ts"),
+      "and the ZIP fact travels with the format list"
+    ).toContain("A ZIP archive is expanded before upload");
+    expect(workspace).not.toContain(
+      '{ name: "Google Drive", availability: "Beta" }'
+    );
+    expect(workspace).toContain(
+      '{ name: "Google Drive", availability: "Read-only" }'
+    );
+    expect(workspace).toContain(
+      '{ name: "File Server", availability: "Assisted setup" }'
+    );
   });
 
   it("keeps internal qualification vocabulary out of the integration buying path", () => {
-    const source = read("app/integrations/page.tsx").replace(/\/\*[\s\S]*?\*\//g, " ");
-    for (const word of A4_WORDS) expect(source.toUpperCase()).not.toContain(`>${word}<`);
+    const source = read("app/integrations/page.tsx").replace(
+      /\/\*[\s\S]*?\*\//g,
+      " "
+    );
+    for (const word of A4_WORDS)
+      expect(source.toUpperCase()).not.toContain(`>${word}<`);
     expect(source).not.toContain("SUPPORT_LEVELS");
     expect(source).toContain('access: "Read-only"');
     // BA-071: "and", like every other fold label on the site.
     expect(source).toContain("Security and sync details");
-    expect(source).toContain("Verify the provider account in Workspace before the first sync.");
+    expect(source).toContain(
+      "Verify the provider account in Workspace before the first sync."
+    );
 
     /*
       BA-061 / BA-065. This test's own subject, pinned the other way round.
@@ -783,9 +885,13 @@ describe("public copy", () => {
       still on the page.
     */
     expect(source).not.toMatch(/qualification is still required/);
-    expect(source).not.toContain("No customer-run install of this agent has been qualified");
-    expect(source.match(/nothing compiles from a source we can no longer read/g), "one per connector")
-      .toHaveLength(3);
+    expect(source).not.toContain(
+      "No customer-run install of this agent has been qualified"
+    );
+    expect(
+      source.match(/nothing compiles from a source we can no longer read/g),
+      "one per connector"
+    ).toHaveLength(3);
     expect(source).toContain("your scheduler is where a failed run surfaces");
     expect(source).toContain("no inbound port");
   });
@@ -839,12 +945,17 @@ describe("public copy", () => {
     "app/resources/page.tsx",
   ];
 
-  it.each(A1_SURFACES)("publishes no retired PDF-locator wording in %s", (surface) => {
-    const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
-    for (const phrase of RETIRED_LOCATOR_WORDING) {
-      expect(copy, `RESOLVED A-1 retires "${phrase}"`).not.toContain(phrase);
+  it.each(A1_SURFACES)(
+    "publishes no retired PDF-locator wording in %s",
+    surface => {
+      const copy = read(surface)
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .toLowerCase();
+      for (const phrase of RETIRED_LOCATOR_WORDING) {
+        expect(copy, `RESOLVED A-1 retires "${phrase}"`).not.toContain(phrase);
+      }
     }
-  });
+  );
 
   /*
     BA-078, the other half of A-1, and the most expensive contradiction the 2026-09-11 audit found.
@@ -864,14 +975,27 @@ describe("public copy", () => {
   it("marks one shipped locator on /evidence, and states the rest as unshipped", () => {
     const page = read("app/evidence/page.tsx");
     const shipped = page.match(/const READING_TODAY = \["([^"]+)"/);
-    expect(shipped, "/evidence no longer names the locator that reads today").not.toBeNull();
+    expect(
+      shipped,
+      "/evidence no longer names the locator that reads today"
+    ).not.toBeNull();
     expect(shipped![1]).toBe("PDF");
 
     // Every other family is in the contracted list, and none of them is the shipped one.
-    const contracted = page.match(/const CONTRACTED_LOCATORS = \[([\s\S]*?)\n\] as const;/);
-    expect(contracted, "the evidence model is no longer published").not.toBeNull();
-    const families = [...contracted![1]!.matchAll(/\["([^"]+)",/g)].map((match) => match[1]!);
-    expect(families.length, "the model is eight families: one shipped, seven contracted").toBe(7);
+    const contracted = page.match(
+      /const CONTRACTED_LOCATORS = \[([\s\S]*?)\n\] as const;/
+    );
+    expect(
+      contracted,
+      "the evidence model is no longer published"
+    ).not.toBeNull();
+    const families = [...contracted![1]!.matchAll(/\["([^"]+)",/g)].map(
+      match => match[1]!
+    );
+    expect(
+      families.length,
+      "the model is eight families: one shipped, seven contracted"
+    ).toBe(7);
     expect(families).not.toContain(shipped![1]);
 
     /*
@@ -883,16 +1007,27 @@ describe("public copy", () => {
       than discovered behind a click -- so that is what is pinned. It is prose in the heading's
       block, and it is not inside a `<details>`.
     */
-    expect(page, "the locator that reads today is marked as the one that does").toContain("Reading today");
-    expect([...page.matchAll(/Reader not shipped/g)], "one statement, not one per tile").toHaveLength(1);
     expect(
-      page.slice(page.indexOf("Reader not shipped")).indexOf("CONTRACTED_LOCATORS.map"),
-      "the state is read before the grid, not after it",
+      page,
+      "the locator that reads today is marked as the one that does"
+    ).toContain("Reading today");
+    expect(
+      [...page.matchAll(/Reader not shipped/g)],
+      "one statement, not one per tile"
+    ).toHaveLength(1);
+    expect(
+      page
+        .slice(page.indexOf("Reader not shipped"))
+        .indexOf("CONTRACTED_LOCATORS.map"),
+      "the state is read before the grid, not after it"
     ).toBeGreaterThan(0);
-    expect(page, "the correction may not go back into a fold")
-      .not.toContain("See current locator coverage");
+    expect(page, "the correction may not go back into a fold").not.toContain(
+      "See current locator coverage"
+    );
     // And may not be put inside one: nothing above the statement opens a disclosure at all.
-    expect(page.slice(0, page.indexOf("Reader not shipped"))).not.toContain("<details");
+    expect(page.slice(0, page.indexOf("Reader not shipped"))).not.toContain(
+      "<details"
+    );
 
     /*
       And the claim is the one `/sources` supports. `LIVE_PRESERVED` is the manifest's own list,
@@ -900,12 +1035,16 @@ describe("public copy", () => {
       leaving /evidence understating what it does.
     */
     const manifest = read("../shared/capabilityManifest.ts");
-    expect(manifest).toContain('const LIVE_PRESERVED = ["page", "paragraph_text", "bbox1000"]');
+    expect(manifest).toContain(
+      'const LIVE_PRESERVED = ["page", "paragraph_text", "bbox1000"]'
+    );
 
     // BA-099: one casing rule across the grid -- the site writes "and", never a spaced slash.
     for (const family of families) {
-      expect(family, "a space-slash pair in a name the site would write with 'and'")
-        .not.toContain(" / ");
+      expect(
+        family,
+        "a space-slash pair in a name the site would write with 'and'"
+      ).not.toContain(" / ");
     }
   });
 
@@ -927,17 +1066,26 @@ describe("public copy", () => {
     ["app/research/page.tsx", "/research"],
   ];
 
-  it.each(TRUST_PAGES)("%s ends on its own step of the §17 trust sequence", (surface, href) => {
-    const source = read(surface);
-    expect(source, `${surface} must render the shared next step`).toContain("TrustNext");
-    expect(source, `${surface} must name itself, not another page's position`)
-      .toContain(`from="${href}"`);
-  });
+  it.each(TRUST_PAGES)(
+    "%s ends on its own step of the §17 trust sequence",
+    (surface, href) => {
+      const source = read(surface);
+      expect(source, `${surface} must render the shared next step`).toContain(
+        "TrustNext"
+      );
+      expect(
+        source,
+        `${surface} must name itself, not another page's position`
+      ).toContain(`from="${href}"`);
+    }
+  );
 
   it("gives every step of the trust sequence a precise next action", () => {
     const source = read("components/trust-next.tsx");
     // Every href declared in the order must also have an action, or a page renders an empty CTA.
-    const steps = [...source.matchAll(/href: "([^"]+)"/g)].map((match) => match[1]!);
+    const steps = [...source.matchAll(/href: "([^"]+)"/g)].map(
+      match => match[1]!
+    );
     const actions = [...source.matchAll(/"(\/[a-z]+)": "([^"]+)"/g)];
     expect(steps.length).toBeGreaterThanOrEqual(5);
     for (const step of steps.slice(0, -1)) {
@@ -961,19 +1109,35 @@ describe("public copy", () => {
     const page = read("app/developers/page.tsx");
     const contents = read("lib/package-contents.ts");
     const exporter = read("lib/collection-download.ts");
-    const extras = contents.match(/const PACKAGE_EXTRAS = \[([\s\S]*?)\n\] as const;/);
-    expect(extras, "the extra-file list is still declared in lib/package-contents.ts").not.toBeNull();
-    const paths = [...extras![1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
+    const extras = contents.match(
+      /const PACKAGE_EXTRAS = \[([\s\S]*?)\n\] as const;/
+    );
+    expect(
+      extras,
+      "the extra-file list is still declared in lib/package-contents.ts"
+    ).not.toBeNull();
+    const paths = [...extras![1]!.matchAll(/"([^"]+)"/g)].map(
+      match => match[1]!
+    );
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) {
-      expect(exporter, `lib/collection-download.ts never writes ${path}`).toContain(`"${path}"`);
+      expect(
+        exporter,
+        `lib/collection-download.ts never writes ${path}`
+      ).toContain(`"${path}"`);
     }
-    expect(contents, "the required paths come from the exporter, not a second list")
-      .toContain("REQUIRED_PACKAGE_PATHS");
+    expect(
+      contents,
+      "the required paths come from the exporter, not a second list"
+    ).toContain("REQUIRED_PACKAGE_PATHS");
     // G3-007: the three surfaces render the one list rather than each keeping their own.
-    expect(page, "/developers went back to its own file list").toContain("PACKAGE_CONTENTS");
-    expect(read("lib/docs-content.ts"), "the docs tables went back to their own file lists")
-      .toContain("PACKAGE_CONTENTS");
+    expect(page, "/developers went back to its own file list").toContain(
+      "PACKAGE_CONTENTS"
+    );
+    expect(
+      read("lib/docs-content.ts"),
+      "the docs tables went back to their own file lists"
+    ).toContain("PACKAGE_CONTENTS");
     // §16.4: the export is a semantic projection, never a claimed OWL ontology.
     expect(page.toLowerCase()).not.toContain("complete owl");
     expect(page).toContain("semantic projection");
@@ -1000,12 +1164,20 @@ describe("public copy", () => {
     "app/docs/page.tsx",
   ];
 
-  it.each(CONVERSION_SURFACES)("uses no generic call to action in %s", (surface) => {
-    const copy = read(surface).replace(/\/\*[\s\S]*?\*\//g, " ").toLowerCase();
-    for (const generic of ["learn more", "read more", "find out more"]) {
-      expect(copy, `§22 asks for the precise next action, not "${generic}"`).not.toContain(generic);
+  it.each(CONVERSION_SURFACES)(
+    "uses no generic call to action in %s",
+    surface => {
+      const copy = read(surface)
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .toLowerCase();
+      for (const generic of ["learn more", "read more", "find out more"]) {
+        expect(
+          copy,
+          `§22 asks for the precise next action, not "${generic}"`
+        ).not.toContain(generic);
+      }
     }
-  });
+  );
 
   /*
     §10.2's proof strip must stay proof rather than becoming a statistics row.
@@ -1019,7 +1191,9 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     expect(page).not.toContain('className="hero-proof"');
     // §9's order, read as positions: the hero, then the instant proof, then the rest.
-    expect(page.indexOf('data-scene="1"')).toBeLessThan(page.indexOf("copy.proof"));
+    expect(page.indexOf('data-scene="1"')).toBeLessThan(
+      page.indexOf("copy.proof")
+    );
     expect(page.indexOf("copy.proof")).toBeLessThan(page.indexOf("copy.trust"));
     /*
       The strip under a hero is where invented figures arrive: "10M pages compiled", "99.9%
@@ -1029,7 +1203,9 @@ describe("public copy", () => {
       compiled World.
     */
     const deck = read("lib/landing-v2-copy.ts");
-    expect(deck).not.toMatch(/\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i);
+    expect(deck).not.toMatch(
+      /\d[\d,.]*\s*(?:million|billion|% accuracy|customers served|pages processed)/i
+    );
     expect(landingSource()).not.toContain("128,470");
   });
 
@@ -1046,27 +1222,52 @@ describe("public copy", () => {
     reader would rather verify than be told.
   */
   const PURCHASE_OBJECTIONS = [
-    "just OCR", "vector database", "exactly is a World", "relate to RAG", "verify an answer",
-    "source document changes", "Office files", "agent use it", "uncertain", "data safe",
-    "What is ready to use", "much does it cost", "setup is required", "locked in", "Can I export",
-    "delete my data", "security review approve",
+    "just OCR",
+    "vector database",
+    "exactly is a World",
+    "relate to RAG",
+    "verify an answer",
+    "source document changes",
+    "Office files",
+    "agent use it",
+    "uncertain",
+    "data safe",
+    "What is ready to use",
+    "much does it cost",
+    "setup is required",
+    "locked in",
+    "Can I export",
+    "delete my data",
+    "security review approve",
   ];
 
   const purchaseFaq = () =>
-    read("components/pricing-page-client.tsx").match(/const PURCHASE_FAQ[\s\S]*?\n\];/)?.[0] ?? "";
+    read("components/pricing-page-client.tsx").match(
+      /const PURCHASE_FAQ[\s\S]*?\n\];/
+    )?.[0] ?? "";
 
-  it.each(PURCHASE_OBJECTIONS)("answers the §54 objection about %s on /pricing", (objection) => {
-    const faq = purchaseFaq();
-    expect(faq, "the §54 answers are still declared on the pricing page").not.toBe("");
-    expect(faq).toContain(objection);
-  });
+  it.each(PURCHASE_OBJECTIONS)(
+    "answers the §54 objection about %s on /pricing",
+    objection => {
+      const faq = purchaseFaq();
+      expect(
+        faq,
+        "the §54 answers are still declared on the pricing page"
+      ).not.toBe("");
+      expect(faq).toContain(objection);
+    }
+  );
 
   it("points every §54 answer at the page that maintains it", () => {
-    const rows = [...purchaseFaq().matchAll(/^ {2}\[".*\],$/gm)].map((match) => match[0]);
+    const rows = [...purchaseFaq().matchAll(/^ {2}\[".*\],$/gm)].map(
+      match => match[0]
+    );
     expect(rows.length, "§54 lists seventeen objections").toBe(17);
     for (const row of rows) {
-      expect(row, `${row.slice(0, 40)}… answers without offering the page that says it in full`)
-        .toMatch(/"\/[a-z/-]+" as Route/);
+      expect(
+        row,
+        `${row.slice(0, 40)}… answers without offering the page that says it in full`
+      ).toMatch(/"\/[a-z/-]+" as Route/);
     }
   });
 
@@ -1080,7 +1281,7 @@ describe("public copy", () => {
     href must resolve to a real `app/solutions/[slug]` key, because a dead link under the hero is
     the worst place on the site for one, and no card body may carry a digit.
   */
-  it("keeps source choices after the hero and leaves solution pages intact", () => {
+  it("keeps the five homepage beats ordered and leaves source and solution pages intact", () => {
     /*
       Audit B01 / U02. The hero is followed by a named way in rather than by a jump straight into
       World, compile, candidate and ontology. Two things can go wrong and both are still checked:
@@ -1095,31 +1296,34 @@ describe("public copy", () => {
     const deck = read("lib/landing-v2-copy.ts");
     expect(deck).toContain("Check accepted sources");
     expect(deck).toContain('href: "/sources"');
-    expect(read("app/sources/page.tsx")).toContain('<Link href="/integrations">Integrations</Link>');
+    expect(read("app/sources/page.tsx")).toContain(
+      '<Link href="/integrations">Integrations</Link>'
+    );
     expect(
       read("components/landing-v2/scenes/use.tsx"),
-      "the landing offers the format rules one click from the decision they qualify",
+      "the landing offers the format rules one click from the decision they qualify"
     ).toContain("copy.inbound.map");
     // §9's order, read as positions.
     const page = read("components/landing-v2/landing-page.tsx");
-    const order = ['id="hero"', "copy.proof", "copy.sources", "copy.trust", "copy.start"].map((id) => page.indexOf(id));
-    expect(order.every((at, index) => at > 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
-    expect(read("app/solutions/[slug]/page.tsx")).toContain("ai-ready-knowledge");
+    const order = [
+      'id="s1"',
+      "<HeroFilm",
+      'id="s2"',
+      "<CompilerSpecimen",
+      "<ProofScene",
+      "copy.recompile",
+      "copy.trust",
+      "copy.start",
+    ].map(id => page.indexOf(id));
+    expect(
+      order.every(
+        (at, index) => at > 0 && (index === 0 || at > order[index - 1]!)
+      )
+    ).toBe(true);
+    expect(read("app/solutions/[slug]/page.tsx")).toContain(
+      "ai-ready-knowledge"
+    );
   });
-
-  /*
-    Audit B06's case is deleted, and this comment is what is left of it.
-
-    It asserted one sentence separating a directed recreation from the working interface -- "A
-    directed film, not a screen recording" -- because the film drew an extracted table as a ruled
-    grid, labelled a result with a section and line number, and listed `.csv` among the sources,
-    none of which this deployment produces. The entry pages play no film now, so there is no
-    recreation on them to separate from the product: every pixel in the hero is a committed render
-    of a real filing page or vector UI drawn from real World data (§21, contract rule 2). The
-    rule the case existed for is enforced by the case above it -- no film asset on the landing --
-    and by `lib/landing-v2-hero.test.ts`, which fails if the hero resolves to a page this
-    repository has no committed render of.
-  */
 
   /*
     Audit B02. Five solution pages answered the same reader. Each now declares who it is for, as
@@ -1128,11 +1332,19 @@ describe("public copy", () => {
   */
   it("gives every solution page an audience", () => {
     const solutions = read("app/solutions/[slug]/page.tsx");
-    const slugs = [...solutions.matchAll(/^ {2}"([a-z-]+)": \{\r?$/gm)].map((match) => match[1]!);
-    const audiences = [...solutions.matchAll(/^ {4}audience: "([^"]+)",\r?$/gm)].map((match) => match[1]!);
+    const slugs = [...solutions.matchAll(/^ {2}"([a-z-]+)": \{\r?$/gm)].map(
+      match => match[1]!
+    );
+    const audiences = [
+      ...solutions.matchAll(/^ {4}audience: "([^"]+)",\r?$/gm),
+    ].map(match => match[1]!);
     expect(slugs.length).toBeGreaterThanOrEqual(5);
-    expect(audiences, "every solution declares its reader").toHaveLength(slugs.length);
-    expect(solutions, "and the page renders it").toContain("For: {solution.audience}");
+    expect(audiences, "every solution declares its reader").toHaveLength(
+      slugs.length
+    );
+    expect(solutions, "and the page renders it").toContain(
+      "For: {solution.audience}"
+    );
   });
 
   /*
@@ -1149,16 +1361,25 @@ describe("public copy", () => {
       longer be typeset below the 12px floor it was under.
     */
     expect(stage).toContain("compiled from Apple’s public SEC filings");
-    expect(stage, "no straight apostrophe between letters in this note")
-      .not.toContain("Apple&apos;s own public SEC filings");
-    expect(stage, "the limit still names what the corpus does not represent")
-      .toContain("not a claim about a mixed internal corpus");
-    expect(stage, "and the reproducible asset is reachable from the sample")
-      .toContain('href="/reproducibility"');
-    expect(stage, "and what the read does not recover is still one link away")
-      .toContain('href="/sources"');
-    expect(read("components/explore/explore-stage.module.css"))
-      .toMatch(/\.entryNote \{[^}]*font-size: 1[5-9]px/);
+    expect(
+      stage,
+      "no straight apostrophe between letters in this note"
+    ).not.toContain("Apple&apos;s own public SEC filings");
+    expect(
+      stage,
+      "the limit still names what the corpus does not represent"
+    ).toContain("not a claim about a mixed internal corpus");
+    expect(
+      stage,
+      "and the reproducible asset is reachable from the sample"
+    ).toContain('href="/reproducibility"');
+    expect(
+      stage,
+      "and what the read does not recover is still one link away"
+    ).toContain('href="/sources"');
+    expect(read("components/explore/explore-stage.module.css")).toMatch(
+      /\.entryNote \{[^}]*font-size: 1[5-9]px/
+    );
   });
 });
 
@@ -1210,8 +1431,14 @@ const prose = (surface: string) =>
 describe("the site's own vocabulary", () => {
   it("declares two access actions and one Explore action, and no more", () => {
     expect(ACCESS_CTA).toEqual({ href: "/contact", label: "Request access" });
-    expect(SELF_SERVE_CTA).toEqual({ href: "/login", label: "Start with your files" });
-    expect(EXPLORE_CTA).toEqual({ href: "/explore", label: "Explore a Compiled World" });
+    expect(SELF_SERVE_CTA).toEqual({
+      href: "/login",
+      label: "Start with your files",
+    });
+    expect(EXPLORE_CTA).toEqual({
+      href: "/explore",
+      label: "Explore a Compiled World",
+    });
     // The two names the audit found spelled four ways between them, in the table every surface
     // is held to. `RETIRED_NAMES` below is the other half of the same rule.
     expect(PRODUCT_NOUNS).toContain("Compiled World");
@@ -1219,7 +1446,9 @@ describe("the site's own vocabulary", () => {
     // BQ-098: the category noun is in the table too, and no public page writes it in lower case.
     expect(PRODUCT_NOUNS).toContain("Knowledge Compiler");
     for (const file of marketingPageFiles()) {
-      expect(prose(file), `${file} lower-cases the category noun`).not.toMatch(/knowledge compiler/);
+      expect(prose(file), `${file} lower-cases the category noun`).not.toMatch(
+        /knowledge compiler/
+      );
     }
     // The commercial posture chooses between the two; it does not write a third.
     expect(primaryCallToAction({})).toEqual(ACCESS_CTA);
@@ -1235,9 +1464,17 @@ describe("the site's own vocabulary", () => {
       billing flags no longer change the answer -- and when it opens, this case is the one that
       says so out loud rather than a CTA changing under nobody's decision.
     */
-    expect(activationPolicy.customerData.enabled, "the gate below is what this case turns on").toBe(false);
-    expect(primaryCallToAction({ COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", VERCEL_ENV: "production" }))
-      .toEqual(ACCESS_CTA);
+    expect(
+      activationPolicy.customerData.enabled,
+      "the gate below is what this case turns on"
+    ).toBe(false);
+    expect(
+      primaryCallToAction({
+        COMMERCIAL_MODE: "live",
+        TAVONEL_BILLING_LAUNCH_APPROVED: "true",
+        VERCEL_ENV: "production",
+      })
+    ).toEqual(ACCESS_CTA);
   });
 
   /*
@@ -1259,9 +1496,12 @@ describe("the site's own vocabulary", () => {
       if (LEGAL.includes(file)) continue;
       const lines = prose(file)
         .split(/\r?\n/)
-        .filter((line) => !/candidatePromotion|promote\/route/.test(line))
-        .filter((line) => /\bpromot/i.test(line));
-      expect(lines, `${file} writes the promote verb in copy a reader sees`).toEqual([]);
+        .filter(line => !/candidatePromotion|promote\/route/.test(line))
+        .filter(line => /\bpromot/i.test(line));
+      expect(
+        lines,
+        `${file} writes the promote verb in copy a reader sees`
+      ).toEqual([]);
     }
   });
 
@@ -1274,14 +1514,21 @@ describe("the site's own vocabulary", () => {
   */
   it("closes the public sample on the same access action the header offers", () => {
     expect(activationPolicy.customerData.enabled).toBe(false);
-    const primary = EXPLORE_COPY.endActions.find((action) => action.primary);
-    expect(primary).toEqual({ label: ACCESS_CTA.label, href: ACCESS_CTA.href, primary: true });
+    const primary = EXPLORE_COPY.endActions.find(action => action.primary);
+    expect(primary).toEqual({
+      label: ACCESS_CTA.label,
+      href: ACCESS_CTA.href,
+      primary: true,
+    });
   });
 
-  it.each(CHROME_SURFACES)("publishes no retired name in %s", (surface) => {
+  it.each(CHROME_SURFACES)("publishes no retired name in %s", surface => {
     const source = prose(surface);
     for (const name of RETIRED_NAMES) {
-      expect(source, `"${name}" is a retired spelling; the table is PRODUCT_NOUNS`).not.toContain(name);
+      expect(
+        source,
+        `"${name}" is a retired spelling; the table is PRODUCT_NOUNS`
+      ).not.toContain(name);
     }
   });
 
@@ -1315,17 +1562,24 @@ describe("the site's own vocabulary", () => {
 
   it("names the two site-wide actions from their constants on every marketing route", () => {
     const routes = marketingPageFiles();
-    expect(routes.length, "no marketing routes found -- the walk is out of date").toBeGreaterThan(10);
+    expect(
+      routes.length,
+      "no marketing routes found -- the walk is out of date"
+    ).toBeGreaterThan(10);
     const offenders: string[] = [];
     for (const file of routes) {
       const source = prose(file);
       for (const [, label] of source.matchAll(
-        /<Link className="btn[^"]*" href=(?:"\/(?:explore|contact)"|\{"\/(?:explore|contact)" as Route\})>([^<{][^<]*)<\/Link>/g,
+        /<Link className="btn[^"]*" href=(?:"\/(?:explore|contact)"|\{"\/(?:explore|contact)" as Route\})>([^<{][^<]*)<\/Link>/g
       )) {
-        if (!CTA_VARIANTS.includes(label.trim())) offenders.push(`${file}: "${label.trim()}"`);
+        if (!CTA_VARIANTS.includes(label.trim()))
+          offenders.push(`${file}: "${label.trim()}"`);
       }
     }
-    expect(offenders, "a button writes its own label for an action that has a constant").toEqual([]);
+    expect(
+      offenders,
+      "a button writes its own label for an action that has a constant"
+    ).toEqual([]);
   });
 
   /*
@@ -1341,11 +1595,18 @@ describe("the site's own vocabulary", () => {
       `cta.label` unless the page is /ko, where it is that action's Korean name keyed by the same
       destination. The chrome may still write neither English literal itself.
     */
-    expect(chrome, "the header derives its label from the action it was given")
-      .toContain("const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;");
+    expect(
+      chrome,
+      "the header derives its label from the action it was given"
+    ).toContain(
+      "const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;"
+    );
     expect(chrome, "and renders that").toContain("{ctaLabel}");
     for (const literal of ["Request access", "Start with your files"]) {
-      expect(chrome, `the header writes "${literal}" instead of reading it`).not.toContain(literal);
+      expect(
+        chrome,
+        `the header writes "${literal}" instead of reading it`
+      ).not.toContain(literal);
     }
     /*
       BQ-059. The phone sheet no longer carries the action, so the guard stops asking it to.
@@ -1356,11 +1617,20 @@ describe("the site's own vocabulary", () => {
       three sections it was always for. What this still has to guarantee is the thing the row was
       opened about: neither chrome writes an action label of its own.
     */
-    expect(chrome, "the phone sheet is given no action to draw twice")
-      .not.toContain("<MobilePrimaryNav cta=");
+    expect(
+      chrome,
+      "the phone sheet is given no action to draw twice"
+    ).not.toContain("<MobilePrimaryNav cta=");
     const sheet = prose("components/mobile-primary-nav.tsx");
-    for (const literal of ["Contact<", "Request access", "Start with your files"]) {
-      expect(sheet, `the phone sheet writes "${literal}" instead of reading it`).not.toContain(literal);
+    for (const literal of [
+      "Contact<",
+      "Request access",
+      "Start with your files",
+    ]) {
+      expect(
+        sheet,
+        `the phone sheet writes "${literal}" instead of reading it`
+      ).not.toContain(literal);
     }
   });
 
@@ -1374,11 +1644,18 @@ describe("the site's own vocabulary", () => {
   */
   it("resolves the access action on the server, with no placeholder to replace", () => {
     const cta = read("components/public-primary-cta.tsx");
-    expect(cta, "a client component cannot read the commercial flags").not.toContain('"use client"');
-    expect(cta, "and must not ask the browser for them").not.toContain("fetch(");
+    expect(
+      cta,
+      "a client component cannot read the commercial flags"
+    ).not.toContain('"use client"');
+    expect(cta, "and must not ask the browser for them").not.toContain(
+      "fetch("
+    );
     expect(cta).toContain("primaryCallToAction()");
     const chrome = prose("components/public-site-chrome.tsx");
-    expect(chrome, "the header takes the resolved action rather than a component that guesses it")
-      .not.toContain("PublicPrimaryCta");
+    expect(
+      chrome,
+      "the header takes the resolved action rather than a component that guesses it"
+    ).not.toContain("PublicPrimaryCta");
   });
 });

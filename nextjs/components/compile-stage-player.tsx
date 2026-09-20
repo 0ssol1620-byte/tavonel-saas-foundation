@@ -181,6 +181,7 @@ export default function CompileStagePlayer({
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
   const [videoError, setVideoError] = useState(false);
+  const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
     WCAG 2.2.2. A cut runs ~18s and then advances on its own — auto-playing motion well past the
     five-second bound — so a mechanism to stop it is not optional.
@@ -353,11 +354,18 @@ export default function CompileStagePlayer({
   const live = !preferVideo && canvasReady && !narrow && !(reducedMotion && playRequested);
   const still = !autoplay || paused || !inView || !documentVisible || videoError;
   const control = filmMotionControl({ reducedMotion, saveData, paused, playRequested, ended });
+  const preferredVideoSrc = narrow && active.phoneSrc ? active.phoneSrc : active.src;
+  const fallbackVideoSrc = narrow
+    ? active.fallbackPhoneSrc ?? active.fallbackSrc
+    : active.fallbackSrc;
+  const videoSrc = failedPreferredSrc === preferredVideoSrc && fallbackVideoSrc
+    ? fallbackVideoSrc
+    : preferredVideoSrc;
 
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012), so it may not also change the
        stage -- the tab strip above stays the way to do that. */
-    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0}>
+    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0}>
       {!compact ? <div className="compile-film-stages" role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
         {stages.map((stage, position) => (
           <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
@@ -416,7 +424,14 @@ export default function CompileStagePlayer({
             survives, so nothing is torn down mid-fetch, and there is still exactly one decoder
             open on a phone.
           */
-          <video ref={videoRef} className="compile-film-video" src={narrow && active.phoneSrc ? active.phoneSrc : active.src} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => { setVideoError(true); setPaused(true); }} />
+          <video ref={videoRef} className="compile-film-video" src={videoSrc} data-active={1} muted autoPlay playsInline preload="metadata" disablePictureInPicture disableRemotePlayback poster={active.poster} aria-label={`${active.label} — ${active.line}`} onLoadedMetadata={(event) => { event.currentTarget.playbackRate = Math.max(0.1, playbackRate); }} onEnded={onEnded} onError={() => {
+            if (videoSrc === preferredVideoSrc && fallbackVideoSrc) {
+              setFailedPreferredSrc(preferredVideoSrc);
+              return;
+            }
+            setVideoError(true);
+            setPaused(true);
+          }} />
         )}
         {/* Always rendered: the two states that most need it were the two that hid it. */}
         <button

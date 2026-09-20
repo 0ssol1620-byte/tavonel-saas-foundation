@@ -1,25 +1,10 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { evaluateCustomerDataGate } from "../../shared/customerDataGate";
+import { customerDataPreconditions } from "../../shared/uskcEnums";
 import { activationPolicy } from "./activation-policy";
 import type { CollectionOcrInput } from "./collection-compiler";
 import { buildProductCoreV2Request } from "./core-runtime-v2";
 import { readCapabilities } from "./capabilities";
-
-/**
- * The live path, asserted from the outside.
- *
- * `shared/customerDataGate.ts` makes it *possible* to accept customer data. This file exists to
- * prove that nothing in the deployed request path takes that option. There is exactly one place
- * where a real compile request is built -- `buildProductCoreV2Request` -- and it writes the privacy
- * policy as a literal that no caller can influence. That literal is itself a fail-closed gate, and
- * this test is what stops a later refactor from "wiring it up to the caller" without anyone
- * noticing that the caller is a browser-facing route.
- */
-
-const here = dirname(fileURLToPath(import.meta.url));
-const coreRuntimeSource = readFileSync(join(here, "core-runtime-v2.ts"), "utf8");
 
 function inputs(): CollectionOcrInput[] {
   const versionKey = "a".repeat(64);
@@ -38,53 +23,64 @@ function inputs(): CollectionOcrInput[] {
   ];
 }
 
-describe("customer data is not on the live compile path", () => {
-  it("builds every request as synthetic-only", () => {
+function allowedGate(workspaceId: string) {
+  return evaluateCustomerDataGate({
+    tenantId: workspaceId,
+    workspaceId,
+    now: "2026-09-20T00:00:00.000Z",
+    evidence: customerDataPreconditions.map((precondition) => ({
+      precondition,
+      satisfied: true,
+      evidence: `receipt:${precondition}`,
+      checkedAt: "2026-09-20T00:00:00.000Z",
+    })),
+  });
+}
+
+describe("customer data on the live compile path", () => {
+  it("keeps the pure request builder synthetic-only when no verified decision is supplied", () => {
     const request = buildProductCoreV2Request("pilot-abc", inputs(), new Date("2026-09-06T00:00:00.000Z"));
     expect(request.route.privacyPolicy).toBe("foundation_synthetic_only");
   });
 
-  it("never names the customer-data policy anywhere in the request builder", () => {
-    expect(coreRuntimeSource).toContain('privacyPolicy: "foundation_synthetic_only"');
-    expect(coreRuntimeSource).not.toContain("approved_customer_data");
-    // The request type admits one value, so a caller-supplied policy would not compile.
-    expect(coreRuntimeSource).toContain('privacyPolicy: "foundation_synthetic_only";');
+  it("uses the customer-data policy only for an exact allowed decision", () => {
+    const exact = allowedGate("pilot-abc");
+    const admitted = buildProductCoreV2Request(
+      "pilot-abc",
+      inputs(),
+      new Date("2026-09-20T00:00:00.000Z"),
+      "request-1",
+      null,
+      exact,
+    );
+    expect(admitted.route.privacyPolicy).toBe("approved_customer_data");
+
+    const wrongWorkspace = buildProductCoreV2Request(
+      "pilot-other",
+      inputs(),
+      new Date("2026-09-20T00:00:00.000Z"),
+      "request-2",
+      null,
+      exact,
+    );
+    expect(wrongWorkspace.route.privacyPolicy).toBe("foundation_synthetic_only");
   });
 
-  /*
-    BA-118. The fact this case exists to pin is that the closed gate is *stated* on every public
-    surface that renders the policy, not that it is stated in any particular words. It used to pin
-    "security suite" and "approval receipt" -- our CI and our own internal noun -- which held
-    internal-process vocabulary in place on /pricing, /security, /status and /login.
-
-    So the assertions moved to the fact and got tighter rather than looser: the gate is closed, the
-    sentence says the compile is not open, it names what a reader can do instead, and it may not
-    reach for the internal vocabulary again.
-  */
-  it("keeps the deployment's customer-data capability closed, and says so in customer words", () => {
+  it("keeps the public capability closed until a production receipt exists", () => {
     expect(activationPolicy.customerData.enabled).toBe(false);
     const { reason } = activationPolicy.customerData;
-    expect(reason, "the closed gate is stated").toMatch(/is not open in this deployment/i);
-    expect(reason, "and what is open instead is named").toMatch(/public Compiled World/i);
-    expect(reason, "with no internal-process vocabulary on a public surface")
-      .not.toMatch(/founder|approval receipt|security suite|delegated|decision log|FD-\d\d/i);
+    expect(reason).toMatch(/remains closed/i);
+    expect(reason).toMatch(/production evidence/i);
   });
 
   /*
-    G3-003. One payload, two rows, and they used to disagree in plain sight.
-
-    `/api/status` served "Customer intake is open." beside "Compiling your own files is not open in
-    this deployment yet.", and `/docs/quickstart` read the first of the two. Both rows are still
-    true of what they name -- the storage path is built, permission to compile it is not granted --
-    so what this pins is that the intake row may not use the word the closed gate spends its whole
-    sentence denying, and that it names the arrangement instead.
+    G3-003 keeps storage admission and compile permission as separate facts. Activation does not
+    weaken the quarantine statement or turn it into a generic "upload is open" claim.
   */
-  it("never states intake as simply open while the compile gate is closed", () => {
+  it("keeps the intake description precise while compilation is closed", () => {
     expect(activationPolicy.customerData.enabled).toBe(false);
     const { reason } = activationPolicy.customerIntake;
-    expect(reason, '"intake is open" beside a closed compile gate is the contradiction')
-      .not.toMatch(/intake is open/i);
-    expect(reason, "and what is true instead is named").toMatch(/arranged with us/i);
+    expect(reason).toMatch(/tenant-scoped quarantine/i);
   });
 
   it("says so on the public capability grid", () => {

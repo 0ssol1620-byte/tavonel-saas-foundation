@@ -83,7 +83,12 @@ const FOOTNOTE: Record<LandingV2Locale, string> = {
 const SCENE_INDEX = LANDING_V2_SCENE_ORDER.indexOf("trust") + 1;
 const TITLE_ID = "lv2-trust-title";
 
-export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy: LandingV2TrustCopy }) {
+export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }: {
+  locale: LandingV2Locale;
+  copy: LandingV2TrustCopy;
+  sectionId?: string;
+  sceneIndex?: number;
+}) {
   const byHref = (href: string) => copy.links.find((link) => link.href === href);
   const next = byHref(NEXT_HREF);
   const references = REFERENCE_HREFS.map(byHref).filter(
@@ -91,8 +96,8 @@ export default function Scene({ locale, copy }: { locale: LandingV2Locale; copy:
   );
   return (
     <section
-      id="trust"
-      data-scene={String(SCENE_INDEX)}
+      id={sectionId}
+      data-scene={String(sceneIndex ?? SCENE_INDEX)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
       className="lv2-scene lv2-scene--compact lv2-obsidian lv2-surface"

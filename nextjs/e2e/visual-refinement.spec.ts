@@ -3,9 +3,9 @@ import { test, expect } from "@playwright/test";
 for (const path of ["/", "/ko"]) {
   test(`${path} shares a measured outer edge and gives the film a readable width`, async ({ page }) => {
     await page.goto(path);
-    const wrap = await page.locator("#hero .lv2-wrap").boundingBox();
+    const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
     const mark = await page.locator("header .wordmark").boundingBox();
-    const film = await page.locator("#hero .compile-film-viewport").boundingBox();
+    const film = await page.locator("#s1 .compile-film-viewport").boundingBox();
     expect(wrap && mark && film).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     const cap = page.viewportSize()!.width >= 1600 ? 1280 : 1120;

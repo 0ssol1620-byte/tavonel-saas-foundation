@@ -27,6 +27,41 @@ type DispatchDependencies = {
   markIndeterminate: typeof markModelProviderSpendIndeterminate;
 };
 
+export type ModelProviderAttemptAdmission = {
+  reservationId: string;
+  admissionId: string;
+  provider: string;
+  model: string;
+  meter: string;
+  requestDigest: string;
+  reservedUnits: number;
+  unitMicrousd: number;
+  priceVersion: string;
+  admittedAt: Date;
+};
+
+export type ModelProviderAttemptTerminal<T> = ModelProviderAttemptAdmission & {
+  attemptId: string;
+  completedAt: Date;
+  latencyMs: number;
+  actualUnits: number;
+  actualMicrousd: number;
+  value: T | null;
+  dispatchFailureCode: string | null;
+};
+
+/**
+ * Request-scoped audit seam. `admit` runs after both spend and circuit admission but before the
+ * provider callback. A false result prevents dispatch. `recordTerminal` runs once for every
+ * admitted attempt, including thrown/timeout callbacks, and a failed write withholds the result.
+ */
+export type ModelProviderAttemptLifecycle<T> = {
+  admit(input: ModelProviderAttemptAdmission): Promise<
+    { ok: true; attemptId: string } | { ok: false }
+  >;
+  recordTerminal(input: ModelProviderAttemptTerminal<T>): Promise<boolean>;
+};
+
 const defaults: DispatchDependencies = {
   readCircuit: readModelProviderCircuitSnapshot,
   commitAdmission: commitModelProviderCircuitAdmission,
@@ -99,6 +134,7 @@ export async function runGovernedModelProviderCall<T>(
     circuitOutcome: ModelProviderCircuitOutcome;
   }>,
   deps: DispatchDependencies = defaults,
+  lifecycle?: ModelProviderAttemptLifecycle<T>,
 ): Promise<GovernedModelProviderResult<T>> {
   // A readable enabled circuit is required before taking a budget hold. This avoids filling the
   // ledger with reservations that can never reach a provider when circuit state is unavailable.
@@ -135,6 +171,49 @@ export async function runGovernedModelProviderCall<T>(
       providerDispatched: false, reservationId, admissionId: input.admissionId };
   }
 
+  const admittedAt = new Date();
+  const receipt = held.receipt as Record<string, unknown>;
+  const unitMicrousd = Number(receipt.unitMicrousd);
+  const priceVersion = String(receipt.priceVersion ?? "");
+  const lifecycleAdmission: ModelProviderAttemptAdmission = {
+    reservationId,
+    admissionId: input.admissionId,
+    provider: input.provider,
+    model: input.model,
+    meter: input.meter,
+    requestDigest: input.requestDigest,
+    reservedUnits: input.reservedUnits,
+    unitMicrousd,
+    priceVersion,
+    admittedAt,
+  };
+  const attempt = lifecycle ? await lifecycle.admit(lifecycleAdmission).catch(() => ({ ok: false as const })) : null;
+  if (lifecycle && (!attempt || !attempt.ok)) {
+    const released = await releaseUnusedReservation(deps, input.tenantId, reservationId,
+      "MODEL_ATTEMPT_DECISION_UNAVAILABLE");
+    // No provider request happened. Use the non-provider failure class so a local receipt-store
+    // outage cannot poison the provider health counter; half-open probes remain conservative.
+    await commitOutcome(deps, input.provider, admission.receipt, {
+      kind: "failure", scope: "semantic_document", code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE",
+    });
+    return { ok: false, code: released ? "MODEL_ATTEMPT_DECISION_UNAVAILABLE"
+      : "MODEL_PROVIDER_RELEASE_FAILED", providerDispatched: false, reservationId,
+    admissionId: input.admissionId };
+  }
+  const recordTerminal = async (value: T | null, actualUnits: number, failureCode: string | null) => {
+    if (!lifecycle || !attempt?.ok) return true;
+    return lifecycle.recordTerminal({
+      ...lifecycleAdmission,
+      attemptId: attempt.attemptId,
+      completedAt: new Date(),
+      latencyMs: Math.max(0, Date.now() - admittedAt.getTime()),
+      actualUnits,
+      actualMicrousd: actualUnits * unitMicrousd,
+      value,
+      dispatchFailureCode: failureCode,
+    }).catch(() => false);
+  };
+
   try {
     const result = await call();
     if (!Number.isSafeInteger(result.actualUnits) || result.actualUnits < 0
@@ -144,6 +223,10 @@ export async function runGovernedModelProviderCall<T>(
       await commitOutcome(deps, input.provider, admission.receipt, {
         kind: "failure", scope: "provider_operational", code: "PROVIDER_RESULT_INVALID",
       });
+      if (!await recordTerminal(null, input.reservedUnits, "PROVIDER_RESULT_INVALID")) {
+        return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE",
+          providerDispatched: true, reservationId, admissionId: input.admissionId };
+      }
       return { ok: false, code: pending.ok ? "MODEL_PROVIDER_RESULT_INDETERMINATE"
         : "MODEL_PROVIDER_RECONCILIATION_MARK_FAILED", providerDispatched: true,
       reservationId, admissionId: input.admissionId };
@@ -157,11 +240,24 @@ export async function runGovernedModelProviderCall<T>(
       await deps.markIndeterminate({ tenantId: input.tenantId, reservationId,
         reasonCode: "SETTLEMENT_UNCONFIRMED" });
       await commitOutcome(deps, input.provider, admission.receipt, result.circuitOutcome);
+      if (!await recordTerminal(result.value, result.actualUnits, "SETTLEMENT_UNCONFIRMED")) {
+        return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE",
+          providerDispatched: true, reservationId, admissionId: input.admissionId };
+      }
       return { ok: false, code: "MODEL_PROVIDER_SETTLEMENT_UNCONFIRMED",
         providerDispatched: true, reservationId, admissionId: input.admissionId };
     }
     if (!await commitOutcome(deps, input.provider, admission.receipt, result.circuitOutcome)) {
+      if (!await recordTerminal(result.value, result.actualUnits,
+        "MODEL_PROVIDER_CIRCUIT_OUTCOME_UNCONFIRMED")) {
+        return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE",
+          providerDispatched: true, reservationId, admissionId: input.admissionId };
+      }
       return { ok: false, code: "MODEL_PROVIDER_CIRCUIT_OUTCOME_UNCONFIRMED",
+        providerDispatched: true, reservationId, admissionId: input.admissionId };
+    }
+    if (!await recordTerminal(result.value, result.actualUnits, null)) {
+      return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE",
         providerDispatched: true, reservationId, admissionId: input.admissionId };
     }
     return { ok: true, value: result.value, reservationId, admissionId: input.admissionId,
@@ -172,6 +268,10 @@ export async function runGovernedModelProviderCall<T>(
     await commitOutcome(deps, input.provider, admission.receipt, {
       kind: "failure", scope: "provider_operational", code: "PROVIDER_CALL_FAILED",
     });
+    if (!await recordTerminal(null, input.reservedUnits, "PROVIDER_CALL_FAILED")) {
+      return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE",
+        providerDispatched: true, reservationId, admissionId: input.admissionId };
+    }
     return { ok: false, code: pending.ok ? "MODEL_PROVIDER_CALL_INDETERMINATE"
       : "MODEL_PROVIDER_RECONCILIATION_MARK_FAILED", providerDispatched: true,
     reservationId, admissionId: input.admissionId };

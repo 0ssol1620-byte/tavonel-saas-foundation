@@ -314,13 +314,6 @@
 }
 .lv2-film .compile-film-panes { display: none; }
 .lv2-film .compile-film-caption p { color: var(--text-mid); }
-.lv2-film-note {
-  margin: 14px auto 0;
-  max-width: min(1120px, 100%);
-  color: var(--text-lo);
-  text-align: center;
-  line-height: 1.5;
-}
 .lv2-page {
   position: relative;
   display: block;
@@ -375,16 +368,14 @@
 /* Visual hierarchy: paper is reserved for actual source evidence. */
 .lv2-surface { background: var(--ink-900); border-block: 1px solid var(--border-dark); }
 .lv2-hero-h1 { font-synthesis: weight; font-weight: 600; font-variation-settings: "wght" 600; }
-.lv2-hero-intake, .lv2-film-note {
+.lv2-hero-intake {
   font-family: var(--f-sans); font-size: 14px; letter-spacing: 0; line-height: 1.55;
 }
-.lv2-film-note { text-align: left; }
 .lv2-film .compile-film-stages button { font-size: 14px; letter-spacing: 0; }
 .lv2 .lv2-eyebrow { font-family: var(--f-sans); font-size: 13px; font-weight: 600; letter-spacing: .1em; }
 .lv2-proof-note { max-width: 62ch; }
 @media (min-width: 1600px) {
   .lv2-film { --lv2-film-w: 1280px; }
-  .lv2-film-note { max-width: 1280px; }
 }
 @media (max-width: 767px) {
   .lv2-scene-support { margin-top: 16px; }

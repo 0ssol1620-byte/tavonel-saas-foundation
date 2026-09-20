@@ -38,6 +38,7 @@ export type RerankerResult =
 export type RerankerInvokeOptions = {
   topK?: number;
   timeoutMs?: number;
+  attemptLifecycle?: import("./model-provider-dispatch").ModelProviderAttemptLifecycle<RerankerResult>;
 };
 
 export type RerankerAdapter = {

@@ -166,11 +166,15 @@ export default function Scene({
   locale,
   copy,
   data,
+  sectionId = "proof",
+  sceneIndex = SCENE_INDEX,
 }: {
   locale: LandingV2Locale;
   copy: LandingV2ProofCopy;
   /** `buildProofTabs()`. Server-only, and read here when the composition does not pass it. */
   data?: ProofTab[];
+  sectionId?: string;
+  sceneIndex?: number;
 }) {
   const tabs = data ?? buildProofTabs();
   const next = SCENE_ACTIONS[locale].proof;
@@ -185,8 +189,8 @@ export default function Scene({
 
   return (
     <section
-      id="proof"
-      data-scene={String(SCENE_INDEX)}
+      id={sectionId}
+      data-scene={String(sceneIndex)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
       className="lv2-scene lv2-scene--proof lv2-paper"

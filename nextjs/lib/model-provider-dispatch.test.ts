@@ -23,7 +23,7 @@ function dependencies() {
       .mockResolvedValueOnce({ ok: true, state: initial })
       .mockResolvedValue({ ok: true, state: afterAdmission }),
     reserve: vi.fn().mockResolvedValue({ ok: true, dispatchAllowed: true,
-      receipt: { reservationId } }),
+      receipt: { reservationId, unitMicrousd: 250, priceVersion: "runpod-2026-09" } }),
     settle: vi.fn().mockResolvedValue({ ok: true, receipt: { status: "processed" } }),
     markIndeterminate: vi.fn().mockResolvedValue({ ok: true,
       receipt: { status: "pending_reconciliation" } }),
@@ -116,5 +116,70 @@ describe("governed paid-provider dispatch", () => {
       reasonCode: "SETTLEMENT_UNCONFIRMED",
     }));
     expect(deps.settle).not.toHaveBeenCalledWith(expect.objectContaining({ outcome: "released" }));
+  });
+
+  it("persists the decision with real admission IDs before provider dispatch, then one terminal outcome", async () => {
+    const deps = dependencies();
+    const order: string[] = [];
+    const lifecycle = {
+      admit: vi.fn(async (admission) => {
+        order.push("decision");
+        expect(admission).toMatchObject({ reservationId, admissionId: input.admissionId,
+          unitMicrousd: 250, priceVersion: "runpod-2026-09" });
+        return { ok: true as const, attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" };
+      }),
+      recordTerminal: vi.fn(async (terminal) => {
+        order.push("outcome");
+        expect(terminal).toMatchObject({ reservationId, admissionId: input.admissionId,
+          attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", actualUnits: 4,
+          actualMicrousd: 1000, dispatchFailureCode: null });
+        return true;
+      }),
+    };
+    const result = await runGovernedModelProviderCall(input, async () => {
+      order.push("provider");
+      return { value: "accepted", actualUnits: 4, reasonCode: "PROVIDER_RESULT_ACCEPTED",
+        circuitOutcome: { kind: "success" as const } };
+    }, deps as never, lifecycle);
+    expect(result).toMatchObject({ ok: true, value: "accepted" });
+    expect(order).toEqual(["decision", "provider", "outcome"]);
+    expect(lifecycle.admit).toHaveBeenCalledTimes(1);
+    expect(lifecycle.recordTerminal).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed and releases the unused hold when the decision receipt cannot commit", async () => {
+    const deps = dependencies();
+    const call = vi.fn();
+    const lifecycle = {
+      admit: vi.fn().mockResolvedValue({ ok: false as const }),
+      recordTerminal: vi.fn(),
+    };
+    await expect(runGovernedModelProviderCall(input, call, deps as never, lifecycle)).resolves.toMatchObject({
+      ok: false, code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE", providerDispatched: false,
+      reservationId, admissionId: input.admissionId,
+    });
+    expect(call).not.toHaveBeenCalled();
+    expect(deps.settle).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "released", actualUnits: 0, reasonCode: "MODEL_ATTEMPT_DECISION_UNAVAILABLE",
+    }));
+    expect(lifecycle.recordTerminal).not.toHaveBeenCalled();
+  });
+
+  it("records one failed terminal outcome after an ambiguous provider failure", async () => {
+    const deps = dependencies();
+    const lifecycle = {
+      admit: vi.fn().mockResolvedValue({ ok: true as const,
+        attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
+      recordTerminal: vi.fn().mockResolvedValue(true),
+    };
+    const result = await runGovernedModelProviderCall(input, async () => {
+      throw new Error("timeout after dispatch");
+    }, deps as never, lifecycle);
+    expect(result).toMatchObject({ ok: false, code: "MODEL_PROVIDER_CALL_INDETERMINATE" });
+    expect(lifecycle.recordTerminal).toHaveBeenCalledTimes(1);
+    expect(lifecycle.recordTerminal).toHaveBeenCalledWith(expect.objectContaining({
+      value: null, actualUnits: input.reservedUnits,
+      dispatchFailureCode: "PROVIDER_CALL_FAILED",
+    }));
   });
 });

@@ -903,12 +903,13 @@ describe("G2-013 /status carries a record, not a reassurance", () => {
 
   it("offers a subscribe path that exists", () => {
     expect(page).toContain("/changelog/feed.xml");
-    expect(page, "an announcement list nobody has built may not be implied")
-      .toContain("there is no announcement list");
+    expect(page, "workspace incidents offer a direct update path")
+      .toContain("email support@tavonel.com for direct updates");
   });
 
-  it("says the page shares the deployment it reports on", () => {
-    expect(page).toContain("served by the same deployment it reports on");
+  it("gives an outage path that remains useful when the page cannot load", () => {
+    expect(page).toContain("If this page is unavailable");
+    expect(page).toContain("support@tavonel.com");
   });
 
   it("publishes no uptime percentage", () => {

@@ -3,7 +3,11 @@ import { cookies } from "next/headers";
 import { preload } from "react-dom";
 import { HERO_FILM_POSTER } from "@/components/landing-v2/hero-film";
 import LandingPage from "@/components/landing-v2/landing-page";
-import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
+import {
+  LANDING_VARIANT_COOKIE,
+  LANDING_VARIANT_QUERY,
+  landingVariantState,
+} from "@/lib/landing-experiments";
 import { BRAND_LINE } from "@/lib/site-navigation";
 
 /**
@@ -27,8 +31,12 @@ import { BRAND_LINE } from "@/lib/site-navigation";
 */
 export const metadata: Metadata = {
   title: `TAVONEL — ${BRAND_LINE.descriptor}`,
-  description: "Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.",
-  alternates: { canonical: "/", languages: { en: "/", ko: "/ko", "x-default": "/" } },
+  description:
+    "Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.",
+  alternates: {
+    canonical: "/",
+    languages: { en: "/", ko: "/ko", "x-default": "/" },
+  },
   openGraph: {
     title: BRAND_LINE.headline,
     description: BRAND_LINE.descriptor,
@@ -77,36 +85,6 @@ export default async function HomePage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
-  /*
-    FOUNDER DECISION 2026-09-20: the LCP resource is the hero film's poster again.
-
-    The centered hero paints one image above the fold -- `poster-1-hero-2x.webp`, the first frame
-    of cut 1 at the size the frame paints it. `CompileStagePlayer` renders that poster on the
-    server and swaps in the decoder only after the film is in view, so the poster is what the LCP
-    measurement actually sees whether or not the video ever plays. It carries
-    `fetchPriority="high"` there (`priorityPoster`), and this is the preload that matches it.
-
-    §27 bars an autoplay VIDEO from being the LCP element, and it still is not one: the element
-    that paints is an <img>. The film starts after it, on intersection.
-
-    No `imageSrcSet`/`imageSizes`: the poster is one locked file at one size, so a candidate list
-    would be a list of one and `sizes` would describe a choice the browser does not have.
-
-    IT IS `react-dom`'s `preload()` AND NOT A <link> ELEMENT, WHICH REVERSES A CONTRACT RULE (F10).
-
-    Contract rule 10 says "a real <link> element, not react-dom preload()", and it says so
-    because audit MED-15 measured the helper never reaching the shipped HTML on the OLD landing
-    (fixture build 2026-09-18, where the document's only rel=preload was a low-priority script).
-    That page was a client component; this one is a server component, and React 19 flushes the
-    resource into the head as a real <link rel="preload"> in the served document. That is
-    verified rather than assumed: `e2e/landing-v2.spec.ts` counts it in the document the server
-    sends, not in the DOM after hydration.
-
-    What the element form could not do is be ONE preload. React hoists a <link rel="preload">
-    into the head as a resource and ALSO renders the element where it sits in the tree, so the
-    document carried two entries for one file (P3 QA round 2, P2-2) -- with `href` and, measured
-    on this build rather than assumed, without it too. The helper emits the hoisted one alone.
-  */
   preload(HERO_FILM_POSTER, { as: "image", fetchPriority: "high" });
   return (
     <>

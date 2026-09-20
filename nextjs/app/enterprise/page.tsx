@@ -79,8 +79,8 @@ export default function EnterprisePage() {
                 <article className="link"><h3>Result</h3><p>An answer opens its evidence, and a signed candidate package can be verified offline.</p></article>
               </div>
               <p className="fine">
-                This public sample demonstrates the web product contract. It is not customer-path,
-                benchmark or production Core evidence.
+                This synthetic sample demonstrates the source-to-answer review flow. Deployment
+                evidence for a qualified review is provided against the agreed customer scope.
               </p>
 
               <h2>How it is run</h2>

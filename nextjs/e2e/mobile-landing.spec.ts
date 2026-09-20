@@ -6,19 +6,11 @@ const PHONE = ["360", "390"];
 const NARROW = ["360", "390", "768"];
 
 /*
-  Landing V2 (contract D1, D13), amended by the founder 2026-09-20. The four film tests left
-  this file, and the film came back without them.
+  Landing V2 (contract D1, D13), amended by the six-beat homepage on 2026-09-20.
 
-  They measured the phone hero: the encoded-film path and its 1440-wide encode, the 16:10 pan
-  frame, the absence of a chip row and a tablist, and the reduced-motion poster with its explicit
-  Play control. Three of the four describe a composition that no longer exists even though the
-  film does -- the hero plays the four locked cuts in one framed pane rather than panning across
-  one, and `e2e/landing-v2.spec.ts` measures that pane, its controls and its reduced-motion
-  poster at 390 and at the reduced-motion project. They are not restored here, because a second
-  spec measuring the same frame is a second thing to keep in step.
-
-  What stays here is everything that was never about the film: the narrow overflow sweep, the
-  header row, the phone sheet, and the touch floor.
+  CompilerSpecimen interaction, reduced-motion parity, and its five stage controls belong to
+  `landing-v2.spec.ts`. This file keeps the mobile shell contracts: the narrow overflow sweep,
+  header row, navigation sheet, and touch floor. The deeper `/film` route retains its own tests.
 */
 
 test("nothing on the narrow landing is laid out outside the viewport", async ({ page }, testInfo) => {
@@ -34,12 +26,8 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   const escaped = await page.evaluate(() => {
     const result: string[] = [];
-    /*
-      G1-012: the film pans below 900px, so its panes and recording sit past the right edge inside
-      a real `overflow-x: auto` frame. That is the supported wide-content pattern (the same rule
-      `overflow-audit.spec.ts` applies to tables and code); `overflow-x: hidden` is not a scroller
-      and still counts, because hidden is what made these defects invisible in the first place.
-    */
+    /* A real horizontal scroller may contain wide content. `overflow-x: hidden` is not a
+       scroller and still counts, because clipping must not make a layout defect invisible. */
     const clippedByScroller = (element: HTMLElement) => {
       for (let parent = element.parentElement; parent; parent = parent.parentElement) {
         const overflowX = getComputedStyle(parent).overflowX;

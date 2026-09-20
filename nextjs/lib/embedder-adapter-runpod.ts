@@ -1,4 +1,4 @@
-import type { EmbedderAdapter, EmbedderInvokeOptions, EmbedderModelIdentity, EmbedderResult } from "./embedder-adapter";
+import { digestOf, type EmbedderAdapter, type EmbedderInvokeOptions, type EmbedderModelIdentity, type EmbedderResult } from "./embedder-adapter";
 
 // RunPod backend for EmbedderAdapter, calling an official Hugging Face Text Embeddings
 // Inference (TEI) container deployed as a RunPod Load Balancer Serverless endpoint --
@@ -166,6 +166,7 @@ export function createRunPodEmbedderAdapter(
 ): EmbedderAdapter {
   return {
     identity: () => identity,
+    endpointId: () => digestOf(config.url.trim().replace(/\/$/, "")),
     embedDocuments: (texts, options) => callEmbeddingRoute(config, identity, texts, options, fetcher),
     embedQuery: (text, options) => callEmbeddingRoute(config, identity, [text], options, fetcher),
   };

@@ -1,6 +1,6 @@
 import CompileStagePlayer from "@/components/compile-stage-player";
 import { COMPILE_STAGES, type CompileStage } from "@/lib/compile-stages";
-import { landingV2HeroExtra, LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-hero-copy";
+import { LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-hero-copy";
 
 /*
   The hero's visual: the four locked compile films, under the centered text block.
@@ -39,12 +39,18 @@ import { landingV2HeroExtra, LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-
 */
 
 /**
- * Cut 1's hero encode: the same 450 frames at a lower CRF, with a poster at the size it is
- * painted. `phoneSrc` is the 1440-wide variant the player picks below 900px.
+ * Cut 1 uses the byte-locked 2x master that the other three stages already use.
+ *
+ * The later `compile-cut-hq*` derivatives were named for their lower CRF, but both changed the
+ * source from yuv444p to yuv420p. This film is coloured mono text on near-black panels, where
+ * quarter-resolution chroma visibly smears glyph edges; the phone derivative also discarded half
+ * the pixels in each dimension. The locked master preserves the verified 2880x1800/yuv444p source
+ * on every viewport and is already recorded in `lib/locked-film-assets.json`.
  */
 const HERO_CUT = {
-  src: "/film/compile-cut-hq.mp4",
-  phoneSrc: "/film/compile-cut-hq-1440.mp4",
+  src: "/film/compile-cut.mp4",
+  fallbackSrc: "/film/compile-cut-hq.mp4",
+  fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4",
   poster: "/film/poster-1-hero-2x.webp",
 } as const;
 
@@ -63,13 +69,6 @@ export default function HeroFilm({ korean = false }: { korean?: boolean }) {
   return (
     <div className="lv2-film">
       <CompileStagePlayer stages={heroStages(korean)} preferVideo priorityPoster korean={korean} />
-      {/*
-        §11.3 and contract rule 7. The cuts draw a ruled table, section-and-line labels and `.csv`
-        sources; this deployment emits none of the three. The sentence that separates the directed
-        film from what a compile emits travels with the film, and it is the same sentence the
-        previous landing published -- not a softer second spelling of it.
-      */}
-      <p className="lv2-film-note lv2-meta">{landingV2HeroExtra(korean).filmNote}</p>
     </div>
   );
 }

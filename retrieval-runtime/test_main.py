@@ -95,7 +95,7 @@ async def run():
     info = await main.model_info()
     check(
         "model-info embedder revision matches pin",
-        info["embedder"]["revision"] == "5617a9f61b028005a4858fdac845db406aefb181",
+        info["embedder"]["revision"] == "142964af7e05de16511657561de8e8750fc153a0",
     )
     check(
         "model-info reranker revision matches pin",

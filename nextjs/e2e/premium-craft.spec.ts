@@ -17,10 +17,10 @@ async function dismissConsent(page: import("@playwright/test").Page) {
   a real destination at a target a thumb can hit -- so the assertion is made against the next
   action Scene 07 does carry, and the row-level geometry comes back here with the rows.
 */
-test("the Bring it / Use it scene ends on a usable next action", async ({ page }) => {
+test("the closing scene ends on usable next actions", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const scene = page.locator("section#use");
+  const scene = page.locator("section#s6");
   await expect(scene).toHaveCount(1);
   await scene.scrollIntoViewIfNeeded();
   const action = scene.locator("a.lv2-text-link");

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { activationPolicy } from "../lib/activation-policy";
 
 const statusV2 = ({
   signIn = true,
@@ -85,7 +86,5 @@ test("/pricing names the customer-data gate, server-side, with its own reason", 
   expect(html).toContain('data-purchase-gate="customerData"');
   const gate = page.locator('[data-purchase-gate="customerData"]');
   await expect(gate).toBeVisible();
-  await expect(gate).toContainText(
-    "Compiling your own files is not open in this deployment yet. A completed public Compiled World is open to read in full today, and intake for your own sources is arranged with us.",
-  );
+  await expect(gate).toContainText(activationPolicy.customerData.reason);
 });

@@ -7,6 +7,10 @@ export type CompileStage = {
   src: string;
   /** A lighter encode for the phone pan (below 900px); the master when absent. */
   phoneSrc?: string;
+  /** Compatibility encode used only after the preferred source raises a decoder error. */
+  fallbackSrc?: string;
+  /** Narrow-screen compatibility encode; falls back to fallbackSrc when absent. */
+  fallbackPhoneSrc?: string;
   poster: string;
 };
 

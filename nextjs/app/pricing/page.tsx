@@ -3,8 +3,8 @@ import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
-import { primaryCallToAction, readCommercialState } from "@/lib/commercial-state";
-import { readAccessMode } from "@/lib/foundation-pilot";
+import { primaryCallToAction } from "@/lib/commercial-state";
+import { readPublicStatusV2 } from "@/lib/public-status";
 
 export const dynamic = "force-dynamic";
 
@@ -100,11 +100,11 @@ const PLAN_CAPABILITIES: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
   the data, and `lib/output-escaping.test.ts` carries the justification for the sink.
 */
 export default function PricingPage() {
-  const commercial = readCommercialState();
+  const status = readPublicStatusV2();
   return (
     <PricingPageClient
-      initialLiveCheckout={commercial.liveChargesEnabled}
-      initialSelfService={readAccessMode() === "self_service"}
+      initialLiveCheckout={status.availableActions.purchasePlan.enabled}
+      initialSelfService={status.availableActions.createAccount.enabled}
       cta={primaryCallToAction()}
       gates={PURCHASE_GATES}
       planCapabilities={PLAN_CAPABILITIES}

@@ -5,11 +5,11 @@ import { LANDING_V2_SCENE_ORDER, type LandingV2Locale, type LandingV2StartCopy }
 import styles from "./start.module.css";
 
 /*
-  Scene 09 -- the close (§19, D5, D6, D9).
+  Scene 06 -- the close (§19, D5, D6, D9).
 
   Obsidian again, Full Bleed, and the one place on this landing where the filled control is the
   commercial action rather than Explore. The hero fills Explore because a reader who has seen
-  nothing yet should be sent to the finished World first; nine scenes later that reader has seen
+  nothing yet should be sent to the finished World first; by the closing scene that reader has seen
   it, so the close asks. Both actions are on screen either way -- the hierarchy is what changes.
 
   WHY THIS SCENE DOES NOT RESERVE A VIEWPORT
@@ -65,15 +65,19 @@ export default function Scene({
   locale,
   copy,
   actions,
+  sectionId = "start",
+  sceneIndex,
 }: {
   locale: LandingV2Locale;
   copy: LandingV2StartCopy;
   actions: StartActions;
+  sectionId?: string;
+  sceneIndex?: number;
 }) {
   return (
     <section
-      id="start"
-      data-scene={String(SCENE_INDEX)}
+      id={sectionId}
+      data-scene={String(sceneIndex ?? SCENE_INDEX)}
       tabIndex={-1}
       aria-labelledby={TITLE_ID}
       className="lv2-scene lv2-obsidian"

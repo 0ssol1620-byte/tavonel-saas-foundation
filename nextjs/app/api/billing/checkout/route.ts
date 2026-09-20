@@ -3,7 +3,9 @@ import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
 import { readCommercialState } from "@/lib/commercial-state";
+import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "@/lib/checkout-policy";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { readPublicStatusV2 } from "@/lib/public-status";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,8 +44,17 @@ export async function POST(request: Request) {
   if (!paddle || !offer || secret.length < 32) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
   }
-  if (!readCommercialState().checkoutEnabled) {
-    return NextResponse.json({ code: "BILLING_LAUNCH_PENDING" }, { status: 503, headers: NO_STORE });
+  const offerPolicy = decideOfferCheckoutPolicy(offer);
+  if (!offerPolicy.allowed) {
+    return NextResponse.json({ code: offerPolicy.code }, { status: 403, headers: NO_STORE });
+  }
+  const commercial = readCommercialState();
+  const checkoutPolicy = decideCheckoutPolicy(
+    commercial,
+    readPublicStatusV2().availableActions.purchasePlan.enabled,
+  );
+  if (!checkoutPolicy.allowed) {
+    return NextResponse.json({ code: checkoutPolicy.code }, { status: 503, headers: NO_STORE });
   }
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });

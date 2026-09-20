@@ -82,6 +82,15 @@ describe("state-changing route classification", () => {
     expect(Object.entries(entries).filter(([, entry]) => !legend.has(entry.type))).toEqual([]);
   });
 
+  it("classifies the destructive founder reset as Supabase bearer-only", () => {
+    expect(entries["app/api/account/test-reset/route.ts"]).toEqual({
+      type: "A-bearer",
+      methods: ["POST"],
+      credential: "bearer:supabase-jwt",
+      note: expect.stringContaining("Destructive founder-only"),
+    });
+  });
+
   /*
     The forward guard. Today no route derives privilege from an ambient cookie, so no Origin
     guard exists. The day one does, this fails until the entry names the guard that protects

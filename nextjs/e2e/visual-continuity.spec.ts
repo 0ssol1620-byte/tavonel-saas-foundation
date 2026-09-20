@@ -47,9 +47,10 @@ test.describe("visual continuity — locked film side", () => {
       tablists, and the hero one carries exactly the four cuts -- cut 4 included, by that decision.
       The retired One-Path markup (.one-path-world-stage, one-path-works-film) still stays out.
     */
-    await expect(page.getByRole("tablist")).toHaveCount(2);
-    await expect(page.locator("#hero").getByRole("tab")).toHaveCount(4);
-    await expect(page.locator("#proof").getByRole("tab")).toHaveCount(3);
+    await expect(page.getByRole("tablist")).toHaveCount(3);
+    await expect(page.locator("#s1").getByRole("tab")).toHaveCount(4);
+    await expect(page.locator("#s2").getByRole("tab")).toHaveCount(5);
+    await expect(page.locator("#s3").getByRole("tab")).toHaveCount(3);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);
   });

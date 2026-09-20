@@ -11,7 +11,7 @@ const REQUEST = {
   role: "embedder",
   provider: "huggingface",
   model: "BAAI/bge-m3",
-  revision: "5617a9f61b028005a4858fdac845db406aefb181",
+  revision: "142964af7e05de16511657561de8e8750fc153a0",
 };
 
 function entry(overrides = {}) {

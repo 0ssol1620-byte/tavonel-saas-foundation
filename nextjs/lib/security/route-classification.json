@@ -13,6 +13,7 @@
   "cookies": "The only Set-Cookie on the API surface is the self-service trial device cookie (lib/self-service-trial.ts:69, HttpOnly; Secure; SameSite=Lax). It is an abuse signal consumed by bootstrap_foundation_self_service_trial, never an authorization credential: app/api/access/bootstrap/route.ts rejects the request with AUTH_REQUIRED before reading it unless a Bearer JWT is present.",
   "routes": {
     "app/api/access/bootstrap/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:supabase-jwt", "note": "Sets the trial device cookie, but requires the Bearer JWT first." },
+    "app/api/account/test-reset/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:supabase-jwt", "note": "Destructive founder-only two-phase reset. Requires the exact founder email, active workspace owner membership, reset id, and a dry-run manifest digest; database assertions repeat identity, ownership, legal-hold, and active-work checks." },
     "app/api/billing/checkout/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:supabase-jwt" },
     "app/api/billing/portal/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:supabase-jwt" },
     "app/api/collections/[id]/ask/route.ts": { "type": "A-bearer", "methods": ["POST"], "credential": "bearer:api-key-or-supabase-jwt" },

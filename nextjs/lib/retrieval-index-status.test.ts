@@ -51,7 +51,11 @@ function postgrest() {
   const fetcher = vi.fn(async (href: string, init: RequestInit = {}) => {
     const [path, query = ""] = String(href).split("https://idx.supabase.co")[1]!.split("?");
     const parameters = new URLSearchParams(query);
-    if (path === "/rest/v1/foundation_retrieval_profiles") return new Response(null, { status: 201 });
+    if (path === "/rest/v1/foundation_retrieval_profiles") {
+      return init.method === "POST"
+        ? new Response(null, { status: 201 })
+        : Response.json([{ id: PROFILE.id }]);
+    }
     if (path !== "/rest/v1/foundation_retrieval_compile_runs") throw new Error(`unexpected path ${path}`);
     if (init.method === "POST") {
       if (refuseRunInsert) return Response.json({ code: "P0001" }, { status: 400 });

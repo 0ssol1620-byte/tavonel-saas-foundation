@@ -1,39 +1,39 @@
-import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import {
+  PublicSiteFooter,
+  PublicSiteHeader,
+} from "@/components/public-site-chrome";
+import CompilerSpecimen from "./compiler-specimen";
 import HeroFilm from "./hero-film";
 import HeroStatement from "./hero-statement";
 import LandingAnalytics from "./landing-analytics";
-import EvidenceScene from "./scenes/evidence";
 import ProofScene from "./scenes/proof";
 import RecompileScene from "./scenes/recompile";
-import SourcesScene from "./scenes/sources";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
-import UseScene from "./scenes/use";
-import WhyScene from "./scenes/why";
 import { KO_EXPLORE_LABEL, WORKSPACE_LABEL } from "./scene-actions";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import {
-  buildEvidenceRecord,
   buildProofTabs,
   buildRecompileView,
-  type EvidenceRecord,
   type ProofTab,
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
-import { landingVariantState, type LandingVariantState } from "@/lib/landing-experiments";
+import {
+  landingVariantState,
+  type LandingVariantState,
+} from "@/lib/landing-experiments";
 
 /*
   Landing V2 (blueprint 2026-09-19, contract D1/D9/D10/D11). One composition, two languages.
 
-  Nine scenes in §9's order, each one a named focusable landmark answering a single question, on
-  the ground alternation D9 sets: obsidian hero, paper proof, and on down to an obsidian close.
+  Six beats move from the hero film through the compiler specimen, proof, change, trust, and close.
 
   WHERE THE SCENES LIVE
   The hero is built here because it is the only scene whose text column, action row and demo are
-  three separate components the page has to compose. Scenes 02-09 are each a whole `<section>` of
-  their own under `./scenes/`, and each one owns its id, its `data-scene` index (read from
+  three separate components the page has to compose. The remaining beats are each a whole
+  `<section>` of their own under `./scenes/`, and each owns its id and `data-scene` index (read from
   `LANDING_V2_SCENE_ORDER`, never typed), its ground class and its one next action. This file
   therefore no longer carries a generic `Scene()` shell: a shell that renders a heading and a link
   is exactly what the eight scene lanes replaced, and keeping it would have left two places that
@@ -56,18 +56,19 @@ import { landingVariantState, type LandingVariantState } from "@/lib/landing-exp
   The compiled World's projections, read once per process rather than once per render.
 
   `/` and `/ko` are `force-dynamic` (the commercial posture has to be resolved per request), so
-  without this the three builders would run the collection compiler on every request to the two
+  without this the two builders would run the collection compiler on every request to the two
   most-visited routes. The World behind them is frozen at build time and every builder is pure
   over it, so a module-level memo is the whole of what is needed -- not a cache with an
   invalidation story, because there is nothing that can change it while the process lives.
-  (`lib/landing-v2-sources.ts` already memoizes its own, which is why Scene 03 is not here.)
 */
-type ProofData = { tabs: ProofTab[]; record: EvidenceRecord; recompile: RecompileView };
+type ProofData = {
+  tabs: ProofTab[];
+  recompile: RecompileView;
+};
 let proofMemo: ProofData | undefined;
 function proofData(): ProofData {
   return (proofMemo ??= {
     tabs: buildProofTabs(),
-    record: buildEvidenceRecord(),
     recompile: buildRecompileView(),
   });
 }
@@ -101,7 +102,9 @@ export default function LandingPage({
     that action's own, keyed by destination in `KO_CHROME.cta`.
   */
   const access = primaryCallToAction();
-  const accessLabel = korean ? KO_CHROME.cta[access.href] ?? access.label : access.label;
+  const accessLabel = korean
+    ? (KO_CHROME.cta[access.href] ?? access.label)
+    : access.label;
   const heroActions = {
     exploreLabel: korean ? KO_EXPLORE_LABEL : EXPLORE_CTA.label,
     exploreHref: EXPLORE_CTA.href,
@@ -109,6 +112,9 @@ export default function LandingPage({
     accessHref: access.href,
     workspaceLabel: WORKSPACE_LABEL[locale],
   };
+  const specimenCopy = korean
+    ? { eyebrow: "작동 방식", title: "한 원문이 지식이 되는 다섯 단계" }
+    : { eyebrow: "How it compiles", title: "One source. Five transformations." };
 
   return (
     <div className="page lv2" lang={korean ? "ko" : undefined}>
@@ -124,17 +130,13 @@ export default function LandingPage({
         <LandingAnalytics variant={experiment.tracked} />
 
         {/*
-          01 Hero -- FOUNDER DECISION 2026-09-20: one centered statement, then one visual.
+          01 Hero -- one centered statement, then the directed four-cut product film.
 
-          This is the reference pattern, not §11.1's asymmetric split: the competitor captures in
-          `reports/landing-v2-0919/compare/` all open with a centered block and put the product
-          picture under it, and the founder asked for the same shape with the four compile films
-          back as the picture. `lv2-scene--full` is gone with the split -- a hero that is a
-          statement plus a film is taller than a viewport by construction, and a `min-height` that
-          reserved one would only add ground between the two.
+          The interactive compiler specimen follows as its own explanatory landmark in Scene 02.
         */}
+        {/* 02 Compiler specimen -- one committed public source through five transformations. */}
         <section
-          id="hero"
+          id="s1"
           data-scene="1"
           tabIndex={-1}
           aria-labelledby="lv2-hero-title"
@@ -148,25 +150,46 @@ export default function LandingPage({
               accent={korean ? undefined : "every source"}
               headlineVariant={experiment.headlineVariant}
               /*
-                D8 Test 02 applies to the hero row only. Scene 09's close keeps the access action
+                D8 Test 02 applies to the hero row only. The close keeps the access action
                 filled on both arms: that is §19's composition and not the variable under test,
                 and swapping two rows at once would make the result unattributable.
               */
-              actions={{ ...heroActions, scene: "1", ctaOrderVariant: experiment.ctaOrderVariant }}
+              actions={{
+                ...heroActions,
+                scene: "1",
+                ctaOrderVariant: experiment.ctaOrderVariant,
+              }}
             />
             <HeroFilm korean={korean} />
           </div>
         </section>
 
-        {/* 02-09. Each scene is its own landmark; the order here is §9's and D9's. */}
-        <ProofScene locale={locale} copy={copy.proof} data={proof.tabs} />
-        <SourcesScene locale={locale} copy={copy.sources} />
-        <EvidenceScene locale={locale} copy={copy.evidence} data={proof.record} />
-        <RecompileScene locale={locale} copy={copy.recompile} data={proof.recompile} />
-        <WhyScene locale={locale} copy={copy.why} />
-        <UseScene locale={locale} copy={copy.use} />
-        <TrustScene locale={locale} copy={copy.trust} />
-        <StartScene locale={locale} copy={copy.start} actions={heroActions} />
+        <section
+          id="s2"
+          data-scene="2"
+          tabIndex={-1}
+          aria-labelledby="lv2-s2-title"
+          className="lv2-scene lv2-obsidian"
+        >
+          <div className="lv2-wrap">
+            <div className="lv2-scene-head">
+              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
+              <h2 className="lv2-h2" id="lv2-s2-title">{specimenCopy.title}</h2>
+            </div>
+            <CompilerSpecimen korean={korean} />
+          </div>
+        </section>
+
+        <ProofScene locale={locale} copy={copy.proof} data={proof.tabs} sectionId="s3" sceneIndex={3} />
+        <RecompileScene
+          locale={locale}
+          copy={copy.recompile}
+          data={proof.recompile}
+          sectionId="s4"
+          sceneIndex={4}
+        />
+        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
+        <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />
     </div>

@@ -550,7 +550,7 @@ const FAQ_GROUPS = ["What it is", "What it costs", "What happens to my data", "W
   "use client" module's non-component exports are client references in the server bundle, so the
   server component cannot read `PURCHASE_FAQ`. Next server-renders this into the HTML either way.
 */
-const PRICING_JSON_LD = {
+const pricingJsonLd = (purchaseReady: boolean) => ({
   "@context": "https://schema.org",
   "@graph": [
     ...Object.values(BILLING_OFFERS).map((offer) => ({
@@ -560,7 +560,7 @@ const PRICING_JSON_LD = {
       url: "https://tavonel.com/pricing",
       category: "subscription",
       availability:
-        offer.saleChannel === "self_serve"
+        offer.saleChannel === "self_serve" && purchaseReady
           ? "https://schema.org/InStock"
           : "https://schema.org/LimitedAvailability",
       priceSpecification: {
@@ -582,7 +582,7 @@ const PRICING_JSON_LD = {
       })),
     },
   ],
-};
+});
 
 export default function PricingPageClient({
   initialLiveCheckout,
@@ -604,6 +604,7 @@ export default function PricingPageClient({
 }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [ownerBillingExempt, setOwnerBillingExempt] = useState(false);
   // SD-01: the same `activationPolicy` row the fine print under the grid prints.
   const ownFilesOpen = gates.some((gate) => gate.id === "customerData" && gate.enabled);
   /*
@@ -660,6 +661,22 @@ export default function PricingPageClient({
       if (client && !cancelled) {
         const { data } = await client.auth.getSession();
         if (!cancelled) setSignedIn(Boolean(data.session));
+        if (data.session) {
+          try {
+            const billing = await fetch("/api/billing/status", {
+              cache: "no-store",
+              headers: { authorization: `Bearer ${data.session.access_token}` },
+            });
+            const payload = await billing.json().catch(() => null) as {
+              access?: { source?: unknown; billingExempt?: unknown };
+            } | null;
+            if (!cancelled && billing.ok) {
+              setOwnerBillingExempt(payload?.access?.source === "owner" && payload.access.billingExempt === true);
+            }
+          } catch {
+            if (!cancelled) setOwnerBillingExempt(false);
+          }
+        }
       }
       try {
         const response = await fetch("/api/status/v2", { cache: "no-store" });
@@ -697,19 +714,20 @@ export default function PricingPageClient({
   const planHref = (plan: (typeof PLANS)[number]) => {
     if (plan.anchor) return `#${plan.anchor}`;
     if (plan.name === "Evaluation") return selfService ? "/login" : ACCESS_CTA.href;
+    if (ownerBillingExempt && plan.offerCode) return "/workspace";
     if (!plan.offerCode || !liveCheckout) return "/contact";
     return loginUrlForOffer(plan.offerCode);
   };
 
   /** True only where the Paddle overlay can actually open, which is where the anchor is hijacked. */
   const opensOverlay = (plan: (typeof PLANS)[number]) =>
-    Boolean(plan.offerCode) && liveCheckout && signedIn;
+    Boolean(plan.offerCode) && liveCheckout && signedIn && !ownerBillingExempt;
 
   return (
     <div className="page pricing-page">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdHtml(PRICING_JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout)) }}
       />
       <PublicSiteHeader cta={cta} />
       <main id="main">
@@ -847,7 +865,9 @@ export default function PricingPageClient({
                       void startCheckout(plan.offerCode);
                     }}
                   >
-                    {plan.name === "Evaluation"
+                    {ownerBillingExempt && plan.offerCode
+                      ? "Open your workspace"
+                      : plan.name === "Evaluation"
                       ? selfService ? "Start free evaluation" : ACCESS_CTA.label
                       : !plan.offerCode
                         ? plan.name === "Enterprise" ? "How an Enterprise quote is built" : `Talk to us about ${plan.name}`

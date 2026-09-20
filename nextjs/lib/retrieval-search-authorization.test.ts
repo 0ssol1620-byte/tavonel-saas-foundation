@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, reauthorize, pipeline, activeWorld, freshness, indexState } = vi.hoisted(() => ({
+const { authorize, reauthorize, pipeline, activeWorld, freshness, indexState, runtimeResolve } = vi.hoisted(() => ({
   authorize: vi.fn(),
   reauthorize: vi.fn(),
   pipeline: vi.fn(),
   activeWorld: vi.fn(),
   freshness: vi.fn(),
   indexState: vi.fn(),
+  runtimeResolve: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", () => ({
@@ -19,10 +20,12 @@ vi.mock("@/lib/retrieval-runtime-config", () => ({
   createProductionEmbedderAdapter: vi.fn(),
   createProductionRerankerAdapter: vi.fn(),
   readRetrievalRuntimeEnv: () => null,
+  resolveConfiguredProductionRetrievalRuntime: runtimeResolve,
   selectProductionRetrievalRuntime: () => ({
     profile: { id: "profile-1" },
     embedder: undefined,
     reranker: undefined,
+    routerDecision: undefined,
     decision: {
       evaluatedAt: "2026-09-20T00:00:00.000Z",
       registrySource: "unconfigured",
@@ -100,6 +103,12 @@ beforeEach(() => {
   activeWorld.mockReset().mockResolvedValue({ ok: true, world: ACTIVE });
   freshness.mockReset().mockResolvedValue({ checkedAt: "2026-09-20T00:00:00.000Z" });
   indexState.mockReset().mockResolvedValue({ status: "missing", errorClass: null });
+  runtimeResolve.mockReset().mockResolvedValue({ ok: true, runtime: {
+    profile: { id: "profile-1" }, embedder: undefined, reranker: undefined,
+    routerDecision: undefined,
+    decision: { evaluatedAt: "2026-09-20T00:00:00.000Z", registrySource: "unconfigured",
+      components: {}, fallbacks: ["lexical", "structural"] },
+  } });
   pipeline.mockReset().mockResolvedValue({
     ok: true,
     packet: contextPacket(),
@@ -120,12 +129,19 @@ beforeEach(() => {
 describe("search late authorization", () => {
   it("returns evidence only after revalidating the original principal", async () => {
     const response = await POST(request(), { params: Promise.resolve({ id: COLLECTION }) });
+    const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect((await response.json()).code).toBe("SEARCH_RESULTS");
+    expect(body.code).toBe("SEARCH_RESULTS");
+    expect(JSON.stringify(body)).not.toMatch(/shadowEvaluation|policyId|canaryBucket/);
     expect(reauthorize).toHaveBeenCalledOnce();
     expect(reauthorize).toHaveBeenCalledWith(expect.any(Request), PRINCIPAL, "ask:read", "observer");
     expect(freshness.mock.invocationCallOrder[0]).toBeLessThan(reauthorize.mock.invocationCallOrder[0]);
+    expect(pipeline).toHaveBeenCalledWith(expect.objectContaining({ routerDecision: undefined }));
+    expect(runtimeResolve).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceKey: WORKSPACE, collectionId: COLLECTION, endpoint: "search",
+      query: "retention period", indexStatus: "missing",
+    }));
   });
 
   it("returns no ContextPacket when the API key is revoked while retrieval runs", async () => {
