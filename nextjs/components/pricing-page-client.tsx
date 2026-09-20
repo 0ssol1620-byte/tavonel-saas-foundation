@@ -754,23 +754,10 @@ export default function PricingPageClient({
               two sentences long -- there is nothing in it a reader has to be steered past.
             */}
             <p className="lede">
-              No credit arithmetic. The processing rate is {formatUsd(STANDARD_PAGE_USD)} per
-              standard page; complex pages are escalated only when a page needs it, and never
-              exceed {formatUsd(MAXIMUM_PAGE_USD)} per page without a new confirmation.
-            </p>
-            {/*
-              §12.3's sentence, with this deployment's own values in it.
-
-              Written as one line above the cards because the question it answers -- what does
-              the subscription buy, and what happens on the page after that -- was previously
-              answerable only by reading a card, a fold and an estimator in that order.
-            */}
-            <p className="lede">
-              Your plan includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
-              pages each month on {BILLING_OFFERS.observer_access.label} and{" "}
-              {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} on{" "}
-              {BILLING_OFFERS.studio_access.label}. Additional compiled pages are billed at{" "}
-              {formatUsd(STANDARD_PAGE_USD)} per standard page.
+              Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
+              pages each month; Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
+              Additional pages are {formatUsd(STANDARD_PAGE_USD)} each, with complex processing
+              capped at {formatUsd(MAXIMUM_PAGE_USD)} per page and confirmed before a run.
             </p>
             {/*
               BA-119. Audit M04's disclosure stays -- both gates are still read from
@@ -900,27 +887,8 @@ export default function PricingPageClient({
                 <Link href={"/status" as Route}>Current deployment state</Link>
               </p>
             ))}
-            {/*
-              BQ-135. The way down a 13,000px page.
-
-              Measured on a phone the document below this point is about twenty-five screens, and
-              the only way through it was the thumb. This is the strip `/security` already uses:
-              plain anchors to headings that already carry ids, in fine print, no component and
-              no second list to keep in step -- a section that loses its id loses its link in the
-              same edit. It sits under the grid rather than above it, because the first thing on
-              a pricing page should be the prices.
-            */}
-            <nav className="fine pricing-jump" aria-label="On this page">
-              <a href="#pricing-details-title">How your plan works</a>
-              <a href="#plan-differences-title">What the step between plans buys</a>
-              <a href="#pricing-limits-title">Limits</a>
-              <a href="#page-classes-title">What makes a page complex</a>
-              <a href="#plan-capability-title">What each plan can do</a>
-              <a href="#pricing-scenarios-title">What four volumes cost</a>
-              <a href="#usage-estimator-title">Estimate your corpus</a>
-              <a href="#enterprise-pricing-title">Enterprise</a>
-              <a href="#pricing-faq-title">Questions before you buy</a>
-            </nav>
+            <details className="status-fold pricing-depth" id="plan-details">
+              <summary>Plan limits and capability details</summary>
             <section className="pricing-details" aria-labelledby="pricing-details-title">
               <h2 id="pricing-details-title">How your plan works</h2>
             <div className="tiles pricing-glance">
@@ -1038,11 +1006,9 @@ export default function PricingPageClient({
               <article className="tile">
                 <h4>How many escalate</h4>
                 <p>
-                  We publish no figure. Nothing here has measured the share of a typical corpus
-                  that escalates, and a number invented for this page would be exactly the estimate
-                  the reservation exists to replace. Preflight shows the maximum for your own files
-                  before you commit, which is the answer for your corpus rather than an average
-                  over somebody else&apos;s.
+                  The share depends on the corpus. Preflight shows the maximum for your own files
+                  before you commit, so the decision uses your documents rather than a generic
+                  average.
                 </p>
               </article>
             </div>
@@ -1135,6 +1101,7 @@ export default function PricingPageClient({
               and is shown before the run starts. Every figure is in US dollars, excluding tax.
             </p>
             </section>
+            </details>
             <section className="usage-estimator" aria-labelledby="usage-estimator-title" data-visual>
               <div>
                 {/* G2-042. The widget states its own currency and tax basis: a reader who scrolls
@@ -1183,11 +1150,10 @@ export default function PricingPageClient({
             <section id="enterprise-pricing" aria-labelledby="enterprise-pricing-title">
               <h2 id="enterprise-pricing-title">Enterprise</h2>
               <p className="lede">
-                There is no Enterprise price list, because no Enterprise scope has been agreed that
-                a list would describe. An Enterprise quote starts from the same two numbers as
-                every plan above — {formatUsd(STANDARD_PAGE_USD)} per standard page, never more
-                than {formatUsd(MAXIMUM_PAGE_USD)} — and the conversation is about what sits around
-                them. Quotes are written in US dollars, excluding tax.
+                Enterprise quotes start from {formatUsd(STANDARD_PAGE_USD)} per standard page,
+                capped at {formatUsd(MAXIMUM_PAGE_USD)} for complex processing. Volume, source
+                types, deployment needs, onboarding, and support define the final scope. Quotes
+                are written in US dollars, excluding tax.
               </p>
               <h3 id="enterprise-variables-title">What moves the quote</h3>
               <ul aria-labelledby="enterprise-variables-title">
@@ -1206,14 +1172,15 @@ export default function PricingPageClient({
                 <Link className="btn ghost" href={"/trust" as Route}>Review public trust resources</Link>
               </div>
             </section>
-            <section aria-labelledby="pricing-faq-title">
-              <h2 id="pricing-faq-title">Questions before you buy</h2>
+            <details className="status-fold pricing-depth" id="pricing-faq">
+              <summary id="pricing-faq-title">Questions before you buy</summary>
+              <section aria-labelledby="pricing-faq-title">
               {FAQ_GROUPS.map((group) => (
                 <div key={group}>
                   <h3>{group}</h3>
                   <div className="pricing-faq">
-                    {PURCHASE_FAQ.filter(([,,,, rowGroup]) => rowGroup === group).map(([question, answer, href, label], index) => (
-                      <details className="status-fold" key={question} open={index === 0}>
+                    {PURCHASE_FAQ.filter(([,,,, rowGroup]) => rowGroup === group).map(([question, answer, href, label]) => (
+                      <details className="status-fold" key={question}>
                         <summary>{question}</summary>
                         <p>{answer}</p>
                         <p className="fine"><Link href={href}>{label}</Link></p>
@@ -1222,7 +1189,8 @@ export default function PricingPageClient({
                   </div>
                 </div>
               ))}
-            </section>
+              </section>
+            </details>
 
             {/*
               §12.4. The four questions that stop a purchase, each pointed at the page that
