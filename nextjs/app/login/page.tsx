@@ -29,6 +29,7 @@ import {
 } from "@/lib/recipe-intent";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 
 type AuthState = "checking" | "ready" | "unconfigured";
 
@@ -108,22 +109,15 @@ export default function LoginPage() {
         }
       }
       try {
-        const response = await fetch("/api/status", { cache: "no-store" });
-        const body = (await response.json()) as {
-          auth?: string;
-          commercialMode?: "pilot" | "live";
-          selfService?: boolean;
-          activationPolicy?: { customerData?: { enabled?: boolean } };
-        };
+        const response = await fetch("/api/status/v2", { cache: "no-store" });
+        if (!response.ok) throw new Error("status unavailable");
+        const body = parsePublicStatusV2(await response.json());
+        if (!body) throw new Error("invalid status contract");
         if (cancelled) return;
-        // Only the two values this deployment can actually be in set the badge. A malformed
-        // status body leaves it unset rather than defaulting to the wrong label.
-        setCommercialMode(body.commercialMode === "live" || body.commercialMode === "pilot"
-          ? body.commercialMode
-          : null);
-        setSelfService(body.selfService === true);
-        setCustomerProcessingEnabled(body.activationPolicy?.customerData?.enabled === true);
-        setAuthState(body.auth === "google_oauth_configured" ? "ready" : "unconfigured");
+        setCommercialMode(body.service.commercialMode);
+        setSelfService(body.availableActions.createAccount.enabled);
+        setCustomerProcessingEnabled(body.availableActions.compileCustomerDocuments.enabled);
+        setAuthState(body.availableActions.signIn.enabled ? "ready" : "unconfigured");
       } catch {
         // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
         if (!cancelled) {

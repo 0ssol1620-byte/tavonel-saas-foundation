@@ -26,6 +26,8 @@
     "verify:package": "node scripts/compiled-world/validate.mjs",
     "verify:developer-clean": "node scripts/verify-developer-clean-install.mjs",
     "qa:links": "node scripts/launch-qa/internal-links.mjs",
+    "release:manifest": "node --experimental-strip-types scripts/release-manifest.mjs",
+    "release:manifest:inspect": "node --experimental-strip-types scripts/release-manifest.mjs --allow-incomplete --stdout",
     "scan:secrets": "node scripts/secret-scan.mjs ..",
     "brand:verify": "node scripts/build-brand-assets.mjs --check"
   },

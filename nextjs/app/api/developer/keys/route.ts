@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseDeveloperScopes } from "@/lib/developer-contracts";
-import { requireFoundationSession } from "@/lib/developer-auth";
+import { requireFoundationSession, revalidateFoundationSession } from "@/lib/developer-auth";
 import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-store";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,8 @@ export async function GET(request: Request) {
   if (blocked) return blocked;
   const result = await listDeveloperApiKeys(auth.principal.workspaceKey);
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
+  const current = await revalidateFoundationSession(request, auth.principal, "observer");
+  if (!current.ok) return NextResponse.json({ code: current.code }, { status: current.status, headers: NO_STORE });
   return NextResponse.json({ code: "OK", keys: result.keys }, { headers: NO_STORE });
 }
 
@@ -49,10 +51,11 @@ export async function POST(request: Request) {
   const result = await createDeveloperApiKey({
     workspaceKey: auth.principal.workspaceKey,
     userId: auth.principal.userId,
+    authorizationRevision: auth.principal.authorizationRevision,
     name,
     scopes,
     expiresAt,
   });
-  if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
+  if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "AUTHORIZATION_CHANGED_RETRY" ? 403 : 503, headers: NO_STORE });
   return NextResponse.json({ code: "CREATED", key: result.key, token: result.token }, { status: 201, headers: NO_STORE });
 }

@@ -17,20 +17,33 @@ async function row() {
     byte_length: input.byteLength, mime_type: input.mimeType, recorded_at: "2026-09-09T00:00:00Z" };
 }
 it.each([{ inserted: [] }, { inserted: [{ inserted: true }] }])("verifies the durable winner after insert or replay %j", async ({ inserted }) => {
-  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(inserted)).mockResolvedValueOnce(Response.json([await row()]));
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(Response.json(inserted)).mockResolvedValueOnce(Response.json([await row()]));
   vi.stubGlobal("fetch", fetcher);
   expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: true });
-  expect(fetcher).toHaveBeenCalledTimes(2);
-  const body = JSON.parse(fetcher.mock.calls[0][1].body);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  const body = JSON.parse(fetcher.mock.calls[1][1].body);
   expect(body[0]).not.toHaveProperty("recorded_at");
 });
 it.each(["content_sha256", "workspace_key", "document_id", "provider_revision"])("refuses conflicting %s", async field => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json([])).mockResolvedValueOnce(Response.json([{ ...await row(), [field]: "different" }])));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(Response.json([])).mockResolvedValueOnce(Response.json([{ ...await row(), [field]: "different" }])));
   expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code: "CONNECTOR_BINDING_CONFLICT" });
 });
 it("fails when the migration or write is unavailable", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(new Response(null, { status: 404 })));
   expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" });
+});
+it("does not write a binding when the logical source was tombstoned", async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(false));
+  vi.stubGlobal("fetch", fetcher);
+  expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code: "SOURCE_TOMBSTONED" });
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(String(fetcher.mock.calls[0][0])).toContain("connector_source_import_allowed");
+});
+it("fails closed when the tombstone guard cannot answer", async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 }));
+  vi.stubGlobal("fetch", fetcher);
+  expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code: "CONNECTOR_BINDING_GUARD_UNAVAILABLE" });
+  expect(fetcher).toHaveBeenCalledOnce();
 });
 it("refuses malformed observations before contacting the database", async () => {
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);

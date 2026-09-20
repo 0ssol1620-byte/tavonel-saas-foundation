@@ -31,11 +31,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const result = await rotateDeveloperApiKey({
     workspaceKey: auth.principal.workspaceKey,
     userId: auth.principal.userId,
+    authorizationRevision: auth.principal.authorizationRevision,
     oldKeyId: id,
     name,
     scopes,
     expiresAt: expiresInDays === null ? null : new Date(Date.now() + expiresInDays * 86_400_000).toISOString(),
   });
-  if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "API_KEY_NOT_FOUND" ? 404 : 503, headers: HEADERS });
+  if (!result.ok) return NextResponse.json({ code: result.code }, { status: result.code === "API_KEY_NOT_FOUND" ? 404 : result.code === "AUTHORIZATION_CHANGED_RETRY" ? 403 : 503, headers: HEADERS });
   return NextResponse.json({ code: "ROTATED", apiVersion: 1, key: result.key, token: result.token, replacedKeyId: result.replacedKeyId }, { status: 201, headers: HEADERS });
 }

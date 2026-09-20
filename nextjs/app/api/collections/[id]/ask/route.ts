@@ -10,16 +10,19 @@ import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import {
-  buildProductionRetrievalProfile,
-  createProductionEmbedderAdapter,
-  createProductionRerankerAdapter,
-  readRetrievalRuntimeEnv,
+  selectProductionRetrievalRuntime,
 } from "@/lib/retrieval-runtime-config";
 import { getFoundationActiveWorld, getWorldFreshness, type ActiveWorld } from "@/lib/world-store";
 import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import {
+  attemptedRetrievalModelRoles,
+  attemptedRetrievalModelRolesOnFailure,
+  buildPublicRetrievalRoute,
+  persistRetrievalModelAttempt,
+} from "@/lib/model-attempt-receipt";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -89,19 +92,34 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   const freshness = await getWorldFreshness(workspaceKey, id);
 
   // --- Preferred path: the compiled retrieval pipeline ----------------------------------
-  const runtimeEnv = readRetrievalRuntimeEnv();
+  const runtime = selectProductionRetrievalRuntime(workspaceKey);
   const pipeline = await runRetrievalPipeline({
     workspaceKey,
     collectionId: id,
     worldManifestDigest: active.world.manifestDigest,
     worldStateId: active.world.worldStateId,
     question,
-    profile: buildProductionRetrievalProfile(workspaceKey),
-    embedder: runtimeEnv ? createProductionEmbedderAdapter(runtimeEnv) : null,
-    reranker: runtimeEnv ? createProductionRerankerAdapter(runtimeEnv) : null,
+    profile: runtime.profile,
+    embedder: runtime.embedder,
+    reranker: runtime.reranker,
   });
 
   if (pipeline.ok) {
+    const attemptedRoles = attemptedRetrievalModelRoles(runtime, pipeline.diagnostics);
+    const persisted = await persistRetrievalModelAttempt({
+      endpoint: "ask",
+      workspaceKey,
+      collectionId: id,
+      worldManifestDigest: active.world.manifestDigest,
+      query: question,
+      modelRoute: runtime.decision,
+      attemptedRoles,
+      degradations: pipeline.diagnostics.degradations,
+    });
+    if (!persisted.ok) {
+      return { status: 503, body: { code: persisted.code } };
+    }
+    const publicRoute = buildPublicRetrievalRoute(attemptedRoles, pipeline.diagnostics.degradations);
     const answer = answerFromContextPacket(pipeline.packet, {
       collectionId: id,
       manifestDigest: active.world.manifestDigest,
@@ -124,12 +142,21 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
           retrievalProfile: pipeline.diagnostics.retrievalProfileId,
           rerankerApplied: pipeline.diagnostics.rerankerApplied,
           gateRejections: pipeline.diagnostics.gateRejections,
-          degradations: pipeline.diagnostics.degradations,
+          routeClass: publicRoute.routeClass,
+          degradations: publicRoute.degradationClasses,
         },
       },
     };
   }
   if (!FALLBACK_CODES.has(pipeline.code)) {
+    const attemptedRoles = attemptedRetrievalModelRolesOnFailure(runtime, pipeline.code);
+    const persisted = await persistRetrievalModelAttempt({
+      endpoint: "ask", workspaceKey, collectionId: id,
+      worldManifestDigest: active.world.manifestDigest, query: question,
+      modelRoute: runtime.decision, attemptedRoles, degradations: [],
+      execution: { outcome: "failed", failureClass: "downstream_failure" },
+    });
+    if (!persisted.ok) return { status: 503, body: { code: persisted.code } };
     return {
       status: pipeline.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503,
       body: { code: pipeline.code },
@@ -225,7 +252,8 @@ export async function POST(
     status: active.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : 503, headers: NO_STORE,
   });
   const identity = JSON.stringify([auth.principal.kind, auth.principal.userId,
-    auth.principal.keyId ?? null, [...auth.principal.scopes].sort(), id,
+    auth.principal.keyId ?? null, [...auth.principal.scopes].sort(),
+    auth.principal.authorizationRevision, id,
     active.world.manifestDigest, active.world.worldStateId, active.world.revision]);
   const lease = await acquireWorkspaceOperation("ask", workspaceKey, {
     key: idempotencyKey, identity, body: requestDigest,
@@ -279,6 +307,10 @@ export async function POST(
     const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
+    });
+    const authorizedAtRelease = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
+    if (!authorizedAtRelease.ok) return NextResponse.json({ code: authorizedAtRelease.code }, {
+      status: authorizedAtRelease.status, headers: NO_STORE,
     });
   }
   /*

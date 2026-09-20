@@ -6,9 +6,9 @@ This text is published so that a security or procurement reviewer can read the t
 asking for them. It has not been reviewed by a lawyer, it is not executed, and it binds nobody
 until it is signed. Clauses that are not drafted say so, in place, rather than being left out.
 
-Three commitments in it are written down and will not move without a new version of this document:
-the breach notification window (§8), the sub-processor change notice and objection right (§6), and
-the deletion completion time (§7). The clauses that are completed at signature are marked in place
+Two time-bound commitments in it are written down and will not move without a new version of this
+document: the breach notification window (§8), and the sub-processor change notice and objection
+right (§6). The clauses that are completed at signature are marked in place
 and collected in Annex A.
 
 Where this document and a published page disagree, the published page — `/privacy`,
@@ -24,7 +24,7 @@ error.
 | Processor | TAVONEL. The operating entity's registered name, representative, business registration number and registered address are the ones published in the operator disclosure on this site's terms and privacy pages, and they are restated in the signature version. |
 | Controller | The customer signing the agreement. |
 | Subject matter | Processing of the customer's documents and account data to compile them into a traceable knowledge world, and to operate, secure and support that service. |
-| Duration | The term of the service agreement, plus the period in §7. |
+| Duration | The term of the service agreement, plus any period required by law or needed to complete an agreed return or deletion request. |
 | Governing law | The Republic of Korea, with the Seoul Central District Court as the court of exclusive jurisdiction. The service terms state the same, and a consumer's right to bring a claim in the country where they live is unaffected. |
 
 The customer is the controller of the personal data contained in the documents they upload or
@@ -114,31 +114,15 @@ agreement, and remains liable for their performance.
 
 Mirrors `/privacy`. Where the two differ, `/privacy` is the published statement.
 
-**Completion time.** On the customer's verified deletion request, or on termination, deletion is
-**completed within 30 days of the verified request**. Before requesting it, the customer can
-export their compiled worlds as signed packages.
+On the customer's verified deletion request, or on termination, TAVONEL processes return or
+deletion in accordance with applicable law and confirms the scope and outcome in writing. Before
+requesting it, the customer can export their compiled worlds as signed packages.
 
-What the current service actually does, stated rather than smoothed:
-
-- Disconnecting a connected source deletes the stored provider refresh token immediately, before
-  the connection is marked revoked, and returns an error rather than reporting success if that
-  deletion fails.
-- Removing or losing access to a connected source suspends it, and a suspended source is refused
-  on the next answer, source-byte read, export and promotion.
-- There is no self-service action that deletes a workspace, a source or a derived artifact. A
-  verified request to `privacy@tavonel.com` is carried out by a person, and the 30 days above is
-  the commitment on that person.
-- A copy of a deleted database row can persist in the database provider's own backups until those
-  age out on the provider's schedule. That schedule is the provider's, it has not been verified
-  against this project, and TAVONEL publishes no day count for it. The 30-day commitment is on
-  the live systems TAVONEL operates and not on a provider's backup expiry.
-- Security and operational logs are retained for security and abuse investigation, with no
-  published retention period.
-- TAVONEL cannot currently issue a machine-verifiable deletion receipt. The receipt contract
-  exists in the codebase and refuses to issue one unless the storage listing is empty, the
-  database lookup is empty, the backup expiry is recorded and the audit digest verifies — and no
-  part of the running service calls it. A completed deletion is recorded in the operational record
-  and confirmed to the customer in writing.
+No fixed operational completion period is committed in this draft. A request may be limited or
+delayed by an applicable legal hold or retention duty. Copies in provider backups age out under
+the provider's lifecycle, for which TAVONEL publishes no day count. Security and operational logs
+may be retained for security, abuse investigation, and legal obligations. The public privacy
+notice is the maintained description of the request path.
 
 ## 8. Personal data breach
 
@@ -230,7 +214,8 @@ obligations, or to anything else the law does not allow to be limited. The servi
 same cap for the service agreement, and the two are one limit rather than two: a claim does not
 recover the cap twice for the same facts.
 
-**Term.** This agreement runs for the term of the service agreement, plus the period in §7.
+**Term.** This agreement runs for the term of the service agreement, plus any period required by
+law or needed to complete an agreed return or deletion request.
 
 **Precedence.** Where the Standard Contractual Clauses or the UK Addendum conflict with this
 agreement, they prevail for the transfer they cover. Where this agreement conflicts with the
@@ -254,10 +239,9 @@ version. Until then this document is a draft and is not signed.
 | §10 Transfer annexes | The completed annexes to the Standard Contractual Clauses and the UK Addendum: the parties, the described processing, the technical and organizational measures, the sub-processor list, and a transfer impact assessment |
 | §13 Signature | The signature blocks and the parties' registered details |
 
-Four terms this draft states are not changed by Annex A: the 72-hour breach notification (§8), the
-30-day sub-processor change notice with a right to object (§6), deletion completed within 30 days
-of a verified request (§7), and the liability cap and governing law (§1, §13). A change to any of
-them is a new version of this document.
+Three terms this draft states are not changed by Annex A: the 72-hour breach notification (§8), the
+30-day sub-processor change notice with a right to object (§6), and the liability cap and governing
+law (§1, §13). A change to any of them is a new version of this document.
 
 Governing law, jurisdiction, the transfer mechanism and the liability cap left this annex on
 2026-09-16 and are stated in the body above. They are Draft v1 wording and have not been reviewed

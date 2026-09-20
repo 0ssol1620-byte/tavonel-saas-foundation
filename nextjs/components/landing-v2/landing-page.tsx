@@ -113,7 +113,7 @@ export default function LandingPage({
   return (
     <div className="page lv2" lang={korean ? "ko" : undefined}>
       <PublicSiteHeader cta={access} korean={korean} />
-      <main id="main" tabIndex={-1}>
+      <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
         {/*
           D7: the landing's whole funnel, in one mounted listener that renders nothing (§30).

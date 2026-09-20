@@ -10,9 +10,19 @@ describe("Next.js activation policy", () => {
     expect(activationPolicy.candidatePromotion.enabled).toBe(false);
   });
 
-  it("states the OCR controls it enforces", () => {
-    expect(activationPolicy.ocrGpu.reason).toMatch(/scale-to-zero/i);
-    expect(activationPolicy.ocrGpu.reason).toMatch(/candidate-only/i);
+  it("states customer-visible OCR and review behavior without infrastructure detail", () => {
+    expect(activationPolicy.ocrGpu.reason).toMatch(/scanned pages are read by OCR/i);
+    expect(activationPolicy.ocrGpu.reason).toMatch(/remain candidates/i);
+    expect(activationPolicy.ocrGpu.reason).toMatch(/person explicitly activates/i);
+    expect(activationPolicy.ocrGpu.reason).not.toMatch(/scale-to-zero|endpoint|provider|worker/i);
+  });
+
+  it("states the content boundary without exposing the sanitizer implementation", () => {
+    expect(activationPolicy.cdr.reason).toMatch(/tenant-scoped quarantine/i);
+    expect(activationPolicy.cdr.reason).toMatch(/sanitized/i);
+    expect(activationPolicy.cdr.reason).toMatch(/immutable PDF/i);
+    expect(activationPolicy.cdr.reason).toMatch(/content digest/i);
+    expect(activationPolicy.cdr.reason).not.toMatch(/IAM|PDFium|ClamAV|Cloud Run|asia-northeast3|workload identity|redirects?|worker/i);
   });
 
   /*

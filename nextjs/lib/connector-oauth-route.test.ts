@@ -8,6 +8,7 @@ vi.mock("@/lib/developer-auth", () => ({
       workspaceKey: "pilot-1234567890abcdef",
       userId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
       scopes: [],
+      authorizationRevision: 17,
     },
   })),
 }));
@@ -58,7 +59,7 @@ describe("OAuth authorization route", () => {
     vi.stubEnv("TAVONEL_OAUTH_SECRET_BROKER_TOKEN", "x".repeat(40));
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://oauth-test.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"x".repeat(40)}`);
-    const fetcher = vi.fn(async (input: string | URL | Request) => {
+    const fetcher = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/v1/secrets/write")) return Response.json({ reference: "vault://tavonel/oauth/pkce/state" });
       if (url.includes("foundation_oauth_authorizations")) return Response.json([{ authorization_id: "49d42924-a3cc-4a09-b92d-9c86b58901a1" }]);
@@ -75,5 +76,8 @@ describe("OAuth authorization route", () => {
     expect(url.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(body.authorizationUrl).not.toContain("gcp-sm");
     expect(body.authorizationUrl).not.toContain("client_secret");
+    const authorizationWrite = fetcher.mock.calls.find(([input]) => String(input).includes("foundation_oauth_authorizations"));
+    const stored = JSON.parse(String((authorizationWrite?.[1] as RequestInit | undefined)?.body));
+    expect(stored.authorization_revision).toBe(17);
   });
 });

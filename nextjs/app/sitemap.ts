@@ -49,7 +49,7 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   keeps it, because a reading map is not a request to index and `lib/seo-surface.test.ts` allows
   an llms-only URL exactly where the page declares itself noindex.
 */
-const ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+const ROUTES = ["", "/api", "/benchmarks", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 
@@ -155,8 +155,14 @@ const lastCommitDate = (() => {
 })();
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [...ROUTES, ...DOCS_ROUTES, ...FEED_ROUTES].map((path) => {
-    const lastModified = lastCommitDate(ROUTE_SOURCE(path));
+  const paths = [...ROUTES, ...DOCS_ROUTES, ...FEED_ROUTES];
+  const dates = paths.map((path) => lastCommitDate(ROUTE_SOURCE(path)));
+  // A newly added or untracked route has no Git date yet. Publishing dates for only the older
+  // subset makes the sitemap look authoritative while silently omitting the newest pages, so the
+  // entire build falls back to the valid no-lastmod form until every route has provenance.
+  const datesComplete = dates.every((value) => value !== undefined);
+  return paths.map((path, index) => {
+    const lastModified = datesComplete ? dates[index] : undefined;
     return {
       url: `https://tavonel.com${path}`,
       ...(lastModified ? { lastModified } : {}),

@@ -21,11 +21,11 @@ test("accepts an intact signed export and rejects content, manifest, signature a
     const publicKeyDer = publicKey.export({ format: "der", type: "spki" });
     const contentPath = "ontology/knowledge.jsonld";
     const content = Buffer.from('{"name":"TAVONEL"}\n');
-    const manifest = Buffer.from(JSON.stringify({
+    const manifest = Buffer.from(`${JSON.stringify({
       schemaVersion: "tavonel.signed_export_manifest.v1",
       collectionId: `collection-${"a".repeat(32)}`,
       files: [{ path: contentPath, sizeBytes: content.byteLength, sha256: digest(content) }],
-    }));
+    }, null, 2)}\n`);
     const signature = sign(null, manifest, privateKey);
     const receiptRecord = {
       schemaVersion: "tavonel.export_signature.v1",
@@ -36,7 +36,7 @@ test("accepts an intact signed export and rejects content, manifest, signature a
       signedPayloadSha256: digest(manifest),
       signatureBase64: signature.toString("base64"),
     };
-    const receipt = Buffer.from(JSON.stringify(receiptRecord));
+    const receipt = Buffer.from(`${JSON.stringify(receiptRecord, null, 2)}\n`);
     const changedSignature = `${receiptRecord.signatureBase64[0] === "A" ? "B" : "A"}${receiptRecord.signatureBase64.slice(1)}`;
     const entries = {
       [contentPath]: content,
@@ -46,8 +46,8 @@ test("accepts an intact signed export and rejects content, manifest, signature a
     const cases = [
       { name: "valid", archive: zipSync(entries), ok: true, message: '"ok":true' },
       { name: "content", archive: zipSync({ ...entries, [contentPath]: Buffer.from("tampered") }), ok: false, message: "size mismatch" },
-      { name: "manifest", archive: zipSync({ ...entries, [MANIFEST_PATH]: Buffer.concat([manifest, Buffer.from(" ")]) }), ok: false, message: "manifest digest" },
-      { name: "signature", archive: zipSync({ ...entries, [SIGNATURE_PATH]: Buffer.from(JSON.stringify({ ...receiptRecord, signatureBase64: changedSignature })) }), ok: false, message: "verification failed" },
+      { name: "manifest", archive: zipSync({ ...entries, [MANIFEST_PATH]: Buffer.concat([manifest, Buffer.from(" ")]) }), ok: false, message: "manifest JSON is not canonical" },
+      { name: "signature", archive: zipSync({ ...entries, [SIGNATURE_PATH]: Buffer.from(`${JSON.stringify({ ...receiptRecord, signatureBase64: changedSignature }, null, 2)}\n`) }), ok: false, message: "verification failed" },
       { name: "extra", archive: zipSync({ ...entries, "unsigned.txt": Buffer.from("not in manifest") }), ok: false, message: "unsigned extra file" },
     ];
 

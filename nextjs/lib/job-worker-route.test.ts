@@ -169,4 +169,5 @@ describe("worker behaviour", () => {
     const response = await POST(requestWith(SECRET));
     expect(response.status).toBe(503);
   });
+
 });

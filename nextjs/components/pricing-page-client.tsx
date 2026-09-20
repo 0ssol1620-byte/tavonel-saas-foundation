@@ -19,6 +19,7 @@ import { trackFunnel } from "@/lib/funnel-events";
 import { activationPolicy } from "@/lib/activation-policy";
 import { ACCESS_CTA, type SiteLink } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
+import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import {
   MAX_UNITS_PER_PAGE,
   PROCESSING_UNIT_USD,
@@ -29,9 +30,8 @@ import {
   G2-008. The hard limits a buyer needs, read from the modules that enforce them rather than
   retyped beside the price.
 
-  `shared/intakeCeiling.ts` is the size ceiling every processor in the chain agrees on -- the
-  Cloudflare worker's MAX_SOURCE_BYTES, the Cloud Run rasterizer's MAX_INPUT_BYTES and its
-  MAX_PAGES -- and it is what `/sources` and a 413 refusal already print. `lib/compile-limits.ts`
+  `shared/intakeCeiling.ts` is the size ceiling every processor in the chain agrees on, and it is
+  what `/sources` and a 413 refusal already print. `lib/compile-limits.ts`
   is the corpus contract: CORPUS_MAX_DOCUMENTS is the largest selection one run may carry and
   COMPILE_MAX_DOCUMENTS is the size of the parts it is compiled in. Both were published on
   `/sources` and in the changelog and nowhere near the page where the money decision is made.
@@ -111,7 +111,7 @@ const ENTERPRISE = {
     now names that, and the fine-print treatment is what makes it read as a card action rather
     than a pasted URL.
   */
-  note: { href: "/trust" as Route, label: "What an enterprise security review finds" },
+  note: { href: "/trust" as Route, label: "Review public trust resources" },
   /*
     G2-001 (SD-03). The "Enterprise pricing sheet" link is gone and so is the file it pointed at.
 
@@ -246,12 +246,11 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
     // caller owns the workspace. Delegated decision, 2026-09-11; the row is read off the
     // entitlement function, so it cannot say more than the code admits.
     // SD-02 (G2-002). This row used to end "Team keeps shared membership and roles", which
-    // `/security` and `/trust` deny in plain words: a workspace here has exactly one member and
-    // there are no roles. What differs between the two plans is volume and guided review, and
-    // that is now what the row says. Membership is on the Team card as something not sold yet.
+    // What differs between the two plans is volume and guided review, which is what this row says.
+    // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. Both are single-member workspaces today. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
+      `${BILLING_OFFERS.studio_access.label} carries ${BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")} included pages against ${BILLING_OFFERS.observer_access.label}'s ${BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")}, adds the review queue, version history and a guided onboarding session, and is sold through a conversation rather than a checkout. ${activationPlans.join(" and ")} reach World activation — activating a candidate and rolling one back — as the workspace owner. Source connections are verified separately in Workspace.`,
     ],
     [
       "What does not consume pages",
@@ -395,7 +394,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Members in a workspace",
-    "One, on every plan. Shared members and roles are not sold yet, so there is no seat count to buy and no per-member source permission to set.",
+    "Published plans cover the workspace owner. Team access and identity requirements are confirmed during Enterprise scoping.",
   ],
   [
     "API requests",
@@ -407,11 +406,11 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "Data residency",
-    "Not guaranteed. The database is configured in Seoul and the processing region of every provider is published on the subprocessors page.",
+    "Published plans make no contractual residency commitment. The privacy notice and subprocessor record maintain the applicable locations and international-processing disclosures.",
   ],
   [
     "Uptime and resolution targets",
-    "Not published. Email to support is acknowledged within one business day (KST); no uptime percentage and no resolution time is committed.",
+    "Published plans do not include a contractual uptime or resolution SLA. Enterprise support terms are agreed during scoping.",
   ],
 ];
 
@@ -443,9 +442,8 @@ const ENTERPRISE_QUOTE_NEEDS = [
 
 const ENTERPRISE_NOT_INCLUDED = [
   "A separate deployment. There is no self-hosted, private-cloud or air-gapped installation, on any scope.",
-  "A data residency guarantee. The processing regions are published; a contractual residency commitment is not offered.",
-  "Shared members and roles. A workspace has one member, and an Enterprise scope does not change that today.",
-  "An audit report. There is no SOC 2, no ISO 27001 and no independent penetration test for this deployment.",
+  "A contractual data residency guarantee. Applicable processing locations remain disclosed in the privacy notice and subprocessor record.",
+  "Unreviewed identity, support, or assurance commitments. These are confirmed in writing for the qualified scope.",
 ] as const;
 
 export type PurchaseGate = {
@@ -527,7 +525,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
     absences -- the rows a reader can count on that page -- rather than to a shared number, and
     fails if either page reaches for the thirteen again.
   */
-  ["Can an enterprise security review approve it?", "Yes — the Trust Center publishes the data path, the processors, the privacy notice and the agreement in one index, and it names the two that are not published yet: no recovery objective, and no outside audit. A review reaches its decision there rather than after a pilot.", "/trust" as Route, "Trust Center", "What a review will find"],
+  ["Can an enterprise security review approve it?", "The Trust Center provides the public policies, processor record, legal terms, and reporting contacts. Deployment-specific architecture, control evidence, assurance scope, and questionnaire responses are provided through a qualified review; the reviewer makes the approval decision.", "/trust" as Route, "Trust Center", "What a review will find"],
 ];
 
 /** The order the groups are shown in. Declared rather than derived, because it is an argument. */
@@ -664,11 +662,13 @@ export default function PricingPageClient({
         if (!cancelled) setSignedIn(Boolean(data.session));
       }
       try {
-        const response = await fetch("/api/status", { cache: "no-store" });
-        const status = await response.json() as { liveCheckout?: boolean; selfService?: boolean };
+        const response = await fetch("/api/status/v2", { cache: "no-store" });
+        if (!response.ok) throw new Error("status unavailable");
+        const status = parsePublicStatusV2(await response.json());
+        if (!status) throw new Error("invalid status contract");
         if (!cancelled) {
-          setLiveCheckout(status.liveCheckout === true);
-          setSelfServiceFlag(status.selfService === true);
+          setLiveCheckout(status.availableActions.purchasePlan.enabled);
+          setSelfServiceFlag(status.availableActions.createAccount.enabled);
         }
       } catch {
         // Fail closed: an unreachable status endpoint must never open checkout or public signup.
@@ -1183,7 +1183,7 @@ export default function PricingPageClient({
               </ul>
               <div className="actions">
                 <Link className="btn" href="/contact">Scope an Enterprise pilot</Link>
-                <Link className="btn ghost" href={"/trust" as Route}>What an enterprise security review finds</Link>
+                <Link className="btn ghost" href={"/trust" as Route}>Review public trust resources</Link>
               </div>
             </section>
             <section aria-labelledby="pricing-faq-title">

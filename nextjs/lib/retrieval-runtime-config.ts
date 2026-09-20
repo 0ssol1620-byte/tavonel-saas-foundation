@@ -1,8 +1,21 @@
-import { createRunPodEmbedderAdapter, type RunPodConnectionConfig } from "./embedder-adapter-runpod";
+import {
+  createRunPodEmbedderAdapter,
+  RUNPOD_EMBEDDER_REQUEST_TIMEOUT_MS,
+  type RunPodConnectionConfig,
+} from "./embedder-adapter-runpod";
 import type { EmbedderAdapter } from "./embedder-adapter";
-import { createRunPodRerankerAdapter } from "./reranker-adapter-runpod";
+import {
+  createRunPodRerankerAdapter,
+  RUNPOD_RERANKER_REQUEST_TIMEOUT_MS,
+} from "./reranker-adapter-runpod";
 import type { RerankerAdapter } from "./reranker-adapter";
+import { createGovernedModelProviderFetcher } from "./model-provider-dispatch";
 import { buildBgeM3BaselineProfile, type RetrievalProfile } from "./retrieval-profile";
+import {
+  readRetrievalModelRegistry,
+  selectRegisteredRetrievalModel,
+  type RetrievalModelSelection,
+} from "./retrieval-model-registry";
 
 // Wires the Wave 2 GPU backend: two official Hugging Face Text Embeddings Inference (TEI)
 // containers (ghcr.io/huggingface/text-embeddings-inference:89-1.8.3 -- the Ada Lovelace
@@ -23,6 +36,8 @@ import { buildBgeM3BaselineProfile, type RetrievalProfile } from "./retrieval-pr
 // claimed identity and the running worker's actual identity silently diverge.
 export const BGE_M3_REVISION = "5617a9f61b028005a4858fdac845db406aefb181";
 export const BGE_RERANKER_V2_M3_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e";
+export const BGE_M3_REGISTRY_ID = "retrieval-bge-m3";
+export const BGE_RERANKER_V2_M3_REGISTRY_ID = "retrieval-bge-reranker-v2-m3";
 
 export type RetrievalRuntimeEnv = {
   embedderUrl: string;
@@ -52,18 +67,109 @@ export function buildProductionRetrievalProfile(workspaceKey: string): Retrieval
   return buildBgeM3BaselineProfile(workspaceKey, BGE_M3_REVISION, BGE_RERANKER_V2_M3_REVISION);
 }
 
-export function createProductionEmbedderAdapter(env: RetrievalRuntimeEnv): EmbedderAdapter {
+export function createProductionEmbedderAdapter(env: RetrievalRuntimeEnv, workspaceKey: string): EmbedderAdapter {
   const config: RunPodConnectionConfig = { url: env.embedderUrl, apiKey: env.apiKey };
+  const fetcher = createGovernedModelProviderFetcher({
+    tenantId: workspaceKey,
+    provider: "runpod",
+    model: "BAAI/bge-m3",
+    maximumUnits: Math.ceil(RUNPOD_EMBEDDER_REQUEST_TIMEOUT_MS / 1_000) + 5,
+    reservationSeconds: 60,
+  });
   return createRunPodEmbedderAdapter(
     { provider: "huggingface", model: "BAAI/bge-m3", revision: BGE_M3_REVISION, dimension: 1024, normalize: true },
     config,
+    fetcher,
   );
 }
 
-export function createProductionRerankerAdapter(env: RetrievalRuntimeEnv): RerankerAdapter {
+export function createProductionRerankerAdapter(env: RetrievalRuntimeEnv, workspaceKey: string): RerankerAdapter {
   const config: RunPodConnectionConfig = { url: env.rerankerUrl, apiKey: env.apiKey };
+  const fetcher = createGovernedModelProviderFetcher({
+    tenantId: workspaceKey,
+    provider: "runpod",
+    model: "BAAI/bge-reranker-v2-m3",
+    maximumUnits: Math.ceil(RUNPOD_RERANKER_REQUEST_TIMEOUT_MS / 1_000) + 5,
+    reservationSeconds: 60,
+  });
   return createRunPodRerankerAdapter(
     { provider: "huggingface", model: "BAAI/bge-reranker-v2-m3", revision: BGE_RERANKER_V2_M3_REVISION },
     config,
+    fetcher,
   );
+}
+
+export type RetrievalRuntimeFallback = {
+  component: "dense" | "reranker";
+  mode: "lexical_structure" | "rrf_fused_order";
+  reason: RetrievalModelSelection["reason"] | "RUNTIME_NOT_CONFIGURED";
+};
+
+export type ProductionRetrievalRuntime = {
+  profile: RetrievalProfile;
+  embedder: EmbedderAdapter | null;
+  reranker: RerankerAdapter | null;
+  decision: {
+    schemaVersion: "retrieval-model-route/v1";
+    evaluatedAt: string;
+    registrySource: "TAVONEL_RETRIEVAL_MODEL_REGISTRY_JSON";
+    selections: RetrievalModelSelection[];
+    fallbacks: RetrievalRuntimeFallback[];
+  };
+};
+
+/** The sole production route selector: adapters are constructed only after registry admission. */
+export function selectProductionRetrievalRuntime(
+  workspaceKey: string,
+  options: { env?: RetrievalRuntimeEnv | null; registry?: unknown; now?: Date } = {},
+): ProductionRetrievalRuntime {
+  const now = options.now ?? new Date();
+  const env = options.env === undefined ? readRetrievalRuntimeEnv() : options.env;
+  const registry = options.registry === undefined ? readRetrievalModelRegistry() : options.registry;
+  const profile = buildProductionRetrievalProfile(workspaceKey);
+  const requests = [
+    {
+      registryId: BGE_M3_REGISTRY_ID,
+      role: "embedder" as const,
+      provider: profile.embedding.provider,
+      model: profile.embedding.model,
+      revision: profile.embedding.revision,
+    },
+    {
+      registryId: BGE_RERANKER_V2_M3_REGISTRY_ID,
+      role: "reranker" as const,
+      provider: profile.reranker!.provider,
+      model: profile.reranker!.model,
+      revision: profile.reranker!.revision,
+    },
+  ];
+  const selections = requests.map((request) => selectRegisteredRetrievalModel(registry, request, now));
+  const [embedding, reranker] = selections;
+  const fallbacks: RetrievalRuntimeFallback[] = [];
+  if (!env || !embedding.selected) {
+    fallbacks.push({
+      component: "dense",
+      mode: "lexical_structure",
+      reason: env ? embedding.reason : "RUNTIME_NOT_CONFIGURED",
+    });
+  }
+  if (!env || !reranker.selected) {
+    fallbacks.push({
+      component: "reranker",
+      mode: "rrf_fused_order",
+      reason: env ? reranker.reason : "RUNTIME_NOT_CONFIGURED",
+    });
+  }
+  return {
+    profile,
+    embedder: env && embedding.selected ? createProductionEmbedderAdapter(env, workspaceKey) : null,
+    reranker: env && reranker.selected ? createProductionRerankerAdapter(env, workspaceKey) : null,
+    decision: {
+      schemaVersion: "retrieval-model-route/v1",
+      evaluatedAt: now.toISOString(),
+      registrySource: "TAVONEL_RETRIEVAL_MODEL_REGISTRY_JSON",
+      selections,
+      fallbacks,
+    },
+  };
 }

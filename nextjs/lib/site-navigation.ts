@@ -341,6 +341,13 @@ export const RESOURCE_LINKS: readonly ResourceLink[] = [
     representativeCase: true,
     column: "learn",
   },
+  {
+    href: "/demo",
+    label: "Signed product path",
+    purposes: ["evaluate", "verify"],
+    workflows: ["compile-and-review", "use-elsewhere", "handle-a-revision"],
+    column: "learn",
+  },
   { href: "/knowledge-compiler", label: "Knowledge Compiler guide", purposes: ["learn"], workflows: [], column: "learn" },
   {
     href: "/docs",

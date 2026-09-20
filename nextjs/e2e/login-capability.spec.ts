@@ -1,10 +1,31 @@
 import { expect, test } from "@playwright/test";
 
+const statusV2 = ({
+  signIn = true,
+  createAccount = false,
+  compileCustomerDocuments = false,
+  commercialMode = "live" as "pilot" | "live",
+} = {}) => ({
+  schemaVersion: "tavonel.public_status.v2",
+  service: { name: "TAVONEL", state: "not_assessed", commercialMode },
+  availableActions: {
+    readPublicWorld: { enabled: true, href: "/explore", reason: "Public World is available." },
+    requestPilot: { enabled: true, href: "/contact", reason: "A pilot can be requested." },
+    signIn: { enabled: signIn, href: signIn ? "/login" : "/contact", reason: "Sign-in state." },
+    createAccount: { enabled: createAccount, href: createAccount ? "/login" : "/contact", reason: "Account state." },
+    purchasePlan: { enabled: false, href: "/contact", reason: "Purchase state." },
+    compileCustomerDocuments: {
+      enabled: compileCustomerDocuments,
+      href: compileCustomerDocuments ? "/workspace" : "/contact",
+      reason: "Compilation state.",
+    },
+  },
+  checkedAt: "2026-09-20T00:00:00.000Z",
+  evidenceFreshness: { basis: "configuration_snapshot", operationalProbe: "not_included" },
+});
+
 test("sign-in explains the customer processing gate even when evaluation accounts are enabled", async ({ page }) => {
-  await page.route("**/api/status", route => route.fulfill({ json: {
-    auth: "google_oauth_configured", commercialMode: "live", selfService: true,
-    activationPolicy: { customerData: { enabled: false } },
-  } }));
+  await page.route("**/api/status/v2", route => route.fulfill({ json: statusV2() }));
   await page.goto("/login");
   await expect(page.getByText("Customer file processing is not open yet.")).toBeVisible();
   await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
@@ -17,22 +38,30 @@ test("sign-in explains the customer processing gate even when evaluation account
 });
 
 test("sign-in presents evaluation only when the customer processing gate is enabled", async ({ page }) => {
-  await page.route("**/api/status", route => route.fulfill({ json: {
-    auth: "google_oauth_configured", commercialMode: "live", selfService: true,
-    activationPolicy: { customerData: { enabled: true } },
-  } }));
+  await page.route("**/api/status/v2", route => route.fulfill({
+    json: statusV2({ createAccount: true, compileCustomerDocuments: true }),
+  }));
   await page.goto("/login");
   await expect(page.getByText("Start with a free evaluation.")).toBeVisible();
   await expect(page.getByText("Customer file processing is not open yet.")).toHaveCount(0);
 });
 
-test("a missing capability field does not imply enabled customer processing", async ({ page }) => {
-  await page.route("**/api/status", route => route.fulfill({ json: {
-    auth: "google_oauth_configured", commercialMode: "live", selfService: true,
-  } }));
+test("a partial v2 contract fails closed instead of enabling sign-in or customer processing", async ({ page }) => {
+  const partial = statusV2({ createAccount: true, compileCustomerDocuments: true });
+  delete (partial.availableActions as Partial<typeof partial.availableActions>).compileCustomerDocuments;
+  await page.route("**/api/status/v2", route => route.fulfill({ json: partial }));
   await page.goto("/login");
-  await expect(page.getByText("Customer file processing is not open yet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign-in unavailable" })).toBeDisabled();
   await expect(page.getByText("Start with a free evaluation.")).toHaveCount(0);
+});
+
+test("does not offer a broken sign-in when public auth readiness is false", async ({ page }) => {
+  await page.route("**/api/status/v2", route => route.fulfill({
+    json: statusV2({ signIn: false }),
+  }));
+  await page.goto("/login");
+  await expect(page.getByRole("button", { name: "Sign-in unavailable" })).toBeDisabled();
+  await expect(page.getByText("Sign-in is temporarily unavailable.")).toBeVisible();
 });
 
 /*
@@ -42,10 +71,7 @@ test("a missing capability field does not imply enabled customer processing", as
   was in the first paint is gone and every toBeVisible() check passes.
 */
 test("never shows PRIVATE PILOT on a live deployment, not even for a frame", async ({ page }) => {
-  await page.route("**/api/status", (route) => route.fulfill({
-    json: { auth: "google_oauth_configured", commercialMode: "live", selfService: true,
-      activationPolicy: { customerData: { enabled: false } } },
-  }));
+  await page.route("**/api/status/v2", (route) => route.fulfill({ json: statusV2() }));
   const html = await (await page.goto("/login"))!.text();
   expect(html, "the server payload must not carry the pilot badge").not.toContain("PRIVATE PILOT");
   await expect(page.locator("header .mode")).toHaveCount(0);

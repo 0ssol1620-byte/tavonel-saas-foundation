@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const NO_STORE = { "Cache-Control": "no-store" };
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(
   request: Request,
@@ -35,8 +36,10 @@ export async function POST(
     );
   }
   let body: {
+    operationId?: unknown;
     targetManifestDigest?: unknown;
     expectedCurrentManifest?: unknown;
+    expectedCurrentRevision?: unknown;
     reason?: unknown;
   };
   try {
@@ -47,6 +50,7 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
+  const operationId = typeof body.operationId === "string" ? body.operationId : "";
   const targetManifestDigest =
     typeof body.targetManifestDigest === "string"
       ? body.targetManifestDigest
@@ -55,10 +59,17 @@ export async function POST(
     typeof body.expectedCurrentManifest === "string"
       ? body.expectedCurrentManifest
       : "";
+  const expectedCurrentRevision =
+    typeof body.expectedCurrentRevision === "number"
+      ? body.expectedCurrentRevision
+      : Number.NaN;
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
   if (
+    !UUID.test(operationId) ||
     !SHA256.test(targetManifestDigest) ||
     !SHA256.test(expectedCurrentManifest) ||
+    !Number.isSafeInteger(expectedCurrentRevision) ||
+    expectedCurrentRevision <= 0 ||
     reason.length < 8 ||
     reason.length > 500
   ) {
@@ -95,10 +106,12 @@ export async function POST(
     );
   }
   const rolledBack = await rollbackFoundationWorld({
+    operationId,
     workspaceKey: membership.workspaceId,
     collectionId: id,
     targetManifestDigest,
     expectedCurrentManifest,
+    expectedCurrentRevision,
     actorUserId: user.id,
     reason,
   });
@@ -106,8 +119,15 @@ export async function POST(
     const status =
       rolledBack.code === "ACTIVE_WORLD_CONFLICT"
         ? 409
+        : rolledBack.code === "WORLD_TRANSITION_IDEMPOTENCY_CONFLICT" ||
+            rolledBack.code === "ROLLBACK_TARGET_CONFLICT" ||
+            rolledBack.code === "WORLD_VERSION_BINDING_CONFLICT"
+          ? 409
         : rolledBack.code === "ROLLBACK_TARGET_NOT_FOUND"
           ? 404
+          : rolledBack.code === "WORLD_TRANSITION_FORBIDDEN" ||
+              rolledBack.code === "AUTHORIZATION_CHANGED_RETRY"
+            ? 403
           : 503;
     return NextResponse.json(
       { code: rolledBack.code },

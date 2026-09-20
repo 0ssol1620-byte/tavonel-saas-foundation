@@ -66,7 +66,7 @@ beforeEach(() => {
   resetWorkspaceCostGuard();
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: "user-1", scopes: [] },
+    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: "user-1", scopes: [], authorizationRevision: 7, workspaceRole: "owner" },
   });
   activeWorld.mockResolvedValue({
     ok: true,
@@ -155,7 +155,7 @@ describe("per-workspace concurrency", () => {
 
     authorize.mockResolvedValue({
       ok: true,
-      principal: { kind: "api-key", workspaceKey: "pilot-elsewhere", userId: "user-2", scopes: [] },
+      principal: { kind: "api-key", workspaceKey: "pilot-elsewhere", userId: "user-2", scopes: [], authorizationRevision: 7 },
     });
     const other = ask(question("a different tenant asks"), { params });
     await new Promise((resolve) => setImmediate(resolve));
@@ -220,6 +220,30 @@ describe("idempotency", () => {
     expect(pipeline).toHaveBeenCalledTimes(1);
   });
 
+  it("refuses an answer when authority changes during cache cleanup", async () => {
+    revalidate
+      .mockImplementationOnce(async (_request, expected) => ({ ok: true, principal: expected }))
+      .mockResolvedValueOnce({ ok: false, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 });
+    const denied = await ask(question("what changed in the filing?", "release-race-0001"), { params });
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({ code: "AUTHORIZATION_CHANGED_RETRY" });
+    expect(revalidate).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not replay an answer across an authority epoch change", async () => {
+    expect((await ask(question("what changed in the filing?", "epoch-change-0001"), { params })).status).toBe(200);
+    authorize.mockResolvedValue({
+      ok: true,
+      principal: {
+        kind: "api-key", workspaceKey: WORKSPACE, userId: "user-1", scopes: [], authorizationRevision: 8,
+      },
+    });
+    const second = await ask(question("what changed in the filing?", "epoch-change-0001"), { params });
+    expect(second.status).toBe(200);
+    expect(second.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    expect(pipeline).toHaveBeenCalledTimes(2);
+  });
+
   it("refuses the same key with a different question rather than answering the wrong one", async () => {
     await ask(question("what changed in the filing?", "retry-key-0002"), { params });
     const conflict = await ask(question("a completely different question", "retry-key-0002"), { params });
@@ -249,7 +273,7 @@ describe("idempotency", () => {
     await ask(question("what changed in the filing?", "shared-key-0001"), { params });
     authorize.mockResolvedValue({
       ok: true,
-      principal: { kind: "api-key", workspaceKey: "pilot-elsewhere", userId: "user-2", scopes: [] },
+      principal: { kind: "api-key", workspaceKey: "pilot-elsewhere", userId: "user-2", scopes: [], authorizationRevision: 7 },
     });
     const other = await ask(question("an entirely different question", "shared-key-0001"), { params });
     expect(other.status).toBe(200);

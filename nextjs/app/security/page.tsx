@@ -1,181 +1,33 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
-import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
-import { ProcessingRegionTable, TrustDisclosures } from "@/components/trust-disclosures";
-import { BOUNDARY } from "@/lib/evidence-record";
-import { activationPolicy } from "@/lib/activation-policy";
 import { TRAINING_DATA_CLAIM } from "@/lib/security-claims";
 
 export const metadata: Metadata = {
-  // Each page declares its own address. Without this every route inherited the root
-  // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
   alternates: { canonical: "/security" },
   openGraph: { url: "/security" },
   title: "Security — TAVONEL",
   description:
-    "The path a document takes through TAVONEL: what holds its bytes, what never sees them, and who decides what becomes active.",
+    "How TAVONEL protects source material, separates workspaces, preserves evidence, and keeps activation under human control.",
 };
 
-/**
- * The question a buyer asks second, answered by describing controls rather than absences.
- *
- * The architecture on this page has not changed. Three kinds of sentence came off it.
- *
- * "This page holds no certification and claims none" and "Nothing on this page is a
- * demonstration, an audit result or a compliance claim" were written to prevent a
- * misreading nobody was making. They spent the reader's attention denying a claim the page
- * never made. The page simply does not claim a certification, which is what not having one
- * looks like.
- *
- * The dated internal qualification note ("opened only after the recorded 2026-08-29
- * full-sequence qualification") is release-engineering provenance. It belongs in the release
- * record, not in the answer to "where do my documents go".
- *
- * The GPU vendor's product name was in the data path. A customer's security review cares that
- * analysis is isolated, bounded and given no outbound network — not which supplier's hardware
- * it runs on. The legal disclosure of that supplier stays on /subprocessors, where a
- * subprocessor belongs.
- */
-
-const CAPABILITY_LABELS = {
-  customerIntake: "Customer document intake",
-  cdr: "Content disarm and reconstruction",
-  ocrGpu: "Isolated GPU document reading",
-  candidatePromotion: "Candidate activation into a live world",
-  customerData: "Compiling customer data",
-} as const;
-
-const PATH = [
-  ["The browser", "Holds a short-lived, narrowly scoped upload capability, issued only after the server has checked who you are, what you are entitled to, and what quota is left. It never holds a service key, a webhook secret, storage credentials or a signing credential."],
-  ["Object storage", "Tenant-scoped quarantine holds the bytes. This is the only place a document body exists."],
-  ["The application", "Coordinates contracts and never proxies a document body. A large file does not pass through a request handler."],
-  ["The database", "Stores metadata and immutable proof references. It never stores document bytes."],
+const PROCESSING_PATH = [
+  ["Isolate", "Sources enter a workspace-scoped intake boundary and remain separated from other workspaces."],
+  ["Sanitize", "Required safety checks complete before source material can move to document analysis."],
+  ["Compile", "Only admitted source versions can contribute evidence to a candidate World."],
+  ["Review", "A candidate remains inactive until an authorized person approves it."],
 ] as const;
 
 const CONTROLS = [
-  ["Tenant isolation", "Workspace identity is derived server-side from an authenticated session, never from an identifier the browser supplies. Storage prefixes, database rows and signed capabilities are all scoped to it."],
-  ["Encryption and secrets", "Transport is TLS throughout, and stored objects are encrypted at rest by the storage provider. Authentication, billing, storage and disarm credentials are server-side secrets; the browser may hold a provider's own publishable token and nothing else."],
-  /* ROUND3-P2: one sentence, three surfaces. This page, the landing's trust scene and the
-     /contact FAQ each carried their own copy, and this one spelled the product noun lowercase. */
+  ["Workspace isolation", "Identity and workspace membership are resolved server-side. Data access is scoped to the authenticated workspace and rechecked at protected operations."],
+  ["Data protection", "Traffic is encrypted in transit, stored objects are encrypted at rest, and service credentials remain on trusted server boundaries."],
   [TRAINING_DATA_CLAIM.label, TRAINING_DATA_CLAIM.body],
-  ["Retention and deletion", "Source material, derived artifacts and compiled packages can be deleted on request, and that request is carried out by a person rather than by a self-service control. Which parts of it happen the moment you act, which wait on a provider backup schedule, and where no number is published yet, are set out step by step in the privacy notice."],
-  ["Reliability", "A control opens only after the one before it is qualified, so a partial failure stops the pipeline rather than emitting an incomplete world. There is no best-effort path that publishes anyway."],
-  /*
-    O01. "No tested restore" was true when it was written and stopped being true on 2026-09-10.
-
-    Written from the execution record of that day: the production database was restored from
-    its 2026-09-08 16:33:31 UTC backup into a separate temporary project in the same region,
-    the catalog of the original and the restored copy was compared object by object, all 431
-    matched, and the temporary project was deleted afterwards. The record's own caution
-    travels with it -- a database restore is not a service disaster-recovery exercise -- and
-    so does the scope: the document bytes live in object storage and were not part of it.
-
-    What this row deliberately does not do is turn one drill into a recovery objective. The
-    RPO and RTO targets are a commitment the founder makes, they are not made, and they stay
-    in the unanswered block below until they are.
-  */
-  ["Backup and restore", "One restore has been performed and checked. On 2026-09-10 the production database was restored from its backup of 2026-09-08 16:33:31 UTC into a separate temporary project in the same region; the catalog of the original and the restored copy was compared object by object and all 431 matched; the temporary project was deleted when the check finished. That drill covered the database. It did not cover the document bytes in object storage, a full service recovery, or a run through the customer-facing application, and one drill is a demonstration rather than a practice. The verification record for this drill is available under review."],
-  /*
-    §17.1 asks "who can access it" and "audit", and this page answered neither.
-
-    Written from `lib/developer-store.ts`, which posts an append-only row to
-    `foundation_developer_audit_events` for each key act with the workspace, the action, the
-    target and the actor -- a user id, or a key id when a key acted. Nothing broader is claimed:
-    there is no published customer-facing audit export and no SSO or role model in this
-    deployment, and a security page is the last place to imply either.
-  */
-  ["Access and audit", "Access is a workspace membership checked server-side on every request; there are no roles, no SSO and no seat model in this deployment, so the account that owns a workspace is the account that reaches it. Creating, rotating and revoking a developer key writes an append-only audit row naming the workspace, the action, the target and whether a person or a key acted."],
-  /*
-    I03. The audit asked whether a permission on a source propagates into the objects, the
-    excerpts, the answers and the exports derived from it. It does, and the grain of it is
-    narrower than the phrase suggests.
-
-    Written from `lib/connector-source-access.ts`: `checkConnectorSourceAccess` is called on
-    the answer path, the source-byte read, the export signing and candidate promotion, and it
-    returns a denial when the check itself cannot be completed rather than allowing on error.
-    What it reads is a (source_id, workspace_key) suspension row, so the decision is made per
-    workspace and not per person -- worth saying out loud, because a buyer reading
-    \"source-level access control\" will assume per-member unless told otherwise. The
-    two-users-with-different-permissions case the audit wants tested is not a state this
-    deployment can be put into: a workspace has one member.
-  */
-  ["Source-level access", "A suspended or unreachable source is refused on the same requests that would otherwise use it: an answer, a source-byte read, an export and an activation each re-check it, and a check that cannot complete counts as a refusal rather than a pass. The grain of that decision is the workspace, not the person — a source is reachable for the whole workspace or for none of it, and a workspace has exactly one member here. Per-member source permissions arrive with membership, which this deployment does not have."],
-  /*
-    §17.1 asks two more questions this page did not answer: which model providers see a document,
-    and what a model is allowed to do with it.
-
-    Written from `lib/generator-adapter.ts`, which is a contract with no implementation -- its own
-    STATUS note records that no concrete adapter and no calling route exist -- and from
-    /subprocessors, which lists every service permitted to process any class of data. Neither
-    names a model API, because there is not one. The sentence is about this deployment rather than
-    about the product, because wiring a provider is a decision that will change the answer.
-  */
-  ["Model providers", "No third-party model API receives your documents in this deployment: no such integration is wired, and document reading runs on GPU workers TAVONEL operates. Every service permitted to process any class of data is named on the subprocessors page, and a new one is recorded there before it processes anything."],
-  /*
-    S08. Scanning a file for malware and defending against instructions written inside it are
-    two different problems, and this page answered only the first.
-
-    Written from what is wired rather than from what is intended. The answer route replies on
-    the excerpt path: citations are assembled from evidence records, so there is no
-    model-composed sentence for a document to steer. `lib/generator-adapter.ts` is the seam
-    where that would change and carries no implementation. `lib/prompt-injection.test.ts`
-    exercises the nine injection classes against the contract and holds that the answer path
-    exposes no write tool at all.
-
-    The honest shape of this is a fact plus a gate, not a defence. The reason an instruction
-    inside a document cannot rewrite an answer today is that no model writes the answer, and
-    that reason stops holding the day a generator is wired -- so the gate is named here, where
-    a reader deciding whether to trust it can hold us to it later.
-  */
-  ["Instructions written inside a document", "No model writes prose from your documents in this deployment. An answer is assembled from evidence excerpts and the source locations they came from, so a sentence hidden inside a document has no model output to redirect, and the answer path offers it no write tool to reach. That is a statement about what is wired today and not a defence that survives wiring a generation model: the generator seam is a contract with nothing behind it, and the injection classes are re-run against a real generator, with the result written on this page, before one of them answers a request."],
-  /*
-    Where the data physically is, which /privacy answered and this page did not.
-
-    It belongs in the controls rather than in the unanswered block below, because it is answered:
-    the answer is a configured region and no guarantee. The two halves have to stay together --
-    "the database is in Seoul" alone reads as residency, and a buyer who needs residency would
-    plan around a promise nobody made. The provider list and the per-provider data class stay on
-    /subprocessors, which is the page that maintains them.
-  */
-  ["Where the data is", "The database is configured in Seoul. No data residency is guaranteed: Vercel, Cloudflare, RunPod, Resend, Google and Paddle may process limited data through global infrastructure or support systems outside Korea, and the object-storage location hint is best-effort rather than a promise. Which provider is permitted to process which class of data is on the subprocessors page, and the privacy notice carries the same statement about international processing."],
-] as const;
-
-/*
-  §17.1's last question, now split in two, because half of it got answered.
-
-  The restore happened (see the Backup and restore control above, 2026-09-10). The objectives
-  did not, and those are the harder half: an RPO and an RTO are numbers somebody promises, and
-  a single successful drill does not imply either one. Every sentence available to close the
-  gap anyway is reassurance -- "stored durably", "the storage provider replicates" -- and each
-  answers a different, easier question than the one being asked.
-
-  So the row below narrowed from the whole subject to the part that is still missing, rather
-  than being deleted once the drill gave it something friendly to say. Founder item F-10 owns
-  the targets; until they are set, this stays where a reader looking for them will find it.
-*/
-const UNANSWERED = [
-  ["Recovery objectives — not committed", "The restore above shows the database came back once, verified. Not yet answered is the rest: there is no recovery point objective, no recovery time objective and no published backup retention period for this deployment. Those are commitments somebody has to make and nobody has, and one drill is a different statement from how much work or how much time you would lose. Ask before you depend on either number, and read their absence here as the state of it."],
-  /*
-    The question a procurement reader asks before any of the controls above, which this page left
-    to /trust. It has to be answerable on the page a buyer is sent to, because the controls above
-    are all "checked by us" and that phrase only means something next to the absence of anyone
-    else having checked.
-
-    One sentence of sequencing, no date. An external test after the first paying customer is an
-    order of events; "Q1", "by year end" or "under way" would each be the commitment this row
-    refuses, and nothing has been commissioned. SOC 2 has no timing at all because none is chosen.
-    `lib/trust-page-answers.test.ts` allows these three artefact names only inside this block and
-    fails on a date appearing in it.
-
-    FD-12 (`docs/policy/DECISION_LOG_2026-09-11.md`): that sequencing is a delegated decision,
-    2026-09-11 (orchestrator, under the founder's delegation), reversible by the founder. The
-    provenance is this comment, not the row -- the log's "Public wording of delegated values"
-    section keeps process vocabulary off a public page, and the founder's merge of the pull
-    request carrying the log is the confirmation.
-  */
-  ["Third-party certification and audit — none yet", "Every control above is enforced and checked by us, and that is the whole of what is being claimed. Not yet answered is who else has checked: no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report exists for this deployment, and no such review has been commissioned — which is why no badge appears anywhere on this site. An external penetration test is planned after the first paying customer, and SOC 2 has not started: it is planned alongside that test."],
+  ["Source controls", "A source that is suspended, deleted or cannot be verified is refused before it can be searched, exported or activated."],
+  ["Evidence and audit", "Source versions, evidence references, review decisions and sensitive administration events are recorded so an authorized reviewer can trace what happened."],
+  ["Human activation", "Automated processing can prepare a candidate. It cannot silently replace the active World."],
+  ["Retention and deletion", "Retention and deletion follow the applicable workspace policy and legal-hold state. The public privacy notice describes the customer-facing process."],
+  ["Fail-closed operation", "If a required identity, policy, source or processing check cannot be completed, the protected action is refused rather than treated as successful."],
 ] as const;
 
 export default function SecurityPage() {
@@ -185,85 +37,33 @@ export default function SecurityPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <h1 className="document-title">Where your documents go, and what never sees them.</h1>
+              <h1 className="document-title">How document processing is controlled.</h1>
             </div>
             <div className="stack">
               <p className="lede">
-                Your sources move through a tenant-scoped processing path, and activation remains
-                under human control. Browser-direct upload → quarantine → sanitize and disarm →
-                isolated analysis → candidate world → your approval.
-                 Every external operation fails closed.
+                Sources remain workspace-scoped through intake, analysis and review. Activation
+                remains under human control, and required checks fail closed.
               </p>
 
-              {/*
-                G2-041. This page is 8,007 CSS px on a 412px phone -- roughly 25 screens of
-                near-unbroken prose -- and it had no way to reach any of it but the scrollbar.
-
-                One line of anchors, not a component and not a sticky rail: it costs no new CSS,
-                it is equally useful on a desktop, and a reader who lands here from a security
-                questionnaire is looking for exactly one of these six sections. The longer fix --
-                a sticky index inside the shared policy template -- is marketing-visual's, and
-                this page does not use that template.
-              */}
               <nav className="fine" aria-label="On this page">
                 <b>On this page:</b>{" "}
-                <a href="#boundary">The enforced boundary</a> ·{" "}
-                <a href="#what-holds-what">What holds what</a> ·{" "}
+                <a href="#boundary">Processing boundary</a> ·{" "}
                 <a href="#controls">Controls</a> ·{" "}
-                <a href="#regions">Where the work happens</a> ·{" "}
-                <a href="#review">What a security review will find</a> ·{" "}
-                <a href="#deployment">Current deployment controls</a>
+                <a href="#assurance">Assurance and review</a>
               </nav>
 
-              <h2 id="boundary">The boundary, in the order it is enforced</h2>
+              <h2 id="boundary">The enforced processing boundary</h2>
               <div className="chain">
-                {BOUNDARY.map(([num, name, text]) => (
-                  <article className="link" key={num}>
-                    <span className="st">{num}</span>
-                    <h2>{name}</h2>
+                {PROCESSING_PATH.map(([name, text], index) => (
+                  <article className="link" key={name}>
+                    <span className="st">{String(index + 1).padStart(2, "0")}</span>
+                    <h3>{name}</h3>
                     <p>{text}</p>
                   </article>
                 ))}
               </div>
 
-              <h2 id="what-holds-what">What holds what</h2>
-              {/*
-                BQ-136. Four names and what each one holds is a definition list.
-
-                It was four cards in a two-column grid, each with an <h2> inside it -- so the
-                page's heading outline carried "The browser", "Object storage", "The
-                application" and "The database" as siblings of its real sections, and a
-                reader walking the page by heading met four nouns with no question above them.
-                A <dl> says the relationship the cards were drawing: this term, that
-                definition. `.connector-legend` is the same list /integrations uses for the
-                same shape, so this adds no CSS.
-              */}
-              <dl className="connector-legend">
-                {PATH.map(([name, text]) => (
-                  <div key={name}>
-                    <dt>{name}</dt>
-                    <dd>{text}</dd>
-                  </div>
-                ))}
-              </dl>
-
-              {/*
-                BA-155. One grid, not a controls grid followed by a section labelled "NOT ANSWERED
-                HERE" holding exactly one card that opened with "Not yet answered." The structure
-                itself was declaring a hole, and a grid of one is a grid that looks broken.
-
-                Nothing was deleted to close it: both rows are still here, in the same order, with
-                every absence they carried, and each now leads with the fact that is on record.
-                What replaced the label is a sentence that says what the two rows are.
-
-                They stay their own grid rather than joining the controls grid, and the reason is
-                `.tiles > :last-child:nth-child(odd)` in `tavonel.css`: eleven controls plus two
-                rows is thirteen, and the thirteenth would be stretched to the full width of the
-                section -- which is the defect BA-151 is about, one section further down the page.
-                Two tiles is an even grid. `trust-page-answers.test.ts` still holds both rows'
-                contents, and both `CONTROLS.map` and `UNANSWERED.map` are still what renders.
-              */}
-              <h2 id="controls">Controls</h2>
+              <h2 id="controls">Controls customers can rely on</h2>
               <div className="tiles">
                 {CONTROLS.map(([title, body]) => (
                   <article className="tile" key={title}>
@@ -272,105 +72,23 @@ export default function SecurityPage() {
                   </article>
                 ))}
               </div>
+
+              <h2 id="assurance">Assurance and review</h2>
               <p>
-                The two rows below are the questions a review asks that this deployment answers
-                with a record rather than with a commitment.
-              </p>
-              <div className="tiles">
-                {UNANSWERED.map(([title, body]) => (
-                  <article className="tile" key={title} data-unanswered="1">
-                    <h3>{title}</h3>
-                    <p>{body}</p>
-                  </article>
-                ))}
-              </div>
-
-{/*
-                BA-151 and BA-152.
-
-                BA-151: five tiles in a two-column grid left the fifth stretched across the full
-                width by `.status-list > :last-child:nth-child(odd)`, so the one capability that
-                is off -- compiling customer data -- was the largest object in the section, on the
-                security page of a knowledge compiler. The four controls a customer can rely on now
-                fill the grid evenly and the workspace-activation row is prose underneath it, which
-                is also what BA-151 asks for. No tile can be promoted to hero size by an odd count
-                again, because the count is even and the exception is stated below in words.
-
-                BA-152: one amber HUMAN GATE badge was carrying two opposite meanings -- a designed
-                human decision point we sell, and an activation that has not happened. They are two
-                states now. BY DESIGN takes the `operational` colour because a human gate that is
-                working is a control that is working, not a degradation; the row that is off is the
-                one in prose, and it says "on request" there in words rather than in a badge.
-              */}
-              {/*
-                G2-021 / SD-11. "Global infrastructure; may process outside Korea" was the only
-                answer this page gave about location, and it gave it for every component at once
-                -- including the two that actually touch document bytes, which are the two a
-                reviewer is asking about. "We do not guarantee residency" and "we will not say
-                where" are different statements and only the first is defensible.
-
-                Every value in the table is read from configuration in `lib/trust-disclosures.ts`,
-                and the one component no configuration pins says so rather than being given a
-                plausible region.
-              */}
-              <h2 id="regions">Where the work happens</h2>
-              <p>
-                No data residency is guaranteed, and that is a separate statement from where the
-                work is configured to run. Below is the second one. Which provider is permitted to
-                process which class of data is on the{" "}
-                <Link href={"/subprocessors" as Route}>subprocessors page</Link>.
-              </p>
-              <ProcessingRegionTable />
-
-              {/*
-                G2-004 / G2-023 / G2-028. The same checklist /trust and /enterprise render, from
-                one module, so a reviewer who starts on any of the three reads the same answers.
-              */}
-              {/*
-                It folds here and nowhere else, and G2-041 is the reason. This page was already
-                8,007 CSS px on a phone, the controls and the two record rows above it already
-                state seven of these sixteen answers in full, and adding the list open took it
-                past thirty phone screens. `status-fold` is the pattern this site uses for a long
-                technical list a reader either wants in full or does not want at all -- /sources
-                folds its tier legend, /benchmarks folds its receipt schema.
-
-                What may not happen is the summary hiding what is inside it. It names all three
-                states, so a reader who never opens it has still been told that some of these
-                answers are "not in place".
-              */}
-              <h2 id="review">What a security review will find</h2>
-              <details className="status-fold">
-                <summary>The full checklist: what is in place, what is planned, and what is not in place</summary>
-                <TrustDisclosures on="/security" heading="In the order a review asks them" />
-              </details>
-
-              <h2 id="deployment">Current deployment controls</h2>
-              <div className="status-list">
-                {Object.entries(activationPolicy)
-                  .filter(([key]) => key !== "customerData")
-                  .map(([key, value]) => (
-                    <article key={key} data-state="operational">
-                      <span>{value.enabled ? "enabled" : "by design"}</span>
-                      <h2>{CAPABILITY_LABELS[key as keyof typeof CAPABILITY_LABELS]}</h2>
-                      <p>{value.reason}</p>
-                    </article>
-                  ))}
-              </div>
-              <p className="fine">
-                {CAPABILITY_LABELS.customerData} is enabled per workspace on request, not by a
-                checkout: {activationPolicy.customerData.reason}
+                Public privacy, subprocessor and disclosure records are maintained in the{" "}
+                <Link href={"/trust" as Route}>Trust Center</Link>. A qualified review can also
+                receive the architecture, control evidence and questionnaire responses relevant
+                to its deployment under an appropriate review process.
               </p>
               <p className="fine">
-                Activation is closed by design: a candidate world becomes active only after an
-                authenticated person approves it. Retention and deletion are set out step by step
-                in the <Link href={"/privacy" as Route}>privacy notice</Link>. A security review or
-                a vulnerability report reaches us through{" "}
-                {/* BQ-134: a link named "here" says nothing out of its sentence, and a screen
-                    reader's link list is exactly that. */}
-                <Link href={"/contact" as Route}>the contact page</Link>.
+                Retention and deletion are described in the{" "}
+                <Link href={"/privacy" as Route}>privacy notice</Link>. Security questions and
+                responsible disclosure reports can be sent through the{" "}
+                <Link href={"/contact" as Route}>contact page</Link>.
               </p>
 
               <div className="actions">
+                <Link className="btn" href={"/trust" as Route}>Open the Trust Center</Link>
                 <Link className="btn ghost" href={"/subprocessors" as Route}>Subprocessors</Link>
               </div>
             </div>

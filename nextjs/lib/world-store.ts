@@ -28,10 +28,12 @@ export type WorldVersionRow = {
 };
 
 type WorldMutation = {
+  operationId: string;
   workspaceKey: string;
   collectionId: string;
   actorUserId: string;
   expectedCurrentManifest: string | null;
+  expectedCurrentRevision: number;
   reason: string;
 };
 
@@ -52,11 +54,19 @@ function validReason(reason: string) {
 
 function validMutationBase(value: WorldMutation) {
   return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value.operationId
+    ) &&
     WORKSPACE_ID_PATTERN.test(value.workspaceKey) &&
     COLLECTION_ID_PATTERN.test(value.collectionId) &&
     /^[0-9a-f-]{36}$/i.test(value.actorUserId) &&
+    Number.isSafeInteger(value.expectedCurrentRevision) &&
+    value.expectedCurrentRevision >= 0 &&
     (value.expectedCurrentManifest === null ||
       SHA256.test(value.expectedCurrentManifest)) &&
+    (value.expectedCurrentManifest === null
+      ? value.expectedCurrentRevision === 0
+      : value.expectedCurrentRevision > 0) &&
     validReason(value.reason)
   );
 }
@@ -128,16 +138,110 @@ export function validateRollbackWorldMutation(value: RollbackWorldMutation) {
   return validMutationBase(value) && SHA256.test(value.targetManifestDigest);
 }
 
-async function rpc(name: string, body: Record<string, unknown>) {
+type AtomicWorldTransitionResult = {
+  status: "applied" | "already_active" | "replayed";
+  action: "activate" | "rollback";
+  manifestDigest: string;
+  revision: number;
+  operationId: string;
+  eventId: string;
+  requestSha256: string;
+  receiptSha256: string;
+};
+
+type WorldTransitionErrorCode =
+  | "ACTIVE_WORLD_CONFLICT"
+  | "AUTHORIZATION_CHANGED_RETRY"
+  | "ROLLBACK_TARGET_CONFLICT"
+  | "ROLLBACK_TARGET_NOT_FOUND"
+  | "WORLD_TRANSITION_FORBIDDEN"
+  | "WORLD_TRANSITION_IDEMPOTENCY_CONFLICT"
+  | "WORLD_VERSION_BINDING_CONFLICT"
+  | "WORLD_STORE_WRITE_FAILED";
+
+function transitionErrorCode(message: string): WorldTransitionErrorCode {
+  if (message.includes("world_transition_compare_and_swap_conflict"))
+    return "ACTIVE_WORLD_CONFLICT";
+  if (message.includes("world_active_pointer_missing"))
+    return "ACTIVE_WORLD_CONFLICT";
+  if (message.includes("world_transition_idempotency_conflict"))
+    return "WORLD_TRANSITION_IDEMPOTENCY_CONFLICT";
+  if (message.includes("world_transition_authorization_changed"))
+    return "AUTHORIZATION_CHANGED_RETRY";
+  if (message.includes("world_transition_forbidden"))
+    return "WORLD_TRANSITION_FORBIDDEN";
+  if (message.includes("world_rollback_target_missing"))
+    return "ROLLBACK_TARGET_NOT_FOUND";
+  if (message.includes("world_rollback_target_state_conflict"))
+    return "ROLLBACK_TARGET_CONFLICT";
+  if (message.includes("world_version_immutable_binding_conflict"))
+    return "WORLD_VERSION_BINDING_CONFLICT";
+  return "WORLD_STORE_WRITE_FAILED";
+}
+
+function validAtomicTransitionResult(
+  value: unknown,
+  request: WorldMutation,
+  action: "activate" | "rollback",
+  targetManifestDigest: string
+): value is AtomicWorldTransitionResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<AtomicWorldTransitionResult>;
+  const revision = Number(result.revision);
+  return (
+    (result.status === "applied" ||
+      result.status === "already_active" ||
+      result.status === "replayed") &&
+    result.action === action &&
+    result.manifestDigest === targetManifestDigest &&
+    result.operationId === request.operationId &&
+    /^[0-9a-f-]{36}$/i.test(result.eventId ?? "") &&
+    SHA256.test(result.requestSha256 ?? "") &&
+    SHA256.test(result.receiptSha256 ?? "") &&
+    Number.isSafeInteger(revision) &&
+    (revision === request.expectedCurrentRevision ||
+      revision === request.expectedCurrentRevision + 1)
+  );
+}
+
+async function transitionRpc(
+  value: WorldMutation,
+  action: "activate" | "rollback",
+  targetManifestDigest: string,
+  bindings: {
+    candidateObjectKey: string | null;
+    worldStateId: string | null;
+    coreOutputSha256: string | null;
+  }
+) {
   const config = readSupabaseAdminConfig();
   if (!config)
     return { ok: false as const, code: "WORLD_STORE_NOT_CONFIGURED" };
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, `/rest/v1/rpc/${name}`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    response = await supabaseAdminRequest(
+      config,
+      "/rest/v1/rpc/transition_foundation_world_atomic",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          p_operation_id: value.operationId,
+          p_action: action,
+          p_workspace_key: value.workspaceKey,
+          p_collection_id: value.collectionId,
+          p_target_manifest_digest: targetManifestDigest,
+          p_candidate_object_key: bindings.candidateObjectKey,
+          p_world_state_id: bindings.worldStateId,
+          p_core_output_sha256: bindings.coreOutputSha256,
+          p_expected_current_state:
+            value.expectedCurrentManifest === null ? "empty" : "active",
+          p_expected_current_revision: value.expectedCurrentRevision,
+          p_expected_current_manifest_digest: value.expectedCurrentManifest,
+          p_actor_user_id: value.actorUserId,
+          p_reason: value.reason.trim(),
+        }),
+      }
+    );
   } catch {
     return { ok: false as const, code: "WORLD_STORE_WRITE_FAILED" };
   }
@@ -146,46 +250,34 @@ async function rpc(name: string, body: Record<string, unknown>) {
       message?: unknown;
     } | null;
     const message = typeof error?.message === "string" ? error.message : "";
-    if (message.includes("world_active_pointer_conflict")) {
-      return { ok: false as const, code: "ACTIVE_WORLD_CONFLICT" };
-    }
-    if (message.includes("world_rollback_target_missing")) {
-      return { ok: false as const, code: "ROLLBACK_TARGET_NOT_FOUND" };
-    }
-    return { ok: false as const, code: "WORLD_STORE_WRITE_FAILED" };
+    return { ok: false as const, code: transitionErrorCode(message) };
   }
+  const result = (await response.json().catch(() => null)) as unknown;
+  if (!validAtomicTransitionResult(result, value, action, targetManifestDigest))
+    return { ok: false as const, code: "WORLD_STORE_WRITE_FAILED" };
   return {
     ok: true as const,
-    result: (await response.json()) as Record<string, unknown>,
+    result,
   };
 }
 
 export async function promoteFoundationCandidate(value: PromoteWorldMutation) {
   if (!validatePromoteWorldMutation(value))
     return { ok: false as const, code: "WORLD_PROMOTION_INVALID" };
-  return rpc("promote_foundation_candidate", {
-    p_workspace_key: value.workspaceKey,
-    p_collection_id: value.collectionId,
-    p_manifest_digest: value.manifestDigest,
-    p_candidate_object_key: value.candidateObjectKey,
-    p_world_state_id: value.worldStateId,
-    p_core_output_sha256: value.coreOutputSha256,
-    p_actor_user_id: value.actorUserId,
-    p_expected_current_manifest: value.expectedCurrentManifest,
-    p_reason: value.reason.trim(),
+  return transitionRpc(value, "activate", value.manifestDigest, {
+    candidateObjectKey: value.candidateObjectKey,
+    worldStateId: value.worldStateId,
+    coreOutputSha256: value.coreOutputSha256,
   });
 }
 
 export async function rollbackFoundationWorld(value: RollbackWorldMutation) {
   if (!validateRollbackWorldMutation(value))
     return { ok: false as const, code: "WORLD_ROLLBACK_INVALID" };
-  return rpc("rollback_foundation_world", {
-    p_workspace_key: value.workspaceKey,
-    p_collection_id: value.collectionId,
-    p_target_manifest_digest: value.targetManifestDigest,
-    p_expected_current_manifest: value.expectedCurrentManifest,
-    p_actor_user_id: value.actorUserId,
-    p_reason: value.reason.trim(),
+  return transitionRpc(value, "rollback", value.targetManifestDigest, {
+    candidateObjectKey: null,
+    worldStateId: null,
+    coreOutputSha256: null,
   });
 }
 

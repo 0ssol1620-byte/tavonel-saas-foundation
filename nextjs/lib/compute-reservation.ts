@@ -5,6 +5,13 @@ import { quoteCompilePages } from "./usage-pricing";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const OUTCOMES = new Set(["settled", "operator_review", "released"]);
 const BILLING_SOURCES = new Set(["paid", "trial", "owner"]);
+const MAX_RESERVATION_LIFETIME_MS = 15 * 60 * 1000;
+
+function usableReservationExpiry(value: unknown, now = Date.now()) {
+  if (typeof value !== "string") return false;
+  const expiresAt = Date.parse(value);
+  return Number.isFinite(expiresAt) && expiresAt > now && expiresAt <= now + MAX_RESERVATION_LIFETIME_MS;
+}
 
 function errorCode(message: string) {
   const mappings = [
@@ -80,7 +87,7 @@ export async function reserveFoundationCompute(value: {
   if (!result || !UUID.test(String(result.reservationId ?? "")) || result.documentId !== value.documentId
     || result.state !== "reserved" || result.reservedCredits !== quote.standardUnits
     || result.maximumCredits !== quote.maximumUnits || !BILLING_SOURCES.has(billingSource)
-    || typeof result.expiresAt !== "string" || !Number.isFinite(Date.parse(result.expiresAt))) {
+    || !usableReservationExpiry(result.expiresAt)) {
     return { ok: false as const, code: "COMPUTE_RESERVATION_RECEIPT_INVALID" };
   }
   return {
@@ -133,8 +140,14 @@ export async function settleFoundationCompute(value: {
     return { ok: false as const, code: errorCode(typeof body?.message === "string" ? body.message : "") };
   }
   const result = await response.json().catch(() => null) as Record<string, unknown> | null;
-  if (!result || !["processed", "duplicate"].includes(String(result.status ?? ""))
-    || !UUID.test(String(result.reservationId ?? ""))) {
+  const status = String(result?.status ?? "");
+  const billingSource = String(result?.billingSource ?? "");
+  const processedReceiptMatches = status === "processed"
+    && result?.state === value.outcome
+    && result?.settledCredits === value.actualCredits;
+  if (!result || !UUID.test(String(result.reservationId ?? ""))
+    || !BILLING_SOURCES.has(billingSource)
+    || (status !== "duplicate" && !processedReceiptMatches)) {
     return { ok: false as const, code: "COMPUTE_SETTLEMENT_RECEIPT_INVALID" };
   }
   return { ok: true as const, result };

@@ -1,12 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FOUNDATION_R2_BUCKET,
+  assertFoundationDeletionKey,
+  deleteFoundationSourceObject,
+  inspectFoundationSourceObject,
   assertFoundationSyntheticKey,
   authorizeSyntheticCanary,
   foundationQuarantineRejectKey,
   readR2SignerEnv,
   validateCdrRejectReceipt,
 } from "./r2-synthetic-canary";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("r2 synthetic canary guards", () => {
   it("refuses a missing signer env", () => {
@@ -23,6 +28,60 @@ describe("r2 synthetic canary guards", () => {
     expect(authorizeSyntheticCanary(null, "token-value-ok")).toBe(false);
     expect(authorizeSyntheticCanary("Bearer token-value-ok", "token-value-ok")).toBe(true);
     expect(authorizeSyntheticCanary("Bearer token-value-no", "token-value-ok")).toBe(false);
+  });
+
+  it("allows deletion only inside the named workspace quarantine or immutable prefix", () => {
+    const workspace = "pilot-969dc192daa24119";
+    expect(assertFoundationDeletionKey(FOUNDATION_R2_BUCKET, workspace,
+      `quarantine/${workspace}/doc-1/source`)).toBeNull();
+    expect(assertFoundationDeletionKey(FOUNDATION_R2_BUCKET, workspace,
+      `immutable/${workspace}/${workspace}/doc-1/${"a".repeat(64)}/sanitized.pdf`)).toBeNull();
+    expect(assertFoundationDeletionKey(FOUNDATION_R2_BUCKET, workspace,
+      "quarantine/another-workspace/doc-1/source")).toBe("SOURCE_DELETION_KEY_OUTSIDE_WORKSPACE");
+    expect(assertFoundationDeletionKey(FOUNDATION_R2_BUCKET, workspace,
+      `quarantine/${workspace}/../other/source`)).toBe("SOURCE_DELETION_KEY_INVALID");
+  });
+
+  it("HEADs before deletion and treats a missing object as an idempotent success", async () => {
+    const workspace = "pilot-969dc192daa24119";
+    const key = `quarantine/${workspace}/doc-1/source`;
+    const env = { accountId: "account", bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "access", secretAccessKey: "secret" };
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(null, { status: 404 }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(inspectFoundationSourceObject(env, workspace, key))
+      .resolves.toEqual({ ok: true, exists: false });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: "HEAD" });
+  });
+
+  it.each([204, 404])("accepts DELETE %s after the durable begin transition", async deleteStatus => {
+    const workspace = "pilot-969dc192daa24119";
+    const key = `quarantine/${workspace}/doc-1/source`;
+    const env = { accountId: "account", bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "access", secretAccessKey: "secret" };
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(null, { status: deleteStatus }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(deleteFoundationSourceObject(env, workspace, key)).resolves.toEqual({
+      ok: true, alreadyAbsent: deleteStatus === 404,
+    });
+    expect(fetcher.mock.calls.map(call => call[1]?.method)).toEqual(["DELETE"]);
+  });
+
+  it("does not issue DELETE when HEAD is ambiguous", async () => {
+    const workspace = "pilot-969dc192daa24119";
+    const key = `quarantine/${workspace}/doc-1/source`;
+    const env = { accountId: "account", bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "access", secretAccessKey: "secret" };
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(null, { status: 503 }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(inspectFoundationSourceObject(env, workspace, key)).resolves.toEqual({
+      ok: false, code: "SOURCE_DELETE_HEAD_FAILED",
+    });
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 });
 

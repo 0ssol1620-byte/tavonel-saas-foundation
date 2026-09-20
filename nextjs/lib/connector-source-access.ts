@@ -24,6 +24,51 @@ export async function suspendConnectorSource(input: {
   } catch { return { ok: false, code: "CONNECTOR_SOURCE_SUSPENSION_UNRESOLVED" }; }
 }
 
+/**
+ * Records a provider deletion through the database's legal-hold gate.
+ *
+ * The source suspension is deliberately separate and should be written first: an active legal
+ * hold preserves bytes but must not leave the source queryable. This call never treats an
+ * unreadable policy as inactive. The database returns the same receipt on an identical retry.
+ */
+export async function requestConnectorSourceDeletion(input: {
+  workspaceKey: string; connectionId: string; provider: OAuthConnectorProvider; nativeId: string;
+  reason: "provider_deleted" | "provider_inaccessible";
+}): Promise<{ ok: true; receiptId: string; replayed: boolean; held: boolean } | { ok: false; code: string }> {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false, code: "SOURCE_DELETION_STORE_UNAVAILABLE" };
+  try {
+    const { sourceId } = await connectorSourceIdentity({ ...input, revision: "deletion-identity-only" });
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/request_connector_source_deletion", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: input.workspaceKey,
+        p_source_id: sourceId,
+        p_oauth_connection_id: input.connectionId,
+        p_provider: input.provider,
+        p_reason: input.reason,
+      }),
+    });
+    if (!response.ok) {
+      let code = "SOURCE_DELETION_WRITE_FAILED";
+      try {
+        const body = await response.json() as { message?: unknown };
+        if (typeof body.message === "string" && /^(SOURCE_LEGAL_HOLD_ACTIVE|SOURCE_LEGAL_HOLD_STATE_UNKNOWN)$/.test(body.message)) code = body.message;
+      } catch { /* stable fallback */ }
+      return { ok: false, code };
+    }
+    const value: unknown = await response.json();
+    if (!value || typeof value !== "object") return { ok: false, code: "SOURCE_DELETION_RECEIPT_INVALID" };
+    const receiptId = (value as Record<string, unknown>).receiptId;
+    const status = (value as Record<string, unknown>).status;
+    if (typeof receiptId !== "string" || !/^sha256:[a-f0-9]{64}$/.test(receiptId) ||
+        (status !== "recorded" && status !== "replayed" && status !== "held")) {
+      return { ok: false, code: "SOURCE_DELETION_RECEIPT_INVALID" };
+    }
+    return { ok: true, receiptId, replayed: status === "replayed", held: status === "held" };
+  } catch { return { ok: false, code: "SOURCE_DELETION_WRITE_FAILED" }; }
+}
+
 export async function checkConnectorSourceAccess(workspaceKey: string, documentIds: string[]): Promise<
   { ok: true } | { ok: false; code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" | "CONNECTOR_SOURCE_ACCESS_DENIED" }
 > {

@@ -9,6 +9,7 @@ export type OAuthAuthorizationRecord = {
   redirectUri: string;
   requestedScopes: string[];
   userId: string;
+  authorizationRevision: number;
 };
 
 export type OAuthConnection = {
@@ -70,6 +71,7 @@ export async function createOAuthAuthorization(input: {
   pkceVerifierReference: string;
   redirectUri: string;
   requestedScopes: readonly string[];
+  authorizationRevision: number;
 }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
@@ -87,6 +89,7 @@ export async function createOAuthAuthorization(input: {
         redirect_uri: input.redirectUri,
         requested_scopes: input.requestedScopes,
         created_by: input.userId,
+        authorization_revision: input.authorizationRevision,
         expires_at: expiresAt,
       }),
     });
@@ -119,7 +122,7 @@ export async function consumeOAuthAuthorization(stateSha256: string, provider: O
       body: JSON.stringify({ p_state_sha256: stateSha256, p_provider: provider }),
     });
     const row = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes)) {
+    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes) || !Number.isSafeInteger(row.authorizationRevision) || Number(row.authorizationRevision) < 1) {
       return { ok: false as const, code: "OAUTH_AUTHORIZATION_INVALID" };
     }
     return { ok: true as const, authorization: row as unknown as OAuthAuthorizationRecord };
@@ -159,36 +162,35 @@ export async function createOAuthConnection(input: {
   grantedScopes: string[];
   clientSecretReference: string;
   refreshTokenReference: string;
+  authorizationRevision: number;
 }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
   try {
-    const response = await supabaseAdminRequest(config, "/rest/v1/foundation_oauth_connections?select=oauth_connection_id,provider,display_name,provider_account_id,provider_account_label,granted_scopes,status,cursor_sha256,last_sync_at,last_error_code,created_at,updated_at", {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/create_foundation_oauth_connection_authorized", {
       method: "POST",
-      headers: { Prefer: "return=representation" },
       body: JSON.stringify({
-        workspace_key: input.workspaceKey,
-        provider: input.provider,
-        display_name: input.displayName,
-        provider_account_id: input.providerAccountId,
-        provider_account_label: input.providerAccountLabel,
-        granted_scopes: input.grantedScopes,
-        client_secret_reference: input.clientSecretReference,
-        refresh_token_reference: input.refreshTokenReference,
-        created_by: input.userId,
-        updated_by: input.userId,
+        p_workspace_key: input.workspaceKey,
+        p_actor_user_id: input.userId,
+        p_authorization_revision: input.authorizationRevision,
+        p_provider: input.provider,
+        p_display_name: input.displayName,
+        p_provider_account_id: input.providerAccountId,
+        p_provider_account_label: input.providerAccountLabel,
+        p_granted_scopes: input.grantedScopes,
+        p_client_secret_reference: input.clientSecretReference,
+        p_refresh_token_reference: input.refreshTokenReference,
       }),
     });
-    if (!response.ok) return { ok: false as const, code: response.status === 409 ? "OAUTH_CONNECTION_EXISTS" : "OAUTH_CONNECTION_CREATE_FAILED" };
-    const connection = parseOAuthConnection(((await response.json()) as Array<Record<string, unknown>>)[0] ?? {});
-    if (!connection) return { ok: false as const, code: "OAUTH_STORE_BINDING_INVALID" };
-    if (!await insertOAuthAudit(input.workspaceKey, input.userId, "oauth_connection_created", connection.oauthConnectionId, { provider: input.provider })) {
-      await supabaseAdminRequest(config, `/rest/v1/foundation_oauth_connections?oauth_connection_id=eq.${connection.oauthConnectionId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "revoked", revoked_at: new Date().toISOString(), updated_by: input.userId, updated_at: new Date().toISOString() }),
-      }).catch(() => undefined);
-      return { ok: false as const, code: "DEVELOPER_AUDIT_WRITE_FAILED" };
+    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok) {
+      const message = typeof payload?.message === "string" ? payload.message : "";
+      return { ok: false as const, code: message.includes("oauth_authorization_changed")
+        ? "OAUTH_AUTHORIZATION_CHANGED"
+        : response.status === 409 ? "OAUTH_CONNECTION_EXISTS" : "OAUTH_CONNECTION_CREATE_FAILED" };
     }
+    const connection = parseOAuthConnection(payload ?? {});
+    if (!connection) return { ok: false as const, code: "OAUTH_STORE_BINDING_INVALID" };
     return { ok: true as const, connection };
   } catch {
     return { ok: false as const, code: "OAUTH_CONNECTION_CREATE_FAILED" };

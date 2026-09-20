@@ -88,7 +88,7 @@ async function runOneBatch(request: Request) {
   // job when it reports; the queue reclaims it if this invocation dies outright.
   const claimed = await claimJob(workerId, 180, ["source_import"]);
   if (!claimed.ok) return NextResponse.json({ code: claimed.code, compiles }, { status: 503, headers: HEADERS });
-  if (!claimed.value) return NextResponse.json({ code: "OK", claimed: false, compiles }, { headers: HEADERS });
+  if (!claimed.value) return NextResponse.json({ code: "OK", claimed: false, compiles }, { status: 200, headers: HEADERS });
 
   const job = claimed.value;
   const result = await runSourceImportBatch(job, workerId);
@@ -104,7 +104,7 @@ async function runOneBatch(request: Request) {
     attempt: job.attempt,
     outcome: result.ok ? result.value : { error: result.code },
     compiles,
-  }, { headers: HEADERS });
+  }, { status: 200, headers: HEADERS });
 }
 
 export const GET = runOneBatch;

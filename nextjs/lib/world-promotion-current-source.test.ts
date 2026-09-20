@@ -92,7 +92,13 @@ function request() {
   return new Request(`https://tavonel.com/api/collections/${artifact.collectionId}/promote`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer session" },
-    body: JSON.stringify({ manifestDigest: artifact.manifestDigest, expectedCurrentManifest: null, reason: "Reviewed exact evidence." }),
+    body: JSON.stringify({
+      operationId: "11111111-1111-4111-8111-111111111111",
+      manifestDigest: artifact.manifestDigest,
+      expectedCurrentManifest: null,
+      expectedCurrentRevision: 0,
+      reason: "Reviewed exact evidence.",
+    }),
   });
 }
 

@@ -7,6 +7,7 @@ import {
   trialFeatureBlocked,
   type SessionAccessSource,
 } from "./self-service-trial";
+import { getWorkspaceMembership, type WorkspaceRole } from "./workspace-membership";
 
 export type FoundationPrincipal = {
   kind: "session" | "api-key";
@@ -15,7 +16,23 @@ export type FoundationPrincipal = {
   keyId?: string;
   scopes: readonly DeveloperScope[];
   accessSource?: SessionAccessSource;
+  authorizationRevision: number;
+  workspaceRole: WorkspaceRole;
+  email?: string;
 };
+
+async function resolveWorkspaceAuthority(workspaceKey: string, userId: string) {
+  const found = await getWorkspaceMembership(workspaceKey, userId);
+  if (!found.ok) return found;
+  if (!found.membership || found.membership.state !== "active") {
+    return { ok: false as const, code: "WORKSPACE_MEMBERSHIP_REQUIRED", status: 403 };
+  }
+  return {
+    ok: true as const,
+    authorizationRevision: found.membership.authorizationRevision,
+    workspaceRole: found.membership.role,
+  };
+}
 
 /*
   Requests per clock minute, per key, per scope.
@@ -68,13 +85,24 @@ async function resolveFoundationAuthorization(
     if (!authenticated.principal.scopes.includes(scope)) {
       return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
     }
-    const principal: FoundationPrincipal = {
-      ...authenticated.principal, scopes: [...authenticated.principal.scopes],
-    };
-    const pilot = foundationPilotAccess(principal.userId);
-    if (!pilot || pilot.membership.workspaceId !== principal.workspaceKey) {
+    const pilot = foundationPilotAccess(authenticated.principal.userId);
+    if (!pilot || pilot.membership.workspaceId !== authenticated.principal.workspaceKey) {
       return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
     }
+    const authority = await resolveWorkspaceAuthority(
+      authenticated.principal.workspaceKey,
+      authenticated.principal.userId,
+    );
+    if (!authority.ok) return authority;
+    if (authenticated.principal.authorizationRevision !== authority.authorizationRevision) {
+      return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
+    }
+    const principal: FoundationPrincipal = {
+      ...authenticated.principal,
+      scopes: [...authenticated.principal.scopes],
+      authorizationRevision: authority.authorizationRevision,
+      workspaceRole: authority.workspaceRole,
+    };
     const rate = consumeRate ? await consumeDeveloperApiRateLimit({
       keyId: principal.keyId!,
       workspaceKey: principal.workspaceKey,
@@ -98,6 +126,8 @@ async function resolveFoundationAuthorization(
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
   const access = foundationPilotAccess(user.id);
   if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+  const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
+  if (!authority.ok) return authority;
   const productAccess = await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
   if (!productAccess.ok) {
     return { ok: false as const, code: productAccess.code, status: productAccess.status };
@@ -111,6 +141,9 @@ async function resolveFoundationAuthorization(
     userId: user.id,
     scopes: [scope],
     accessSource: productAccess.access.source,
+    authorizationRevision: authority.authorizationRevision,
+    workspaceRole: authority.workspaceRole,
+    email: typeof user.email === "string" ? user.email : undefined,
   };
   return { ok: true as const, principal };
 }
@@ -127,6 +160,8 @@ export async function revalidateFoundationAuthorization(
   const identity = (principal: FoundationPrincipal) => JSON.stringify([
     principal.kind, principal.workspaceKey, principal.userId, principal.keyId ?? null,
     [...principal.scopes].sort(), principal.accessSource ?? null,
+    principal.authorizationRevision,
+    principal.workspaceRole,
   ]);
   if (identity(current.principal) !== identity(expected)) {
     return { ok: false as const, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 };
@@ -139,6 +174,8 @@ export async function requireFoundationSession(request: Request, minimumPlan: "o
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
   const access = foundationPilotAccess(user.id);
   if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+  const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
+  if (!authority.ok) return authority;
   const productAccess = await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
   if (!productAccess.ok) {
     return { ok: false as const, code: productAccess.code, status: productAccess.status };
@@ -151,6 +188,28 @@ export async function requireFoundationSession(request: Request, minimumPlan: "o
       userId: user.id,
       scopes: [] as DeveloperScope[],
       accessSource: productAccess.access.source,
+      authorizationRevision: authority.authorizationRevision,
+      workspaceRole: authority.workspaceRole,
+      email: typeof user.email === "string" ? user.email : undefined,
     },
   };
+}
+
+/** Re-check a browser session, membership epoch, role, and product access before release. */
+export async function revalidateFoundationSession(
+  request: Request,
+  expected: FoundationPrincipal,
+  minimumPlan: "observer" | "studio" = "observer",
+) {
+  const current = await requireFoundationSession(request, minimumPlan);
+  if (!current.ok) return current;
+  const identity = (principal: FoundationPrincipal) => JSON.stringify([
+    principal.kind, principal.workspaceKey, principal.userId, principal.accessSource ?? null,
+    principal.email ?? null,
+    principal.authorizationRevision, principal.workspaceRole,
+  ]);
+  if (identity(current.principal) !== identity(expected)) {
+    return { ok: false as const, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 };
+  }
+  return current;
 }

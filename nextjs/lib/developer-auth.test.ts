@@ -8,6 +8,7 @@ const {
   authorizeFoundationSessionProduct,
   trialFeatureBlocked,
   consumeDeveloperApiRateLimit,
+  getWorkspaceMembership,
 } = vi.hoisted(() => ({
   authenticateDeveloperApiKey: vi.fn(),
   getRequestUser: vi.fn(),
@@ -16,12 +17,14 @@ const {
   authorizeFoundationSessionProduct: vi.fn(),
   trialFeatureBlocked: vi.fn(),
   consumeDeveloperApiRateLimit: vi.fn(),
+  getWorkspaceMembership: vi.fn(),
 }));
 
 vi.mock("./developer-store", () => ({ authenticateDeveloperApiKey, consumeDeveloperApiRateLimit }));
 vi.mock("./foundation-pilot", () => ({ getRequestUser, foundationPilotAccess }));
 vi.mock("./billing-product-access", () => ({ authorizeFoundationProduct }));
 vi.mock("./self-service-trial", () => ({ authorizeFoundationSessionProduct, trialFeatureBlocked }));
+vi.mock("./workspace-membership", () => ({ getWorkspaceMembership }));
 
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "./developer-auth";
 
@@ -35,6 +38,10 @@ describe("developer request authorization", () => {
     });
     trialFeatureBlocked.mockReturnValue(false);
     consumeDeveloperApiRateLimit.mockResolvedValue({ ok: true });
+    getWorkspaceMembership.mockResolvedValue({
+      ok: true,
+      membership: { state: "active", role: "owner", authorizationRevision: 7 },
+    });
     foundationPilotAccess.mockImplementation((userId: string) => ({
       membership: { workspaceId: userId === "user" ? "pilot-user" : "pilot-1234567890abcdef" },
     }));
@@ -49,6 +56,7 @@ describe("developer request authorization", () => {
         workspaceKey: "pilot-1234567890abcdef",
         userId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
         scopes: ["documents:read"],
+        authorizationRevision: 7,
       },
     });
     const result = await authorizeFoundationRequest(new Request("https://tavonel.com/api/v1/documents", {
@@ -68,7 +76,7 @@ describe("developer request authorization", () => {
   it("fails closed when the API key lacks the exact scope", async () => {
     authenticateDeveloperApiKey.mockResolvedValue({
       ok: true,
-      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["documents:read"] },
+      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["documents:read"], authorizationRevision: 7 },
     });
     const result = await authorizeFoundationRequest(new Request("https://tavonel.com/api/v1/collections/compile", {
       headers: { authorization: `Bearer tvnl_live_abcdefghijkl_${"a".repeat(43)}` },
@@ -81,7 +89,7 @@ describe("developer request authorization", () => {
   it("fails closed when the durable rate counter is unavailable", async () => {
     authenticateDeveloperApiKey.mockResolvedValue({
       ok: true,
-      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"] },
+      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"], authorizationRevision: 7 },
     });
     consumeDeveloperApiRateLimit.mockResolvedValue({ ok: false, code: "API_RATE_LIMIT_UNAVAILABLE" });
     const result = await authorizeFoundationRequest(new Request("https://tavonel.com/api/v1/ask", {
@@ -125,7 +133,7 @@ describe("developer request authorization", () => {
   it("revokes API access when the key creator leaves the pilot allowlist", async () => {
     authenticateDeveloperApiKey.mockResolvedValue({
       ok: true,
-      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "departed", scopes: ["documents:read"] },
+      principal: { kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "departed", scopes: ["documents:read"], authorizationRevision: 7 },
     });
     foundationPilotAccess.mockReturnValue(null);
     const result = await authorizeFoundationRequest(new Request("https://tavonel.com/api/v1/documents", {
@@ -137,7 +145,7 @@ describe("developer request authorization", () => {
 
   it("revalidates a key without spending a second rate allowance", async () => {
     authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
-      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"],
+      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"], authorizationRevision: 7,
     } });
     const request = new Request("https://tavonel.test/api/ask", {
       headers: { authorization: `Bearer ${["tvnl", "live", ""].join("_")}${"a".repeat(43)}` },
@@ -151,7 +159,7 @@ describe("developer request authorization", () => {
 
   it("refuses a revoked key during late authorization", async () => {
     authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
-      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"],
+      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"], authorizationRevision: 7,
     } });
     const request = new Request("https://tavonel.test/api/ask", {
       headers: { authorization: `Bearer ${["tvnl", "live", ""].join("_")}${"a".repeat(43)}` },
@@ -166,7 +174,7 @@ describe("developer request authorization", () => {
 
   it("does not mutate the original authorization when effective access changes", async () => {
     authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
-      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"],
+      kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user", scopes: ["ask:read"], authorizationRevision: 7,
     } });
     const request = new Request("https://tavonel.test/api/ask", {
       headers: { authorization: `Bearer ${["tvnl", "live", ""].join("_")}${"a".repeat(43)}` },
@@ -177,6 +185,49 @@ describe("developer request authorization", () => {
     expect(await revalidateFoundationAuthorization(request, initial.principal, "ask:read"))
       .toEqual({ ok: false, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 });
     expect(initial.principal.accessSource).toBe("paid");
+  });
+
+  it("rejects a key issued before a revoke and reinvite ABA cycle", async () => {
+    authenticateDeveloperApiKey.mockResolvedValue({
+      ok: true,
+      principal: {
+        kind: "api-key", keyId: "key", workspaceKey: "pilot-user", userId: "user",
+        scopes: ["documents:read"], authorizationRevision: 7,
+      },
+    });
+    getWorkspaceMembership.mockResolvedValue({
+      ok: true,
+      membership: { state: "active", role: "owner", authorizationRevision: 9 },
+    });
+    const result = await authorizeFoundationRequest(new Request("https://tavonel.test/api/v1/documents", {
+      headers: { authorization: `Bearer tvnl_live_abcdefghijkl_${"a".repeat(43)}` },
+    }), "documents:read");
+    expect(result).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect(consumeDeveloperApiRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("rejects an ABA membership change even when identity and role return to their original values", async () => {
+    getRequestUser.mockResolvedValue({ id: "user" });
+    const request = new Request("https://tavonel.test/api/ask");
+    const initial = await authorizeFoundationRequest(request, "ask:read");
+    if (!initial.ok) throw new Error("initial authorization failed");
+    expect(initial.principal.authorizationRevision).toBe(7);
+    getWorkspaceMembership.mockResolvedValue({
+      ok: true,
+      membership: { state: "active", role: "owner", authorizationRevision: 9 },
+    });
+    expect(await revalidateFoundationAuthorization(request, initial.principal, "ask:read"))
+      .toEqual({ ok: false, code: "AUTHORIZATION_CHANGED_RETRY", status: 403 });
+  });
+
+  it("fails closed when durable membership freshness cannot be read", async () => {
+    getRequestUser.mockResolvedValue({ id: "user" });
+    getWorkspaceMembership.mockResolvedValue({
+      ok: false, code: "WORKSPACE_MEMBERSHIP_READ_FAILED", status: 503,
+    });
+    expect(await authorizeFoundationRequest(new Request("https://tavonel.test/api/ask"), "ask:read"))
+      .toEqual({ ok: false, code: "WORKSPACE_MEMBERSHIP_READ_FAILED", status: 503 });
+    expect(authorizeFoundationSessionProduct).not.toHaveBeenCalled();
   });
 
   it("rejects a session that expires after work starts", async () => {

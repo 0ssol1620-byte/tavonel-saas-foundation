@@ -61,6 +61,68 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+## 2026-09-20 — Final public-route matrix and `/demo` paper contrast repair
+
+The frozen local production candidate was inspected on `/`, `/enterprise`, `/security`, `/trust`,
+and `/demo` at `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, plus a 1440px
+reduced-motion condition. The initial matrix contains 40 full-page captures. Every navigation
+returned HTTP 200 with zero horizontal overflow, broken images, console errors, or page errors.
+Aborted requests in the capture manifest are Next.js speculative RSC prefetches and two abandoned
+film loads; no displayed asset failed.
+
+Direct inspection found one release-blocking visual defect on `/demo`: the shared dark-ground text
+tokens made its wordmark, navigation, H1, section H2s, and evidence H3s nearly white on the warm
+paper route. Lighthouse confirmed 18 contrast failures, accessibility `0.96`, and a serious
+`color-contrast` failure. The fix is scoped to
+`nextjs/components/signed-product-demo.module.css`: the demo now maps its ink, muted, source, and
+verified colors to the existing paper-safe TAVONEL tokens, exposes the paper text ladder to global
+heading rules, and gives the shared header a paper-safe unscrolled and scrolled state only when it
+contains this demo.
+
+The final production rebuild generated 143/143 static pages. Fresh `/demo` captures at all seven
+required widths and reduced motion returned 200 with zero overflow, broken images, console errors,
+or page errors. Direct inspection at 1920, 1440, 390, 360, and reduced motion confirms the header
+and every H1/H2/H3 use dark paper-safe ink. Current-build three-run Lighthouse medians for
+`/trust` and `/demo` score `1.00` in performance, accessibility, best practices, and SEO;
+`color-contrast` scores `1.00` with zero failing elements on both routes. Focused contract/token
+tests pass 31/31, TypeScript passes, and `git diff --check` reports no whitespace error. The
+definitive full browser matrix finished with 1,607 passed, 431
+intentional project-specific skips, one transient `page.goto` `ERR_ABORTED` that passed on retry,
+and zero final failures; its immediate focused rerun passed 1/1.
+
+Evidence:
+
+- initial 40-route matrix and manifest: `nextjs/.chatgpt2codex/final-web-qa/evidence/`;
+- final eight-condition `/demo` matrix: `nextjs/.chatgpt2codex/final-web-qa/evidence/after-demo-final/`;
+- three-run Lighthouse reports: `nextjs/.chatgpt2codex/final-web-qa/evidence/lighthouse/`;
+- final-build three-run `/trust` and `/demo` Lighthouse reports:
+  `nextjs/.chatgpt2codex/final-web-qa/evidence/lighthouse-final-full/`;
+- final `/trust` and `/demo` accessibility reports:
+  `nextjs/.chatgpt2codex/final-web-qa/evidence/lighthouse-final/trust-accessibility.json` and
+  `nextjs/.chatgpt2codex/final-web-qa/evidence/lighthouse-final/demo-accessibility.json`;
+- definitive build receipt: `verification/final-e2e-3199/build-definitive.log`.
+
+Lighthouse 12.8 produced the `/`, `/enterprise`, and `/security` medians on the immediately
+preceding frozen production build, and the `/trust` and `/demo` medians on the final production
+build. Chrome's DevTools-throttled trace repeatedly failed before navigation with `NO_NAVSTART`, so
+the completed performance samples use provided throttling and are unthrottled local lab
+measurements, not field performance or release-budget evidence.
+
+| Route | Performance | Accessibility | Best practices | SEO | LCP | CLS | TBT |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/` | 1.00 | 1.00 | 1.00 | 1.00 | 535 ms | 0 | 0 ms |
+| `/enterprise` | 1.00 | 1.00 | 1.00 | 1.00 | 159 ms | 0 | 0 ms |
+| `/security` | 1.00 | 1.00 | 1.00 | 1.00 | 158 ms | 0 | 0 ms |
+| `/trust` final | 1.00 | 1.00 | 1.00 | 1.00 | 168 ms | 0 | 0 ms |
+| `/demo` before repair | 1.00 | 0.96 | 1.00 | 1.00 | 239 ms | 0 | 0 ms |
+| `/demo` final | 1.00 | 1.00 | 1.00 | 1.00 | 255 ms | 0 | 0 ms |
+
+This is local production-build, automated layout, accessibility, and direct visual evidence. It
+does not establish production deployment, customer evidence, benchmark qualification, or founder
+aesthetic acceptance.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
 ## 2026-09-10 — Odd public record-grid closure
 
 A full-page contact-sheet review of the production-build public route set found two remaining empty visual cells that geometry-only route checks had not classified: the final records on `/security` and `/status` occupied the left half of their two-column grids while the divider background painted the unused right half gray. The existing `/subprocessors` repair used the same component pattern, so the shared rule now makes the final odd record span the full grid on all three routes.

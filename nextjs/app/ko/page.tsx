@@ -40,7 +40,7 @@ export const dynamic = "force-dynamic";
 */
 export const metadata: Metadata = pageMetadata({
   title: `TAVONEL — ${KO_CHROME.tagline}`,
-  description: "TAVONEL은 지식 컴파일러입니다. 컴파일된 모든 결과는 읽어 온 페이지까지 되짚어 갈 수 있는 경로를 유지합니다. 공개 Compiled World를 지금 전체 열람할 수 있습니다.",
+  description: "완성된 공개 Compiled World를 살펴보고, 결과 하나를 정확한 원문 영역까지 따라가고, 변경 내용과 허용 원문 및 배포 경계를 확인한 뒤 직접 가진 원문을 논의하세요.",
   canonical: "/ko",
   languages: { ko: "/ko", en: "/", "x-default": "/" },
 });

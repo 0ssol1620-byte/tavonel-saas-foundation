@@ -49,12 +49,14 @@ export const DEFAULT_BASE_URL = "https://tavonel.com";
  * Separate from `SERVER_VERSION`, which is the API contract this speaks. A rebuild that changes
  * these bytes changes this; a change to what the API answers changes that.
  */
-export const DISTRIBUTION_VERSION = "2026.9.11.1";
+export const DISTRIBUTION_VERSION = "2026.9.20.1";
 export const API_VERSION_HEADER = "1";
 
 const COLLECTION_ID = /^collection-[a-f0-9]{32}$/;
 const STABLE_ID = /^[a-z-]+-[a-f0-9]{32}$/;
 const MAX_QUERY = 500;
+const SEARCH_LIMIT_MAX = 25;
+const PAGE_LIMIT_MAX = 50;
 
 const collectionProperty = {
   type: "string",
@@ -65,7 +67,8 @@ const collectionProperty = {
 /**
  * One pagination idiom for the whole surface.
  *
- * `search_world` already bounded its `limit` at 1 to 50, and the lens tools had no bound at all:
+ * `search_world` follows the API retrieval bound of 1 to 25. Lens and discovery pagination use
+ * 1 to 50, and the lens tools previously had no bound at all:
  * they fetched an entire World's objects, relations or evidence in one response and filtered
  * client-side. Reusing these two properties -- rather than inventing a second convention for the
  * lenses -- is what keeps "how do I page this" a question with one answer (audit X06).
@@ -73,7 +76,7 @@ const collectionProperty = {
  * Omitting `limit` still returns the whole lens, because defaulting to a page would silently
  * truncate a by-id lookup into NOT_FOUND for anything past the first page.
  */
-const limitProperty = { type: "integer", minimum: 1, maximum: 50 };
+const limitProperty = { type: "integer", minimum: 1, maximum: PAGE_LIMIT_MAX };
 const cursorProperty = {
   type: "string",
   description: "The last id from the previous page. Requires limit. Keyset, not an offset.",
@@ -143,7 +146,7 @@ export const TOOLS = [
       properties: {
         collectionId: collectionProperty,
         query: { type: "string", minLength: 3, maxLength: MAX_QUERY },
-        limit: { type: "integer", minimum: 1, maximum: 50 },
+        limit: { type: "integer", minimum: 1, maximum: SEARCH_LIMIT_MAX },
       },
       required: ["collectionId", "query"],
       additionalProperties: false,
@@ -306,8 +309,9 @@ export function validateInput(tool, input) {
       throw new Error(`INPUT_INVALID: ${key} must be 3 to ${MAX_QUERY} characters`);
     }
   }
-  if (value.limit !== undefined && (!Number.isInteger(value.limit) || value.limit < 1 || value.limit > 50)) {
-    throw new Error("INPUT_INVALID: limit must be an integer from 1 to 50");
+  const limitMax = tool.name === "search_world" ? SEARCH_LIMIT_MAX : PAGE_LIMIT_MAX;
+  if (value.limit !== undefined && (!Number.isInteger(value.limit) || value.limit < 1 || value.limit > limitMax)) {
+    throw new Error(`INPUT_INVALID: limit must be an integer from 1 to ${limitMax}`);
   }
   if (value.cursor !== undefined) {
     // A cursor is an id the previous page handed back, and it goes into a query string. The
@@ -327,6 +331,31 @@ export function validateInput(tool, input) {
     }
   }
   return value;
+}
+
+function object(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Validate the stable success envelope before an agent can treat a 2xx body as product data.
+ * Additive fields remain allowed; these are the required fields published in OpenAPI.
+ */
+export function validateSuccess(tool, payload) {
+  const name = tool.name;
+  const valid = object(payload) && (
+    (name === "list_sources" && Array.isArray(payload.documents)) ||
+    (name === "list_worlds" && payload.code === "COLLECTIONS_LISTED" && Array.isArray(payload.collections)) ||
+    (name === "get_world" && payload.code === "OK" && object(payload.model)) ||
+    (name === "search_world" && ["SEARCH_RESULTS", "SEARCH_EMPTY"].includes(payload.code) && payload.retrievalPath === "compiled-retrieval-v1" && object(payload.contextPacket) && Array.isArray(payload.degradations) && object(payload.activeWorld)) ||
+    (name === "ask_world" && ["GROUNDED_ANSWER", "ANSWER_ABSTAINED"].includes(payload.code) && typeof payload.answer === "string" && Array.isArray(payload.citations) && typeof payload.retrievalPath === "string" && object(payload.activeWorld)) ||
+    (name === "get_object" && payload.code === "OK" && Array.isArray(payload.objects)) ||
+    (name === "get_relation" && payload.code === "OK" && Array.isArray(payload.relations)) ||
+    (name === "get_evidence" && payload.code === "OK" && Array.isArray(payload.evidence)) ||
+    name === "download_package"
+  );
+  if (!valid) throw new Error(`API_SUCCESS_SCHEMA_INVALID: ${name}`);
+  return payload;
 }
 
 export function createClient({ baseUrl, apiKey, fetcher = fetch }) {
@@ -390,7 +419,7 @@ export function createServer({ call }) {
     const tool = byName.get(name);
     if (!tool) throw new Error(`TOOL_NOT_FOUND: ${name}`);
     const value = validateInput(tool, input);
-    const payload = await call(tool.request(value));
+    const payload = validateSuccess(tool, await call(tool.request(value)));
     return tool.select ? tool.select(payload, value) : payload;
   }
 

@@ -599,8 +599,8 @@ test("the closing action offers the reader their own sources", async ({ page }) 
   await page.goto("/explore");
   await expect(page.getByRole("heading", { name: "Try the same path with your own knowledge." })).toBeVisible();
   // G1-001 / SD-01: the primary action is ACCESS_CTA until checkout *and* customer data are open.
-  const status = await (await page.request.get("/api/status")).json();
-  const selfServe = status.liveCheckout === true && status.activationPolicy?.customerData?.enabled === true;
+  const status = await (await page.request.get("/api/status/v2")).json();
+  const selfServe = status.availableActions?.createAccount?.enabled === true;
   await expect(page.getByRole("link", { name: selfServe ? "Start with your files" : "Request access" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Connect a source" })).toBeVisible();
   /*

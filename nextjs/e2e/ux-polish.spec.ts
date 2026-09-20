@@ -93,12 +93,11 @@ test("Explore reaches the actual interactive instrument without a hero-length de
 test("product page shows the product path before secondary product surfaces", async ({ page }) => {
   // The primary CTA is now server-rendered. A browser route mock cannot change that
   // commercial state: read the actual public snapshot and verify both label and destination.
-  const statusResponse = await page.request.get("/api/status");
+  const statusResponse = await page.request.get("/api/status/v2");
   expect(statusResponse.ok()).toBe(true);
   const status = await statusResponse.json();
-  expect(typeof status.liveCheckout).toBe("boolean");
-  // G1-001 / SD-01: `isLiveCommerce` requires the customer-data gate as well as live checkout.
-  const expectedCta = status.liveCheckout && status.activationPolicy?.customerData?.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
+  expect(typeof status.availableActions?.createAccount?.enabled).toBe("boolean");
+  const expectedCta = status.availableActions.createAccount.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
   /*
     BQ-109 deleted `.product-flow`. /product printed the same four beats twice -- once as a
