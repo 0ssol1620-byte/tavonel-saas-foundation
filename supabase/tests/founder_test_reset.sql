@@ -17,9 +17,9 @@ select ok(
   'every non-terminal compile row is locked before reset proceeds'
 );
 
-select unlike(
-  pg_get_functiondef('public.founder_test_reset_assertions(text,uuid,text)'::regprocedure),
-  '%foundation_compile_jobs%updated_at%',
+select ok(
+  pg_get_functiondef('public.founder_test_reset_assertions(text,uuid,text)'::regprocedure)
+    not like '%foundation_compile_jobs%updated_at%',
   'compile safety has no stale-heartbeat exception'
 );
 
