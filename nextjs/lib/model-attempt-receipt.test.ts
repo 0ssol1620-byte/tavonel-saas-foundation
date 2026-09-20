@@ -284,7 +284,7 @@ describe("internal model-attempt receipts and public projection", () => {
 
   it("stores v2 admitted decisions and terminal outcomes as linked append-only records", () => {
     const migration = readFileSync(resolve(import.meta.dirname,
-      "../../supabase/migrations/20260920131400_model_attempt_lineage.sql"), "utf8");
+      "../../supabase/migrations/20260920132001_model_attempt_lineage.sql"), "utf8");
     expect(migration).toContain("tavonel.model_attempt_decision.v2");
     expect(migration).toContain("tavonel.model_attempt_outcome.v2");
     expect(migration).toMatch(/references public\.foundation_model_attempt_decisions \(attempt_id\)/i);
