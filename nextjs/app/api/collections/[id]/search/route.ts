@@ -3,7 +3,7 @@ import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import {
-  selectProductionRetrievalRuntime,
+  resolveConfiguredProductionRetrievalRuntime,
 } from "@/lib/retrieval-runtime-config";
 import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
 import { getFoundationActiveWorld, getWorldFreshness } from "@/lib/world-store";
@@ -76,7 +76,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // A missing GPU runtime is a degradation, not a failure: the pipeline falls back to
   // lexical + structure and reports it in `degradations`, so the caller can tell a
   // full-pipeline result from a degraded one instead of silently receiving weaker retrieval.
-  const runtime = selectProductionRetrievalRuntime(auth.principal.workspaceKey);
+  const indexStateAtAdmission = await readRetrievalIndexState({
+    workspaceKey: auth.principal.workspaceKey,
+    collectionId: id,
+    worldManifestDigest: active.world.manifestDigest,
+  });
+  const runtimeResolution = await resolveConfiguredProductionRetrievalRuntime({
+    workspaceKey: auth.principal.workspaceKey, collectionId: id,
+    endpoint: "search", query, indexStatus: indexStateAtAdmission.status,
+  });
+  if (!runtimeResolution.ok) {
+    return NextResponse.json({ code: "RETRIEVAL_RUNTIME_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
+  }
+  const runtime = runtimeResolution.runtime;
 
   const result = await runRetrievalPipeline({
     workspaceKey: auth.principal.workspaceKey,
@@ -85,6 +97,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     worldStateId: active.world.worldStateId,
     question: query,
     profile: runtime.profile,
+    routerDecision: runtime.routerDecision,
+    modelAttempt: runtime.controlPlaneLineage ? {
+      endpoint: "search",
+      modelRoute: runtime.decision,
+      controlPlaneLineage: runtime.controlPlaneLineage,
+    } : null,
     embedder: runtime.embedder,
     reranker: runtime.reranker,
     contextLimit: requestedLimit,
@@ -108,13 +126,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       state the index is in, and why it is in that state (audit R4-01, Q02).
     */
     const conflict = CONFLICT_CODES.has(result.code);
-    const indexState = conflict
-      ? await readRetrievalIndexState({
-          workspaceKey: auth.principal.workspaceKey,
-          collectionId: id,
-          worldManifestDigest: active.world.manifestDigest,
-        })
-      : null;
+    const indexState = conflict ? indexStateAtAdmission : null;
     const authorizedNow = await revalidateFoundationAuthorization(
       request, auth.principal, "ask:read", "observer",
     );

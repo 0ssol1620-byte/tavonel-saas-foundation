@@ -63,11 +63,15 @@ export default function Scene({
   locale,
   copy,
   data,
+  sectionId = SCENE_ID,
+  sceneIndex,
 }: {
   locale: "en" | "ko";
   copy: LandingV2RecompileCopy;
   /** `buildRecompileView()` from `lib/landing-v2-proof.ts` -- server-only, read at build time. */
   data: RecompileView;
+  sectionId?: string;
+  sceneIndex?: number;
 }) {
   const titleId = `lv2-${SCENE_ID}-title`;
   const countsId = `lv2-${SCENE_ID}-counts`;
@@ -105,8 +109,8 @@ export default function Scene({
 
   return (
     <section
-      id={SCENE_ID}
-      data-scene={String(LANDING_V2_SCENE_ORDER.indexOf(SCENE_ID) + 1)}
+      id={sectionId}
+      data-scene={String(sceneIndex ?? LANDING_V2_SCENE_ORDER.indexOf(SCENE_ID) + 1)}
       tabIndex={-1}
       aria-labelledby={titleId}
       className="lv2-scene lv2-scene--proof lv2-obsidian"

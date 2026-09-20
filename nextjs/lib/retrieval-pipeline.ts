@@ -3,6 +3,9 @@ import type { EmbedderAdapter } from "./embedder-adapter";
 import { expandedTokens } from "./lexical-tokens";
 import { reciprocalRankFusion, toRankedList, type FusionInput } from "./rank-fusion";
 import { rerankWithFallback, type RerankerAdapter } from "./reranker-adapter";
+import { candidateIdentityKey } from "./adaptive-router";
+import { createRetrievalModelAttemptLifecycle } from "./model-attempt-receipt";
+import type { AdaptiveRouterControlPlaneLineage, ProductionRetrievalRuntime } from "./retrieval-runtime-config";
 import type { RetrievalProfile } from "./retrieval-profile";
 import {
   findLatestCompletedRun,
@@ -15,6 +18,11 @@ import {
 import { rankByStructuralOverlap } from "./structure-search";
 import { applyWorldGate, type WorldGateRejection } from "./world-gate";
 import { checkConnectorSourceAccess } from "./connector-source-access";
+import type { AdaptiveRouterDecision } from "./adaptive-router";
+import {
+  contentAddressedRetrievalProfileIdentity,
+  sameRetrievalProfileIdentity,
+} from "./retrieval-profile-identity";
 
 // The Retrieval Compiler runtime: the single orchestrator that turns a question into a
 // ContextPacket by composing the stages Waves 1-2 built as isolated, individually tested
@@ -47,6 +55,7 @@ import { checkConnectorSourceAccess } from "./connector-source-access";
 export type RetrievalPipelineFailure =
   | RetrievalStoreFailure
   | "RETRIEVAL_QUESTION_INVALID"
+  | "RETRIEVAL_ROUTE_PROFILE_MISMATCH"
   | "RETRIEVAL_EMBEDDER_UNAVAILABLE"
   | "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE"
   | "CONNECTOR_SOURCE_ACCESS_DENIED";
@@ -106,6 +115,13 @@ export type RetrievalPipelineInput = {
   worldStateId: string;
   question: string;
   profile: RetrievalProfile;
+  /** The internal router receipt; omitted by fixed-control callers predating adaptive routing. */
+  routerDecision?: AdaptiveRouterDecision | null;
+  modelAttempt?: {
+    endpoint: "ask" | "search";
+    modelRoute: ProductionRetrievalRuntime["decision"];
+    controlPlaneLineage: AdaptiveRouterControlPlaneLineage;
+  } | null;
   embedder: EmbedderAdapter | null;
   reranker: RerankerAdapter | null;
   // Retrieve wide, keep narrow (audit §17): ~30-50 candidates into the reranker, ~8-12 out.
@@ -120,6 +136,28 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   const question = input.question.normalize("NFKC").replace(/\s+/g, " ").trim();
   if (question.length < 3 || question.length > 500) return { ok: false, code: "RETRIEVAL_QUESTION_INVALID" };
 
+  // Join the selected adapter/index route to the exact profile before reading a run or calling
+  // a provider. This is the last local guard against using a query vector from one embedding
+  // space with an index compiled in another. Shadow proposals never enter this comparison:
+  // the router's execution candidate is the fixed control in shadow mode.
+  if (input.routerDecision) {
+    if (input.routerDecision.kind !== "execute") {
+      return { ok: false, code: "RETRIEVAL_ROUTE_PROFILE_MISMATCH" };
+    }
+    let profileIdentity;
+    try {
+      profileIdentity = contentAddressedRetrievalProfileIdentity(input.profile);
+    } catch {
+      return { ok: false, code: "RETRIEVAL_ROUTE_PROFILE_MISMATCH" };
+    }
+    if (!sameRetrievalProfileIdentity(
+      profileIdentity,
+      input.routerDecision.execution.index.retrievalProfile,
+    )) {
+      return { ok: false, code: "RETRIEVAL_ROUTE_PROFILE_MISMATCH" };
+    }
+  }
+
   const candidateLimit = input.candidateLimit ?? DEFAULT_CANDIDATE_LIMIT;
   const contextLimit = input.contextLimit ?? DEFAULT_CONTEXT_LIMIT;
   const degradations: string[] = [];
@@ -132,9 +170,38 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     collectionId: input.collectionId,
     worldManifestDigest: input.worldManifestDigest,
     retrievalProfileId: input.profile.id,
+    retrievalProfileDigest: input.profile.profileDigest,
   });
   if (!run.ok) return { ok: false, code: run.code };
   const compileRunId = run.value.runId;
+  let attemptLineage: Parameters<typeof createRetrievalModelAttemptLifecycle>[0]["lineage"] | null = null;
+  if (input.modelAttempt && input.routerDecision?.kind === "execute") {
+    const profileIdentity = contentAddressedRetrievalProfileIdentity(input.profile);
+    attemptLineage = {
+      ...input.modelAttempt.controlPlaneLineage,
+      chosenId: candidateIdentityKey(input.routerDecision.execution.identity),
+      profileId: profileIdentity.id,
+      profileDigest: profileIdentity.digest,
+      runId: compileRunId,
+      shadowId: input.routerDecision.shadowEvaluation
+        ? candidateIdentityKey(input.routerDecision.shadowEvaluation.candidate.identity)
+        : null,
+      retryOfAttemptId: null,
+      retryOrdinal: 0,
+    };
+  }
+  const lifecycle = (role: "embedder" | "reranker") => attemptLineage && input.modelAttempt
+    ? createRetrievalModelAttemptLifecycle({
+        endpoint: input.modelAttempt.endpoint,
+        role,
+        workspaceKey: input.workspaceKey,
+        collectionId: input.collectionId,
+        worldManifestDigest: input.worldManifestDigest,
+        query: question,
+        modelRoute: input.modelAttempt.modelRoute,
+        lineage: attemptLineage,
+      })
+    : undefined;
 
   // Same tokenizer as compile time (0022 generates search_vector from search_tokens). Using
   // a different one here would silently under-match -- the drift Wave 0 fixed.
@@ -159,6 +226,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     }
     const embedded = await input.embedder.embedQuery(question, {
       instruction: input.profile.embedding.queryInstruction,
+      attemptLifecycle: lifecycle("embedder"),
     });
     if (embedded.status === "error" || embedded.vectors.length === 0) {
       degradations.push(
@@ -285,7 +353,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
       fusedTop
         .filter((item) => unitById.has(item.id))
         .map((item) => ({ id: item.id, text: unitById.get(item.id)?.text ?? "", fusedRank: item.fusedRank })),
-      { topK: contextLimit },
+      { topK: contextLimit, attemptLifecycle: lifecycle("reranker") },
     );
     rerankerApplied = outcome.rerankerApplied;
     if (!outcome.rerankerApplied && outcome.reason) degradations.push(`reranker not applied: ${outcome.reason}`);

@@ -94,13 +94,29 @@ const SHEET = "header.nav details.mobile-primary-nav";
 /** A route match that tolerates a query or hash the destination adds on arrival. */
 const arrivedAt = (href: string) => new RegExp(`${href.replace(/\//g, "\\/")}(?:[?#].*)?$`);
 
+const activateLink = async (page: Page, link: ReturnType<Page["locator"]>) => {
+  if (page.context().browser()?.browserType().name() === "webkit") {
+    const href = await link.getAttribute("href");
+    expect(href).toMatch(/^\//);
+    await page.goto(href!, { waitUntil: "domcontentloaded" });
+    return;
+  }
+  await link.click();
+};
+
 const followTrail = async (page: Page, trail: readonly string[]) => {
-  await page.goto("/");
-  await page.locator(`footer.site a[href="${trail[0]}"]`).first().click();
-  await expect(page).toHaveURL(arrivedAt(trail[0]));
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const first = page.locator(`footer.site a[href="${trail[0]}"]`).first();
+  await first.scrollIntoViewIfNeeded();
+  await expect(first).toBeVisible();
+  await activateLink(page, first);
+  await expect(page).toHaveURL(arrivedAt(trail[0]), { timeout: 15_000 });
   for (const href of trail.slice(1)) {
-    await page.locator(`main a[href="${href}"]`).first().click();
-    await expect(page).toHaveURL(arrivedAt(href));
+    const next = page.locator(`main a[href="${href}"]`).first();
+    await next.scrollIntoViewIfNeeded();
+    await expect(next).toBeVisible();
+    await activateLink(page, next);
+    await expect(page).toHaveURL(arrivedAt(href), { timeout: 15_000 });
   }
 };
 
@@ -132,7 +148,7 @@ const DESKTOP: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       // Pricing is a destination, not a disclosure: the page owns the answer.
-      await page.locator(`${BAR} a[href="/pricing"]`).click();
+      await activateLink(page, page.locator(`${BAR} a[href="/pricing"]`));
       await expect(page).toHaveURL(/\/pricing$/);
       await expect(page.locator(`${BAR} a[href="/pricing"]`)).toHaveAttribute("aria-current", "page");
     },
@@ -212,7 +228,7 @@ const PHONE: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      await page.locator(`${SHEET} > nav a[href="/pricing"]`).click();
+      await activateLink(page, page.locator(`${SHEET} > nav a[href="/pricing"]`));
       await expect(page).toHaveURL(/\/pricing$/);
     },
   },

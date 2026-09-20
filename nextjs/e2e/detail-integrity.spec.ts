@@ -21,22 +21,16 @@ async function connectionErrors(page: Page, scope: string) {
 }
 for (const route of ["/", "/ko"]) test(`source connections have two real endpoints on ${route}`, async ({ page }) => {
   await page.goto(route);
-  await page.locator('#proof').scrollIntoViewIfNeeded();
-  for (const tab of await page.locator('#proof [role="tab"]').all()) {
+  await page.locator('#s3').scrollIntoViewIfNeeded();
+  for (const tab of await page.locator('#s3 [role="tab"]').all()) {
     await tab.click();
-    const pair = '#proof [role="tabpanel"]:not([hidden]) [data-evidence-pair]';
+    const pair = '#s3 [role="tabpanel"]:not([hidden]) [data-evidence-pair]';
     if ((page.viewportSize()?.width ?? 0) >= 900) {
       await expect(page.locator(`${pair} [data-connected="true"]`)).toBeVisible();
       await expect.poll(async () => (await connectionErrors(page, pair)).start).toBeLessThan(2);
       await expect.poll(async () => (await connectionErrors(page, pair)).end).toBeLessThan(2);
     } else await expect(page.locator(`${pair} .lv2-evidence-connector`)).toBeHidden();
   }
-  await page.locator('#evidence').scrollIntoViewIfNeeded();
-  if ((page.viewportSize()?.width ?? 0) >= 1000) {
-    await expect(page.locator('#evidence [data-connected="true"]')).toBeVisible();
-    await expect.poll(async () => (await connectionErrors(page, '#evidence [data-evidence-pair]')).start).toBeLessThan(2);
-    await expect.poll(async () => (await connectionErrors(page, '#evidence [data-evidence-pair]')).end).toBeLessThan(2);
-  } else await expect(page.locator('#evidence .lv2-evidence-connector')).toBeHidden();
   await capture(page, route === '/' ? 'evidence-en' : 'evidence-ko');
 });
 
@@ -139,11 +133,12 @@ test('source endpoints stay attached after a width change, without a page reload
   await page.goto('/');
   for (const width of [1440, 1024, 768, 1920]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.locator('#evidence').scrollIntoViewIfNeeded();
-    if (width >= 1000) {
-      await expect(page.locator('#evidence [data-connected="true"]')).toBeVisible();
-      await expect.poll(async () => (await connectionErrors(page, '#evidence [data-evidence-pair]')).end).toBeLessThan(2);
-    } else await expect(page.locator('#evidence .lv2-evidence-connector')).toBeHidden();
+    await page.locator('#s3').scrollIntoViewIfNeeded();
+    const pair = '#s3 [role="tabpanel"]:not([hidden]) [data-evidence-pair]';
+    if (width >= 900) {
+      await expect(page.locator(`${pair} [data-connected="true"]`)).toBeVisible();
+      await expect.poll(async () => (await connectionErrors(page, pair)).end).toBeLessThan(2);
+    } else await expect(page.locator(`${pair} .lv2-evidence-connector`)).toBeHidden();
   }
 });
 

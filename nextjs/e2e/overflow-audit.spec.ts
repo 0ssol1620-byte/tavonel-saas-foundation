@@ -18,16 +18,15 @@
  * offender is dropped when a scrolling ancestor clips it. `overflow-x: hidden` is NOT treated as
  * a scroll container -- that is the property that hid these defects in the first place.
  *
- * Widths are driven here rather than by Playwright projects on purpose: seven width projects
- * over the whole suite is 544 tests times seven, and 412 (the widest common phone) is not a
- * project at all. One test per width, every route inside it, offenders reported together with
- * the selector that caused them.
+ * Widths are driven here rather than by Playwright projects on purpose. They are the seven
+ * release viewports in root AGENTS.md. One test per width visits every route and reports any
+ * offender with the selector that caused it.
  */
 
 import { test, expect } from "@playwright/test";
 import { FOOTER_GROUPS, NAV_PENDING_HREFS, PRIMARY_NAV, RESOURCE_LINKS, navHrefs } from "../lib/site-navigation";
 
-const WIDTHS = [360, 390, 412, 768, 1024, 1280, 1440] as const;
+const WIDTHS = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
 
 /* The routes the audit named explicitly, plus every route the navigation itself declares --
    so a new nav entry is audited without anyone remembering to add it here.

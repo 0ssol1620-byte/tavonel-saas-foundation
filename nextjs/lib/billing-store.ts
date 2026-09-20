@@ -1,4 +1,8 @@
 import type { PaddleBillingAction } from "./paddle-billing-event";
+import { BILLING_OFFERS } from "./billing-catalog";
+import { readCommercialState } from "./commercial-state";
+import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "./checkout-policy";
+import { readPublicStatusV2 } from "./public-status";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 export type FoundationBillingAccount = {
@@ -101,9 +105,16 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
   const isReversal = action.action === "reversal";
+  const bootstrapAllowed = isReversal ? false : (
+    decideOfferCheckoutPolicy(BILLING_OFFERS[action.offerCode]).allowed
+    && decideCheckoutPolicy(
+      readCommercialState(),
+      readPublicStatusV2().availableActions.purchasePlan.enabled,
+    ).allowed
+  );
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v4", {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v5", {
       method: "POST",
       body: JSON.stringify({
         p_event_id: action.eventId,
@@ -116,10 +127,15 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
         p_offer_code: isReversal ? null : action.offerCode,
         p_transaction_id: action.action === "purchase" || action.action === "allowance" || isReversal ? action.transactionId : null,
         p_customer_id: isReversal ? null : action.customerId,
-        p_subscription_id: action.action === "subscription" ? action.subscriptionId : null,
+        p_subscription_id: isReversal ? null : action.subscriptionId,
         p_subscription_status: action.action === "subscription" ? action.subscriptionStatus : null,
         p_credit_delta: action.action === "purchase" || action.action === "allowance" ? action.creditDelta : 0,
         p_adjustment_id: isReversal ? action.adjustmentId : null,
+        p_binding_nonce: isReversal ? null : action.checkoutBindingNonce,
+        p_binding_issued_at: isReversal ? null : action.checkoutBindingIssuedAt,
+        p_binding_policy_version: isReversal ? null : action.checkoutBindingPolicyVersion,
+        p_binding_fresh: isReversal ? false : action.checkoutBindingFresh,
+        p_bootstrap_allowed: bootstrapAllowed,
       }),
     });
   } catch {
@@ -130,6 +146,7 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
     return { ok: false as const, code: "BILLING_EVENT_APPLY_FAILED" };
   }
   const result = await response.json() as Record<string, unknown>;
+  if (result.status === "binding_rejected") return { ok: true as const, result };
   if (action.action === "subscription") {
     try {
       response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_subscription_schedule", {

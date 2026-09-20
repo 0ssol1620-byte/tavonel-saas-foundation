@@ -101,6 +101,9 @@ beforeEach(() => {
     const method = init?.method ?? "GET";
     calls.push({ url: href, method, body: init?.body ? JSON.parse(String(init.body)) : null });
     if (failOn && href.includes(failOn)) return jsonResponse({ message: "rejected" }, false);
+    if (method === "GET" && href.includes("foundation_retrieval_profiles")) {
+      return jsonResponse([{ id: PROFILE.id }]);
+    }
     return jsonResponse([]);
   });
 });

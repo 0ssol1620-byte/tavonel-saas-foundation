@@ -52,8 +52,12 @@ test("publishes the compilation benchmark protocol and no results table", async 
     required, and neither the old notice nor "this deployment" may come back.
   */
   const stated = page.locator("main");
-  await expect(stated).toContainText("This page is the protocol, not a scoreboard.");
-  await expect(stated).toContainText("or it does not appear");
+  await expect(stated).toContainText("The qualification contract defines what a knowledge-compilation result has to carry");
+  await expect(page.getByRole("heading", { name: "GDP.pdf evaluation design" })).toBeVisible();
+  await expect(stated).toContainText("Results will be published here only with a qualified run receipt");
+  for (const arm of ["Native PDF", "Compiled context", "Fixed retrieval", "Adaptive routing"]) {
+    await expect(page.getByRole("heading", { name: arm, exact: true })).toBeVisible();
+  }
   await expect(stated).not.toContainText("No run on this deployment");
   await expect(stated).not.toContainText("NO VALUE PUBLISHED");
   await expect(stated, "our operations vocabulary on a buyer's page").not.toContainText("this deployment");

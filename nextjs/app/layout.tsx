@@ -229,6 +229,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           §16 of the handoff bars outright. `.route-boot` in `app/tavonel.css` is now dead and is
           L1's to delete.
         */}
+        {/*
+          The optional analytics choice is a document-flow notice above the public shell. Keeping
+          it before page chrome gives the notice real space instead of placing it over the hero,
+          pricing actions or mobile safe area. After a choice, the standing footer control remains
+          the withdrawal path.
+        */}
+        <MarketingConsent />
         {children}
         {/*
           Measurement, on the same terms as everything else here.
@@ -247,7 +254,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           stay quiet and do not imply that measurement is active.
         */}
         {process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED === "1" ? <Analytics /> : null}
-        <MarketingConsent />
       </body>
     </html>
   );

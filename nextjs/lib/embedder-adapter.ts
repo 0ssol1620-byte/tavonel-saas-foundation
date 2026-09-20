@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { checkEmbeddingCompatibility, type RetrievalProfile } from "./retrieval-profile";
+import type { ModelProviderAttemptLifecycle } from "./model-provider-dispatch";
 
 // EmbedderAdapter is the replaceable seam between the Retrieval Runtime and whatever
 // actually produces vectors (RunPod today; Hugging Face, a local/VPC runtime, or another
@@ -35,10 +36,13 @@ export type EmbedderResult =
 export type EmbedderInvokeOptions = {
   instruction?: string;
   timeoutMs?: number;
+  attemptLifecycle?: ModelProviderAttemptLifecycle<EmbedderResult>;
 };
 
 export type EmbedderAdapter = {
   identity(): EmbedderModelIdentity;
+  /** Stable, non-secret binding to the configured provider endpoint when remotely hosted. */
+  endpointId?(): string;
   embedDocuments(texts: string[], options?: EmbedderInvokeOptions): Promise<EmbedderResult>;
   embedQuery(text: string, options?: EmbedderInvokeOptions): Promise<EmbedderResult>;
 };

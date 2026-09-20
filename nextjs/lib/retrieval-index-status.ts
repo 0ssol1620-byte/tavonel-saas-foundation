@@ -63,6 +63,7 @@ export async function readRetrievalIndexState(scope: IndexScope): Promise<Retrie
     collectionId: scope.collectionId,
     worldManifestDigest: scope.worldManifestDigest,
     retrievalProfileId: profile.id,
+    retrievalProfileDigest: profile.profileDigest,
   });
   if (!latest.ok) {
     // No run and no profile are both honestly "no index exists yet". Anything else is a read

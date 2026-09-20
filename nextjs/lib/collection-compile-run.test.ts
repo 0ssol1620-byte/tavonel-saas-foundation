@@ -19,6 +19,7 @@ const fetched = vi.fn();
 const put = vi.fn();
 const dispatched = vi.fn();
 const sourceAccess = vi.fn();
+const customerDataGate = vi.fn();
 
 vi.mock("./r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "acct", bucket: "tavonel-foundation", accessKeyId: "key", secretAccessKey: "secret" }),
@@ -59,6 +60,9 @@ vi.mock("./core-runtime-v2", async (importOriginal) => ({
 vi.mock("./connector-source-access", () => ({
   checkConnectorSourceAccess: (workspaceId: string, documentIds: string[]) => sourceAccess(workspaceId, documentIds),
 }));
+vi.mock("./customer-data-gate-store", () => ({
+  readVerifiedCustomerDataGateDecision: (...args: unknown[]) => customerDataGate(...args),
+}));
 
 const { runCollectionCompile } = await import("./collection-compile-run");
 
@@ -66,6 +70,17 @@ const WS = "pilot";
 const VERSION = "a".repeat(64);
 const DOCUMENT = "doc-legacy-ocr";
 const PREFIX = `immutable/${WS}/${WS}/${DOCUMENT}/${VERSION}`;
+const APPROVED_GATE = {
+  ok: true as const,
+  decision: {
+    allowed: true as const,
+    schemaVersion: "tavonel.customer_data_gate.v1" as const,
+    tenantId: WS,
+    workspaceId: WS,
+    receiptSha256: `sha256:${"f".repeat(64)}`,
+    evaluatedAt: "2026-09-20T00:00:00.000Z",
+  },
+};
 
 function ocrResult(schemaVersion: string, regions: unknown) {
   const text = "The pump was inspected and the reading stayed inside the policy limits.";
@@ -83,7 +98,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-beforeEach(() => sourceAccess.mockReset().mockResolvedValue({ ok: true }));
+beforeEach(() => {
+  sourceAccess.mockReset().mockResolvedValue({ ok: true });
+  customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
+});
 
 function readyWorkspace() {
   listed.mockResolvedValue({
@@ -94,6 +112,52 @@ function readyWorkspace() {
     ],
   });
 }
+
+describe("customer-data approval before source access", () => {
+  it("fails closed with the durable gate code before reading customer objects", async () => {
+    customerDataGate.mockResolvedValue({ ok: false, code: "CUSTOMER_DATA_GATE_RECEIPT_NOT_FOUND" });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run).toEqual({
+      ok: false,
+      status: 503,
+      code: "CUSTOMER_DATA_GATE_RECEIPT_NOT_FOUND",
+      payload: {},
+    });
+    expect(listed).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the durable gate immediately before Core dispatch", async () => {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001",
+      pageIndex0: 0,
+      pageNumber1: 1,
+      order: 0,
+      blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000],
+      text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1,
+      authority: "official",
+    }]) });
+    customerDataGate
+      .mockResolvedValueOnce(APPROVED_GATE)
+      .mockResolvedValueOnce({ ok: false, code: "CUSTOMER_DATA_GATE_RECEIPT_REFUSED" });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run).toEqual({
+      ok: false,
+      status: 503,
+      code: "CUSTOMER_DATA_GATE_RECEIPT_REFUSED",
+      payload: {},
+    });
+    expect(customerDataGate).toHaveBeenCalledTimes(2);
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+});
 
 describe("a source read before region capture", () => {
   it("is refused with OCR_REGIONS_REQUIRED and never dispatched to the Core", async () => {
@@ -274,6 +338,11 @@ describe("a source read before region capture", () => {
     expect(run.ok).toBe(false);
     if (!run.ok) expect(run.code).toBe("SOURCE_VERSION_CHANGED");
     expect(dispatched).toHaveBeenCalledOnce();
+    expect(dispatched.mock.calls[0]?.[5]).toEqual(expect.objectContaining({
+      allowed: true,
+      tenantId: WS,
+      workspaceId: WS,
+    }));
     expect(put).not.toHaveBeenCalled();
   });
 

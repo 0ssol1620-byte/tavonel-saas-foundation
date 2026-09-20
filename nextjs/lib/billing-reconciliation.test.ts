@@ -36,9 +36,11 @@ import { parsePaddleBillingAction } from "./paddle-billing-event";
 
 const SECRET = "billing-test-secret-that-is-at-least-32-characters";
 const OBSERVER_PRICE = `pri_${"o".repeat(26)}`;
+const STUDIO_PRICE = `pri_${"s".repeat(26)}`;
 const paddleEnv = {
   FOUNDATION_BILLING_HMAC: SECRET,
   PADDLE_PRICE_OBSERVER_ACCESS: OBSERVER_PRICE,
+  PADDLE_PRICE_STUDIO_ACCESS: STUDIO_PRICE,
 };
 const principal = {
   userId: "969dc192-daa2-4119-969d-c192daa24119",
@@ -64,8 +66,32 @@ function allowanceWebhookBody() {
     data: {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
-      custom_data: createCheckoutBinding({ ...principal, offerCode: "observer_access" }, SECRET),
+      subscription_id: `sub_${"s".repeat(26)}`,
+      custom_data: createCheckoutBinding(
+        { ...principal, offerCode: "observer_access" },
+        SECRET,
+        new Date("2026-09-11T07:00:00.000Z"),
+      ),
       items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    },
+  });
+}
+
+function contactOnlyWebhookBody() {
+  return JSON.stringify({
+    event_id: `evt_${"b".repeat(26)}`,
+    event_type: "transaction.completed",
+    occurred_at: "2026-09-11T07:00:00.000Z",
+    data: {
+      id: `txn_${"u".repeat(26)}`,
+      customer_id: `ctm_${"d".repeat(26)}`,
+      subscription_id: `sub_${"q".repeat(26)}`,
+      custom_data: createCheckoutBinding(
+        { ...principal, offerCode: "studio_access" },
+        SECRET,
+        new Date("2026-09-11T07:00:00.000Z"),
+      ),
+      items: [{ quantity: 1, price: { id: STUDIO_PRICE } }],
     },
   });
 }
@@ -73,6 +99,7 @@ function allowanceWebhookBody() {
 function configureLedger() {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
+  vi.stubEnv("PADDLE_SANDBOX", "true");
 }
 
 function respond(body: unknown, status = 200) {
@@ -108,6 +135,9 @@ describe("O04 duplicate webhook delivery", () => {
     expect(replay).toMatchObject({ ok: true, result: { status: "duplicate" } });
     expect(sentBodies(fetchMock)[0]).toBe(sentBodies(duplicateMock)[0]);
     expect(sentBodies(duplicateMock)[0]).toContain(`"p_event_id":"${first!.eventId}"`);
+    expect(sentBodies(duplicateMock)[0]).toContain('"p_binding_fresh":true');
+    expect(sentBodies(duplicateMock)[0]).toContain('"p_bootstrap_allowed":true');
+    expect(String(duplicateMock.mock.calls[0]?.[0])).toContain("/apply_foundation_billing_event_v5");
     expect(duplicateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -121,6 +151,48 @@ describe("O04 duplicate webhook delivery", () => {
       ok: false,
       code: "BILLING_EVENT_APPLY_FAILED",
     });
+  });
+
+  it("re-evaluates global and per-offer policy before the RPC consumes a new binding", async () => {
+    configureLedger();
+    const closedAction = parsePaddleBillingAction(allowanceWebhookBody(), paddleEnv);
+    vi.stubEnv("PADDLE_SANDBOX", "false");
+    const closedFetch = respond({ status: "binding_rejected", reason: "checkout_policy_closed" });
+    vi.stubGlobal("fetch", closedFetch);
+    await expect(applyFoundationBillingAction(closedAction as never)).resolves.toMatchObject({ ok: true });
+    expect(sentBodies(closedFetch)[0]).toContain('"p_bootstrap_allowed":false');
+
+    vi.stubEnv("PADDLE_SANDBOX", "true");
+    const contactAction = parsePaddleBillingAction(contactOnlyWebhookBody(), paddleEnv);
+    const contactFetch = respond({ status: "binding_rejected", reason: "checkout_policy_closed" });
+    vi.stubGlobal("fetch", contactFetch);
+    await expect(applyFoundationBillingAction(contactAction as never)).resolves.toMatchObject({ ok: true });
+    expect(sentBodies(contactFetch)[0]).toContain('"p_bootstrap_allowed":false');
+  });
+
+  it("does not schedule a subscription event that the binding boundary rejected", async () => {
+    configureLedger();
+    const rejected = respond({ status: "binding_rejected", reason: "checkout_policy_closed" });
+    vi.stubGlobal("fetch", rejected);
+    await expect(applyFoundationBillingAction({
+      action: "subscription",
+      eventId: `evt_${"z".repeat(26)}`,
+      eventType: "subscription.created",
+      occurredAt: "2026-09-11T07:00:00.000Z",
+      payloadSha256: `sha256:${"1".repeat(64)}`,
+      userId: principal.userId,
+      workspaceId: principal.workspaceId,
+      offerCode: "observer_access",
+      subscriptionId: `sub_${"z".repeat(26)}`,
+      customerId: `ctm_${"z".repeat(26)}`,
+      subscriptionStatus: "inactive",
+      subscriptionCancelAt: null,
+      checkoutBindingNonce: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      checkoutBindingIssuedAt: "2026-09-11T07:00:00.000Z",
+      checkoutBindingPolicyVersion: "checkout-v1",
+      checkoutBindingFresh: true,
+    })).resolves.toMatchObject({ ok: true, result: { status: "binding_rejected" } });
+    expect(rejected).toHaveBeenCalledTimes(1);
   });
 });
 

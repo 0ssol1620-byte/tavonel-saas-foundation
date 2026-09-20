@@ -65,6 +65,7 @@ import { ARCHIVE_LIMITS } from "@/lib/archive-expand";
 import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store";
 import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
+import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import type { ReviewQueueInput } from "@/lib/review-queue";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
@@ -2912,6 +2913,7 @@ export default function WorkspacePage() {
           ) : null}
 
           {tab === "billing" ? (
+          <>
           <section className="card billing-card">
             <div>
               {/* workspace-18 (C1): the selected tab directly above already says "Usage & billing",
@@ -2962,6 +2964,8 @@ export default function WorkspacePage() {
             ) : null}
             {billingAccount?.updatedAt ? <small>Last persisted billing change · {formatTimestamp(billingAccount.updatedAt)}</small> : null}
           </section>
+          <FounderTestResetPanel />
+          </>
           ) : null}
 
           {/*

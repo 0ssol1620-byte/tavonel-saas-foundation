@@ -81,12 +81,12 @@ describe("createRunPodRerankerAdapter", () => {
     expect(result.status).toBe("error");
   });
 
-  it("accepts a response that omits some candidates as status ok -- rerankWithFallback decides what to do with an incomplete set", async () => {
+  it("rejects a response that omits candidates so the governed attempt cannot record false success", async () => {
     const fetcher = vi.fn(async () => jsonResponse([{ index: 0, score: 0.9 }]));
     const adapter = createRunPodRerankerAdapter(identity, config, fetcher as unknown as typeof fetch);
     const result = await adapter.rerank("q", candidates);
-    expect(result.status).toBe("ok");
-    if (result.status === "ok") expect(result.ranked).toEqual([{ id: "a", score: 0.9 }]);
+    expect(result.status).toBe("error");
+    if (result.status === "error") expect(result.reason).toMatch(/schema validation/);
   });
 
   it("rejects a response that is not an array", async () => {

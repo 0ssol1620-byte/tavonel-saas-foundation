@@ -17,10 +17,10 @@ async function dismissConsent(page: import("@playwright/test").Page) {
   a real destination at a target a thumb can hit -- so the assertion is made against the next
   action Scene 07 does carry, and the row-level geometry comes back here with the rows.
 */
-test("the Bring it / Use it scene ends on a usable next action", async ({ page }) => {
+test("the closing scene ends on usable next actions", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const scene = page.locator("section#use");
+  const scene = page.locator("section#s6");
   await expect(scene).toHaveCount(1);
   await scene.scrollIntoViewIfNeeded();
   const action = scene.locator("a.lv2-text-link");
@@ -56,6 +56,11 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   const plans = page.locator(".pricing-page .plans");
   await expect(plans.locator(".plan")).toHaveCount(4);
   await expect(page.locator(".pricing-faq details")).toHaveCount(17);
+  const planDetails = page.locator("#plan-details");
+  await expect(planDetails).not.toHaveAttribute("open", "");
+  await expect(page.locator(".pricing-details")).not.toBeVisible();
+  await planDetails.locator(":scope > summary").click();
+  await expect(page.locator(".pricing-details")).toBeVisible();
   /*
     Ten with the explicit human-activation policy beside the nine plan details. Refunds states
     the window and consumed share here rather than only in the FAQ below it.
@@ -85,7 +90,8 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   const choice = await plans.boundingBox();
   const details = await page.locator(".pricing-details").boundingBox();
   expect(choice!.y + choice!.height).toBeLessThan(details!.y);
-  expect(await plans.locator("button").evaluateAll(elements => elements.every(e => e.getBoundingClientRect().height >= 44))).toBe(true);
+  expect(await plans.locator("a.btn").evaluateAll(elements => elements.every(e => e.getBoundingClientRect().height >= 44))).toBe(true);
+  await expect(page.locator("#pricing-faq")).not.toHaveAttribute("open", "");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

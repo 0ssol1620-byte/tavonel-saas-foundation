@@ -72,7 +72,7 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     return { id: section.id, top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
   }));
   /*
-    Landing V2, 2026-09-19: nine scenes, not five. Two of the three rules are unchanged -- the
+    Landing V2, 2026-09-20: six scenes. Two of the three rules are unchanged -- the
     scenes butt up against each other, and none of them is collapsed.
 
     The third is restated rather than kept verbatim. It barred a viewport-height floor outright,
@@ -82,7 +82,7 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     thing the old rule was actually protecting: no scene may floor at more than one viewport, and
     no scene may be taller than two. An ocean is still a failure; a composed frame is not one.
   */
-  expect(geometry.map(item => item.id)).toEqual(["hero", "proof", "sources", "evidence", "recompile", "why", "use", "trust", "start"]);
+  expect(geometry.map(item => item.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "s6"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }

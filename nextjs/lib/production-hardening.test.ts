@@ -10,8 +10,9 @@ describe("2026-09-05 production hardening", () => {
     const server = read("app/pricing/page.tsx");
     const client = read("components/pricing-page-client.tsx");
     expect(server).toContain('export const dynamic = "force-dynamic"');
-    expect(server).toContain("readCommercialState()");
-    expect(server).toContain('readAccessMode() === "self_service"');
+    expect(server).toContain("readPublicStatusV2()");
+    expect(server).toContain("status.availableActions.purchasePlan.enabled");
+    expect(server).toContain("status.availableActions.createAccount.enabled");
     expect(client).toContain("useState(initialLiveCheckout)");
     expect(client).toContain("useState(initialSelfService)");
     expect(client.indexOf('className="plans"')).toBeLessThan(client.indexOf('className="usage-estimator"'));

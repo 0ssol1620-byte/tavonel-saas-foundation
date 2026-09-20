@@ -21,6 +21,8 @@
     "check": "pnpm brand:verify && node scripts/check-type-floor.mjs && tsc --noEmit && eslint app components lib",
     "lint": "eslint app components lib",
     "proof:live-ocr": "node scripts/foundation-live-ocr-proof.mjs",
+    "proof:runpod-retrieval": "node scripts/runpod-retrieval-smoke.mjs",
+    "eval:gdp-pdf:check": "node --experimental-strip-types scripts/gdp-pdf-evidence-check.mjs",
     "ops:smoke": "node scripts/operations-smoke.mjs",
     "verify:export": "node scripts/verify-signed-export.mjs",
     "verify:package": "node scripts/compiled-world/validate.mjs",

@@ -4,6 +4,7 @@ import type { RetrievalProfile } from "./retrieval-profile";
 import type { DenseMetric } from "./dense-search";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { COLLECTION_ID_PATTERN } from "./immutable-keys";
+import { contentAddressedRetrievalProfileIdentity } from "./retrieval-profile-identity";
 
 // The persistence and execution seam for the Retrieval Compiler. Wave 1/2 produced pure,
 // database-free modules (retrieval-units.ts compiles units, lexical-search.ts and
@@ -277,12 +278,17 @@ export async function findLatestCompletedRun(params: {
   collectionId: string;
   worldManifestDigest: string;
   retrievalProfileId: string;
+  retrievalProfileDigest: string;
 }): Promise<StoreResult<CompileRunRecord>> {
-  if (!validScope(params.workspaceKey, params.collectionId) || !SHA256.test(params.worldManifestDigest)) {
+  if (!validScope(params.workspaceKey, params.collectionId) || !SHA256.test(params.worldManifestDigest)
+    || !SHA256.test(params.retrievalProfileDigest)) {
     return fail("RETRIEVAL_SCOPE_INVALID");
   }
   const config = readSupabaseAdminConfig();
   if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
+  const profile = await requireExactRetrievalProfile(config, params.workspaceKey,
+    params.retrievalProfileId, params.retrievalProfileDigest);
+  if (!profile.ok) return profile;
 
   const query = new URLSearchParams({
     select: "run_id,workspace_key,collection_id,world_manifest_digest,retrieval_profile_id,status,unit_count,embedding_count",
@@ -496,11 +502,42 @@ export async function runDenseSearch(params: {
 
 // ---- Profile persistence -------------------------------------------------------------
 
+async function requireExactRetrievalProfile(
+  config: NonNullable<ReturnType<typeof readSupabaseAdminConfig>>,
+  workspaceKey: string,
+  profileId: string,
+  profileDigest: string,
+): Promise<StoreResult<null>> {
+  const query = new URLSearchParams({
+    select: "id",
+    workspace_key: `eq.${workspaceKey}`,
+    id: `eq.${profileId}`,
+    profile_digest: `eq.${profileDigest}`,
+    limit: "1",
+  });
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_profiles?${query}`);
+  } catch {
+    return fail("RETRIEVAL_STORE_READ_FAILED");
+  }
+  if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
+  const rows = await response.json().catch(() => null) as Array<Record<string, unknown>> | null;
+  return Array.isArray(rows) && rows.length === 1 && rows[0]?.id === profileId
+    ? { ok: true, value: null }
+    : fail("RETRIEVAL_PROFILE_NOT_FOUND");
+}
+
 export async function ensureRetrievalProfile(
   profile: RetrievalProfile,
   createdByUserId: string,
 ): Promise<StoreResult<string>> {
   if (!validScope(profile.workspaceKey)) return fail("RETRIEVAL_SCOPE_INVALID");
+  try {
+    contentAddressedRetrievalProfileIdentity(profile);
+  } catch {
+    return fail("RETRIEVAL_SCOPE_INVALID");
+  }
   const config = readSupabaseAdminConfig();
   if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
 
@@ -528,17 +565,18 @@ export async function ensureRetrievalProfile(
   try {
     response = await supabaseAdminRequest(config, "/rest/v1/foundation_retrieval_profiles", {
       method: "POST",
-      // A profile is content-addressed by its digest, so re-registering an identical profile
-      // must be a no-op rather than a conflict; a DIFFERENT profile reusing an existing id is
-      // a real error and still fails, because the digest column would have to change.
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      // Never update an existing profile row. Compile runs reference the stable (workspace,id)
+      // key, so mutating its digest would make an old run appear to belong to a new embedding
+      // space. Ignore an identical duplicate, then verify the exact digest below.
+      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
       body: JSON.stringify([row]),
     });
   } catch {
     return fail("RETRIEVAL_STORE_WRITE_FAILED");
   }
   if (!response.ok) return fail("RETRIEVAL_STORE_WRITE_FAILED");
-  return { ok: true as const, value: profile.id };
+  const exact = await requireExactRetrievalProfile(config, profile.workspaceKey, profile.id, profile.profileDigest);
+  return exact.ok ? { ok: true as const, value: profile.id } : fail("RETRIEVAL_STORE_WRITE_FAILED");
 }
 
 // The latest run for the triple, whatever state it reached -- the observability counterpart to
@@ -559,12 +597,17 @@ export async function findLatestRun(params: {
   collectionId: string;
   worldManifestDigest: string;
   retrievalProfileId: string;
+  retrievalProfileDigest: string;
 }): Promise<StoreResult<LatestRunRecord>> {
-  if (!validScope(params.workspaceKey, params.collectionId) || !SHA256.test(params.worldManifestDigest)) {
+  if (!validScope(params.workspaceKey, params.collectionId) || !SHA256.test(params.worldManifestDigest)
+    || !SHA256.test(params.retrievalProfileDigest)) {
     return fail("RETRIEVAL_SCOPE_INVALID");
   }
   const config = readSupabaseAdminConfig();
   if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
+  const profile = await requireExactRetrievalProfile(config, params.workspaceKey,
+    params.retrievalProfileId, params.retrievalProfileDigest);
+  if (!profile.ok) return profile;
 
   // Precedence is written here, not inferred from how the status strings happen to sort.
   //

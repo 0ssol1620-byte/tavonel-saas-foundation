@@ -61,6 +61,63 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+## 2026-09-21 — Original-source compiler specimen and mobile film inspection
+
+The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
+
+The four byte-locked 2880×1800 hero films remain the title-adjacent product film. At 390px and 360px, the player starts as a focused inspection surface with two-axis pan, stage-specific initial camera positions, and an explicit `Fit full frame` / `Focus details` control. Reduced motion remains a still poster until Play is selected.
+
+Verification:
+
+- Compiler specimen captures: 20 states at 1440, 390, 360, and reduced motion; 20/20 source frames stayed horizontally contained. Evidence: `goal-staging/compiler-specimen-proof`.
+- Hero mobile captures: 12 focused/full-frame/reduced-motion states at 390 and 360. Evidence: `goal-staging/hero-mobile-proof`.
+- Full Playwright before the final paused-transition correction: 1,445 passed, 440 intended skips, one reproducible paused-transition failure, and one retry-only source-manifest read. The paused-transition correction then passed its exact focused test.
+- Final production prebuild after that correction passed `check`, all 345 Vitest files / 4,941 tests, and the 143-page Next.js build.
+- Lighthouse launch budgets passed. Enforced medians: `/` 0.94/1.00/1.00/1.00, `/privacy` 0.98/1.00/1.00/1.00, `/security` 0.98/1.00/1.00/1.00, `/pricing` 0.98/1.00/1.00/1.00, `/explore` 0.95/1.00/1.00/1.00. Login and callback SEO remain measured-only at 0.66.
+
+This is local final-tree evidence. Exact-head CI, immutable preview inspection, and founder aesthetic acceptance remain required before merge or production deployment.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-20 — Homepage film and compiler-specimen composition candidate
+
+The homepage candidate now keeps the four-cut HeroFilm directly below the headline in `#s1` and
+moves the deterministic five-stage CompilerSpecimen into its own explanatory landmark, `#s2`.
+Proof, recompile, trust, and start follow as `#s3` through `#s6`. The public recreation disclaimer
+was removed from the hero. English and Korean entry routes preload the committed first poster.
+
+Focused verification ran against a fresh Next.js production build on a dedicated local port:
+
+- focused Vitest contracts: **5 files, 308 passed, 0 failed**;
+- strict TypeScript: passed;
+- Next.js production build: passed, including all 143 static-generation steps;
+- homepage Playwright matrix: **95 passed, 49 intentional project-specific skips, 0 failed** across
+  `1920`, `1440`, `1280`, `1024`, `768`, `390`, `360`, and reduced motion;
+- mobile landing regression at `768`, `390`, and `360`: **24 passed, 6 intentional skips, 0 failed**;
+- evidence-first entry-page contract at `1440`: **4 passed, 0 failed**;
+- the production-hardening file's landing continuity test passed as part of a focused run; that run
+  reported 7 passes and 2 unrelated project-specific skips before one stale evidence-link assertion
+  was corrected, then the complete evidence-first file passed 4/4;
+- `git diff --check`: no whitespace errors (line-ending conversion warnings only).
+
+The first production-build attempt reached page-data collection and failed with transient missing-
+module errors for two routes while the shared checkout was active. The immediate full rerun compiled,
+typechecked, generated all 143 static pages, and completed successfully; only the successful build
+served the browser checks above.
+
+The homepage matrix asserts six ordered named landmarks, unique IDs and valid in-page targets, the
+HeroFilm/CompilerSpecimen separation, the committed high-resolution poster, desktop and phone film
+source selection, five selectable compiler stages, one source identity through all stages, roving
+keyboard selection, manual pause persistence, offscreen and hidden-document suspension, reduced-
+motion parity, mobile 44px controls, and zero horizontal overflow for `/` and `/ko` at every required
+width.
+
+This evidence proves the local production candidate's DOM, interaction, responsive, motion, and
+asset-selection contracts. It does not include a founder visual pass, cross-browser launch matrix,
+new screenshot census, Lighthouse rerun, deployed-byte validation, or live customer-account proof.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
 ## 2026-09-20 — Final public-route matrix and `/demo` paper contrast repair
 
 The frozen local production candidate was inspected on `/`, `/enterprise`, `/security`, `/trust`,

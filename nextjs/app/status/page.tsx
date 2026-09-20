@@ -159,9 +159,7 @@ export default async function StatusPage() {
       another customer&rsquo;s name.
     </p>
     <p>
-      This page is served by the same deployment it reports on, so an outage that takes the site
-      down takes this page with it. That is why the line above asks you to report what you are
-      seeing rather than wait for it to appear here.
+      If this page is unavailable, report service impact to support@tavonel.com.
     </p>
 
     <h2>Getting told without coming back</h2>
@@ -169,9 +167,7 @@ export default async function StatusPage() {
       Releases and the changes that come with them are published on the{" "}
       <Link href={"/changelog" as Route}>changelog</Link>, which has an{" "}
       <a href="/changelog/feed.xml">Atom feed</a> any reader can subscribe to. For an incident
-      affecting your workspace, email support@tavonel.com and you will be replied to directly;
-      there is no announcement list, and saying otherwise would be describing one that does not
-      exist.
+      affecting your workspace, email support@tavonel.com for direct updates.
     </p>
 
     <h2>Incident contact</h2><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>

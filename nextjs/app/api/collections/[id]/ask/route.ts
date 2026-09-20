@@ -10,7 +10,7 @@ import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import {
-  selectProductionRetrievalRuntime,
+  resolveConfiguredProductionRetrievalRuntime,
 } from "@/lib/retrieval-runtime-config";
 import { getFoundationActiveWorld, getWorldFreshness, type ActiveWorld } from "@/lib/world-store";
 import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
@@ -92,7 +92,17 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   const freshness = await getWorldFreshness(workspaceKey, id);
 
   // --- Preferred path: the compiled retrieval pipeline ----------------------------------
-  const runtime = selectProductionRetrievalRuntime(workspaceKey);
+  const indexState = await readRetrievalIndexState({
+    workspaceKey, collectionId: id, worldManifestDigest: active.world.manifestDigest,
+  });
+  const runtimeResolution = await resolveConfiguredProductionRetrievalRuntime({
+    workspaceKey, collectionId: id, endpoint: "ask", query: question,
+    indexStatus: indexState.status,
+  });
+  if (!runtimeResolution.ok) {
+    return { status: 503, body: { code: "RETRIEVAL_RUNTIME_UNAVAILABLE" } };
+  }
+  const runtime = runtimeResolution.runtime;
   const pipeline = await runRetrievalPipeline({
     workspaceKey,
     collectionId: id,
@@ -100,6 +110,12 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
     worldStateId: active.world.worldStateId,
     question,
     profile: runtime.profile,
+    routerDecision: runtime.routerDecision,
+    modelAttempt: runtime.controlPlaneLineage ? {
+      endpoint: "ask",
+      modelRoute: runtime.decision,
+      controlPlaneLineage: runtime.controlPlaneLineage,
+    } : null,
     embedder: runtime.embedder,
     reranker: runtime.reranker,
   });
@@ -169,11 +185,6 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   // compile step existed, a compile that failed on an unreachable embedder and a run still in
   // flight are three different operator problems, and "no compiled retrieval index exists yet"
   // described all three identically. The run table already knows which one it is.
-  const indexState = await readRetrievalIndexState({
-    workspaceKey,
-    collectionId: id,
-    worldManifestDigest: active.world.manifestDigest,
-  });
   const signer = readR2SignerEnv();
   if (!signer) return { status: 503, body: { code: "SIGNER_NOT_CONFIGURED" } };
   const loaded = await getWorkspaceCollectionCandidate(signer, workspaceKey, active.world.candidateObjectKey);

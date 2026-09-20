@@ -1,9 +1,11 @@
+import { createHmac, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createCheckoutBinding } from "./billing-binding";
 import { parsePaddleBillingAction } from "./paddle-billing-event";
 
 const SECRET = "billing-test-secret-that-is-at-least-32-characters";
 const OBSERVER_PRICE = `pri_${"o".repeat(26)}`;
+const EVENT_AT = "2026-08-29T07:00:00.000Z";
 const env = {
   FOUNDATION_BILLING_HMAC: SECRET,
   PADDLE_PRICE_OBSERVER_ACCESS: OBSERVER_PRICE,
@@ -13,21 +15,43 @@ const bindingInput = {
   workspaceId: "pilot-969dc192daa24119",
 } as const;
 
+function checkoutBinding(issuedAt = new Date(EVENT_AT)) {
+  return createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET, issuedAt);
+}
+
+function legacyCheckoutBinding() {
+  const unsigned = {
+    tavonel_binding_version: "v2",
+    tavonel_user_id: bindingInput.userId,
+    tavonel_workspace_id: bindingInput.workspaceId,
+    tavonel_offer_code: "observer_access",
+    tavonel_nonce: randomUUID(),
+    tavonel_issued_at: EVENT_AT,
+  };
+  return {
+    ...unsigned,
+    tavonel_binding: createHmac("sha256", SECRET)
+      .update(Object.values(unsigned).join("\0"), "utf8")
+      .digest("hex"),
+  };
+}
+
 function body(eventType: string, data: Record<string, unknown>, eventCharacter = "e") {
   return JSON.stringify({
     event_id: `evt_${eventCharacter.repeat(26)}`,
     event_type: eventType,
-    occurred_at: "2026-08-29T07:00:00.000Z",
+    occurred_at: EVENT_AT,
     data,
   });
 }
 
 describe("Paddle billing event projection", () => {
   it("grants recurring allowance only for the signed binding and allow-listed price", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    const binding = checkoutBinding();
     const action = parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
       custom_data: binding,
       items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
     }), env);
@@ -36,11 +60,13 @@ describe("Paddle billing event projection", () => {
       offerCode: "observer_access",
       creditDelta: 2_000,
       workspaceId: bindingInput.workspaceId,
+      checkoutBindingFresh: true,
     });
 
     const tampered = parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
       custom_data: { ...binding, tavonel_offer_code: "studio_access" },
       items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
     }, "f"), env);
@@ -48,7 +74,7 @@ describe("Paddle billing event projection", () => {
   });
 
   it("does not grant included usage before Paddle completes the transaction", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    const binding = checkoutBinding();
     expect(parsePaddleBillingAction(body("transaction.paid", {
       id: `txn_${"t".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
@@ -58,7 +84,7 @@ describe("Paddle billing event projection", () => {
   });
 
   it("grants one included-usage allowance from each completed subscription transaction", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    const binding = checkoutBinding();
     expect(parsePaddleBillingAction(body("transaction.completed", {
       id: `txn_${"r".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
@@ -79,7 +105,7 @@ describe("Paddle billing event projection", () => {
     ["subscription.trialing", "trialing"],
     ["subscription.updated", "active"],
   ])("projects %s as access state without duplicating the transaction allowance", (eventType, status) => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    const binding = checkoutBinding();
     expect(parsePaddleBillingAction(body(eventType, {
       id: `sub_${"s".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
@@ -90,7 +116,7 @@ describe("Paddle billing event projection", () => {
   });
 
   it("projects a period-end cancellation without revoking active access", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    const binding = checkoutBinding();
     expect(parsePaddleBillingAction(body("subscription.updated", {
       id: `sub_${"s".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
@@ -106,7 +132,7 @@ describe("Paddle billing event projection", () => {
   });
 
   it("rejects a malformed scheduled cancellation", () => {
-    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "observer_access" }, SECRET);
+    const binding = checkoutBinding();
     expect(parsePaddleBillingAction(body("subscription.updated", {
       id: `sub_${"s".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
@@ -115,6 +141,46 @@ describe("Paddle billing event projection", () => {
       custom_data: binding,
       items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
     }), env)).toMatchObject({ action: "ignored", reason: "subscription_contract_invalid" });
+  });
+
+  it("marks an old authentic binding stale while preserving it for stored-subscription reconciliation", () => {
+    const binding = checkoutBinding(new Date("2026-08-29T06:44:59.999Z"));
+    expect(parsePaddleBillingAction(body("subscription.updated", {
+      id: `sub_${"s".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      status: "active",
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), env)).toMatchObject({
+      action: "subscription",
+      checkoutBindingFresh: false,
+      checkoutBindingNonce: binding.tavonel_nonce,
+    });
+  });
+
+  it("preserves authenticated v2 metadata for an existing subscription association only", () => {
+    const binding = legacyCheckoutBinding();
+    expect(parsePaddleBillingAction(body("subscription.updated", {
+      id: `sub_${"s".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      status: "active",
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), env)).toMatchObject({
+      action: "subscription",
+      checkoutBindingPolicyVersion: "legacy-v2",
+      checkoutBindingFresh: false,
+      checkoutBindingNonce: binding.tavonel_nonce,
+    });
+  });
+
+  it("requires a subscription id before a completed subscription transaction can reach projection", () => {
+    expect(parsePaddleBillingAction(body("transaction.completed", {
+      id: `txn_${"t".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      custom_data: checkoutBinding(),
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), env)).toMatchObject({ action: "ignored", reason: "transaction_subscription_binding_invalid" });
   });
 
   it.each([

@@ -1,9 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { RetrievalDiagnostics } from "./retrieval-pipeline";
 import type { ProductionRetrievalRuntime } from "./retrieval-runtime-config";
+import type { ModelProviderAttemptLifecycle, ModelProviderAttemptTerminal } from "./model-provider-dispatch";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 export const MODEL_ATTEMPT_RECEIPT_SCHEMA = "tavonel.model_attempt_receipt.v1" as const;
+export const MODEL_ATTEMPT_DECISION_SCHEMA = "tavonel.model_attempt_decision.v2" as const;
+export const MODEL_ATTEMPT_OUTCOME_SCHEMA = "tavonel.model_attempt_outcome.v2" as const;
 export const RETRIEVAL_ROUTE_POLICY_VERSION = "retrieval-route-policy/v1" as const;
 
 export type PublicRetrievalRoute = {
@@ -15,6 +18,7 @@ export type PublicRetrievalRoute = {
 
 type RuntimeDecision = ProductionRetrievalRuntime["decision"];
 type AttemptedRole = "embedder" | "reranker";
+type ModelAttemptFailureClass = InternalModelAttemptReceipt["failureClass"];
 const PRE_MODEL_FAILURES = new Set([
   "RETRIEVAL_QUESTION_INVALID", "RETRIEVAL_RUN_NOT_FOUND", "RETRIEVAL_PROFILE_NOT_FOUND",
 ]);
@@ -100,6 +104,253 @@ function canonical(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`).join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+export type ModelAttemptDecisionLineage = {
+  policyId: string;
+  policyVersion: string;
+  policyRevision: number;
+  rolloutRevision: number;
+  assignmentId: string;
+  policyDigest: string;
+  evidenceDigest: string;
+  scopeDigest: string;
+  assignmentDigest: string;
+  thresholdsDigest: string;
+  indexStateDigest: string;
+  controlId: string;
+  chosenId: string;
+  profileId: string;
+  profileDigest: string;
+  runId: string;
+  shadowId: string | null;
+  reservationId: string;
+  admissionId: string;
+  retryOfAttemptId: string | null;
+  retryOrdinal: number;
+};
+
+type AuditedAdapterResult = {
+  status: "ok" | "error";
+  reason?: string;
+  receipt: { outputDigest: string | null; timedOut: boolean; durationMs: number };
+};
+
+export type RetrievalModelAttemptContext = {
+  endpoint: "ask" | "search";
+  role: AttemptedRole;
+  workspaceKey: string;
+  collectionId: string;
+  worldManifestDigest: string;
+  query: string;
+  modelRoute: RuntimeDecision;
+  lineage: Omit<ModelAttemptDecisionLineage, "reservationId" | "admissionId">;
+};
+
+export type ModelAttemptTerminalOutcome = {
+  outcome: "succeeded" | "degraded" | "failed";
+  failureClass: ModelAttemptFailureClass;
+  latencyMs: number;
+  usage: {
+    meter: string;
+    inputUnits: number;
+    outputUnits: number;
+    totalUnits: number;
+    billedUnits: number;
+  };
+  priceReferenceDigest: string;
+  costUsdMicros: number;
+  outputDigest: string;
+  trustReferenceDigest: string;
+};
+
+type ModelAttemptDecisionReceipt = ModelAttemptDecisionLineage & {
+  schemaVersion: typeof MODEL_ATTEMPT_DECISION_SCHEMA;
+  attemptId: string;
+  admittedAt: string;
+  endpoint: "ask" | "search";
+  attemptedRole: AttemptedRole;
+  provider: string;
+  model: string;
+  meter: string;
+  tenantDigest: string;
+  collectionDigest: string;
+  worldManifestDigest: string;
+  inputDigest: string;
+  routeDecisionDigest: string;
+};
+
+type ModelAttemptOutcomeReceipt = ModelAttemptTerminalOutcome & {
+  schemaVersion: typeof MODEL_ATTEMPT_OUTCOME_SCHEMA;
+  outcomeId: string;
+  attemptId: string;
+  completedAt: string;
+};
+
+export type ModelAttemptDecisionPersistenceResult =
+  | { ok: true; attemptId: string }
+  | { ok: false; code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE" };
+
+export type ModelAttemptOutcomePersistenceResult =
+  | { ok: true; attemptId: string; outcomeId: string }
+  | { ok: false; code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE" };
+
+/**
+ * Commits the decision and its complete control-plane lineage before provider dispatch. The
+ * query and evaluated feature values cross this boundary only as digests.
+ */
+export async function admitModelAttemptDecision(input: {
+  endpoint: "ask" | "search";
+  attemptedRole: AttemptedRole;
+  provider: string;
+  model: string;
+  meter: string;
+  workspaceKey: string;
+  collectionId: string;
+  worldManifestDigest: string;
+  query: string;
+  modelRoute: RuntimeDecision;
+  lineage: ModelAttemptDecisionLineage;
+  attemptId?: string;
+  now?: Date;
+  env?: Readonly<Record<string, string | undefined>>;
+}): Promise<ModelAttemptDecisionPersistenceResult> {
+  const config = readSupabaseAdminConfig(input.env ?? process.env);
+  if (!config) return { ok: false, code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE" };
+  const attemptId = input.attemptId ?? randomUUID();
+  const receipt: ModelAttemptDecisionReceipt = {
+    schemaVersion: MODEL_ATTEMPT_DECISION_SCHEMA,
+    attemptId,
+    admittedAt: (input.now ?? new Date()).toISOString(),
+    endpoint: input.endpoint,
+    attemptedRole: input.attemptedRole,
+    provider: input.provider,
+    model: input.model,
+    meter: input.meter,
+    tenantDigest: sha256Digest(input.workspaceKey),
+    collectionDigest: sha256Digest(input.collectionId),
+    worldManifestDigest: input.worldManifestDigest,
+    inputDigest: sha256Digest(input.query.normalize("NFKC").replace(/\s+/g, " ").trim()),
+    routeDecisionDigest: sha256Digest(canonical(input.modelRoute)),
+    ...input.lineage,
+  };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/admit_model_attempt_decision_v2", {
+      method: "POST",
+      body: JSON.stringify({ p_receipt: receipt }),
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE" };
+    }
+    const result = await response.json().catch(() => null) as { attemptId?: unknown } | null;
+    return result?.attemptId === attemptId && UUID.test(attemptId)
+      ? { ok: true, attemptId }
+      : { ok: false, code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE" };
+  } catch {
+    return { ok: false, code: "MODEL_ATTEMPT_DECISION_UNAVAILABLE" };
+  }
+}
+
+/** Appends the one terminal outcome for an already-admitted decision. */
+export async function recordModelAttemptOutcome(input: {
+  attemptId: string;
+  terminal: ModelAttemptTerminalOutcome;
+  outcomeId?: string;
+  now?: Date;
+  env?: Readonly<Record<string, string | undefined>>;
+}): Promise<ModelAttemptOutcomePersistenceResult> {
+  const config = readSupabaseAdminConfig(input.env ?? process.env);
+  if (!config) return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE" };
+  const outcomeId = input.outcomeId ?? randomUUID();
+  const receipt: ModelAttemptOutcomeReceipt = {
+    schemaVersion: MODEL_ATTEMPT_OUTCOME_SCHEMA,
+    outcomeId,
+    attemptId: input.attemptId,
+    completedAt: (input.now ?? new Date()).toISOString(),
+    ...input.terminal,
+  };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/record_model_attempt_outcome_v2", {
+      method: "POST",
+      body: JSON.stringify({ p_receipt: receipt }),
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE" };
+    }
+    const result = await response.json().catch(() => null) as {
+      attemptId?: unknown; outcomeId?: unknown;
+    } | null;
+    return result?.attemptId === input.attemptId && result.outcomeId === outcomeId
+      && UUID.test(input.attemptId) && UUID.test(outcomeId)
+      ? { ok: true, attemptId: input.attemptId, outcomeId }
+      : { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE" };
+  } catch {
+    return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE" };
+  }
+}
+
+function classifiedTerminal<T extends AuditedAdapterResult>(
+  input: ModelProviderAttemptTerminal<T>,
+  worldManifestDigest: string,
+): ModelAttemptTerminalOutcome {
+  const value = input.value;
+  const failed = input.dispatchFailureCode !== null || value === null || value.status === "error";
+  const reason = input.dispatchFailureCode ?? value?.reason ?? "";
+  const invalid = /schema validation|omitted|dimension|profile expects|returned no vector/i.test(reason);
+  return {
+    outcome: failed ? "failed" : "succeeded",
+    failureClass: failed ? (invalid ? "invalid_model_output" : "provider_unavailable") : "none",
+    latencyMs: Math.max(input.latencyMs, value?.receipt.durationMs ?? 0),
+    usage: {
+      meter: input.meter,
+      inputUnits: 0,
+      outputUnits: 0,
+      totalUnits: input.actualUnits,
+      billedUnits: input.actualUnits,
+    },
+    priceReferenceDigest: sha256Digest(
+      `${input.provider}:${input.model}:${input.meter}:${input.priceVersion}:${input.unitMicrousd}`,
+    ),
+    costUsdMicros: input.actualMicrousd,
+    outputDigest: value?.receipt.outputDigest
+      ?? sha256Digest(`${input.provider}:${input.model}:${input.admissionId}:${reason || "no-output"}`),
+    trustReferenceDigest: worldManifestDigest,
+  };
+}
+
+/** Binds a verified router decision to spend/circuit identifiers created by real dispatch. */
+export function createRetrievalModelAttemptLifecycle<T extends AuditedAdapterResult>(
+  context: RetrievalModelAttemptContext,
+): ModelProviderAttemptLifecycle<T> {
+  return {
+    async admit(admission) {
+      return admitModelAttemptDecision({
+        endpoint: context.endpoint,
+        attemptedRole: context.role,
+        provider: admission.provider,
+        model: admission.model,
+        meter: admission.meter,
+        workspaceKey: context.workspaceKey,
+        collectionId: context.collectionId,
+        worldManifestDigest: context.worldManifestDigest,
+        query: context.query,
+        modelRoute: context.modelRoute,
+        lineage: {
+          ...context.lineage,
+          reservationId: admission.reservationId,
+          admissionId: admission.admissionId,
+        },
+      });
+    },
+    async recordTerminal(terminal) {
+      return (await recordModelAttemptOutcome({
+        attemptId: terminal.attemptId,
+        terminal: classifiedTerminal(terminal, context.worldManifestDigest),
+      })).ok;
+    },
+  };
 }
 
 function buildInternalReceipt(input: {

@@ -13,11 +13,15 @@ vi.mock("./supabase-admin", () => ({
 }));
 
 import {
+  admitModelAttemptDecision,
   attemptedRetrievalModelRoles,
   attemptedRetrievalModelRolesOnFailure,
   buildPublicRetrievalRoute,
+  MODEL_ATTEMPT_DECISION_SCHEMA,
+  MODEL_ATTEMPT_OUTCOME_SCHEMA,
   MODEL_ATTEMPT_RECEIPT_SCHEMA,
   persistRetrievalModelAttempt,
+  recordModelAttemptOutcome,
 } from "./model-attempt-receipt";
 import { buildOperatorStatusV1 } from "./operator-status";
 
@@ -146,6 +150,98 @@ describe("internal model-attempt receipts and public projection", () => {
     expect(JSON.stringify(body)).not.toContain(base.workspaceKey);
   });
 
+  it("admits a routing decision before dispatch with complete lineage and no raw query or features", async () => {
+    readConfig.mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "secret" });
+    const attemptId = "33333333-3333-4333-8333-333333333333";
+    adminRequest.mockResolvedValue(Response.json({ attemptId, status: "admitted" }));
+    const lineage = {
+      policyId: "66666666-6666-4666-8666-666666666666",
+      policyVersion: "policy/v7",
+      policyRevision: 7,
+      rolloutRevision: 11,
+      assignmentId: "77777777-7777-4777-8777-777777777777",
+      policyDigest: `sha256:${"1".repeat(64)}`,
+      evidenceDigest: `sha256:${"2".repeat(64)}`,
+      scopeDigest: `sha256:${"3".repeat(64)}`,
+      assignmentDigest: `sha256:${"4".repeat(64)}`,
+      thresholdsDigest: `sha256:${"5".repeat(64)}`,
+      indexStateDigest: `sha256:${"6".repeat(64)}`,
+      controlId: `sha256:${"7".repeat(64)}`,
+      chosenId: `sha256:${"8".repeat(64)}`,
+      profileId: "retrieval-profile-2",
+      profileDigest: `sha256:${"9".repeat(64)}`,
+      runId: "run-88",
+      shadowId: "shadow-17",
+      reservationId: "44444444-4444-4444-8444-444444444444",
+      admissionId: "provider-admission-44",
+      retryOfAttemptId: null,
+      retryOrdinal: 0,
+    };
+    await expect(admitModelAttemptDecision({
+      ...base,
+      attemptedRole: "embedder",
+      provider: "runpod",
+      model: "bge-m3",
+      meter: "gpu_second",
+      lineage,
+      attemptId,
+      now: new Date("2026-09-20T08:00:00.000Z"),
+    })).resolves.toEqual({ ok: true, attemptId });
+
+    const [, path, init] = adminRequest.mock.calls[0];
+    expect(path).toBe("/rest/v1/rpc/admit_model_attempt_decision_v2");
+    const body = JSON.parse(String(init.body));
+    expect(body.p_receipt).toMatchObject({
+      schemaVersion: MODEL_ATTEMPT_DECISION_SCHEMA,
+      attemptId,
+      admittedAt: "2026-09-20T08:00:00.000Z",
+      attemptedRole: "embedder",
+      provider: "runpod",
+      model: "bge-m3",
+      meter: "gpu_second",
+      ...lineage,
+    });
+    expect(body.p_receipt.inputDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(body.p_receipt.routeDecisionDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    const encoded = JSON.stringify(body);
+    expect(encoded).not.toContain(base.query);
+    expect(encoded).not.toContain(base.workspaceKey);
+    expect(encoded).not.toContain('"features"');
+  });
+
+  it("links one terminal measured outcome to its admitted decision", async () => {
+    readConfig.mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "secret" });
+    const attemptId = "33333333-3333-4333-8333-333333333333";
+    const outcomeId = "55555555-5555-4555-8555-555555555555";
+    adminRequest.mockResolvedValue(Response.json({ attemptId, outcomeId, status: "recorded" }));
+    const terminal = {
+      outcome: "succeeded" as const,
+      failureClass: "none" as const,
+      latencyMs: 237,
+      usage: { meter: "token", inputUnits: 41, outputUnits: 13, totalUnits: 54, billedUnits: 54 },
+      priceReferenceDigest: `sha256:${"c".repeat(64)}`,
+      costUsdMicros: 187,
+      outputDigest: `sha256:${"d".repeat(64)}`,
+      trustReferenceDigest: `sha256:${"e".repeat(64)}`,
+    };
+    await expect(recordModelAttemptOutcome({
+      attemptId,
+      outcomeId,
+      terminal,
+      now: new Date("2026-09-20T08:00:00.237Z"),
+    })).resolves.toEqual({ ok: true, attemptId, outcomeId });
+
+    const [, path, init] = adminRequest.mock.calls[0];
+    expect(path).toBe("/rest/v1/rpc/record_model_attempt_outcome_v2");
+    expect(JSON.parse(String(init.body)).p_receipt).toEqual({
+      schemaVersion: MODEL_ATTEMPT_OUTCOME_SCHEMA,
+      outcomeId,
+      attemptId,
+      completedAt: "2026-09-20T08:00:00.237Z",
+      ...terminal,
+    });
+  });
+
   it("keeps operator metrics numeric and drops hostile routing/provider fields", () => {
     const source = Object.assign({
       state: "available" as const,
@@ -184,6 +280,28 @@ describe("internal model-attempt receipts and public projection", () => {
     expect(migration).toMatch(/grant execute on function public\.record_model_attempt_receipt_v1\(jsonb\) to service_role/i);
     expect(migration).toContain("foundation_model_attempt_receipts_append_only");
     expect(migration).toContain("jsonb_array_length(p_receipt->'attemptedRoles') = 0");
+  });
+
+  it("stores v2 admitted decisions and terminal outcomes as linked append-only records", () => {
+    const migration = readFileSync(resolve(import.meta.dirname,
+      "../../supabase/migrations/20260920132001_model_attempt_lineage.sql"), "utf8");
+    expect(migration).toContain("tavonel.model_attempt_decision.v2");
+    expect(migration).toContain("tavonel.model_attempt_outcome.v2");
+    expect(migration).toMatch(/references public\.foundation_model_attempt_decisions \(attempt_id\)/i);
+    expect(migration).toContain("foundation_model_attempt_decisions_append_only");
+    expect(migration).toContain("foundation_model_attempt_outcomes_append_only");
+    expect(migration).toMatch(/reservation_id uuid not null[\s\S]*references public\.model_provider_spend_reservations \(reservation_id\)/i);
+    expect(migration).toMatch(/admission_event_id text not null[\s\S]*references public\.model_provider_circuit_events \(event_id\)/i);
+    expect(migration).toContain("v_reservation.request_key is distinct from p_receipt->>'admissionId'");
+    expect(migration).toContain("v_reservation.provider is distinct from p_receipt->>'provider'");
+    expect(migration).toContain("v_reservation.model is distinct from p_receipt->>'model'");
+    expect(migration).toContain("v_reservation.meter is distinct from p_receipt->>'meter'");
+    expect(migration).toContain("v_reservation.expires_at <= v_now");
+    expect(migration).toContain("model_attempt_decision_timestamp_invalid");
+    expect(migration).toContain("v_admission.provider is distinct from v_reservation.provider");
+    expect(migration).toMatch(/revoke all on function public\.admit_model_attempt_decision_v2\(jsonb\)[\s\S]*service_role/i);
+    expect(migration).toContain("model_attempt_outcome_without_admission");
+    expect(migration).toContain("array['query', 'features', 'prompt', 'rawOutput', 'rawError', 'apiKey']");
   });
 
   it("keeps detailed decisions on the receipt call and the public route on the bounded projection", () => {

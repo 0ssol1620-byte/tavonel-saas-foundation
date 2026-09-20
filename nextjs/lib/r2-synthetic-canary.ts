@@ -63,6 +63,58 @@ export function assertFoundationDeletionKey(bucket: string, workspaceKey: string
   return null;
 }
 
+export function founderResetPrefixes(workspaceKey: string) {
+  if (!WORKSPACE_ID_PATTERN.test(workspaceKey)) return null;
+  return [`quarantine/${workspaceKey}/`, `immutable/${workspaceKey}/${workspaceKey}/`] as const;
+}
+
+function decodeXml(value: string) {
+  return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+}
+
+/** Exhaustive, paginated inventory restricted to the two namespaces owned by one workspace. */
+export async function listFounderResetObjects(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  now = new Date(),
+): Promise<{ ok: true; keys: string[] } | { ok: false; code: string }> {
+  if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
+  const prefixes = founderResetPrefixes(workspaceKey);
+  if (!prefixes) return { ok: false, code: "RESET_WORKSPACE_INVALID" };
+  const keys: string[] = [];
+  for (const prefix of prefixes) {
+    let continuation: string | null = null;
+    do {
+      const query: Record<string, string> = { "list-type": "2", "max-keys": "1000", prefix };
+      if (continuation) query["continuation-token"] = continuation;
+      const canonicalQuery = Object.keys(query).sort()
+        .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`).join("&");
+      const response = await signedS3Request(env, "GET", `/${env.bucket}`, canonicalQuery, undefined, now);
+      if (!response?.ok) return { ok: false, code: "RESET_LIST_FAILED" };
+      const xml = await response.text();
+      for (const match of xml.matchAll(/<Key>([\s\S]*?)<\/Key>/gi)) {
+        const key = decodeXml(match[1] ?? "");
+        if (assertFoundationDeletionKey(env.bucket, workspaceKey, key)) {
+          return { ok: false, code: "RESET_LIST_OUTSIDE_WORKSPACE" };
+        }
+        keys.push(key);
+        if (keys.length > 1_000) return { ok: false, code: "RESET_OBJECT_LIMIT_EXCEEDED" };
+      }
+      const truncated = /<IsTruncated>true<\/IsTruncated>/i.test(xml);
+      continuation = truncated
+        ? decodeXml(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/i.exec(xml)?.[1] ?? "")
+        : null;
+      if (truncated && !continuation) return { ok: false, code: "RESET_LIST_CURSOR_MISSING" };
+    } while (continuation);
+  }
+  return { ok: true, keys: [...new Set(keys)].sort() };
+}
+
+export async function deleteFounderResetObject(env: R2SignerEnv, workspaceKey: string, key: string, now = new Date()) {
+  return deleteFoundationSourceObject(env, workspaceKey, key, now);
+}
+
 /** HEAD one tenant-scoped source object before the durable delete-start transition. */
 export async function inspectFoundationSourceObject(
   env: R2SignerEnv,

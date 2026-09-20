@@ -5,7 +5,7 @@ governance receipts in nextjs/lib/embedder-adapter.ts / reranker-adapter.ts). Ea
 fetched by exact revision via snapshot_download into a local path, then loaded from that
 local path -- this pins the revision regardless of whether the FlagEmbedding wrapper
 classes themselves expose a `revision` kwarg:
-  embedder: BAAI/bge-m3 @ 5617a9f61b028005a4858fdac845db406aefb181
+  embedder: BAAI/bge-m3 @ 142964af7e05de16511657561de8e8750fc153a0
   reranker: BAAI/bge-reranker-v2-m3 @ 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
 
 Response schemas match nextjs/lib/embedder-adapter-runpod.ts and
@@ -44,7 +44,7 @@ async def model_info():
         "embedder": {
             "provider": "huggingface",
             "model": "BAAI/bge-m3",
-            "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+            "revision": "142964af7e05de16511657561de8e8750fc153a0",
             "dimension": 1024,
             "normalize": True,
         },
@@ -72,7 +72,7 @@ async def embed_documents(data: dict):
         from FlagEmbedding import BGEM3FlagModel
         from huggingface_hub import snapshot_download
 
-        local_path = snapshot_download(repo_id="BAAI/bge-m3", revision="5617a9f61b028005a4858fdac845db406aefb181")
+        local_path = snapshot_download(repo_id="BAAI/bge-m3", revision="142964af7e05de16511657561de8e8750fc153a0")
         _EMBED_MODEL = BGEM3FlagModel(local_path, use_fp16=True)  # type: ignore[name-defined]
         model = _EMBED_MODEL  # type: ignore[name-defined]
 
@@ -108,7 +108,7 @@ async def embed_query(data: dict):
         from FlagEmbedding import BGEM3FlagModel
         from huggingface_hub import snapshot_download
 
-        local_path = snapshot_download(repo_id="BAAI/bge-m3", revision="5617a9f61b028005a4858fdac845db406aefb181")
+        local_path = snapshot_download(repo_id="BAAI/bge-m3", revision="142964af7e05de16511657561de8e8750fc153a0")
         _EMBED_MODEL = BGEM3FlagModel(local_path, use_fp16=True)  # type: ignore[name-defined]
         model = _EMBED_MODEL  # type: ignore[name-defined]
 

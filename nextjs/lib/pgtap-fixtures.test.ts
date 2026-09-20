@@ -35,7 +35,7 @@ const allMigrations = readdirSync(migrationsDirectory)
 // results_eq and is_empty and reported a clean fixture as broken.
 const ASSERTION_HELPERS = [
   "has_table", "has_column", "has_index", "has_function", "has_type", "has_enum", "has_pk", "has_fk",
-  "is", "isnt", "ok", "throws_ok", "lives_ok", "results_eq", "results_ne", "set_eq", "bag_eq",
+  "is", "isnt", "ok", "like", "unlike", "throws_ok", "lives_ok", "results_eq", "results_ne", "set_eq", "bag_eq",
   "is_empty", "isnt_empty", "col_is_pk", "col_type_is", "col_not_null", "col_has_default",
   "function_returns", "table_privs_are", "function_privs_are", "policies_are", "policy_cmd_is",
 ].join("|");

@@ -2,22 +2,31 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { isBillingOfferCode, type BillingOfferCode } from "./billing-catalog";
 
 export type CheckoutBinding = {
-  tavonel_binding_version: "v1";
+  tavonel_binding_version: "v2" | "v3";
   tavonel_user_id: string;
   tavonel_workspace_id: string;
   tavonel_offer_code: BillingOfferCode;
   tavonel_nonce: string;
+  tavonel_issued_at: string;
+  tavonel_policy_version: string;
   tavonel_binding: string;
 };
 
+export const CHECKOUT_BINDING_MAX_AGE_MS = 15 * 60 * 1_000;
+export const CHECKOUT_BINDING_POLICY_VERSION = "checkout-v1";
+const CHECKOUT_POLICY_VERSION = /^checkout-v[1-9][0-9]*$/;
+
 function bindingPayload(value: Omit<CheckoutBinding, "tavonel_binding">) {
-  return [
+  const fields = [
     value.tavonel_binding_version,
     value.tavonel_user_id,
     value.tavonel_workspace_id,
     value.tavonel_offer_code,
     value.tavonel_nonce,
-  ].join("\0");
+    value.tavonel_issued_at,
+  ];
+  if (value.tavonel_binding_version === "v3") fields.push(value.tavonel_policy_version);
+  return fields.join("\0");
 }
 
 function signature(value: Omit<CheckoutBinding, "tavonel_binding">, secret: string) {
@@ -27,23 +36,27 @@ function signature(value: Omit<CheckoutBinding, "tavonel_binding">, secret: stri
 export function createCheckoutBinding(
   input: { userId: string; workspaceId: string; offerCode: BillingOfferCode },
   secret: string,
+  now = new Date(),
 ): CheckoutBinding {
-  if (secret.length < 32) throw new Error("billing_binding_secret_unqualified");
+  if (secret.length < 32 || !Number.isFinite(now.getTime())) throw new Error("billing_binding_secret_unqualified");
   const unsigned = {
-    tavonel_binding_version: "v1" as const,
+    tavonel_binding_version: "v3" as const,
     tavonel_user_id: input.userId,
     tavonel_workspace_id: input.workspaceId,
     tavonel_offer_code: input.offerCode,
     tavonel_nonce: randomUUID(),
+    tavonel_issued_at: now.toISOString(),
+    tavonel_policy_version: CHECKOUT_BINDING_POLICY_VERSION,
   };
   return { ...unsigned, tavonel_binding: signature(unsigned, secret) };
 }
 
-export function verifyCheckoutBinding(value: unknown, secret: string | undefined): CheckoutBinding | null {
+/** Authenticates durable provider metadata without requiring the original checkout to remain fresh. */
+export function authenticateCheckoutBinding(value: unknown, secret: string | undefined): CheckoutBinding | null {
   if (!value || typeof value !== "object" || !secret || secret.length < 32) return null;
   const input = value as Record<string, unknown>;
   if (
-    input.tavonel_binding_version !== "v1" ||
+    (input.tavonel_binding_version !== "v2" && input.tavonel_binding_version !== "v3") ||
     typeof input.tavonel_user_id !== "string" ||
     !/^[a-f0-9-]{36}$/i.test(input.tavonel_user_id) ||
     typeof input.tavonel_workspace_id !== "string" ||
@@ -51,13 +64,41 @@ export function verifyCheckoutBinding(value: unknown, secret: string | undefined
     !isBillingOfferCode(input.tavonel_offer_code) ||
     typeof input.tavonel_nonce !== "string" ||
     !/^[a-f0-9-]{36}$/i.test(input.tavonel_nonce) ||
+    typeof input.tavonel_issued_at !== "string" ||
+    (input.tavonel_binding_version === "v3" && (
+      typeof input.tavonel_policy_version !== "string" ||
+      !CHECKOUT_POLICY_VERSION.test(input.tavonel_policy_version)
+    )) ||
     typeof input.tavonel_binding !== "string" ||
     !/^[a-f0-9]{64}$/i.test(input.tavonel_binding)
   ) {
     return null;
   }
-  const binding = input as CheckoutBinding;
-  const expected = Buffer.from(signature(binding, secret), "hex");
-  const received = Buffer.from(binding.tavonel_binding, "hex");
-  return received.length === expected.length && timingSafeEqual(received, expected) ? binding : null;
+  const signedBinding = input as CheckoutBinding;
+  const expected = Buffer.from(signature(signedBinding, secret), "hex");
+  const received = Buffer.from(signedBinding.tavonel_binding, "hex");
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) return null;
+  return input.tavonel_binding_version === "v2"
+    ? { ...signedBinding, tavonel_policy_version: "legacy-v2" }
+    : signedBinding;
+}
+
+export function isCheckoutBindingFresh(binding: CheckoutBinding, at: Date) {
+  const issuedAtMs = Date.parse(binding.tavonel_issued_at);
+  const atMs = at.getTime();
+  return Number.isFinite(issuedAtMs)
+    && Number.isFinite(atMs)
+    && issuedAtMs <= atMs
+    && atMs - issuedAtMs <= CHECKOUT_BINDING_MAX_AGE_MS
+    && binding.tavonel_binding_version === "v3"
+    && binding.tavonel_policy_version === CHECKOUT_BINDING_POLICY_VERSION;
+}
+
+export function verifyCheckoutBinding(
+  value: unknown,
+  secret: string | undefined,
+  now = new Date(),
+): CheckoutBinding | null {
+  const binding = authenticateCheckoutBinding(value, secret);
+  return binding && isCheckoutBindingFresh(binding, now) ? binding : null;
 }

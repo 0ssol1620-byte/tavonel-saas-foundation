@@ -7,12 +7,22 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   page.on("request", request => {
     if (/google-analytics\.com|googletagmanager\.com/.test(request.url())) googleRequests.push(request.url());
   });
+  const serverResponse = await page.request.get("/");
+  expect(await serverResponse.text(), "the server must reserve consent geometry before hydration")
+    .toContain('aria-label="Optional analytics"');
   await page.goto("/");
   const panel = page.getByRole("region", { name: "Optional analytics" });
   await expect(panel).toBeVisible();
   const bounds = await panel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await expect(panel).toHaveCSS("position", "relative");
+  const header = page.locator("header.nav");
+  const headerBounds = await header.boundingBox();
+  expect(headerBounds, "public header has no box").not.toBeNull();
+  expect(bounds!.y + bounds!.height, "consent must end before the public header begins")
+    .toBeLessThanOrEqual((headerBounds?.y ?? 0) + 1);
+  expect(await page.evaluate(() => getComputedStyle(document.body).paddingBottom)).toBe("0px");
   await testInfo.attach("analytics-choice", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
   await page.reload();
@@ -21,6 +31,42 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   expect(googleRequests).toEqual([]);
   await page.getByRole("button", { name: "Analytics preferences" }).click();
   await expect(panel).toBeVisible();
+});
+
+test("the consent notice never covers homepage or pricing actions at 1440 and 390", async ({ page }, testInfo) => {
+  test.skip(!["1440", "390"].includes(testInfo.project.name), "focused visual contract widths");
+  for (const route of ["/", "/pricing"]) {
+    await page.goto(route);
+    const panel = page.getByRole("region", { name: "Optional analytics" });
+    await expect(panel).toBeVisible();
+    const panelBox = await panel.boundingBox();
+    const headerBox = await page.locator("header.nav").boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(headerBox).not.toBeNull();
+    expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(headerBox!.y + 1);
+
+    const target = route === "/"
+      ? page.getByRole("link", { name: "Explore a Compiled World", exact: true }).first()
+      : page.locator(".plan-action a").first();
+    await expect(target).toBeVisible();
+    const targetBox = await target.boundingBox();
+    expect(targetBox).not.toBeNull();
+    const intersects = !(
+      panelBox!.y + panelBox!.height <= targetBox!.y ||
+      targetBox!.y + targetBox!.height <= panelBox!.y ||
+      panelBox!.x + panelBox!.width <= targetBox!.x ||
+      targetBox!.x + targetBox!.width <= panelBox!.x
+    );
+    expect(intersects, `${route} primary action is obscured at ${testInfo.project.name}px`).toBe(false);
+
+    await page.evaluate(() => window.scrollTo(0, Math.min(1_000, document.documentElement.scrollHeight - innerHeight)));
+    const movedPanel = await panel.boundingBox();
+    expect(movedPanel, "document-flow notice should still have a box").not.toBeNull();
+    expect(movedPanel!.y + movedPanel!.height).toBeLessThanOrEqual(0);
+    const stuckHeader = await page.locator("header.nav").boundingBox();
+    expect(stuckHeader, "public header should remain available after the notice scrolls away").not.toBeNull();
+    expect(Math.abs(stuckHeader!.y)).toBeLessThanOrEqual(1);
+  }
 });
 
 test("consented measurement sanitizes URLs and excludes private events and routes", async ({ page, baseURL }) => {

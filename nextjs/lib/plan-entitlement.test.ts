@@ -119,6 +119,21 @@ describe("plan entitlement", () => {
     const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
     expect(pricing, "the pricing card must derive checkout from saleChannel")
       .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');
+    expect(pricing, "contact-only plans must never enter checkout")
+      .toContain('if (!plan.offerCode || !liveCheckout) return "/contact"');
+    expect(pricing, "a signed-out Developer buyer must carry the offer through sign-in")
+      .toContain("return loginUrlForOffer(plan.offerCode)");
+    expect(pricing, "a signed-in Developer buyer must open the existing checkout")
+      .toContain("void startCheckout(plan.offerCode)");
+  });
+
+  it("keeps secondary pricing detail available without leading with it", () => {
+    const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
+    expect(pricing).toContain('<details className="status-fold pricing-depth" id="plan-details">');
+    expect(pricing).toContain("Plan limits and capability details");
+    expect(pricing).toContain('<details className="status-fold pricing-depth" id="pricing-faq">');
+    expect(pricing, "FAQ rows should be closed until a buyer asks the question")
+      .not.toMatch(/<details className="status-fold" key=\{question\} open=/);
   });
 
   it("does not sell a plan the pricing page invents on its own", () => {

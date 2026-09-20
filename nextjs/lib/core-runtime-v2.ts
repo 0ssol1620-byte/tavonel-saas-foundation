@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { readCompiledWorldValidationChecks, regionsOrNone } from "../../shared/compiledWorldValidation";
+import { gateAdmitsCustomerData, type CustomerDataGateDecision } from "../../shared/customerDataGate";
 import {
   GENERIC_MIXED_CORPUS_BLUEPRINT,
   advertisedOntologyRelations,
@@ -59,7 +60,7 @@ export type ProductCoreV2CompileRequest = {
     qualityRequirement: "high_assurance";
     maxCostCredits: number;
     maxLatencyMs: number;
-    privacyPolicy: "foundation_synthetic_only";
+    privacyPolicy: "foundation_synthetic_only" | "approved_customer_data";
   };
   documents: Array<{
     nativeId: string;
@@ -203,6 +204,7 @@ export function buildProductCoreV2Request(
   now = new Date(),
   requestId = `core-${randomUUID()}`,
   previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null,
+  customerDataGate?: CustomerDataGateDecision,
 ): ProductCoreV2CompileRequest {
   const binding = documentBinding(workspaceId, documents);
   const collectionId = productCoreV2CollectionId(workspaceId, documents);
@@ -238,7 +240,9 @@ export function buildProductCoreV2Request(
       maxCostCredits: 10,
       // Never more than this process will wait; see lib/execution-budget.ts.
       maxLatencyMs: CORE_MAX_LATENCY_MS,
-      privacyPolicy: "foundation_synthetic_only",
+      privacyPolicy: gateAdmitsCustomerData(customerDataGate, workspaceId, workspaceId)
+        ? "approved_customer_data"
+        : "foundation_synthetic_only",
     },
     documents: [...documents]
       .sort((left, right) => left.documentId.localeCompare(right.documentId))
@@ -627,8 +631,19 @@ export async function dispatchProductCoreV2(
   documents: CollectionOcrInput[],
   now = new Date(),
   previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null,
+  customerDataGate?: CustomerDataGateDecision,
 ): Promise<{ ok: true; result: ProductCoreV2CompileResponse } | { ok: false; code: string }> {
-  const envelope = buildProductCoreV2Request(workspaceId, documents, now, undefined, previousActiveWorld);
+  if (customerDataGate && !gateAdmitsCustomerData(customerDataGate, workspaceId, workspaceId)) {
+    return { ok: false, code: "CUSTOMER_DATA_GATE_DECISION_INVALID" };
+  }
+  const envelope = buildProductCoreV2Request(
+    workspaceId,
+    documents,
+    now,
+    undefined,
+    previousActiveWorld,
+    customerDataGate,
+  );
   const body = JSON.stringify(envelope);
   const inputSha256 = `sha256:${sha256(body)}`;
   const timestamp = String(Math.floor(now.getTime() / 1000));

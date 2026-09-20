@@ -62,11 +62,11 @@ describe("raw HTML injection", () => {
     const byPath = new Map(users.map((file) => [file.path, file.text]));
     expect(byPath.get("app/layout.tsx")).toMatch(/__html: jsonLdHtml\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(breadcrumbList\(trail\)\)/);
-    expect(byPath.get("components/pricing-page-client.tsx")).toMatch(/__html: jsonLdHtml\(PRICING_JSON_LD\)/);
+    expect(byPath.get("components/pricing-page-client.tsx")).toMatch(/__html: jsonLdHtml\(pricingJsonLd\(initialLiveCheckout\)\)/);
     expect(
       byPath.get("components/pricing-page-client.tsx"),
       "the pricing block is a module constant over the catalog, never assembled from a prop or a fetch",
-    ).toMatch(/const PRICING_JSON_LD = \{\s*\n\s*"@context": "https:\/\/schema\.org"/);
+    ).toMatch(/const pricingJsonLd = \(purchaseReady: boolean\) => \(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     // G1-018 (truth lane, 2026-09-16): /knowledge-compiler emits FAQPage from the same five questions it renders.
     expect(byPath.get("app/knowledge-compiler/page.tsx")).toMatch(/__html: jsonLdHtml\(faqPageJsonLd\)/);
     expect(byPath.get("app/knowledge-compiler/page.tsx"), "built from the page's own literal")

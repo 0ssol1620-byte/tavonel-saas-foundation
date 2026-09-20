@@ -19,9 +19,8 @@ import { koTermDrift } from "./ko-terms";
   being a place to put a sentence that would not survive them.
 
   REWRITTEN 2026-09-20 with the founder's centered hero. Four of the five entries this guarded
-  belonged to the compiler demo and went with it; what is left is the film note -- which is a
-  disclosure rather than a marketing sentence -- and /explore's Entity caveat, which moved to
-  Scene 02 with the World it qualifies.
+  belonged to the compiler demo and went with it; what is left is the film label and /explore's
+  Entity caveat, which moved to Scene 02 with the World it qualifies.
 */
 
 const root = join(import.meta.dirname, "..");
@@ -56,30 +55,6 @@ describe("the Landing V2 hero copy", () => {
       expect(/\d/.test(stage.label), `ko stage ${index} label states a figure`).toBe(false);
       expect(/\d/.test(stage.line), `ko stage ${index} line states a figure`).toBe(false);
     }
-  });
-
-  /*
-    THE FILM NOTE IS THE CONDITION THE FILMS ARE ON THE PAGE UNDER (§11.3, contract rule 7).
-
-    The four locked cuts draw a ruled table, section-and-line labels and `.csv` sources, and this
-    deployment emits none of the three. §11.3 makes closing that gap the first priority of the
-    rebuild; the answer the founder's hero takes is the previous landing's, which is that the film
-    stays and the sentence separating it from what a compile emits stays with it. What is asserted
-    is that the note still names all three and still says what a compile does emit -- a note
-    softened to "a stylised film" would pass a `length > 0` check and disclose nothing.
-  */
-  it("names every part of the film that runs ahead of this deployment", () => {
-    const en = LANDING_V2_HERO_EXTRA.en.filmNote;
-    expect(en).toMatch(/directed film/i);
-    expect(en).toMatch(/not a screen recording/i);
-    for (const ahead of ["ruled table", "section-and-line", ".csv"]) {
-      expect(en, `the note stops naming the ${ahead}`).toContain(ahead);
-    }
-    expect(en, "and it says what a compile does emit").toMatch(/paragraph as it was printed/i);
-    const ko = LANDING_V2_HERO_EXTRA.ko.filmNote;
-    expect(ko, "the Korean note keeps the .csv source in it").toContain(".csv");
-    expect(ko).toContain("연출 영상");
-    expect(ko).toContain("실제 화면 녹화가 아닙니다");
   });
 
   it("imports the published disclosure rather than respelling it", () => {

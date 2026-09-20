@@ -314,12 +314,99 @@
 }
 .lv2-film .compile-film-panes { display: none; }
 .lv2-film .compile-film-caption p { color: var(--text-mid); }
-.lv2-film-note {
-  margin: 14px auto 0;
-  max-width: min(1120px, 100%);
-  color: var(--text-lo);
-  text-align: center;
-  line-height: 1.5;
+.lv2-film .compile-film-mobile-tools { display: none; }
+
+/*
+  The locked films are authored on a 1440 × 900 CSS stage. Fitting that whole composition into a
+  360px phone made its fixed 10px labels about 2.5px tall; a 2x source cannot repair display-size
+  compression. The phone therefore starts with a 1120 × 700 inspection surface inside a bounded
+  viewport. It retains the full 16:10 frame in the same element, supports two-axis touch/keyboard
+  pan, and exposes an explicit full-frame control so no context is hidden without a way back.
+
+  The four film tabs still choose the semantic cut. This view control changes only the scale of
+  the active locked asset; it never substitutes, crops, or re-encodes it.
+*/
+@media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
+  .lv2-film .compile-film-viewport {
+    aspect-ratio: auto;
+    height: min(54svh, 480px);
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain auto;
+    scroll-snap-type: x mandatory;
+    touch-action: pan-x pan-y;
+    scrollbar-width: thin;
+  }
+  .lv2-film .compile-film-panes {
+    display: flex;
+    width: 1120px;
+    height: 700px;
+  }
+  .lv2-film .compile-film-video,
+  .lv2-film .compile-film-still,
+  .lv2-film .compile-film-live {
+    width: 1120px;
+    height: 700px;
+    max-width: none;
+    object-fit: contain;
+  }
+  .lv2-film .compile-film-motion-control {
+    position: sticky;
+    grid-area: 1 / 1;
+    align-self: end;
+    justify-self: start;
+    left: calc(100% - 56px);
+    margin-bottom: 12px;
+  }
+  .lv2-film .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport {
+    aspect-ratio: 8 / 5;
+    height: auto;
+    overflow: hidden;
+    scroll-snap-type: none;
+  }
+  .lv2-film .compile-film-sequence[data-mobile-view="fit"] .compile-film-panes { display: none; }
+  .lv2-film .compile-film-sequence[data-mobile-view="fit"] .compile-film-video,
+  .lv2-film .compile-film-sequence[data-mobile-view="fit"] .compile-film-still,
+  .lv2-film .compile-film-sequence[data-mobile-view="fit"] .compile-film-live {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+  }
+  .lv2-film .compile-film-sequence[data-mobile-view="fit"] .compile-film-motion-control {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    left: auto;
+    margin: 0;
+    align-self: auto;
+    justify-self: auto;
+  }
+  .lv2-film .compile-film-mobile-tools {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    width: min(100%, var(--lv2-film-w));
+    margin-inline: auto;
+  }
+  .lv2-film .compile-film-focus-control {
+    min-height: 44px;
+    padding: 9px 13px;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-hi);
+    font: 600 12px/1.2 var(--f-sans);
+  }
+  .lv2-film .compile-film-focus-control:focus-visible {
+    outline: 2px solid var(--source);
+    outline-offset: 2px;
+  }
+  .lv2-film .compile-film-mobile-tools p {
+    margin: 0;
+    color: var(--text-lo);
+    font: 12px/1.45 var(--f-sans);
+  }
 }
 .lv2-page {
   position: relative;
@@ -375,16 +462,14 @@
 /* Visual hierarchy: paper is reserved for actual source evidence. */
 .lv2-surface { background: var(--ink-900); border-block: 1px solid var(--border-dark); }
 .lv2-hero-h1 { font-synthesis: weight; font-weight: 600; font-variation-settings: "wght" 600; }
-.lv2-hero-intake, .lv2-film-note {
+.lv2-hero-intake {
   font-family: var(--f-sans); font-size: 14px; letter-spacing: 0; line-height: 1.55;
 }
-.lv2-film-note { text-align: left; }
 .lv2-film .compile-film-stages button { font-size: 14px; letter-spacing: 0; }
 .lv2 .lv2-eyebrow { font-family: var(--f-sans); font-size: 13px; font-weight: 600; letter-spacing: .1em; }
 .lv2-proof-note { max-width: 62ch; }
 @media (min-width: 1600px) {
   .lv2-film { --lv2-film-w: 1280px; }
-  .lv2-film-note { max-width: 1280px; }
 }
 @media (max-width: 767px) {
   .lv2-scene-support { margin-top: 16px; }

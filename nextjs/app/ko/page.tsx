@@ -5,7 +5,11 @@ import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { HERO_FILM_POSTER } from "@/components/landing-v2/hero-film";
 import LandingPage from "@/components/landing-v2/landing-page";
 import DocumentLangKo from "./document-lang";
-import { LANDING_VARIANT_COOKIE, LANDING_VARIANT_QUERY, landingVariantState } from "@/lib/landing-experiments";
+import {
+  LANDING_VARIANT_COOKIE,
+  LANDING_VARIANT_QUERY,
+  landingVariantState,
+} from "@/lib/landing-experiments";
 import { pageMetadata } from "@/lib/page-seo";
 import { KO_CHROME } from "@/lib/site-navigation";
 
@@ -16,8 +20,8 @@ import { KO_CHROME } from "@/lib/site-navigation";
   모든 문장은 `lib/landing-v2-copy.ts`의 한국어 카피 — D12에 따라 영문을 그대로 옮긴 번역이고
   새로운 주장은 없다. 화면에 나오는 숫자는 전부 컴파일된 공개 World에서 읽어 온 값이다.
 
-  창업자 결정(2026-09-20)으로 히어로는 가운데 정렬한 문장 블록과 그 아래의 영상이다. 잠긴 네 컷을
-  `components/landing-v2/hero-film.tsx`가 한국어 라벨·자막과 함께 재생하며, 바이트는 그대로다.
+  히어로는 가운데 정렬한 문장 블록과 그 아래의 결정론적 컴파일러 표본이다. 공개 샘플의 같은 원문을
+  Page → Structure → Evidence → Knowledge → Intelligence의 다섯 단계로 보여 준다.
 
   `app/ko/layout.tsx`는 2026-09-19 수정 2차에서 삭제했다. 그 레이아웃은 `<div lang="ko">`
   하나만 렌더했는데, `LandingPage`가 이미 `.page`에 `lang="ko"`를 붙이고 `DocumentLangKo`가
@@ -40,7 +44,8 @@ export const dynamic = "force-dynamic";
 */
 export const metadata: Metadata = pageMetadata({
   title: `TAVONEL — ${KO_CHROME.tagline}`,
-  description: "완성된 공개 Compiled World를 살펴보고, 결과 하나를 정확한 원문 영역까지 따라가고, 변경 내용과 허용 원문 및 배포 경계를 확인한 뒤 직접 가진 원문을 논의하세요.",
+  description:
+    "완성된 공개 Compiled World를 살펴보고, 결과 하나를 정확한 원문 영역까지 따라가고, 변경 내용과 허용 원문 및 배포 경계를 확인한 뒤 직접 가진 원문을 논의하세요.",
   canonical: "/ko",
   languages: { ko: "/ko", en: "/", "x-default": "/" },
 });
@@ -61,9 +66,6 @@ export default async function KoreanEntryPage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
-  /* 영문 페이지와 같은 LCP 리소스: 히어로 영상의 포스터 한 장(창업자 결정 2026-09-20).
-     F10: 엘리먼트가 아니라 react-dom의 preload()다 — 엘리먼트로 두면 React가 head에 호이스트한
-     사본과 제자리에 렌더한 원본이 함께 나와 같은 리소스를 두 번 프리로드한다. */
   preload(HERO_FILM_POSTER, { as: "image", fetchPriority: "high" });
   return (
     <>

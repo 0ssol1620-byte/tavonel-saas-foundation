@@ -28,6 +28,13 @@ export async function POST(request: Request) {
   }
   const applied = await applyFoundationBillingAction(action);
   if (!applied.ok) return NextResponse.json({ code: applied.code }, { status: 503, headers });
+  if (applied.result.status === "binding_rejected") {
+    return NextResponse.json({
+      code: "EVENT_IGNORED",
+      eventId: action.eventId,
+      reason: typeof applied.result.reason === "string" ? applied.result.reason : "checkout_binding_rejected",
+    }, { status: 200, headers });
+  }
   /*
     The paid hop, from the receipt rather than from the browser that came back from checkout.
     `checkout_completed` already counts the return trip; this counts the subscription the

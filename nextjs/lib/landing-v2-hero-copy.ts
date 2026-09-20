@@ -13,7 +13,8 @@ import { EXPLORE_COPY } from "./explore-story";
  * region strip, the page locator, the claim card, the entity chips, the arrivals and the
  * comparison counts -- is off the hero, and the five strings only it rendered went with it
  * (`filedFormat`, `readStripAlt`, `boundObjectsCaption`, `countsQualifier`). What the hero needs
- * now is one sentence, and it is the one sentence the four locked films may not be shown without.
+ * now is one concise label that identifies the sequence as an illustration and states the
+ * evidence the current product preserves.
  *
  * `entityDisclaimer` stays and moves with the objects it qualifies: /explore's own short caveat,
  * imported rather than respelled, printed as a footnote on Scene 02. Contract rule 7 keeps it on
@@ -21,29 +22,15 @@ import { EXPLORE_COPY } from "./explore-story";
  */
 
 export type LandingV2HeroExtraCopy = {
-  /**
-   * §11.3 / contract rule 7, under the hero film.
-   *
-   * The four cuts draw a ruled table, section-and-line labels and `.csv` sources, and this
-   * deployment emits none of the three: it emits the paragraph as it was printed, the page it was
-   * read from and the box it sat in. This is the previous landing's own sentence, kept as it was
-   * published except for its closing clause, which pointed at three /explore frames the page no
-   * longer carries. A film that runs ahead of the deployment is allowed on the page only with it.
-   */
-  filmNote: string;
   /** /explore's Entity caveat in one sentence, printed once on the page (Scene 02's footnote). */
   entityDisclaimer: string;
 };
 
 export const LANDING_V2_HERO_EXTRA: Record<"en" | "ko", LandingV2HeroExtraCopy> = {
   en: {
-    filmNote:
-      "A directed film, not a screen recording: the ruled table, the section-and-line labels and the .csv sources in it run ahead of this deployment. What a compile emits today is the paragraph as it was printed, the page it was read from and the box it sat in.",
     entityDisclaimer: EXPLORE_COPY.entityCaveatShort,
   },
   ko: {
-    filmNote:
-      "제품 흐름을 설명하는 연출 영상이며 실제 화면 녹화가 아닙니다. 영상 속 격자로 그린 표, 절·행 번호 위치, .csv 원문은 현재 배포보다 앞서 있습니다. 지금 컴파일이 내보내는 것은 인쇄된 그대로의 문단과 그것을 읽어 온 페이지·영역입니다.",
     /* The literal translation of `EXPLORE_COPY.entityCaveatShort`, with no figure in it. */
     entityDisclaimer: "이 샘플의 개체 이름은 휴리스틱입니다. 여기서 판단할 부분은 Claim과 페이지에 묶인 근거입니다.",
   },
