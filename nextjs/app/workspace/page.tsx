@@ -1997,6 +1997,7 @@ export default function WorkspacePage() {
     reviewCount,
     activeRevision: activeWorld?.revision ?? null,
     compileErrorCode: compileJob?.errorCode ?? null,
+    compileJobState: compileJob?.state ?? null,
     blockedSourceCount: compileJob?.blocked.length ?? 0,
     hasGroundedAnswer: askResult?.status === "grounded",
     hasAiConnection: aiConnectionTaken,

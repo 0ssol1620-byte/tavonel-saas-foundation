@@ -35,3 +35,25 @@ describe("compile job review handoff", () => {
     expect(html).not.toContain("Review evidence package");
   });
 });
+
+
+describe("completed run is not activated knowledge", () => {
+  it("does not present a completed job as an activated World", () => {
+    const html = render({ state: "ready" });
+    expect(html).toContain("Compilation finished.");
+    expect(html).toContain("Completion does not activate knowledge for AI use");
+    expect(html).not.toContain("Compiled World ready.");
+    expect(html).toContain("Inspect compiled result");
+    expect(html).toContain(`/workspace?collection=${job.collectionId}`);
+  });
+  it.each([null, "../other", "collection-not-valid"])("does not invent a ready-result link for %s", collectionId => {
+    expect(render({ state: "ready", collectionId })).not.toContain("Inspect compiled result");
+  });
+  it("keeps an unknown server state explicit and without continuation controls", () => {
+    const html = render({ state: "future_state" as CompileJobView["state"] });
+    expect(html).toContain("Run state unavailable.");
+    expect(html).toContain("unrecognized run state");
+    expect(html).not.toContain("This runs on our servers");
+    expect(html).not.toContain("Cancel this compile");
+  });
+});

@@ -75,6 +75,12 @@ for (const state of ['ready', 'review_required', 'failed', 'cancelled']) test(`a
   await expect(stage.locator('canvas')).toHaveCount(0);
   await expect(stage.locator('[role="status"] p')).not.toBeEmpty();
   await expect(stage).not.toHaveAttribute('data-tone', 'ready');
+  await expect(page.locator('h1')).not.toContainText('ready to compile');
+  await expect(page.locator('.workspace-compile-job')).not.toContainText('Compiled World ready.');
+  if (state === 'ready') {
+    await expect(page.locator('h1')).toHaveText('Compilation finished.');
+    await expect(page.locator('.workspace-compile-job')).toContainText('Completion does not activate knowledge for AI use');
+  }
   expect((await stage.boundingBox())!.height).toBeLessThan(260);
   await capture(page, `workspace-${state}-no-result`);
 });

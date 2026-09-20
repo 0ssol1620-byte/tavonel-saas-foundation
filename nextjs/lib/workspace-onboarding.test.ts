@@ -121,8 +121,8 @@ describe("workspace state", () => {
 
   it("does not tell a returning user with nothing readable to build their first World", () => {
     const state = deriveWorkspaceState(input({ documentCount: 2, operatorReviewCount: 2 }));
-    expect(state.stateTitle).toBe("Your files are being prepared.");
-    expect(state.nextAction).toEqual({ label: "Open sources", surface: "sources" });
+    expect(state.stateTitle).toBe("Your sources need review.");
+    expect(state.nextAction).toEqual({ label: "Open sources needing review", surface: "sources" });
   });
 });
 
@@ -208,5 +208,32 @@ describe("attention items", () => {
   it("reports a review-required candidate even when no reason count came back", () => {
     const items = deriveAttentionItems(input({ collectionReviewRequired: true, reviewCount: 0 }));
     expect(items[0].detail).toBe("The compiled candidate requires review before it can become active.");
+  });
+});
+
+
+describe("selected run and header consistency", () => {
+  it.each([
+    ["ready", "Compilation finished."],
+    ["review_required", "This compile needs review."],
+    ["cancelled", "The selected compile was cancelled."],
+    ["failed", "The last compile stopped."],
+  ] as const)("does not invite a new compile over a %s run without a loaded result", (compileJobState, title) => {
+    const state = deriveWorkspaceState(input({ documentCount: 1, readyDocumentCount: 1, compileJobState }));
+    expect(state.stateTitle).toBe(title);
+    expect(state.nextAction.label).not.toBe("Choose sources to compile");
+    expect(state.nextAction.surface).toBe(compileJobState === "failed" ? "activity" : "runs");
+  });
+  it("does not describe an existing saved run as an untouched workspace", () => {
+    expect(deriveWorkspaceMode(input({ compileJobState: "cancelled" }))).toBe("returning");
+  });
+  it("does not tick candidate or activation steps from a ready job alone", () => {
+    const steps = deriveOnboardingSteps(input({ compileJobState: "ready" }));
+    expect(steps.find(s => s.id === "compile")?.done).toBe(false);
+    expect(steps.find(s => s.id === "activate")?.done).toBe(false);
+  });
+  it("still prioritizes an actual loaded candidate and an actual active revision", () => {
+    expect(deriveWorkspaceState(input({ compileJobState: "ready", hasCandidate: true, candidateNeedsDecision: true })).stateTitle).toBe("Ready for your review.");
+    expect(deriveWorkspaceState(input({ compileJobState: "ready", hasCandidate: true, activeRevision: 2 })).stateTitle).toBe("Your published knowledge · v2");
   });
 });

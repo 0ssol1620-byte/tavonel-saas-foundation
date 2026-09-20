@@ -48,7 +48,7 @@ const STATE_COPY: Record<CompileState, string> = {
   resolving: "Resolving entities across documents.",
   building_world: "Building the World.",
   review_required: "A review package is ready for a person to inspect.",
-  ready: "Compiled World ready.",
+  ready: "Compilation finished.",
   failed: "This compile stopped.",
   cancelled: "Cancelled.",
 };
@@ -98,7 +98,8 @@ export function CompileJobPanel({
   onCancel: () => void;
   onOpenPart?: (jobId: string) => void;
 }) {
-  const settled = SETTLED.includes(job.state);
+  const knownState = Object.prototype.hasOwnProperty.call(STATE_COPY, job.state);
+  const settled = !knownState || SETTLED.includes(job.state);
   const awaitingReview = job.state === "review_required";
   const undecided = job.blocked.length > 0 && !job.blockedResolution && !settled;
   const security = job.blocked.filter((entry) => entry.kind === "security");
@@ -107,7 +108,7 @@ export function CompileJobPanel({
   return (
     <section className="workspace-compile-job" aria-labelledby="workspace-compile-job-title" data-state={job.state}>
       <p className="eyebrow">{corpus ? `Part ${(job.batchIndex ?? 0) + 1} of ${corpus.batchCount}` : "Compile"}</p>
-      <h2 id="workspace-compile-job-title">{STATE_COPY[job.state]}</h2>
+      <h2 id="workspace-compile-job-title">{knownState ? STATE_COPY[job.state] : "Run state unavailable."}</h2>
       {corpus ? (
         <>
           <p className="fine">
@@ -154,7 +155,11 @@ export function CompileJobPanel({
         The sentence this whole change exists to make true. It is worth saying out loud, in the
         place where somebody is deciding whether they can close the laptop.
       */}
-      {awaitingReview ? (
+      {!knownState ? (
+        <p className="fine" role="status">The server returned an unrecognized run state. Refresh the run details before taking another action.</p>
+      ) : job.state === "ready" ? (
+        <p className="fine">Completion does not activate knowledge for AI use. Inspect the result and its activation state before using it.</p>
+      ) : awaitingReview ? (
         <p className="fine">Processing has paused for your review. Inspect the evidence package and its review reasons before deciding what to do next.</p>
       ) : settled ? null : (
         <p className="fine">This runs on our servers. You can close this page and come back to it.</p>
@@ -162,6 +167,11 @@ export function CompileJobPanel({
       {awaitingReview && job.collectionId && /^collection-[a-f0-9]{32}$/.test(job.collectionId) ? (
         <div className="workspace-intake-actions">
           <a className="btn" href={`/workspace?collection=${encodeURIComponent(job.collectionId)}`}>Review evidence package</a>
+        </div>
+      ) : null}
+      {job.state === "ready" && job.collectionId && /^collection-[a-f0-9]{32}$/.test(job.collectionId) ? (
+        <div className="workspace-intake-actions">
+          <a className="btn" href={`/workspace?collection=${encodeURIComponent(job.collectionId)}`}>Inspect compiled result</a>
         </div>
       ) : null}
       <progress
