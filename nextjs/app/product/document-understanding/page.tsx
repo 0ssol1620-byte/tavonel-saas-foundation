@@ -5,6 +5,8 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import SolutionProofSample, { type ProofPick } from "@/components/solution-proof-sample";
 import proofStyles from "@/components/solution-proof-sample.module.css";
+import RegionHighlight from "@/components/evidence/region-highlight";
+import { sampleEvidencePage } from "@/lib/evidence-regions";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 
@@ -190,6 +192,21 @@ export default function DocumentUnderstandingPage() {
                   </article>
                 ))}
               </div>
+              {/*
+                G1-019 / gap #3, 2026-09-22. "The place, kept" is the second of the four cards and
+                was the one claim on this page with nothing under it: the crop at the foot shows
+                one region enlarged, which demonstrates what a region contains and not that a page
+                carries several of them at measured positions.
+
+                This is the whole page with every region the public sample World read out of it,
+                at the compiler's own coordinates. Paragraph boxes only: the manifest records
+                `no_table_or_formula_extraction`, so nothing here draws a cell, a row or a grid,
+                and the READ card above says the same thing in words.
+              */}
+              <RegionHighlight
+                view={sampleEvidencePage()}
+                caption="What the read left behind on one page of the public sample World: a box for each region, at the coordinates recorded for it, and the paragraph text each one carries."
+              />
               <p className="fine">
                 Every sentence above about what is read comes from the capability manifest this
                 deployment validates uploads against — tier, preserved fields and limitations per
