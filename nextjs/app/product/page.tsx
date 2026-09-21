@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicPageShell } from "@/components/public-page-shell";
+import ExploreFrame from "@/components/explore/explore-frame";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 import tableStyles from "@/components/docs/docs-table.module.css";
@@ -84,6 +85,14 @@ export default function ProductPage() {
             <div className="stack">
               <p className="lede">Documents, scans and connected systems go in. A source-grounded, versioned Compiled World comes out — with evidence still attached.</p>
               <div className="actions"><PublicPrimaryCta className="btn" /><Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link></div>
+              {/*
+                Gap #8. The hub for "a World your AI can use" had no World on it.
+
+                The same renderer /explore draws, over the same compiled artifact, above the
+                fold on the page that makes the claim -- not a diagram of one. It is the frame
+                the category guide carries too, from one component, so the two cannot drift.
+              */}
+              <ExploreFrame caption="A Compiled World, drawn from the published sample" />
             </div>
           </div>
 

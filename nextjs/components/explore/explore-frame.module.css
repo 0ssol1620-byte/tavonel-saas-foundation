@@ -1,0 +1,67 @@
+/*
+  Gap #8. The embedded frame around the shared World renderer.
+
+  `world-visual.module.css` sizes `.field` against the viewport height, because on `/explore` the
+  stage owns the screen. Inside a reading column it cannot: the container fixes the width here and
+  the renderer's own `aspect-ratio` sets the height from it, so the composition is the same at
+  every viewport and nothing is measured at runtime.
+*/
+.frame {
+  margin: 0;
+  border: 1px solid var(--hairline);
+  background: var(--g1);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 18px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-mid);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+/* The renderer's own width rule is viewport-height based; inside a column it takes the column. */
+.field > div {
+  width: 100%;
+}
+
+.field {
+  padding: 14px;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-lo);
+  font-size: 12px;
+}
+
+.digest {
+  font-family: var(--f-mono);
+  letter-spacing: 0.04em;
+}
+
+.note {
+  margin: 0;
+  padding: 10px 14px 14px;
+  color: var(--text-lo);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 720px) {
+  .field {
+    padding: 10px;
+  }
+}

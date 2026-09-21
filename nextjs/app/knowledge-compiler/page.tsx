@@ -1,6 +1,7 @@
 import type { Metadata, Route } from "next";
 import KnowledgeCompilerDiagram from "@/components/knowledge-compiler-diagram";
 import PublicProofRegistry from "@/components/public-proof-registry";
+import ExploreFrame from "@/components/explore/explore-frame";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
@@ -101,7 +102,18 @@ export default function KnowledgeCompilerPage() {
       { key: "STRUCTURE", description: "Directory, ontology, entities, claims and relations.", state: "REVIEWABLE" },
       { key: "EVIDENCE", description: "Source version, the exact location inside it, excerpt and digest.", state: "TRACEABLE" },
       { key: "WORLD", description: "Candidate and active revisions separated by a human decision.", state: "VERSIONED" },
-    ] },
+    ],
+      /*
+        Gap #8. The artifact this section defines, drawn beside the definition of it.
+
+        A category guide that names the unit of value and then shows nothing is asking a reader
+        to take the category on trust. This is `/explore`'s own renderer over `/explore`'s own
+        compiled World -- the same component `/product` carries, from one file, so the two frames
+        cannot drift -- and the caveat about what one issuer's filings do and do not establish
+        travels inside it rather than being left behind on the route it came from.
+      */
+      figure: <ExploreFrame caption="One Compiled World, from the published sample" />,
+    },
     {
       title: "Where each category acts",
       body: "These are not four competing products. They are four different spans of one pipeline, which is why the comparisons below are about scope rather than quality.",

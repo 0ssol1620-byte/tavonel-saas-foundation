@@ -103,6 +103,7 @@ describe("the first-call tabs on /developers", () => {
   it("points the agent tab at a tool the published MCP server defines, making this same request", () => {
     const tool = TOOLS.find((entry) => entry.name === FIRST_CALL_OPERATION.mcpTool);
     expect(tool, `the MCP server defines no ${FIRST_CALL_OPERATION.mcpTool}`).toBeTruthy();
+    if (!tool) return;
     const request = tool.request({});
     expect(request.method).toBe("GET");
     expect(request.path).toBe(`/api/v1${FIRST_CALL_OPERATION.path}`);
