@@ -103,12 +103,12 @@ describe("source deletion cron route", () => {
     expect(await failure.json()).toEqual({ code: "SOURCE_DELETE_FAILED", processed: 0 });
   });
 
-  it("keeps credentials external and leaves the fail-closed worker unscheduled", () => {
+  it("keeps credentials external and schedules inventory before physical purge", () => {
     const route = readFileSync(new URL("../app/api/internal/deletions/run/route.ts", import.meta.url), "utf8");
     expect(route).toContain("process.env.FOUNDATION_WORKER_SECRET");
     expect(route).toContain("process.env.CRON_SECRET");
     expect(route).not.toMatch(/["'`][A-Za-z0-9+/=_-]{32,}["'`]/);
     const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
-    expect(vercel.crons).not.toContainEqual(expect.objectContaining({ path: "/api/internal/deletions/run" }));
+    expect(vercel.crons).toContainEqual({ path: "/api/internal/deletions/attest", schedule: "3,18,33,48 * * * *" });\n    expect(vercel.crons).toContainEqual({ path: "/api/internal/deletions/run", schedule: "8,23,38,53 * * * *" });
   });
 });
