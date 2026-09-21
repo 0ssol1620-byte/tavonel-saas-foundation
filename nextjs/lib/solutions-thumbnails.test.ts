@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import SolutionProofSample from "../components/solution-proof-sample";
+import SolutionProofSample, { type ProofPick, type ProofVariant } from "../components/solution-proof-sample";
 import { SOLUTIONS } from "../app/solutions/[slug]/page";
 import { exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import { sourceRegionRaster } from "./source-page-rasters";
@@ -26,6 +26,13 @@ import { toVisualWorldModel } from "./visual-world-model";
 
 const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
 const entries = Object.entries(SOLUTIONS);
+
+/*
+  The component takes its whole props object with a default, so `createElement` resolves the
+  no-props overload and rejects a call that passes one. Naming the signature here is the narrow
+  fix: it asserts nothing about behaviour, and a prop that stops existing still fails the build.
+*/
+const Thumb = SolutionProofSample as (props: { pick: ProofPick; variant: ProofVariant }) => ReactElement | null;
 
 /** The component's own selection, repeated here rather than imported, so drift fails. */
 function selected(pick: { form: string; match: RegExp }) {
@@ -60,7 +67,7 @@ describe("the /solutions card thumbnails", () => {
   it("renders a real image with its dimensions, lazily, and no link inside the card", () => {
     for (const [slug, solution] of entries) {
       const html = renderToStaticMarkup(
-        createElement(SolutionProofSample, { pick: solution.proof, variant: "thumb" as const }),
+        createElement(Thumb, { pick: solution.proof, variant: "thumb" }),
       );
       expect(html, `${slug} renders no image`).toContain("<img");
       expect(html, `${slug} omits width or height`).toMatch(/width="\d+"[\s\S]*height="\d+"/);
@@ -88,7 +95,7 @@ describe("the /solutions card thumbnails", () => {
   it("claims no accuracy and no table structure in what a thumbnail says", () => {
     for (const [slug, solution] of entries) {
       const html = renderToStaticMarkup(
-        createElement(SolutionProofSample, { pick: solution.proof, variant: "thumb" as const }),
+        createElement(Thumb, { pick: solution.proof, variant: "thumb" }),
       );
       const text = html.replace(/<[^>]+>/g, " ").toLowerCase();
       for (const barred of ["accuracy", "accurate", "extracted table", "table extraction", "per minute", "throughput"]) {
