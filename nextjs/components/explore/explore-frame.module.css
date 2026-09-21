@@ -52,6 +52,30 @@
   letter-spacing: 0.04em;
 }
 
+/*
+  BA-240's 44px floor, which this frame has to opt into by hand.
+
+  `app/tavonel.css` grows inline links to the floor under a coarse pointer, but it does that
+  through a list of global class names -- `.fine`, `.lede`, `.tile` and the rest -- and the two
+  links here sit on hashed CSS-module classes that no such list can name. So the frame applies
+  the pattern documented there rather than adding itself to that list: block padding for the hit
+  area, an equal negative margin to give the space back, so the header row and the paragraph keep
+  the height they lay out at and nothing reflows on a phone.
+
+  13px rather than the 12.5px used elsewhere, with the line height declared here so it cannot be
+  inherited smaller: 12px of type at 1.7 is 20.4px, and 20.4 + 26 clears 44 with room for
+  sub-pixel rounding instead of landing on it.
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .head a,
+  .note a {
+    display: inline-block;
+    padding-block: 13px;
+    margin-block: -13px;
+    line-height: 1.7;
+  }
+}
+
 .note {
   margin: 0;
   padding: 10px 14px 14px;

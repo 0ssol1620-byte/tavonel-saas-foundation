@@ -79,6 +79,32 @@ describe("the embedded Explore frame", () => {
     }
   });
 
+  /*
+    BA-240. The floor rule in `app/tavonel.css` names global classes, and every class in this
+    frame is a hashed module one, so the two links here fall outside it and have to opt in.
+
+    `e2e/mobile-landing.spec.ts` measures every anchor on /knowledge-compiler against 44px, and
+    both of these are 12px type in a 12px row -- about 20px of line box each. Held here as well
+    as there, because the e2e run needs a build and this does not.
+  */
+  it("gives its two links the 44px touch floor its module classes are outside of", () => {
+    const css = page("components/explore/explore-frame.module.css");
+    const at = css.indexOf("@media (pointer: coarse)");
+    expect(at, "the frame declares no coarse-pointer floor").toBeGreaterThan(-1);
+    const floor = css.slice(at);
+    for (const selector of [".head a", ".note a"]) {
+      expect(floor, `${selector} is not given the floor`).toContain(selector);
+    }
+    /* The documented pattern: padding for the hit area, an equal negative margin giving it back. */
+    const padding = /padding-block:\s*(\d+(?:\.\d+)?)px/.exec(floor);
+    const margin = /margin-block:\s*-(\d+(?:\.\d+)?)px/.exec(floor);
+    const lineHeight = /line-height:\s*([\d.]+)/.exec(floor);
+    expect(padding && margin && lineHeight).toBeTruthy();
+    expect(Number(padding![1])).toBe(Number(margin![1]));
+    /* 12px of type at its declared line height, plus the padding on both sides, has to clear 44. */
+    expect(12 * Number(lineHeight![1]) + 2 * Number(padding![1])).toBeGreaterThan(44);
+  });
+
   it("claims no accuracy, no throughput and no table structure around the frame", () => {
     const text = html.replace(/<[^>]+>/g, " ").toLowerCase();
     for (const barred of ["accuracy", "accurate", "per minute", "per second", "throughput", "at scale", "table extraction", "row", "cell"]) {
