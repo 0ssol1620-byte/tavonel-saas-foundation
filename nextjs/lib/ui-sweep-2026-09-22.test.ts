@@ -85,10 +85,12 @@ describe("UI sweep 2026-09-22", () => {
     expect(rule, ".sources a states the floor").toMatch(/min-height:\s*44px/);
     expect(rule, "and takes the growth back so the row does not reflow").toMatch(/margin-block:\s*-9px/);
     /* The evidence and export links are standalone 21px lines with no row padding to grow into,
-       so they take the padding themselves: 21 + 2x11.5 = 44, given straight back. */
+       so they take the padding themselves: 21 + 2x12 = 45, given straight back. The extra pixel
+       over 44 is deliberate -- a line box is a fractional number and 44.0 exactly is a coin
+       toss against a floor asserted at 43.99. */
     const standalone = demo.match(/\.evidence a, \.exportRecord > a \{[^}]*padding-block[^}]*\}/)?.[0] ?? "";
-    expect(standalone, ".evidence a / .exportRecord > a grow and give it back").toMatch(/padding-block:\s*11\.5px/);
-    expect(standalone).toMatch(/margin-block:\s*-11\.5px/);
+    expect(standalone, ".evidence a / .exportRecord > a grow and give it back").toMatch(/padding-block:\s*12px/);
+    expect(standalone).toMatch(/margin-block:\s*-12px/);
   });
 
   /*
@@ -98,8 +100,8 @@ describe("UI sweep 2026-09-22", () => {
   */
   it("makes the changelog permalinks tappable without moving their baseline row", () => {
     const rule = touchBlock.match(/\.changelog-entry header a \{[^}]*\}/)?.[0] ?? "";
-    expect(rule, "the permalink grows to 26 + 2x9 = 44").toMatch(/padding-block:\s*9px/);
-    expect(rule, "and gives the growth back").toMatch(/margin-block:\s*-9px/);
+    expect(rule, "the permalink grows to 26 + 2x10 = 46").toMatch(/padding-block:\s*10px/);
+    expect(rule, "and gives the growth back").toMatch(/margin-block:\s*-10px/);
   });
 
   /*

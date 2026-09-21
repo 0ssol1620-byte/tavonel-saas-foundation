@@ -75,7 +75,7 @@
 .sources a { display: inline-flex; align-items: center; min-height: 44px; margin-block: -9px; }
 /* The evidence and export links are standalone lines of 21px with no row padding to grow into,
    so they take the padding themselves and give it straight back. */
-.evidence a, .exportRecord > a { display: inline-block; padding-block: 11.5px; margin-block: -11.5px; }
+.evidence a, .exportRecord > a { display: inline-block; padding-block: 12px; margin-block: -12px; }
 .sources small { color: var(--demo-muted); text-align: right; }
 /*
   `.88em` is relative to whatever it lands in, and it landed in 12px (`.checks`) and 13px
