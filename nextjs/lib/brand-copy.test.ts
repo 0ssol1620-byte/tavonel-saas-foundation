@@ -484,8 +484,12 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("opens with the four-cut HeroFilm and moves the deterministic specimen below it", () => {
+  it("opens on the live inspector, then the four-cut film and the deterministic specimen", () => {
     const page = landingSource();
+    /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
+       film opens the landmark that explains how the World was compiled. The entry pages preload
+       the hero's own raster because that is the image above the fold now. */
+    expect(page.indexOf("<HeroProof")).toBeLessThan(page.indexOf("<HeroFilm"));
     expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
@@ -493,8 +497,8 @@ describe("public copy", () => {
     expect(read("components/landing-v2/compiler-specimen.tsx")).not.toContain(
       "<video"
     );
-    expect(read("app/page.tsx")).toContain("HERO_FILM_POSTER");
-    expect(read("app/ko/page.tsx")).toContain("HERO_FILM_POSTER");
+    expect(read("app/page.tsx")).toContain("HERO_PROOF_IMAGE");
+    expect(read("app/ko/page.tsx")).toContain("HERO_PROOF_IMAGE");
     expect(read("components/landing-v2/hero-film.tsx")).not.toContain("lv2-film-note");
   });
 
@@ -1307,8 +1311,9 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<HeroFilm",
+      "<HeroProof",
       'id="s2"',
+      "<HeroFilm",
       "<CompilerSpecimen",
       "<ProofScene",
       "copy.recompile",

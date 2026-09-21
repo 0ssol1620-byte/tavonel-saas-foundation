@@ -4,6 +4,7 @@ import {
 } from "@/components/public-site-chrome";
 import CompilerSpecimen from "./compiler-specimen";
 import HeroFilm from "./hero-film";
+import HeroProof from "./hero-proof";
 import HeroStatement from "./hero-statement";
 import LandingAnalytics from "./landing-analytics";
 import ProofScene from "./scenes/proof";
@@ -130,11 +131,18 @@ export default function LandingPage({
         <LandingAnalytics variant={experiment.tracked} />
 
         {/*
-          01 Hero -- one centered statement, then the directed four-cut product film.
+          01 Hero -- one centered statement, then the product itself on the public sample World.
 
-          The interactive compiler specimen follows as its own explanatory landmark in Scene 02.
+          2026-09-22, gap #1. What sat here was the four-cut film: a recording of the product,
+          above the fold, on the one page where a reader decides whether this works. The film is
+          not removed -- it moves into Scene 02, the "How it compiles" landmark it was always
+          explaining -- and the hero now carries `HeroProof`: the same Evidence Inspector panel
+          /evidence and /product/document-understanding already share, live, with no login, over
+          the public sample World, and the four counts that World actually holds under it.
+
+          The founder's 2026-09-20 composition is unchanged: one centered statement, then one
+          visual. Which visual it is, is what changed.
         */}
-        {/* 02 Compiler specimen -- one committed public source through five transformations. */}
         <section
           id="s1"
           data-scene="1"
@@ -160,10 +168,15 @@ export default function LandingPage({
                 ctaOrderVariant: experiment.ctaOrderVariant,
               }}
             />
-            <HeroFilm korean={korean} />
+            <HeroProof korean={korean} />
           </div>
         </section>
 
+        {/*
+          02 How it compiles -- the four-cut film, then one committed public source through five
+          transformations. The film leads because it is the overview and the specimen is the
+          detail; both are now in the landmark whose heading says they are the explanation.
+        */}
         <section
           id="s2"
           data-scene="2"
@@ -176,6 +189,7 @@ export default function LandingPage({
               <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-s2-title">{specimenCopy.title}</h2>
             </div>
+            <HeroFilm korean={korean} />
             <CompilerSpecimen korean={korean} />
           </div>
         </section>
