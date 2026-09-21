@@ -120,7 +120,7 @@ test.describe("HeroFilm", () => {
     /* Gap #1: the film is below the fold, so its poster no longer competes with the hero's own
        raster for the first paint. The raster the entry page preloads is the one above the fold. */
     expect(poster).not.toMatch(/fetchpriority="high"/i);
-    expect(html).toMatch(/<link[^>]+rel="preload"[^>]+explore-sample/pages//);
+    expect(html).toMatch(/<link[^>]+rel="preload"[^>]+explore-sample\/pages\//);
   });
 
   test("selects the verified locked master on desktop", async ({ page }, testInfo) => {
