@@ -44,7 +44,8 @@ while read r; do git grep -qF "$r" -- nextjs shared server scripts || echo "$r";
 | Recommendation | Rows | Where |
 | --- | --- | --- |
 | WIRE NOW | 1 | §1 — done in this lane |
-| WIRE WITH FLAG | 5 | §4 (3), §6 (2) |
+| WIRED this lane, founder-approved | 1 | §4 — spend reconciliation endpoint |
+| WIRE WITH FLAG | 4 | §4 (3), §6 (1) |
 | KEEP OFF (founder) | 18 | §2 (10), §4 (3), §6 (5) |
 | DELETE | 8 | §3 |
 | KEEP AS-IS — not a gap | 5 | §4 |
@@ -155,7 +156,7 @@ the root build, not an agent's.
 
 | Symbol(s) | File | What it does | Why it exists | Risk | Effort | Recommendation |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reconcileModelProviderSpend` | `nextjs/lib/model-provider-spend.ts` | Resolves a reservation parked as `pending_reconciliation` against the provider invoice | `…_model_provider_spend_control.sql`; audit §3 closure item 2 | Needs a real invoice; inventing units would be fabricated cost data | ~1 day | **WIRE WITH FLAG** — operator-only endpoint, human-supplied actual units. Never automatic |
+| `reconcileModelProviderSpend` | `nextjs/lib/model-provider-spend.ts` | Resolves a reservation parked as `pending_reconciliation` against the provider invoice | `…_model_provider_spend_control.sql`; audit §3 closure item 2 | Needs a real invoice; inventing units would be fabricated cost data | ~1 day | **WIRED 2026-09-22** — `app/api/internal/model-provider/reconcile/route.ts`, bearer-guarded, POST-only so nothing can schedule it, human-supplied units |
 | `issueDeletionEvidence` | `nextjs/lib/operations-p0.ts` | Refuses a deletion receipt unless storage is empty, DB lookup is empty, backup expiry is recorded and the audit digest is valid | `docs/runbooks/P0_RETENTION_DELETION_RESTORE.md` step 6; `nextjs/app/privacy/page.tsx:134` publicly states nothing calls it | Irreversible customer-data deletion | ~1 day | **WIRE WITH FLAG** — belongs to the `deletion` lane, not this one; pairs with `refresh_source_deletion_inventory` (§6) |
 | `handleScimProvisioningRequest`, `handleSsoCallbackBoundary` | `nextjs/lib/enterprise-identity-route-boundary.ts` | SCIM provisioning and SSO callback boundaries; both take `runtimeEnabled` | Enterprise identity | Auth bypass; needs per-tenant IdP config | ~1 day | **WIRE WITH FLAG** — routes exist to be added, but only with a tenant IdP registry the founder supplies |
 | `generateGroundedAnswer`, `GeneratorAdapter` | `nextjs/lib/generator-adapter.ts` | Verifies every citation against the ContextPacket before an answer counts as grounded | File's own STATUS note: enforcement contract, no provider integration exists | Model choice, paid API, unsupported claims | days | **KEEP OFF (founder)** — needs a model decision and an Arena receipt |
@@ -233,17 +234,43 @@ exactly the budget the probe would start charging against on a schedule.
 ## 6. Migration RPCs with no TypeScript caller
 
 157 functions defined across `supabase/migrations`. Of those, 55 have no reference from
-`nextjs`, `shared`, `server` or `scripts`. **47 are correctly uncalled**: triggers and RLS helpers
+`nextjs`, `shared`, `server` or `scripts`. **48 are correctly uncalled**: triggers and RLS helpers
 invoked by the database (`guard_*`, `prevent_*`, `reject_*`, `assert_*`, `enforce_*`,
 `is_workspace_owner`, `founder_test_reset_*`), or SQL-internal helpers called by the RPC next to
 them (`commit_model_provider_circuit_event_v1` and `model_provider_circuit_state_json_v1` are both
 called by `commit_model_provider_circuit_admission_v1` / `…_outcome_v1`, which TypeScript does
-call). The remaining 7 are real:
+call). The remaining 6 are real:
+
+**Correction, 2026-09-22 (second pass).** The first pass of this table listed
+`capture_connector_checkpoint` as a real uncalled RPC because its name does not carry a
+`guard_`/`prevent_`/`trigger_` prefix. It is a trigger —
+`create trigger foundation_jobs_checkpoint after update of state on public.foundation_jobs` —
+and the connector sync path is wired end to end, with exactly the ACK-after-durable property:
+
+- `/api/v1/oauth-connectors/connections/[id]/sync` → `enqueueConnectorSync` (`lib/job-store.ts:70`)
+  → `enqueue_connector_sync`, which seeds the new job's `cursor_token` from
+  `foundation_connector_checkpoints`, so a replayed sync resumes at the watermark.
+- `/api/internal/jobs/run` → `runSourceImportBatch` → `loadConnectorSyncPage`
+  (`lib/connector-sync-page.ts`), which persists the observed page **before** importing any item,
+  so a crash re-reads the same page rather than re-listing a provider whose contents moved.
+- items imported → `completeJobBatch(… cursorToken)` (`lib/sync-worker.ts:298`, whose comment
+  states the rule: "Only now, with the batch durably admitted, does the checkpoint move") →
+  `complete_foundation_job_batch` sets `succeeded` + `cursor_token` → the trigger writes the
+  checkpoint **in the same transaction**, so a rollback rolls back the success and its watermark
+  together.
+
+Coverage already existed for two of the three properties this lane was asked to test — replayed
+page (`lib/sync-worker.test.ts:138`), ACK-after-durable (`:178`, `:226`), and at the database
+level `supabase/tests/connector_checkpoints.sql` ("failed checkpoint rolls back success",
+"expired lease preserves watermark", "different target never inherits watermark"). The third,
+`connector_checkpoint_target_mismatch`, was raised in two places and asserted in neither; this
+lane added that assertion. No application code was written, because a second checkpoint path in
+TypeScript would duplicate a database-transactional guarantee with a weaker one.
 
 | RPC | Migration | What it does | Recommendation |
 | --- | --- | --- | --- |
 | `refresh_source_deletion_inventory` | `20260920132000_legal_hold_deletion_sweeper.sql` | Rebuilds the deletion inventory a legal-hold sweep acts on | **WIRE WITH FLAG** — with `issueDeletionEvidence`; `deletion` lane owns it |
-| `capture_connector_checkpoint` | `20260909210203_connector_sync_checkpoints.sql` | Durable connector sync checkpoint | **WIRE WITH FLAG** — needed for idempotent at-least-once connector sync; ~0.5 day, additive |
+| ~~`capture_connector_checkpoint`~~ | `20260909210203_connector_sync_checkpoints.sql` | **Reclassified: it is a trigger, already wired.** See the correction above | — |
 | `append_enterprise_audit_event` | `0014_enterprise_control_plane.sql`, hardened by `0054_audit_rpc_server_only.sql` | Append-only enterprise audit event | **KEEP OFF (founder)** — pairs with the SCIM/SSO boundary in §4 |
 | `reserve_foundation_compute_v2` | `0036_maximum_reservation_and_overage.sql` | Legacy compute reservation | **KEEP OFF (founder)** — superseded by `reserve_model_provider_spend_v1`; deprecate rather than wire |
 | `settle_foundation_compute_v2` | same | Legacy compute settlement | **KEEP OFF (founder)** — same |
@@ -267,3 +294,8 @@ about. They should be deprecated through the ladder, not wired.
 - **Did not delete anything in §3.** Deletion is subtractive and touches the root build; it needs
   the founder's decision to retire the legacy root runtime. The rows are named and ready.
 - **Did not set any flag.** Every off flag in §5 is off for a reason that is a founder call.
+- **Did not write a TypeScript connector checkpoint.** The founder approved wiring
+  `capture_connector_checkpoint`; the second pass found it already wired as a database trigger
+  inside the completion transaction. Duplicating that in application code would have replaced one
+  transactional guarantee with two records that can disagree. The one missing assertion was added
+  instead, and the correction is recorded in §6.
