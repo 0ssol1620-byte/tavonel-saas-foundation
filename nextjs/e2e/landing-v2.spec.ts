@@ -117,10 +117,26 @@ test.describe("HeroFilm", () => {
     expect(poster).toContain(HERO_POSTER);
     expect(poster).toMatch(/ width="[1-9]\d*"/);
     expect(poster).toMatch(/ height="[1-9]\d*"/);
-    /* Gap #1: the film is below the fold, so its poster no longer competes with the hero's own
-       raster for the first paint. The raster the entry page preloads is the one above the fold. */
+    /*
+      Gap #1: the film is below the fold, so its poster no longer claims the first paint, and the
+      hero's own page raster is the image that does.
+
+      This asserted a `<link rel="preload">` for that raster in the first round and failed. The
+      assertion was wrong, not the page: `react-dom`'s `preload()` puts no link element into the
+      served HTML of these two routes -- checked against tavonel.com, where the film poster was
+      preloaded in exactly the same way and no such link has ever been in the document either.
+      What the server render does carry, and what actually decides the first paint, is the
+      loading posture of the two rasters, so that is what is pinned here. It is a stronger
+      statement of the same contract, not a weaker one: the old line asserted the intent, this
+      one asserts the outcome, and on both images rather than on one.
+    */
     expect(poster).not.toMatch(/fetchpriority="high"/i);
-    expect(html).toMatch(/<link[^>]+rel="preload"[^>]+explore-sample\/pages\//);
+    expect(poster).not.toMatch(/loading="eager"/i);
+    const heroRaster = html.match(/<img[^>]*src="\/explore-sample\/pages\/[^"]*"[^>]*>/)?.[0] ?? "";
+    expect(heroRaster, "the hero server-renders no sample-World page raster").not.toBe("");
+    expect(heroRaster).toMatch(/loading="eager"/i);
+    expect(heroRaster).toMatch(/ width="[1-9]\d*"/);
+    expect(heroRaster).toMatch(/ height="[1-9]\d*"/);
   });
 
   test("selects the verified locked master on desktop", async ({ page }, testInfo) => {

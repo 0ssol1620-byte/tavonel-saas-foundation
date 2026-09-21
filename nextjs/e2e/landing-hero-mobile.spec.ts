@@ -2,14 +2,26 @@ import { expect, test } from "@playwright/test";
 
 const PHONE_PROJECTS = new Set(["360", "390"]);
 
-test.describe("landing hero mobile film inspection", () => {
+/*
+  Gap #1, 2026-09-22: the film moved from the hero into Scene 02, "How it compiles".
+
+  Every assertion in this file is unchanged. The phone film contract -- starts magnified, keeps an
+  explicit route back to the full frame, keeps all four cuts, stays keyboard-scrollable, and holds
+  a poster under reduced motion until the visitor plays -- belongs to the film, not to the landmark
+  it sits in, so only the section id moved with it. Written once here so a future move is one edit
+  rather than four. The hero's own phone behaviour is asserted in `e2e/evidence-first.spec.ts` and
+  `e2e/landing-v2.spec.ts`.
+*/
+const FILM_SCENE = "#s2 .compile-film-sequence";
+
+test.describe("landing film mobile inspection", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(!PHONE_PROJECTS.has(testInfo.project.name), "the focused film is a phone layout");
     await page.goto("/");
   });
 
   test("starts magnified and keeps an explicit route back to the full frame", async ({ page }) => {
-    const sequence = page.locator("#s1 .compile-film-sequence");
+    const sequence = page.locator(FILM_SCENE);
     const viewport = sequence.locator(".compile-film-viewport");
     const media = viewport.locator(".compile-film-video, .compile-film-still").first();
     const fit = page.getByRole("button", { name: "Fit full frame" });
@@ -44,7 +56,7 @@ test.describe("landing hero mobile film inspection", () => {
   });
 
   test("preserves all four film tabs and keeps the focused viewport keyboard-scrollable", async ({ page }) => {
-    const sequence = page.locator("#s1 .compile-film-sequence");
+    const sequence = page.locator(FILM_SCENE);
     const viewport = sequence.locator(".compile-film-viewport");
     const tabs = sequence.getByRole("tab");
 
@@ -66,7 +78,7 @@ test.describe("landing hero mobile film inspection", () => {
   test("keeps reduced motion on the focused poster until the visitor explicitly plays", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
-    const sequence = page.locator("#s1 .compile-film-sequence");
+    const sequence = page.locator(FILM_SCENE);
 
     await expect(sequence).toHaveAttribute("data-narrow", "1");
     await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
