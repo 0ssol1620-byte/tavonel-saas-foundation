@@ -41,10 +41,22 @@ import styles from "./region-highlight.module.css";
 export default function RegionHighlight({
   view,
   caption,
+  imageAlt,
+  imageEager = false,
 }: {
   view: EvidencePageView;
   /** One sentence from the page that uses this, saying what the reader is looking at. */
   caption?: string;
+  /*
+    An alt to use instead of the default metadata line. `""` is the correct answer rather than a
+    missing one where the caller already puts that metadata in text beside the image -- which the
+    figcaption below does, and which the home hero relies on because the landing's own guard bars
+    a digit in any alt on that page. Left undefined the default stands, and
+    `evidence-regions.test.ts` holds it to naming the file it is a picture of.
+  */
+  imageAlt?: string;
+  /** This panel is the first paint of its page: load the raster eagerly rather than lazily. */
+  imageEager?: boolean;
 }) {
   const [selected, setSelected] = useState(0);
   const detailId = useId();
@@ -64,9 +76,12 @@ export default function RegionHighlight({
             height={view.image.height}
             /* The alt carries no figure and no excerpt: the metadata is text beside the image,
                where a reader can see which number counts what. */
-            alt={`Page ${view.source.page} of ${view.source.filename}, ${view.source.qualifier}`}
+            alt={
+              imageAlt ??
+              `Page ${view.source.page} of ${view.source.filename}, ${view.source.qualifier}`
+            }
             decoding="async"
-            loading="lazy"
+            loading={imageEager ? "eager" : "lazy"}
           />
         ) : (
           <div className={styles.pageAbsent}>
@@ -96,7 +111,14 @@ export default function RegionHighlight({
                 height: `${(region.bbox1000[3] - region.bbox1000[1]) / 10}%`,
               }}
             >
-              <span className={styles.regionName}>
+              {/*
+                `data-derived="1"`: every number in this accessible name -- the position, the
+                count and the page -- is read from the view above, and the panel beside it
+                prints the same three with their locator. The landing's figure guard walks the
+                rendered page for a digit that has no receipt, and it cannot see an aria name
+                apart from painted copy.
+              */}
+              <span className={styles.regionName} data-derived="1">
                 Evidence region {position + 1} of {view.regions.length}, page {view.source.page}
               </span>
             </button>
@@ -114,12 +136,18 @@ export default function RegionHighlight({
           The source's own words. A quotation, trimmed at a word boundary with the truncation
           marked; never a summary and never a rewrite.
         */}
-        <blockquote className={styles.excerpt}>
+        {/*
+          `data-derived="1"`: the quotation is the source's own text and the locator printed
+          directly under it is its receipt. The landing's figure guard walks the rendered page
+          for a digit that has none, and a filing's own sentence is the one kind of digit on this
+          site that always has one.
+        */}
+        <blockquote className={styles.excerpt} data-derived="1">
           {active.excerpt}
           {active.excerptTruncated ? "…" : ""}
         </blockquote>
         <p className={styles.locator} data-derived="1">{active.locator}</p>
-        <p className={styles.source}>
+        <p className={styles.source} data-derived="1">
           {view.source.filename} · {view.source.qualifier} · page{" "}
           <span data-derived="1">{view.source.page}</span> of{" "}
           <span data-derived="1">{view.source.pageCount}</span>
