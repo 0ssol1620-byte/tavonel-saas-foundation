@@ -294,14 +294,37 @@ describe("the /benchmarks page", () => {
     // A percentage literal in this file would be a number nobody can trace to a receipt.
     expect(page).not.toMatch(/\d+(\.\d+)?\s*%/);
     /*
-      Comments are stripped first. The header comment explains that no arena figure and no vendor
-      row belongs on this page, and a check that fails on its own rationale is a check nobody
-      keeps.
+      Comments are stripped first. The header comment explains which names may not be hand-typed
+      here, and a check that fails on its own rationale is a check nobody keeps.
+
+      2026-09-22: "arena" left this list, and the reason is worth the paragraph.
+
+      It was here when the page published nothing, where it stood for "no figure from the Model
+      Arena campaign appears on a protocol page". The page now opens on that campaign's completed
+      run, so the ban would forbid the page from naming the run it publishes.
+
+      What the rule was protecting is unchanged and is still checked below: every figure and
+      every model name comes out of `content/benchmarks/model-arena-20260903.json`, which is
+      bound to the campaign's own reports by sha256 and validated before it renders. The vendor
+      names stay banned as literals -- a model name typed into this file is a name nobody can
+      trace to a receipt, whether we ran that model or not.
     */
     const shipped = page.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
-    for (const name of ["OmniDocBench", "Mistral", "Gemini", "GPT-", "Claude", "Qwen", "arena"]) {
-      expect(shipped, `${name} has no place on a page that publishes no comparison`).not.toContain(name);
+    for (const name of ["OmniDocBench", "Mistral", "Gemini", "GPT-", "Claude", "Qwen"]) {
+      expect(shipped, `${name} is a name nobody can trace to a receipt when it is typed here`).not.toContain(name);
     }
+  });
+
+  it("reads the arena board from the validated artifact rather than retyping a row", () => {
+    expect(page).toContain('from "@/lib/model-arena-page-data"');
+    expect(page).toContain("modelArenaBoard()");
+    /*
+      No decimal literal in this file. Every Edit distance, TEDS score and median on the page is
+      a field of the artifact, formatted where it is rendered; a float typed here would be a
+      figure with nothing behind it.
+    */
+    const shipped = page.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+    expect(shipped).not.toMatch(/\b\d+\.\d+\b/);
   });
 
   it("declares its own address and asks to be indexed", () => {
