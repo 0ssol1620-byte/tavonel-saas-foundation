@@ -169,7 +169,7 @@ export default function DevelopersPage() {
                   difference between "we have MCP" and "here is the same read over it".
                 */}
                 <p>Your first authenticated read, over HTTP or through the MCP server.</p>
-                <DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]} />
+                <DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]} label="First API request example" />
                 <p className="fine">
                   All four perform <code>GET /api/v1/documents</code> with a key scoped{" "}
                   <code>documents:read</code>. There is no npm or PyPI package to install: the

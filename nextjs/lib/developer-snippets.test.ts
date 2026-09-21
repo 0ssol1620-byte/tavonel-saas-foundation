@@ -132,7 +132,17 @@ describe("the first-call tabs on /developers", () => {
       fileURLToPath(new URL("../components/docs-snippet.tsx", import.meta.url)),
       "utf8",
     );
-    expect(page).toContain("<DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]} />");
+    expect(page).toContain("<DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]}");
+    /*
+      The group's accessible name, which `e2e/visual-refinement.spec.ts` finds this block by.
+
+      The tabs replaced a `<pre role="region" aria-label="First API request example">`, and a
+      panel cannot carry `region` as well as `tabpanel`. The name moved to the strip, so the strip
+      is where it is held: a rename here renames the thing that spec goes looking for.
+    */
+    expect(page).toContain('label="First API request example"');
+    expect(component).toContain("aria-label={label}");
+    expect(component).toContain('label = "Request language"');
     expect(component).toContain('role="tablist"');
     expect(component).toContain('role="tabpanel"');
     /* Plain buttons: a tab that is a div takes no Enter and no focus ring. */

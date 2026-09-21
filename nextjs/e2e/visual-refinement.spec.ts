@@ -46,9 +46,44 @@ test("footer labels use their own cells without clipped or escaping text", async
 
 test("the first developer request remains keyboard reachable on a narrow screen", async ({ page }) => {
   await page.goto("/developers");
-  const sample = page.getByRole("region", { name: "First API request example" });
-  await expect(sample).toHaveAttribute("tabindex", "0");
-  await sample.focus();
-  await expect(sample).toBeFocused();
-  await expect(sample.locator("code")).not.toHaveText("");
+  /*
+    Gap #7 made the one block four, and the role moved with it.
+
+    What this pinned was a lone `<pre role="region" aria-label="First API request example">`. It
+    is now the APG tab group `/api` and the quickstart already use -- cURL, TypeScript, Python and
+    MCP -- and an element that is a `tabpanel` cannot also be a `region`: the two roles are
+    mutually exclusive, and the accessible name of a panel is the tab that controls it. So the
+    selector had to move. The contract did not, and it is held harder than before: the group still
+    carries this test's name, every panel is in the HTML with code in it, the panel a reader is
+    looking at takes focus from the keyboard, and the strip is one Tab stop rather than four.
+  */
+  const sample = page.locator("figure.docs-code");
+  await expect(sample).toHaveCount(1);
+  await expect(page.getByRole("tablist", { name: "First API request example" })).toBeVisible();
+
+  const panels = sample.locator('[role="tabpanel"]');
+  await expect(panels).toHaveCount(4);
+  for (const code of await panels.locator("code").allTextContents()) {
+    expect(code.trim().length).toBeGreaterThan(0);
+  }
+
+  const first = panels.first();
+  await expect(first).toHaveAttribute("tabindex", "0");
+  await first.focus();
+  await expect(first).toBeFocused();
+  await expect(first.locator("code")).not.toHaveText("");
+
+  /*
+    The roving tabindex, as the server renders it.
+
+    Asserted on the markup rather than by pressing a key, because a keypress sent before React has
+    hydrated does nothing and retrying it walks the selection along -- a flake with no failure to
+    find. What matters here is the property the pattern requires and the one a reader feels: one
+    Tab stop on the strip, not four, and the rest of the group reached with the arrows that
+    `lib/developer-snippets.test.ts` holds the handler for.
+  */
+  const strip = sample.getByRole("tab");
+  await expect(strip).toHaveCount(4);
+  expect(await strip.evaluateAll(buttons => buttons.map(button => button.tabIndex)))
+    .toEqual([0, -1, -1, -1]);
 });
