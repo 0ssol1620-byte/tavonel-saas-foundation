@@ -53,6 +53,13 @@ const ROUTES = [
     */
     "/solutions",
     "/docs/quickstart",
+    /*
+      A child of a nav destination, so no map above reaches it: the menu declares /benchmarks and
+      `navHrefs()` returns exactly that. /benchmarks/gdp-pdf is five wide tables and a column of
+      64-character digests, which is the shape that overflows a 360px document when a scroll
+      frame or a break rule is missing -- exactly what this sweep exists to catch.
+    */
+    "/benchmarks/gdp-pdf",
     "/sources",
     "/status",
     "/security",

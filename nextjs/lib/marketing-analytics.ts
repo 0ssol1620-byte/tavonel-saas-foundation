@@ -11,7 +11,7 @@ export const CONSENT_KEY = "tavonel.analytics-consent.v1";
   here is what makes a *consented* page view possible; it exempts nothing.
 */
 export const PUBLIC_MARKETING_PATHS = new Set([
-  "/", "/api", "/arena", "/benchmarks", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise",
+  "/", "/api", "/arena", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise",
   "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy",
   "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
   "/refunds", "/research", "/research/notes", "/resources", "/security", "/sources", "/status",

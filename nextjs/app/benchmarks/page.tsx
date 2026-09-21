@@ -212,6 +212,20 @@ export default function BenchmarksPage() {
                 <a href="https://huggingface.co/datasets/surgeai/GDP.pdf">public dataset</a>{" "}
                 and <a href="https://github.com/surge-ai/gdp-pdf">reference harness</a>.
               </p>
+              {/*
+                Two of the four arms have now been run. The result page says what it found --
+                which was that the compiled arm did not beat the PDF alone -- and lists every
+                condition that makes it incomparable with a published GDP.pdf score. It is linked
+                rather than summarised here: a one-line summary of a negative result on the
+                protocol page is where a negative result goes to be forgotten.
+              */}
+              <p className={styles.para}>
+                <Link href={"/benchmarks/gdp-pdf" as Route}>
+                  Read the two-arm run: compiled context against the PDF alone
+                </Link>{" "}
+                &mdash; a first result on this design, with its deviations, denominators and
+                receipts. It is not comparable with any published GDP.pdf score.
+              </p>
               <div className="chain">
                 {GDP_PDF_ARMS.map(([title, body]) => (
                   <article className="link" key={title}>

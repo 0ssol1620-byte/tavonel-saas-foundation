@@ -1,0 +1,243 @@
+/*
+  Local to /benchmarks/gdp-pdf. Same rule as the parent sheet: every value is a token from
+  app/tavonel.css, no colour is invented, and the global .stack, .fine and .status-fold do the
+  work they already do elsewhere.
+
+  This page is five tables and a receipt list, so the sheet is the table shape plus the three
+  panels that carry a state rather than a figure. `.table` and `.tableScroll` are the parent
+  sheet's `.results` / `.resultsScroll` -- deliberately copied rather than imported, because a
+  CSS module cannot be shared across route segments without becoming a global, and the alternative
+  (moving a five-selector table into app/tavonel.css so two pages can read it) makes a site-wide
+  primitive out of a page detail.
+
+  The tables are wide on purpose -- a cost row has nine columns and a denominator beside every
+  rate -- so every one of them sits in a scroll container with `min-width: 0`. That is what keeps
+  the *page* from scrolling sideways at 360px: the table scrolls inside its own frame, and the
+  document does not.
+*/
+
+/* The label the page hangs under. --unresolved, because the question is open. */
+.notComparable {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-hi);
+  border-left: 2px solid var(--unresolved);
+  background: var(--g1);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-mid);
+  max-width: 76ch;
+}
+.notComparable b {
+  color: var(--text-hi);
+  font-weight: 500;
+}
+
+/*
+  The finding. One sentence, in the page's largest body size, because it is the thing the page
+  is for -- and it reads the same whichever of the three branches produced it.
+
+  `data-verdict` is on the element so the result is inspectable in the DOM and assertable in a
+  test without parsing the sentence. It is not a colour hook: a negative result is not painted
+  red here. The result is what it is and the type says it; tinting it would editorialise.
+*/
+.finding {
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--hairline-hi);
+  border-left: 2px solid var(--unresolved);
+  background: var(--g1);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-hi);
+  max-width: 72ch;
+}
+
+/* A state a reader needs stated, where a table or a figure is absent. */
+.state {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  background: var(--g1);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-mid);
+  max-width: 76ch;
+}
+
+/* Body copy under a section heading. Not .lede: the page has one lede. */
+.para {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 13.5px;
+  line-height: 1.66;
+  color: var(--text-mid);
+}
+.para b {
+  color: var(--text-hi);
+  font-weight: 500;
+}
+
+/* A section heading, the step between the 48px h1 and the mono labels. */
+.sectionTitle {
+  font-family: var(--f-sans);
+  font-size: 16px;
+  letter-spacing: -0.008em;
+  text-transform: none;
+  font-variation-settings: "wght" 560;
+  text-wrap: initial;
+  color: var(--text-hi);
+}
+
+/* What this does and does not show: statements, so a list rather than cards. */
+.plainList {
+  margin: 0;
+  padding-left: 18px;
+  max-width: 72ch;
+  display: grid;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.66;
+  color: var(--text-mid);
+}
+.plainList b {
+  color: var(--text-hi);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.tableScroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.table caption {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  border-bottom: 1px solid var(--hairline);
+}
+.table th,
+.table td {
+  padding: 10px 16px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+.table thead th {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--text-lo);
+}
+.table tbody th {
+  font-weight: 500;
+  color: var(--text-hi);
+  white-space: normal;
+  min-width: 14ch;
+}
+.table td {
+  color: var(--text-lo);
+}
+.table td.value {
+  color: var(--text-hi);
+}
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* A cell of prose inside a table -- the conditions panel's two explanatory columns. */
+.table td.wrap {
+  white-space: normal;
+  min-width: 26ch;
+  max-width: 44ch;
+  line-height: 1.55;
+}
+
+/*
+  The denominator beside a rate, and the reason a figure is partial. Smaller than the figure it
+  qualifies and never smaller than the 12px floor -- a denominator a reader cannot read is the
+  same as no denominator.
+*/
+.over {
+  display: inline;
+  color: var(--text-lo);
+  font-size: 12px;
+}
+.note {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-lo);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: normal;
+}
+
+/* ------------------------------------------------------------------ receipts */
+
+.receipt {
+  margin: 0;
+  display: grid;
+  gap: 0;
+}
+.receiptRow {
+  display: grid;
+  grid-template-columns: minmax(16ch, 22ch) 1fr;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.receiptRow:last-child {
+  border-bottom: 0;
+}
+.receiptRow dt {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+.receiptRow dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-mid);
+  min-width: 0;
+}
+
+/*
+  A 64-character digest is one unbreakable token. Left to itself it forces the whole receipt list
+  wider than a 360px viewport, which is how a digest in body prose becomes a horizontal scrollbar
+  on the document. It breaks anywhere, and it is the one place on the page where that is right.
+*/
+.digest {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  font-size: 12px;
+  color: var(--text-lo);
+}
+
+@media (max-width: 640px) {
+  .receiptRow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
