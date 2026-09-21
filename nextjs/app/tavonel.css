@@ -3785,10 +3785,13 @@
       dataset` and `reference harness` at 18px on /benchmarks, `Integrations` at 18px on
       /sources.
 
-      A link in a paragraph is running prose wherever the paragraph was written, so the same
-      padding-and-negative-margin gets applied by shape rather than by name. The three
-      exclusions are the shapes that are not prose links and carry their own floor below: the
-      buttons, the verification link, and the chips.
+      A link in a paragraph is running prose wherever the paragraph was written, so it takes the
+      same treatment by shape rather than by name -- the identical three declarations, not a
+      second pattern. Padding alone was tried and measured 43px on a 18px line: vertical padding
+      on an inline box is painted and hit-tested but does not raise the line box, which leaves
+      the total a function of the font size and one pixel short on /sources. The four exclusions
+      are the shapes in a paragraph that are not prose links and carry their own floor below: the
+      two buttons, the verification link and the chips.
     */
     main p > a:not(.btn):not(.btn-primary):not(.link-verify):not(.tag) {
       display: inline-block;
