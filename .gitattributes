@@ -82,3 +82,12 @@ nextjs/public/research/receipts/*.json -text
 # Deterministic browser icon representations
 nextjs/public/brand/*.svg text eol=lf
 nextjs/public/icon.svg text eol=lf
+
+# The three that the hashbang assertion in lib/journey-acceptance.test.ts had been failing on for
+# every Windows checkout: they open with `#!/usr/bin/env node` and were never pinned, so
+# core.autocrlf gave them a `\r` hashbang. That is also why vitest could not import
+# scripts/db/*.test.mjs at all -- the transform stopped on the carriage return in the script the
+# test imports and blamed the import line. Pinned here, and `scripts/db/*.mjs` as a whole so the
+# operator drills beside them cannot pick up the same defect.
+nextjs/scripts/gdp-pdf-evidence-check.mjs text eol=lf
+nextjs/scripts/db/*.mjs text eol=lf

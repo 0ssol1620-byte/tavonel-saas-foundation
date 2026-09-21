@@ -44,6 +44,19 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
 end $$;
+-- Supabase ships pgcrypto in an \`extensions\` schema, and from 20260920120000 onward the chain
+-- calls \`extensions.digest(...)\` by that qualified name. Without this the run stopped at 68/81
+-- with "schema extensions does not exist", which is why nothing had ever executed the deletion
+-- sweeper or the inventory attestation against a real PostgreSQL. The relocation is for a cluster
+-- where an earlier run installed pgcrypto into public.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+do $$ begin
+  if (select n.nspname from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+       where e.extname = 'pgcrypto') <> 'extensions' then
+    execute 'alter extension pgcrypto set schema extensions';
+  end if;
+end $$;
 create schema if not exists auth;
 create table if not exists auth.users (
   instance_id uuid, id uuid primary key, aud text, role text, email text,
