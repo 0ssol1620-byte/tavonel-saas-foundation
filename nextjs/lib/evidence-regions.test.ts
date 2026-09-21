@@ -121,6 +121,41 @@ describe("the rendered region highlight", () => {
     }
   });
 
+  it("holds the 44px floor in the stylesheet, so a padding edit fails here and not in Product QA", () => {
+    /*
+      The size half of the fix, recomputed from the sheet rather than trusted.
+
+      `e2e/mobile-landing.spec.ts` measures this in a browser, which is the real answer and takes
+      a twenty-minute Product QA run to give. Both numbers on this component are arithmetic over
+      declarations, so the arithmetic is done here too: a row that someone re-pads to 9px, or an
+      action link whose block padding is trimmed, fails in the unit suite in a second.
+    */
+    const sheet = read("components/evidence/region-highlight.module.css");
+    const block = (selector: string) => {
+      const found = new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`).exec(sheet)?.[1];
+      expect(found, `${selector} is gone from the stylesheet`).toBeTruthy();
+      return found!;
+    };
+    const px = (source: string, property: string) =>
+      Number(new RegExp(`${property}:\\s*([\\d.]+)px`).exec(source)?.[1] ?? Number.NaN);
+
+    /* A row is a block control: its own floor, independent of how much text lands in it. */
+    expect(px(block(".row"), "min-height")).toBeGreaterThanOrEqual(44);
+
+    /*
+      The panel's one action reaches the floor by BA-240's padding instead, so the sum is the
+      line box plus both paddings -- which is exactly the number that is easy to break by
+      editing one of the three declarations it is made of.
+    */
+    const open = block(".open");
+    const lineBox = px(open, "font-size") * Number(/line-height:\s*([\d.]+)/.exec(open)?.[1] ?? "0");
+    expect(lineBox + 2 * px(block(".open a"), "padding-block")).toBeGreaterThanOrEqual(44);
+
+    /* And the boxes carry no minimum at all: a clamped box is drawn where the passage is not. */
+    const region = block(".region");
+    expect(region).not.toMatch(/min-height|min-width/);
+  });
+
   it("names every button and binds it to the panel that describes it", () => {
     for (let index = 0; index < view.regions.length; index += 1) {
       expect(text).toContain(`Evidence region ${index + 1} of ${view.regions.length}`);
