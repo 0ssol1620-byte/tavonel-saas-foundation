@@ -256,7 +256,7 @@ export function issueDeletionEvidence(input: DeletionEvidenceInput) {
   };
 }
 
-export type RestoreEvidenceInput = {
+export type RestoreDrillEvidenceInput = {
   evidenceId: string;
   backupId: string;
   snapshotAt: string;
@@ -271,7 +271,7 @@ export type RestoreEvidenceInput = {
   cleanupCompletedAt: string;
 };
 
-export function issueRestoreEvidence(input: RestoreEvidenceInput) {
+export function issueRestoreDrillEvidence(input: RestoreDrillEvidenceInput) {
   const completedMs = Date.parse(input.completedAt);
   const cleanupMs = Date.parse(input.cleanupCompletedAt);
   if (
@@ -296,7 +296,7 @@ export function issueRestoreEvidence(input: RestoreEvidenceInput) {
   return {
     ok: true as const,
     evidence: {
-      schemaVersion: "tavonel.restore_evidence.v1" as const,
+      schemaVersion: "tavonel.restore_drill.v1" as const,
       ...input,
       outcome: "verified_restored" as const,
       recoveryTimeSeconds: Math.ceil(

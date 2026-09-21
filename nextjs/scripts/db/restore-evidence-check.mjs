@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const VERSION = "tavonel.restore_evidence.v1";
+const DRILL_VERSION = "tavonel.restore_drill.v1";
 const SHA256 = /^[0-9a-f]{64}$/;
 const FINGERPRINT = /^sha256:[0-9a-f]{64}$/;
 const UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
@@ -65,6 +66,11 @@ function pair(value, base, label) {
 
 export function normalizeRestoreReceipt(value, receiptPath) {
   if (!isRecord(value)) throw new RestoreEvidenceInputError("receipt must be a JSON object");
+  if (value.schemaVersion === DRILL_VERSION) {
+    throw new RestoreEvidenceInputError(
+      "RESTORE_DRILL_RECEIPT_REJECTED: this is an object-copy restore drill receipt; validate it with scripts/db/restore-drill-check.mjs",
+    );
+  }
   if (value.schemaVersion !== VERSION) throw new RestoreEvidenceInputError(`schemaVersion must be ${VERSION}`);
   const base = dirname(resolve(receiptPath));
   if (!isRecord(value.environment)) throw new RestoreEvidenceInputError("environment must be an object");

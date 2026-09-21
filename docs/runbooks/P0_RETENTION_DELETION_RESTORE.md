@@ -20,7 +20,7 @@ Before enabling automatic deletion, the owner must record retention days for qua
 3. Compare row counts and manifest digests, then execute at least one integrity query covering tenant isolation and object references.
 4. Record completion time and calculated recovery time.
 5. Destroy the isolated restore and record cleanup completion.
-6. Call `issueRestoreEvidence`. A digest mismatch, count mismatch, missing integrity check, non-isolated destination or missing cleanup fails the evidence gate.
+6. Call `issueRestoreDrillEvidence`. A digest mismatch, count mismatch, missing integrity check, non-isolated destination or missing cleanup fails the evidence gate.
 
 ## Required live proof
 
@@ -154,8 +154,9 @@ state the migrations promise; and that `issueDeletionEvidence` accepted the resu
 Writes one probe object under `synthetic/restore-drill/<date>/<nonce>/`, copies it to a dated
 `restored/` location, reads both back, compares size and SHA-256, checks the JSON contract, deletes
 both, re-lists the prefix to confirm nothing is left, and issues the receipt through
-`issueRestoreEvidence`. Same shape as
-`docs/evidence/production/TAVONEL_R2_RESTORE_DRILL_2026-09-01.json`.
+`issueRestoreDrillEvidence`. Same shape as
+`docs/evidence/production/TAVONEL_R2_RESTORE_DRILL_2026-09-01.json`. The receipt's contract is
+`tavonel.restore_drill.v1`, validated offline by `scripts/db/restore-drill-check.mjs`.
 
 ### Commands
 
@@ -164,6 +165,11 @@ cd nextjs
 
 node --experimental-strip-types scripts/db/restore-drill.mjs
 node --experimental-strip-types --test scripts/db/restore-drill.test.mjs
+node --experimental-strip-types --test scripts/db/restore-drill-check.test.mjs
+
+# validate a receipt a previous --execute run wrote
+node scripts/db/restore-drill-check.mjs --json \
+  --receipt ../docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>.json
 
 export R2_ACCOUNT_ID=...
 export R2_BUCKET=...
@@ -211,24 +217,43 @@ the original, and that both objects were gone afterwards.
   `"not verified (no backup API wired)"` — a token is permission to ask, and nobody has wired
   anything to ask yet. Neither value ever reads as "available".
 
-### Known contract collision — do not paper over it
+### Contract collision — resolved 2026-09-21
 
-`nextjs/scripts/db/restore-evidence-check.mjs` validates a schema also called
-`tavonel.restore_evidence.v1`, and it is **not** the schema `issueRestoreEvidence` produces. The
-checker expects a database-restore receipt with `environment`, `source` / `schemaIdentity` /
-`dataIdentity` artifact pairs, a `representativeQuery` and a signed export archive with a trusted
-fingerprint. `issueRestoreEvidence` emits `{evidenceId, backupId, snapshotAt, …,
-recoveryTimeSeconds}`. Running the checker over this drill's receipt fails at the first field:
+Two incompatible contracts once shared the version string `tavonel.restore_evidence.v1`: the
+database-restore receipt (`environment`, `source` / `schemaIdentity` / `dataIdentity` artifact
+pairs, a `representativeQuery`, a signed export archive with a trusted fingerprint) and this
+object-copy drill receipt (`{evidenceId, backupId, snapshotAt, …, recoveryTimeSeconds}`). The
+object-copy contract was renamed. Nothing was fabricated to make either side fit the other —
+inventing a provisioning artifact, a representative query or a signed export to go green is
+exactly what this repository forbids.
+
+| Receipt | Contract | Produced by | Validated by |
+| --- | --- | --- | --- |
+| `docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>.json` | `tavonel.restore_drill.v1` | `scripts/db/restore-drill.mjs` via `issueRestoreDrillEvidence` | `scripts/db/restore-drill-check.mjs` |
+| Database restore receipt | `tavonel.restore_evidence.v1` | operator, by hand | `scripts/db/restore-evidence-check.mjs` |
+
+Each checker refuses the other's receipt by name rather than failing at whichever field happens
+to be missing first:
 
 ```
-restore evidence input error: environment must be an object
+restore evidence input error: RESTORE_DRILL_RECEIPT_REJECTED: this is an object-copy restore
+drill receipt; validate it with scripts/db/restore-drill-check.mjs
+
+restore drill input error: RESTORE_EVIDENCE_RECEIPT_REJECTED: this is a database-restore
+receipt; validate it with scripts/db/restore-evidence-check.mjs
 ```
 
-Two incompatible contracts share one version string, and that is a real defect. The drill does
-**not** fabricate a provisioning artifact, a representative query or a signed export in order to
-go green — inventing files to satisfy a schema is exactly what this repository forbids. Until one
-of the two contracts is renamed, `restore-evidence-check.mjs` validates the *database* restore
-receipt and this object-copy receipt is validated by `issueRestoreEvidence` alone.
+**What the drill checker can and cannot recompute.** The drill deletes both objects before it
+writes the receipt, so there is no artifact file left to hash — and a checker that demanded one
+would be asking for evidence the drill is designed not to leave behind. What it does recompute is
+the probe itself: `restore-drill.mjs` derives the probe body byte-for-byte from the drill nonce,
+the nonce is the tail of `drillId`, and both sides import the same `restoreDrillProbeBody`. A
+receipt whose `object.sha256` is not that body's digest fails `PROBE_DIGEST_MISMATCH`. The checker
+also re-derives `recoveryTimeSeconds` from the timestamps, binds `evidence.backupId` to `drillId`,
+requires both manifest digests to equal `sha256:<object.sha256>`, and requires both keys to sit
+under `synthetic/restore-drill/<date>/<nonce>/`. It records `databaseBackupAvailability` verbatim
+and asserts nothing about it, for the reason above: the drill cannot observe a backup, and a
+checker that demanded a value there would be inviting one to be invented.
 
 ## Running the offline suites
 

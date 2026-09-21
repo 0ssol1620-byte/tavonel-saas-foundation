@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Rehearse an object restore: write a probe artifact, copy it to a dated drill location, prove the
- * copy is byte-identical, clean both up, and emit a receipt through `issueRestoreEvidence`.
+ * copy is byte-identical, clean both up, and emit a receipt through `issueRestoreDrillEvidence`.
  *
  *   node --experimental-strip-types scripts/db/restore-drill.mjs            # dry run
  *   node --experimental-strip-types scripts/db/restore-drill.mjs --execute  # writes to R2
@@ -32,7 +32,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { issueRestoreEvidence } from "../../lib/operations-p0.ts";
+import { issueRestoreDrillEvidence } from "../../lib/operations-p0.ts";
+import {
+  DRILL_CONTRACT_VERSION,
+  PROBE_CONTRACT_VERSION,
+  restoreDrillProbeBody,
+} from "./restore-drill-check.mjs";
 import { scanTextForSecrets } from "../secret-scan.mjs";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
@@ -60,16 +65,9 @@ const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 export function planRestoreDrill({ now = new Date(), nonce = randomUUID() } = {}) {
   const date = now.toISOString().slice(0, 10);
   const suffix = createHash("sha256").update(nonce).digest("hex").slice(0, 12);
-  const body = Buffer.from(
-    `${JSON.stringify({
-      schemaVersion: "tavonel.restore_drill_probe.v1",
-      drill: suffix,
-      note: "TAVONEL restore drill probe. Not customer data.",
-    })}\n`,
-    "utf8",
-  );
+  const body = restoreDrillProbeBody(suffix);
   return {
-    schemaVersion: "tavonel.restore_drill.v1",
+    schemaVersion: DRILL_CONTRACT_VERSION,
     startedAt: now.toISOString(),
     drillId: `restore-drill-${date}-${suffix}`,
     sourceKey: `synthetic/restore-drill/${date}/${suffix}/source.json`,
@@ -121,7 +119,7 @@ export async function runRestoreDrill(plan, ops) {
   if (restoredRead.body.length !== plan.sizeBytes) {
     return fail("RESTORE_SIZE_MISMATCH", { restored: restoredRead.body.length });
   }
-  // Three checks, counted because `issueRestoreEvidence` demands at least one and a count that
+  // Three checks, counted because `issueRestoreDrillEvidence` demands at least one and a count that
   // is not a count of anything is a number nobody can audit: size, digest, and the JSON contract.
   let parsed;
   try {
@@ -129,7 +127,7 @@ export async function runRestoreDrill(plan, ops) {
   } catch {
     return fail("RESTORE_CONTRACT_NOT_JSON", {});
   }
-  if (parsed?.schemaVersion !== "tavonel.restore_drill_probe.v1") {
+  if (parsed?.schemaVersion !== PROBE_CONTRACT_VERSION) {
     return fail("RESTORE_CONTRACT_MISMATCH", {});
   }
   const completedAt = (await ops.now()).toISOString();
@@ -149,7 +147,7 @@ export async function runRestoreDrill(plan, ops) {
   const cleanupCompletedAt = (await ops.now()).toISOString();
   steps.push(step("cleanup", true, { remaining: 0 }));
 
-  const evidence = issueRestoreEvidence({
+  const evidence = issueRestoreDrillEvidence({
     evidenceId: plan.evidenceId ?? randomUUID(),
     backupId: plan.drillId,
     snapshotAt: plan.startedAt,
@@ -169,7 +167,7 @@ export async function runRestoreDrill(plan, ops) {
   if (!evidence.ok) return { ok: false, code: "RESTORE_EVIDENCE_REFUSED", steps, detail: evidence.code };
 
   const receipt = {
-    schemaVersion: "tavonel.restore_drill.v1",
+    schemaVersion: DRILL_CONTRACT_VERSION,
     drillId: plan.drillId,
     operatorId: backup.operatorId,
     scope: "foundation-r2-object-copy-restore",

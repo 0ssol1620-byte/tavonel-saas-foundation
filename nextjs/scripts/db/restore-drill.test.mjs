@@ -30,6 +30,8 @@ test("a clean run copies, hash-compares, cleans up and emits a receipt", async (
   assert.deepEqual(result.steps.map((entry) => entry.step), [
     "write-source", "verify-source", "verify-restore", "database-backup", "cleanup",
   ]);
+  assert.equal(result.receipt.schemaVersion, "tavonel.restore_drill.v1");
+  assert.equal(result.receipt.evidence.schemaVersion, "tavonel.restore_drill.v1");
   assert.equal(result.receipt.evidence.outcome, "verified_restored");
   assert.equal(result.receipt.evidence.integrityChecksPassed, 3);
   assert.equal(ops.bucket.size, 0);
