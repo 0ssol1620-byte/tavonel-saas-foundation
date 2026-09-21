@@ -23,6 +23,7 @@ const evaluation: OperationalSli = {
   freshness: { lastRunAt: "2026-09-20T11:59:00.000Z", ageMs: 60_000, ttlMs: 600_000 },
   availability: { required: ["coreV2", "r2", "db"], passing: 2, total: 3, ratio: 2 / 3, failed: ["db"], unobserved: [] },
   window: { passingRuns: 2, totalRuns: 3, ratio: 2 / 3, successfulRequestLatencyP95Ms: 100, latencySamples: 8 },
+  modelProviders: [{ provider: "runpod", status: "closed", correlatedFailures: 0 }],
   alerts: [{ severity: "warning", reason: "required_check_failed" }],
 };
 
