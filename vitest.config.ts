@@ -1,24 +1,26 @@
-import { defineConfig } from "vitest/config";
 import path from "path";
+import { defineConfig } from "vitest/config";
 
-const templateRoot = path.resolve(import.meta.dirname);
+/*
+  The root tree is no longer a runtime. `server/_core` (express + tRPC + the template's
+  third-party integrations), `client/` and the vite build were retired on 2026-09-22 --
+  UNWIRED_INVENTORY_2026-09-22 §3. What remains under `server/` and `shared/` is the
+  contract and migration suite the deployed Next.js product is checked against, plus the
+  §2 modules the inventory marks KEEP OFF (founder).
+
+  So this config compiles no client, resolves no `@` alias, and includes only server tests.
+*/
+const repositoryRoot = path.resolve(import.meta.dirname);
 
 export default defineConfig({
-  root: templateRoot,
+  root: repositoryRoot,
   resolve: {
     alias: {
-      "@": path.resolve(templateRoot, "client", "src"),
-      "@shared": path.resolve(templateRoot, "shared"),
-      "@assets": path.resolve(templateRoot, "attached_assets"),
+      "@shared": path.resolve(repositoryRoot, "shared"),
     },
   },
   test: {
     environment: "node",
-    include: [
-      "server/**/*.test.ts",
-      "server/**/*.spec.ts",
-      "client/**/*.test.ts",
-      "client/**/*.spec.ts",
-    ],
+    include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
   },
 });
