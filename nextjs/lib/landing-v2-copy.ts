@@ -356,6 +356,15 @@ const EN: LandingV2Copy = {
       §15 also frames the event as a source that changed. Nothing in the 2025 Form 10-K was
       reissued; four later filings arrived. An arrival is not a revision, so the headline says
       arrive.
+
+      COPY-TRUST, 2026-09-22. `contractNote` said the same thing backwards -- "This deployment
+      compares two complete compiles rather than performing a selective rebuild" -- so the small
+      print under a scene headed "the knowledge is compiled again" was a sentence about what does
+      not run, on the first screen a buyer forms an impression from. The boundary is unchanged and
+      is not softened: the note still names the selective rebuild, and `support` above still says
+      every snapshot is a complete compile. What moved is which half leads and where the full
+      answer lives -- `contractHref` goes to the page that marks clause 05 dashed and says in words
+      which two stages of the path execute here.
     */
     headline: "When new sources arrive,",
     headlineAccent: "the knowledge is compiled again.",
@@ -376,7 +385,7 @@ const EN: LandingV2Copy = {
       untouched: "untouched",
     },
     contractNote:
-      "Recompiling only what depends on a changed source is the compiler contract. This deployment compares two complete compiles rather than performing a selective rebuild.",
+      "Every snapshot here is a complete compile of the corpus, and the comparison names what the arriving filings changed. A selective rebuild — recompiling only what depends on a changed source — is the compiler contract, published clause by clause.",
     contractHref: "/product/continuous-knowledge",
   },
 
@@ -437,16 +446,16 @@ const EN: LandingV2Copy = {
     ],
     outbound: [
       { id: "sources", label: "Check accepted sources", note: "Review the current intake formats and their stated limits.", href: "/sources", built: true },
-      { id: "contract", label: "Read the compiler contract", note: "See which behavior is available and which remains qualified.", href: "/product/continuous-knowledge", built: true },
+      { id: "contract", label: "Read the compiler contract", note: "Read the eight clauses of the compile contract and the state each one holds here.", href: "/product/continuous-knowledge", built: true },
       { id: "boundary", label: "Review the trust boundary", note: "Check the controls and the deployment states the site publishes.", href: "/trust", built: true },
-      { id: "access", label: "Discuss your sources", note: "Use the access path only after the public result answers your questions.", href: "/contact", built: true },
+      { id: "access", label: "Discuss your sources", note: "Talk through your own sources and the intake path that fits them.", href: "/contact", built: true },
     ],
   },
 
   trust: {
     id: "trust",
     eyebrow: "CHECK THE BOUNDARIES",
-    headline: "Read what this deployment actually does.",
+    headline: "Read what this deployment does.",
     support: "Four things this deployment does, each written down where it can be checked.",
     /*
       The four §18 proofs, and where each one is backed.
@@ -608,7 +617,7 @@ const KO: LandingV2Copy = {
       untouched: "그대로",
     },
     contractNote:
-      "바뀐 원문에 의존하는 부분만 다시 컴파일하는 것은 컴파일러의 계약입니다. 이 배포판은 선택적 재빌드를 수행하지 않고 두 번의 전체 컴파일을 비교합니다.",
+      "여기의 모든 스냅샷은 자료 전체를 컴파일한 결과이고, 비교 결과가 도착한 공시 문서가 무엇을 바꿨는지 알려 줍니다. 바뀐 원문에 의존하는 부분만 다시 컴파일하는 선택적 재빌드는 컴파일러의 계약이며, 조항별로 공개되어 있습니다.",
     contractHref: "/product/continuous-knowledge",
   },
 
@@ -650,17 +659,17 @@ const KO: LandingV2Copy = {
     ],
     outbound: [
       { id: "sources", label: "허용 원문 확인하기", note: "현재 반입 형식과 공개된 제한을 확인합니다.", href: "/sources", built: true },
-      { id: "contract", label: "컴파일러 계약 읽기", note: "사용 가능한 동작과 아직 조건이 붙은 동작을 구분합니다.", href: "/product/continuous-knowledge", built: true },
+      { id: "contract", label: "컴파일러 계약 읽기", note: "컴파일 계약의 여덟 개 조항과 각 조항이 여기서 갖는 상태를 읽습니다.", href: "/product/continuous-knowledge", built: true },
       { id: "boundary", label: "신뢰 경계 살펴보기", note: "사이트가 공개한 통제와 배포 상태를 확인합니다.", href: "/trust", built: true },
-      { id: "access", label: "가지고 있는 원문 논의하기", note: "공개 결과를 확인한 뒤 접근 경로를 이용합니다.", href: "/contact", built: true },
+      { id: "access", label: "가지고 있는 원문 논의하기", note: "직접 가진 원문과 그에 맞는 반입 경로를 함께 논의합니다.", href: "/contact", built: true },
     ],
   },
 
   trust: {
     id: "trust",
     eyebrow: "경계 확인하기",
-    headline: "이 배포판이 실제로 하는 일을 읽어 보세요.",
-    support: "이 배포판이 실제로 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
+    headline: "이 배포판이 하는 일을 읽어 보세요.",
+    support: "이 배포판이 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
     proofs: [
       { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다.", href: "/security" },
       { id: "evidence", label: "근거는 계속 붙어 있습니다", note: "게시된 객체는 그것이 컴파일된 원문 버전, 페이지, 영역을 함께 가지며, 그것이 없으면 게시되지 않습니다.", href: "/evidence" },
