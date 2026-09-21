@@ -1,5 +1,5 @@
 /**
- * V01 — every public route, every width, no horizontal overflow.
+ * V01 — every public route, every width, no horizontal overflow and nothing clipped away.
  *
  * The audit could not answer this: it read text, not rendered pixels. What existed here was
  * `scripts/find-overflow.mjs`, a hand-run debug tool wired to no script, pinned to one page
@@ -20,7 +20,8 @@
  *
  * Widths are driven here rather than by Playwright projects on purpose. They are the seven
  * release viewports in root AGENTS.md. One test per width visits every route and reports any
- * offender with the selector that caused it.
+ * offender with the selector that caused it. The second measurement, added by BA-249, is the
+ * vertical one: see `measureClippedRows` below.
  */
 
 import { test, expect } from "@playwright/test";
@@ -67,7 +68,7 @@ const ROUTES = [
   .sort();
 
 type Offender = { selector: string; reason: string; box: string };
-type RouteReport = { route: string; documentOverflow: number; offenders: Offender[] };
+type RouteReport = { route: string; documentOverflow: number; offenders: Offender[]; clipped: ClipOffender[] };
 
 /** Runs in the page. Mirrors scripts/find-overflow.mjs, with the scroll-container exemption. */
 function measureOverflow(): { documentOverflow: number; offenders: Offender[] } {
@@ -116,8 +117,66 @@ function measureOverflow(): { documentOverflow: number; offenders: Offender[] } 
   };
 }
 
+/**
+ * BA-249 — the vertical half of the same question, on the card grids.
+ *
+ * `.tiles` clips on purpose: `overflow: hidden` is what gives the grid its rounded corners over
+ * a 1px seam background. That makes it the one place where a row track sized smaller than the
+ * card sitting in it produces no scrollbar and no horizontal offender — the tiles simply overlap
+ * and the last line of every one of them is sliced off. /trust shipped that way.
+ *
+ * The rule: in a container that clips its overflow and lays its children out in rows (grid or
+ * flex), no in-flow child's border box may pass the container's content box. Restricting it to
+ * grid and flex containers is deliberate — a `-webkit-line-clamp` block is a clip that is doing
+ * its job, and a visually hidden `thead` is 1px tall by design.
+ */
+type ClipOffender = { container: string; child: string; past: number; detail: string };
+
+function measureClippedRows(): ClipOffender[] {
+  const name = (element: Element) => {
+    const cls = typeof element.className === "string" && element.className.trim()
+      ? `.${element.className.trim().split(/\s+/).slice(0, 3).join(".")}`
+      : "";
+    return `${element.tagName.toLowerCase()}${cls}`.slice(0, 120);
+  };
+
+  const offenders: ClipOffender[] = [];
+  for (const container of document.querySelectorAll("body *")) {
+    const style = getComputedStyle(container);
+    if (style.display === "none" || style.visibility === "hidden") continue;
+    if (style.overflowY !== "hidden" && style.overflowY !== "clip") continue;
+    if (!/^(inline-)?(grid|flex)$/.test(style.display)) continue;
+    // A one-pixel box is a visually hidden pattern, not a laid-out container.
+    if (container.clientHeight <= 2) continue;
+
+    const box = container.getBoundingClientRect();
+    const contentBottom = box.bottom
+      - parseFloat(style.borderBottomWidth)
+      - parseFloat(style.paddingBottom);
+
+    for (const child of container.children) {
+      const childStyle = getComputedStyle(child);
+      if (childStyle.display === "none" || childStyle.visibility === "hidden") continue;
+      // Out-of-flow children are positioned against the box on purpose.
+      if (childStyle.position === "absolute" || childStyle.position === "fixed") continue;
+      const childBox = child.getBoundingClientRect();
+      if (childBox.height < 1) continue;
+      const past = childBox.bottom - contentBottom;
+      if (past <= 1) continue;
+      offenders.push({
+        container: name(container),
+        child: name(child),
+        past: Math.round(past * 10) / 10,
+        detail: `child ${Math.round(childBox.height)}px, container clientHeight ${container.clientHeight} vs scrollHeight ${container.scrollHeight}`,
+      });
+      if (offenders.length >= 12) return offenders;
+    }
+  }
+  return offenders;
+}
+
 for (const width of WIDTHS) {
-  test(`no public route overflows horizontally at ${width}px`, async ({ browser }) => {
+  test(`no public route overflows or clips its content at ${width}px`, async ({ browser }) => {
     test.setTimeout(180_000);
     const context = await browser.newContext({ viewport: { width, height: width <= 430 ? 844 : 900 } });
     const page = await context.newPage();
@@ -132,8 +191,9 @@ for (const width of WIDTHS) {
            this suite must not depend on a film finishing. */
         await page.waitForTimeout(500);
         const measured = await page.evaluate(measureOverflow);
-        if (measured.documentOverflow > 1 || measured.offenders.length > 0) {
-          failures.push({ route, ...measured });
+        const clipped = await page.evaluate(measureClippedRows);
+        if (measured.documentOverflow > 1 || measured.offenders.length > 0 || clipped.length > 0) {
+          failures.push({ route, ...measured, clipped });
         }
       }
     } finally {
@@ -143,8 +203,9 @@ for (const width of WIDTHS) {
       .map(entry => [
         `${entry.route} (document overflow ${entry.documentOverflow}px)`,
         ...entry.offenders.map(offender => `    ${offender.selector} — ${offender.reason} [${offender.box}]`),
+        ...entry.clipped.map(clip => `    ${clip.container} clips ${clip.child} by ${clip.past}px — ${clip.detail}`),
       ].join("\n"))
       .join("\n");
-    expect(failures, `horizontal overflow at ${width}px:\n${report}`).toEqual([]);
+    expect(failures, `overflow or clipped content at ${width}px:\n${report}`).toEqual([]);
   });
 }
