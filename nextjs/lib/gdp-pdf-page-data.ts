@@ -364,6 +364,20 @@ export function gdpPdfVerdict(deltaPp: number): GdpPdfVerdict {
 }
 
 /**
+ * The page's h1, chosen by the same sign as the sentence under it.
+ *
+ * A headline written by hand is the one line that survives an artifact swap while ceasing to be
+ * true, which is exactly the failure this page is about. It is a function for the same reason
+ * the sentence is.
+ */
+export function gdpPdfHeadline(deltaPp: number): string {
+  const verdict = gdpPdfVerdict(deltaPp);
+  if (verdict === "no_difference") return "Compiled context made no measurable difference.";
+  if (verdict === "improved") return "Compiled context beat the PDF alone.";
+  return "Compiled context did not beat the PDF.";
+}
+
+/**
  * The headline sentence, chosen by the sign of the measured delta.
  *
  * Three branches, one of which is the one the committed artifact takes. There is no default

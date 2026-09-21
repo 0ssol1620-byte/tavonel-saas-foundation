@@ -10,6 +10,7 @@ import {
   gdpPdfDeltaSentence,
   gdpPdfDeviations,
   gdpPdfFailureNotes,
+  gdpPdfHeadline,
   gdpPdfPercent,
   gdpPdfPoints,
   gdpPdfReport,
@@ -66,7 +67,10 @@ export default function GdpPdfBenchmarkPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <h1 className="document-title">Compiled context did not beat the PDF.</h1>
+              {/* Chosen by the sign of the delta, like the sentence below it. A hand-written
+                  headline is the one line that survives an artifact swap while ceasing to be
+                  true, and on this page that would be the whole failure. */}
+              <h1 className="document-title">{gdpPdfHeadline(macroDelta)}</h1>
             </div>
 
             <div className="stack">

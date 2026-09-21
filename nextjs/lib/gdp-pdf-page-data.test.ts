@@ -18,6 +18,7 @@ import {
   gdpPdfDeltaSentence,
   gdpPdfDeviations,
   gdpPdfFailureNotes,
+  gdpPdfHeadline,
   gdpPdfReport,
   gdpPdfVerdict,
   validateGdpPdfReport,
@@ -189,6 +190,12 @@ describe("gdpPdfDeltaSentence", () => {
     }
   });
 
+  it("titles the page by the same sign, so the h1 cannot outlive its artifact", () => {
+    expect(gdpPdfHeadline(12.3)).toBe("Compiled context beat the PDF alone.");
+    expect(gdpPdfHeadline(0)).toBe("Compiled context made no measurable difference.");
+    expect(gdpPdfHeadline(-30)).toBe("Compiled context did not beat the PDF.");
+  });
+
   it("agrees with itself on the boundary of the floor", () => {
     expect(gdpPdfVerdict(0.04)).toBe("no_difference");
     expect(gdpPdfVerdict(0.06)).toBe("improved");
@@ -277,6 +284,10 @@ describe("the rendered page", () => {
 
   it("marks the verdict in the DOM so it can be read without parsing prose", () => {
     expect(html).toContain(`data-verdict="${gdpPdfVerdict(report.pairwise_delta.macro_delta_pp)}"`);
+  });
+
+  it("titles itself from the delta rather than from copy", () => {
+    expect(html).toContain(gdpPdfHeadline(report.pairwise_delta.macro_delta_pp));
   });
 
   it("states that it is not comparable with published GDP.pdf scores", () => {
