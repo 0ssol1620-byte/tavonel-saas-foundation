@@ -14,15 +14,22 @@
   gap: 18px;
   min-width: 0;
   align-items: start;
+  grid-template-areas: "page" "list" "detail";
 }
+.page { grid-area: page; }
+.list { grid-area: list; }
+.detail { grid-area: detail; }
 
 /*
   Stacked at phone width, page beside excerpt from 880px. The page column is capped so a tall
-  filing page does not push the excerpt off a laptop screen.
+  filing page does not push the excerpt off a laptop screen; the region list sits under the page
+  in that same column, so the picture and its index read as one thing.
 */
 @media (min-width: 880px) {
   .frame {
     grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    grid-template-areas: "page detail" "list detail";
+    align-content: start;
     gap: 24px;
   }
 }
@@ -66,7 +73,12 @@
 }
 
 /*
-  One region: a real button at the box's real coordinates.
+  One region: the drawing of a box at the box's real coordinates, and nothing else.
+
+  It used to be the button as well, which is what made this component unusable on a phone: at
+  360px the ten boxes on the sample page measure 12-37px tall, and a box cannot be grown to 44px
+  without moving it off the words it marks. So the control moved to `.row` below and this is
+  inert -- no tab stop, no name, no minimum size, exactly the measured rectangle.
 
   1px --source outline with a fill under it, which is the landing's Source Region primitive at
   §22's 4-7% band. The selected region steps the outline to 2px and the fill to 14%; both states
@@ -74,16 +86,13 @@
 */
 .region {
   position: absolute;
+  display: block;
   margin: 0;
   padding: 0;
   border: 1px solid var(--source);
   border-radius: 2px;
   /* The fill is the pseudo-element below, so the 1px outline keeps full strength over it. */
   background: transparent;
-  cursor: pointer;
-  /* A box with no text in it still has a minimum reachable size for a pointer and a screen zoom. */
-  min-width: 12px;
-  min-height: 12px;
 }
 .region::before {
   content: "";
@@ -92,15 +101,62 @@
   background: var(--source);
   opacity: 0.06;
 }
-.region[aria-pressed="true"] {
+.region[data-selected] {
   border-width: 2px;
   box-shadow: 0 0 0 1px var(--ground);
 }
-.region[aria-pressed="true"]::before { opacity: 0.16; }
-.region:focus-visible {
+.region[data-selected]::before { opacity: 0.16; }
+
+/* ------------------------------------------------------ the regions, as reachable rows */
+
+/*
+  The control surface. One row per region, full width, at least 44px tall, so selecting a region
+  on a touch screen is hitting a row rather than a 12px sliver of a 243px-wide page image.
+*/
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.row {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 11px 12px;
+  text-align: left;
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--decor);
+  border-radius: var(--r-paper-lg);
+  background: var(--g1);
+  cursor: pointer;
+}
+.row[aria-pressed="true"] {
+  border-color: var(--hairline-hi);
+  border-left: 2px solid var(--source);
+  background: var(--g2);
+}
+.row:focus-visible {
   outline: 2px solid var(--text-hi);
   outline-offset: 2px;
 }
+
+/* The source's own words, clamped by the box rather than rewritten by the component. */
+.rowExcerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-mid);
+}
+.row[aria-pressed="true"] .rowExcerpt { color: var(--text-hi); }
 
 /* The button's accessible name. Read aloud, never painted. */
 .regionName {
@@ -177,4 +233,17 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
+}
+/*
+  The one action in this panel, at the floor. BA-240's pattern verbatim -- block padding for the
+  hit area, an equal negative margin to give it back -- so the line box keeps its text height and
+  nothing in the figcaption reflows. It is here rather than in the BA-240 block in tavonel.css
+  because that block names global classes, and a module class is hashed at build time.
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .open a {
+    display: inline-block;
+    padding-block: 12.5px;
+    margin-block: -12.5px;
+  }
 }
