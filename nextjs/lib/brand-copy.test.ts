@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
-import { LANDING_FRAMES } from "./landing-frames";
 import {
   ACCESS_CTA,
   BRAND_LINE,
@@ -770,8 +769,11 @@ describe("public copy", () => {
     the page reaches the real record rather than a picture of it, every figure on it declares
     that it was measured, and no locator vocabulary is taught to a first-time reader.
 
-    `LANDING_FRAMES` still exists and its hrefs are still checked: the frames are real captures
-    of the live route and a later scene may use them. They are simply not on the entry pages.
+    `LANDING_FRAMES` and its six captures were deleted on 2026-09-22 -- the last of the eight
+    DELETE rows in UNWIRED_INVENTORY_2026-09-22 §3. The record was kept on the theory that a
+    later scene might use them; no scene does, and an unrendered screenshot record is a caption
+    nobody reads guarding six files nobody is served. What this test owes is unchanged, and it
+    is owed by `components/landing-v2/scenes/proof.tsx`, which is actually on the page.
   */
   it("reaches original-source proof from the page without teaching locator jargon", () => {
     const proof = read("components/landing-v2/scenes/proof.tsx");
@@ -786,12 +788,6 @@ describe("public copy", () => {
       read("lib/landing-v2-proof.ts"),
       "the deep link is the product's own URL shape"
     ).toContain("/explore?act=evidence&evidence=");
-    for (const href of Object.values(LANDING_FRAMES).map(frame => frame.href)) {
-      expect(
-        href,
-        "every frame opens the live route it is a screenshot of"
-      ).toMatch(/^\/explore/);
-    }
     expect(landingSource()).not.toContain("Exact bbox");
   });
   it("stages a customer's own upload in the workspace, not a fixture world", () => {
