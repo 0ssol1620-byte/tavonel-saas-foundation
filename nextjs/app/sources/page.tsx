@@ -122,7 +122,7 @@ export default function SourcesPage() {
                 </div>
                 <div>
                   <dt>Omitted</dt>
-                  <dd><b>{census.omitted}</b>listed here and refused at upload, with nothing about them compiled.</dd>
+                  <dd><b>{census.omitted}</b>listed here and turned away at upload, with nothing about them compiled.</dd>
                 </div>
               </dl>
 
