@@ -82,3 +82,5 @@ nextjs/public/research/receipts/*.json -text
 # Deterministic browser icon representations
 nextjs/public/brand/*.svg text eol=lf
 nextjs/public/icon.svg text eol=lf
+
+nextjs/content/benchmarks/*.json text eol=lf
