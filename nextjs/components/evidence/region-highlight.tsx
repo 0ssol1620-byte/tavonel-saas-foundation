@@ -126,14 +126,20 @@ export default function RegionHighlight({
               onClick={() => setSelected(position)}
             >
               {/*
-                `data-derived="1"`: every number a row carries has a receipt. The position, the
-                count and the page are read from the view above, and the excerpt is the filing's
-                own sentence with its locator printed in the panel below. The landing's figure
-                guard walks the rendered page for a digit that has none.
+                `data-derived="1"`: every number in this accessible name -- the position, the
+                count and the page -- is read from the view above, and the panel beside it
+                prints the same three with their locator. The landing's figure guard walks the
+                rendered page for a digit that has no receipt, and it cannot see an aria name
+                apart from painted copy.
               */}
               <span className={styles.regionName} data-derived="1">
                 Evidence region {position + 1} of {view.regions.length}, page {view.source.page}
               </span>
+              {/*
+                And the same attribute on the row's painted half, for the same reason the
+                quotation below carries it: the text is the filing's own sentence, and the
+                locator that receipts it is printed in the panel beside this list.
+              */}
               <span className={styles.rowExcerpt} data-derived="1">{region.excerpt}</span>
             </button>
           </li>
