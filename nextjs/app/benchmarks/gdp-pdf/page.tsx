@@ -446,10 +446,10 @@ export default function GdpPdfBenchmarkPage() {
               </details>
               <p className={styles.para}>
                 The protocol these arms are sealed against, the source pins and the rights position
-                on the corpus are in <code>nextjs/eval/gdp-pdf/README.md</code>, summarised on{" "}
-                <Link href={"/reproducibility" as Route}>Reproducibility</Link>. Prompts, PDFs,
-                answers and judge rationales stay in the restricted run store; only their digests
-                appear above.
+                on the corpus are in <code>nextjs/eval/gdp-pdf/README.md</code> and{" "}
+                <code>nextjs/eval/gdp-pdf/protocol.json</code> in this repository, which is also
+                what the conditions table above is diffed against. Prompts, PDFs, answers and judge
+                rationales stay in the restricted run store; only their digests appear here.
               </p>
               <p className={styles.para}>
                 The corpus is{" "}

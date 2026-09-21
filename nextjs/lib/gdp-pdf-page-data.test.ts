@@ -325,6 +325,40 @@ describe("the rendered page", () => {
   });
 });
 
+/*
+  THE 360px GUARD, as far as a node test can carry it.
+
+  The e2e overflow sweep is the real check and this route is in its list. It cannot run in this
+  worktree (`@vercel/functions` is declared but absent from the shared node_modules, so
+  `next build` fails before Playwright starts), and a CSS module resolves to `{}` under vitest, so
+  the rendered markup carries no class names to assert on.
+
+  What is still checkable is the source invariant that makes the page safe at 360px: every wide
+  table sits in a scroll frame of its own, and the 64-character digests carry a break rule. A
+  table added without its frame is the exact regression that turns the document sideways, and it
+  fails here rather than three CI jobs later.
+*/
+describe("the page cannot scroll the document sideways", () => {
+  const source = readFileSync(resolve(import.meta.dirname, "../app/benchmarks/gdp-pdf/page.tsx"), "utf8");
+  const sheet = readFileSync(resolve(import.meta.dirname, "../app/benchmarks/gdp-pdf/gdp-pdf.module.css"), "utf8");
+
+  it("wraps every table in a scroll frame", () => {
+    const tables = source.match(/<table className=\{styles\.table\}/g) ?? [];
+    const frames = source.match(/<div className=\{styles\.tableScroll\}/g) ?? [];
+    expect(tables.length).toBeGreaterThan(0);
+    expect(frames.length).toBe(tables.length);
+  });
+
+  it("gives that frame its own overflow and a min-width of zero", () => {
+    expect(sheet).toMatch(/\.tableScroll\s*\{[^}]*overflow-x:\s*auto/);
+    expect(sheet).toMatch(/\.tableScroll\s*\{[^}]*min-width:\s*0/);
+  });
+
+  it("lets a 64-character digest break", () => {
+    expect(sheet).toMatch(/\.digest\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  });
+});
+
 describe("the route's public surface", () => {
   it("declares its own canonical", () => {
     expect(metadata.alternates?.canonical).toBe("/benchmarks/gdp-pdf");
