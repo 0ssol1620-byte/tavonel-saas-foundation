@@ -2359,6 +2359,12 @@
   /* A column head is a label, not a machine identifier: sans, at the floor, not 9px mono caps. */
   .docs-table th { color: var(--text-lo); font: 500 var(--t-1) / 1.4 var(--f-sans); letter-spacing: 0.02em; }
   .docs-table td { color: var(--text-lo); }
+  /* Gap #14. A plan cell says which of the three states it is in; the tick is the one that is
+     coloured, so a scan down the column does not read an absence as a quieter yes. */
+  .docs-table td[data-state] { white-space: nowrap; font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; }
+  .docs-table td[data-state="provided"] { color: var(--verified); font-size: 14px; letter-spacing: 0; }
+  .docs-table td[data-state="planned"] { color: var(--changed); }
+  .docs-table td[data-state="not_sold"] { color: var(--reused); }
   .docs-table code { color: var(--text-hi); font: var(--t-2) var(--f-mono); }
 
   .docs-pager { display: flex; justify-content: space-between; gap: 16px; padding-top: 18px; border-top: 1px solid var(--hairline); font: var(--t-1) var(--f-sans); }
@@ -3524,6 +3530,139 @@
   }
   .src-para { margin: 0; max-width: 72ch; font-size: 13.5px; line-height: 1.66; color: var(--text-mid); }
   .src-para b { color: var(--text-hi); font-weight: 500; }
+
+  /*
+    The four denominators over the tier chips (/sources, gap #4 of the 2026-09-22 audit).
+
+    Counted from the manifest at render time by `capabilityCensus`, so there is no written
+    number here to drift. It is a row of figures rather than a fifth table column because none of
+    them is per-format: they are what the twelve rows below add up to.
+  */
+  .src-census {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    margin: 0;
+    background: var(--seam);
+    border: 1px solid var(--hairline);
+  }
+  .src-census > div { padding: 14px 16px; background: var(--ground); }
+  .src-census dt {
+    margin: 0 0 6px;
+    font-family: var(--f-sans);
+    font-size: var(--t-1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+  .src-census dd { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-mid); }
+  .src-census dd b { display: block; font: 400 24px/1 var(--f-mono); color: var(--text-hi); }
+  @media (max-width: 620px) {
+    .src-census { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /*
+    The Provided / Roadmap / Not provided table (/trust, /security, /enterprise).
+
+    It reuses `.docs-table` and the `.src-tier` chip rather than growing a third table style:
+    the chip already encodes the four status colours and prints its state as a word, which is the
+    property that matters -- a glyph-only cell reads as a score. A seam between the state groups
+    is the only rule this adds, so a reader can see where "in place" ends.
+  */
+  .trust-provisions tbody + tbody > tr:first-child > * { border-top: 1px solid var(--hairline-hi); }
+  .trust-provisions td, .trust-provisions th { vertical-align: top; }
+  .trust-provisions tbody th { font-weight: 400; color: var(--text-hi); min-width: 16ch; }
+  /* `.policy-copy a` covers /trust and /enterprise; /security has no policy wrapper, and the
+     global reset is `color: inherit; text-decoration: none`, so the source link would render as
+     prose on exactly the page a reviewer checks the sources on. */
+  .provision-source {
+    color: var(--text-lo);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .provision-source:hover { color: var(--text-hi); }
+  }
+
+  /*
+    The public sample, framed (/enterprise, gap #15).
+
+    The label is positioned inside the border rather than placed above it: the thing being
+    guarded against is the frame travelling into a deck without the words "SYNTHETIC DATA", and a
+    caption above the artifact is the first thing a crop loses.
+  */
+  .sample-frame { margin: 0; display: grid; gap: 12px; }
+  .sample-frame-art {
+    position: relative;
+    padding: 44px 20px 20px;
+    border: 1px solid var(--hairline-hi);
+    background: var(--g1);
+  }
+  .sample-frame-label {
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    font: 400 var(--t-1)/1 var(--f-sans);
+    letter-spacing: 0.14em;
+    color: var(--text-lo);
+  }
+  .sample-frame-grid { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 22px; align-items: start; }
+  /* US Letter, 612 x 792pt. The proxy is the page's proportion and nothing else is drawn on it. */
+  .sample-frame-page {
+    position: relative;
+    aspect-ratio: 612 / 792;
+    border: 1px solid var(--hairline-hi);
+    background: var(--ground);
+  }
+  .sample-frame-page > i {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -20px;
+    font: 400 var(--t-1)/1 var(--f-mono);
+    font-style: normal;
+    letter-spacing: 0.08em;
+    color: var(--text-lo);
+    text-align: center;
+  }
+  /* The one rectangle: the bbox the compile request carries, at its own coordinates. */
+  .sample-frame-region {
+    position: absolute;
+    border: 1px solid var(--verified);
+    background: var(--verified-deep);
+  }
+  .sample-frame-read { display: grid; gap: 12px; min-width: 0; }
+  .sample-frame-q { margin: 0; color: var(--text-hi); font-size: 15px; line-height: 1.5; }
+  .sample-frame-excerpt {
+    margin: 0;
+    padding: 12px 14px;
+    border-left: 1px solid var(--verified-dim);
+    background: var(--ground);
+    font-size: 13.5px;
+    line-height: 1.66;
+    color: var(--text-mid);
+    overflow-wrap: anywhere;
+  }
+  .sample-frame-meta { margin: 0; display: grid; gap: 7px; }
+  .sample-frame-meta > div { display: grid; grid-template-columns: 13ch minmax(0, 1fr); gap: 12px; }
+  .sample-frame-meta dt {
+    margin: 0;
+    font-family: var(--f-sans);
+    font-size: var(--t-1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+  .sample-frame-meta dd { margin: 0; font-size: 13px; color: var(--text-mid); overflow-wrap: anywhere; }
+
+  /* A 148px page proxy beside a column of prose is two unreadable columns on a phone. */
+  @media (max-width: 620px) {
+    .sample-frame-grid { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+    .sample-frame-page { max-width: 148px; }
+    .sample-frame-meta > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
 
   @media (max-width: 760px) {
     .src-matrix thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

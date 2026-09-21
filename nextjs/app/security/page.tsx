@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
+import TrustProvisions from "@/components/trust-provisions";
 import { TRAINING_DATA_CLAIM } from "@/lib/security-claims";
 
 export const metadata: Metadata = {
@@ -49,6 +50,7 @@ export default function SecurityPage() {
                 <b>On this page:</b>{" "}
                 <a href="#boundary">Processing boundary</a> ·{" "}
                 <a href="#controls">Controls</a> ·{" "}
+                <a href="#security-provisions-title">What is in place</a> ·{" "}
                 <a href="#assurance">Assurance and review</a>
               </nav>
 
@@ -72,6 +74,13 @@ export default function SecurityPage() {
                   </article>
                 ))}
               </div>
+
+              {/*
+                Gap #6, 2026-09-22. The controls above are what is in place. A reviewer's
+                next question is what is not, and the answer was four pages of prose away.
+                One content module, three surfaces; this page adds no wording of its own.
+              */}
+              <TrustProvisions id="security-provisions" />
 
               <h2 id="assurance">Assurance and review</h2>
               <p>
