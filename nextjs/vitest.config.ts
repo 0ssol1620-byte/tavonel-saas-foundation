@@ -18,6 +18,10 @@ export default defineConfig({
     // The eval metric tests only: pure functions over committed result files, fast enough for
     // every run. eval/ask-eval/run.harness.test.ts and eval/k08-live-engine/emit-inputs.test.ts
     // stay out -- they write report files and take minutes, and live in eval/vitest.config.ts.
-    include: ["lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts"],
+    // scripts/router/*: operator CLIs whose pure planning/aggregation half is unit tested here.
+    include: [
+      "lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts",
+      "scripts/router/*.test.mjs",
+    ],
   },
 });

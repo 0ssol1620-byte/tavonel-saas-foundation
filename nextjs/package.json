@@ -31,7 +31,9 @@
     "release:manifest": "node --experimental-strip-types scripts/release-manifest.mjs",
     "release:manifest:inspect": "node --experimental-strip-types scripts/release-manifest.mjs --allow-incomplete --stdout",
     "scan:secrets": "node scripts/secret-scan.mjs ..",
-    "brand:verify": "node scripts/build-brand-assets.mjs --check"
+    "brand:verify": "node scripts/build-brand-assets.mjs --check",
+    "router:seed:shadow": "node --experimental-transform-types --import ./scripts/router/register-ts-loader.mjs scripts/router/seed-shadow-rollout.mjs",
+    "router:shadow:report": "node --experimental-transform-types --import ./scripts/router/register-ts-loader.mjs scripts/router/shadow-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
