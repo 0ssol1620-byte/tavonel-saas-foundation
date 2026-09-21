@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import {
-  TRUST_PROVISIONS,
   TRUST_PROVISION_STATE_LABEL,
   TRUST_PROVISION_STATE_TOKEN,
   trustProvisionCounts,
