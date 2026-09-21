@@ -3769,8 +3769,21 @@
     /* Inline links inside running prose: grow the hit area with block padding and take it back
        with an equal negative margin, so the line box keeps its text height and the paragraph does
        not reflow. Unscoped -- the footer, the policy pages and the docs pager are exactly the
-       places that failed, and every one of them sat outside the wrapper this was scoped to. */
-    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb, .notice) a,
+       places that failed, and every one of them sat outside the wrapper this was scoped to.
+
+       BA-249 -- `:not(.tile, .link)`, because the pull-back only cancels on an inline box.
+
+       An inline-level anchor's margin box is what sizes the line box, so +12.5px of padding and
+       -12.5px of margin cancel and the paragraph does not reflow. A card that *is* the anchor is
+       a grid item instead: `a.tile.trust-link` on /trust matched `.policy-copy a`, was blockified
+       out of `.tile`'s own `display: flex` into `display: block` (losing its 9px gap), took
+       12.5px of block padding in place of the authored 16px, and had its margin box -- which is
+       what sizes the row track -- pulled 25px shorter than its border box. Every track came out
+       at the tile's content-box height, every tile overlapped the one below it, and `.tiles`'
+       `overflow: hidden` (there to clip the border radius) sliced the last line off all eight.
+       A card anchor is already a 44px-plus target, so nothing here needs the hit area.
+       `e2e/overflow-audit.spec.ts` measures it now. */
+    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb, .notice) a:not(.tile, .link),
     a[href^="mailto:"],
     a[href^="tel:"] {
       display: inline-block;
