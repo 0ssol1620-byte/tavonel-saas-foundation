@@ -2364,7 +2364,7 @@
   .docs-table td[data-state] { white-space: nowrap; font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; }
   .docs-table td[data-state="provided"] { color: var(--verified); font-size: 14px; letter-spacing: 0; }
   .docs-table td[data-state="planned"] { color: var(--changed); }
-  .docs-table td[data-state="not_sold"] { color: var(--reused); }
+  .docs-table td[data-state="not_sold"] { color: var(--text-lo); }
   .docs-table code { color: var(--text-hi); font: var(--t-2) var(--f-mono); }
 
   .docs-pager { display: flex; justify-content: space-between; gap: 16px; padding-top: 18px; border-top: 1px solid var(--hairline); font: var(--t-1) var(--f-sans); }
