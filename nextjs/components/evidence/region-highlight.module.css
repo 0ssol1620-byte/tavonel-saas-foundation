@@ -239,10 +239,13 @@
   hit area, an equal negative margin to give it back -- so the line box keeps its text height and
   nothing in the figcaption reflows.
 
-  The `main p > a` rule this commit adds to that block in tavonel.css already covers this anchor
-  on all three pages that render the component today. It is repeated here on purpose: the frame
-  is shared, a caller can put it outside `<main>`, and a panel with exactly one action in it
-  should not depend on where a page chose to mount it for that action to be reachable.
+  It is safe here for the reason PR #92 found it is not safe everywhere: the pull-back cancels
+  only on an inline-level box, where the margin box is what sizes the line box. On a grid or
+  flex item the parent measures the margin box instead, and /trust lost 25px of every row track
+  to that. Here the grid item is the `<p class="open">` and the anchor is an ordinary inline
+  child of it, so the paragraph's height is its line box either way -- which is why this belongs
+  in the module, where the author can see what the parent lays out as, rather than in a global
+  rule matching by shape.
 */
 @media (pointer: coarse), (max-width: 1079px) {
   .open a {

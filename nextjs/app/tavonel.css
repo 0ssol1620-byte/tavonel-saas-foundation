@@ -3778,26 +3778,27 @@
       margin-block: -12.5px;
     }
     /*
-      G1-TAP, 2026-09-22. The list above is global class names, and a paragraph inside a CSS
-      module has a hashed class it can never name -- so every module that writes prose reopens
-      the same defect one route at a time. A 360px sweep found four already: `capability
-      manifest` at 103x16 in the Explore frame on /knowledge-compiler and /product, `public
-      dataset` and `reference harness` at 18px on /benchmarks, `Integrations` at 18px on
-      /sources.
+      G1-TAP, 2026-09-22. Not widened here, and the reason is worth leaving behind.
 
-      A link in a paragraph is running prose wherever the paragraph was written, so it takes the
-      same treatment by shape rather than by name -- the identical three declarations, not a
-      second pattern. Padding alone was tried and measured 43px on a 18px line: vertical padding
-      on an inline box is painted and hit-tested but does not raise the line box, which leaves
-      the total a function of the font size and one pixel short on /sources. The four exclusions
-      are the shapes in a paragraph that are not prose links and carry their own floor below: the
-      two buttons, the verification link and the chips.
+      The list above is global class names, and a paragraph written inside a CSS module has a
+      hashed class it can never name -- so every module that writes prose reopens this defect on
+      a new route. A 360px sweep over seventeen public routes found four sitting there: `public
+      dataset` and `reference harness` at 18px on /benchmarks, `Integrations` at 18px on
+      /sources, and the Explore frame's `capability manifest` at 16px, since fixed in its own
+      module by the lane that owns it.
+
+      Matching by shape instead -- `main p > a` -- clears all four, and was measured doing so.
+      It is not here because these three declarations are only safe on an inline-level box. The
+      pull-back cancels because the margin box sizes the line box; on a grid or flex item the
+      parent measures the margin box instead, and /trust lost 25px of every row track that way
+      (PR #92). `p > a` is a narrower match than the one that broke, but a paragraph is not
+      guaranteed to be a block container, and a rule that silently blockifies whatever it
+      catches is the wrong instrument for a floor that must hold on every route at once.
+
+      A module that needs the floor opts in from its own stylesheet, where the author can see
+      what the anchor's parent lays out as. `components/evidence/region-highlight.module.css`
+      does that for the one action in its panel.
     */
-    main p > a:not(.btn):not(.btn-primary):not(.link-verify):not(.tag) {
-      display: inline-block;
-      padding-block: 12.5px;
-      margin-block: -12.5px;
-    }
     /* Real controls take a real floor. 44, not the 42 that was here: the number in the guideline
        is the number. The wordmark, the sign-in link, the search input, every <summary> and every
        <select> are on the list because each of them was measured under it. */
