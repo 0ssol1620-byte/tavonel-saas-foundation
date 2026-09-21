@@ -60,6 +60,7 @@ export default function GdpPdfBenchmarkPage() {
   const domains = Object.keys(report.per_domain).sort();
   const hardest = report.hardest_documents ?? [];
   const subset = report.compiled_available_subset;
+  const truncated = report.packet_size?.packets_truncated_by_budget;
 
   return (
     <PublicSitePage>
@@ -379,6 +380,16 @@ export default function GdpPdfBenchmarkPage() {
                   retrieval and the adaptive router were not run in this lane. They are not run,
                   which is different from zero.
                 </li>
+                {truncated !== undefined && report.packet_size !== undefined && truncated > 0 ? (
+                  <li>
+                    <b>It does not show</b> the compiled context at full size.{" "}
+                    <span data-derived="1">{truncated}</span> of the{" "}
+                    <span data-derived="1">{report.packet_size.n}</span> packets reached the
+                    adapter&rsquo;s character budget and were cut before the model read them, so on
+                    those tasks the arm answered from a truncated packet. That is a condition of
+                    this run, recorded here; it is not a correction to the result above.
+                  </li>
+                ) : null}
                 {failureNotes.map((note) => (
                   <li key={note}>{note}</li>
                 ))}

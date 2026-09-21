@@ -14,7 +14,7 @@
  *      count over its own denominator.
  *   2. A number the artifact does not contain. The page's headline sentence is chosen from the
  *      sign of the measured delta by `gdpPdfVerdict`; there is no branch that can print an
- *      improvement the report does not carry. On the committed pilot the delta is negative, and
+ *      improvement the report does not carry. On the committed run the delta is negative, and
  *      the page says so.
  *   3. A deviation that quietly disappears. `gdpPdfDeviations` diffs the run manifest against the
  *      sealed protocol in `eval/gdp-pdf/protocol.json`, so the conditions panel is generated from
@@ -39,7 +39,7 @@ import protocol from "../eval/gdp-pdf/protocol.json";
  * it computed, so a stale digest names its own fix.
  */
 export const GDP_PDF_ARTIFACT_SHA256 =
-  "3083fb261b395b2fab52f6ff6b3fc8cf8a3a21d440e879c8034b996cd89c79f8" as const;
+  "0302712c8a0570492347d604c00a8090bff13b92cd96190d3844798aa258f953" as const;
 
 export const GDP_PDF_ARTIFACT_PATH = "nextjs/content/benchmarks/gdp-pdf.json" as const;
 
@@ -131,6 +131,12 @@ export type GdpPdfReport = Readonly<{
   official_comparable: boolean;
   cells_recorded: number;
   hardest_documents?: readonly GdpPdfHardestDocument[];
+  /*
+    Packet size, as measured. `packets_truncated_by_budget` is the count of compiled packets that
+    hit the adapter's character budget and were cut before the model saw them -- a condition of
+    the run, published beside the result rather than argued against it.
+  */
+  packet_size?: Readonly<{ n: number; packets_truncated_by_budget?: number }>;
 }>;
 
 /* ------------------------------------------------------------------ validation */
