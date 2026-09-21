@@ -165,3 +165,30 @@
   border: 1px solid var(--verified-dim);
   border-radius: var(--r-paper-lg, 4px);
 }
+
+/*
+  Gap #11. The card thumbnail: the crop, sized by the card rather than by the page it printed on.
+
+  The `crop` variant caps its own width from the manifest's region scale, which is right on a
+  reading page and wrong in a 330px card -- there the crop takes the card's width and the fixed
+  height on the element keeps the ratio. Nothing in here is interactive: the card's own anchor is
+  expanded over it, and a second target under that overlay would be unreachable.
+*/
+.thumb {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 168px;
+  object-fit: cover;
+  object-position: top left;
+  background: var(--paper, #f4f1ea);
+  border: 1px solid var(--verified-dim);
+  border-radius: var(--r-paper-lg, 4px);
+}
