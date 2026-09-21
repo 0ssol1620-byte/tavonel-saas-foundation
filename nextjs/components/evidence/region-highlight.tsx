@@ -20,7 +20,7 @@ import styles from "./region-highlight.module.css";
     percentage of a page, and the image behind it is the whole page, so the mapping is exact at
     every rendered size and needs no layout measurement. This is the same arithmetic
     `components/landing-v2/source-region.tsx` does for the landing's single box; what is added
-    here is that a box is a control a reader can reach.
+    here is that a page carries several of them and a reader can pick one.
   - **No table grid and no cell.** The capability manifest records
     `no_table_or_formula_extraction`. Drawing a lattice over a page would show a structure this
     system does not extract, so a region is a rectangle and an excerpt, and there is no `<table>`,
