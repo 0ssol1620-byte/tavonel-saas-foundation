@@ -37,6 +37,7 @@ import {
   `/sources` and in the changelog and nowhere near the page where the money decision is made.
 */
 import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+import { corpusFit, LIMIT_STATE_GLYPH, LIMIT_STATE_LABEL } from "@/lib/plan-limit-fit";
 
 /*
   Plans come from the billing catalog, not from a second list kept next to it.
@@ -629,9 +630,24 @@ export default function PricingPageClient({
     pages, so the control opens on "your plan already covers this" rather than on a figure
     nobody chose.
   */
-  const [pages, setPages] = useState<number>(BILLING_OFFERS.observer_access.includedPages);
+  /*
+    Gap #5 (V-5). One corpus, described the way a buyer holds it, priced and measured at once.
+
+    The control was a single "Processed pages" box, and a page count alone cannot answer the
+    question a buyer asks before the price: does this corpus compile here? That answer needs the
+    shape -- how many sources, and how long the longest one is -- because every ceiling in this
+    deployment is per source or per run, never per month. So the estimator reads the shape and
+    derives the volume from it, which also stops the calculator from stating a page total that
+    the selection beside it contradicts.
+
+    The defaults multiply to the Developer plan's included pages, which is where BA-128 put the
+    old single control: the calculator still opens on "your plan already covers this".
+  */
+  const [sources, setSources] = useState<number>(25);
+  const [pagesPerSource, setPagesPerSource] = useState<number>(20);
+  const fit = corpusFit(sources, pagesPerSource);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
-  const estimate = estimatorRows(pages);
+  const estimate = estimatorRows(fit.pages);
 
   /*
     §32 `pricing_plan_viewed`, fired when the grid is actually on screen.
@@ -1108,17 +1124,53 @@ export default function PricingPageClient({
                     straight to the calculator never passes the sentence under the plan grid. */}
                 <h3 id="usage-estimator-title">What will this corpus cost?</h3>
                 <p className="fine">All figures in US dollars, excluding tax.</p>
-                <label htmlFor="pricing-pages">Processed pages</label>
-                <input
-                  id="pricing-pages"
-                  type="number"
-                  min="1"
-                  max="10000"
-                  step="1"
-                  value={pages}
-                  onChange={(event) => setPages(Number(event.target.value))}
-                />
+                <div className="usage-estimator-inputs">
+                  <p>
+                    <label htmlFor="pricing-sources">Sources in this run</label>
+                    <input
+                      id="pricing-sources"
+                      type="number"
+                      min="1"
+                      max={CORPUS_MAX_DOCUMENTS * 2}
+                      step="1"
+                      value={sources}
+                      onChange={(event) => setSources(Number(event.target.value))}
+                    />
+                  </p>
+                  <p>
+                    <label htmlFor="pricing-pages">Pages in the longest source</label>
+                    <input
+                      id="pricing-pages"
+                      type="number"
+                      min="1"
+                      max={PROCESSING_CEILING.maxSourcePages * 2}
+                      step="1"
+                      value={pagesPerSource}
+                      onChange={(event) => setPagesPerSource(Number(event.target.value))}
+                    />
+                  </p>
+                </div>
               </div>
+              {/*
+                Gap #5. What the selection above meets before it meets a price.
+
+                Every row states the ceiling it is measured against and says on which plans that
+                ceiling holds, which on this deployment is all of them. A reader who came looking
+                for the plan that lifts the 80-page ceiling reads here that there is not one,
+                instead of buying and finding out.
+              */}
+              <dl className="usage-estimator-fit" aria-label="How this corpus meets the compile ceilings">
+                {fit.rows.map((row) => (
+                  <div key={row.id} data-fit={row.state}>
+                    <dt>
+                      <span aria-hidden="true">{LIMIT_STATE_GLYPH[row.state]}</span>
+                      {row.label}
+                      <small>{LIMIT_STATE_LABEL[row.state]}</small>
+                    </dt>
+                    <dd>{row.value}<small>{row.ceiling}</small></dd>
+                  </div>
+                ))}
+              </dl>
               <dl>
                 <div><dt>{BILLING_OFFERS.observer_access.label} total, USD</dt><dd>{formatUsd(estimate.developerTotalUsd)}</dd></div>
                 <div><dt>{BILLING_OFFERS.studio_access.label} total, USD</dt><dd>{formatUsd(estimate.teamTotalUsd)}</dd></div>

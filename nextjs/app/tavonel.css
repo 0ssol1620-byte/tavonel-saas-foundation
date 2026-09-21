@@ -1927,6 +1927,24 @@
   .usage-estimator dl div { display: flex; justify-content: space-between; gap: 20px; align-items: baseline; padding: 12px 14px; background: var(--g1); }
   .usage-estimator dt { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
   .usage-estimator dd { margin: 0; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+  /*
+    Gap #5. The corpus shape, and how it meets the ceilings, in the calculator that prices it.
+
+    Two controls where there was one, side by side until the column is too narrow for both, and
+    the fit rows spanning the whole widget under them -- they belong to the selection, not to the
+    money column, and reading them beside the totals would suggest the plan sets them.
+  */
+  .usage-estimator-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px clamp(16px, 3vw, 34px); }
+  .usage-estimator-inputs p { margin: 0; }
+  .usage-estimator-inputs input { width: 100%; }
+  .usage-estimator-fit { grid-column: 1 / -1; }
+  .usage-estimator-fit dt { display: grid; grid-template-columns: 1.2em auto; column-gap: 9px; align-items: baseline; color: var(--text-hi); }
+  .usage-estimator-fit dt > span { font-family: var(--f-mono); color: var(--text-lo); }
+  .usage-estimator-fit dt small { grid-column: 2; margin-top: 3px; font-size: 12px; letter-spacing: 0; color: var(--text-lo); }
+  .usage-estimator-fit dd { text-align: right; }
+  .usage-estimator-fit dd small { display: block; margin-top: 3px; font-size: 12px; letter-spacing: 0; color: var(--text-lo); }
+  .usage-estimator-fit div[data-fit="within"] dt > span { color: var(--verified); }
+  .usage-estimator-fit div[data-fit="refused"] dt > span { color: var(--changed); }
   /* A plan card is a third of a column, and at 1280 that is about 190px of content box. The
      labels here are full sentences -- "Choose this plan -> sign in" says what happens next, which
      is worth more than the one line it costs -- so the button wraps instead of running past the
