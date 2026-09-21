@@ -25,12 +25,12 @@
  * says nothing about what R2 and Postgres will actually answer.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { issueDeletionEvidence } from "../../lib/operations-p0.ts";
 import { PROBE_WORKSPACE_PATTERN } from "../../lib/immutable-keys.ts";
+import { datedReceiptPath, writeReceiptOnce } from "./evidence-receipt.mjs";
 import { scanTextForSecrets } from "../secret-scan.mjs";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
@@ -99,7 +99,12 @@ export function planSourceDeletionDrill({ now = new Date(), nonce = randomUUID()
       sha256: sha256(derived),
       sizeBytes: derived.length,
     },
-  ].sort((a, b) => a.key.localeCompare(b.key));
+    // Byte order, not locale order. The database canonicalizes the manifest with
+    // `order by value->>'key'`, which is `text` collation-independent byte comparison for the
+    // ASCII keys these drills produce; `localeCompare` can disagree with it (it folds case and
+    // treats `-` as ignorable in some locales), and a plan sorted differently from the
+    // attestation is a manifest digest mismatch that looks like tampering.
+  ].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 
   return {
     schemaVersion: "tavonel.source_deletion_drill.v1",
@@ -359,8 +364,8 @@ export async function createLiveOps(env = process.env) {
   return { ok: true, ops: createLiveDrillOps(env) };
 }
 
-export function receiptPath(now, directory = EVIDENCE_DIRECTORY) {
-  return resolve(directory, `TAVONEL_SOURCE_DELETION_DRILL_${now.toISOString().slice(0, 10)}.json`);
+export function receiptPath(now, drillId, directory = EVIDENCE_DIRECTORY) {
+  return datedReceiptPath("SOURCE_DELETION_DRILL", now, drillId, directory);
 }
 
 async function main(argv) {
@@ -387,19 +392,23 @@ async function main(argv) {
   }
 
   if (!execute) {
-    process.stdout.write(
-      `${JSON.stringify({ dryRun: true, wouldWrite: receiptPath(new Date()), ...result }, null, 2)}\n`,
-    );
+    const wouldWrite = receiptPath(new Date(), result.receipt.drillId);
+    process.stdout.write(`${JSON.stringify({ dryRun: true, wouldWrite, ...result }, null, 2)}\n`);
     process.stdout.write(
       "dry run: nothing was created, deleted or written. The model is not the system.\n",
     );
     return;
   }
 
-  const path = receiptPath(new Date());
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(result.receipt, null, 2)}\n`, "utf8");
-  process.stdout.write(`${path}\n`);
+  const written = writeReceiptOnce(receiptPath(new Date(), result.receipt.drillId), result.receipt);
+  if (!written.ok) {
+    // The drill itself succeeded; refusing to publish it is still a failure, because the run
+    // produced evidence that now has nowhere to go that does not destroy older evidence.
+    process.stderr.write(`${written.code}: ${written.path}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  process.stdout.write(`${written.path}\n`);
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

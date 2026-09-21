@@ -68,6 +68,14 @@ export async function runSourceDeletionInventoryAttestation(
     return { ok: false, code: "SOURCE_INVENTORY_CHANGED_DURING_SCAN", processed: 0 };
   }
 
+  // The database refuses this too, and refusing it here as well is not redundancy: a worker
+  // that submits an empty listing has already decided the prefix is empty, and the round trip
+  // that would tell it otherwise is the one being guarded. An R2 listing that returns nothing
+  // for a source that still has bound documents is a listing that failed open.
+  if (objects.length === 0 && candidate.documentIds.length > 0) {
+    return { ok: false, code: "SOURCE_INVENTORY_EMPTY_LISTING", processed: 0 };
+  }
+
   const recorded = await attest(candidate.deletionId, objects);
   if (!recorded.ok) return { ok: false, code: recorded.code, processed: 0 };
   if (recorded.attestation.artifactCount !== objects.length) {

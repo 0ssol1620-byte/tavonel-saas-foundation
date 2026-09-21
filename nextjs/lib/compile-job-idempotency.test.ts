@@ -118,8 +118,14 @@ class FakeCompileJobs {
 
 const WORKSPACE = "pilot-slottest01";
 const USER = "77777777-7777-4777-8777-777777777777";
+// Canonical lowercase uuids, because `enqueueCompileJob` now refuses anything else: the
+// source-deletion quiescence guard matches `foundation_compile_jobs.document_ids` against
+// `uuid::text`, and an id it cannot match is a running compile the guard cannot see.
 const docs = (from: number, to: number) =>
-  Array.from({ length: to - from + 1 }, (_, i) => `doc-${String(from + i).padStart(3, "0")}`);
+  Array.from(
+    { length: to - from + 1 },
+    (_, i) => `00000000-0000-4000-8000-${String(from + i).padStart(12, "0")}`,
+  );
 
 function install(rule: LookupRule, returnsIdempotencyKey = true) {
   const store = new FakeCompileJobs(rule, returnsIdempotencyKey);
@@ -304,6 +310,26 @@ describe("an answer that is not the slot that was asked for", () => {
     expect(result.ok === false && result.code).toBe("COMPILE_JOB_SLOT_CONFLICT");
   });
 
+  it("refuses a document id the source-deletion quiescence guard could not match", async () => {
+    // foundation_compile_jobs.document_ids is text[]; the guard compares it against uuid::text.
+    // An uppercase uuid, or an id that is not a uuid at all, is stored verbatim, never matches,
+    // and hides a running compile from the guard that is supposed to block physical deletion.
+    install("slot-aware");
+    // Hex letters on purpose: an all-digit uuid is its own uppercase, and would test nothing.
+    const canonical = "0000000a-000b-4000-8000-00000000000c";
+    for (const documentIds of [
+      [canonical.toUpperCase()],
+      ["doc-001"],
+      [canonical, "not-a-uuid"],
+    ]) {
+      const result = await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds });
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.code).toBe("COMPILE_JOB_SCOPE_INVALID");
+    }
+    await expect(
+      enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: [canonical] }),
+    ).resolves.toMatchObject({ ok: true });
+  });
   it("reports a slot conflict from the database as a conflict, not a write failure", async () => {
     const store = install("slot-aware");
     const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));

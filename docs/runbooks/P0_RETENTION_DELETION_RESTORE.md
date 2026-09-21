@@ -108,7 +108,7 @@ preflight · provision · grace · request · attest · sweep · verify · evide
 and ends with `dry run: nothing was created, deleted or written. The model is not the system.`
 
 An `--execute` run prints one line: the absolute path of
-`docs/evidence/production/TAVONEL_SOURCE_DELETION_DRILL_<date>.json`.
+`docs/evidence/production/TAVONEL_SOURCE_DELETION_DRILL_<date>_<nonce>.json`.
 
 ### How to abort
 
@@ -169,7 +169,7 @@ node --experimental-strip-types --test scripts/db/restore-drill-check.test.mjs
 
 # validate a receipt a previous --execute run wrote
 node scripts/db/restore-drill-check.mjs --json \
-  --receipt ../docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>.json
+  --receipt ../docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>_<nonce>.json
 
 export R2_ACCOUNT_ID=...
 export R2_BUCKET=...
@@ -188,7 +188,12 @@ Steps, all `"ok": true`, in this order:
 write-source · verify-source · verify-restore · database-backup · cleanup
 ```
 
-`--execute` prints the path of `docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>.json`.
+`--execute` prints the path of `docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>_<nonce>.json`.
+
+The `<nonce>` is the drill id tail, so two runs on one day are two receipts. A run whose receipt
+path already exists refuses with `RECEIPT_ALREADY_EXISTS` and exit 1 rather than overwriting it --
+the drill succeeded, but its evidence has nowhere to go that does not destroy older evidence, and
+that is an operator decision.
 
 ### How to abort
 
@@ -229,7 +234,7 @@ exactly what this repository forbids.
 
 | Receipt | Contract | Produced by | Validated by |
 | --- | --- | --- | --- |
-| `docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>.json` | `tavonel.restore_drill.v1` | `scripts/db/restore-drill.mjs` via `issueRestoreDrillEvidence` | `scripts/db/restore-drill-check.mjs` |
+| `docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>_<nonce>.json` | `tavonel.restore_drill.v1` | `scripts/db/restore-drill.mjs` via `issueRestoreDrillEvidence` | `scripts/db/restore-drill-check.mjs` |
 | Database restore receipt | `tavonel.restore_evidence.v1` | operator, by hand | `scripts/db/restore-evidence-check.mjs` |
 
 Each checker refuses the other's receipt by name rather than failing at whichever field happens

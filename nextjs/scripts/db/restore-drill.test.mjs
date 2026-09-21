@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { writeReceiptOnce } from "./evidence-receipt.mjs";
 
 import {
   BACKUP_TOKEN_ENV,
@@ -99,8 +104,28 @@ test("--execute refuses when any single variable is missing", async () => {
   }
 });
 
-test("the receipt is dated and lands in the production evidence folder", () => {
-  const path = receiptPath(new Date("2026-09-21T11:00:00.000Z")).split(/[\\/]/);
-  assert.equal(path.at(-1), "TAVONEL_RESTORE_DRILL_2026-09-21.json");
+test("the receipt is dated, discriminated and lands in the production evidence folder", () => {
+  const path = receiptPath(new Date("2026-09-21T11:00:00.000Z"), plan().drillId).split(/[\\/]/);
+  assert.match(path.at(-1), /^TAVONEL_RESTORE_DRILL_2026-09-21_[0-9a-f]{12}\.json$/);
   assert.equal(path.at(-2), "production");
+});
+
+test("two runs on one day get two receipts, and neither can overwrite the other", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tavonel-restore-receipt-"));
+  const when = new Date("2026-09-21T11:00:00.000Z");
+  const first = receiptPath(when, "restore-drill-2026-09-21-aaaaaaaaaaaa", directory);
+  const second = receiptPath(when, "restore-drill-2026-09-21-bbbbbbbbbbbb", directory);
+  assert.equal(first.split(/[\\/]/).at(-1), "TAVONEL_RESTORE_DRILL_2026-09-21_aaaaaaaaaaaa.json");
+  // Same day, second run: a second file, not a silent replacement of the first.
+  assert.notEqual(second, first);
+
+  assert.deepEqual(writeReceiptOnce(first, { restore: true }), { ok: true, path: first });
+  const again = writeReceiptOnce(first, { replaced: true });
+  assert.equal(again.ok, false);
+  assert.equal(again.code, "RECEIPT_ALREADY_EXISTS");
+  assert.deepEqual(JSON.parse(readFileSync(first, "utf8")), { restore: true });
+});
+
+test("a receipt path needs a drill id it can discriminate on", () => {
+  assert.throws(() => receiptPath(new Date("2026-09-21T11:00:00.000Z"), "restore-drill"), /RECEIPT_DRILL_ID_UNUSABLE/);
 });

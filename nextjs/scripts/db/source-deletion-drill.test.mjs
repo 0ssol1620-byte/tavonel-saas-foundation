@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { writeReceiptOnce } from "./evidence-receipt.mjs";
 
 import {
   createFixtureOps,
@@ -183,8 +188,28 @@ test("--execute refuses a backup expiry that is not an RFC 3339 UTC timestamp", 
   assert.equal(result.code, "DRILL_BACKUP_EXPIRY_MALFORMED");
 });
 
-test("the receipt is dated and lands in the production evidence folder", () => {
-  const path = receiptPath(new Date("2026-09-21T11:00:00.000Z")).split(/[\\/]/);
-  assert.equal(path.at(-1), "TAVONEL_SOURCE_DELETION_DRILL_2026-09-21.json");
+test("the receipt is dated, discriminated and lands in the production evidence folder", () => {
+  const path = receiptPath(new Date("2026-09-21T11:00:00.000Z"), `sha256:${"b".repeat(64)}`).split(/[\\/]/);
+  assert.equal(path.at(-1), "TAVONEL_SOURCE_DELETION_DRILL_2026-09-21_bbbbbbbbbbbb.json");
   assert.equal(path.at(-2), "production");
+});
+
+test("two runs on one day get two receipts, and neither can overwrite the other", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tavonel-deletion-receipt-"));
+  const when = new Date("2026-09-21T11:00:00.000Z");
+  const first = receiptPath(when, `sha256:${"b".repeat(64)}`, directory);
+  const second = receiptPath(when, `sha256:${"c".repeat(64)}`, directory);
+  // Same day, second run: a second file, not a silent replacement of the first.
+  assert.notEqual(second, first);
+
+  assert.deepEqual(writeReceiptOnce(first, { deletion: true }), { ok: true, path: first });
+  const again = writeReceiptOnce(first, { replaced: true });
+  assert.equal(again.ok, false);
+  assert.equal(again.code, "RECEIPT_ALREADY_EXISTS");
+  assert.deepEqual(JSON.parse(readFileSync(first, "utf8")), { deletion: true });
+});
+
+test("the plan sorts object keys in byte order, the order the manifest digest assumes", () => {
+  const keys = plan().objects.map((object) => object.key);
+  assert.deepEqual(keys, [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
 });

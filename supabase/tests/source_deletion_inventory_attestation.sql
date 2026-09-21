@@ -8,7 +8,7 @@
 --   pilot-del3  grace 0, hold ON   -- legal hold active
 --   pilot-del4  grace 0, policy row removed after the request -- hold state unknown
 begin;
-select plan(36);
+select plan(37);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -195,6 +195,18 @@ select throws_ok(
           from generate_series(1, 513) as n)) $$,
   'SOURCE_DELETION_INVENTORY_INVALID',
   '513 objects is refused rather than truncated to the 512 the attestation can hold'
+);
+
+-- An empty listing for a source that still has bound documents is a listing that did not happen,
+-- not a source with nothing in it. Recording it would seal artifact_count 0 as a complete
+-- inventory, enqueue no object, and turn every later attestation of the real bytes into a
+-- permanent ATTESTATION_CONFLICT.
+select throws_ok(
+  $$ select public.attest_source_deletion_inventory(
+       (select deletion_id from public.source_deletion_tombstones where workspace_key = 'pilot-del1'),
+       '[]'::jsonb) $$,
+  'SOURCE_DELETION_INVENTORY_EMPTY',
+  'an empty manifest cannot seal a deletion whose source still has bound documents'
 );
 
 select throws_ok(

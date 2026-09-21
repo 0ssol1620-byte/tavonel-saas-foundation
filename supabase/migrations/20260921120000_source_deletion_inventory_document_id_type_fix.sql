@@ -12,7 +12,12 @@
 -- The fix carries the document set in both representations and compares each column against its
 -- own type. Casting the job column to uuid[] instead was rejected: document_ids has no uuid
 -- CHECK, so one non-uuid row in that table would turn this guard back into an error -- and an
--- error here blocks deletion for every workspace, not only that job's.
+-- error here blocks deletion for every workspace, not only that job's. `enqueueCompileJob` now
+-- refuses a non-canonical document id, so the text comparison below can only miss a row that
+-- predates that guard.
+--
+-- It also refuses an empty inventory for a source that still has bound documents. See the
+-- SOURCE_DELETION_INVENTORY_EMPTY block below.
 begin;
 
 create or replace function public.source_deletion_inventory_candidate()
@@ -188,6 +193,21 @@ begin
     into v_count, v_distinct_count
     from pg_catalog.jsonb_array_elements(p_objects);
   if v_count <> v_distinct_count then raise exception 'SOURCE_DELETION_INVENTORY_DUPLICATE_KEY'; end if;
+
+  -- An empty listing for a source that still has bound documents seals the deletion as a
+  -- complete inventory of nothing: artifact_count 0, attestation_kind
+  -- 'complete_r2_prefix_inventory_v1', no object enqueued, and every later attestation of the
+  -- real objects rejected as an ATTESTATION_CONFLICT for good. A worker whose R2 listing failed
+  -- open, or that was handed a truncated page, submits exactly this. Refuse it: the empty array
+  -- is indistinguishable from a listing that did not happen, and this row is the record that
+  -- the customer's bytes were accounted for.
+  --
+  -- The cost is deliberate. A source whose documents genuinely hold no objects cannot be
+  -- attested through this path and needs an operator, because 'there was nothing there' and
+  -- 'we could not see what was there' look identical from here and only one of them is safe.
+  if v_count = 0 and coalesce(pg_catalog.array_length(v_document_ids, 1), 0) > 0 then
+    raise exception 'SOURCE_DELETION_INVENTORY_EMPTY';
+  end if;
 
   select coalesce(
     pg_catalog.jsonb_agg(

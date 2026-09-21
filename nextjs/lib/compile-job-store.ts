@@ -155,6 +155,22 @@ const COMPILE_JOB_ID = /^cjob-[a-f0-9]{32}$/;
 /** The machine-code shape the job row's own `error_code` check enforces (0038:62). */
 const ERROR_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/**
+ * Lowercase, no `i` flag, deliberately.
+ *
+ * The source-deletion quiescence guard asks whether any unfinished compile still names a
+ * document, and it asks by matching `foundation_compile_jobs.document_ids` (text[], from 0038)
+ * against `connector_document_bindings.document_id::text`. PostgreSQL renders a uuid lowercase,
+ * so a job row holding `A1B2...` -- or holding something that is not a uuid at all, which the
+ * compile ingress pattern /^[A-Za-z0-9_-]{1,80}$/ accepts -- never matches, the guard sees no
+ * running compile, and the source is physically deleted underneath a job that is still reading
+ * it. The guard fails open, silently, on a value the API itself allowed in.
+ *
+ * Fixing the comparison in SQL was rejected: `document_ids` has no uuid CHECK, so casting that
+ * column would turn one bad legacy row into an error that blocks deletion for every workspace.
+ * The narrow fix is to stop writing ids the guard cannot see.
+ */
+const CANONICAL_DOCUMENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export function newCompileJobId() {
   return `cjob-${randomBytes(16).toString("hex")}`;
@@ -349,6 +365,9 @@ export async function enqueueCompileJob(input: {
   if (!UUID.test(input.createdByUserId)) return fail("COMPILE_JOB_SCOPE_INVALID");
   const documentIds = [...new Set(input.documentIds)];
   if (documentIds.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  // See CANONICAL_DOCUMENT_ID: an id the deletion guard cannot match is worse than a rejected
+  // compile, so it is rejected here, where every caller converges, rather than at the route.
+  if (documentIds.some((id) => !CANONICAL_DOCUMENT_ID.test(id))) return fail("COMPILE_JOB_SCOPE_INVALID");
   if (input.corpus && !CORPUS_ID_PATTERN.test(input.corpus.corpusId)) return fail("COMPILE_JOB_SCOPE_INVALID");
 
   const slot = input.corpus

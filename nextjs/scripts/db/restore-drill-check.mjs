@@ -2,7 +2,7 @@
 
 /**
  * Offline validator for the object-copy restore drill receipt
- * (`docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>.json`).
+ * (`docs/evidence/production/TAVONEL_RESTORE_DRILL_<date>_<nonce>.json`).
  *
  * Exit 0: pass, 1: mismatch, 2: malformed.
  *

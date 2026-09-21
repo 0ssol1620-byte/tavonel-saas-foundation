@@ -173,10 +173,19 @@ jobs:
       # argument into a measurement. The glob stays `20260911*` and is deliberately not `2026*`:
       # the four `20260909*` connector migrations are `create table` without `if not exists` and
       # are correctly create-once.
+      #
+      # The two deletion-inventory migrations join for the same reason: both are `create or replace
+      # function` plus `revoke`/`grant`, with no top-level data statement, so replaying them is a
+      # measurement of that claim rather than a restatement of it. They are named individually and
+      # the glob is deliberately not `2026092*`: thirteen files in that window -- every `20260920*`
+      # control-plane migration and `20260921100000` -- are `create table` without `if not exists`
+      # and are correctly create-once. Widening the glob to reach these two would have turned the
+      # second pass red on the first `create table` it replayed.
       - name: Apply the repair migrations a second time and re-run the suite
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
-          for file in supabase/migrations/005[2345]_*.sql supabase/migrations/20260911*_*.sql; do
+          for file in supabase/migrations/005[2345]_*.sql supabase/migrations/20260911*_*.sql \
+                      supabase/migrations/20260921110000_*.sql supabase/migrations/20260921120000_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done

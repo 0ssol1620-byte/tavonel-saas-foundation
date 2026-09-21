@@ -85,8 +85,6 @@ export async function putFoundationProbeObject(
   return status === 200 || status === 204 ? { ok: true } : { ok: false, code: "PROBE_PUT_FAILED" };
 }
 
-export { PROBE_WORKSPACE_PATTERN };
-
 export function founderResetPrefixes(workspaceKey: string) {
   if (!WORKSPACE_ID_PATTERN.test(workspaceKey)) return null;
   return [`quarantine/${workspaceKey}/`, `immutable/${workspaceKey}/${workspaceKey}/`] as const;

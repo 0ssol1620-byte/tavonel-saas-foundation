@@ -28,11 +28,11 @@
  *   forbids.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { issueRestoreDrillEvidence } from "../../lib/operations-p0.ts";
+import { datedReceiptPath, writeReceiptOnce } from "./evidence-receipt.mjs";
 import {
   DRILL_CONTRACT_VERSION,
   PROBE_CONTRACT_VERSION,
@@ -231,8 +231,8 @@ export async function createLiveOps(env = process.env) {
   return createLiveRestoreOps(env);
 }
 
-export function receiptPath(now, directory = EVIDENCE_DIRECTORY) {
-  return resolve(directory, `TAVONEL_RESTORE_DRILL_${now.toISOString().slice(0, 10)}.json`);
+export function receiptPath(now, drillId, directory = EVIDENCE_DIRECTORY) {
+  return datedReceiptPath("RESTORE_DRILL", now, drillId, directory);
 }
 
 async function main(argv) {
@@ -258,16 +258,20 @@ async function main(argv) {
     return;
   }
   if (!execute) {
-    process.stdout.write(
-      `${JSON.stringify({ dryRun: true, wouldWrite: receiptPath(new Date()), ...result }, null, 2)}\n`,
-    );
+    const wouldWrite = receiptPath(new Date(), result.receipt.drillId);
+    process.stdout.write(`${JSON.stringify({ dryRun: true, wouldWrite, ...result }, null, 2)}\n`);
     process.stdout.write("dry run: no object was written to R2 and no receipt was saved.\n");
     return;
   }
-  const path = receiptPath(new Date());
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(result.receipt, null, 2)}\n`, "utf8");
-  process.stdout.write(`${path}\n`);
+  const written = writeReceiptOnce(receiptPath(new Date(), result.receipt.drillId), result.receipt);
+  if (!written.ok) {
+    // The drill itself succeeded; refusing to publish it is still a failure, because the run
+    // produced evidence that now has nowhere to go that does not destroy older evidence.
+    process.stderr.write(`${written.code}: ${written.path}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  process.stdout.write(`${written.path}\n`);
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
