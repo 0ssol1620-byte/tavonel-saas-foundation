@@ -109,6 +109,7 @@ describe("source deletion cron route", () => {
     expect(route).toContain("process.env.CRON_SECRET");
     expect(route).not.toMatch(/["'`][A-Za-z0-9+/=_-]{32,}["'`]/);
     const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
-    expect(vercel.crons).toContainEqual({ path: "/api/internal/deletions/attest", schedule: "3,18,33,48 * * * *" });\n    expect(vercel.crons).toContainEqual({ path: "/api/internal/deletions/run", schedule: "8,23,38,53 * * * *" });
+    expect(vercel.crons).toContainEqual({ path: "/api/internal/deletions/attest", schedule: "3,18,33,48 * * * *" });
+    expect(vercel.crons).toContainEqual({ path: "/api/internal/deletions/run", schedule: "8,23,38,53 * * * *" });
   });
 });
