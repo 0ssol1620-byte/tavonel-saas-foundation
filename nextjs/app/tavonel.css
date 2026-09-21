@@ -3777,6 +3777,24 @@
       padding-block: 12.5px;
       margin-block: -12.5px;
     }
+    /*
+      G1-TAP, 2026-09-22. The list above is global class names, and a paragraph inside a CSS
+      module has a hashed class it can never name -- so every module that writes prose reopens
+      the same defect one route at a time. A 360px sweep found four already: `capability
+      manifest` at 103x16 in the Explore frame on /knowledge-compiler and /product, `public
+      dataset` and `reference harness` at 18px on /benchmarks, `Integrations` at 18px on
+      /sources.
+
+      A link in a paragraph is running prose wherever the paragraph was written, so the same
+      padding-and-negative-margin gets applied by shape rather than by name. The three
+      exclusions are the shapes that are not prose links and carry their own floor below: the
+      buttons, the verification link, and the chips.
+    */
+    main p > a:not(.btn):not(.btn-primary):not(.link-verify):not(.tag) {
+      display: inline-block;
+      padding-block: 12.5px;
+      margin-block: -12.5px;
+    }
     /* Real controls take a real floor. 44, not the 42 that was here: the number in the guideline
        is the number. The wordmark, the sign-in link, the search input, every <summary> and every
        <select> are on the list because each of them was measured under it. */
