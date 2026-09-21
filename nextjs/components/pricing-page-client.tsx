@@ -820,7 +820,7 @@ export default function PricingPageClient({
                     */}
                     {plan.notYetSold.length > 0 ? (
                       <>
-                        <p className="fine"><b>Coming, not yet sold</b></p>
+                        <p className="fine"><b>Not sold with this plan</b></p>
                         <ul>{plan.notYetSold.map((item) => <li key={item}>{item}</li>)}</ul>
                       </>
                     ) : null}
