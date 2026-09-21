@@ -237,8 +237,12 @@
 /*
   The one action in this panel, at the floor. BA-240's pattern verbatim -- block padding for the
   hit area, an equal negative margin to give it back -- so the line box keeps its text height and
-  nothing in the figcaption reflows. It is here rather than in the BA-240 block in tavonel.css
-  because that block names global classes, and a module class is hashed at build time.
+  nothing in the figcaption reflows.
+
+  The `main p > a` rule this commit adds to that block in tavonel.css already covers this anchor
+  on all three pages that render the component today. It is repeated here on purpose: the frame
+  is shared, a caller can put it outside `<main>`, and a panel with exactly one action in it
+  should not depend on where a page chose to mount it for that action to be reachable.
 */
 @media (pointer: coarse), (max-width: 1079px) {
   .open a {
