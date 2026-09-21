@@ -1,3 +1,14 @@
+/**
+ * A workspace this deployment minted for a drill and nothing else.
+ *
+ * The deletion drill has to write real objects under `quarantine/` and `immutable/`, because a
+ * deletion rehearsed only against `synthetic/` proves nothing about the prefixes the sweeper
+ * actually walks. What makes that safe is the workspace, not the prefix: a probe workspace is
+ * created by the drill, holds nothing but its own few hundred bytes, and cannot collide with a
+ * `pilot-` key a customer was issued.
+ */
+export const PROBE_WORKSPACE_PATTERN = /^pilot-drill[0-9a-f]{8}$/;
+
 export const WORKSPACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 export const DOCUMENT_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 export const COLLECTION_ID_PATTERN = /^collection-[a-f0-9]{32}$/;

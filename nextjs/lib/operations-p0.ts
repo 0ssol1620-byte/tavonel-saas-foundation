@@ -2,7 +2,17 @@ import { createHash } from "node:crypto";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const WORKSPACE_KEY = /^ws_[a-z0-9]{8,64}$/;
+/**
+ * Both spellings, because only one of them exists.
+ *
+ * This file was written against `ws_<id>`, and no workspace key in this deployment has ever had
+ * that shape: `enterprise_workspaces.workspace_key`, `request_connector_source_deletion` and
+ * every `pilot-` fixture agree on `pilot-<id>`. The consequence was silent and total --
+ * `issueDeletionEvidence` returned DELETION_NOT_PROVEN for every real workspace, which is the
+ * literal reason app/privacy notes that nothing calls it. Widening is additive: nothing that
+ * passed before fails now, and the first drill that emits a receipt is the thing that proves it.
+ */
+const WORKSPACE_KEY = /^(?:ws_[a-z0-9]{8,64}|pilot-[A-Za-z0-9]{1,16})$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const REASON_CODE = /^[A-Z0-9_]{3,80}$/;
 
