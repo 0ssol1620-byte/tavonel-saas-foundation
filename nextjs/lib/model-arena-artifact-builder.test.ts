@@ -3,8 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-// @ts-expect-error -- the builder is a plain .mjs script with no type declarations by design:
-// it runs under `node` with no build step, and typing it would mean compiling it to run it.
+// The builder is a plain .mjs script (tsconfig allowJs types it as it runs under `node`, no build step).
 import { anomalySections, buildArtifact, REQUIRED_SOURCES } from "../scripts/benchmarks/build-model-arena-artifact.mjs";
 import { MODEL_ARENA_ARTIFACT_SHA256 } from "./model-arena-page-data";
 
