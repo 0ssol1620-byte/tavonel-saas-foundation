@@ -259,10 +259,14 @@ function probe({ tapFloor, fontFloor, lineFloor, contrastFloor }) {
       }
     }
 
-    // (5) media with no intrinsic size — the CLS source.
+    /* (5) media whose box is not known until the bytes arrive -- the CLS source. An explicit
+       `height` in CSS settles the box just as well as the attributes do, so the landing film's
+       `<video>`, sized 1120x700 by the stylesheet, is not one of these. Only content-determined
+       media reserves nothing. */
     if ((tag === "img" || tag === "video") && !(element.hasAttribute("width") && element.hasAttribute("height"))
-        && style.aspectRatio === "auto" && style.position === "static") {
-      push("media-dims", element, `<${tag}> has no width/height attributes and no aspect-ratio`, box);
+        && style.aspectRatio === "auto" && style.position === "static"
+        && (style.height === "auto" || style.width === "auto")) {
+      push("media-dims", element, `<${tag}> reserves no box: no width/height attributes, no aspect-ratio, height ${style.height}`, box);
     }
 
     // (6) tap targets, mobile widths only.

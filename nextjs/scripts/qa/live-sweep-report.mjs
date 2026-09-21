@@ -56,7 +56,9 @@ for (const name of ledgers) {
    fix whatever width first reported it. */
 const families = new Map();
 for (const row of rows) {
-  const key = `${row.route}|${row.type}|${row.selector}`;
+  /* The text is part of the identity: the selector for a tap target is often just `a`, and
+     seven links in one footer are seven things to measure, not one. */
+  const key = `${row.route}|${row.type}|${row.selector}|${row.text}`;
   const family = families.get(key) ?? { ...row, widths: new Set(), runs: new Set(), worst: row.severity };
   family.widths.add(row.width);
   family.runs.add(row.run);
@@ -95,5 +97,8 @@ Method, thresholds and the exclusions that keep the count honest are in
 ${table}
 `;
 
-await writeFile(OUT, markdown);
+/* Disposition -- what was fixed, what was deferred and why -- is written by hand and lives in a
+   sibling `.notes.md`, so regenerating the table never discards it. */
+const notes = await readFile(OUT.replace(/\.md$/, ".notes.md"), "utf8").catch(() => "");
+await writeFile(OUT, notes ? `${markdown}\n${notes}` : markdown);
 console.log(`${OUT} — ${sorted.length} defects (${counts.P0} P0, ${counts.P1} P1, ${counts.P2} P2) from ${rows.length} measurements`);
