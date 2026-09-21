@@ -196,8 +196,8 @@ describe("the hero panel's geometry below 900px", () => {
     still specific enough, which is the half a unit test can hold; the width itself is Product QA's.
   */
   it("keeps the locator breakable on a Korean page, where `anywhere` alone loses the cascade", () => {
-    const module = source("components/evidence/region-highlight.module.css");
-    const rule = module.match(/\.detail\s+\.locator\s*\{[^}]*\}/)?.[0];
+    const panelCss = source("components/evidence/region-highlight.module.css");
+    const rule = panelCss.match(/\.detail\s+\.locator\s*\{[^}]*\}/)?.[0];
     expect(rule, "the (0,2,0) locator rule is gone; /ko will overflow at 360px again").toBeTruthy();
     expect(rule).toMatch(/word-break:\s*break-all/);
     /* The site rule it has to outrank, still in the file it comes from. */
