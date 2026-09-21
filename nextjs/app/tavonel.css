@@ -3824,6 +3824,10 @@
       min-width: 44px;
       justify-content: center;
     }
+    /* The changelog permalink wraps a `<time>` and measured 26px. Its header is a baseline flex
+       row, so a 44px box would push the row and drop the date off the baseline it shares with
+       the surface tag; it takes the prose pattern instead and the row does not move. */
+    .changelog-entry header a { display: inline-block; padding-block: 9px; margin-block: -9px; }
     /* The legal footer's underline, restated so it does not sink to the bottom of the taller
        box. Same hairline, same 1px, 3px off the baseline -- `text-underline-offset` follows the
        text where `border-bottom` followed the box. */
