@@ -104,7 +104,7 @@ export function GET(request: Request) {
       named after the job a reader is doing, which is also the order /api renders them in.
     */
     tags: [
-      { name: "Capabilities", description: "What this deployment can read, and who signs what it exports. No key required." },
+      { name: "Capabilities", description: "What TAVONEL can read, and who signs what it exports. No key required." },
       { name: "Documents", description: "Direct-to-storage upload, and the immutable document inventory it produces." },
       { name: "Compile", description: "Turning a document set into a candidate Compiled World, and following the run." },
       { name: "Worlds", description: "Reading an active World, its lenses, its retrieval index and its version state." },
@@ -126,7 +126,7 @@ export function GET(request: Request) {
           summary: "Read the capability manifest",
           tags: ["Capabilities"],
           security: [],
-          description: "Every source format this deployment can read, with its support tier, what survives into the compiled World, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload. The two per-source ceilings this deployment enforces — bytes and pages — are published here as `knownLimitations` tokens.",
+          description: "Every source format TAVONEL can read, with its support tier, what survives into the compiled World, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload. The two per-source ceilings TAVONEL enforces — bytes and pages — are published here as `knownLimitations` tokens.",
           responses: {
             "200": ok(
               "The capability manifest and the sha256 of its serialized form. `contentSha256` is taken over the manifest without that field: delete it, re-serialize with the key order unchanged, and hash.",
@@ -1148,7 +1148,7 @@ export function GET(request: Request) {
           tags: ["Connections"],
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
-          description: "Lists configured provider readiness and tenant OAuth connections. Provider credentials are never returned. A provider whose client is not configured on this deployment reports `configured: false` rather than being hidden.",
+          description: "Lists configured provider readiness and tenant OAuth connections. Provider credentials are never returned. A provider whose client is not configured reports `configured: false` rather than being hidden.",
           responses: {
             "200": ok(
               "Provider readiness and the workspace's connections.",
@@ -1343,7 +1343,7 @@ export function GET(request: Request) {
                   readerPlan: { type: "array", items: str },
                   preserved: { type: "array", items: str },
                   visual: { type: "array", items: str },
-                  knownLimitations: { type: "array", items: str, description: "Tokens, not prose. The two per-source ceilings this deployment enforces appear here." },
+                  knownLimitations: { type: "array", items: str, description: "Tokens, not prose. The two per-source ceilings TAVONEL enforces appear here." },
                   evidenceLocatorKinds: { type: "array", items: str },
                   qualifiedAt: { ...nullableStr, description: "Null everywhere until a qualification run produces a receipt. A verified tier without a receipt is not representable." },
                   qualificationReceipt: nullableStr,

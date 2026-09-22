@@ -87,7 +87,7 @@ export function refusalDetail(refusal: DocumentRefusal): string {
     case "PARSER_OOM":
       return `${size}${PROCESSING_CEILING_SENTENCE} Split it or connect the source system instead.`;
     case "UNSUPPORTED_FORMAT":
-      return "This source is not in a format this deployment can prepare. Export it as PDF and retry.";
+      return "This source is not in a format TAVONEL can prepare. Export it as PDF and retry.";
     case "ENCRYPTED_SOURCE":
       return "This source is encrypted or password-protected. Remove the protection and retry.";
     case "MALWARE_QUARANTINED":

@@ -236,7 +236,7 @@ export const DECISION_TABLE: readonly DecisionRow[] = [
     priorityAction: "Check the title, the intent match and the result form. Confirm the content actually fits the query before making the wording louder.",
     inputs: ["search_console.impressions", "search_console.clicks"],
     availability: "needs_founder_access",
-    availabilityNote: "No Search Console property is connected to this deployment and no code here reads one.",
+    availabilityNote: "No Search Console property is connected and no code here reads one.",
   },
   {
     id: "visits_without_sample_opens",

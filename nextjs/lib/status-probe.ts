@@ -35,7 +35,7 @@ const DEPENDENCY_LABEL: Record<ProbeDependency, string> = {
 };
 
 const ERROR_SENTENCE: Record<string, string> = {
-  not_configured: "no probe target is configured in this deployment",
+  not_configured: "no probe target is configured",
   gpu_spend_gate: "not probed: a health request would cold-start a GPU worker",
   timeout: "no answer inside the probe's time limit",
   unreachable: "the request did not reach it",
