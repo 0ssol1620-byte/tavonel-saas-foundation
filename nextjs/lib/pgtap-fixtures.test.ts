@@ -64,8 +64,13 @@ function assertionCount(sql: string): number {
 // rather than guessed, which also means a typo'd expectation fails here rather than at 2am.
 const THROWS_OK_CALL = /\bthrows_ok\s*\(/g;
 const THROWS_OK_PINNED = /\bthrows_ok\s*\(\s*\$\$[\s\S]*?\$\$\s*,\s*'([^']+)'\s*,/g;
+// Both cases, on purpose. The pattern used to be `[a-z][a-z0-9_]*`, which quietly collected only
+// the lowercase half of the chain: every SOURCE_DELETION_*, SOURCE_LEGAL_HOLD_* and CONNECTOR_*
+// error the deletion migrations raise is upper case, so a fixture covering the deletion sweeper
+// could not pin one of them and failed here rather than against the database. The allowed set has
+// to be what the migrations raise, not the half the pattern happened to match.
 const RAISED_BY_A_MIGRATION = new Set(
-  [...allMigrations.matchAll(/raise exception '([a-z][a-z0-9_]*)/g)].map((match) => match[1]),
+  [...allMigrations.matchAll(/raise exception '([A-Za-z][A-Za-z0-9_]*)/g)].map((match) => match[1]),
 );
 
 // `raise exception 'x_mismatch: stored % vs query %'` is raised with its arguments interpolated,

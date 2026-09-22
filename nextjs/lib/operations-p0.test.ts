@@ -13,7 +13,7 @@ import {
   buildOperationsAlert,
   deliverOperationsAlert,
   issueDeletionEvidence,
-  issueRestoreEvidence,
+  issueRestoreDrillEvidence,
   operationsAlertCounters,
   planLargeDocumentAdmission,
   resetOperationsAlertDelivery,
@@ -176,11 +176,17 @@ describe("P0 operational contracts", () => {
       integrityChecksPassed: 5,
       cleanupCompletedAt: "2026-08-30T01:05:00Z",
     };
-    expect(issueRestoreEvidence(restore)).toMatchObject({
+    expect(issueRestoreDrillEvidence(restore)).toMatchObject({
       ok: true,
-      evidence: { outcome: "verified_restored", recoveryTimeSeconds: 180 },
+      evidence: {
+        // The object-copy drill contract, not `tavonel.restore_evidence.v1`, which
+        // `scripts/db/restore-evidence-check.mjs` owns for the database restore.
+        schemaVersion: "tavonel.restore_drill.v1",
+        outcome: "verified_restored",
+        recoveryTimeSeconds: 180,
+      },
     });
-    expect(issueRestoreEvidence({ ...restore, restoredRowCount: 11 })).toEqual({
+    expect(issueRestoreDrillEvidence({ ...restore, restoredRowCount: 11 })).toEqual({
       ok: false,
       code: "RESTORE_NOT_PROVEN",
     });

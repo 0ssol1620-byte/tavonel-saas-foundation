@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { failureClasses } from "../../shared/uskcEnums";
-import { isKeyInsideWorkspacePrefix, WORKSPACE_ID_PATTERN } from "./immutable-keys";
+import { isKeyInsideWorkspacePrefix, PROBE_WORKSPACE_PATTERN, WORKSPACE_ID_PATTERN } from "./immutable-keys";
 
 export const FOUNDATION_R2_BUCKET = "tavonel-saas-foundation-quarantine";
 export const SYNTHETIC_PREFIX = "synthetic/";
@@ -61,6 +61,28 @@ export function assertFoundationDeletionKey(bucket: string, workspaceKey: string
     return "SOURCE_DELETION_KEY_OUTSIDE_WORKSPACE";
   }
   return null;
+}
+
+/**
+ * PUT one small object into a probe workspace's own prefixes.
+ *
+ * Deliberately not a general write primitive. It refuses any workspace that is not a probe, any
+ * key the delete path would refuse, and any body large enough to be a real document -- so the
+ * worst it can do is leave a few hundred bytes in a workspace the drill just created.
+ */
+export async function putFoundationProbeObject(
+  env: R2SignerEnv,
+  workspaceKey: string,
+  key: string,
+  body: Buffer,
+  now = new Date(),
+): Promise<{ ok: true } | { ok: false; code: string }> {
+  if (!PROBE_WORKSPACE_PATTERN.test(workspaceKey)) return { ok: false, code: "PROBE_WORKSPACE_REQUIRED" };
+  const blocked = assertFoundationDeletionKey(env.bucket, workspaceKey, key);
+  if (blocked) return { ok: false, code: blocked };
+  if (body.length === 0 || body.length > 4096) return { ok: false, code: "PROBE_OBJECT_SIZE_INVALID" };
+  const status = await signedS3(env, "PUT", key, body, now);
+  return status === 200 || status === 204 ? { ok: true } : { ok: false, code: "PROBE_PUT_FAILED" };
 }
 
 export function founderResetPrefixes(workspaceKey: string) {
@@ -478,6 +500,72 @@ export async function getFoundationQuarantineReject(
   }
   const receipt = validateCdrRejectReceipt(parsed, workspaceKey, documentId);
   return receipt ? { ok: true, receipt } : { ok: false, code: "REJECT_RECEIPT_INVALID" };
+}
+
+/**
+ * Read/write/list/delete, restricted to the `synthetic/` namespace.
+ *
+ * The restore drill needs all four against objects it wrote itself, and the alternative was a
+ * second SigV4 signer in a script -- the one thing that must never be copied, because a signer
+ * with its own idea of which keys are in scope is a signer that can be pointed anywhere. Every
+ * method here runs `assertFoundationSyntheticKey` first, so the whole surface is bounded by the
+ * same assertion the canary already uses, and no customer key is reachable through it.
+ */
+export function syntheticNamespace(env: R2SignerEnv) {
+  const guard = (key: string) => assertFoundationSyntheticKey(env.bucket, key);
+  return {
+    async put(key: string, body: Buffer, now = new Date()) {
+      const blocked = guard(key);
+      if (blocked) return { ok: false as const, code: blocked };
+      if (body.length === 0 || body.length > 65_536) return { ok: false as const, code: "SYNTHETIC_SIZE_INVALID" };
+      const status = await signedS3(env, "PUT", key, body, now);
+      return status === 200 || status === 204
+        ? { ok: true as const }
+        : { ok: false as const, code: "SYNTHETIC_PUT_FAILED" };
+    },
+    async read(key: string, now = new Date()) {
+      const blocked = guard(key);
+      if (blocked) return { ok: false as const, code: blocked };
+      const response = await signedS3Response(env, "GET", key, undefined, now);
+      if (!response || !response.ok) {
+        await response?.body?.cancel().catch(() => {});
+        return { ok: false as const, code: "SYNTHETIC_READ_FAILED" };
+      }
+      const buffer = await response.arrayBuffer().catch(() => null);
+      return buffer
+        ? { ok: true as const, body: Buffer.from(buffer) }
+        : { ok: false as const, code: "SYNTHETIC_READ_FAILED" };
+    },
+    async remove(key: string, now = new Date()) {
+      const blocked = guard(key);
+      if (blocked) return { ok: false as const, code: blocked };
+      const status = await signedS3(env, "DELETE", key, undefined, now);
+      return status === 200 || status === 204 || status === 404
+        ? { ok: true as const }
+        : { ok: false as const, code: "SYNTHETIC_DELETE_FAILED" };
+    },
+    async list(prefix: string, now = new Date()) {
+      // A prefix is guarded by appending a name to it: the assertion is about the namespace, and
+      // a prefix that could not host a legal key cannot be listed either.
+      const blocked = guard(`${prefix}probe`);
+      if (blocked) return { ok: false as const, code: blocked };
+      const query: Record<string, string> = { "list-type": "2", "max-keys": "1000", prefix };
+      const canonicalQuery = Object.keys(query)
+        .sort()
+        .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`)
+        .join("&");
+      const response = await signedS3Request(env, "GET", `/${env.bucket}`, canonicalQuery, undefined, now);
+      if (!response?.ok) return { ok: false as const, code: "SYNTHETIC_LIST_FAILED" };
+      const xml = await response.text();
+      const keys: string[] = [];
+      for (const match of xml.matchAll(/<Key>([\s\S]*?)<\/Key>/gi)) {
+        const key = decodeXml(match[1] ?? "");
+        if (guard(key)) return { ok: false as const, code: "SYNTHETIC_LIST_OUTSIDE_NAMESPACE" };
+        keys.push(key);
+      }
+      return { ok: true as const, keys: [...new Set(keys)].sort() };
+    },
+  };
 }
 
 export async function runSyntheticR2Canary(env: R2SignerEnv, now = new Date()): Promise<SyntheticCanaryResult> {

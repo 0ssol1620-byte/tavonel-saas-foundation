@@ -6,7 +6,11 @@ const wrapper = readFileSync(new URL("../scripts/run-hermetic-vitest.mjs", impor
 
 describe("hermetic production prebuild", () => {
   it("keeps ordinary CI tests unchanged while isolating only Next.js prebuild", () => {
-    expect(pkg.scripts.test).toBe("vitest run");
+    // The pin is on the wrapper, not on the literal. What must stay true is that `test` is the
+    // ordinary CI path -- plain vitest, no hermetic wrapper -- so a lane that appends its own
+    // suite to it (the deletion drills append `pnpm test:scripts`) is not a regression.
+    expect(pkg.scripts.test.startsWith("vitest run")).toBe(true);
+    expect(pkg.scripts.test).not.toContain("run-hermetic-vitest");
     expect(pkg.scripts.prebuild).toBe("pnpm check && node scripts/run-hermetic-vitest.mjs");
   });
 

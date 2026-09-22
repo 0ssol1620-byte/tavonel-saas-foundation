@@ -90,17 +90,31 @@ export function scanForSecrets(root) {
     }
     // A file that is mostly NUL is a binary this scan cannot read usefully.
     if (source.includes(String.fromCharCode(0))) continue;
-    const file = relative(root, path).split(sep).join("/");
-    const lines = source.split("\n");
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index];
-      for (const [name, pattern] of PATTERNS) {
-        if (pattern.test(line)) findings.push({ file, line: index + 1, pattern: name });
-      }
-      for (const match of line.matchAll(SENSITIVE_ENV_NAME)) {
-        if (!PUBLIC_ENV_ALLOWLIST.has(match[0])) {
-          findings.push({ file, line: index + 1, pattern: `public-env-not-allowlisted:${match[0]}` });
-        }
+    findings.push(...scanTextForSecrets(source, relative(root, path).split(sep).join("/")));
+  }
+  return findings;
+}
+
+/**
+ * The same patterns against text that is not a file yet.
+ *
+ * An operator drill builds a receipt in memory and writes it under `docs/evidence/`, where this
+ * scanner would catch a leaked credential on the next CI run -- one commit too late. Scanning the
+ * string before it is written is the same check moved to the moment it can still refuse. The
+ * per-line loop lives here so both callers share it, rather than the drill growing its own
+ * almost-right copy of these patterns.
+ */
+export function scanTextForSecrets(source, file = "<memory>") {
+  const findings = [];
+  const lines = source.split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    for (const [name, pattern] of PATTERNS) {
+      if (pattern.test(line)) findings.push({ file, line: index + 1, pattern: name });
+    }
+    for (const match of line.matchAll(SENSITIVE_ENV_NAME)) {
+      if (!PUBLIC_ENV_ALLOWLIST.has(match[0])) {
+        findings.push({ file, line: index + 1, pattern: `public-env-not-allowlisted:${match[0]}` });
       }
     }
   }

@@ -17,7 +17,7 @@ export function GET() {
       },
       evidence: {
         deletion: "tavonel.deletion_evidence.v1",
-        restore: "tavonel.restore_evidence.v1",
+        restoreDrill: "tavonel.restore_drill.v1",
         alert: "tavonel.operations_alert.v1",
       },
       decisionGates: {

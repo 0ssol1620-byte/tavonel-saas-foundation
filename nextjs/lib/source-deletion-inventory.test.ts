@@ -60,6 +60,23 @@ describe("source deletion inventory attestation", () => {
     );
   });
 
+  it("refuses to attest an empty listing while the source still has bound documents", async () => {
+    // An R2 listing that fails open returns []. Attesting it would record artifact_count 0 as a
+    // complete inventory, enqueue nothing, and make every later attestation of the real objects
+    // a permanent ATTESTATION_CONFLICT. The database refuses this; so does the worker.
+    const list = vi.fn(async () => ({ ok: true as const, objects: [] }));
+    const readCandidate = vi.fn(async () => ({
+      ok: true as const,
+      candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId] },
+    }));
+    const attest = vi.fn();
+
+    await expect(runSourceDeletionInventoryAttestation({
+      signer, list, readCandidate, attest,
+    })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_EMPTY_LISTING", processed: 0 });
+    expect(attest).not.toHaveBeenCalled();
+  });
+
   it("refuses a prefix that changes while bytes are being hashed", async () => {
     const first = [{
       key: `quarantine/${workspaceKey}/${documentId}/source`,

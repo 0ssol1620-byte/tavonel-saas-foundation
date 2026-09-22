@@ -95,6 +95,9 @@ nextjs/public/icon.svg text eol=lf
 # test, so their bytes must be identical in a Windows working tree and on a Linux CI runner.
 nextjs/content/benchmarks/*.json text eol=lf
 
-# Operator scripts carry a hashbang and are executed directly by a shell. A CRLF checkout
-# puts the carriage return inside the interpreter path; lib/journey-acceptance.test.ts pins it.
+# Operator scripts carry a hashbang and are executed directly by a shell. A CRLF checkout puts the
+# carriage return inside the interpreter path; lib/journey-acceptance.test.ts pins it. That is also
+# why vitest could not import scripts/db/*.test.mjs at all -- the transform stopped on the carriage
+# return in the script the test imports and blamed the import line. The glob covers every script,
+# so the deletion drills cannot pick the same defect back up.
 nextjs/scripts/**/*.mjs text eol=lf
