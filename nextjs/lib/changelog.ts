@@ -67,7 +67,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "Reduced motion gets the whole story at once as a static composition with the play control still present, rather than a hidden animation.",
     ],
     fixed: [
-      "What this deployment does and does not yet do was spread across the header, the first screen and a note about how the film was made. It is stated once, in the deployment's own words, at the two points where a reader is deciding what to do about it.",
+      "What TAVONEL does and does not yet do was spread across the header, the first screen and a note about how the film was made. It is stated once, in the deployment's own words, at the two points where a reader is deciding what to do about it.",
       "Numbers on the entry pages could be typed into the copy. Every figure the pages print is read out of the compiled public World and marked as measured, and a browser check walks both rendered pages for a digit that carries no such mark.",
     ],
   },
@@ -86,7 +86,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       "The research receipts behind the published figures are downloadable, each with its full sha256, so a number on this site can be checked against the artifact it came from rather than taken on trust.",
     ],
     improved: [
-      "The two per-source ceilings this deployment enforces — 5 MB and 80 pages — are published on the pages that promise the ceilings, with the code a refusal carries.",
+      "The two per-source ceilings TAVONEL enforces — 5 MB and 80 pages — are published on the pages that promise the ceilings, with the code a refusal carries.",
       "API rate limits are published per scope on /docs/billing-and-limits, taken from the values the authorizer enforces.",
       "Documentation search is on every page rather than only the index, and a result shows the matched phrase in context.",
       "Every request example renders in all three languages in the page source, so a crawler or an agent reading raw HTML sees cURL, Python and TypeScript rather than one of them.",

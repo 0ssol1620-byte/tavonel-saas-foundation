@@ -144,7 +144,7 @@ export default function CompilerContractDiagram() {
         are compared against what a full rebuild would have produced. If they match, the compile
         passes and a new candidate World is offered for a person to activate; if they do not
         match, it refuses to publish and the previously active World stands. Two stages are drawn
-        solid, because two of them run in this deployment: the source change itself and the new
+        solid, because two of them run today: the source change itself and the new
         candidate World. What joins them here is the solid line down the left margin — a compile
         rebuilds the whole collection it is given. Everything between them is drawn dashed: the
         semantic diff, the dependency impact, the selective preserve and recompile, the
@@ -166,7 +166,7 @@ export default function CompilerContractDiagram() {
       {/* The legend is part of the drawing: the stroke weight is carrying a claim, so it is named. */}
       <g className={styles.legend}>
         <path className={styles.legendBuilt} d="M690 14 H726" />
-        <text x="734" y="18">RUNS IN THIS DEPLOYMENT</text>
+        <text x="734" y="18">RUNS TODAY</text>
         <path className={styles.legendDirection} d="M690 32 H726" />
         <text x="734" y="36">DIRECTION</text>
       </g>

@@ -158,7 +158,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Getting started",
     summary: "From an API key to a verified evidence-bound answer, with the one step no key can take.",
     blocks: [
-      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request this deployment will accept from you today. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request TAVONEL will accept from you today. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
       { kind: "heading", text: "The seven steps" },
       {
@@ -537,7 +537,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     summary: "Bearer keys, the scopes they carry, and what no key can do.",
     blocks: [
       { kind: "heading", text: "Getting a key" },
-      { kind: "prose", text: "Keys are created in the workspace, under **Developers**. The plaintext is shown once, at creation, and is not recoverable afterwards — store it before you close the dialog. Creating, rotating and revoking a key each write an audit row, readable through the audit endpoint below. A request with no key, or with a key this deployment did not issue, is refused with 401 and the code **AUTH_REQUIRED**: that is the first error most integrations see, and it means the credential rather than the request." },
+      { kind: "prose", text: "Keys are created in the workspace, under **Developers**. The plaintext is shown once, at creation, and is not recoverable afterwards — store it before you close the dialog. Creating, rotating and revoking a key each write an audit row, readable through the audit endpoint below. A request with no key, or with a key TAVONEL did not issue, is refused with 401 and the code **AUTH_REQUIRED**: that is the first error most integrations see, and it means the credential rather than the request." },
       { kind: "heading", text: "Sending the key" },
       { kind: "prose", text: "Send the key as a bearer token. Keys are workspace-scoped and carry an explicit scope set; a request outside its scopes is refused with 403 and API_SCOPE_REQUIRED rather than silently returning less." },
       { kind: "code", label: "Every request", language: "bash", body: `curl -sS https://tavonel.com/api/v1/documents -H "${KEY_HEADER}"` },
@@ -599,7 +599,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         CHECK constraint all read.
       */
       { kind: "heading", text: "What is not extracted" },
-      { kind: "note", text: "**Tables and formulas are not extracted.** Every format in the table above is read through the same sanitize-to-PDF and OCR path, so a price table arrives as the paragraphs it was printed as and the grid that arranged them is not recovered. A spreadsheet's cells and formulas survive nothing on this deployment. The capability manifest carries no_table_or_formula_extraction on every entry; this is that token in a sentence, on the page a developer reads to decide whether their documents will work." },
+      { kind: "note", text: "**Tables and formulas are not extracted.** Every format in the table above is read through the same sanitize-to-PDF and OCR path, so a price table arrives as the paragraphs it was printed as and the grid that arranged them is not recovered. A spreadsheet's cells and formulas survive nothing today. The capability manifest carries no_table_or_formula_extraction on every entry; this is that token in a sentence, on the page a developer reads to decide whether their documents will work." },
       { kind: "heading", text: "The ceilings, and why they are those numbers" },
       {
         kind: "table",
@@ -634,7 +634,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
     group: "Input and compile",
     summary: "Direct-to-storage upload, and why bytes never reach the application server.",
     blocks: [
-      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Everything on this page is the contract the capability endpoint serves once intake is arranged; it is not a request this deployment will accept from you today.` },
+      { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} Everything on this page is the contract the capability endpoint serves once intake is arranged; it is not a request TAVONEL will accept from you today.` },
       { kind: "heading", text: "Why bytes never reach our server" },
       { kind: "prose", text: "Uploads are direct. The capability endpoint returns a short-lived URL to object storage; you PUT the bytes there. The application server sees the request for permission and the receipt afterwards, and never the document." },
       { kind: "heading", text: "Requesting a capability and listing documents" },
@@ -936,12 +936,12 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "prose", text: "A revoke takes effect on the next request rather than waiting for a background reindex. Immutable outputs already compiled are retained: a revoke stops future reads, it does not rewrite history, and a World compiled from that source keeps citing the source version it actually read. A revoke that the store could not record answers 503 rather than 204 — it is reported only when it is written." },
       { kind: "endpoint", operationId: "revokeConnection" },
       { kind: "heading", text: "OAuth connectors" },
-      { kind: "prose", text: "Where a provider is configured on this deployment, a connection can be created through OAuth instead of a local agent. The authorization is single-use and PKCE, and it fails closed: unless both the provider client and the managed secret broker are configured, no authorization is started, because an authorization that cannot store a refresh secret is an authorization that ends in a broken connection. A revoke deletes the stored refresh secret and is reported as done only when the secret is actually gone." },
+      { kind: "prose", text: "Where a provider is configured, a connection can be created through OAuth instead of a local agent. The authorization is single-use and PKCE, and it fails closed: unless both the provider client and the managed secret broker are configured, no authorization is started, because an authorization that cannot store a refresh secret is an authorization that ends in a broken connection. A revoke deletes the stored refresh secret and is reported as done only when the secret is actually gone." },
       { kind: "endpoint", operationId: "listOAuthConnectors" },
       { kind: "endpoint", operationId: "startOAuthConnectorAuthorization" },
       { kind: "endpoint", operationId: "revokeOAuthConnector" },
       { kind: "heading", text: "Availability by provider" },
-      { kind: "note", text: "Connector availability differs by provider and by workspace, and listOAuthConnectors reports configured: false for a provider whose client this deployment does not hold rather than hiding it. The Integrations page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
+      { kind: "note", text: "Connector availability differs by provider and by workspace, and listOAuthConnectors reports configured: false for a provider whose client TAVONEL does not hold rather than hiding it. The Integrations page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
     ],
   },
   {
@@ -1142,7 +1142,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
         rows: [
           ["Claude Desktop / Claude Code over MCP", "Node 20+, tavonel-mcp.mjs, a key scoped worlds:read + ask:read", `A real MCP handshake and ${MCP_TOOL_COUNT_WORD} read-only tools, with no write, activate or rollback tool present.`],
           ["Python over the public sample World", "Python 3.12+, no key at all", "The shape of a TAVONEL answer — object, evidence, source version, page, region — and that its bytes match the published digest."],
-          ["curl before you have a key", "curl and jq, no key", "What this deployment can read, what its contract publishes, and who signs its exports."],
+          ["curl before you have a key", "curl and jq, no key", "What TAVONEL can read, what its contract publishes, and who signs its exports."],
         ],
       },
       { kind: "heading", text: "Recipe 1 — Claude Desktop and Claude Code" },
@@ -1188,7 +1188,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { kind: "prose", text: "Three unauthenticated reads answer the three questions an evaluator asks first. `/api/v1/capabilities` is the same list the upload route validates against, so a format absent from it is refused at upload rather than accepted and dropped. `/api/openapi` is the contract itself — and carries no `promote` and no `rollback` path, because neither exists for a key. `/api/export/trust` publishes the export signing key, or refuses with `EXPORT_SIGNER_NOT_CONFIGURED` on a deployment that has none." },
       {
         kind: "code",
-        label: "What this deployment can read, publish and sign",
+        label: "What TAVONEL can read, publish and sign",
         language: "bash",
         body: [
           `# Every readable format, with its tier and its stated limitations. No key.`,

@@ -18,7 +18,7 @@ type PublicStatusInputs = {
   policy: PublicCapabilityPolicy;
 };
 
-const CLOSED_REASON = "This action is not open in this deployment. Request a scoped pilot to continue.";
+const CLOSED_REASON = "This action is not open today. Request a scoped pilot to continue.";
 
 /**
  * The public projection of deployment state.
@@ -55,7 +55,7 @@ export function buildPublicStatusV2(inputs: PublicStatusInputs): PublicStatusV2 
         href: inputs.authReady ? "/login" : "/contact",
         reason: inputs.authReady
           ? "Sign-in is available."
-          : "Sign-in is not available in this deployment.",
+          : "Sign-in is not available today.",
       },
       createAccount: {
         enabled: selfServiceReady,
@@ -67,7 +67,7 @@ export function buildPublicStatusV2(inputs: PublicStatusInputs): PublicStatusV2 
         href: purchaseReady ? "/pricing" : "/contact",
         reason: purchaseReady
           ? "A plan can be purchased for an available customer workflow."
-          : "Purchasing does not enable customer document processing in this deployment.",
+          : "Purchasing does not enable customer document processing today.",
       },
       compileCustomerDocuments: {
         enabled: customerPathReady,

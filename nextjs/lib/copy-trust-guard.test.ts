@@ -181,4 +181,35 @@ describe("copy trust guard", () => {
         .not.toContain("implemented_not_proven");
     }
   });
+
+  /*
+    "in this deployment", which is the same mistake in operations clothing.
+
+    It is not a hedge -- the sentence around it is usually a firm statement -- so the register
+    above never caught it, and the disclosure allowlist exempted the four surfaces it survived on
+    longest. But a buyer does not know what a deployment is, cannot tell how many there are, and
+    reads the phrase as "somewhere else this works differently". `e2e/explore.spec.ts`,
+    `e2e/benchmarks.spec.ts` and `lib/explore-story.test.ts` each already barred it from one
+    surface; this is the same rule with no surface left out. The sentences that carried it kept
+    every fact they stated and say "today" instead, which is what they meant.
+
+    REASON_MODULES are the typed records whose strings are rendered by pages that do not contain
+    them, so a grep of the page would not find the phrase.
+  */
+  const REASON_MODULES = [
+    "lib/capabilities.ts",
+    "lib/public-status.ts",
+    "components/compiler-contract-diagram.tsx",
+    "app/auth/callback/page.tsx",
+    "app/login/page.tsx",
+  ] as const;
+
+  it.each([...GUARDED, ...Object.keys(DISCLOSURE_SURFACES), ...REASON_MODULES])(
+    "keeps our word for a running copy of the product out of %s",
+    (file) => {
+      expect(prose(file), `${file} is guarded and must exist`).not.toBeNull();
+      expect(prose(file)!.toLowerCase(), `${file} says "this deployment" to a customer`)
+        .not.toContain("this deployment");
+    },
+  );
 });

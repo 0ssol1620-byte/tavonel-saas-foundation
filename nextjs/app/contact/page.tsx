@@ -119,7 +119,7 @@ export default function ContactPage() {
                   </details>
                   <details className={faq.item}>
                     <summary>Which model providers see my documents?</summary>
-                    <p className={faq.answer}>No third-party model API receives your documents in this deployment: document reading runs on GPU workers TAVONEL operates, and every document is treated as hostile data. <Link href="/security" prefetch={false}>Security</Link></p>
+                    <p className={faq.answer}>No third-party model API receives your documents today: document reading runs on GPU workers TAVONEL operates, and every document is treated as hostile data. <Link href="/security" prefetch={false}>Security</Link></p>
                   </details>
                   <details className={faq.item}>
                     <summary>What happens when a passage cannot be verified?</summary>

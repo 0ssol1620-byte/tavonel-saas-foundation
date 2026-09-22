@@ -135,7 +135,7 @@ export default function LoginPage() {
     const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
     const client = getSupabaseBrowserClient();
     if (!client) {
-      setError("Auth is not configured in this deployment.");
+      setError("Sign-in is not available right now.");
       setBusy(false);
       return;
     }
