@@ -22,8 +22,10 @@ import { isSourceRegionBox } from "./source-region-box";
        document, so the absence branch says so rather than filling the frame.
     3. **No grid, no cell.** The capability manifest records `no_table_or_formula_extraction`.
        The markup carries no table and no cell semantics anywhere.
-    4. **Keyboard before hover, and useful before hydration.** Every region is a real button in
-       document order, and the server render already carries one region's excerpt and locator.
+    4. **Keyboard and thumb before hover, and useful before hydration.** Every region is a real
+       button in document order -- a row in the list under the page, never the drawn box, which
+       at 360px measures 12-37px tall and cannot be grown to a touch floor without leaving the
+       words it marks. The server render already carries one region's excerpt and locator.
 */
 
 const view = sampleEvidencePage();
@@ -102,6 +104,56 @@ describe("the rendered region highlight", () => {
     expect((html.match(/aria-pressed="true"/g) ?? [])).toHaveLength(1);
     expect(text).toContain(view.regions[0]!.excerpt.slice(0, 40));
     expect(text).toContain(view.regions[0]!.locator);
+  });
+
+  it("puts every one of those buttons in the list, and none of them on the page image", () => {
+    /*
+      The touch fix, as a structural assertion: the boxes drawn over the page are inert spans at
+      the compiler's coordinates, and the controls are list rows, which CSS can hold at 44px
+      without moving a single coordinate. A button back inside the page div is the regression.
+    */
+    const pageMarkup = html.slice(html.indexOf("<div"), html.indexOf("<ul"));
+    expect(pageMarkup).not.toContain("<button");
+    expect(html.match(/<li>/g) ?? []).toHaveLength(view.regions.length);
+    /* Every row shows that region's own words -- no label is written for it. */
+    for (const region of view.regions) {
+      expect(text).toContain(region.excerpt.slice(0, 40));
+    }
+  });
+
+  it("holds the 44px floor in the stylesheet, so a padding edit fails here and not in Product QA", () => {
+    /*
+      The size half of the fix, recomputed from the sheet rather than trusted.
+
+      `e2e/mobile-landing.spec.ts` measures this in a browser, which is the real answer and takes
+      a twenty-minute Product QA run to give. Both numbers on this component are arithmetic over
+      declarations, so the arithmetic is done here too: a row that someone re-pads to 9px, or an
+      action link whose block padding is trimmed, fails in the unit suite in a second.
+    */
+    const sheet = read("components/evidence/region-highlight.module.css");
+    const block = (selector: string) => {
+      const found = new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`).exec(sheet)?.[1];
+      expect(found, `${selector} is gone from the stylesheet`).toBeTruthy();
+      return found!;
+    };
+    const px = (source: string, property: string) =>
+      Number(new RegExp(`${property}:\\s*([\\d.]+)px`).exec(source)?.[1] ?? Number.NaN);
+
+    /* A row is a block control: its own floor, independent of how much text lands in it. */
+    expect(px(block(".row"), "min-height")).toBeGreaterThanOrEqual(44);
+
+    /*
+      The panel's one action reaches the floor by BA-240's padding instead, so the sum is the
+      line box plus both paddings -- which is exactly the number that is easy to break by
+      editing one of the three declarations it is made of.
+    */
+    const open = block(".open");
+    const lineBox = px(open, "font-size") * Number(/line-height:\s*([\d.]+)/.exec(open)?.[1] ?? "0");
+    expect(lineBox + 2 * px(block(".open a"), "padding-block")).toBeGreaterThanOrEqual(44);
+
+    /* And the boxes carry no minimum at all: a clamped box is drawn where the passage is not. */
+    const region = block(".region");
+    expect(region).not.toMatch(/min-height|min-width/);
   });
 
   it("names every button and binds it to the panel that describes it", () => {

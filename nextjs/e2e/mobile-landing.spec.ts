@@ -128,8 +128,28 @@ test.describe("on a touch screen", () => {
     home route and nothing else -- and the routes that actually failed the audit were /pricing,
     /docs and /integrations. One test, six routes: if a route-scoped sheet undercuts the floor it
     is that route that names itself in the failure.
+
+    G1-TAP, 2026-09-22. Eight routes. The two added are the only two besides `/` that render
+    `components/evidence/region-highlight.tsx`, whose controls were the drawn evidence boxes
+    themselves -- 12 to 37px tall at 360, because that is how tall the passages are on the page,
+    and a box cannot be grown to 44px and still be where the passage was. `/` was already on the
+    list, which is how that was caught. The boxes are the picture now; the rows under them are
+    the control.
+
+    /product is deliberately not here: it renders the Explore frame, not this component, and a
+    route belongs on this list because something on it was measured rather than because it is
+    nearby.
   */
-  for (const route of ["/", "/pricing", "/resources", "/docs/errors", "/integrations", "/knowledge-compiler"]) {
+  for (const route of [
+    "/",
+    "/pricing",
+    "/resources",
+    "/docs/errors",
+    "/integrations",
+    "/knowledge-compiler",
+    "/evidence",
+    "/product/document-understanding",
+  ]) {
   test(`every reachable control on ${route} keeps the 44px touch floor`, async ({ page }, testInfo) => {
     test.skip(!PHONE.includes(testInfo.project.name), "the touch floor is a phone contract");
     await page.goto(route);
