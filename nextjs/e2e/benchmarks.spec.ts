@@ -22,7 +22,7 @@ const FAMILIES = [
   "Operations",
 ];
 
-test("publishes the compilation benchmark protocol and no results table", async ({ page }) => {
+test("publishes the compilation benchmark protocol and no table without a receipt", async ({ page }) => {
   await page.goto("/benchmarks");
   // The 2026-09-17 copy pass rewrote the imperative headline ("Measure the compile...") as a
   // statement. What this pins is unchanged: the H1 names the measurement, not a result.
@@ -61,12 +61,30 @@ test("publishes the compilation benchmark protocol and no results table", async 
   await expect(stated).not.toContainText("No run on this deployment");
   await expect(stated).not.toContainText("NO VALUE PUBLISHED");
   await expect(stated, "our operations vocabulary on a buyer's page").not.toContainText("this deployment");
-  await expect(page.locator("table")).toHaveCount(0);
+  /*
+    Gap #2 (2026-09-22). The page now carries the Model Arena run we made ourselves and its two
+    receipt tables: the per-model receipts (revision, hardware, listed price snapshot) and the
+    campaign files with the sha256 of the bytes every figure was read from. Those are the only
+    tables allowed here. A results table for the compile protocol still waits on a qualified
+    record, and a table carrying a figure with no receipt is the thing this test exists against.
+  */
+  const receiptTables = page.locator('table[class*="receipts"]');
+  expect(
+    await page.locator("table").count(),
+    "every table on /benchmarks is a receipt table",
+  ).toBe(await receiptTables.count());
+  await expect(receiptTables.last()).toContainText("sha256");
 
   const body = (await page.locator("main").innerText()).replace(/\s+/g, " ");
   expect(body, "a percentage here would be a number with no receipt").not.toMatch(/\d+(\.\d+)?\s*%/);
-  for (const vendor of ["OmniDocBench", "Mistral", "Gemini", "GPT-", "Qwen"]) {
-    expect(body, `${vendor} has no place on a page that publishes no comparison`).not.toContain(vendor);
+  /*
+    OmniDocBench is the benchmark our own run was scored on, named beside its evaluator pin, so
+    it is no longer barred here. A vendor's published leaderboard row still is: a figure someone
+    else measured stays theirs.
+  */
+  await expect(page.locator("main")).toContainText("evaluator revision");
+  for (const vendor of ["Mistral", "Gemini", "GPT-", "Qwen"]) {
+    expect(body, `${vendor} has no place on a page that publishes only our own run`).not.toContain(vendor);
   }
 });
 

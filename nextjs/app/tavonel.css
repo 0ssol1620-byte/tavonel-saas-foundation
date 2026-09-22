@@ -1934,6 +1934,24 @@
   .usage-estimator dl div { display: flex; justify-content: space-between; gap: 20px; align-items: baseline; padding: 12px 14px; background: var(--g1); }
   .usage-estimator dt { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
   .usage-estimator dd { margin: 0; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+  /*
+    Gap #5. The corpus shape, and how it meets the ceilings, in the calculator that prices it.
+
+    Two controls where there was one, side by side until the column is too narrow for both, and
+    the fit rows spanning the whole widget under them -- they belong to the selection, not to the
+    money column, and reading them beside the totals would suggest the plan sets them.
+  */
+  .usage-estimator-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px clamp(16px, 3vw, 34px); }
+  .usage-estimator-inputs p { margin: 0; }
+  .usage-estimator-inputs input { width: 100%; }
+  .usage-estimator-fit { grid-column: 1 / -1; }
+  .usage-estimator-fit dt { display: grid; grid-template-columns: 1.2em auto; column-gap: 9px; align-items: baseline; color: var(--text-hi); }
+  .usage-estimator-fit dt > span { font-family: var(--f-mono); color: var(--text-lo); }
+  .usage-estimator-fit dt small { grid-column: 2; margin-top: 3px; font-size: 12px; letter-spacing: 0; color: var(--text-lo); }
+  .usage-estimator-fit dd { text-align: right; }
+  .usage-estimator-fit dd small { display: block; margin-top: 3px; font-size: 12px; letter-spacing: 0; color: var(--text-lo); }
+  .usage-estimator-fit div[data-fit="within"] dt > span { color: var(--verified); }
+  .usage-estimator-fit div[data-fit="refused"] dt > span { color: var(--changed); }
   /* A plan card is a third of a column, and at 1280 that is about 190px of content box. The
      labels here are full sentences -- "Choose this plan -> sign in" says what happens next, which
      is worth more than the one line it costs -- so the button wraps instead of running past the
@@ -3938,6 +3956,28 @@
       padding-block: 12.5px;
       margin-block: -12.5px;
     }
+    /*
+      G1-TAP, 2026-09-22. Not widened here, and the reason is worth leaving behind.
+
+      The list above is global class names, and a paragraph written inside a CSS module has a
+      hashed class it can never name -- so every module that writes prose reopens this defect on
+      a new route. A 360px sweep over seventeen public routes found four sitting there: `public
+      dataset` and `reference harness` at 18px on /benchmarks, `Integrations` at 18px on
+      /sources, and the Explore frame's `capability manifest` at 16px, since fixed in its own
+      module by the lane that owns it.
+
+      Matching by shape instead -- `main p > a` -- clears all four, and was measured doing so.
+      It is not here because these three declarations are only safe on an inline-level box. The
+      pull-back cancels because the margin box sizes the line box; on a grid or flex item the
+      parent measures the margin box instead, and /trust lost 25px of every row track that way
+      (PR #92). `p > a` is a narrower match than the one that broke, but a paragraph is not
+      guaranteed to be a block container, and a rule that silently blockifies whatever it
+      catches is the wrong instrument for a floor that must hold on every route at once.
+
+      A module that needs the floor opts in from its own stylesheet, where the author can see
+      what the anchor's parent lays out as. `components/evidence/region-highlight.module.css`
+      does that for the one action in its panel.
+    */
     /* Real controls take a real floor. 44, not the 42 that was here: the number in the guideline
        is the number. The wordmark, the sign-in link, the search input, every <summary> and every
        <select> are on the list because each of them was measured under it. */
@@ -4550,6 +4590,28 @@
   .world-diff-sample-digests { margin: 0; padding: 11px 16px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1)/1.6 var(--f-mono); background: var(--g1); }
   .world-diff-sample-fine { margin: 0; padding: 12px 16px; color: var(--text-lo); font-size: 12px; line-height: 1.6; }
   .world-diff-sample-fine a { color: var(--text-mid); text-decoration: underline; text-underline-offset: 3px; }
+
+  /*
+    Gap #10 -- the same panel, carrying every version of the sample World instead of one arrival.
+    It reuses the rules above and adds only the step list. The figures come from five frozen
+    compiles; this file frames them and computes nothing.
+  */
+  .world-recompile-steps { margin: 0; padding: 0; list-style: none; }
+  .world-recompile-steps > li { border-bottom: 1px solid var(--hairline); }
+  .world-recompile-steps > li:last-child { border-bottom: 0; }
+  .world-recompile-steps .world-diff-sample-rows > div:last-child { border-bottom: 0; }
+  .world-recompile-steps .world-diff-sample-digests { border-bottom: 0; }
+  .world-recompile-step-head {
+    margin: 0;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    background: var(--ground);
+  }
+  .world-recompile-step-head b { color: var(--text-hi); font-size: 13px; font-weight: 540; }
+  .world-recompile-step-head span { color: var(--text-lo); font: var(--t-1)/1.6 var(--f-mono); overflow-wrap: anywhere; }
 
   /*
     T1-007 (cross-lane from `seo-tech`) -- an inline link inside a paragraph is underlined.

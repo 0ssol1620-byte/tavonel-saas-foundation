@@ -1,0 +1,244 @@
+/*
+  The Model Arena charts. Built from the tokens in app/tavonel.css -- no colour is invented here,
+  and the charts carry exactly one hue: --source, the token that already means "source, document,
+  location" everywhere else on the site. A measurement of how closely a model reproduced a page
+  belongs to that meaning; a second hue would have to mean something, and there is nothing else
+  for it to mean.
+
+  There is no animation and no transition in this file, so `prefers-reduced-motion` has nothing
+  to turn off. That is deliberate rather than an omission: motion encodes meaning on this site,
+  and a bar growing on scroll encodes nothing.
+*/
+
+.chart {
+  margin: 0;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.chartHead {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.chartHead h3 {
+  margin: 0;
+  font-family: var(--f-sans);
+  font-size: 15px;
+  font-variation-settings: "wght" 560;
+  letter-spacing: -0.008em;
+  color: var(--text-hi);
+}
+.chartHead p {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-lo);
+}
+
+/* ---------------------------------------------------------------- bars */
+
+.bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg, 8px);
+  overflow: hidden;
+  min-width: 0;
+}
+
+/*
+  One row: name, bar, figure, denominator.
+
+  At 360px the four parts stack into two lines -- the name over the bar, the figure and its
+  denominator under it -- rather than squeezing a four-column grid into 328px. Nothing is hidden
+  at any width; the row reflows.
+*/
+.bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label label"
+    "track track"
+    "value pages";
+  align-items: center;
+  gap: 6px 12px;
+  padding: 11px 16px;
+  background: var(--g1);
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .bar {
+    grid-template-columns: minmax(0, 168px) minmax(0, 1fr) auto auto;
+    grid-template-areas: "label track value pages";
+    gap: 0 16px;
+  }
+}
+
+.barLabel {
+  grid-area: label;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-hi);
+  overflow-wrap: anywhere;
+}
+
+.barTrack {
+  grid-area: track;
+  display: block;
+  width: 100%;
+  height: 8px;
+  min-width: 0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.barGround { fill: var(--g3); }
+.barFill { fill: var(--source); }
+
+.barValue {
+  grid-area: value;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+}
+
+/* The denominator travels with the figure. It is never smaller than the type floor. */
+.barPages {
+  grid-area: pages;
+  justify-self: end;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-lo);
+}
+
+/* ---------------------------------------------------------------- plot */
+
+/*
+  The plot sits in its own scroll frame for the same reason the tables do: it has a smallest
+  width at which it is still readable, and below that a reader scrolls it rather than reading a
+  squashed one. The axis ticks are SVG text, so the box is a fixed user-unit box and is not
+  scaled down to the viewport.
+*/
+.plotScroll {
+  overflow-x: auto;
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg, 8px);
+  background: var(--g1);
+}
+.plot {
+  display: block;
+  width: 560px;
+  max-width: none;
+  height: auto;
+}
+.axis {
+  stroke: var(--hairline-hi);
+  stroke-width: 1;
+}
+.dot {
+  fill: var(--source);
+  fill-opacity: 0.85;
+  stroke: var(--source);
+  stroke-width: 1;
+}
+/*
+  An axis tick. 12px is the type floor, and it applies here exactly as it does to HTML: the plot
+  sits in a scroll frame at its own user-unit size rather than being scaled to the viewport, so a
+  tick is 12 real pixels on a phone and on a desktop.
+*/
+.tick {
+  fill: var(--text-lo);
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
+.dotKey {
+  margin: 0;
+  padding: 0 0 0 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-lo);
+}
+.dotKey b {
+  color: var(--text-hi);
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- receipts */
+
+/*
+  The 360px rule for a wide table: the table keeps its own width and the frame scrolls. A table
+  that is allowed to shrink past its content pushes the whole page sideways, which is the one
+  failure the phone sweep catches on every route that has ever had a table on it.
+*/
+.tableScroll {
+  overflow-x: auto;
+  min-width: 0;
+  margin: 14px 0 0;
+}
+
+.receipts {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 620px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+.receipts caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-lo);
+}
+.receipts th,
+.receipts td {
+  border-bottom: 1px solid var(--hairline);
+  padding: 9px 14px 9px 0;
+  text-align: left;
+  vertical-align: top;
+}
+.receipts thead th {
+  border-bottom: 1px solid var(--hairline-hi);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--text-lo);
+}
+.receipts tbody th {
+  color: var(--text-hi);
+  font-weight: 500;
+}
+.receipts tbody th em {
+  display: block;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  font-style: normal;
+  color: var(--text-lo);
+}
+
+/* A digest is 64 characters with no space in it; it breaks anywhere rather than widening a cell. */
+.digest {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: var(--text-lo);
+}

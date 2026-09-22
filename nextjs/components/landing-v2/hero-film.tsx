@@ -54,7 +54,18 @@ const HERO_CUT = {
   poster: "/film/poster-1-hero-2x.webp",
 } as const;
 
-/** The LCP resource of both entry pages: the first stage's poster, preloaded by `app/page.tsx`. */
+/**
+ * The first stage's poster.
+ *
+ * It was the LCP resource of both entry pages while this film was the hero. Gap #1 (2026-09-22)
+ * moved the film into Scene 02, so the poster is below the fold now: the entry pages preload the
+ * hero's own page raster instead, and the player below no longer marks this one `priorityPoster`.
+ * Two eager, high-priority rasters where only one is above the fold is a slower first paint on
+ * the phone widths the founder checks, not a faster one.
+ *
+ * The constant stays exported because it is still the first frame the player paints and
+ * `lib/one-path-contract.test.ts` holds its bytes.
+ */
 export const HERO_FILM_POSTER: string = HERO_CUT.poster;
 
 function heroStages(korean: boolean): CompileStage[] {
@@ -68,7 +79,7 @@ function heroStages(korean: boolean): CompileStage[] {
 export default function HeroFilm({ korean = false }: { korean?: boolean }) {
   return (
     <div className="lv2-film">
-      <CompileStagePlayer stages={heroStages(korean)} preferVideo priorityPoster korean={korean} />
+      <CompileStagePlayer stages={heroStages(korean)} preferVideo korean={korean} />
     </div>
   );
 }

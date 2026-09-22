@@ -1,0 +1,641 @@
+{
+  "benchmark": {
+    "dataset_license": "research-only-non-commercial",
+    "dataset_redistribution": "prohibited_without_separate_rights_review",
+    "dataset_revision": "aa1ee96d106dbe53d0ae59474d75c6e6d9b53fec",
+    "driver": "reports/full_compare_20260905/_win_omnidoc_score_full.py",
+    "evaluator": "OmniDocBench end2end quick_match",
+    "evaluator_entrypoint": "python pdf_validation.py --config config.yaml",
+    "evaluator_license": "Apache-2.0",
+    "evaluator_pin": "193627ae9e97d89188468ed1ee3b7a856ff76044",
+    "evaluator_repository": "opendatalab/OmniDocBench",
+    "gt_pages": 1651,
+    "name": "OmniDocBench"
+  },
+  "board_generated_at_kst": "2026-09-06 19:55 KST",
+  "campaign_id": "TAVONEL-MODEL-ARENA-PUBLIC-20260903-V1",
+  "caveats": [
+    "Speed = inference latency from campaign.sqlite (median sec/page, serial pages/h). NOT scoring wall-time.",
+    "Do not use OmniDoc elapsed_min or olmOCR score_min as speed.",
+    "ParseBench layout = N/A for all models (elements_available=false).",
+    "opus5_subscription and infinity_parser2_flash missing from speed board.",
+    "infinity_parser2_pro is FOUNDER_EXCLUDED — reference-only (speed shown; quality pending/excluded).",
+    "glm_ocr OmniDoc remains REF until optional SUCCESS-only rescore.",
+    "monkeyocrv2_b OmniDoc restored home-native text Edit ~0.0578.",
+    "See ANOMALY_NOTES.md."
+  ],
+  "cloud_cost_usd": 0,
+  "comparison_generated_at_kst": "2026-09-06 20:26 KST",
+  "hosted_price_reference": {
+    "captured_at": "2026-09-03",
+    "input_usd_per_mtok": 5,
+    "model_key": "opus5_subscription",
+    "note": "masterplan section 4 records this as an API list-price reference. This run uses the subscription surface, so the number is only used for api_equivalent_list_price_usd. Never report the subscription lane as $0/page (ARENA_CONTRACT section 7).",
+    "output_usd_per_mtok": 25,
+    "source_url": "https://www.anthropic.com/news/claude-opus-5"
+  },
+  "models": [
+    {
+      "display_name": "OvisOCR2",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:7cc1f10400f2b4d675c9a3dd91cafc9532f1f77c4a885ab2da911c0651e05cd0",
+        "runtime_image_digest": "bootstrap:sha256:8b85d8155ff2d859e350b8d66181e08ae37836102d7087ac8dfe6cc3cefa7c9b",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "apache-2.0",
+        "weights_repository": "ATH-MaaS/OvisOCR2",
+        "weights_revision": "1fc9221b7823a371d6e97f92d527cc847e24e107"
+      },
+      "key": "ovisocr2",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.08709481724356007,
+        "pages": 1651,
+        "reading_order_edit": 0.11285344862372688,
+        "table_edit": 0.05136626410571414,
+        "table_teds": 0.9342227115011672,
+        "tag": "settled_full_1651_sequential",
+        "text_edit": 0.028989424886648758
+      },
+      "speed": {
+        "median_seconds_per_page": 4,
+        "missing": false,
+        "p90_seconds_per_page": 10,
+        "serial_pages_per_hour": 900,
+        "timed_pages": 5132
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "PaddleOCR-VL 1.6",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:a6d8a7deb0f96cb419712746b451078c4961fdeace70e65dc928f9318d58777f",
+        "runtime_image_digest": "bootstrap:sha256:06849dac601360301ae68d44b4b737c8bb549009579b00b6a04353b86294feda",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu",
+        "license": "apache-2.0",
+        "weights_repository": "PaddlePaddle/PaddleOCR-VL-1.6",
+        "weights_revision": "c5630abae1d940eafe0697512a0325494b02ab42"
+      },
+      "key": "paddleocr_vl_1_6",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.08675582063822039,
+        "pages": 1651,
+        "reading_order_edit": 0.1303752613462286,
+        "table_edit": 0.05127512718920824,
+        "table_teds": 0.9343771234810438,
+        "tag": "settled_full_1651",
+        "text_edit": 0.04258990084547369
+      },
+      "speed": {
+        "median_seconds_per_page": 4,
+        "missing": false,
+        "p90_seconds_per_page": 9,
+        "serial_pages_per_hour": 900,
+        "timed_pages": 5117
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "HPD-Parsing",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA H100 80GB HBM3",
+        "listed_usd_per_hour": 3.49,
+        "price_snapshot_sha256": "sha256:1a61d52222faa9c0ddad4a257ab6e70491adaf93ebb8b4abedd6a0483494aba7",
+        "runtime_image_digest": "bootstrap:sha256:bf449b59ee3a732ac78b6d57ba50734038a2cf46c30a6409b4a76316412f624a",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/hpd-parsing-vllm:latest-nvidia-gpu",
+        "license": "apache-2.0",
+        "weights_repository": "PaddlePaddle/HPD-Parsing",
+        "weights_revision": "91de80054c23ab4238e3d7073fa2b83c2a7e301e"
+      },
+      "key": "hpd_parsing",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.09903619873484044,
+        "pages": 1651,
+        "reading_order_edit": 0.1270331889878599,
+        "table_edit": 0.07867511953583654,
+        "table_teds": 0.8514320024813226,
+        "tag": "settled_full_1651_sequential",
+        "text_edit": 0.04290863972961698
+      },
+      "speed": {
+        "median_seconds_per_page": 3,
+        "missing": false,
+        "p90_seconds_per_page": 7,
+        "serial_pages_per_hour": 1200,
+        "timed_pages": 5117
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "Infinity-Parser2-Flash",
+      "gpu": {
+        "absent_reason": "no canary proof in the campaign evidence directory for this model key",
+        "gpu_type": null,
+        "listed_usd_per_hour": null,
+        "price_snapshot_sha256": null,
+        "runtime_image_digest": null,
+        "verdict": null
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "apache-2.0",
+        "weights_repository": "infly/Infinity-Parser2-Flash",
+        "weights_revision": "cfddc4106b0abc4706f05575a164f7dd35d09c46"
+      },
+      "key": "infinity_parser2_flash",
+      "notes": [
+        "infinity_parser2_flash OmniDoc timing\n\n- **text Edit 0.0449 is valid** (settled leaderboard).\n- elapsed_min **682** is scoring wall-time at workers=2, not inference failure."
+      ],
+      "omnidoc": {
+        "formula_edit": 0.14073222469775745,
+        "pages": 1651,
+        "reading_order_edit": 0.1376551902112244,
+        "table_edit": 0.12926098809663256,
+        "table_teds": 0.820213653204851,
+        "tag": "settled_full_1651_priority_flash",
+        "text_edit": 0.04486710197411037
+      },
+      "speed": {
+        "median_seconds_per_page": null,
+        "missing": true,
+        "p90_seconds_per_page": null,
+        "serial_pages_per_hour": null,
+        "timed_pages": null
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "MinerU VLM (MinerU2.5-Pro-2605-1.2B)",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA A40",
+        "listed_usd_per_hour": 0.49,
+        "price_snapshot_sha256": "sha256:d740783489bd956adb72c9fa72d2613b47e406121136a96f5c3022013e272987",
+        "runtime_image_digest": "bootstrap:sha256:299fb4e14dda21723cb7b98fc4affe85e5bbcef44d9b84ee005e2fac340f6081",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "LicenseRef-MinerU-Open-Source-License",
+        "weights_repository": "opendatalab/MinerU2.5-Pro-2605-1.2B",
+        "weights_revision": "bff20d4ae2bf202df9f45284b4d43681555a97ed"
+      },
+      "key": "mineru_vlm",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.09940916587990116,
+        "pages": 1651,
+        "reading_order_edit": 0.1323476839165843,
+        "table_edit": 0.060922118768073276,
+        "table_teds": 0.9265405221540454,
+        "tag": "settled_full_1651_sequential",
+        "text_edit": 0.05081097651076065
+      },
+      "speed": {
+        "median_seconds_per_page": 5,
+        "missing": false,
+        "p90_seconds_per_page": 8,
+        "serial_pages_per_hour": 720,
+        "timed_pages": 5117
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "MonkeyOCRv2-B-Parsing",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:139817ec531fe88c84c8c2ccf05e2dcf96b3b21a28cceb0f391b7676ef1df95a",
+        "runtime_image_digest": "bootstrap:sha256:4ed1fde5a4a644498339866fc8c69181c647bf227e9ba269bbdce9ed8657a31a",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "apache-2.0",
+        "weights_repository": "zenosai/MonkeyOCRv2-B-Parsing",
+        "weights_revision": "2419139b7bcd3fda2689b2a83167172afba91c8b"
+      },
+      "key": "monkeyocrv2_b",
+      "notes": [
+        "olmocr2 / monkeyocrv2_b OmniDoc soft-skip — CONCLUDED (2026-09-06 ~19:26 KST)\n\nCross-check (no multi-hour rescore):\n\n### Hashes / values (box vs home before restore)\n- `olmocr2` `md_*_metric_result.json`: **identical** box↔home sha256 `3c8b6d69…` — text Edit **0.178971**, TEDS **0.560256**.\n- `monkeyocrv2_b` on board had been **box** metrics sha256 `1e4a2030…` — text **0.124293**, TEDS **0.499530** (overwrote home).\n\n### Backups / home-native\n- **monkeyocrv2_b = B recoverable overwrite.** Home sequential finished text **0.057780** / TEDS **0.824255** (log + `scoring_progress_sequential.json`). Verbatim metric still in `benchmark/cache/omnidoc/result/md_monkeyocrv2_b_quick_match_metric_result.json` (28434 B, sha256 `fdc09b00…`). Restored into `omnidoc_raw/monkeyocrv2_b/` + board rebuild. Box metrics kept under `BACKUP_box_softskip_*` and staging `monkeyocrv2_b_BOX_metric_result.json`.\n- **olmocr2 = A genuine (not soft-skip overwrite of better home).** Home sequential failed (`missing metric for prefix=md_olmocr2`); only complete metrics are box soft-skip. Preds: 1651 md, 1 empty / 9 tiny — not a mass soft-skip emptiness artifact.\n\n### Spot-check preds\n- Both models ~median 2.3–2.4 KB markdown; content looks real OCR (not placeholder flood).\n\n### Board after restore\n- `monkeyocrv2_b` rank ~6: text **0.0578**, TEDS **0.8243** (home-native).\n- `olmocr2` remains box: text **0.1790**, TEDS **0.5603**."
+      ],
+      "omnidoc": {
+        "formula_edit": 0.1533643483819323,
+        "pages": 1651,
+        "reading_order_edit": 0.13609762525200678,
+        "table_edit": 0.10307015487920575,
+        "table_teds": 0.8242551742212804,
+        "tag": "settled_full_1651_sequential",
+        "text_edit": 0.05778014231068365
+      },
+      "speed": {
+        "median_seconds_per_page": 6,
+        "missing": false,
+        "p90_seconds_per_page": 16,
+        "serial_pages_per_hour": 600,
+        "timed_pages": 5093
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "DeepSeek-OCR-2",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:fd217ef9947756c2a70a6a9dc5fc494ecb2bd5cabc4958de098b74464626734a",
+        "runtime_image_digest": "bootstrap:sha256:4216e2a384e49aebc72da31afe36e8eb558cd47e5706a524c1e0a63f94e56cde",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "apache-2.0",
+        "weights_repository": "deepseek-ai/DeepSeek-OCR-2",
+        "weights_revision": "aaa02f3811945a91062062994c5c4a3f4c0af2b0"
+      },
+      "key": "deepseek_ocr2",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.12590957002015002,
+        "pages": 1651,
+        "reading_order_edit": 0.1499599214925253,
+        "table_edit": 0.11777843053928444,
+        "table_teds": 0.784612185551888,
+        "tag": "settled_full_1651",
+        "text_edit": 0.058428365213310136
+      },
+      "speed": {
+        "median_seconds_per_page": 27,
+        "missing": false,
+        "p90_seconds_per_page": 60,
+        "serial_pages_per_hour": 133.3,
+        "timed_pages": 5132
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "MinerU 3.4.5 Pipeline (PP-OCRv6)",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:dc9357bc0c9b24ceda6198706ac7f83c7d56dad5ac59304cdb23f91ceb5d6b12",
+        "runtime_image_digest": "bootstrap:sha256:0e3e0ab6f9cfac7866d8e4766902b8cb1f82050033e0cfdd28ca8075dd061507",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "LicenseRef-MinerU-Open-Source-License",
+        "weights_repository": "opendatalab/PDF-Extract-Kit-1.0",
+        "weights_revision": "ed6b654c018d742e65a17671e379c5e6ecc87ec9"
+      },
+      "key": "mineru_pipeline",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.2676371850123475,
+        "pages": 1651,
+        "reading_order_edit": 0.15514050392262704,
+        "table_edit": 0.36409592991085843,
+        "table_teds": 0.7963664412124991,
+        "tag": "settled_full_1651_sequential",
+        "text_edit": 0.059040755404404274
+      },
+      "speed": {
+        "median_seconds_per_page": 4,
+        "missing": false,
+        "p90_seconds_per_page": 13,
+        "serial_pages_per_hour": 900,
+        "timed_pages": 5132
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "Unlimited-OCR",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:5e8ed330efe3d8e378ed4c2f07e36f97ca235835d7e18394b2851d48c72542e6",
+        "runtime_image_digest": "bootstrap:sha256:4619084ea2a43c0b5129b579f975d2ebe384aeafa51517f646ff6987659fa981",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "mit",
+        "weights_repository": "baidu/Unlimited-OCR",
+        "weights_revision": "07dea832e22aefee32ad281d4b80551282e1c168"
+      },
+      "key": "unlimited_ocr",
+      "notes": [],
+      "omnidoc": {
+        "formula_edit": 0.1885027727852359,
+        "pages": 1651,
+        "reading_order_edit": 0.18229692775837927,
+        "table_edit": 0.1125916309653909,
+        "table_teds": 0.8622784874448293,
+        "tag": "box_settled_full_1651_sequential",
+        "text_edit": 0.09785409348178797
+      },
+      "speed": {
+        "median_seconds_per_page": 29,
+        "missing": false,
+        "p90_seconds_per_page": 61,
+        "serial_pages_per_hour": 124.1,
+        "timed_pages": 5107
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "olmOCR-2-7B-1025-FP8",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:342c3e2a45092d6bc3c0efa5aac98deb1738c2ee568bfb84acf2dd69107dfdf8",
+        "runtime_image_digest": "bootstrap:sha256:06c80382bf188304b35fe9368d6252c6fdbf6d1eb1709ae6f6bebfc4de41c937",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "apache-2.0",
+        "weights_repository": "allenai/olmOCR-2-7B-1025-FP8",
+        "weights_revision": "40bd7202494b8264ee17ada08b401b5aab7a9ce1"
+      },
+      "key": "olmocr2",
+      "notes": [
+        "olmocr2 / monkeyocrv2_b OmniDoc soft-skip — CONCLUDED (2026-09-06 ~19:26 KST)\n\nCross-check (no multi-hour rescore):\n\n### Hashes / values (box vs home before restore)\n- `olmocr2` `md_*_metric_result.json`: **identical** box↔home sha256 `3c8b6d69…` — text Edit **0.178971**, TEDS **0.560256**.\n- `monkeyocrv2_b` on board had been **box** metrics sha256 `1e4a2030…` — text **0.124293**, TEDS **0.499530** (overwrote home).\n\n### Backups / home-native\n- **monkeyocrv2_b = B recoverable overwrite.** Home sequential finished text **0.057780** / TEDS **0.824255** (log + `scoring_progress_sequential.json`). Verbatim metric still in `benchmark/cache/omnidoc/result/md_monkeyocrv2_b_quick_match_metric_result.json` (28434 B, sha256 `fdc09b00…`). Restored into `omnidoc_raw/monkeyocrv2_b/` + board rebuild. Box metrics kept under `BACKUP_box_softskip_*` and staging `monkeyocrv2_b_BOX_metric_result.json`.\n- **olmocr2 = A genuine (not soft-skip overwrite of better home).** Home sequential failed (`missing metric for prefix=md_olmocr2`); only complete metrics are box soft-skip. Preds: 1651 md, 1 empty / 9 tiny — not a mass soft-skip emptiness artifact.\n\n### Spot-check preds\n- Both models ~median 2.3–2.4 KB markdown; content looks real OCR (not placeholder flood).\n\n### Board after restore\n- `monkeyocrv2_b` rank ~6: text **0.0578**, TEDS **0.8243** (home-native).\n- `olmocr2` remains box: text **0.1790**, TEDS **0.5603**."
+      ],
+      "omnidoc": {
+        "formula_edit": 0.26989717582787004,
+        "pages": 1651,
+        "reading_order_edit": 0.25762079403460214,
+        "table_edit": 0.21387285750546323,
+        "table_teds": 0.5602558912770055,
+        "tag": "box_settled_full_1651_sequential",
+        "text_edit": 0.17897110792994364
+      },
+      "speed": {
+        "median_seconds_per_page": 13,
+        "missing": false,
+        "p90_seconds_per_page": 33,
+        "serial_pages_per_hour": 276.9,
+        "timed_pages": 5132
+      },
+      "status": "settled",
+      "status_note": null
+    },
+    {
+      "display_name": "GLM-OCR",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA GeForce RTX 4090",
+        "listed_usd_per_hour": 0.74,
+        "price_snapshot_sha256": "sha256:1230a3f269dc3772d0c8c6403afe8a2f537cb6a66832ee78958cb74146c8720e",
+        "runtime_image_digest": "bootstrap:sha256:e4de55adb525dbd168e152826bb87941a389b661bacacd80fff453f6538d256e",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": "vllm/vllm-openai:nightly",
+        "license": "mit",
+        "weights_repository": "zai-org/GLM-OCR",
+        "weights_revision": "ca5d8b3e287e52589e37c28385d9655ee4372f9d"
+      },
+      "key": "glm_ocr",
+      "notes": [
+        "REF; 52 OmniDoc FAILED-injected; metrics pre-inject (47 empties); optional SUCCESS-only rescore",
+        "glm_ocr OmniDoc SUCCESS-only rescore (2026-09-06 20:27 KST)\n\n- **Kept REF** (founder policy / `_build_comparison.py` REF set); board REF row updated.\n- BEFORE (pre-inject, 47 empties in 1651 GT match): text Edit **0.0846**, formula **0.2960**, table Edit **0.5014**, TEDS **0.4874**, reading **0.2127**, pages **1651**, tag `settled_full_1651_parallel`.\n- AFTER (box CPU workers=2, $0): text Edit **0.0444**, formula **0.2708**, table Edit **0.4914**, TEDS **0.4941**, reading **0.1796**, pages **1599**, tag `box_success_only_after_failed_inject`, elapsed **612.9s**, returncode=0.\n- Prepare: 1599 nonempty SUCCESS-only; 52 FAILED excluded (47 empty+5 missing).\n- GT: filtered OmniDocBench to 1599 SUCCESS-matched pages (full bench source; missing FAILED would otherwise score as empty under full 1651 GT).\n- Note: initial zip extract via system unzip corrupted CJK filenames (90 orphans); fixed via Python UTF-8 extract before final score.\n- Soft-skip installed: `omnidoc_raw/glm_ocr/` and `C:/Users/yspow/box_omnidoc_results/`.\n- Prior REF metrics backed up under `omnidoc_raw/glm_ocr/BACKUP_pre_success_only/`."
+      ],
+      "omnidoc": {
+        "formula_edit": 0.270832066527723,
+        "pages": 1599,
+        "reading_order_edit": 0.17959343392487567,
+        "table_edit": 0.4913927562924891,
+        "table_teds": 0.4940527045037998,
+        "tag": "box_success_only_after_failed_inject",
+        "text_edit": 0.044396237653493695
+      },
+      "speed": {
+        "median_seconds_per_page": 5,
+        "missing": false,
+        "p90_seconds_per_page": 13,
+        "serial_pages_per_hour": 720,
+        "timed_pages": 5064
+      },
+      "status": "reference",
+      "status_note": "Reference row: on the board for context, not ranked with the settled rows."
+    },
+    {
+      "display_name": "Claude Opus 5 - Claude Code subscription surface",
+      "gpu": {
+        "absent_reason": "no canary proof in the campaign evidence directory for this model key",
+        "gpu_type": null,
+        "listed_usd_per_hour": null,
+        "price_snapshot_sha256": null,
+        "runtime_image_digest": null,
+        "verdict": null
+      },
+      "identity": {
+        "api_model_id": "claude-opus-5",
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "proprietary-anthropic-commercial-terms",
+        "weights_repository": null,
+        "weights_revision": null
+      },
+      "key": "opus5_subscription",
+      "notes": [
+        "REF; 21 prepare-skipped under full GT; speed missing from speed board",
+        "opus5_subscription ParseBench table ≈ 0\n\n- Cause: GFM pipe tables vs scorer requiring HTML `<table>`.\n- Fix path: pipe→HTML re-prepare + table-only rescore (no re-inference).",
+        "opus5_subscription olmOCR timing\n\n- **overall 0.740372 is valid.**\n- Recorded score_min ~0.2 min is anomalous (likely resume/cache) — **do not use for speed ranking.**"
+      ],
+      "omnidoc": {
+        "formula_edit": 0.14578510130063985,
+        "pages": 1651,
+        "reading_order_edit": 0.1674707928556213,
+        "table_edit": 0.5402926750449081,
+        "table_teds": 0.8283613154045,
+        "tag": "settled_full_1651_parallel",
+        "text_edit": 0.0896186246104797
+      },
+      "speed": {
+        "median_seconds_per_page": null,
+        "missing": true,
+        "p90_seconds_per_page": null,
+        "serial_pages_per_hour": null,
+        "timed_pages": null
+      },
+      "status": "reference",
+      "status_note": "Reference row: on the board for context, not ranked with the settled rows."
+    },
+    {
+      "display_name": "Infinity-Parser2-Pro",
+      "gpu": {
+        "absent_reason": null,
+        "gpu_type": "NVIDIA H100 80GB HBM3",
+        "listed_usd_per_hour": 3.49,
+        "price_snapshot_sha256": "sha256:e9f8cf950b1e243ec7b1156c1754d867f8b7e3f9bcc88eb3131ab04adfaf73de",
+        "runtime_image_digest": "bootstrap:sha256:8230584b4c245b1bfbaadc3ee0b849395d6d312e507fca3a262d35d2c8084969",
+        "verdict": "PASS"
+      },
+      "identity": {
+        "api_model_id": null,
+        "container_digest": null,
+        "container_digest_unresolved_reason": "lane F resolves the immutable image digest during the build phase",
+        "container_image": null,
+        "license": "apache-2.0",
+        "weights_repository": "infly/Infinity-Parser2-Pro",
+        "weights_revision": "b27d470100514329fc6439aada8f16ccea5f9e2a"
+      },
+      "key": "infinity_parser2_pro",
+      "notes": [],
+      "omnidoc": null,
+      "speed": {
+        "median_seconds_per_page": 9,
+        "missing": false,
+        "p90_seconds_per_page": 15,
+        "serial_pages_per_hour": 400,
+        "timed_pages": 1521
+      },
+      "status": "excluded",
+      "status_note": "FOUNDER_EXCLUDED 2026-09-04 over GPU spend (H100x2, about $7/h per pod). Speed is reference-only; no quality reading was completed, so this model has no quality row."
+    }
+  ],
+  "registry_snapshot_at": "2026-09-05T03:01:01Z",
+  "schema": "tavonel.site.model_arena.v1",
+  "sources": [
+    {
+      "path": "evaluator_registry.json",
+      "sha256": "668eaa0fb6fc7f823ac88cb20b692dc4d45a2c114fd4d7a6e0f5457b454a380b"
+    },
+    {
+      "path": "evidence/canary-proof-deepseek_ocr2.json",
+      "sha256": "011ea7c988a31dfe66b7caa7ba88f34f246179d201028767c50d3ea1d51931c9"
+    },
+    {
+      "path": "evidence/canary-proof-glm_ocr.json",
+      "sha256": "fc30bde2b38d20c363179acdfcfc825c580f7411b2c4ab1492fb54354fa1fef8"
+    },
+    {
+      "path": "evidence/canary-proof-hpd_parsing.json",
+      "sha256": "9ed6340270ec6ff7c9aa037f7b5258b02b1a53d91daef0f6d11d2d079e2e334b"
+    },
+    {
+      "path": "evidence/canary-proof-infinity_parser2_pro.json",
+      "sha256": "b5f5a1e1fc62193312b9c86e6988e5b78627a3b9cf9f5831d47a403d9ae378a9"
+    },
+    {
+      "path": "evidence/canary-proof-mineru_pipeline.json",
+      "sha256": "8f82ecc4a49cfac6e12d966aa69bb845fac887b495da85dd3aac2acd2b7f9835"
+    },
+    {
+      "path": "evidence/canary-proof-mineru_vlm.json",
+      "sha256": "07eba250b9b61cb8f9b024fc6ed8c0a411f4f3015b3e6a68ec309365e7945426"
+    },
+    {
+      "path": "evidence/canary-proof-monkeyocrv2_b.json",
+      "sha256": "cebd226979599ce36b94713986c3acf7ea20fcd5c5a4038bdd2d468e0457ab89"
+    },
+    {
+      "path": "evidence/canary-proof-olmocr2.json",
+      "sha256": "6b10ab06116cf7d6eb0eddc6a37980c388328bde2bcce695deaf58802c4d8896"
+    },
+    {
+      "path": "evidence/canary-proof-ovisocr2.json",
+      "sha256": "595ee2db9cb47289ce7473ec84d4bff792b227c619a6358a6458f4f923ca3389"
+    },
+    {
+      "path": "evidence/canary-proof-paddleocr_vl_1_6.json",
+      "sha256": "c69e60c938e85091851ad53dd9af13156668f5d53f82c76839882b64dff1e87a"
+    },
+    {
+      "path": "evidence/canary-proof-unlimited_ocr.json",
+      "sha256": "6409f0204be62c9db95b1030e2d99dcf36a046cd29dd60013e4671516bfe13dc"
+    },
+    {
+      "path": "model_registry.json",
+      "sha256": "83152ef92e2792a7ab3b2ef25fa9774115adfea2ebcd45363f7207764f8ee693"
+    },
+    {
+      "path": "reports/full_compare_20260905/ANOMALY_NOTES.md",
+      "sha256": "b7c64194f638a9a2ccbe3c38a2484d2f6d949a504e9a1cc1926cdfb23b44da9d"
+    },
+    {
+      "path": "reports/full_compare_20260905/LEADERBOARD_QUALITY_SPEED.json",
+      "sha256": "2a699cbf8c107bb57a4f837a9e053028a2cbaf18007a612f26ef0596d504f260"
+    },
+    {
+      "path": "reports/full_compare_20260905/STATUS.md",
+      "sha256": "bf2e367a6f2bf4189f00e090713164e0e68daf7c20dbeeb1c72ef2b107e652ea"
+    },
+    {
+      "path": "reports/full_compare_20260905/comparison_omnidoc_full.json",
+      "sha256": "d95eefd4bae67cf15ee975dac327a4b5bd533f07d01d43c6d1a9967fd82a49e5"
+    }
+  ],
+  "speed_method": {
+    "definition": "Inference latency per page from the campaign database (SUCCESS started_at to finished_at), as a median and the serial pages per hour that median implies.",
+    "not_measured": "Scoring wall-time. OmniDoc elapsed and olmOCR scoring time are not speed.",
+    "source": "D:/CodexProjects/ai-knowledge-compiler/research/model_arena_20260903/reports/partial_score_20260905/comparison_speed.json"
+  }
+}

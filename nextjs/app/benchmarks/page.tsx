@@ -10,30 +10,53 @@ import {
   RECEIPT_FIELDS,
   qualifiedBenchmarkRecords,
 } from "@/lib/benchmark-registry";
+import {
+  ArenaBarChart,
+  ArenaReceipts,
+  ArenaSpeedQualityPlot,
+} from "@/components/benchmarks/arena-charts";
+import {
+  arenaBars,
+  arenaDots,
+  modelArenaBoard,
+  settledModels,
+  unsettledModels,
+} from "@/lib/model-arena-page-data";
 import styles from "./benchmarks.module.css";
 
 /*
   This route returned 404 for months, and the 404 was the honest answer at the time: the only
   thing we could have put here was a table of numbers a reader had no way to check.
 
-  What it publishes now is the part that was always publishable -- the protocol. Which families
-  a knowledge-compilation result is measured in, what a record has to carry before it counts as
-  a result, and the four rules that decide whether a run may be compared to anything. None of
-  that needs a score to be true, and all of it is the thing a reader can hold us to later.
+  It now opens on a completed run instead of on the protocol that governs one. The protocol is
+  still published, in full, below the results -- what changed is which of the two a reader meets
+  first. A page whose subject is measurement, opening on four paragraphs about how measurement
+  ought to work and no measurement, was the one page on this site that argued against itself.
 
-  The taxonomy and the receipt fields are read from lib/benchmark-registry.ts, which is also what
-  validates a record at build time. The page cannot promise a field the validator does not check,
-  and the validator cannot require a field the page did not publish, because there is one list.
+  What the results are and are not:
 
-  No competitor score, no arena figure and no vendor leaderboard row appears here. A number that
-  someone else measured is theirs; the registry can record it as a quotation, and
-  validateBenchmarkReceipt refuses to let it be shown as a result.
+  - They are the Model Arena campaign of 2026-09-03: thirteen document-reading models run here,
+    on one corpus, through one evaluator revision, with a canary proof per model. OmniDocBench
+    scores the first stage of the work -- reading a page -- and nothing more. It does not measure
+    identity, lineage, temporal integrity or recompilation, which is why the eight-family
+    protocol below exists and why no number here is presented as a score for TAVONEL.
+  - No competitor's published leaderboard row appears beside them. A number someone else measured
+    is theirs; `validateBenchmarkReceipt` refuses to render a quotation as a result, and the same
+    rule is why this page compares models we ran to each other and to nothing else.
+  - The word "accuracy" does not appear on this page. An Edit distance and a TEDS score are
+    structural similarity measures against one benchmark's ground truth; `benchmarks-page.test.ts`
+    fails the build if the rendered page contains the word.
+
+  The board is read from `content/benchmarks/model-arena-20260903.json`, written by
+  `scripts/benchmarks/build-model-arena-artifact.mjs` from the campaign's own reports and bound
+  to each of them by sha256. The taxonomy and receipt fields below are read from
+  lib/benchmark-registry.ts, which is also what validates a record at build time.
 */
 
 export const metadata: Metadata = {
   title: "Knowledge Compilation Benchmark — TAVONEL",
   description:
-    "The metric families, the receipt fields and the qualification rules a knowledge compilation result has to satisfy before TAVONEL publishes it as a number.",
+    "A completed document-reading run with its receipts — model revisions, page counts, GPU and price snapshot — and the protocol a knowledge compilation result has to satisfy before it is published.",
   alternates: { canonical: "/benchmarks" },
   openGraph: { url: "/benchmarks" },
   robots: { index: true, follow: true },
@@ -107,8 +130,18 @@ const READING_A_NUMBER = [
   and this is a rendering decision rather than a second vocabulary.
 */
 const METRIC_LABEL: Record<string, string> = {
-  bbox: "region accuracy",
+  /*
+    Three of these normalise away the word "accuracy", which the constitution does not let this
+    site use for a completion or a similarity figure and which three registry identifiers still
+    spell. "text accuracy" is a similarity to a reference transcription, "bbox" is whether a
+    region landed where the ground truth puts it, and "point-in-time accuracy" is whether an
+    answer matches what was true on a date. Each label now names what is measured; the registry
+    keeps its identifiers, because renaming a metric there would move what the validator checks.
+  */
+  "text accuracy": "text fidelity to the source",
+  bbox: "region placement",
   "bbox correctness": "region correctness",
+  "point-in-time accuracy": "point-in-time correctness",
   VRAM: "GPU memory",
   "hallucination / omission": "hallucinated and omitted content",
   "source change → active world p50 / p95": "median and 95th-percentile time from source change to Active World",
@@ -141,6 +174,15 @@ const GDP_PDF_ARMS = [
 
 export default function BenchmarksPage() {
   const records = qualifiedBenchmarkRecords();
+  const arena = modelArenaBoard();
+  const settled = settledModels();
+  const unsettled = unsettledModels();
+  /*
+    The failed hypothesis, read from the evidence record rather than restated here, so the page
+    that publishes the run and the page that publishes the research findings cannot disagree
+    about what was and was not supported.
+  */
+  const notSupported = EVIDENCE.filter((entry) => entry.state === "unsupported");
 
   return (
     <PublicSitePage>
@@ -153,27 +195,202 @@ export default function BenchmarksPage() {
 
             <div className="stack">
               <p className="lede">
-                A document-reading leaderboard scores the first stage of the work. Compiling
-                knowledge also has to bind each statement to the region that supports it, decide
-                when two mentions are one thing, keep track of which revision is current, work out
-                what a change to page 40 invalidates three files away, and refuse to answer what
-                the world cannot support. The Knowledge Compilation Benchmark is the protocol
-                for measuring all of it — eight families, one receipt, four rules.
+                A document-reading leaderboard scores the first stage of the work, and the run
+                below is ours: {settled.length} models read the same{" "}
+                <span data-derived="1">{arena.benchmark.gt_pages.toLocaleString("en-US")}</span>{" "}
+                benchmark pages through one evaluator revision, with the model revision, the
+                hardware and the listed price snapshot recorded for each. Compiling knowledge also
+                has to bind each statement to the region that supports it, decide when two mentions
+                are one thing, keep track of which revision is current, and refuse to answer what
+                the world cannot support — the protocol for measuring all of that is published
+                under the results.
               </p>
+
+              {/* ------------------------------------------------- the completed run */}
+
+              <h2 className={styles.sectionTitle}>
+                Document reading, measured here — Model Arena, {arena.board_generated_at_kst}
+              </h2>
+              <p className={styles.para}>
+                Every row is a model we ran on {arena.benchmark.name}, scored by{" "}
+                {arena.benchmark.evaluator} at evaluator revision{" "}
+                <span data-derived="1">{arena.benchmark.evaluator_pin.slice(0, 12)}</span>. This is
+                one stage of the work — reading a page — and it is not a score for TAVONEL, for
+                retrieval or for a compiled World. No competitor&rsquo;s published leaderboard row
+                is placed beside these; a figure someone else measured stays theirs.
+              </p>
+
+              <ArenaBarChart
+                title="Text Edit distance against the benchmark’s ground truth"
+                direction="Lower is better"
+                unit="normalised edit distance, 0 to 1"
+                bars={arenaBars("text_edit", settled)}
+              />
+
+              <ArenaBarChart
+                title="Table structure similarity (TEDS)"
+                direction="Higher is better"
+                unit="tree-edit-distance similarity, 0 to 1"
+                bars={arenaBars("table_teds", settled)}
+              />
+
+              <ArenaSpeedQualityPlot dots={arenaDots(settled)} />
+
+              {/*
+                The rows that are not settled, with the campaign's own reason each one is not.
+
+                They are on the page rather than filtered out of it. Two are reference readings
+                the campaign refused to rank, and one is a model the founder stopped mid-run over
+                GPU spend; a board that quietly dropped all three would be a board whose shape was
+                chosen after the numbers were known.
+              */}
+              <h3 className={styles.sectionTitle}>Rows the campaign did not settle</h3>
+              <div className="chain">
+                {unsettled.map((model) => (
+                  <article className="link" key={model.key}>
+                    <span className="st">{model.status}</span>
+                    <h3>{model.display_name}</h3>
+                    {model.status_note ? <p>{model.status_note}</p> : null}
+                    {model.omnidoc ? (
+                      <p className="fine" data-derived="1">
+                        text Edit {model.omnidoc.text_edit.toFixed(4)} · table TEDS{" "}
+                        {model.omnidoc.table_teds.toFixed(4)} · reading-order Edit{" "}
+                        {model.omnidoc.reading_order_edit.toFixed(4)} · over{" "}
+                        {model.omnidoc.pages.toLocaleString("en-US")} pages · tag{" "}
+                        {model.omnidoc.tag}
+                      </p>
+                    ) : null}
+                    {/*
+                      The campaign's own notes, folded and unedited.
+
+                      They are the scoring lane's internal record -- markdown, model keys, tags
+                      and all -- and rewriting one into a marketing sentence is the edit that
+                      makes a receipt stop receipting. So they are carried byte for byte and put
+                      behind a disclosure, where the reader who wants to know why a row is a
+                      reference row finds the answer in the words the run recorded.
+                    */}
+                    {model.notes.length > 0 ? (
+                      <details className="status-fold">
+                        <summary>Why, in the campaign&rsquo;s own words</summary>
+                        {model.notes.map((note) => (
+                          <pre className={styles.verbatim} key={note}>{note}</pre>
+                        ))}
+                      </details>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+
+              {arena.hosted_price_reference ? (
+                <p className={styles.state}>
+                  <b>The hosted row.</b> {arena.hosted_price_reference.model_key} ran on a
+                  subscription surface, not on a GPU we rented, so it has no hardware line. Its
+                  list-price reference on{" "}
+                  <span data-derived="1">{arena.hosted_price_reference.captured_at}</span> was $
+                  <span data-derived="1">{arena.hosted_price_reference.input_usd_per_mtok}</span>
+                  /Mtok in and $
+                  <span data-derived="1">{arena.hosted_price_reference.output_usd_per_mtok}</span>
+                  /Mtok out. {arena.hosted_price_reference.note}
+                </p>
+              ) : null}
+
+              {/*
+                The failed hypothesis, on the results section rather than at the foot of the page.
+
+                A reader looking at ten bars is exactly the reader who should be told that the one
+                ranking signal this site does not have is a blind quality score, and that it is
+                absent because it was tested and did not work.
+              */}
+              {notSupported.map((entry) => (
+                <div className={styles.notSupported} key={entry.title}>
+                  <p className={styles.notSupportedMark}>Not supported</p>
+                  <h3>{entry.title}</h3>
+                  <p>{entry.body}</p>
+                  <p className="fine">
+                    Nothing on this page, and no routing decision behind it, reads a scalar
+                    quality score. <Link href={"/research/notes" as Route}>Read the finding</Link>.
+                  </p>
+                </div>
+              ))}
+
+              <h3 className={styles.sectionTitle}>Conditions, licence and pins</h3>
+              <ul className={styles.conditions}>
+                <li>
+                  <b>Dataset.</b> {arena.benchmark.name} at revision{" "}
+                  <span data-derived="1">{arena.benchmark.dataset_revision.slice(0, 12)}</span> —
+                  licensed {arena.benchmark.dataset_license}, redistribution{" "}
+                  {arena.benchmark.dataset_redistribution.replace(/_/g, " ")}. Its pages are not
+                  republished here and no page image from it appears on this site.
+                </li>
+                <li>
+                  <b>Evaluator.</b> {arena.benchmark.evaluator} from{" "}
+                  {arena.benchmark.evaluator_repository} at pin{" "}
+                  <span data-derived="1">{arena.benchmark.evaluator_pin}</span>, licence{" "}
+                  {arena.benchmark.evaluator_license}, entrypoint{" "}
+                  <code>{arena.benchmark.evaluator_entrypoint}</code>. Scoring driver:{" "}
+                  <code>{arena.benchmark.driver}</code>.
+                </li>
+                <li>
+                  <b>Speed.</b> {arena.speed_method.definition} {arena.speed_method.not_measured}
+                </li>
+                <li>
+                  <b>Registry snapshot.</b> Model revisions and the GPU catalogue were resolved at{" "}
+                  <span data-derived="1">{arena.registry_snapshot_at}</span>. A listed GPU rate is
+                  the provider&rsquo;s rate when that pod was provisioned; it is raw hardware cost
+                  and never a price for a page.
+                </li>
+              </ul>
+
+              <h3 className={styles.sectionTitle}>What the campaign said about itself</h3>
+              <ul className={styles.conditions}>
+                {arena.caveats.map((caveat) => (
+                  <li className={styles.verbatim} key={caveat}>{caveat}</li>
+                ))}
+              </ul>
+
+              <ArenaReceipts models={arena.models} sources={arena.sources} />
+
+              {/* ------------------------------------------------- the sibling run */}
+
+              <h2 className={styles.sectionTitle}>The other run on this site</h2>
+              <div className="chain">
+                <article className="link">
+                  <span className="st">GDP.pdf</span>
+                  <h3>Does compiled context change what a model gets right?</h3>
+                  <p>
+                    A held-out task set answered twice by the same model — once from the PDF alone,
+                    once with TAVONEL&rsquo;s compiled context beside it. The measured delta, the
+                    conditions it was measured under and the deviations from the sealed protocol
+                    are on its own page.
+                  </p>
+                  <p className="fine">
+                    <Link href={"/benchmarks/gdp-pdf" as Route}>Read the GDP.pdf run</Link>
+                  </p>
+                </article>
+                <article className="link">
+                  <span className="st">Model Arena</span>
+                  <h3>Which reader should the router send a page to?</h3>
+                  <p>
+                    The board above. It answers what a page costs to read and how closely each
+                    reader reproduced it, which is the evidence a routing policy is learned from —
+                    not a claim that any of these is the right model for your corpus.
+                  </p>
+                </article>
+              </div>
+
+              {/* ------------------------------------------------- the protocol */}
 
               {/*
                 B04 asked each of the five hubs to say which question it answers, and it was
                 right to. BA-088 is about how it was done.
 
-                The role sentence went into the lede above -- "the protocol for measuring
-                all of it" -- and the four cross-links are one labelled row at the foot, because
-                the same 11px mono template opened five consecutive pages in the same order and
-                put a navigation paragraph where the argument should start.
-
                 BA-076. What sat here was a bordered state block announcing, three paragraphs
                 under a headline promising "Measure the compile", that this page has no
                 benchmark results. Nothing about being a protocol needs a score, and the
                 condition for a row arriving is a forward statement rather than a confession.
+
+                Moved below the results 2026-09-22: the same sentence, in the place where a
+                reader who has just read a board asks what governs one.
               */}
               <p className={styles.state}>
                 The qualification contract defines what a knowledge-compilation result has to
