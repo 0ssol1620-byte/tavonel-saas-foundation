@@ -218,7 +218,10 @@ describe("copy trust guard", () => {
   it("never calls the product a deployment, on any surface", () => {
     const offenders: string[] = [];
     for (const file of [...sources("app"), ...sources("components"), ...sources("lib"), ...sources("../shared")]) {
-      const source = prose(file)!.toLowerCase();
+      // JSX wraps prose across lines, and the browser collapses that back to one space.
+      // `.../document-understanding` read "this\n                deployment" and went out
+      // three times because the check looked for a single space.
+      const source = prose(file)!.toLowerCase().replace(/\s+/g, " ");
       for (const phrase of BANNED_VOCABULARY) {
         if (source.includes(phrase)) offenders.push(`${file}: "${phrase}"`);
       }

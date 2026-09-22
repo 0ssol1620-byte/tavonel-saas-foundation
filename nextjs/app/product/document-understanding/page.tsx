@@ -208,8 +208,8 @@ export default function DocumentUnderstandingPage() {
                 caption="What the read left behind on one page of the public sample World: a box for each region, at the coordinates recorded for it, and the paragraph text each one carries."
               />
               <p className="fine">
-                Every sentence above about what is read comes from the capability manifest this
-                deployment validates uploads against — tier, preserved fields and limitations per
+                Every sentence above about what is read comes from the capability manifest TAVONEL
+                validates uploads against — tier, preserved fields and limitations per
                 format, published in full at{" "}
                 <Link href={"/sources" as Route}>supported sources</Link>. Measurements and
                 methodology are published in the{" "}
