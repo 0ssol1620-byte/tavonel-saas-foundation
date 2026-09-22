@@ -40,6 +40,27 @@
 }
 
 /*
+  The touch floor, opted into from here rather than widened globally.
+
+  G1-TAP left this route open on purpose and wrote down why: the global list in `app/tavonel.css`
+  matches global class names, and a paragraph written inside a CSS module has a hashed class it can
+  never name. `public dataset` and `reference harness` measured 87x18 and 111x18 at 360 on the live
+  build, which is how they were found again.
+
+  The three declarations are only safe on an inline-level box, so the opt-in belongs where an author
+  can see what the anchor's parent lays out as. Here `.para` is a paragraph and its links are inline,
+  so the block padding grows the hit area and the equal negative margin hands it back to the line
+  box. The paragraph does not reflow. `e2e/mobile-landing.spec.ts` sweeps /benchmarks now.
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .para a {
+    display: inline-block;
+    padding-block: 12.5px;
+    margin-block: -12.5px;
+  }
+}
+
+/*
   A section heading, in the page's own typeface. Pairs with the global .slate's rule.
 
   BA-112: the page was 4,303px at 1280 and 7,361px at 390 with exactly one sans element below

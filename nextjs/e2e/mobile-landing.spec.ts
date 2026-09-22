@@ -165,6 +165,11 @@ test.describe("on a touch screen", () => {
     "/evidence",
     "/product/document-understanding",
     "/trust",
+    /* Added 2026-09-22. Both were measured below the floor on the live production build while the
+       fifteen routes above passed, which is the whole argument for them being on the list: a route
+       belongs here because something on it was measured, not because it looked nearby. */
+    "/benchmarks",
+    "/sources",
   ]) {
   test(`every reachable control on ${route} keeps the 44px touch floor`, async ({ page }, testInfo) => {
     test.skip(!PHONE.includes(testInfo.project.name), "the touch floor is a phone contract");
