@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { readModelProviderCircuitSnapshot } from "@/lib/model-provider-circuit-store";
 import { evaluateOperationalSli } from "@/lib/operational-sli";
 import { operationalSliAlertWindow, persistOperationalSliAlert } from "@/lib/operational-sli-alert-store";
 import { authorizeSyntheticCanary, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
+import { RETRIEVAL_MODEL_PROVIDER } from "@/lib/retrieval-runtime-config";
 import { readProbeHistory } from "@/lib/synthetic-probe-store";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +30,11 @@ async function evaluateAndPersist(request: Request) {
   const history = signer
     ? await readProbeHistory(signer, windowStartedAt)
     : { ok: false as const, code: "PROBE_STORE_NOT_CONFIGURED" };
-  const evaluation = evaluateOperationalSli(history, { now: windowStartedAt });
+  const modelProviderCircuits = [{
+    provider: RETRIEVAL_MODEL_PROVIDER,
+    snapshot: await readModelProviderCircuitSnapshot(RETRIEVAL_MODEL_PROVIDER),
+  }];
+  const evaluation = evaluateOperationalSli(history, { now: windowStartedAt, modelProviderCircuits });
   const persisted = await persistOperationalSliAlert(evaluation, windowStartedAt);
   if (!persisted.ok) {
     return NextResponse.json(

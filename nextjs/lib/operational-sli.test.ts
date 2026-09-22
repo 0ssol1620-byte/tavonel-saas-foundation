@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  MODEL_PROVIDER_CIRCUIT_SCHEMA,
+  type ModelProviderCircuitState,
+} from "./model-provider-circuit";
 import { PROBE_RUN_SCHEMA, type ProbeCheck, type ProbeRun } from "./synthetic-probe";
 import type { ProbeHistory } from "./synthetic-probe-store";
 import {
@@ -31,6 +35,22 @@ function run(startedAt: string, overrides: Partial<ProbeRun> = {}): ProbeRun {
     checks: checks(),
     fixtureE2E: { enabled: false, status: "not_enabled", code: null },
     ...overrides,
+  };
+}
+
+function circuitState(phase: "closed" | "open" | "half_open"): ModelProviderCircuitState {
+  return {
+    schemaVersion: MODEL_PROVIDER_CIRCUIT_SCHEMA,
+    provider: "runpod",
+    phase,
+    revision: 3,
+    correlatedFailures: 0,
+    failureWindowStartedAt: null,
+    openedAt: null,
+    cooldownUntil: null,
+    probeAdmissionId: null,
+    probeExpiresAt: null,
+    updatedAt: NOW.toISOString(),
   };
 }
 
@@ -137,6 +157,57 @@ describe("B35 operational SLI and freshness gate", () => {
     expect(result.window.latencySamples).toBe(MAX_WINDOW_RUNS * 3);
     expect(result.window.successfulRequestLatencyP95Ms).toBe(20);
     expect(result.freshness.lastRunAt).toBe(NOW.toISOString());
+  });
+
+  it("reports a closed paid-provider breaker without changing an available state", () => {
+    const result = evaluateOperationalSli(stored([run("2026-09-20T11:59:00.000Z")]), {
+      now: NOW,
+      modelProviderCircuits: [{
+        provider: "runpod",
+        snapshot: { ok: true, state: circuitState("closed") },
+      }],
+    });
+    expect(result.state).toBe("available");
+    expect(result.modelProviders).toEqual([{ provider: "runpod", status: "closed", correlatedFailures: 0 }]);
+    expect(result.alerts).toEqual([]);
+  });
+
+  it("degrades -- never blocks -- on an open paid-provider breaker", () => {
+    const result = evaluateOperationalSli(stored([run("2026-09-20T11:59:00.000Z")]), {
+      now: NOW,
+      modelProviderCircuits: [{
+        provider: "runpod",
+        snapshot: { ok: true, state: { ...circuitState("open"), correlatedFailures: 5,
+          openedAt: NOW.toISOString(), cooldownUntil: NOW.toISOString() } },
+      }],
+    });
+    expect(result.state).toBe("degraded");
+    expect(result.modelProviders).toEqual([{ provider: "runpod", status: "open", correlatedFailures: 5 }]);
+    expect(result.alerts).toEqual([{ severity: "warning", reason: "model_provider_circuit_open" }]);
+  });
+
+  it("never reads an unavailable circuit as closed, including on an empty history", () => {
+    const unreadable = [{ provider: "runpod", snapshot: { ok: false as const, code: "state_unavailable" as const } }];
+    const healthy = evaluateOperationalSli(stored([run("2026-09-20T11:59:00.000Z")]),
+      { now: NOW, modelProviderCircuits: unreadable });
+    expect(healthy.state).toBe("degraded");
+    expect(healthy.modelProviders).toEqual([{ provider: "runpod", status: "unavailable", correlatedFailures: 0 }]);
+    expect(healthy.alerts).toEqual([{ severity: "warning", reason: "model_provider_circuit_state_unavailable" }]);
+
+    const blocked = evaluateOperationalSli(stored([]), { now: NOW, modelProviderCircuits: unreadable });
+    expect(blocked.state).toBe("blocked");
+    expect(blocked.modelProviders).toEqual([{ provider: "runpod", status: "unavailable", correlatedFailures: 0 }]);
+    expect(blocked.alerts).toEqual([
+      { severity: "critical", reason: "observation_missing" },
+      { severity: "warning", reason: "model_provider_circuit_state_unavailable" },
+    ]);
+  });
+
+  it("refuses an unbounded provider identifier", () => {
+    expect(() => evaluateOperationalSli(stored([run("2026-09-20T11:59:00.000Z")]), {
+      now: NOW,
+      modelProviderCircuits: [{ provider: "RunPod Inc.", snapshot: { ok: false, code: "state_missing" } }],
+    })).toThrow(RangeError);
   });
 
   it("rejects unbounded or empty policy inputs", () => {

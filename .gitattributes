@@ -60,6 +60,7 @@ nextjs/scripts/check-type-floor.mjs text eol=lf
 nextjs/scripts/fetch-explore-sec-corpus.mjs text eol=lf
 nextjs/scripts/verify-developer-clean-install.mjs text eol=lf
 nextjs/scripts/journey/*.mjs text eol=lf
+nextjs/scripts/qa/*.mjs text eol=lf
 
 # Every node script under scripts/ opens with a hashbang, and lib/journey-acceptance.test.ts
 # fails on a CRLF one: a Linux shell resolves the interpreter as `node`, and the module

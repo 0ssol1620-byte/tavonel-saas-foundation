@@ -18,7 +18,14 @@ type ReservationCode =
   | "MODEL_PROVIDER_GLOBAL_SPEND_BREAKER_OPEN"
   | "MODEL_PROVIDER_TENANT_SPEND_BREAKER_OPEN"
   | "MODEL_PROVIDER_IDEMPOTENCY_CONFLICT"
-  | "MODEL_PROVIDER_RESERVATION_RECEIPT_INVALID";
+  | "MODEL_PROVIDER_RESERVATION_RECEIPT_INVALID"
+  // Reconciliation refusals. They are deliberately NOT in RESERVATION_CODES: a reservation
+  // receipt may never claim one, because only the reconciliation RPC can raise them.
+  | "MODEL_PROVIDER_RESERVATION_NOT_FOUND"
+  | "MODEL_PROVIDER_RESERVATION_NOT_ACTIVE"
+  | "MODEL_PROVIDER_RECONCILIATION_NOT_FOUND"
+  | "MODEL_PROVIDER_RECONCILIATION_CONFLICT"
+  | "MODEL_PROVIDER_RESERVED_COST_EXCEEDED";
 
 const RESERVATION_CODES = new Set<ReservationCode>([
   "MODEL_PROVIDER_RESERVATION_INVALID", "MODEL_PROVIDER_LEDGER_NOT_CONFIGURED",
@@ -36,6 +43,14 @@ function mappedCode(message: string): ReservationCode {
     ["model_provider_tenant_spend_breaker_open", "MODEL_PROVIDER_TENANT_SPEND_BREAKER_OPEN"],
     ["model_provider_idempotency_conflict", "MODEL_PROVIDER_IDEMPOTENCY_CONFLICT"],
     ["model_provider_reservation_invalid", "MODEL_PROVIDER_RESERVATION_INVALID"],
+    // Without these five an operator reconciling a typo'd or already-settled reservation id
+    // got MODEL_PROVIDER_LEDGER_FAILED, indistinguishable from the ledger being down. On a
+    // money path that is the difference between "fix your input" and "page someone".
+    ["model_provider_reservation_not_found", "MODEL_PROVIDER_RESERVATION_NOT_FOUND"],
+    ["model_provider_reservation_not_active", "MODEL_PROVIDER_RESERVATION_NOT_ACTIVE"],
+    ["model_provider_reconciliation_not_found", "MODEL_PROVIDER_RECONCILIATION_NOT_FOUND"],
+    ["model_provider_reconciliation_conflict", "MODEL_PROVIDER_RECONCILIATION_CONFLICT"],
+    ["model_provider_reserved_cost_exceeded", "MODEL_PROVIDER_RESERVED_COST_EXCEEDED"],
   ] as const;
   return map.find(([needle]) => message.includes(needle))?.[1] ?? "MODEL_PROVIDER_LEDGER_FAILED";
 }

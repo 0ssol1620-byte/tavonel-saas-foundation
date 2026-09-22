@@ -207,9 +207,15 @@ export const KO_CHROME = {
     `lib/landing-v2-copy.ts` reads this constant for the landing's Korean microtext rather than
     keeping a second translation of one sentence: the rule rule 5 applies to the English
     ("verbatim, never a second spelling") applies to its translation too.
+
+    COPY-TRUST, 2026-09-22. It opened on "이 배포판에서는 아직 고객의 파일을 컴파일하지 않습니다" --
+    so the first Korean sentence in the footer of every public route, and the close of the Korean
+    entry page, was what the deployment does not do. It states the same two facts in the same order
+    the English does now: the World a reader can open today, then the arranged path. The gate is
+    unchanged and still stated once, in Korean, in the site's one spelling of it.
   */
   customerDataGate:
-    "이 배포판에서는 아직 고객의 파일을 컴파일하지 않습니다. 완성된 공개 Compiled World는 오늘 전체를 읽을 수 있고, 직접 가진 원문의 반입은 저희와 협의해 진행합니다.",
+    "완성된 Compiled World는 오늘 근거까지 전부 읽을 수 있습니다. 직접 가진 원문의 컴파일은 요금제 구매가 아니라 저희와 함께 설정합니다.",
 } as const;
 
 /**

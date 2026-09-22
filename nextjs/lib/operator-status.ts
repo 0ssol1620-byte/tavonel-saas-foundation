@@ -11,7 +11,13 @@ const ALLOWED_ALERT_REASONS = new Set([
   "required_check_unobserved",
   "synthetic_transaction_refused",
   "window_failure_budget_exceeded",
+  "model_provider_circuit_open",
+  "model_provider_circuit_state_unavailable",
 ]);
+
+const ALLOWED_PROVIDER_STATUS = new Set(["closed", "open", "half_open", "unavailable"]);
+const PROVIDER_NAME = /^[a-z0-9][a-z0-9._-]{1,63}$/;
+const MAX_PROVIDER_ROWS = 16;
 
 export type OperatorAuthorization =
   | { ok: true; subject: string }
@@ -33,6 +39,7 @@ export type OperationalStatusSource = {
     latencySamples: number;
   };
   alerts: Array<{ severity: "warning" | "critical"; reason: string }>;
+  modelProviders?: Array<{ provider: string; status: string; correlatedFailures: number }>;
   modelAttempts?: {
     total: number;
     receiptsRecorded: number;
@@ -65,6 +72,12 @@ export type OperatorStatusV1 = {
     latencySamples: number;
   };
   alerts: Array<{ severity: "warning" | "critical"; reason: string }>;
+  /** Paid-provider breaker state. Bounded to name, phase and failure count. */
+  modelProviders: Array<{
+    provider: string;
+    status: "closed" | "open" | "half_open" | "unavailable";
+    correlatedFailures: number;
+  }>;
   modelAttempts: {
     total: number;
     receiptsRecorded: number;
@@ -122,6 +135,14 @@ export function buildOperatorStatusV1(source: OperationalStatusSource): Operator
       latencySamples: finiteCount(source.window.latencySamples),
     },
     alerts,
+    modelProviders: (source.modelProviders ?? [])
+      .filter((entry) => PROVIDER_NAME.test(entry.provider) && ALLOWED_PROVIDER_STATUS.has(entry.status))
+      .slice(0, MAX_PROVIDER_ROWS)
+      .map((entry) => ({
+        provider: entry.provider,
+        status: entry.status as OperatorStatusV1["modelProviders"][number]["status"],
+        correlatedFailures: finiteCount(entry.correlatedFailures),
+      })),
     modelAttempts: {
       total: finiteCount(source.modelAttempts?.total ?? 0),
       receiptsRecorded: finiteCount(source.modelAttempts?.receiptsRecorded ?? 0),
