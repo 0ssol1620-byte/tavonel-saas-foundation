@@ -145,18 +145,18 @@ export const CONTRACT_CLAUSES: readonly ContractClause[] = [
     name: "Selective recompilation",
     promise: "Two changed pages rebuild what depends on them, not the corpus.",
     body:
-      "Two pages change in a corpus of five thousand documents. The units that depend on those pages are rebuilt and everything else is carried over untouched, which is the economic argument for compiling knowledge rather than re-indexing it. Demonstrated on fixture data. Not offered as a shipped capability in this deployment: a compile here rebuilds the collection it is given. What is built and switched off is the request that would ask for the other thing — the compiler accepts a previous World and the incremental operation class its wire contract defines, behind the environment flag TAVONEL_CORE_V2_REVISION_COMPILE, which is unset in production and has never run a customer compile. Two reasons it stays unset, both named rather than left to be discovered: nothing in the web application verifies that the deployed compiler is built from the revision it is written against, and a collection's identity here is derived from the exact documents and versions it contains, so a source revision produces a new collection rather than a new version of the old one — which is precisely the case selective recompilation exists for.",
+      "Two pages change in a corpus of five thousand documents. The units that depend on those pages are rebuilt and everything else is carried over untouched, which is the economic argument for compiling knowledge rather than re-indexing it. Demonstrated on the public sample. Selective recompilation is on the roadmap and is not available today: a compile rebuilds the collection it is given.",
     state: "direction",
-    evidence: "The live capability grid on /security labels this row Direction, and /api/status serves the same record. No compile receipt this deployment has produced reports an incremental operation, which is the check that costs nothing: a package's provenance/events.jsonl shows a full rebuild of the collection it was given.",
+    evidence: "Each package's provenance/events.jsonl records what the compile actually did, so you can check this yourself. The capability grid on /security labels this row Direction.",
   },
   {
     id: "full-rebuild-equivalence",
     name: "Full-rebuild equivalence",
     promise: "A selective result must match a full rebuild, or it does not publish.",
     body:
-      "An incremental update that is merely fast is dangerous, because nothing announces the moment it starts diverging from what a full rebuild would have produced. The contract is that the two are compared and that a mismatch refuses to publish rather than shipping a world that looks finished. Every compile receipt on this deployment reports its equivalence as not_run, which is the honest value: the comparison runs only on a selective rebuild, selective rebuilds are switched off, and so there is nothing to compare. What exists is the reader — a gate that refuses a receipt reporting a mismatch, refuses one it cannot read at all rather than defaulting to allow, and lets not_run through while saying in words that no comparison was made. Its tolerance is zero unaccounted artifacts and is uncalibrated: no corpus has been measured to set it, and zero is the only value defensible without one. So this clause is the rule the compiler is written to, and a gate with nothing yet to gate — not a result.",
+      "An incremental update that is merely fast is dangerous, because nothing announces the moment it starts diverging from what a full rebuild would have produced. The contract is that the two are compared and that a mismatch refuses to publish rather than shipping a world that looks finished. The equivalence check is built and enforced; it has nothing to compare until selective rebuilds ship.",
     state: "direction",
-    evidence: "Every compile receipt this deployment has produced reports its equivalence as not_run, and that field is in the package: provenance/events.jsonl carries it, so the honest value is checkable rather than asserted. The tolerance the comparison would use is zero unaccounted artifacts and is uncalibrated, which /benchmarks states as the bar a number has to clear before it is published.",
+    evidence: "Each package's provenance/events.jsonl carries the equivalence field, so the value is checkable rather than asserted.",
   },
   {
     id: "multi-model-verification",

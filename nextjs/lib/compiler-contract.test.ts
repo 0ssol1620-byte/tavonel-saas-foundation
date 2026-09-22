@@ -124,8 +124,15 @@ describe("compiler contract clauses", () => {
 
     const selective = clause("selective-recompilation");
     expect(selective.state).toBe("direction");
-    expect(selective.body).toContain("Demonstrated on fixture data");
-    expect(selective.body).toContain("Not offered as a shipped capability");
+    expect(selective.body).toContain("Demonstrated on the public sample");
+    /*
+      The 2026-09-22 copy cleanup restated the clause in a buyer's words: the grid still says
+      "Not offered as a shipped capability", and the clause now says the same thing as "is on
+      the roadmap and is not available today". Both halves are asserted so neither surface can
+      quietly promote the row on its own.
+    */
+    expect(selective.body).toContain("is not available today");
+    expect(selective.body).toContain("a compile rebuilds the collection it is given");
   });
 
   it("keeps equivalence, identity and second-read verification out of the shipped column", () => {
