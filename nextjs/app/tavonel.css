@@ -3949,7 +3949,12 @@
        `overflow: hidden` (there to clip the border radius) sliced the last line off all eight.
        A card anchor is already a 44px-plus target, so nothing here needs the hit area.
        `e2e/overflow-audit.spec.ts` measures it now. */
-    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb, .notice) a:not(.tile, .link),
+    /* `.src-para` joins the list on 2026-09-22. It is a global class, not a module's hashed one,
+       so this is the list that can reach it -- `.src-matrix` beside it covered the capability
+       table but never the prose above it, and `Integrations` measured 73x18 at 360 on the live
+       build. Its links are inline inside a paragraph, which is the shape these three declarations
+       are safe on. */
+    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .src-para, .doc-breadcrumb, .notice) a:not(.tile, .link),
     a[href^="mailto:"],
     a[href^="tel:"] {
       display: inline-block;
@@ -3977,6 +3982,13 @@
       A module that needs the floor opts in from its own stylesheet, where the author can see
       what the anchor's parent lays out as. `components/evidence/region-highlight.module.css`
       does that for the one action in its panel.
+
+      2026-09-22, later the same day: all four are closed, each by the route that owns it rather
+      than by widening this selector. `app/benchmarks/benchmarks.module.css` opts `.para a` in,
+      which is the prescription above being followed. `.src-para` is a global class and not a
+      module's hashed one, so it simply joined the list. The Explore frame was already fixed.
+      /benchmarks and /sources are on the `e2e/mobile-landing.spec.ts` sweep now, so a reopening
+      names its own route instead of waiting for another manual pass.
     */
     /* Real controls take a real floor. 44, not the 42 that was here: the number in the guideline
        is the number. The wordmark, the sign-in link, the search input, every <summary> and every
