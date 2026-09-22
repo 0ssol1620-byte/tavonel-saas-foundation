@@ -201,10 +201,9 @@ export default function IntegrationsPage() {
             </p>
             <p className="fine">
               That is the whole list. {NO_CONNECTOR.slice(0, -1).join(", ")} and{" "}
-              {NO_CONNECTOR.at(-1)} have no connector here, none of them is on a published roadmap,
-              and nothing on this site says when one would arrive. Where such a system keeps its
-              files in one of the cloud drives below, or exports to a directory or a bucket, that
-              path works today; the system&rsquo;s own API is not read.
+              {NO_CONNECTOR.at(-1)} have no connector here. Where such a system keeps its files in
+              one of the cloud drives below, or exports to a directory or a bucket, that path works
+              today; the system&rsquo;s own API is not read.
             </p>
             {/*
               BQ-106. The legend for the tier chip every card below carries.
