@@ -172,9 +172,15 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       public route now, so its one Korean translation lives in `KO_CHROME.customerDataGate` and
       the landing's close reads that constant -- one gate, one spelling, in both languages. What
       this case is about has not changed: the gate is on the Korean page, in Korean.
+
+      COPY-TRUST 2026-09-22. The pinned fragment moved because the sentence did. It used to open
+      on "이 배포판에서는 아직 고객의 파일을 컴파일하지 않습니다" -- the Korean entry page's closing
+      scene led with what the deployment does not do. It leads with the World a Korean reader can
+      open today and names the arranged path second, which is the English sentence translated
+      literally. The gate is still stated, still in Korean, still once.
     */
     expect(LANDING_V2_COPY.ko.start.microtext, "the Korean close states the gate in the reader's language")
-      .toContain("이 배포판에서는 아직 고객의 파일을 컴파일하지 않습니다");
+      .toContain("직접 가진 원문의 컴파일은 요금제 구매가 아니라 저희와 함께 설정합니다");
     expect(copyDeck, "and the English close is the policy's own sentence, not a paraphrase")
       .toContain("microtext: activationPolicy.customerData.reason");
     expect(copyDeck, "the Korean close reads the site's one spelling of the gate, not a second one")

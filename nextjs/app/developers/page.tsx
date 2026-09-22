@@ -3,12 +3,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
-import { DocsCopyButton } from "@/components/docs-copy-button";
+import { DocsSnippet } from "@/components/docs-snippet";
 import { TrackedLink } from "@/components/tracked-link";
 import { PageToc, tocEntries } from "@/components/docs/page-toc";
 import { PACKAGE_CONTENTS } from "@/lib/package-contents";
 import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
-import { FIRST_CALL } from "@/lib/developer-snippets";
+import { FIRST_CALL_SNIPPETS } from "@/lib/developer-snippets";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -36,9 +36,8 @@ export const metadata: Metadata = {
   last one still standing, so a reader arriving from the primary nav watched the site's
   structure change under them and lost the way to every other page.
 */
-/* The curl block above the tooling tiles, hoisted so the copy control and the <pre> are one
-   string rather than two that have to agree. */
-// The two lines the landing page also prints, from one string (`lib/developer-snippets.ts`).
+/* The tab group above the tooling tiles. Its four bodies -- and the two lines the landing page
+   also prints -- come from `lib/developer-snippets.ts`, so none of them can drift from another. */
 
 const PATHS = [
   {
@@ -156,13 +155,28 @@ export default function DevelopersPage() {
               <div className="stack">
                 <h2 id={sections[2].id}>Public tooling</h2>
                 <h3>Start with the contract, then a scoped key.</h3>
-                <figure className="docs-code">
-                  <figcaption>
-                    <span>Your first authenticated read</span>
-                    <DocsCopyButton value={FIRST_CALL} />
-                  </figcaption>
-                  <pre tabIndex={0} role="region" aria-label="First API request example"><code>{FIRST_CALL}</code></pre>
-                </figure>
+                {/*
+                  Gap #7. The same first read in cURL, TypeScript, Python and MCP.
+
+                  `DocsSnippet` is the tab group `/api` and the quickstart already use, so this
+                  is one component and one remembered language choice across the whole site
+                  rather than a second tab implementation with its own keyboard behaviour. Every
+                  panel is in the server-rendered HTML; the inactive ones are hidden, which is
+                  what keeps the page readable with no JavaScript and to a crawler.
+
+                  The fourth tab is a client config, not a fifth language. An agent reaches this
+                  operation through `list_sources`, and saying so where the HTTP tabs are is the
+                  difference between "we have MCP" and "here is the same read over it".
+                */}
+                <p>Your first authenticated read, over HTTP or through the MCP server.</p>
+                <DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]} label="First API request example" />
+                <p className="fine">
+                  All four perform <code>GET /api/v1/documents</code> with a key scoped{" "}
+                  <code>documents:read</code>. There is no npm or PyPI package to install: the
+                  HTTP samples use each language&apos;s standard library, and the agent tab
+                  registers the downloadable server below, which exposes this read as{" "}
+                  <code>list_sources</code>.
+                </p>
                 <div className="tiles">
                   <article className="tile"><h3>OpenAPI</h3><p>Machine-readable v1 HTTP contract.</p><TrackedLink className="btn ghost" event="developer_api_started" href="/api/openapi">OpenAPI contract</TrackedLink></article>
                   <article className="tile"><h3>CLI</h3><p>Node.js 20+ client with immutable version and update check.</p><a className="btn ghost" href="/developer/tavonel-cli.mjs" download>Download CLI</a></article>

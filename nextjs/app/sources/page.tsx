@@ -5,6 +5,7 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import SourceCapabilityTable from "@/components/source-capability-table";
 import { ACCESS_CTA } from "@/lib/site-navigation";
 import {
+  capabilityCensus,
   publicCapabilityRows,
   sharedAcceptedLimitationLabels,
 } from "../../../shared/capabilityManifest";
@@ -64,6 +65,14 @@ export default function SourcesPage() {
   */
   const rows = publicCapabilityRows();
   const shared = sharedAcceptedLimitationLabels();
+  /*
+    Gap #4, 2026-09-22. The tier chips said which tier a row was in and the page never said how
+    many rows that was, so a reader counted twelve rows by hand to find out whether "best effort"
+    described one format or all of them. Counted from the manifest here rather than written, and
+    only the integers cross -- the projection above already exists to keep manifest identifiers
+    off the client and a denominator is no reason to start sending them.
+  */
+  const census = capabilityCensus();
 
   return (
     <PublicSitePage>
@@ -97,6 +106,25 @@ export default function SourcesPage() {
                 the exact region that binds a result back to its source. What that path does not
                 do, it does not do for any of them: {shared.join(" · ")}.
               </p>
+
+              <dl className="src-census">
+                <div>
+                  <dt>Accepted</dt>
+                  <dd><b>{census.accepted}</b>of {census.total} listed formats are accepted at upload.</dd>
+                </div>
+                <div>
+                  <dt>Preserved</dt>
+                  <dd><b>{census.preserved}</b>fields cross into the compile request, the same three for every accepted format.</dd>
+                </div>
+                <div>
+                  <dt>Converted</dt>
+                  <dd><b>{census.converted}</b>of the accepted formats are turned into another format before they are read.</dd>
+                </div>
+                <div>
+                  <dt>Omitted</dt>
+                  <dd><b>{census.omitted}</b>listed here and turned away at upload, with nothing about them compiled.</dd>
+                </div>
+              </dl>
 
               <SourceCapabilityTable rows={rows} />
 

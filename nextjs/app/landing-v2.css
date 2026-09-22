@@ -488,3 +488,88 @@
 .lv2-evidence-connector path { fill: none; stroke: var(--source); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .lv2-evidence-connector circle { fill: var(--source); }
 .lv2-evidence-connector[data-connected="false"] { visibility: hidden; }
+
+/* ------------------------------------------------------------------ the hero's proof panel
+
+  Gap #1 / #9, 2026-09-22. The hero's visual is the Evidence Inspector on the public sample
+  World, with the four counts that World holds under it.
+
+  THE 900px RULE IS A LAYOUT RULE HERE, NOT A FALLBACK
+  There is no canvas and no WebGL under `.lv2-hero-proof` at any width -- it is one raster,
+  absolutely positioned buttons and text -- so nothing has to be switched off on a phone. What
+  changes below 900px is columns: the stat strip goes to one column, and
+  `region-highlight.module.css` already stacks the page above its excerpt below 880px. At 360px
+  that leaves a single column with no horizontal scroll and no second decoder.
+
+  NO ANIMATION AND NO TRANSITION, so `prefers-reduced-motion` has nothing to turn off -- the same
+  reason the region highlight's own stylesheet gives.
+*/
+.lv2-hero-proof {
+  margin-top: 40px;
+  display: grid;
+  gap: 28px;
+  /* The hero text is centred; the panel is reading matter and is not. */
+  text-align: left;
+}
+@media (min-width: 900px) {
+  .lv2-hero-proof { margin-top: 48px; }
+}
+.lv2-hero-inspector {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg, 10px);
+  background: var(--g1);
+  padding: 18px;
+}
+@media (min-width: 900px) {
+  .lv2-hero-inspector { padding: 24px; }
+}
+
+/* The strip. One column on a phone, two at tablet, four from 900px -- and never a scroller. */
+.lv2-hero-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-paper-lg, 10px);
+  overflow: hidden;
+}
+@media (min-width: 560px) {
+  .lv2-hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .lv2-hero-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.lv2-hero-stats li { margin: 0; min-width: 0; background: var(--ground); }
+.lv2-hero-stats a {
+  display: grid;
+  gap: 6px;
+  /* A whole cell is the target, so the 44px minimum is met by the padding rather than by a rule. */
+  padding: 16px 18px;
+  min-height: 44px;
+  text-decoration: none;
+  color: inherit;
+}
+.lv2-hero-stats a:hover .lv2-hero-stat-label { color: var(--text-mid); }
+.lv2-hero-stats a:focus-visible { outline: 2px solid var(--text-hi); outline-offset: -2px; }
+.lv2-hero-stat-value {
+  font-size: clamp(24px, 3.4vw, 32px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-hi);
+  overflow-wrap: anywhere;
+}
+/* The digest is a name, not a quantity: it is set in mono and at reading size. */
+.lv2-hero-stat-value[data-mono="1"] {
+  font-family: var(--f-mono);
+  font-size: clamp(14px, 1.6vw, 16px);
+  letter-spacing: 0;
+}
+.lv2-hero-stat-label {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-lo);
+}

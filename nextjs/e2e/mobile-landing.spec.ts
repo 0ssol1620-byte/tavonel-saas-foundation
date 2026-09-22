@@ -128,8 +128,43 @@ test.describe("on a touch screen", () => {
     home route and nothing else -- and the routes that actually failed the audit were /pricing,
     /docs and /integrations. One test, six routes: if a route-scoped sheet undercuts the floor it
     is that route that names itself in the failure.
+
+    G1-TAP, 2026-09-22. Eight routes. The two added are the only two besides `/` that render
+    `components/evidence/region-highlight.tsx`, whose controls were the drawn evidence boxes
+    themselves -- 12 to 37px tall at 360, because that is how tall the passages are on the page,
+    and a box cannot be grown to 44px and still be where the passage was. `/` was already on the
+    list, which is how that was caught. The boxes are the picture now; the rows under them are
+    the control.
+
+    /product is deliberately not here: it renders the Explore frame, not this component, and a
+    route belongs on this list because something on it was measured rather than because it is
+    nearby.
   */
-  for (const route of ["/", "/pricing", "/resources", "/docs/errors", "/integrations", "/knowledge-compiler"]) {
+  /*
+    UI-SWEEP 2026-09-22 adds six. The live sweep at 360px found the floor broken on routes this
+    list had never visited: the four legal documents share `components/policy-layout.tsx`, whose
+    footer nav is `.site-links` and not the `.site-footer` the floor rule names, and every one of
+    its seven links measured 22px; /demo's source rows measured 26px inside a 62px row; and
+    /changelog's filter chips held the 44px row while measuring 40px across, which is the same
+    guideline failing on the other axis. One route per failing surface, not all sixty -- the rule
+    is unscoped CSS and a route-scoped sheet undercutting it names itself here.
+  */
+  for (const route of [
+    "/",
+    "/pricing",
+    "/resources",
+    "/docs/errors",
+    "/integrations",
+    "/knowledge-compiler",
+    "/privacy",
+    "/terms",
+    "/refunds",
+    "/subprocessors",
+    "/demo",
+    "/changelog",
+    "/evidence",
+    "/product/document-understanding",
+  ]) {
   test(`every reachable control on ${route} keeps the 44px touch floor`, async ({ page }, testInfo) => {
     test.skip(!PHONE.includes(testInfo.project.name), "the touch floor is a phone contract");
     await page.goto(route);
@@ -145,6 +180,16 @@ test.describe("on a touch screen", () => {
       .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.height < 43.99)
       .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height })));
     expect(short).toEqual([]);
+
+    /* The other axis, on the filter chips. A target is two-dimensional and these held the 44px
+       row while measuring 40px across on the shortest label -- "All" on /changelog at 360. The
+       assertion is scoped to the chips rather than every button, because a link can be a word
+       inside a sentence, which WCAG 2.5.8 exempts and which this site sets everywhere. */
+    const narrow = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".changelog-filter button, .docs-langs button")]
+      .map(element => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.width < 43.99)
+      .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), width: rect.width })));
+    expect(narrow).toEqual([]);
   });
   }
 });

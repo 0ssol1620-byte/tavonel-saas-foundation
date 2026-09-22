@@ -37,7 +37,15 @@ const pageCount = exploreSampleSources.reduce((total, source) => total + source.
   eight times stronger; it made it read as a template.
 */
 export type ProofPick = { form: string; match: RegExp; framing: string };
-export type ProofVariant = "canonical" | "excerpt" | "crop";
+/*
+  Gap #11 adds `thumb`: the crop with nothing interactive in it.
+
+  The /solutions hub expands one anchor over the whole card (`solutions.module.css`, BA-052), so
+  a second link inside a card is covered by the card's own target and announced twice. The
+  thumbnail is therefore the crop and its filing line and no anchor -- the card is the link, and
+  the region opens from the detail page the card leads to.
+*/
+export type ProofVariant = "canonical" | "excerpt" | "crop" | "thumb";
 
 function selectRegion(pick?: ProofPick): VisualEvidence | null {
   if (!pick) return chooseExploreEntryProof(world.evidence, []);
@@ -107,6 +115,36 @@ export default function SolutionProofSample({ pick, variant = "canonical", korea
     drawing a stand-in for one.
   */
   const crop = sourceRegionRaster(region.digest, region.page, region.bbox1000);
+
+  /*
+    Gap #11. The same crop with no anchor and no target of its own, for a card that is the link.
+
+    `loading="lazy"` here and not on the crop variant: five of these are on one hub page, well
+    below the fold, and the committed rasters are between 25KB and 250KB each. The dimensions are
+    on the element, so the card reserves its space before the bytes arrive and nothing shifts.
+  */
+  if (variant === "thumb") {
+    return crop ? (
+      <figure className={styles.thumb} data-proof-kind="source-passage" data-proof-variant="thumb">
+        {/* eslint-disable-next-line @next/next/no-img-element -- as the crop variant: the
+            committed raster is served byte for byte so the render stays checkable. */}
+        <img src={crop.file} alt={`${filingLabel(region, korean)}, ${copy.cropAlt(region.page)}`} width={crop.width} height={crop.height} decoding="async" loading="lazy" />
+        <figcaption className={styles.excerptFoot}>
+          <span>{filingLabel(region, korean)} · {copy.pageOf(region.page, region.pageCount)}</span>
+        </figcaption>
+      </figure>
+    ) : (
+      <figure className={styles.thumb} data-proof-kind="source-passage" data-proof-variant="thumb">
+        <p className={styles.excerptText} data-evidence-id={region.id}>
+          {preview.text}{preview.truncated ? "…" : ""}
+        </p>
+        <figcaption className={styles.excerptFoot}>
+          <span>{filingLabel(region, korean)} · {copy.page(region.page)}</span>
+        </figcaption>
+      </figure>
+    );
+  }
+
   if (variant === "crop" && crop) {
     return (
       <figure className={styles.crop} data-proof-kind="source-passage" data-proof-variant="crop">

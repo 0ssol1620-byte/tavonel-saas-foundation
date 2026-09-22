@@ -134,11 +134,34 @@ describe("B06 authenticated operator status", () => {
     });
   });
 
+  it("projects paid-provider breaker state and drops anything outside the vocabulary", () => {
+    const status = buildOperatorStatusV1(source({
+      alerts: [
+        { severity: "warning", reason: "model_provider_circuit_open" },
+        { severity: "warning", reason: "provider_endpoint_url" },
+      ],
+      modelProviders: [
+        { provider: "runpod", status: "open", correlatedFailures: 5 },
+        { provider: "runpod", status: "state_unavailable", correlatedFailures: 1 },
+        { provider: "https://x.api.runpod.ai/v2/abc", status: "closed", correlatedFailures: 0 },
+      ],
+    }));
+
+    expect(status.modelProviders).toEqual([{ provider: "runpod", status: "open", correlatedFailures: 5 }]);
+    expect(status.alerts).toEqual([{ severity: "warning", reason: "model_provider_circuit_open" }]);
+    expect(JSON.stringify(status)).not.toContain("api.runpod.ai");
+  });
+
+  it("emits an empty provider list rather than omitting the field when nothing is read", () => {
+    expect(buildOperatorStatusV1(source()).modelProviders).toEqual([]);
+  });
+
   it("keeps the deployed route separate from the public DTO and disabled by default", () => {
     const route = readFileSync(resolve(import.meta.dirname, "../app/api/operator/status/v1/route.ts"), "utf8");
     expect(route).toContain("unconfiguredOperatorAuthorizer");
     expect(route).toContain("evaluateOperationalSli");
     expect(route).toContain("readProbeHistory");
+    expect(route).toContain("readModelProviderCircuitSnapshot");
     expect(route).not.toContain("public-status");
     expect(route).not.toContain("PUBLIC_STATUS_SCHEMA");
   });

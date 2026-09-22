@@ -3,7 +3,7 @@ import { runRetrievalPipeline } from "./retrieval-pipeline";
 import { buildBgeM3BaselineProfile } from "./retrieval-profile";
 import type { EmbedderAdapter } from "./embedder-adapter";
 import type { RerankerAdapter } from "./reranker-adapter";
-import { ADAPTIVE_ROUTER_SCHEMA, type AdaptiveRouterDecision } from "./adaptive-router";
+import { ADAPTIVE_ROUTER_SCHEMA, candidateIdentityKey, type AdaptiveRouterDecision } from "./adaptive-router";
 import { contentAddressedRetrievalProfileIdentity } from "./retrieval-profile-identity";
 
 // Drives the REAL orchestrator (retrieval-pipeline.ts) end to end. Every stage below is
@@ -118,6 +118,9 @@ beforeEach(() => {
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     requests.push({ url: href, body });
     if (href.includes("/rpc/connector_documents_blocked")) return jsonResponse(sourceBlocked);
+    if (href.includes("/rpc/admit_model_attempt_decision_v2")) {
+      return jsonResponse({ attemptId: body?.p_receipt?.attemptId });
+    }
 
     if (href.includes("/rpc/search_foundation_retrieval_units_lexical")) {
       if (scenario.failLexicalRpc) return jsonResponse({ message: "boom" }, false);
@@ -269,6 +272,94 @@ describe("retrieval pipeline orchestration", () => {
     expect(embed).toHaveBeenCalledOnce();
     expect(embed.mock.calls[0]?.[1]?.attemptLifecycle).toMatchObject({
       admit: expect.any(Function), recordTerminal: expect.any(Function),
+    });
+  });
+
+  // A shadow rollout is only worth running if it leaves evidence behind. This drives the same
+  // seam the governed adapter drives (`attemptLifecycle.admit` before dispatch) and asserts the
+  // durable decision row names both what answered (the control) and what the policy preferred
+  // (the shadow candidate). Without the shadow id the row could not distinguish a shadow
+  // rollout from an ordinary fixed-control request.
+  it("persists a durable attempt decision naming the shadow candidate the policy preferred", async () => {
+    const profileIdentity = contentAddressedRetrievalProfileIdentity(PROFILE);
+    const candidate = (endpointId: string) => ({
+      identity: { provider: "huggingface", model: "BAAI/bge-m3",
+        revision: PROFILE.embedding.revision, endpointId },
+      capabilities: ["retrieval"], region: "us", retentionDays: 0,
+      price: { observedAt: "2026-09-21T09:00:00.000Z", estimatedCostUsdMicros: 10 },
+      estimatedLatencyMs: 100, circuit: "closed" as const,
+      index: { status: "ready" as const, retrievalProfile: profileIdentity },
+    });
+    const control = candidate("control-endpoint");
+    const challenger = candidate("challenger-endpoint");
+    const routeDecision: AdaptiveRouterDecision = {
+      schemaVersion: ADAPTIVE_ROUTER_SCHEMA,
+      kind: "execute",
+      reason: "shadow_control",
+      policyId: "11111111-1111-4111-8111-111111111111",
+      policyVersion: "shadow-1",
+      canaryBucket: 42,
+      execution: control,
+      shadowEvaluation: { candidate: challenger, dispatchAllowed: false },
+      assessments: [],
+    };
+    const controlKey = candidateIdentityKey(control.identity);
+    const challengerKey = candidateIdentityKey(challenger.identity);
+
+    const input = baseInput();
+    // Stands in for governEmbedderAdapter: admit runs before the provider call, exactly once.
+    input.embedder = {
+      ...stubEmbedder(),
+      embedQuery: async (_text, options) => {
+        await options?.attemptLifecycle?.admit({
+          reservationId: "33333333-3333-4333-8333-333333333333",
+          admissionId: "retrieval-shadow-0001",
+          provider: "runpod", model: "BAAI/bge-m3", meter: "gpu_second",
+          requestDigest: `sha256:${"7".repeat(64)}`, reservedUnits: 5,
+          unitMicrousd: 1, priceVersion: "price-1", admittedAt: new Date("2026-09-21T09:00:00.000Z"),
+        });
+        return stubEmbedder().embedQuery(_text);
+      },
+    };
+
+    const result = await runRetrievalPipeline({
+      ...input,
+      routerDecision: routeDecision,
+      modelAttempt: {
+        endpoint: "search",
+        modelRoute: {
+          schemaVersion: "retrieval-model-route/v1",
+          evaluatedAt: "2026-09-21T09:00:00.000Z",
+          registrySource: "TAVONEL_RETRIEVAL_MODEL_REGISTRY_JSON",
+          selections: [], fallbacks: [], router: routeDecision,
+        },
+        controlPlaneLineage: {
+          policyId: "11111111-1111-4111-8111-111111111111", policyVersion: "shadow-1",
+          policyRevision: 1, rolloutRevision: 1,
+          assignmentId: "22222222-2222-4222-8222-222222222222",
+          policyDigest: `sha256:${"1".repeat(64)}`, evidenceDigest: `sha256:${"2".repeat(64)}`,
+          scopeDigest: `sha256:${"3".repeat(64)}`, assignmentDigest: `sha256:${"4".repeat(64)}`,
+          thresholdsDigest: `sha256:${"5".repeat(64)}`, indexStateDigest: `sha256:${"6".repeat(64)}`,
+          controlId: controlKey,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    const admitted = requests.filter((entry) => entry.url.includes("/rpc/admit_model_attempt_decision_v2"));
+    expect(admitted).toHaveLength(1);
+    expect((admitted[0]?.body as { p_receipt?: unknown } | null)?.p_receipt).toMatchObject({
+      schemaVersion: "tavonel.model_attempt_decision.v2",
+      endpoint: "search",
+      attemptedRole: "embedder",
+      controlId: controlKey,
+      chosenId: controlKey,
+      shadowId: challengerKey,
+      policyId: "11111111-1111-4111-8111-111111111111",
+      rolloutRevision: 1,
+      assignmentId: "22222222-2222-4222-8222-222222222222",
+      runId: RUN_ID,
+      retryOrdinal: 0,
     });
   });
 

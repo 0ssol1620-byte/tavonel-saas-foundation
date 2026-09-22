@@ -66,11 +66,27 @@ describe("customer data on the live compile path", () => {
     expect(wrongWorkspace.route.privacyPolicy).toBe("foundation_synthetic_only");
   });
 
-  it("keeps the public capability closed until a production receipt exists", () => {
+  /*
+    COPY-TRUST 2026-09-22. The flag is what keeps the capability closed; the sentence beside it is
+    the most-rendered string on this site.
+
+    This case used to pin the reason to "remains closed" and "production evidence" -- our internal
+    precondition vocabulary, printed on /pricing, /security, /status, /login, /integrations, the
+    workspace and the landing's closing scene. Neither phrase is a receipt a reader can open, and
+    an exact-workspace approval receipt is a fact about our release process rather than about what
+    a buyer gets. What replaces them is the pair of facts the reader can act on: the public World
+    is readable now, and compiling their own sources goes through us rather than a checkout.
+
+    The gate itself is unweakened and is asserted where it lives -- `enabled` is false above, and
+    every route guarding on it still refuses. The string may not quietly turn into an offer, so the
+    two rules below are the ones that matter: it names the arranged path, and it never says a plan
+    purchase opens the compile.
+  */
+  it("states the arranged intake path without offering a self-serve compile", () => {
     expect(activationPolicy.customerData.enabled).toBe(false);
     const { reason } = activationPolicy.customerData;
-    expect(reason).toMatch(/remains closed/i);
-    expect(reason).toMatch(/production evidence/i);
+    expect(reason).toMatch(/set up with us|arranged with us/i);
+    expect(reason).toMatch(/rather than enabled by a plan purchase/i);
   });
 
   /*

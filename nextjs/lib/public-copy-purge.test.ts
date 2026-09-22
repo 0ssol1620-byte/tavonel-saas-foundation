@@ -126,6 +126,23 @@ const DEFENSIVE_PHRASES = [
   "deterministic product sample",
 ] as const;
 
+/*
+  One phrase, allowed on one route, for a reason that outranks this list.
+
+  /benchmarks publishes the blind-quality-scoring hypothesis in the state the campaign gave it:
+  NOT SUPPORTED. The constitution's evidence rules require a failed hypothesis to be published as
+  one -- "Blind quality detection is published as not supported" -- and `lib/evidence-record.ts`
+  already prints that exact word as the badge for `state: "unsupported"`, on /research/notes.
+
+  On a page of results it is a finding's own state word beside the finding, which is the opposite
+  of a page defending itself: it is the page volunteering the experiment that did not work, next
+  to the ones that did. It stays banned on every other surface, and this route may not add a
+  second phrase without the same kind of reason.
+*/
+const ALLOWED_BY_ROUTE: Readonly<Record<string, readonly string[]>> = {
+  benchmarks: ["not supported"],
+};
+
 /** Comments explain what was removed and must not themselves count as the thing. */
 function strip(source: string) {
   return source
@@ -162,7 +179,10 @@ describe("public copy purge", () => {
 
   it.each(SALES_SURFACES)("keeps defensive phrasing off /%s", (route) => {
     const source = shippedSourceFor(route)!.toLowerCase();
-    const found = DEFENSIVE_PHRASES.filter((phrase) => source.includes(phrase));
+    const allowed = ALLOWED_BY_ROUTE[route] ?? [];
+    const found = DEFENSIVE_PHRASES.filter(
+      (phrase) => source.includes(phrase) && !allowed.includes(phrase),
+    );
     expect(found, `/${route} renders defensive phrasing: ${found.join(", ")}`).toEqual([]);
   });
 

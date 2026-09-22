@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { activationPolicy } from "./activation-policy";
 import { primaryCallToAction } from "./commercial-state";
 import { EXPLORE_COPY } from "./explore-story";
-import { LANDING_FRAMES } from "./landing-frames";
 import {
   ACCESS_CTA,
   BRAND_LINE,
@@ -136,6 +135,16 @@ const COPY_SURFACES = [
   "app/sources/page.tsx",
   "components/source-capability-table.tsx",
   "../shared/capabilityManifest.ts",
+  /*
+    The trust provisions table and the public sample frame (gaps #6, #14 and #15 of the
+    2026-09-22 audit). Both are copy on three sales surfaces and neither is a `page.tsx`:
+    every sentence /trust, /security and /enterprise publish about what is provided is in
+    the content module, and a barred phrase written into a row would render on all three
+    while each page's own source stayed clean.
+  */
+  "components/trust-provisions.tsx",
+  "components/sample-world-frame.tsx",
+  "content/trust/provisions.ts",
   /*
     The surfaces the positioning pass (RESOLVED A-1, A-4, A-6) rewrote, none of which had a row.
 
@@ -484,8 +493,12 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("opens with the four-cut HeroFilm and moves the deterministic specimen below it", () => {
+  it("opens on the live inspector, then the four-cut film and the deterministic specimen", () => {
     const page = landingSource();
+    /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
+       film opens the landmark that explains how the World was compiled. The entry pages preload
+       the hero's own raster because that is the image above the fold now. */
+    expect(page.indexOf("<HeroProof")).toBeLessThan(page.indexOf("<HeroFilm"));
     expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
@@ -493,8 +506,8 @@ describe("public copy", () => {
     expect(read("components/landing-v2/compiler-specimen.tsx")).not.toContain(
       "<video"
     );
-    expect(read("app/page.tsx")).toContain("HERO_FILM_POSTER");
-    expect(read("app/ko/page.tsx")).toContain("HERO_FILM_POSTER");
+    expect(read("app/page.tsx")).toContain("HERO_PROOF_IMAGE");
+    expect(read("app/ko/page.tsx")).toContain("HERO_PROOF_IMAGE");
     expect(read("components/landing-v2/hero-film.tsx")).not.toContain("lv2-film-note");
   });
 
@@ -770,8 +783,11 @@ describe("public copy", () => {
     the page reaches the real record rather than a picture of it, every figure on it declares
     that it was measured, and no locator vocabulary is taught to a first-time reader.
 
-    `LANDING_FRAMES` still exists and its hrefs are still checked: the frames are real captures
-    of the live route and a later scene may use them. They are simply not on the entry pages.
+    `LANDING_FRAMES` and its six captures were deleted on 2026-09-22 -- the last of the eight
+    DELETE rows in UNWIRED_INVENTORY_2026-09-22 §3. The record was kept on the theory that a
+    later scene might use them; no scene does, and an unrendered screenshot record is a caption
+    nobody reads guarding six files nobody is served. What this test owes is unchanged, and it
+    is owed by `components/landing-v2/scenes/proof.tsx`, which is actually on the page.
   */
   it("reaches original-source proof from the page without teaching locator jargon", () => {
     const proof = read("components/landing-v2/scenes/proof.tsx");
@@ -786,12 +802,6 @@ describe("public copy", () => {
       read("lib/landing-v2-proof.ts"),
       "the deep link is the product's own URL shape"
     ).toContain("/explore?act=evidence&evidence=");
-    for (const href of Object.values(LANDING_FRAMES).map(frame => frame.href)) {
-      expect(
-        href,
-        "every frame opens the live route it is a screenshot of"
-      ).toMatch(/^\/explore/);
-    }
     expect(landingSource()).not.toContain("Exact bbox");
   });
   it("stages a customer's own upload in the workspace, not a fixture world", () => {
@@ -1307,8 +1317,9 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<HeroFilm",
+      "<HeroProof",
       'id="s2"',
+      "<HeroFilm",
       "<CompilerSpecimen",
       "<ProofScene",
       "copy.recompile",

@@ -79,7 +79,7 @@ export default function WorkspaceGettingStarted({
                 <div>
                   <strong>{step.title}</strong>
                   <small>{step.detail}</small>
-                  <small className="workspace-step-state">{step.done ? "Done" : "Not yet"}</small>
+                  <small className="workspace-step-state">{step.done ? "Done" : "To do"}</small>
                 </div>
               </li>
             ))}

@@ -60,15 +60,23 @@ describe("approved one-path experience", () => {
     expect(data.length).toBe(bytes);
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
-  it("orders the landing as film, explanation, proof, change, trust and action", () => {
+  /*
+    2026-09-22, gap #1. The film is still the landing's overview and is still one component
+    mounted once -- what moved is which landmark it is in. The hero now carries the live Evidence
+    Inspector (`<HeroProof>`), and the film opens Scene 02, the "How it compiles" landmark whose
+    heading is the sentence it illustrates. The order below is read as positions, so it is the
+    assertion that had to move rather than a rule that had to be dropped.
+  */
+  it("orders the landing as proof, explanation, proof scene, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
     expect(page).toContain("<HeroFilm");
     expect(page).toContain("<CompilerSpecimen");
     const order = [
       'id="s1"',
-      "<HeroFilm",
+      "<HeroProof",
       'id="s2"',
+      "<HeroFilm",
       "<CompilerSpecimen",
       "<ProofScene",
       "<RecompileScene",
@@ -86,7 +94,11 @@ describe("approved one-path experience", () => {
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
-    expect(film).toContain("preferVideo priorityPoster");
+    /* `priorityPoster` went with the film when it moved below the fold: the hero's own page
+       raster is what the entry pages preload now, and two eager high-priority rasters where one
+       is above the fold is a slower first paint, not a faster one. */
+    expect(film).toContain("preferVideo");
+    expect(film).not.toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");
