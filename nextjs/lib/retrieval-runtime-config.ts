@@ -51,6 +51,8 @@ import { loadAdaptiveRouterPlan } from "./adaptive-router-control-plane-store";
 // claimed identity and the running worker's actual identity silently diverge.
 export const BGE_M3_REVISION = "142964af7e05de16511657561de8e8750fc153a0";
 export const BGE_RERANKER_V2_M3_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e";
+/** The paid provider both retrieval adapters dispatch through; also the circuit/ledger key. */
+export const RETRIEVAL_MODEL_PROVIDER = "runpod";
 export const BGE_M3_REGISTRY_ID = "retrieval-bge-m3";
 export const BGE_RERANKER_V2_M3_REGISTRY_ID = "retrieval-bge-reranker-v2-m3";
 
@@ -93,7 +95,7 @@ export function createProductionEmbedderAdapter(env: RetrievalRuntimeEnv, worksp
   );
   return governEmbedderAdapter(adapter, {
     tenantId: workspaceKey,
-    provider: "runpod",
+    provider: RETRIEVAL_MODEL_PROVIDER,
     model: "BAAI/bge-m3",
     maximumUnits: Math.ceil(RUNPOD_EMBEDDER_REQUEST_TIMEOUT_MS / 1_000) + 5,
     reservationSeconds: 60,
@@ -108,7 +110,7 @@ export function createProductionRerankerAdapter(env: RetrievalRuntimeEnv, worksp
   );
   return governRerankerAdapter(adapter, {
     tenantId: workspaceKey,
-    provider: "runpod",
+    provider: RETRIEVAL_MODEL_PROVIDER,
     model: "BAAI/bge-reranker-v2-m3",
     maximumUnits: Math.ceil(RUNPOD_RERANKER_REQUEST_TIMEOUT_MS / 1_000) + 5,
     reservationSeconds: 60,
