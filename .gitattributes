@@ -83,3 +83,7 @@ nextjs/public/research/receipts/*.json -text
 # Deterministic browser icon representations
 nextjs/public/brand/*.svg text eol=lf
 nextjs/public/icon.svg text eol=lf
+
+# Operator scripts carry a hashbang and are executed directly by a shell. A CRLF checkout
+# puts the carriage return inside the interpreter path; lib/journey-acceptance.test.ts pins it.
+nextjs/scripts/**/*.mjs text eol=lf

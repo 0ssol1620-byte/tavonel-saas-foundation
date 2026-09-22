@@ -28,6 +28,7 @@ import {
 import {
   contentAddressedRetrievalProfileIdentity,
   sameRetrievalProfileIdentity,
+  type RetrievalProfileIdentity,
 } from "./retrieval-profile-identity";
 import { createHash } from "node:crypto";
 import { loadAdaptiveRouterPlan } from "./adaptive-router-control-plane-store";
@@ -178,6 +179,23 @@ export type ProductionRetrievalRuntimeResolution =
       | "ADAPTIVE_ROUTER_CONTROL_PLANE_FAILED" | "ADAPTIVE_ROUTER_CONTROL_PLANE_INVALID" };
 
 export const ADAPTIVE_RETRIEVAL_CONTROL_ENV = "TAVONEL_ADAPTIVE_RETRIEVAL_CONTROL_JSON";
+/**
+ * Declared shadow challengers, as a JSON array.
+ *
+ * A challenger is a *second deployment of the control's exact embedding space*: provider,
+ * endpoint, region, retention, price, latency and circuit may differ, but model and revision are
+ * inherited from the control and cannot be restated here. A different embedding family cannot be
+ * a retrieval challenger while a single compiled index exists, because its vectors are not
+ * comparable to the index the query is answered from; that needs a second compiled index in the
+ * challenger's space, not a configuration entry.
+ *
+ * Shadow never dispatches a challenger (`shadowEvaluation.dispatchAllowed` is `false`), so these
+ * entries carry the control's runtime. If a later rollout state ever selected one for execution,
+ * `selectAdaptiveProductionRetrievalRuntime` refuses with CONTROL_INTEGRITY_MISMATCH because the
+ * bound adapter's endpoint is not the chosen endpoint. Declaring a challenger cannot silently
+ * route customer traffic to it.
+ */
+export const ADAPTIVE_RETRIEVAL_CHALLENGER_ENV = "TAVONEL_ADAPTIVE_RETRIEVAL_CHALLENGER_JSON";
 
 type AdaptiveControlConfig = {
   capabilities: string[];
@@ -231,6 +249,124 @@ function readAdaptiveControlConfig(env: Readonly<Record<string, string | undefin
     circuit: row.circuit as AdaptiveControlConfig["circuit"],
     requirements: requirements as AdaptiveControlConfig["requirements"],
   };
+}
+
+type AdaptiveChallengerConfig = {
+  provider: string;
+  endpointId: string;
+  region: string;
+  retentionDays: number;
+  price: { observedAt: string; estimatedCostUsdMicros: number };
+  estimatedLatencyMs: number;
+  circuit: "closed" | "open" | "unavailable";
+  indexStatus: "ready" | "missing" | "stale" | "unavailable";
+};
+
+/** `[]` means none declared. `null` means declared but unreadable, and suspends adaptive routing. */
+function readAdaptiveChallengerConfigs(
+  env: Readonly<Record<string, string | undefined>>,
+): AdaptiveChallengerConfig[] | null {
+  const encoded = env[ADAPTIVE_RETRIEVAL_CHALLENGER_ENV]?.trim();
+  if (!encoded) return [];
+  let value: unknown;
+  try { value = JSON.parse(encoded); } catch { return null; }
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const rows: AdaptiveChallengerConfig[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") return null;
+    const row = entry as Record<string, unknown>;
+    const price = row.price as Record<string, unknown> | undefined;
+    if (row.schemaVersion !== "tavonel.adaptive_retrieval_challenger.v1"
+      || typeof row.provider !== "string" || row.provider.length === 0
+      || typeof row.endpointId !== "string" || row.endpointId.length === 0
+      || typeof row.region !== "string" || row.region.length === 0
+      || !nonNegativeInteger(row.retentionDays)
+      || !price || typeof price.observedAt !== "string" || !Number.isFinite(Date.parse(price.observedAt))
+      || !nonNegativeInteger(price.estimatedCostUsdMicros)
+      || !nonNegativeInteger(row.estimatedLatencyMs)
+      || !["closed", "open", "unavailable"].includes(String(row.circuit))
+      || !["ready", "missing", "stale", "unavailable"].includes(String(row.indexStatus))) return null;
+    rows.push({
+      provider: row.provider, endpointId: row.endpointId, region: row.region,
+      retentionDays: row.retentionDays, price: price as AdaptiveChallengerConfig["price"],
+      estimatedLatencyMs: row.estimatedLatencyMs,
+      circuit: row.circuit as AdaptiveChallengerConfig["circuit"],
+      indexStatus: row.indexStatus as AdaptiveChallengerConfig["indexStatus"],
+    });
+  }
+  return rows;
+}
+
+export type AdaptiveRouterCandidateSet = {
+  control: AdaptiveRouterControl;
+  candidates: readonly AdaptiveRetrievalRuntimeCandidate[];
+};
+
+/**
+ * The single construction of the router's control and candidate set. The request path and the
+ * control-plane seeding script both call this, so a seeded policy's candidate-set, index-state
+ * and thresholds digests are the ones the runtime will recompute, or the policy is rejected.
+ */
+export function buildAdaptiveRouterCandidateSet(input: {
+  fixed: ProductionRetrievalRuntime;
+  profileIdentity: RetrievalProfileIdentity;
+  embedderIdentity: { provider: string; model: string; revision: string };
+  endpointId: string;
+  env?: Readonly<Record<string, string | undefined>>;
+}): AdaptiveRouterCandidateSet | null {
+  const env = input.env ?? process.env;
+  const config = readAdaptiveControlConfig(env);
+  const challengers = readAdaptiveChallengerConfigs(env);
+  if (!config || !challengers) return null;
+  const index = { status: "ready" as const, retrievalProfile: input.profileIdentity };
+  const candidate: AdaptiveRouteCandidate = {
+    identity: { provider: input.embedderIdentity.provider, model: input.embedderIdentity.model,
+      revision: input.embedderIdentity.revision, endpointId: input.endpointId },
+    capabilities: config.capabilities,
+    region: config.region,
+    retentionDays: config.retentionDays,
+    price: config.price,
+    estimatedLatencyMs: config.estimatedLatencyMs,
+    circuit: config.circuit,
+    index,
+  };
+  const control: AdaptiveRouterControl = {
+    candidate: candidate.identity,
+    requirements: {
+      capabilities: config.capabilities,
+      allowedRegions: config.requirements.allowedRegions,
+      maxRetentionDays: config.requirements.maxRetentionDays,
+      maxPriceAgeMs: config.requirements.maxPriceAgeMs,
+      budgetUsdMicros: config.requirements.budgetUsdMicros,
+      deadlineMs: config.requirements.deadlineMs,
+      retrievalProfile: input.profileIdentity,
+    },
+  };
+  const candidates: AdaptiveRetrievalRuntimeCandidate[] = [
+    { candidate, endpointId: input.endpointId, runtime: input.fixed },
+  ];
+  for (const challenger of challengers) {
+    // Model and revision are the control's: a challenger declares a second endpoint for the
+    // same embedding space, never a second model. Its runtime is the control's, so execution
+    // of a challenger fails the endpoint-identity check rather than answering from it.
+    if (challenger.endpointId === input.endpointId) return null;
+    candidates.push({
+      candidate: {
+        identity: { provider: challenger.provider, model: input.embedderIdentity.model,
+          revision: input.embedderIdentity.revision, endpointId: challenger.endpointId },
+        capabilities: config.capabilities,
+        region: challenger.region,
+        retentionDays: challenger.retentionDays,
+        price: challenger.price,
+        estimatedLatencyMs: challenger.estimatedLatencyMs,
+        circuit: challenger.circuit,
+        index: { status: challenger.indexStatus, retrievalProfile: input.profileIdentity },
+      },
+      endpointId: challenger.endpointId,
+      runtime: input.fixed,
+    });
+  }
+  return { control, candidates };
 }
 
 export function retrievalRoutingRequestId(collectionId: string, query: string): string {
@@ -416,40 +552,20 @@ export async function resolveConfiguredProductionRetrievalRuntime(input: {
     now,
   });
   const requestId = retrievalRoutingRequestId(input.collectionId, input.query);
-  const config = readAdaptiveControlConfig(envSource);
   const embedderIdentity = fixed.embedder?.identity();
   const endpointId = fixed.embedder?.endpointId?.();
-  if (!config || input.indexStatus !== "compiled" || !embedderIdentity || !endpointId) {
+  if (input.indexStatus !== "compiled" || !embedderIdentity || !endpointId) {
     return { ok: true, runtime: fixed };
   }
 
   let profileIdentity;
   try { profileIdentity = contentAddressedRetrievalProfileIdentity(fixed.profile); }
   catch { return { ok: false, code: "CONTROL_INTEGRITY_MISMATCH" }; }
-  const candidate: AdaptiveRouteCandidate = {
-    identity: { provider: embedderIdentity.provider, model: embedderIdentity.model,
-      revision: embedderIdentity.revision, endpointId },
-    capabilities: config.capabilities,
-    region: config.region,
-    retentionDays: config.retentionDays,
-    price: config.price,
-    estimatedLatencyMs: config.estimatedLatencyMs,
-    circuit: config.circuit,
-    index: { status: "ready", retrievalProfile: profileIdentity },
-  };
-  const control: AdaptiveRouterControl = {
-    candidate: candidate.identity,
-    requirements: {
-      capabilities: config.capabilities,
-      allowedRegions: config.requirements.allowedRegions,
-      maxRetentionDays: config.requirements.maxRetentionDays,
-      maxPriceAgeMs: config.requirements.maxPriceAgeMs,
-      budgetUsdMicros: config.requirements.budgetUsdMicros,
-      deadlineMs: config.requirements.deadlineMs,
-      retrievalProfile: profileIdentity,
-    },
-  };
-  const candidates = [{ candidate, endpointId, runtime: fixed }];
+  const candidateSet = buildAdaptiveRouterCandidateSet({
+    fixed, profileIdentity, embedderIdentity, endpointId, env: envSource,
+  });
+  if (!candidateSet) return { ok: true, runtime: fixed };
+  const { control, candidates } = candidateSet;
   const loaded = await loadAdaptiveRouterPlan({
     scope: { workspaceKey: input.workspaceKey, collectionId: input.collectionId,
       endpoint: input.endpoint, retrievalProfileDigest: profileIdentity.digest },
