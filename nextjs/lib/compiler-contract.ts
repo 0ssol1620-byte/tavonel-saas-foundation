@@ -50,7 +50,7 @@ export const CONTRACT_STATE: Record<ContractClauseState, ContractStateVocabulary
   },
   direction: {
     label: DIRECTION_STATE.toUpperCase(),
-    meaning: "An intended property of the compiler contract. Not offered as a shipped capability in this deployment.",
+    meaning: "An intended property of the compiler contract. Not offered as a shipped capability in TAVONEL today.",
   },
 };
 

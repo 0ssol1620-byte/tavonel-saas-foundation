@@ -73,7 +73,13 @@ test("grades no clause as qualified, because no receipt is published here", asyn
   // Selective recompilation is the row the product is most tempted to upgrade, so it is named.
   const selective = page.locator("#selective-recompilation");
   expect(await selective.getAttribute("data-state")).toBe("direction");
-  expect(await selective.innerText()).toContain("Not offered as a shipped capability");
+  /*
+     The wording moved on 2026-09-22 when the clause stopped narrating its own wiring; the fact
+     it has to carry did not. What is asserted is still that the rendered row says the capability
+     is not shipped, and the row must not name the environment flag it used to name.
+  */
+  expect(await selective.innerText()).toContain("is not available today");
+  expect(await selective.innerText()).not.toContain("CORE_V2_REVISION_COMPILE");
 });
 
 test("draws the whole source-change flow, and says which half of it runs here", async ({ page }: { page: Page }) => {

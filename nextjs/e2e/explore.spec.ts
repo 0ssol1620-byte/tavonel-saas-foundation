@@ -375,7 +375,12 @@ test("Act 3 reports the arriving filings with derived counts and claims no equiv
     on the rendered page rather than on the constant, because the page is what makes the claim.
   */
   await expect(steps.first().getByText("Recompiled", { exact: true })).toBeVisible();
-  await expect(timeline).toContainText("every object in the World is rebuilt at every step");
+  /*
+     Reworded 2026-09-22. "A full compile of the corpus as it stood" denies incremental
+     compilation as plainly as the sentence it replaces, and the denial is still asserted on the
+     rendered caption rather than on the constant behind it.
+  */
+  await expect(timeline).toContainText("Each step is a full compile of the corpus as it stood");
 
   /*
     BA-028. The act used to close on a FULL-REBUILD EQUIVALENCE heading whose state read NOT
