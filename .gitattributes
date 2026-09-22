@@ -94,3 +94,7 @@ nextjs/public/icon.svg text eol=lf
 # Committed benchmark artifacts. Each one is bound by sha256 in a lib module and rehashed by a
 # test, so their bytes must be identical in a Windows working tree and on a Linux CI runner.
 nextjs/content/benchmarks/*.json text eol=lf
+
+# Operator scripts carry a hashbang and are executed directly by a shell. A CRLF checkout
+# puts the carriage return inside the interpreter path; lib/journey-acceptance.test.ts pins it.
+nextjs/scripts/**/*.mjs text eol=lf
