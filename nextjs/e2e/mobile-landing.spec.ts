@@ -164,6 +164,7 @@ test.describe("on a touch screen", () => {
     "/changelog",
     "/evidence",
     "/product/document-understanding",
+    "/trust",
   ]) {
   test(`every reachable control on ${route} keeps the 44px touch floor`, async ({ page }, testInfo) => {
     test.skip(!PHONE.includes(testInfo.project.name), "the touch floor is a phone contract");
@@ -190,6 +191,51 @@ test.describe("on a touch screen", () => {
       .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.width < 43.99)
       .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), width: rect.width })));
     expect(narrow).toEqual([]);
+  });
+
+  /*
+    The defect this was written for shipped to production and survived the unit suite, a
+    502-measurement width sweep and the overflow check at the top of this file. At 360 the `.tiles`
+    grid on /trust sized each row track to the tile's content box while the tile itself drew its
+    padding, so every tile stood about 25px taller than its own track and `overflow: hidden` --
+    there for the border radius -- sliced the last line off each one. Nothing above catches that:
+    the page never scrolls sideways and every control still clears 44px. The text simply is not
+    there.
+
+    So the assertion is on the clipping container rather than on the page: anything that hides its
+    own overflow while holding more content than box. Two shapes are deliberate and excluded. A
+    1x1 box is the visually-hidden accessible-name pattern. A clamped box truncates on purpose and
+    draws an ellipsis, which is a design decision rather than a lost line.
+  */
+  test(`nothing on ${route} is clipped by a container that hides its own overflow`, async ({ page }, testInfo) => {
+    test.skip(!PHONE.includes(testInfo.project.name), "the clipping this catches is a narrow-width failure");
+    await page.goto(route);
+    await page.evaluate(async () => {
+      for (let y = 0; y < document.body.scrollHeight; y += 480) {
+        window.scrollTo(0, y);
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+      window.scrollTo(0, 0);
+    });
+    const clipped = await page.evaluate(() => {
+      const result: { selector: string; axis: string; hidden: number }[] = [];
+      for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
+        const style = getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        if (box.width <= 1 && box.height <= 1) continue;
+        if (style.webkitLineClamp !== "none" || style.getPropertyValue("line-clamp")) continue;
+        const selector = `${element.tagName}.${String(element.className).slice(0, 36)}`;
+        const hides = (axis: string) => axis === "hidden" || axis === "clip";
+        if (hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
+          result.push({ selector, axis: "y", hidden: element.scrollHeight - element.clientHeight });
+        }
+        if (hides(style.overflowX) && element.scrollWidth - element.clientWidth > 2) {
+          result.push({ selector, axis: "x", hidden: element.scrollWidth - element.clientWidth });
+        }
+      }
+      return result;
+    });
+    expect(clipped).toEqual([]);
   });
   }
 });
