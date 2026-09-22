@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/product/continuous-knowledge" },
   title: "Continuous recompilation — TAVONEL",
   description:
-    "The Compiler Contract: eight clauses that say what a compile guarantees when a source changes, each carrying the state it holds in this deployment.",
+    "The Compiler Contract: eight clauses that say what a compile guarantees when a source changes, each carrying the state it holds in TAVONEL.",
   /*
     No `robots` field here, and one line elsewhere is still wrong.
 
@@ -120,7 +120,7 @@ export default function ContinuousKnowledgePage() {
               </dl>
               <p className="fine">
                 No clause on this page is marked {CONTRACT_STATE.qualified.label}. That state
-                requires a named corpus and a receipt, and this deployment publishes neither — the
+                requires a named corpus and a receipt, and TAVONEL publishes neither — the
                 measurements it does publish are in the{" "}
                 <Link href={"/research/notes" as Route}>research notes</Link>.
               </p>
@@ -181,12 +181,12 @@ export default function ContinuousKnowledgePage() {
               are resolved; the untouched half is carried over and the affected half rebuilt; and
               the result is compared against what a full rebuild would have produced, with a
               mismatch refusing to publish rather than shipping a world that looks finished.{" "}
-              <b>Two stages of that path run in this deployment.</b> The drawing says which two,
+              <b>Two stages of that path run in TAVONEL today.</b> The drawing says which two,
               and the solid line down its left side is what happens here instead.
             </p>
             <CompilerContractDiagram />
             <p className="fine">
-              Solid is what this deployment executes: a source revision arrives, and a compile
+              Solid is what TAVONEL executes: a source revision arrives, and a compile
               rebuilds the whole collection it is given into a candidate version a person
               activates. Everything dashed — the semantic diff, the dependency impact, the
               preserve-and-rebuild split, the equivalence comparison and the pass or refuse it

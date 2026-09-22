@@ -92,7 +92,7 @@ const AGENT_OPERATIONS: Array<[string, string]> = [
     is our internal qualification state: it is a fact about our test coverage, and the sentence
     beside it already tells the reader that timings come from a run on their own corpus.
   */
-  ["Monitoring", "The agent runs on your host under your scheduler, so your scheduler is where a failed run surfaces: the process exits non-zero and reports there. It has no inbound port, no health endpoint and no callback to us, so its liveness is whatever your scheduler reports. Timings are whatever a run on your own corpus produces."],
+  ["Monitoring", "The agent runs on your host under your scheduler, so your scheduler is where a failed run surfaces: the process exits non-zero and reports there. It has no inbound port, no health endpoint and no callback to us, so its liveness is whatever your scheduler reports. Timings are whatever a run on your own files produces."],
 ] as const;
 
 /*

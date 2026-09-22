@@ -361,7 +361,7 @@ const PLAN_DIFFERENCES: ReadonlyArray<readonly [string, string, string]> = [
     howYouBuy(BILLING_OFFERS.studio_access.saleChannel),
   ],
   [
-    "Guided corpus onboarding",
+    "Guided onboarding for your documents",
     BILLING_OFFERS.observer_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
     BILLING_OFFERS.studio_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
   ],
@@ -1060,7 +1060,7 @@ export default function PricingPageClient({
               <article className="tile">
                 <h4>How many escalate</h4>
                 <p>
-                  The share depends on the corpus. Preflight shows the maximum for your own files
+                  The share depends on your documents. Preflight shows the maximum for your own files
                   before you commit, so the decision uses your documents rather than a generic
                   average.
                 </p>
@@ -1168,7 +1168,7 @@ export default function PricingPageClient({
               <div>
                 {/* G2-042. The widget states its own currency and tax basis: a reader who scrolls
                     straight to the calculator never passes the sentence under the plan grid. */}
-                <h3 id="usage-estimator-title">What will this corpus cost?</h3>
+                <h3 id="usage-estimator-title">What will this run cost?</h3>
                 <p className="fine">All figures in US dollars, excluding tax.</p>
                 <div className="usage-estimator-inputs">
                   <p>
