@@ -96,6 +96,13 @@ const EXEMPT = {
   subprocessors: "legal: naming the subprocessor is the entire purpose of the page",
   research: "research index",
   "research/notes": "noindex-adjacent research: 13.20 puts failure records here, with context",
+  /*
+    Still exempt because it is noindex, no longer exempt in practice: the 2026-09-22 copy
+    cleanup took "does not prove semantic quality" out of the summary, which was the one
+    phrase this entry was covering. The route keeps the entry -- it is a noindex Resources
+    page and 13.19 still files it there -- and the test below pins the copy so the phrase
+    cannot come back under cover of the exemption.
+  */
   reproducibility: "noindex: 13.19 files it under Resources",
   // `benchmarks` left this list for SALES_SURFACES when it stopped being a noindex 404.
   customers: "noindex",
@@ -215,6 +222,23 @@ describe("public copy purge", () => {
     const source = strip(readFileSync(new URL("./trust-disclosures.ts", import.meta.url), "utf8")).toLowerCase();
     const found = DEFENSIVE_PHRASES.filter((phrase) => source.includes(phrase));
     expect(found, `the disclosures render defensive phrasing: ${found.join(", ")}`).toEqual([]);
+  });
+
+  /*
+    The exemption is a licence /reproducibility no longer draws on.
+
+    Its summary used to answer an accusation nobody made -- a digest "does not prove semantic
+    quality, and this page does not claim it does" -- and the route was on EXEMPT partly so
+    that could stand. The summary now states the scope positively ("This page proves byte
+    identity") and the limit itself is still on the page, in the section that says its scope
+    is byte identity and not semantic quality. Checked here rather than dropped, because an
+    exempt route with clean copy is exactly where the register creeps back unnoticed.
+  */
+  it("keeps defensive phrasing off /reproducibility even though it is exempt", () => {
+    const source = shippedSourceFor("reproducibility")!.toLowerCase();
+    const found = DEFENSIVE_PHRASES.filter((phrase) => source.includes(phrase));
+    expect(found, `/reproducibility renders defensive phrasing: ${found.join(", ")}`).toEqual([]);
+    expect(source, "the scope limit itself must stay on the page").toContain("not semantic quality");
   });
 
   it("exempts only routes that are legal text or actually noindex", () => {

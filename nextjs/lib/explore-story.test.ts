@@ -205,7 +205,7 @@ describe("the Change act's numbers are the diff's numbers", () => {
     expect(EXPLORE_COPY.changeCaption).not.toMatch(/\bdemo\b/i);
     // The positive statement of the same fact the removed clause carried.
     expect(EXPLORE_COPY.changeTimelineNote)
-      .toContain("every object in the World is rebuilt at every step");
+      .toContain("a full compile of the corpus as it stood");
   });
 });
 

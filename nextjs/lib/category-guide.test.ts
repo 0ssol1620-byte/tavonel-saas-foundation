@@ -162,9 +162,10 @@ describe("every solution page says where it stops too", () => {
         sentinel is the sentence that says it is not a checkout -- which is also the rule the
         entitlements lane requires of every surface.
       - BA-050: "not calibrated" -> the review behaviour a buyer plans around. The uncalibrated
-        threshold itself is not deleted from the site: `lib/evidence-record.ts` publishes "Most
-        thresholds are uncalibrated" as a first-class row on /evidence, and this asserts that,
-        so the fact cannot leave the site by way of this page being tidied.
+        threshold itself is not deleted from the site: `lib/evidence-record.ts` publishes
+        "Thresholds are set by judgement, not calibration" as a first-class row on /evidence --
+        the 2026-09-22 copy cleanup retitled that row and kept it -- and this asserts the row, so
+        the fact cannot leave the site by way of this page being tidied.
     */
     const sentinels = [
       "declines when nothing matched at all",
@@ -181,7 +182,7 @@ describe("every solution page says where it stops too", () => {
     expect(
       readFileSync(resolve(import.meta.dirname, "./evidence-record.ts"), "utf8"),
       "the uncalibrated-threshold statement stays published on /evidence",
-    ).toContain("Most thresholds are uncalibrated");
+    ).toContain("Thresholds are set by judgement, not calibration");
   });
 });
 

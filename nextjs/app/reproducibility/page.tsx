@@ -18,10 +18,13 @@ import { TrustNext } from "@/components/trust-next";
   this lane, and the reason is written in the lane report rather than guessed at here: flipping
   it needs `app/sitemap.ts` (whose own comment argues the opposite), two positive controls in
   `lib/seo-surface.test.ts` that use this page as *the* noindex example, and the
-  `public-copy-purge.test.ts` exemption that lets this page keep "does not prove semantic
-  quality" -- a phrase the audit's own recommended hero sentence for this page also contains.
-  Three files in two other lanes' trees, one of them a shared guard. It is an integration
-  decision with a patch attached, not a page edit.
+  `public-copy-purge.test.ts` exemption entry for this route. Three files in two other lanes'
+  trees, one of them a shared guard. It is an integration decision with a patch attached, not a
+  page edit.
+
+  The 2026-09-22 copy cleanup removed the reason the purge exemption was load-bearing: the
+  summary no longer says a digest "does not prove semantic quality". The scope limit stays in
+  "What it establishes", where it is a statement rather than a denial.
 */
 export const metadata: Metadata = { title: "Reproducibility — TAVONEL", description: "Digest-bound public samples you can download, rerun and verify byte for byte.", alternates: { canonical: "/reproducibility" }, openGraph: { url: "/reproducibility" }, robots: { index: false, follow: true } };
 
@@ -72,7 +75,7 @@ export default function ReproducibilityPage() {
       <Link href={"/trust" as Route}>Trust</Link>
     </p>
     <TrustNext from="/reproducibility" />
-  </>} eyebrow="Public proof protocol" title="Rebuild the evidence, not the claim." state="PUBLIC SAMPLE · DIGEST-BOUND" summary="One question: can you rerun the same input and get the same bytes. A digest proves bytes — it does not prove semantic quality, and this page does not claim it does." sections={[
+  </>} eyebrow="Public proof protocol" title="Rebuild the evidence, not the claim." state="PUBLIC SAMPLE · DIGEST-BOUND" summary="One question: rerun the same input and get the same bytes. This page proves byte identity." sections={[
     { title: "Frozen inputs", body: "The downloadable manifest names three public proof PDFs already shipped with the product and pins each byte sequence by SHA-256. The complete digests are in the manifest.", rows: FIXTURES.map((fixture) => (
       { key: fixture.key, description: `${fixture.name} · sha256 ${short(fixture.digest)}`, state: "PUBLIC SAMPLE" }
     )), download: { href: "/reproducibility/sample", label: "Download reproducibility manifest" } },
