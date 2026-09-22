@@ -708,6 +708,7 @@ const SECTION_BY_PATH: Readonly<Record<string, NavSection>> = {
   "/explore": "resources",
   "/knowledge-compiler": "resources",
   "/benchmarks": "resources",
+  "/benchmarks/gdp-pdf": "resources",
   "/changelog": "resources",
   "/evidence": "resources",
   "/reproducibility": "resources",
