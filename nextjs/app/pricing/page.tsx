@@ -1,4 +1,8 @@
-import PricingPageClient, { type PlanCapabilityRow, type PurchaseGate } from "@/components/pricing-page-client";
+import PricingPageClient, {
+  type PlanCapabilityRow,
+  type PlanFeatureState,
+  type PurchaseGate,
+} from "@/components/pricing-page-client";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
@@ -74,16 +78,53 @@ function account(plan: BillingOfferCode): FoundationBillingAccount {
   return { accessPlan: plan, subscriptionStatus: "active", billingHold: false } as FoundationBillingAccount;
 }
 
-const PLAN_CAPABILITIES: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
+const PLAN_CODES = Object.keys(BILLING_OFFERS) as BillingOfferCode[];
+
+const ENTITLEMENT_ROWS: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
   capability: row.capability,
   route: row.route,
   level: row.level,
-  plans: (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).map((code) => ({
+  plans: PLAN_CODES.map((code) => ({
     label: BILLING_OFFERS[code].label,
     saleChannel: BILLING_OFFERS[code].saleChannel,
-    allowed: billingProductDecision(account(code), row.level, TABLE_ROLE).ok,
+    // An entitlement row is provided or it is not part of the plan. It is never "planned":
+    // the function either admits the call today or it refuses it today.
+    state: (billingProductDecision(account(code), row.level, TABLE_ROLE).ok
+      ? "provided"
+      : "not_sold") satisfies PlanFeatureState,
   })),
 }));
+
+/*
+  G2-002 / gap #14: the rows a buyer chooses a plan for, which the entitlement function cannot
+  answer because there is no route to ask it about.
+
+  `notYetSold` in the billing catalog is the list of capabilities a plan is described by and does
+  not sell yet -- Team names shared members, roles and per-member source permissions. The plan
+  card has printed them since SD-02; the comparison table has not, so the one place a buyer met
+  the plan's actual differentiator was a card above a table that then answered ✓ / ✓ on six rows.
+
+  A plan that lists the capability reads "Planned". A plan that does not list it does not sell it
+  at all, so it reads "Not sold". Neither renders a tick, which is the whole point of the row:
+  `lib/plan-feature-matrix.test.ts` fails if an unsold capability ever gets one. When the
+  capability ships it leaves `notYetSold` and the row disappears from here by itself.
+*/
+const UNSOLD_CAPABILITIES = [
+  ...new Set(PLAN_CODES.flatMap((code) => BILLING_OFFERS[code].notYetSold as readonly string[])),
+];
+
+const UNSOLD_ROWS: PlanCapabilityRow[] = UNSOLD_CAPABILITIES.map((capability) => ({
+  capability,
+  plans: PLAN_CODES.map((code) => ({
+    label: BILLING_OFFERS[code].label,
+    saleChannel: BILLING_OFFERS[code].saleChannel,
+    state: ((BILLING_OFFERS[code].notYetSold as readonly string[]).includes(capability)
+      ? "planned"
+      : "not_sold") satisfies PlanFeatureState,
+  })),
+}));
+
+const PLAN_CAPABILITIES: PlanCapabilityRow[] = [...ENTITLEMENT_ROWS, ...UNSOLD_ROWS];
 
 /*
   G2-032's JSON-LD is not here, and that is a runtime constraint rather than a preference.

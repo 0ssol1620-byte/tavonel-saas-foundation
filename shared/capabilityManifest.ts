@@ -697,3 +697,44 @@ export const CAPABILITY_TOKEN_LABEL: Record<string, string> = {
 export function capabilityTokenLabel(token: string): string {
   return CAPABILITY_TOKEN_LABEL[token] ?? token.replaceAll("_", " ");
 }
+
+/*
+  The four denominators the table's tier chips are counted over.
+
+  Gap #4 of the 2026-09-22 competitor visual audit: the chips say which tier a row is in and the
+  page never says how many rows that is, so a reader counts twelve rows by hand to find out
+  whether "best effort" describes one format or all of them. Every figure here is counted from
+  the manifest at render time -- there is no written number to drift -- and the projection sends
+  integers, so no manifest identifier crosses to the client for the sake of a count.
+
+  `preserved` is the size of the set every accepted row carries, not a sum over rows: three
+  fields cross into the compile request and each accepted format carries the same three. Counting
+  it per row would print 36 and mean nothing. `converted` counts the accepted rows that are
+  turned into another format before a reader ever sees them, which is the single fact most likely
+  to change what a buyer expects of their own files.
+*/
+export type CapabilityCensus = {
+  readonly total: number;
+  readonly accepted: number;
+  readonly preserved: number;
+  readonly converted: number;
+  readonly omitted: number;
+  /** Rows carrying a qualification receipt. Zero until a qualification suite runs. */
+  readonly qualified: number;
+};
+
+export function capabilityCensus(manifest: CapabilityManifest = CAPABILITY_MANIFEST): CapabilityCensus {
+  const accepted = manifest.entries.filter((entry) => isAcceptedAtUpload(entry.status));
+  const preserved = new Set(accepted.flatMap((entry) => entry.preserved));
+  const converted = accepted.filter((entry) =>
+    entry.knownLimitations.some((limitation) => limitation.startsWith("converted_")),
+  );
+  return {
+    total: manifest.entries.length,
+    accepted: accepted.length,
+    preserved: preserved.size,
+    converted: converted.length,
+    omitted: manifest.entries.length - accepted.length,
+    qualified: manifest.entries.filter((entry) => entry.qualificationReceipt !== null).length,
+  };
+}

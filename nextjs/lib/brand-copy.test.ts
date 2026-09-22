@@ -137,6 +137,16 @@ const COPY_SURFACES = [
   "components/source-capability-table.tsx",
   "../shared/capabilityManifest.ts",
   /*
+    The trust provisions table and the public sample frame (gaps #6, #14 and #15 of the
+    2026-09-22 audit). Both are copy on three sales surfaces and neither is a `page.tsx`:
+    every sentence /trust, /security and /enterprise publish about what is provided is in
+    the content module, and a barred phrase written into a row would render on all three
+    while each page's own source stayed clean.
+  */
+  "components/trust-provisions.tsx",
+  "components/sample-world-frame.tsx",
+  "content/trust/provisions.ts",
+  /*
     The surfaces the positioning pass (RESOLVED A-1, A-4, A-6) rewrote, none of which had a row.
 
     Every one of them carries a claim of the exact kind this file exists to guard -- what
