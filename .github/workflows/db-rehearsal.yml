@@ -91,7 +91,7 @@ jobs:
             /tmp/fingerprints-boundary.tsv > "fingerprints-after-${HISTORY_BOUNDARY}.json"
           echo "fingerprint rows: $(jq 'length' "fingerprints-after-${HISTORY_BOUNDARY}.json")"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fingerprints-after-${{ env.HISTORY_BOUNDARY }}
           path: fingerprints-after-${{ env.HISTORY_BOUNDARY }}.json
@@ -138,14 +138,14 @@ jobs:
             /tmp/fingerprints-head.tsv > "fingerprints-after-${{ steps.chain.outputs.head }}.json"
           echo "fingerprint rows: $(jq 'length' "fingerprints-after-${{ steps.chain.outputs.head }}.json")"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: schema-after-${{ steps.chain.outputs.head }}
           path: schema-after-${{ steps.chain.outputs.head }}.sql
           retention-days: 30
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fingerprints-after-${{ steps.chain.outputs.head }}
           path: fingerprints-after-${{ steps.chain.outputs.head }}.json

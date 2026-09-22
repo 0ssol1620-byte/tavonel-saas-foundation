@@ -40,7 +40,7 @@ jobs:
           const pass=rows.every(r=>r.overflow===0&&r.filmTop<500&&r.smallTargets===0&&r.keyboardSelected&&r.filmTabSelectsCorrectAsset)&&noAutoplay;
           fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify({sha:process.env.GITHUB_SHA,scope:'static design artifact only; not current app E2E',pass,noAutoplay,rows},null,2));console.log(JSON.stringify({pass,noAutoplay,rows}));if(!pass)process.exitCode=1;
           JS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: film-first-design-review-${{ github.sha }}
