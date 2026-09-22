@@ -148,7 +148,7 @@ const PARTS: readonly Part[] = [
   {
     state: "EVIDENCE",
     title: "Where a fact came from",
-    body: "Every qualified claim points at a source version and its exact location inside it. On this deployment that location takes one form for every accepted format — a numbered page of the sanitized PDF and a box on it — because a spreadsheet, a slide deck and a Word file are all converted to PDF before anything reads them. A world holding an unresolved link is not emitted at all.",
+    body: "Every qualified claim points at a source version and its exact location inside it. In TAVONEL that location takes one form for every accepted format — a numbered page of the sanitized PDF and a box on it — because a spreadsheet, a slide deck and a Word file are all converted to PDF before anything reads them. A world holding an unresolved link is not emitted at all.",
   },
   {
     state: "VERSIONS",

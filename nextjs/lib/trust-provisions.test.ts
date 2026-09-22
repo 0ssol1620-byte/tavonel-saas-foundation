@@ -79,10 +79,19 @@ describe("the Provided / Roadmap / Not provided table", () => {
   it("states the assurance report as absent, in the draft agreement's words", () => {
     const assurance = TRUST_PROVISIONS.find((row) => row.id === "third_party_assurance");
     expect(assurance?.state).toBe("not_provided");
-    // The one sentence a buyer asks for first, and the one a page is most tempted to soften.
-    expect(assurance?.line).toContain("no SOC 2 report");
-    expect(assurance?.line).toContain("no ISO 27001 certificate");
-    expect(assurance?.line).toContain("no independent penetration-test report");
+    /*
+      The one sentence a buyer asks for first, and the one a page is most tempted to soften.
+
+      The 2026-09-22 copy cleanup dropped the "stated plainly, because a buyer will ask" preamble
+      and collapsed three negatives into one. All four facts it carried are still asserted here,
+      individually: the three absent reports, the planned penetration test, and the audit right
+      being a right to inspect rather than a report that exists.
+    */
+    expect(assurance?.line).toContain("No SOC 2 report");
+    expect(assurance?.line).toContain("ISO 27001 certificate");
+    expect(assurance?.line).toContain("independent penetration-test report");
+    expect(assurance?.line).toContain("penetration test is planned after the first paying customer");
+    expect(assurance?.line).toContain("audit right is a real right to inspect controls");
   });
 
   it("keeps the recovery objectives and the residency guarantee out of the provided column", () => {

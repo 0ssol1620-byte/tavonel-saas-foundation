@@ -49,7 +49,7 @@ const PATHS = [
   {
     kind: "Portable",
     title: "A signed package",
-    body: "Take the World away as files: JSON-LD and Turtle semantic projections, graph nodes and relationships, a retrieval corpus, provenance activities and a validation report, under a signed manifest with a digest for every file.",
+    body: "Take the World away as files: JSON-LD and Turtle semantic projections, graph nodes and relationships, a retrieval-ready index, provenance activities and a validation report, under a signed manifest with a digest for every file.",
     detail: "Verifiable offline against a fingerprint you fetch separately. It is a snapshot of one revision — take the live path when the reader must stay current.",
   },
   {

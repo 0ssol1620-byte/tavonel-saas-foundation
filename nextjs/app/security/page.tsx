@@ -43,7 +43,8 @@ export default function SecurityPage() {
             <div className="stack">
               <p className="lede">
                 Sources remain workspace-scoped through intake, analysis and review. Activation
-                remains under human control, and required checks fail closed.
+                remains under human control, and a check that cannot complete blocks the action
+                rather than allowing it.
               </p>
 
               <nav className="fine" aria-label="On this page">

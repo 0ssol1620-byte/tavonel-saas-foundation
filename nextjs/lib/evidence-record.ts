@@ -108,7 +108,7 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
     state: "measured",
     title: "Recovery changes the outcome",
     takeaway: "What this means for you: on a page that is hard to read, the recovery step is the difference between getting the document's content and getting an empty page.",
-    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh. Ours, and never placed beside a competitor's number as if reproduced.",
+    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e, the same pipeline scored 80.6 with the recovery lane and 53.7 with only that lane switched off — a gap of 26.9 points, 95% confidence intervals 79.62–81.57 and 52.62–54.93, which do not overlap. Model, evaluator revision, corpus, source manifest, test set and settings were identical; the only difference was whether the documents recovery delivered carried their content. Measured 2026-08-08 over 1,403 documents and 8,413 checks. One category, headers and footers, scores higher without recovery, because a check that a phrase is absent passes trivially on an empty page — the no-recovery figure is generous rather than harsh.",
     receipt: {
       id: "R-01",
       of: "recovery counterfactual on olmOCR-Bench",
@@ -140,9 +140,9 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
   },
   {
     state: "unproven",
-    title: "Most thresholds are uncalibrated",
+    title: "Thresholds are set by judgement, not calibration",
     takeaway: "What this means for you: the cut-offs that decide when the system refuses or merges are set by judgement rather than by a measurement, so ask before you depend on one.",
-    body: "Tests show the code does what its author intended. They do not show a threshold is right. Nothing here presents an uncalibrated threshold as a measured result.",
+    body: "Tests show the code does what its author intended. They do not show a threshold is right. No threshold here is presented as a measured result.",
   },
   /*
     BA-075. This card was titled with a frozen mechanism name -- one of the technologies on the
@@ -154,8 +154,8 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
   {
     state: "unproven",
     title: "Rebuilding only what changed",
-    takeaway: "What this means for you: the landing-page demonstration runs on fixed data, and it is not a capability this deployment gives you today.",
-    body: "The landing demonstration follows a dependency path on declared fixture data. That is not a measurement of production impact precision, and it is not a shipped capability.",
+    takeaway: "What this means for you: the landing-page demonstration runs on sample data, and it is not a capability TAVONEL gives you today.",
+    body: "The landing demonstration follows a dependency path on declared sample data. It is not a shipped capability.",
   },
 ];
 

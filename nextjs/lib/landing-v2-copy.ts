@@ -455,8 +455,8 @@ const EN: LandingV2Copy = {
   trust: {
     id: "trust",
     eyebrow: "CHECK THE BOUNDARIES",
-    headline: "Read what this deployment does.",
-    support: "Four things this deployment does, each written down where it can be checked.",
+    headline: "Read what TAVONEL does.",
+    support: "Four things TAVONEL does, each written down where it can be checked.",
     /*
       The four §18 proofs, and where each one is backed.
 

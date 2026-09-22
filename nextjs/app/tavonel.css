@@ -4310,7 +4310,11 @@
   .board-list > li:last-child { border-bottom: 0; }
   .board-list > li[data-status="attention"] { box-shadow: inset 2px 0 0 var(--changed); }
   .board-list > li[data-status="failed"] { box-shadow: inset 2px 0 0 var(--failed); }
-  .board-row-summary { width: 100%; min-height: 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, auto) 24px; align-items: center; gap: 12px; padding: 9px 12px; text-align: left; }
+  /* Four children -- name, stage, status, chevron -- so four tracks. The three-track version
+     that was here only ever looked right because `.one-path-workspace`'s four-track rule in
+     app/workspace-no1.css wins on specificity; anywhere that class is absent the chevron fell
+     into an implicit track this file never sized. */
+  .board-row-summary { width: 100%; min-height: 48px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(110px, auto) 24px; align-items: center; gap: 12px; padding: 9px 12px; text-align: left; }
   @media (hover: hover) and (pointer: fine) {
     .board-row-summary:hover { background: var(--g1); }
   }

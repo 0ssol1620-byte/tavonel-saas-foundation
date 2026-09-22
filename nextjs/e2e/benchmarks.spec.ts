@@ -81,8 +81,17 @@ test("publishes the compilation benchmark protocol and no table without a receip
     OmniDocBench is the benchmark our own run was scored on, named beside its evaluator pin, so
     it is no longer barred here. A vendor's published leaderboard row still is: a figure someone
     else measured stays theirs.
+
+    The 2026-09-22 copy cleanup dropped the paragraph's closing narration -- the sentence that
+    announced no competitor row was placed beside these, on a page that carries none. What it
+    protected is pinned positively instead: the board states the scope of the scores, states that
+    every row is a run we made ourselves, and still names the evaluator revision the run was
+    scored at. The vendor-name sweep below is unchanged and is what actually keeps someone
+    else's figure off this page.
   */
   await expect(page.locator("main")).toContainText("evaluator revision");
+  await expect(page.locator("main")).toContainText("These scores measure page reading only");
+  await expect(page.locator("main")).toContainText("a model we ran ourselves");
   for (const vendor of ["Mistral", "Gemini", "GPT-", "Qwen"]) {
     expect(body, `${vendor} has no place on a page that publishes only our own run`).not.toContain(vendor);
   }

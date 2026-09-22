@@ -118,7 +118,7 @@ export default async function StatusPage() {
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 
     <h2>Scheduled dependency checks</h2>
-    <p>Each check here is a request this deployment sent through the dependency on a schedule, carrying no customer data, and it reports what came back. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
+    <p>Each check here is a request TAVONEL sent through the dependency on a schedule, carrying no customer data, and it reports what came back. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
       Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
       of any outcome: <strong>{stamp(probe.lastRunAt)}</strong>

@@ -158,7 +158,7 @@ const PARTS = [
   // and no threshold on confidence routes anything. The confidence is recorded, and that is all.
   // BA-014 keeps both halves of that and leads with the one a reader can use: the confidence
   // travels with the region it belongs to, and a failed read opens review rather than passing.
-  ["Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. No threshold routes on that confidence — it is recorded, and a reader that never reports doubt cannot be believed later."],
+  ["Confidence travels with the region", "Every region carries the read confidence recorded for it in the OCR output, and a failed read opens review rather than passing silently. That confidence is recorded for review; it does not automatically block or approve anything."],
 ] as const;
 
 export default function DocumentUnderstandingPage() {

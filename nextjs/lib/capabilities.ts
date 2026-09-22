@@ -75,6 +75,6 @@ export function readCapabilities(status: StatusResponse | null, failed: boolean)
     // claiming neither is a finished production feature. They are the two rows where an overclaim
     // would be most tempting, so they are the two rows marked explicitly.
     { name: "Knowledge architecture", state: "Direction", tone: "direction", note: DISCLOSURE.ontology },
-    { name: "Selective recompilation", state: "Direction", tone: "direction", note: "Demonstrated above on fixture data. Not offered as a shipped capability in this deployment." },
+    { name: "Selective recompilation", state: "Direction", tone: "direction", note: "Demonstrated on the public sample. Not offered as a shipped capability in TAVONEL today." },
   ];
 }

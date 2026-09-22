@@ -827,8 +827,20 @@ describe("the compiler contract clauses this projection has to keep", () => {
   it("keeps selective recompilation and equivalence out of the shipped column while the flag is off", () => {
     expect(clause("selective-recompilation").state).toBe("direction");
     expect(clause("full-rebuild-equivalence").state).toBe("direction");
-    // The clause may say the gate is written; it may not say a compile here is gated by it.
-    expect(clause("full-rebuild-equivalence").body).toContain("not_run");
-    expect(clause("selective-recompilation").body).toContain(CORE_V2_REVISION_COMPILE_FLAG);
+    /*
+      The clause may say the gate is written; it may not say a compile here is gated by it.
+
+      The 2026-09-22 copy cleanup took the receipt field name and the environment-variable name
+      out of the customer-facing clause, so the same fact is pinned in the clause's own words --
+      the gate has nothing to compare, the capability is not available today -- and the flag name
+      is now pinned as something the copy may not contain rather than something it must.
+    */
+    expect(clause("full-rebuild-equivalence").body)
+      .toContain("nothing to compare until selective rebuilds ship");
+    expect(clause("selective-recompilation").body).toContain("is not available today");
+    expect(
+      clause("selective-recompilation").body,
+      "customer copy may not name an internal flag",
+    ).not.toContain(CORE_V2_REVISION_COMPILE_FLAG);
   });
 });

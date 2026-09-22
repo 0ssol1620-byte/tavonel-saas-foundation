@@ -126,7 +126,7 @@ export const EXPLORE_COPY = {
   changeCaption:
     "Both snapshots are complete compiles of the corpus as it stood, compared object by object. Every count below is measured from that comparison.",
   changeCountsNote:
-    "A content-addressed object keeps its identity while its compiled fields hold and gets a new one when they do not, so an arriving filing both adds objects and rebuilds objects the annual filing already carried. All four counts are shown as measured.",
+    "A content-addressed object keeps its identity while its compiled fields hold and gets a new one when they do not, so an arriving filing both adds objects and rebuilds objects the annual filing already carried.",
   changeArrivalsHeading: "FILINGS THAT ARRIVED",
   changeTimelineHeading: "HOW THIS WORLD WAS REACHED",
   /*
@@ -143,7 +143,7 @@ export const EXPLORE_COPY = {
     with, and it no longer names the deployment.
   */
   changeTimelineNote:
-    "Each step is a complete compile of the corpus as it stood, compared with the complete compile before it: every object in the World is rebuilt at every step, so the recompiled figure is the whole World rather than a selectively rebuilt subset. Rebuilt in place counts objects the previous World already carried whose compiled fields moved — the arriving filing's dependency impact, as measured. The steps run in reporting-period order, which is not filing order here: Apple filed the 2026 proxy statement three weeks before the first-quarter report it follows above.",
+    "Each step is a full compile of the corpus as it stood, compared with the one before it. Steps run in reporting-period order.",
   askPlaceholder: "Ask this World…",
   askNote:
     "This sample answers four prepared questions. Each answer is the source text the retriever scored, not a rewrite of it.",

@@ -76,8 +76,8 @@ const REFERENCE_HREFS = ["/subprocessors"] as const;
   and not a proof because the reader does not have to open it to believe the four above.
 */
 const FOOTNOTE: Record<LandingV2Locale, string> = {
-  en: "What this deployment runs, and what it does not, component by component",
-  ko: "이 배포판이 무엇을 실행하고 무엇을 실행하지 않는지, 구성 요소별로",
+  en: "What TAVONEL runs, and what it does not, component by component",
+  ko: "TAVONEL이 무엇을 실행하고 무엇을 실행하지 않는지, 구성 요소별로",
 };
 
 const SCENE_INDEX = LANDING_V2_SCENE_ORDER.indexOf("trust") + 1;

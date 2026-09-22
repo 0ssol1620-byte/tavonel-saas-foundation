@@ -109,7 +109,7 @@ export const TRUST_PROVISIONS: readonly TrustProvision[] = [
     id: "data_residency",
     subject: "Contractual data residency",
     state: "not_provided",
-    line: "The database and the serverless functions are configured for Seoul and the object bucket carries an Asia-Pacific location hint, which is best-effort. One processor pins no region at all, and the record says so rather than stating one.",
+    line: "The database and the serverless functions are configured for Seoul and the object bucket carries an Asia-Pacific location hint, which is best-effort. One processor (RunPod) has no pinned region.",
     source: SUBPROCESSORS,
   },
   {
@@ -165,7 +165,7 @@ export const TRUST_PROVISIONS: readonly TrustProvision[] = [
     id: "third_party_assurance",
     subject: "Third-party assurance report",
     state: "not_provided",
-    line: "Stated plainly, because a buyer will ask: there is no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report for this deployment. An external penetration test is planned after the first paying customer, and SOC 2 timing is not set. The audit right in the draft agreement is a real right to look rather than a right to be handed a report that exists.",
+    line: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet. An external penetration test is planned after the first paying customer; SOC 2 timing is not set. The draft agreement's audit right is a real right to inspect controls, not a report that already exists.",
     source: DPA,
   },
   {

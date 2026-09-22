@@ -81,7 +81,7 @@ export const SOLUTIONS = {
     proof: {
       form: "10-Q",
       match: /CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS/,
-      framing: "A printed financial statement, read the way this deployment reads one: every figure stays readable and locatable as the paragraphs it was printed as, while the grid that arranged them is not recovered.",
+      framing: "A printed financial statement, read the way TAVONEL reads one: every figure stays readable and locatable as the paragraphs it was printed as, while the grid that arranged them is not recovered.",
     },
     outcomes: ["Provenance to the exact source location", "Visible confidence and review reasons", "Immutable OCR output", "Regions ready for compilation"],
     limitations: [
@@ -125,8 +125,8 @@ export const SOLUTIONS = {
         change what they would do. Both facts survive, stated as the behaviour a buyer plans
         around -- you load the exports into the store you already run, and an uncertain merge is
         held rather than decided. The uncalibrated-threshold statement itself is not deleted from
-        the site: it is a first-class row on /evidence ("Most thresholds are uncalibrated ...
-        nothing here presents an uncalibrated threshold as a measured result",
+        the site: it is a first-class row on /evidence ("Thresholds are set by judgement, not
+        calibration ... no threshold here is presented as a measured result",
         `lib/evidence-record.ts`), which is where a reader who wants it looks.
       */
       "Exports are Turtle, JSON-LD and CSV — load them into any store you already run.",

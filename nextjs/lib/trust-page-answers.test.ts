@@ -370,7 +370,7 @@ describe("CA B04 the five hubs each say which question they answer", () => {
   */
   it("reproducibility states its role in the summary the registry renders", () => {
     const source = read("app/reproducibility/page.tsx");
-    expect(source).toContain("can you rerun the same input and get the same bytes");
+    expect(source).toContain("rerun the same input and get the same bytes");
     expect(source).toContain("/research/notes");
   });
 });
