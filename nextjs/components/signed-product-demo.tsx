@@ -1,3 +1,4 @@
+import DemoVersionDiff from "./demo-version-diff";
 import type { SignedProductDemo } from "@/lib/signed-product-demo";
 import styles from "./signed-product-demo.module.css";
 
@@ -53,6 +54,14 @@ export default function SignedProductDemo({ demo }: { demo: SignedProductDemo })
             <div><span>Revision C</span><ins>{demo.change.to}</ins></div>
           </div>
           <p className={styles.meta}>Bound to source version <code>{demo.change.sourceVersionId}</code>.</p>
+          {/*
+            Gap #12. The step stated the change and stopped there, so whether the compile noticed
+            was something a reader had to take on trust. `DemoVersionDiff` compiles the corpus
+            either side of the change notice and reports the difference between the two finished
+            artifacts -- including the claim that revision B is superseded, in the compiler's own
+            words rather than in ours.
+          */}
+          <DemoVersionDiff />
         </li>
 
         <li className={styles.step}>

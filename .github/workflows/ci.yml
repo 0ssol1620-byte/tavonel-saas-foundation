@@ -26,7 +26,11 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
           node node_modules/typescript/bin/tsc --noEmit
-      - run: pnpm build
+      # No `pnpm build` here. The root tree stopped being a runtime on 2026-09-22: the express
+      # entrypoint (`server/_core/index.ts`), the template SPA (`client/`) and the vite build were
+      # deleted, so both halves of the old `vite build && esbuild server/_core/index.ts` now have
+      # nothing to compile. `server/legacyRootRuntime.test.ts`, which `pnpm test` above runs, fails
+      # if either comes back. The deployed product is built by the `nextjs` job below.
   nextjs:
     runs-on: ubuntu-latest
     defaults:

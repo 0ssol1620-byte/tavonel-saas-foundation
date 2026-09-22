@@ -7,7 +7,7 @@
   "packageManager": "pnpm@10.34.4",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "pnpm check && pnpm test",
+    "prebuild": "pnpm check && node scripts/run-hermetic-vitest.mjs",
     "build": "next build",
     "start": "next start",
     "test": "vitest run && pnpm test:scripts",
@@ -32,7 +32,9 @@
     "release:manifest": "node --experimental-strip-types scripts/release-manifest.mjs",
     "release:manifest:inspect": "node --experimental-strip-types scripts/release-manifest.mjs --allow-incomplete --stdout",
     "scan:secrets": "node scripts/secret-scan.mjs ..",
-    "brand:verify": "node scripts/build-brand-assets.mjs --check"
+    "brand:verify": "node scripts/build-brand-assets.mjs --check",
+    "router:seed:shadow": "node --experimental-transform-types --import ./scripts/router/register-ts-loader.mjs scripts/router/seed-shadow-rollout.mjs",
+    "router:shadow:report": "node --experimental-transform-types --import ./scripts/router/register-ts-loader.mjs scripts/router/shadow-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

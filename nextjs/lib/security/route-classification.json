@@ -212,6 +212,14 @@
       "credential": "bearer:shared-secret",
       "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. Cross-tenant by design; never reachable with a customer credential."
     },
+    "app/api/internal/model-provider/reconcile/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:shared-secret",
+      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. POST only and deliberately no GET: the actual units come off a provider invoice a person read, so this must not be schedulable. Resolves one pending_reconciliation reservation; refuses unknown, already-settled and conflicting ones, and replays idempotently."
+    },
     "app/api/internal/oauth-secrets/v1/secrets/[operation]/route.ts": {
       "type": "A-bearer",
       "methods": [

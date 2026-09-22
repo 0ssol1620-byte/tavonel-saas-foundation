@@ -64,9 +64,28 @@
 
 .sources { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--demo-line); }
 .sources li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid var(--demo-line); }
+/*
+  UI-SWEEP 2026-09-22. The row is 62px tall and the link inside it measured 26px, so the target
+  a thumb has to hit is the text and nothing else. The hit area grows into the padding the row
+  already has and an equal negative block margin takes the growth back, which is the pattern
+  `tavonel.css` uses for the same problem in prose -- the row height and the baseline the date
+  aligns to are unchanged.
+*/
 .sources a, .evidence a, .exportRecord > a { color: var(--demo-ink); font-weight: 650; text-underline-offset: 4px; }
+.sources a { display: inline-flex; align-items: center; min-height: 44px; margin-block: -9px; }
+/* The evidence and export links are standalone lines of 21px with no row padding to grow into,
+   so they take the padding themselves and give it straight back. */
+.evidence a, .exportRecord > a { display: inline-block; padding-block: 12px; margin-block: -12px; }
 .sources small { color: var(--demo-muted); text-align: right; }
-.demo code { overflow-wrap: anywhere; font-family: var(--font-mono, ui-monospace, monospace); font-size: .88em; }
+/*
+  `.88em` is relative to whatever it lands in, and it landed in 12px (`.checks`) and 13px
+  (`.boundary`, `.facing dd`) boxes, resolving to 10.56px and 11.44px -- under the 12px floor the
+  design system states as settled. The repository's own floor check is a grep over declared px
+  values, so a relative size compounds straight past it; this was measured on the rendered page.
+  `max()` keeps the optical step down wherever there is room for it and stops at the floor where
+  there is not.
+*/
+.demo code { overflow-wrap: anywhere; font-family: var(--font-mono, ui-monospace, monospace); font-size: max(12px, .88em); }
 
 .change { display: grid; grid-template-columns: 1fr auto 1fr; gap: 22px; align-items: center; padding: 28px 0; border-block: 1px solid var(--demo-line); }
 .change div { display: grid; gap: 8px; }

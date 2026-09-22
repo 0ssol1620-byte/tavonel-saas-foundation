@@ -4,6 +4,7 @@ import type { Route } from "next";
 import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
+import TrustProvisions from "@/components/trust-provisions";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/trust" },
@@ -142,6 +143,13 @@ export default function TrustCenterPage() {
               </div>
 
               <TrustDisclosures />
+
+              {/*
+                Gap #6, 2026-09-22. The disclosure list above says where a record is published;
+                it does not say what a reviewer gets. The table does, in three states, from
+                `content/trust/provisions.ts` -- the same rows /security and /enterprise render.
+              */}
+              <TrustProvisions id="trust-provisions" />
 
               {/*
                 BA-173. The first sentence answered an accusation nobody made ("nothing here is a

@@ -5,6 +5,7 @@ import type { Route } from "next";
 import CompilerContractDiagram from "@/components/compiler-contract-diagram";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
+import WorldRecompileTimeline from "@/components/world-recompile-timeline";
 import {
   CONTRACT_CLAUSES,
   CONTRACT_STATE,
@@ -86,6 +87,15 @@ export default function ContinuousKnowledgePage() {
             <div className="stack">
               <DocBreadcrumb trail={TRAIL} />
               <h1 className="document-title">Continuous recompilation — the Compiler Contract.</h1>
+              {/*
+                G1-019 / gap #10 (2026-09-22). Six hundred words about knowledge not being
+                compiled once ran down the right half of this page while the left half held the
+                h1 and then nothing. What fills it is the subject: every version of the public
+                sample World in arrival order, with each pair's manifest digests and the diff
+                between them. Every figure is read out of five frozen compiles; no copy on this
+                page changes, and nothing here is an illustration of a diff.
+              */}
+              <WorldRecompileTimeline />
             </div>
             <div className="stack">
               {/*

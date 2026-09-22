@@ -30,7 +30,19 @@ import { CodeTokens } from "@/components/docs/code-tokens";
  * thumbnail capture throws on the accessor itself, and the component must still render.
  */
 const LANGUAGE_KEY = "tavonel-docs-language";
-export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; label: string; body: string }> }) {
+/*
+  `label` names the group, not the languages in it.
+
+  On `/api` and in the docs a page carries many of these and the only useful name is the generic
+  one, so that is the default and those routes are byte-identical. `/developers` carries exactly
+  one, and it is the page's first authenticated read -- a group announced as "Request language"
+  there tells a screen-reader user which control it is and not which request, which is the half
+  that matters when the block is the only one on the page.
+*/
+export function DocsSnippet({ snippets, label = "Request language" }: {
+  snippets: Array<{ language: string; label: string; body: string }>;
+  label?: string;
+}) {
   /*
     The server renders index 0, and the stored choice is applied after mount rather than during
     the first render: reading storage while rendering would make the server's HTML and the
@@ -89,7 +101,7 @@ export function DocsSnippet({ snippets }: { snippets: Array<{ language: string; 
   return (
     <figure className="docs-code">
       <figcaption>
-        <span className="docs-langs" role="tablist" aria-label="Request language">
+        <span className="docs-langs" role="tablist" aria-label={label}>
           {snippets.map((snippet, index) => (
             <button
               key={snippet.language}

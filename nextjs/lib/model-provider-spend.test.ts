@@ -157,6 +157,33 @@ describe("model-provider spend RPC client", () => {
       outcome: "settled", actualUnits: 8, reasonCode: "PROVIDER_EVIDENCE_CONFIRMED" }))
       .resolves.toMatchObject({ ok: true });
   });
+
+  // Every one of these used to collapse into MODEL_PROVIDER_LEDGER_FAILED, so an operator
+  // reconciling a typo'd or already-settled reservation could not tell their own mistake from
+  // the ledger being down.
+  it.each([
+    ["model_provider_reservation_not_found", "MODEL_PROVIDER_RESERVATION_NOT_FOUND"],
+    ["model_provider_reservation_not_active", "MODEL_PROVIDER_RESERVATION_NOT_ACTIVE"],
+    ["model_provider_reconciliation_not_found", "MODEL_PROVIDER_RECONCILIATION_NOT_FOUND"],
+    ["model_provider_reconciliation_conflict", "MODEL_PROVIDER_RECONCILIATION_CONFLICT"],
+    ["model_provider_reserved_cost_exceeded", "MODEL_PROVIDER_RESERVED_COST_EXCEEDED"],
+  ])("names %s instead of reporting a generic ledger failure", async (message, code) => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message }), { status: 400 })));
+    await expect(reconcileModelProviderSpend({ tenantId: base.tenantId, reservationId,
+      outcome: "settled", actualUnits: 8, reasonCode: "PROVIDER_EVIDENCE_CONFIRMED" }))
+      .resolves.toEqual({ ok: false, code });
+  });
+
+  it("still reports an unrecognised ledger message as a ledger failure", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "connection reset" }), { status: 500 })));
+    await expect(reconcileModelProviderSpend({ tenantId: base.tenantId, reservationId,
+      outcome: "settled", actualUnits: 8, reasonCode: "PROVIDER_EVIDENCE_CONFIRMED" }))
+      .resolves.toEqual({ ok: false, code: "MODEL_PROVIDER_LEDGER_FAILED" });
+  });
 });
 
 describe("model-provider spend migration contract", () => {

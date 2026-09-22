@@ -132,6 +132,16 @@ function refused(reason: AdaptiveRouterActivationReason, contract?: AdaptiveRout
  * The adaptive router is off unless a caller supplies the exact sealed contract expected by
  * deployment and every independent evidence stage has a unique, immutable passing receipt.
  * This module does not read an environment variable or activate any route by itself.
+ *
+ * Authority (decided 2026-09-21; lib/router-activation-authority.test.ts enforces it): candidate
+ * execution is turned on by adaptive_router_rollout_heads.state together with the policy
+ * revision's candidateBasisPoints, resolved inside resolve_adaptive_router_policy_v1. That is
+ * the ONLY switch. This function is an operator-side preflight for the human about to call
+ * transition_adaptive_router_rollout_v1 with canary or active: it refuses a contract whose five
+ * evidence stages are incomplete, failed, duplicated or chronologically impossible. It is
+ * deliberately not wired into the request path -- a second runtime gate could disagree with the
+ * head row, and "code says off, database says active" is the failure nobody sees.
+ * See docs/runbooks/ROUTER_SHADOW_ROLLOUT.md.
  */
 export function evaluateAdaptiveRouterActivation(
   value: unknown,

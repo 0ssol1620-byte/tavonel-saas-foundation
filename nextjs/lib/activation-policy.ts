@@ -69,8 +69,20 @@ export const activationPolicy = {
     enabled per account") was not taken: there is no per-account intake flag anywhere in this
     repository -- `activationPolicy` is one deployment-wide boolean -- so it would have described
     a mechanism the code does not have.
+
+    COPY-TRUST, 2026-09-22. BA-118's fix regressed: by this branch the string read "remains closed
+    until every security precondition has current production evidence and an exact-workspace
+    approval receipt", which is the internal vocabulary it had just removed, back on the same
+    surfaces plus /integrations and the landing's closing scene. It is the most-rendered sentence
+    on this site, and it led with a closure and cited two receipts a reader cannot open.
+
+    Same two facts, reader first: the public World is readable in full today, and compiling your
+    own sources goes through us rather than through a checkout. Nothing is offered that the gate
+    does not allow -- `enabled` is still false, every route guarding on it still refuses, and the
+    capability grid still prints "Closed" in the state column beside this note. The limit is
+    disclosed where the customer meets it; it is not the first thing the sentence says.
   */
-  customerData: { enabled: false, reason: "Customer-data compilation remains closed until every security precondition has current production evidence and an exact-workspace approval receipt." },
+  customerData: { enabled: false, reason: "A finished Compiled World is open to read in full today, with its evidence attached. Compiling your own sources is set up with us rather than enabled by a plan purchase." },
 } as const;
 
 export type ActivationCapability = keyof typeof activationPolicy;

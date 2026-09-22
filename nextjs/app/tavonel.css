@@ -1364,7 +1364,14 @@
      became a cross-axis rule and every block shrink-wrapped -- the /enterprise card grid measured
      1,183px inside a 1,380px column, a third measure on a page that should have one. */
   .policy-copy { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
-  .policy-copy h2 { margin: 20px 0 0; font-size: 18px; letter-spacing: -0.01em; }
+  /*
+    UI-SWEEP 2026-09-22. The leading is stated because nothing else stated it: the inherited
+    value resolved to 20.16px on 18px -- 1.12 -- which is display leading applied to a heading
+    that wraps to two and three lines on a phone. The measured case is "Your statutory rights,
+    which this rule does not touch" on /refunds at 360px. 1.3 is the ratio the 24/32 step of the
+    type scale already uses, carried down to this size.
+  */
+  .policy-copy h2 { margin: 20px 0 0; font-size: 18px; line-height: 1.3; letter-spacing: -0.01em; }
   /*
     pages-23. `/status` now renders this document inside the public chrome, and its five sections
     are real `<h2>`s rather than `<h3>`s under an `<h1>` -- which exposed that the 18px above is
@@ -1927,6 +1934,24 @@
   .usage-estimator dl div { display: flex; justify-content: space-between; gap: 20px; align-items: baseline; padding: 12px 14px; background: var(--g1); }
   .usage-estimator dt { font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; color: var(--text-lo); }
   .usage-estimator dd { margin: 0; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+  /*
+    Gap #5. The corpus shape, and how it meets the ceilings, in the calculator that prices it.
+
+    Two controls where there was one, side by side until the column is too narrow for both, and
+    the fit rows spanning the whole widget under them -- they belong to the selection, not to the
+    money column, and reading them beside the totals would suggest the plan sets them.
+  */
+  .usage-estimator-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px clamp(16px, 3vw, 34px); }
+  .usage-estimator-inputs p { margin: 0; }
+  .usage-estimator-inputs input { width: 100%; }
+  .usage-estimator-fit { grid-column: 1 / -1; }
+  .usage-estimator-fit dt { display: grid; grid-template-columns: 1.2em auto; column-gap: 9px; align-items: baseline; color: var(--text-hi); }
+  .usage-estimator-fit dt > span { font-family: var(--f-mono); color: var(--text-lo); }
+  .usage-estimator-fit dt small { grid-column: 2; margin-top: 3px; font-size: 12px; letter-spacing: 0; color: var(--text-lo); }
+  .usage-estimator-fit dd { text-align: right; }
+  .usage-estimator-fit dd small { display: block; margin-top: 3px; font-size: 12px; letter-spacing: 0; color: var(--text-lo); }
+  .usage-estimator-fit div[data-fit="within"] dt > span { color: var(--verified); }
+  .usage-estimator-fit div[data-fit="refused"] dt > span { color: var(--changed); }
   /* A plan card is a third of a column, and at 1280 that is about 190px of content box. The
      labels here are full sentences -- "Choose this plan -> sign in" says what happens next, which
      is worth more than the one line it costs -- so the button wraps instead of running past the
@@ -1993,7 +2018,9 @@
     transition: color var(--dur-3) var(--ease-out), border-color var(--dur-3) var(--ease-out);
   }
   @media (hover: hover) and (pointer: fine) {
-    .site-links a:hover { color: var(--text-hi); border-color: var(--verified-dim); }
+    /* Both rules, because the underline is a border at wide widths and a text-decoration below
+       1080px, where the link grows to the 44px touch floor. */
+    .site-links a:hover { color: var(--text-hi); border-color: var(--verified-dim); text-decoration-color: var(--verified-dim); }
   }
   footer.site { position: relative; z-index: 10; border-top: 1px solid var(--hairline); padding: 40px 0 calc(var(--bar) + 40px) var(--rail); background: var(--ground); }
   /*
@@ -2359,6 +2386,12 @@
   /* A column head is a label, not a machine identifier: sans, at the floor, not 9px mono caps. */
   .docs-table th { color: var(--text-lo); font: 500 var(--t-1) / 1.4 var(--f-sans); letter-spacing: 0.02em; }
   .docs-table td { color: var(--text-lo); }
+  /* Gap #14. A plan cell says which of the three states it is in; the tick is the one that is
+     coloured, so a scan down the column does not read an absence as a quieter yes. */
+  .docs-table td[data-state] { white-space: nowrap; font-family: var(--f-sans); font-size: var(--t-1); letter-spacing: 0.06em; }
+  .docs-table td[data-state="provided"] { color: var(--verified); font-size: 14px; letter-spacing: 0; }
+  .docs-table td[data-state="planned"] { color: var(--changed); }
+  .docs-table td[data-state="not_sold"] { color: var(--text-lo); }
   .docs-table code { color: var(--text-hi); font: var(--t-2) var(--f-mono); }
 
   .docs-pager { display: flex; justify-content: space-between; gap: 16px; padding-top: 18px; border-top: 1px solid var(--hairline); font: var(--t-1) var(--f-sans); }
@@ -3525,6 +3558,139 @@
   .src-para { margin: 0; max-width: 72ch; font-size: 13.5px; line-height: 1.66; color: var(--text-mid); }
   .src-para b { color: var(--text-hi); font-weight: 500; }
 
+  /*
+    The four denominators over the tier chips (/sources, gap #4 of the 2026-09-22 audit).
+
+    Counted from the manifest at render time by `capabilityCensus`, so there is no written
+    number here to drift. It is a row of figures rather than a fifth table column because none of
+    them is per-format: they are what the twelve rows below add up to.
+  */
+  .src-census {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    margin: 0;
+    background: var(--seam);
+    border: 1px solid var(--hairline);
+  }
+  .src-census > div { padding: 14px 16px; background: var(--ground); }
+  .src-census dt {
+    margin: 0 0 6px;
+    font-family: var(--f-sans);
+    font-size: var(--t-1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+  .src-census dd { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-mid); }
+  .src-census dd b { display: block; font: 400 24px/1 var(--f-mono); color: var(--text-hi); }
+  @media (max-width: 620px) {
+    .src-census { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /*
+    The Provided / Roadmap / Not provided table (/trust, /security, /enterprise).
+
+    It reuses `.docs-table` and the `.src-tier` chip rather than growing a third table style:
+    the chip already encodes the four status colours and prints its state as a word, which is the
+    property that matters -- a glyph-only cell reads as a score. A seam between the state groups
+    is the only rule this adds, so a reader can see where "in place" ends.
+  */
+  .trust-provisions tbody + tbody > tr:first-child > * { border-top: 1px solid var(--hairline-hi); }
+  .trust-provisions td, .trust-provisions th { vertical-align: top; }
+  .trust-provisions tbody th { font-weight: 400; color: var(--text-hi); min-width: 16ch; }
+  /* `.policy-copy a` covers /trust and /enterprise; /security has no policy wrapper, and the
+     global reset is `color: inherit; text-decoration: none`, so the source link would render as
+     prose on exactly the page a reviewer checks the sources on. */
+  .provision-source {
+    color: var(--text-lo);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .provision-source:hover { color: var(--text-hi); }
+  }
+
+  /*
+    The public sample, framed (/enterprise, gap #15).
+
+    The label is positioned inside the border rather than placed above it: the thing being
+    guarded against is the frame travelling into a deck without the words "SYNTHETIC DATA", and a
+    caption above the artifact is the first thing a crop loses.
+  */
+  .sample-frame { margin: 0; display: grid; gap: 12px; }
+  .sample-frame-art {
+    position: relative;
+    padding: 44px 20px 20px;
+    border: 1px solid var(--hairline-hi);
+    background: var(--g1);
+  }
+  .sample-frame-label {
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    font: 400 var(--t-1)/1 var(--f-sans);
+    letter-spacing: 0.14em;
+    color: var(--text-lo);
+  }
+  .sample-frame-grid { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 22px; align-items: start; }
+  /* US Letter, 612 x 792pt. The proxy is the page's proportion and nothing else is drawn on it. */
+  .sample-frame-page {
+    position: relative;
+    aspect-ratio: 612 / 792;
+    border: 1px solid var(--hairline-hi);
+    background: var(--ground);
+  }
+  .sample-frame-page > i {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -20px;
+    font: 400 var(--t-1)/1 var(--f-mono);
+    font-style: normal;
+    letter-spacing: 0.08em;
+    color: var(--text-lo);
+    text-align: center;
+  }
+  /* The one rectangle: the bbox the compile request carries, at its own coordinates. */
+  .sample-frame-region {
+    position: absolute;
+    border: 1px solid var(--verified);
+    background: var(--verified-deep);
+  }
+  .sample-frame-read { display: grid; gap: 12px; min-width: 0; }
+  .sample-frame-q { margin: 0; color: var(--text-hi); font-size: 15px; line-height: 1.5; }
+  .sample-frame-excerpt {
+    margin: 0;
+    padding: 12px 14px;
+    border-left: 1px solid var(--verified-dim);
+    background: var(--ground);
+    font-size: 13.5px;
+    line-height: 1.66;
+    color: var(--text-mid);
+    overflow-wrap: anywhere;
+  }
+  .sample-frame-meta { margin: 0; display: grid; gap: 7px; }
+  .sample-frame-meta > div { display: grid; grid-template-columns: 13ch minmax(0, 1fr); gap: 12px; }
+  .sample-frame-meta dt {
+    margin: 0;
+    font-family: var(--f-sans);
+    font-size: var(--t-1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+  .sample-frame-meta dd { margin: 0; font-size: 13px; color: var(--text-mid); overflow-wrap: anywhere; }
+
+  /* A 148px page proxy beside a column of prose is two unreadable columns on a phone. */
+  @media (max-width: 620px) {
+    .sample-frame-grid { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+    .sample-frame-page { max-width: 148px; }
+    .sample-frame-meta > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
+
   @media (max-width: 760px) {
     .src-matrix thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .src-matrix tr {
@@ -3769,14 +3935,49 @@
     /* Inline links inside running prose: grow the hit area with block padding and take it back
        with an equal negative margin, so the line box keeps its text height and the paragraph does
        not reflow. Unscoped -- the footer, the policy pages and the docs pager are exactly the
-       places that failed, and every one of them sat outside the wrapper this was scoped to. */
-    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb, .notice) a,
+       places that failed, and every one of them sat outside the wrapper this was scoped to.
+
+       BA-249 -- `:not(.tile, .link)`, because the pull-back only cancels on an inline box.
+
+       An inline-level anchor's margin box is what sizes the line box, so +12.5px of padding and
+       -12.5px of margin cancel and the paragraph does not reflow. A card that *is* the anchor is
+       a grid item instead: `a.tile.trust-link` on /trust matched `.policy-copy a`, was blockified
+       out of `.tile`'s own `display: flex` into `display: block` (losing its 9px gap), took
+       12.5px of block padding in place of the authored 16px, and had its margin box -- which is
+       what sizes the row track -- pulled 25px shorter than its border box. Every track came out
+       at the tile's content-box height, every tile overlapped the one below it, and `.tiles`'
+       `overflow: hidden` (there to clip the border radius) sliced the last line off all eight.
+       A card anchor is already a 44px-plus target, so nothing here needs the hit area.
+       `e2e/overflow-audit.spec.ts` measures it now. */
+    :is(.fine, .lede, .policy-copy, .site-footer, .faq, .tile, .link, .docs-pager, .src-matrix, .doc-breadcrumb, .notice) a:not(.tile, .link),
     a[href^="mailto:"],
     a[href^="tel:"] {
       display: inline-block;
       padding-block: 12.5px;
       margin-block: -12.5px;
     }
+    /*
+      G1-TAP, 2026-09-22. Not widened here, and the reason is worth leaving behind.
+
+      The list above is global class names, and a paragraph written inside a CSS module has a
+      hashed class it can never name -- so every module that writes prose reopens this defect on
+      a new route. A 360px sweep over seventeen public routes found four sitting there: `public
+      dataset` and `reference harness` at 18px on /benchmarks, `Integrations` at 18px on
+      /sources, and the Explore frame's `capability manifest` at 16px, since fixed in its own
+      module by the lane that owns it.
+
+      Matching by shape instead -- `main p > a` -- clears all four, and was measured doing so.
+      It is not here because these three declarations are only safe on an inline-level box. The
+      pull-back cancels because the margin box sizes the line box; on a grid or flex item the
+      parent measures the margin box instead, and /trust lost 25px of every row track that way
+      (PR #92). `p > a` is a narrower match than the one that broke, but a paragraph is not
+      guaranteed to be a block container, and a rule that silently blockifies whatever it
+      catches is the wrong instrument for a floor that must hold on every route at once.
+
+      A module that needs the floor opts in from its own stylesheet, where the author can see
+      what the anchor's parent lays out as. `components/evidence/region-highlight.module.css`
+      does that for the one action in its panel.
+    */
     /* Real controls take a real floor. 44, not the 42 that was here: the number in the guideline
        is the number. The wordmark, the sign-in link, the search input, every <summary> and every
        <select> are on the list because each of them was measured under it. */
@@ -3789,6 +3990,12 @@
     .wordmark,
     .nav-signin,
     .site-footer a,
+    /* UI-SWEEP 2026-09-22. `.site-links` is the *other* footer -- the legal nav that
+       `components/policy-layout.tsx` renders on /privacy, /terms, /refunds and /subprocessors.
+       It is not `.site-footer`, so the line above never reached it and all seven links measured
+       22px tall at 360. The underline moves from `border-bottom` to `text-decoration` below, so
+       it keeps hugging the words once the box is 44px. */
+    .site-links a,
     .docs-langs button,
     .changelog-filter button,
     .tag,
@@ -3798,9 +4005,31 @@
     .skip {
       min-height: 44px;
     }
-    :is(.docs-langs button, .changelog-filter button, .tag, summary) {
+    :is(.docs-langs button, .changelog-filter button, .tag, summary, .site-links a) {
       display: inline-flex;
       align-items: center;
+    }
+    /* A target is two-dimensional. These chips already had the 44px row and still measured 40px
+       across on the shortest label ("All" on /changelog at 360), which fails the same guideline
+       on the other axis. */
+    :is(.docs-langs button, .changelog-filter button) {
+      min-width: 44px;
+      justify-content: center;
+    }
+    /* The changelog permalink wraps a `<time>` and measured 26px. Its header is a baseline flex
+       row, so a 44px box would push the row and drop the date off the baseline it shares with
+       the surface tag; it takes the prose pattern instead and the row does not move. */
+    .changelog-entry header a { display: inline-block; padding-block: 10px; margin-block: -10px; }
+    /* The legal footer's underline, restated so it does not sink to the bottom of the taller
+       box. Same hairline, same 1px, 3px off the baseline -- `text-underline-offset` follows the
+       text where `border-bottom` followed the box. */
+    .site-links a {
+      border-bottom: 0;
+      padding-bottom: 0;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-decoration-color: var(--hairline-hi);
+      text-underline-offset: 3px;
     }
   }
 
@@ -4361,6 +4590,28 @@
   .world-diff-sample-digests { margin: 0; padding: 11px 16px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; border-bottom: 1px solid var(--hairline); color: var(--text-lo); font: var(--t-1)/1.6 var(--f-mono); background: var(--g1); }
   .world-diff-sample-fine { margin: 0; padding: 12px 16px; color: var(--text-lo); font-size: 12px; line-height: 1.6; }
   .world-diff-sample-fine a { color: var(--text-mid); text-decoration: underline; text-underline-offset: 3px; }
+
+  /*
+    Gap #10 -- the same panel, carrying every version of the sample World instead of one arrival.
+    It reuses the rules above and adds only the step list. The figures come from five frozen
+    compiles; this file frames them and computes nothing.
+  */
+  .world-recompile-steps { margin: 0; padding: 0; list-style: none; }
+  .world-recompile-steps > li { border-bottom: 1px solid var(--hairline); }
+  .world-recompile-steps > li:last-child { border-bottom: 0; }
+  .world-recompile-steps .world-diff-sample-rows > div:last-child { border-bottom: 0; }
+  .world-recompile-steps .world-diff-sample-digests { border-bottom: 0; }
+  .world-recompile-step-head {
+    margin: 0;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    background: var(--ground);
+  }
+  .world-recompile-step-head b { color: var(--text-hi); font-size: 13px; font-weight: 540; }
+  .world-recompile-step-head span { color: var(--text-lo); font: var(--t-1)/1.6 var(--f-mono); overflow-wrap: anywhere; }
 
   /*
     T1-007 (cross-lane from `seo-tech`) -- an inline link inside a paragraph is underlined.

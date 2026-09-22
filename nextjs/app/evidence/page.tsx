@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustNext } from "@/components/trust-next";
+import RegionHighlight from "@/components/evidence/region-highlight";
+import { sampleEvidencePage } from "@/lib/evidence-regions";
 import styles from "./evidence.module.css";
 
 export const metadata: Metadata = {
@@ -157,6 +159,25 @@ export default function EvidencePage() {
                 have no customers. The consent policy is a policy, so it is stated once, on
                 /trust, as one. What is gone is the count.
               */}
+
+              {/*
+                G1-019 / gap #3, 2026-09-22. The page whose subject is that a result can be
+                followed to the place it came from had no place on it: the evidence example was
+                a tile reading "PDF -- Page and region on that page." Both sentences are true and
+                neither shows anything.
+
+                What is here now is the mechanism running on the public sample World: a committed
+                render of a real filing page, with every region that World read out of it drawn
+                at the compiler's own coordinates. Hover or tab to one and the excerpt and the
+                locator it carries are printed beside it. There is no grid and no cell -- this
+                deployment does not extract table structure, and drawing one would show a
+                capability the manifest says is absent.
+              */}
+              <h2>One page, and every region a World read from it</h2>
+              <RegionHighlight
+                view={sampleEvidencePage()}
+                caption="From the public sample World. Each box is a region the compiler recorded, at the coordinates it recorded; the excerpt is the source's own text, and the locator under it is what a result cites."
+              />
 
               <h2>What an exact source location is</h2>
               <p className="fine">

@@ -60,6 +60,14 @@ nextjs/scripts/check-type-floor.mjs text eol=lf
 nextjs/scripts/fetch-explore-sec-corpus.mjs text eol=lf
 nextjs/scripts/verify-developer-clean-install.mjs text eol=lf
 nextjs/scripts/journey/*.mjs text eol=lf
+nextjs/scripts/qa/*.mjs text eol=lf
+
+# Every node script under scripts/ opens with a hashbang, and lib/journey-acceptance.test.ts
+# fails on a CRLF one: a Linux shell resolves the interpreter as `node`, and the module
+# transform applied to an imported .mjs stops on the stray carriage return. The individual pins
+# above predate this line and are kept; this one covers the class, including the three scripts a
+# fresh Windows checkout was still getting CRLF hashbangs on.
+nextjs/scripts/**/*.mjs text eol=lf
 
 # The two reference verifiers are copied verbatim to nextjs/public/developer/ as
 # tavonel-verify-export.mjs and tavonel-verify-package.mjs, pinned by sha256 in
@@ -83,11 +91,13 @@ nextjs/public/research/receipts/*.json -text
 nextjs/public/brand/*.svg text eol=lf
 nextjs/public/icon.svg text eol=lf
 
-# The three that the hashbang assertion in lib/journey-acceptance.test.ts had been failing on for
-# every Windows checkout: they open with `#!/usr/bin/env node` and were never pinned, so
-# core.autocrlf gave them a `\r` hashbang. That is also why vitest could not import
-# scripts/db/*.test.mjs at all -- the transform stopped on the carriage return in the script the
-# test imports and blamed the import line. Pinned here, and `scripts/db/*.mjs` as a whole so the
-# operator drills beside them cannot pick up the same defect.
-nextjs/scripts/gdp-pdf-evidence-check.mjs text eol=lf
-nextjs/scripts/db/*.mjs text eol=lf
+# Committed benchmark artifacts. Each one is bound by sha256 in a lib module and rehashed by a
+# test, so their bytes must be identical in a Windows working tree and on a Linux CI runner.
+nextjs/content/benchmarks/*.json text eol=lf
+
+# Operator scripts carry a hashbang and are executed directly by a shell. A CRLF checkout puts the
+# carriage return inside the interpreter path; lib/journey-acceptance.test.ts pins it. That is also
+# why vitest could not import scripts/db/*.test.mjs at all -- the transform stopped on the carriage
+# return in the script the test imports and blamed the import line. The glob covers every script,
+# so the deletion drills cannot pick the same defect back up.
+nextjs/scripts/**/*.mjs text eol=lf

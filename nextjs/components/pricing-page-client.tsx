@@ -37,6 +37,7 @@ import {
   `/sources` and in the changelog and nowhere near the page where the money decision is made.
 */
 import { PROCESSING_CEILING, PROCESSING_CEILING_MIB } from "../../shared/intakeCeiling";
+import { corpusFit, LIMIT_STATE_GLYPH, LIMIT_STATE_LABEL } from "@/lib/plan-limit-fit";
 
 /*
   Plans come from the billing catalog, not from a second list kept next to it.
@@ -221,7 +222,7 @@ const REFUND_MAX_CONSUMED_PERCENT = Math.round(REFUND_MAX_CONSUMED_FRACTION * 10
 */
 function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
   const activation = planCapabilities.find((row) => row.level === "activation");
-  const activationPlans = activation?.plans.filter((plan) => plan.allowed).map((plan) => plan.label) ?? [];
+  const activationPlans = activation?.plans.filter((plan) => plan.state === "provided").map((plan) => plan.label) ?? [];
   return [
     [
       "Base subscription",
@@ -454,12 +455,50 @@ export type PurchaseGate = {
   reason: string;
 };
 
+/*
+  G2-002 / gap #14, 2026-09-22. Three states, because a checkmark answers a question this table
+  is not allowed to answer.
+
+  Every cell used to be `allowed` -- one boolean from `billingProductDecision`, printed as a tick
+  or a dash. That is correct for the six entitlement rows and wrong for the thing a buyer reads
+  the table for, because the capability a plan is chosen on is the one it does not have yet. The
+  catalog already names those: `notYetSold` on the Team offer lists shared members, roles and
+  per-member source permissions, and the plan card prints them. The table did not, so the only
+  place a buyer met them was a card they had already scrolled past.
+
+  So a cell is one of three, and only the first ever renders a tick:
+
+    provided   `billingProductDecision` admits this plan at this route's level, today.
+    planned    the plan names it in `notYetSold`: a differentiator, not sold yet, not billed.
+    not_sold   it is not part of this plan at all.
+
+  Nothing here is typed out. `planned` is a plan listing the capability in its own catalog entry,
+  `not_sold` is a plan that does not, and a capability that ships leaves `notYetSold` -- which
+  deletes its row from this half of the table and adds it to the entitlement half, with no edit
+  to the page. `lib/plan-feature-matrix.test.ts` fails if any cell that is not `provided` renders
+  a checkmark.
+*/
+export type PlanFeatureState = "provided" | "planned" | "not_sold";
+
+export const PLAN_FEATURE_STATE_LABEL: Record<PlanFeatureState, string> = {
+  provided: "✓",
+  planned: "Planned",
+  not_sold: "Not sold",
+};
+
+/** The accessible name, because a tick and the word "Planned" are not read the same way. */
+export const PLAN_FEATURE_STATE_NAME: Record<PlanFeatureState, string> = {
+  provided: "Provided",
+  planned: "Planned, not sold with this plan yet",
+  not_sold: "Not sold with this plan",
+};
+
 export type PlanCapabilityRow = {
   capability: string;
-  /** The route file whose access check this row's level is taken from. */
-  route: string;
-  level: "observer" | "studio" | "activation";
-  plans: ReadonlyArray<{ label: string; saleChannel: string; allowed: boolean }>;
+  /** The route file whose access check this row's level is taken from; absent on an unsold row. */
+  route?: string;
+  level?: "observer" | "studio" | "activation";
+  plans: ReadonlyArray<{ label: string; saleChannel: string; state: PlanFeatureState }>;
 };
 
 /*
@@ -629,9 +668,24 @@ export default function PricingPageClient({
     pages, so the control opens on "your plan already covers this" rather than on a figure
     nobody chose.
   */
-  const [pages, setPages] = useState<number>(BILLING_OFFERS.observer_access.includedPages);
+  /*
+    Gap #5 (V-5). One corpus, described the way a buyer holds it, priced and measured at once.
+
+    The control was a single "Processed pages" box, and a page count alone cannot answer the
+    question a buyer asks before the price: does this corpus compile here? That answer needs the
+    shape -- how many sources, and how long the longest one is -- because every ceiling in this
+    deployment is per source or per run, never per month. So the estimator reads the shape and
+    derives the volume from it, which also stops the calculator from stating a page total that
+    the selection beside it contradicts.
+
+    The defaults multiply to the Developer plan's included pages, which is where BA-128 put the
+    old single control: the calculator still opens on "your plan already covers this".
+  */
+  const [sources, setSources] = useState<number>(25);
+  const [pagesPerSource, setPagesPerSource] = useState<number>(20);
+  const fit = corpusFit(sources, pagesPerSource);
   const { start: startCheckout, busy: billingBusy } = useCheckout(setNotice);
-  const estimate = estimatorRows(pages);
+  const estimate = estimatorRows(fit.pages);
 
   /*
     §32 `pricing_plan_viewed`, fired when the grid is actually on screen.
@@ -820,7 +874,7 @@ export default function PricingPageClient({
                     */}
                     {plan.notYetSold.length > 0 ? (
                       <>
-                        <p className="fine"><b>Coming, not yet sold</b></p>
+                        <p className="fine"><b>Not sold with this plan</b></p>
                         <ul>{plan.notYetSold.map((item) => <li key={item}>{item}</li>)}</ul>
                       </>
                     ) : null}
@@ -1018,7 +1072,7 @@ export default function PricingPageClient({
               `billingProductDecision(plan, level)` from the server component, and the level on
               each row is read from the route that enforces it.
             */}
-            <h3 id="plan-capability-title">What each plan can do</h3>
+            <h3 id="plan-capability-title">What each plan can do, and what it does not</h3>
             <div className="table-scroll">
             <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-capability-title">
               <thead>
@@ -1043,8 +1097,13 @@ export default function PricingPageClient({
                   <tr key={row.capability}>
                     <th scope="row">{row.capability}</th>
                     {row.plans.map((plan) => (
-                      <td key={plan.label} data-label={plan.label} data-allowed={plan.allowed ? 1 : 0} aria-label={plan.allowed ? "Yes" : "No"}>
-                        {plan.allowed ? "✓" : "—"}
+                      <td
+                        key={plan.label}
+                        data-label={plan.label}
+                        data-state={plan.state}
+                        aria-label={PLAN_FEATURE_STATE_NAME[plan.state]}
+                      >
+                        {PLAN_FEATURE_STATE_LABEL[plan.state]}
                       </td>
                     ))}
                   </tr>
@@ -1058,8 +1117,11 @@ export default function PricingPageClient({
               One paragraph, said once.
             */}
             <p className="fine">
-              Every row is answered for the workspace owner, the role a buyer of either plan holds
-              in their own workspace. The free evaluation reaches the{" "}
+              A row marked Planned is a capability the plan names in its own catalog entry as not
+              sold yet; it is not billed, not enabled by buying the plan, and not a date. A row
+              marked Not sold is not part of that plan at all. Only a capability the API admits
+              today carries a tick. Every row is answered for the workspace owner, the role a
+              buyer of either plan holds in their own workspace. The free evaluation reaches the{" "}
               {BILLING_OFFERS.observer_access.label} rows that do not activate a World, inside its
               file and page limits; activating one needs a paid plan, which is why it has no column
               here. An Enterprise scope is agreed in the conversation rather than compared against
@@ -1108,17 +1170,53 @@ export default function PricingPageClient({
                     straight to the calculator never passes the sentence under the plan grid. */}
                 <h3 id="usage-estimator-title">What will this corpus cost?</h3>
                 <p className="fine">All figures in US dollars, excluding tax.</p>
-                <label htmlFor="pricing-pages">Processed pages</label>
-                <input
-                  id="pricing-pages"
-                  type="number"
-                  min="1"
-                  max="10000"
-                  step="1"
-                  value={pages}
-                  onChange={(event) => setPages(Number(event.target.value))}
-                />
+                <div className="usage-estimator-inputs">
+                  <p>
+                    <label htmlFor="pricing-sources">Sources in this run</label>
+                    <input
+                      id="pricing-sources"
+                      type="number"
+                      min="1"
+                      max={CORPUS_MAX_DOCUMENTS * 2}
+                      step="1"
+                      value={sources}
+                      onChange={(event) => setSources(Number(event.target.value))}
+                    />
+                  </p>
+                  <p>
+                    <label htmlFor="pricing-pages">Pages in the longest source</label>
+                    <input
+                      id="pricing-pages"
+                      type="number"
+                      min="1"
+                      max={PROCESSING_CEILING.maxSourcePages * 2}
+                      step="1"
+                      value={pagesPerSource}
+                      onChange={(event) => setPagesPerSource(Number(event.target.value))}
+                    />
+                  </p>
+                </div>
               </div>
+              {/*
+                Gap #5. What the selection above meets before it meets a price.
+
+                Every row states the ceiling it is measured against and says on which plans that
+                ceiling holds, which on this deployment is all of them. A reader who came looking
+                for the plan that lifts the 80-page ceiling reads here that there is not one,
+                instead of buying and finding out.
+              */}
+              <dl className="usage-estimator-fit" aria-label="How this corpus meets the compile ceilings">
+                {fit.rows.map((row) => (
+                  <div key={row.id} data-fit={row.state}>
+                    <dt>
+                      <span aria-hidden="true">{LIMIT_STATE_GLYPH[row.state]}</span>
+                      {row.label}
+                      <small>{LIMIT_STATE_LABEL[row.state]}</small>
+                    </dt>
+                    <dd>{row.value}<small>{row.ceiling}</small></dd>
+                  </div>
+                ))}
+              </dl>
               <dl>
                 <div><dt>{BILLING_OFFERS.observer_access.label} total, USD</dt><dd>{formatUsd(estimate.developerTotalUsd)}</dd></div>
                 <div><dt>{BILLING_OFFERS.studio_access.label} total, USD</dt><dd>{formatUsd(estimate.teamTotalUsd)}</dd></div>

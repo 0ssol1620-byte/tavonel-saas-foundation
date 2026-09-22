@@ -1,6 +1,7 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { PublicPageShell } from "@/components/public-page-shell";
+import SolutionProofSample from "@/components/solution-proof-sample";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { SOLUTIONS } from "./[slug]/page";
 import styles from "./solutions.module.css";
@@ -78,6 +79,17 @@ export default function SolutionsPage() {
                 <h2 className={styles.cardTitle}>
                   <Link href={`/solutions/${slug}` as Route}>{solution.title}</Link>
                 </h2>
+                {/*
+                  Gap #11. Five cards, five different filings, cut from the page each one printed on.
+
+                  The hub was five text cards with no image on any of them, and the failure the
+                  audit warns against is five copies of one document -- G1-016 in a new place.
+                  Nothing new is selected here: each solution's `proof.match` already locates a
+                  region the compiler emitted in the filing that solution's own audience would be
+                  reading, and the thumbnail is the committed render of that page cropped to that
+                  region. Nothing drawn, nothing authored, no raster committed for this.
+                */}
+                <SolutionProofSample pick={solution.proof} variant="thumb" />
                 <p className={styles.audience}>For: {solution.audience}</p>
                 <p className={styles.problem}>{solution.problem}</p>
                 <p>{solution.lede}</p>

@@ -82,6 +82,21 @@ begin
   r := public.claim_foundation_job('worker-sync-v3-aaaaaaaaaaaaaaaa',120,array['source_import']::public.foundation_job_type[]);
   assert r->>'job_id'='job-'||repeat('f',32), 'v3 worker claims Google lifecycle';
   perform public.complete_foundation_job_batch('pilot-cptest','job-'||repeat('f',32),'worker-sync-v3-aaaaaaaaaaaaaaaa','succeeded',1,1,gcursor);
+  -- connector_checkpoint_target_mismatch is raised in two places and was asserted in neither.
+  -- It is the guard that stops a checkpoint written for one target from being handed to a sync
+  -- of a different one, which would resume a folder from another folder's watermark and skip
+  -- every file between them. The digest collides only if the targets are equal, so a mismatch
+  -- here means the stored target really did change under a stable key.
+  update public.foundation_connector_checkpoints set target = '{"rootPath":"/moved"}'::jsonb
+    where workspace_key='pilot-cptest' and oauth_connection_id=gconn;
+  begin
+    r := public.enqueue_connector_sync('job-'||repeat('1',32),'pilot-cptest',actor,gconn,'{}');
+    raise exception 'target mismatch unexpectedly admitted';
+  exception when raise_exception then
+    if sqlerrm <> 'connector_checkpoint_target_mismatch' then raise; end if;
+  end;
+  update public.foundation_connector_checkpoints set target = '{}'::jsonb
+    where workspace_key='pilot-cptest' and oauth_connection_id=gconn;
   r := public.enqueue_connector_sync('job-'||repeat('0',32),'pilot-cptest',actor,gconn,'{}');
   assert r->>'created'='true', 'Google subsequent poll admitted';
   assert (select cursor_token=gcursor from public.foundation_jobs where workspace_key='pilot-cptest' and job_id='job-'||repeat('0',32)), 'Google change checkpoint inherited';

@@ -3,7 +3,10 @@ import Link from "next/link";
 import type { Route } from "next";
 import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import SampleWorldFrame from "@/components/sample-world-frame";
+import TrustProvisions from "@/components/trust-provisions";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { signedProductDemo } from "@/lib/signed-product-demo";
 
 export const metadata: Metadata = {
   title: "Enterprise — TAVONEL",
@@ -71,17 +74,21 @@ export default function EnterprisePage() {
               </div>
 
               <h2>Follow one result back to its source</h2>
-              <p className="fine">PUBLIC SAMPLE · SYNTHETIC DATA</p>
+              {/*
+                Gap #15, 2026-09-22. This section used to be the words "PUBLIC SAMPLE ·
+                SYNTHETIC DATA" above four cards describing a sample, with the sample nowhere
+                on the page. The frame below is the sample: the real cited excerpt, page and
+                evidence region that `lib/signed-product-demo.ts` compiles at build time from
+                the repository's own synthetic PDFs, with the label inside the border so a crop
+                cannot part the two. The four cards stay, under it, as the steps it went through.
+              */}
+              <SampleWorldFrame demo={signedProductDemo} />
               <div className="chain">
                 <article className="link"><h3>Source</h3><p>A labeled sample page and source version.</p></article>
                 <article className="link"><h3>Change</h3><p>A candidate records what was added, changed or removed.</p></article>
                 <article className="link"><h3>Approval</h3><p>A person accepts or refuses the candidate; there is no silent activation.</p></article>
                 <article className="link"><h3>Result</h3><p>An answer opens its evidence, and a signed candidate package can be verified offline.</p></article>
               </div>
-              <p className="fine">
-                This synthetic sample demonstrates the source-to-answer review flow. Deployment
-                evidence for a qualified review is provided against the agreed customer scope.
-              </p>
 
               <h2>How it is run</h2>
               <div className="chain">
@@ -108,6 +115,12 @@ export default function EnterprisePage() {
                 inputs and named-contact support before any material is provided. Processing your
                 own documents is arranged with us and is not enabled by purchasing a plan.
               </p>
+              {/*
+                Gap #6 + #15, 2026-09-22. The security buyer arrives here, not on /trust, and the
+                paragraph below sent them to two other pages to find out what is not provided.
+                Same content module, same three states, same rows as /trust and /security.
+              */}
+              <TrustProvisions id="enterprise-provisions" heading="What a security review gets, and what it does not" />
               <p className="fine">
                 Review the maintained public record in the <Link href={"/trust" as Route}>Trust Center</Link> and{" "}
                 <Link href={"/security" as Route}>Security</Link>. Deployment-specific architecture,
