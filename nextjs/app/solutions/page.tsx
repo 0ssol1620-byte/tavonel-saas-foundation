@@ -103,8 +103,8 @@ export default function SolutionsPage() {
           <p className="fine">
             Next: the guides, samples and research in the{" "}
             <Link href="/resources">resources hub</Link>, or the exact product contract in the{" "}
-            <Link href="/docs">documentation</Link>. A described use is not a completed customer
-            case, and none of these five pages is written as one.
+            <Link href="/docs">documentation</Link>. These five pages describe how the compiler
+            is used, not completed customer engagements.
           </p>
         </div>
       </div></div></section>

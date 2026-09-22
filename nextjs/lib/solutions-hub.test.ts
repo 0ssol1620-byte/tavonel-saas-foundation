@@ -72,15 +72,21 @@ describe("the solutions hub", () => {
       the old lede, in both directions: the disclaimer may not return to the top, and it may not
       quietly disappear from the bottom either.
     */
-    expect(shipped).toContain("A described use is not a completed customer");
+    /*
+      The 2026-09-22 copy cleanup restated the foot sentence positively: "These five pages
+      describe how the compiler is used, not completed customer engagements." Same fact, same
+      place, so this still refuses both directions -- it may not return to the lede, and it may
+      not disappear from the foot.
+    */
+    expect(shipped).toContain("not completed customer engagements");
     const lede = shipped.match(/<p className="lede">([\s\S]*?)<\/p>/)?.[1] ?? "";
     expect(lede, "the hub has a lede").not.toBe("");
     expect(lede).toContain("Five ways teams put the compiler to work");
     expect(lede, "the lede does not disqualify its own five entries")
-      .not.toContain("not a completed customer");
+      .not.toContain("not completed customer engagements");
     const fine = shipped.match(/<p className="fine">([\s\S]*?)<\/p>/)?.[1] ?? "";
     expect(fine, "and it is the page's closing line instead")
-      .toContain("A described use is not a completed customer");
+      .toContain("not completed customer engagements");
   });
 
   /*
