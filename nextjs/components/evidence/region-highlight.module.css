@@ -165,6 +165,28 @@
   max-width: 62ch;
 }
 
+/*
+  ...and on /ko, "anywhere" is not enough to make that true.
+
+  `app/one-path.css` gives every Korean text element `word-break: keep-all` and
+  `overflow-wrap: break-word`, at a specificity of (0,1,1) -- higher than the (0,1,0) of the
+  class above -- so on /ko the rule that wins replaces `anywhere` with `break-word`. The two
+  keywords are not interchangeable here: `anywhere` contributes soft-wrap opportunities to
+  min-content sizing and `break-word` does not. A 64-character digest therefore kept a 511px
+  min-content on /ko, which became the base size of the detail's grid track, which the 62ch cap
+  held at 446px inside a 282px container -- and the home hero pushed /ko 125px sideways at 360px
+  while / was clean. Measured on the PR preview, 2026-09-22.
+
+  `break-all` rather than a wider `word-break` override, and scoped to the locator alone: this
+  line is a page number, a box and a hex digest. It has no word to keep whole in any language,
+  which is exactly what the Korean rule is protecting everywhere else. (0,2,0) beats (0,1,1)
+  without an `!important` and without either file knowing about the other's layer.
+*/
+.detail .locator {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
 .source {
   margin: 0;
   font-size: 12.5px;

@@ -42,14 +42,22 @@ test.describe("visual continuity — locked film side", () => {
     */
     await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
     /*
-      Founder decision 2026-09-20: the hero shows the four locked compile cuts again (centred
-      statement, films below), so the stage player's tablist is back beside Scene 02's. Two
-      tablists, and the hero one carries exactly the four cuts -- cut 4 included, by that decision.
-      The retired One-Path markup (.one-path-world-stage, one-path-works-film) still stays out.
+      Founder decision 2026-09-20: the four locked compile cuts are on the entry page again, and
+      the stage player's tablist is back beside the compiler specimen's. Gap #1 (2026-09-22) moved
+      the film out of the hero into Scene 02, "How it compiles", so both tablists are now in that
+      one landmark and the hero has none.
+
+      What this asserts did not weaken with the move. The page still carries exactly three
+      tablists; the film still carries exactly the four cuts -- cut 4 included, by that decision --
+      and it is now pinned to the film's own tablist rather than to whatever happened to be in a
+      section, which is the stricter form of the same statement. The hero is asserted to have no
+      tabs at all, which is new. The retired One-Path markup (.one-path-world-stage,
+      one-path-works-film) still stays out.
     */
     await expect(page.getByRole("tablist")).toHaveCount(3);
-    await expect(page.locator("#s1").getByRole("tab")).toHaveCount(4);
-    await expect(page.locator("#s2").getByRole("tab")).toHaveCount(5);
+    await expect(page.locator("#s1").getByRole("tab")).toHaveCount(0);
+    await expect(page.locator("#s2 .compile-film-stages").getByRole("tab")).toHaveCount(4);
+    await expect(page.locator("#s2 [data-compiler-specimen]").getByRole("tab")).toHaveCount(5);
     await expect(page.locator("#s3").getByRole("tab")).toHaveCount(3);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);

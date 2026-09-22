@@ -180,4 +180,27 @@ describe("the hero panel's geometry below 900px", () => {
     expect(block).toMatch(/\.lv2-hero-stat-value\s*\{[^}]*overflow-wrap:\s*anywhere/);
     expect(block).not.toMatch(/\.lv2-hero-stats[^{]*\{[^}]*(?:min-width|width):\s*\d{3,}px/);
   });
+
+  /*
+    THE ONE THING THIS RUNNER CANNOT MEASURE, PINNED WHERE IT CAN.
+
+    Product QA found the hero pushing /ko 125px sideways at 360px while / was clean, and no test
+    here could see it: there is no layout engine in vitest. The cause was a cascade collision that
+    IS visible in the text. `app/one-path.css` gives every Korean text element
+    `word-break: keep-all` and `overflow-wrap: break-word` at (0,1,1), which outranks the
+    `.locator` class at (0,1,0) -- and `break-word`, unlike `anywhere`, contributes no soft-wrap
+    opportunity to min-content sizing. So on /ko the 64-character digest kept a 511px min-content,
+    that became the base size of the detail's grid track, and the panel overflowed a 282px column.
+
+    `.detail .locator` at (0,2,0) is what wins it back. This asserts the rule is still there and
+    still specific enough, which is the half a unit test can hold; the width itself is Product QA's.
+  */
+  it("keeps the locator breakable on a Korean page, where `anywhere` alone loses the cascade", () => {
+    const panelCss = source("components/evidence/region-highlight.module.css");
+    const rule = panelCss.match(/\.detail\s+\.locator\s*\{[^}]*\}/)?.[0];
+    expect(rule, "the (0,2,0) locator rule is gone; /ko will overflow at 360px again").toBeTruthy();
+    expect(rule).toMatch(/word-break:\s*break-all/);
+    /* The site rule it has to outrank, still in the file it comes from. */
+    expect(source("app/one-path.css")).toMatch(/:lang\(ko\)[^{]*\{[^}]*word-break:\s*keep-all/);
+  });
 });
