@@ -55,7 +55,18 @@
 .ownerStrip { grid-template-columns: auto minmax(0, 1fr); min-height: 36px; padding-block: 6px; }
 .ownerStrip span { color: var(--text-lo); }
 
-.content { max-width: 1520px; width: 100%; margin: 0 auto; }
+/*
+  The shell already puts a 240px rail on the left, so the viewport is asymmetric before this
+  rule runs. Centring what is left of it then adds an equal band on BOTH sides, and the left
+  band lands between the rail and the card where a reader sees it as a missing component
+  rather than as margin. At a 2400px CSS viewport that band measured 320px per side and the
+  card began 600px from the left edge, with the rail ending at 240px.
+
+  So the cap stays and the centring goes: left-aligned against the rail, with the slack
+  collected on the right where a gutter beside a rail is what a reader expects. Below 1024px
+  the rail collapses to a single column and the cap never binds, so nothing changes there.
+*/
+.content { max-width: 1520px; width: 100%; margin: 0; }
 .surfaceTitle { margin: 0 0 4px; color: var(--text-hi); font-size: clamp(22px, 2vw, 28px); font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
 .stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 8px 0 24px; border-bottom: 1px solid var(--hairline-hi); }
 .stateHero > div { display: grid; gap: 8px; }
