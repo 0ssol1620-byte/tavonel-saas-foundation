@@ -50,4 +50,4 @@ export const PROCESSING_CEILING_LIMITATIONS = [
 
 /** One sentence a customer can act on. Used by the refusal copy and the typed 413. */
 export const PROCESSING_CEILING_SENTENCE =
-  `This deployment processes sources up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages.`;
+  `TAVONEL processes sources up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages.`;

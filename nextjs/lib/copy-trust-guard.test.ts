@@ -194,7 +194,12 @@ describe("copy trust guard", () => {
 
     It walks the tree instead of reading a list, because a list is exactly what let the phrase
     survive on `app/evidence/page.tsx` and `components/world-recompile-timeline.tsx` through two
-    passes: both render it, and neither was on anybody's list. The Korean half carries a second
+    passes: both render it, and neither was on anybody's list.
+
+    `../shared` is in the walk because it is not under `nextjs/` and was therefore outside the
+    first tree scan too. `PROCESSING_CEILING_SENTENCE` in `shared/intakeCeiling.ts` opened with
+    the phrase and is rendered on every /docs page and in the upload capability response -- one
+    string, twenty-odd surfaces, invisible to a scan that stops at the app directory. The Korean half carries a second
     rule with it -- `/ko` had drifted to "이 배포판이 하는 일" while the English section already said
     "Read what TAVONEL does", which breaks D12 as well as naming the deployment.
   */
@@ -212,7 +217,7 @@ describe("copy trust guard", () => {
 
   it("never calls the product a deployment, on any surface", () => {
     const offenders: string[] = [];
-    for (const file of [...sources("app"), ...sources("components"), ...sources("lib")]) {
+    for (const file of [...sources("app"), ...sources("components"), ...sources("lib"), ...sources("../shared")]) {
       const source = prose(file)!.toLowerCase();
       for (const phrase of BANNED_VOCABULARY) {
         if (source.includes(phrase)) offenders.push(`${file}: "${phrase}"`);
