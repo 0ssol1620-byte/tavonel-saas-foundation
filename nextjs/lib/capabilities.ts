@@ -38,7 +38,7 @@ export function readCapabilities(status: StatusResponse | null, failed: boolean)
   const policy = status?.activationPolicy ?? {};
 
   const gate = (key: string, name: string, openText: string, closedText: string): Capability => {
-    if (failed) return { name, state: "Unknown", tone: "unknown", note: "Status could not be read from this deployment." };
+    if (failed) return { name, state: "Unknown", tone: "unknown", note: "Status could not be read." };
     const entry = policy[key];
     if (!status || entry?.enabled === undefined) return { name, state: "Checking", tone: "unknown", note: "Reading live deployment state." };
     return entry.enabled
@@ -47,7 +47,7 @@ export function readCapabilities(status: StatusResponse | null, failed: boolean)
   };
 
   const flag = (value: string | undefined, name: string, openValues: string[], openText: string, closedText: string): Capability => {
-    if (failed) return { name, state: "Unknown", tone: "unknown", note: "Status could not be read from this deployment." };
+    if (failed) return { name, state: "Unknown", tone: "unknown", note: "Status could not be read." };
     if (!status || !value) return { name, state: "Checking", tone: "unknown", note: "Reading live deployment state." };
     return openValues.includes(value)
       ? { name, state: "Configured", tone: "open", note: openText }
@@ -55,11 +55,11 @@ export function readCapabilities(status: StatusResponse | null, failed: boolean)
   };
 
   return [
-    gate("customerIntake", "Document intake", "Private-pilot intake is open.", "Intake is closed in this deployment."),
+    gate("customerIntake", "Document intake", "Private-pilot intake is open.", "Intake is closed today."),
     gate("cdr", "Content disarm", "Sanitization runs before anything is read.", "Sanitization is not active."),
     gate("ocrGpu", "OCR on scans", "Qualified GPU OCR is available.", "GPU OCR is gated."),
     gate("candidatePromotion", "Activating a World", "", "Activation is always an explicit human decision. Closed on purpose, not pending."),
-    gate("customerData", "Customer-data compilation", "", "This deployment compiles synthetic sources only. Customer data stays gated until every named security precondition has evidence."),
+    gate("customerData", "Customer-data compilation", "", "TAVONEL compiles synthetic sources only. Customer data stays gated until every named security precondition has evidence."),
     flag(status?.auth, "Google sign-in", ["google_oauth_configured"], "Sign-in is available to pilot users.", "No auth provider is configured here."),
     flag(
       status?.billing,

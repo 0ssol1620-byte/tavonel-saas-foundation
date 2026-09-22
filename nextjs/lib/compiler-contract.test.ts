@@ -789,7 +789,7 @@ describe("the crawl surface for the contract route", () => {
   The drawing has to agree with the clause list it illustrates.
 
   A flowchart is the one element a reader looks at instead of reading eight paragraphs, so a
-  stage drawn solid under a legend that reads "RUNS IN THIS DEPLOYMENT" is a stronger claim than
+  stage drawn solid under a legend that reads "RUNS TODAY" is a stronger claim than
   any sentence on the page. Each stage belongs to a clause; a stage whose clause is graded a
   direction may not be drawn as built. The diagram is a component, and vitest only collects
   `lib/**`, so it is read as text -- which is enough, because the states are literals.

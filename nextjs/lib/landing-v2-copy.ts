@@ -668,8 +668,8 @@ const KO: LandingV2Copy = {
   trust: {
     id: "trust",
     eyebrow: "경계 확인하기",
-    headline: "이 배포판이 하는 일을 읽어 보세요.",
-    support: "이 배포판이 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
+    headline: "TAVONEL이 하는 일을 읽어 보세요.",
+    support: "TAVONEL이 하는 네 가지이며, 각각 확인할 수 있는 곳에 적혀 있습니다.",
     proofs: [
       { id: "training", label: "고객의 자료는 학습 데이터가 아닙니다", note: "고객의 문서는 공용 모델 학습에 사용되지 않습니다. 모델은 World를 컴파일하기 위해서만 원문을 읽습니다.", href: "/security" },
       { id: "evidence", label: "근거는 계속 붙어 있습니다", note: "게시된 객체는 그것이 컴파일된 원문 버전, 페이지, 영역을 함께 가지며, 그것이 없으면 게시되지 않습니다.", href: "/evidence" },

@@ -120,7 +120,7 @@ export default function AuthCallbackPage() {
               <h1>{phase === "access-failed" ? "Workspace access needs attention." : "Sign-in did not complete."}</h1>
               <p className="lead" role="status">
                 {phase === "unconfigured"
-                  ? "No auth provider is configured in this deployment, so sign-in cannot be completed here."
+                  ? "No auth provider is configured, so sign-in cannot be completed here."
                   : phase === "session-failed"
                     ? "Google returned, but no session was established. Please try again."
                     : "Your Google session is valid, but the workspace access check could not be completed. Please try again or contact support if the account should have access."}
