@@ -193,6 +193,10 @@ describe("copy trust guard", () => {
     surface; this is the same rule with no surface left out. The sentences that carried it kept
     every fact they stated and say "today" instead, which is what they meant.
 
+    The Korean half is the same drift. The English trust section already said "Read what TAVONEL
+    does"; `/ko` had wandered to "이 배포판이 하는 일", which breaks D12 -- Korean is a literal
+    translation that makes no new claim -- on top of naming the deployment.
+
     REASON_MODULES are the typed records whose strings are rendered by pages that do not contain
     them, so a grep of the page would not find the phrase.
   */
@@ -208,8 +212,10 @@ describe("copy trust guard", () => {
     "keeps our word for a running copy of the product out of %s",
     (file) => {
       expect(prose(file), `${file} is guarded and must exist`).not.toBeNull();
-      expect(prose(file)!.toLowerCase(), `${file} says "this deployment" to a customer`)
-        .not.toContain("this deployment");
+      const source = prose(file)!.toLowerCase();
+      for (const phrase of ["this deployment", "이 배포판"]) {
+        expect(source, `${file} says "${phrase}" to a customer`).not.toContain(phrase);
+      }
     },
   );
 });
