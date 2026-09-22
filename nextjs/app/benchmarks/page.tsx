@@ -212,12 +212,10 @@ export default function BenchmarksPage() {
                 Document reading, measured here — Model Arena, {arena.board_generated_at_kst}
               </h2>
               <p className={styles.para}>
-                Every row is a model we ran on {arena.benchmark.name}, scored by{" "}
-                {arena.benchmark.evaluator} at evaluator revision{" "}
-                <span data-derived="1">{arena.benchmark.evaluator_pin.slice(0, 12)}</span>. This is
-                one stage of the work — reading a page — and it is not a score for TAVONEL, for
-                retrieval or for a compiled World. No competitor&rsquo;s published leaderboard row
-                is placed beside these; a figure someone else measured stays theirs.
+                These scores measure page reading only. Every row is a model we ran ourselves on{" "}
+                {arena.benchmark.name}, scored by {arena.benchmark.evaluator} at evaluator revision{" "}
+                <span data-derived="1">{arena.benchmark.evaluator_pin.slice(0, 12)}</span>, under the
+                conditions listed below.
               </p>
 
               <ArenaBarChart
@@ -244,7 +242,7 @@ export default function BenchmarksPage() {
                 GPU spend; a board that quietly dropped all three would be a board whose shape was
                 chosen after the numbers were known.
               */}
-              <h3 className={styles.sectionTitle}>Rows the campaign did not settle</h3>
+              <h3 className={styles.sectionTitle}>Rows we did not rank</h3>
               <div className="chain">
                 {unsettled.map((model) => (
                   <article className="link" key={model.key}>
@@ -341,7 +339,7 @@ export default function BenchmarksPage() {
                 </li>
               </ul>
 
-              <h3 className={styles.sectionTitle}>What the campaign said about itself</h3>
+              <h3 className={styles.sectionTitle}>Limits of this run</h3>
               <ul className={styles.conditions}>
                 {arena.caveats.map((caveat) => (
                   <li className={styles.verbatim} key={caveat}>{caveat}</li>
@@ -372,8 +370,7 @@ export default function BenchmarksPage() {
                   <h3>Which reader should the router send a page to?</h3>
                   <p>
                     The board above. It answers what a page costs to read and how closely each
-                    reader reproduced it, which is the evidence a routing policy is learned from —
-                    not a claim that any of these is the right model for your corpus.
+                    reader reproduced it, which is the evidence a routing policy is learned from.
                   </p>
                 </article>
               </div>

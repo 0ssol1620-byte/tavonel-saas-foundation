@@ -98,9 +98,7 @@ export default function GdpPdfBenchmarkPage() {
               <h2 className={styles.sectionTitle}>The conditions this was run under</h2>
               <p className={styles.para}>
                 Each row is a difference between the run manifest and the sealed protocol in{" "}
-                <code>eval/gdp-pdf/protocol.json</code>. The list is computed from those two
-                documents, so a deviation cannot be dropped from this page without changing one of
-                them.
+                <code>eval/gdp-pdf/protocol.json</code>.
               </p>
               <div className={styles.tableScroll}>
                 <table className={styles.table}>
@@ -194,8 +192,7 @@ export default function GdpPdfBenchmarkPage() {
                     ? ` and the micro delta ${gdpPdfPoints(subset.micro_delta_pp)}`
                     : ""}
                   . That cut separates &ldquo;no packet existed&rdquo; from &ldquo;the packet did
-                  not help&rdquo;; quoting it without its denominator would be a misreport, and it
-                  does not replace the headline above.
+                  not help&rdquo;.
                 </p>
               ) : null}
 
@@ -349,12 +346,7 @@ export default function GdpPdfBenchmarkPage() {
                   them into the JSON -- and the honest render of an absent table is a sentence
                   saying it is absent, not a table of plausible rows.
                 */
-                <p className={styles.state}>
-                  The committed run report carries no per-task rows, so this table is empty rather
-                  than filled. The ranking exists in the run&rsquo;s own markdown report; it reaches
-                  this page when the report builder writes <code>hardest_documents</code> into the
-                  artifact, and not before.
-                </p>
+                <p className={styles.state}>Per-task rows are not published for this run.</p>
               )}
 
               <h2 className={styles.sectionTitle}>What this does and does not show</h2>
@@ -362,8 +354,7 @@ export default function GdpPdfBenchmarkPage() {
                 <li>
                   <b>It shows</b> that on {pairedN} tasks of this set, under this surface and this
                   grader, the compiled-context arm did not beat the model reading the PDF directly.
-                  That is a finding about our compiled context, and it is published because it did
-                  not go our way.
+                  That is a finding about our compiled context.
                 </li>
                 <li>
                   <b>It does not show</b> a GDP.pdf score. {deviations.length} conditions differ
