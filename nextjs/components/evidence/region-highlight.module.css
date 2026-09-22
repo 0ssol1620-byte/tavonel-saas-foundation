@@ -34,6 +34,27 @@
   }
 }
 
+/*
+  From 1200px the index gets its own column.
+
+  Stacking the list under the page works where width is scarce, but on a wide screen it made the
+  frame as tall as page + list -- 414 + 689 = 1,103px on the landing sample -- while 970px of the
+  1,294px frame sat empty beside a 320px picture. That pushed the hero scene to 1,869px against a
+  900px viewport, and `production-hardening.spec.ts` rightly calls a scene past two viewports an
+  ocean rather than a composed frame.
+
+  Three columns cost nothing here: the picture keeps its 320px cap, the index keeps the same 44px
+  rows in the same order, and the frame's height becomes the tallest single column instead of the
+  sum of two. No row is hidden, nothing scrolls inside the frame, and the phone and laptop
+  layouts above are untouched.
+*/
+@media (min-width: 1200px) {
+  .frame {
+    grid-template-columns: minmax(0, 320px) minmax(0, 320px) minmax(0, 1fr);
+    grid-template-areas: "page list detail";
+  }
+}
+
 .page {
   position: relative;
   display: block;
