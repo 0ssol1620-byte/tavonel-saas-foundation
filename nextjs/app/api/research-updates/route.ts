@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   // Fail closed on the two preconditions separately, so an operator reading a 503 can tell a
   // missing service-role credential from a missing table.
   if (!readSupabaseAdminConfig()) {
-    return error("Research updates are not available on this deployment.", 503);
+    return error("Research updates are not available.", 503);
   }
   if (!RESEARCH_UPDATES_TABLE_MIGRATED) {
     return error("Research updates are not open yet. Nothing was stored.", 503);

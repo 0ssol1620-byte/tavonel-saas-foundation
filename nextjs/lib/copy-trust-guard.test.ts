@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /*
@@ -183,39 +183,42 @@ describe("copy trust guard", () => {
   });
 
   /*
-    "in this deployment", which is the same mistake in operations clothing.
+    "in this deployment" and its Korean twin, which are the same mistake in operations clothing.
 
-    It is not a hedge -- the sentence around it is usually a firm statement -- so the register
-    above never caught it, and the disclosure allowlist exempted the four surfaces it survived on
-    longest. But a buyer does not know what a deployment is, cannot tell how many there are, and
-    reads the phrase as "somewhere else this works differently". `e2e/explore.spec.ts`,
-    `e2e/benchmarks.spec.ts` and `lib/explore-story.test.ts` each already barred it from one
-    surface; this is the same rule with no surface left out. The sentences that carried it kept
-    every fact they stated and say "today" instead, which is what they meant.
+    Not a hedge -- the sentence around it is usually a firm statement -- so the register above
+    never looked, and the disclosure allowlist exempted the surfaces it survived on longest. But a
+    buyer does not know what a deployment is, cannot tell how many there are, and reads it as
+    "somewhere else this works differently". `e2e/explore.spec.ts`, `e2e/benchmarks.spec.ts` and
+    `lib/explore-story.test.ts` each already barred it from one surface; this is the same rule with
+    no surface left out.
 
-    The Korean half is the same drift. The English trust section already said "Read what TAVONEL
-    does"; `/ko` had wandered to "이 배포판이 하는 일", which breaks D12 -- Korean is a literal
-    translation that makes no new claim -- on top of naming the deployment.
-
-    REASON_MODULES are the typed records whose strings are rendered by pages that do not contain
-    them, so a grep of the page would not find the phrase.
+    It walks the tree instead of reading a list, because a list is exactly what let the phrase
+    survive on `app/evidence/page.tsx` and `components/world-recompile-timeline.tsx` through two
+    passes: both render it, and neither was on anybody's list. The Korean half carries a second
+    rule with it -- `/ko` had drifted to "이 배포판이 하는 일" while the English section already said
+    "Read what TAVONEL does", which breaks D12 as well as naming the deployment.
   */
-  const REASON_MODULES = [
-    "lib/capabilities.ts",
-    "lib/public-status.ts",
-    "components/compiler-contract-diagram.tsx",
-    "app/auth/callback/page.tsx",
-    "app/login/page.tsx",
-  ] as const;
+  const BANNED_VOCABULARY = ["this deployment", "이 배포판"] as const;
 
-  it.each([...GUARDED, ...Object.keys(DISCLOSURE_SURFACES), ...REASON_MODULES])(
-    "keeps our word for a running copy of the product out of %s",
-    (file) => {
-      expect(prose(file), `${file} is guarded and must exist`).not.toBeNull();
+  function sources(dir: string): string[] {
+    const found: string[] = [];
+    for (const entry of readdirSync(new URL(dir, ROOT), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) found.push(...sources(path));
+      else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) found.push(path);
+    }
+    return found;
+  }
+
+  it("never calls the product a deployment, on any surface", () => {
+    const offenders: string[] = [];
+    for (const file of [...sources("app"), ...sources("components"), ...sources("lib")]) {
       const source = prose(file)!.toLowerCase();
-      for (const phrase of ["this deployment", "이 배포판"]) {
-        expect(source, `${file} says "${phrase}" to a customer`).not.toContain(phrase);
+      for (const phrase of BANNED_VOCABULARY) {
+        if (source.includes(phrase)) offenders.push(`${file}: "${phrase}"`);
       }
-    },
-  );
+    }
+    expect(offenders, `operations vocabulary on a customer surface: ${offenders.join("; ")}`)
+      .toEqual([]);
+  });
 });

@@ -39,7 +39,7 @@ export default function DesignPartners({ className }: { className?: string }) {
         </li>
         <li>
           <strong>The limits for your formats, in writing, before anything runs.</strong>
-          The same capability manifest this deployment validates every upload against, read against
+          The same capability manifest TAVONEL validates every upload against, read against
           the files you actually have.
         </li>
         <li>

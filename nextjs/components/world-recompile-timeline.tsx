@@ -87,7 +87,7 @@ export default function WorldRecompileTimeline() {
       <p className="world-diff-sample-fine">
         Every World above is a complete compile of its corpus, compared after the fact. What each
         step reports is the difference between two finished compiles, not the work a selective
-        rebuild would have done — this deployment has no selective path, and{" "}
+        rebuild would have done — TAVONEL has no selective path, and{" "}
         <Link href={"/explore?act=change" as Route}>the change view</Link> says the same thing
         where the same figures are produced.
       </p>

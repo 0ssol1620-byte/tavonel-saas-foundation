@@ -72,7 +72,7 @@ export function ApiTryIt({ routes }: { routes: TryItRoute[] }) {
     <section className={styles.tryIt} aria-labelledby="try-it-heading">
       <h2 id="try-it-heading" className={styles.heading}>Try it, with no key</h2>
       <p className={styles.lede}>
-        Three unauthenticated reads, run from this page against this deployment. No signup, no
+        Three unauthenticated reads, run from this page against TAVONEL. No signup, no
         credential, nothing that spends. The same three are a copy-pasteable curl recipe on{" "}
         <Link href={"/docs/integration-recipes" as Route}>Integration recipes</Link>.
       </p>

@@ -56,7 +56,7 @@ export const metadata: Metadata = {
 const TRY_IT: TryItRoute[] = [
   {
     path: "/api/v1/capabilities",
-    label: "What this deployment can read",
+    label: "What TAVONEL can read",
     note: "The same list the upload route validates against. A format absent from it is refused at upload rather than accepted and dropped.",
   },
   {
@@ -211,7 +211,7 @@ export default async function ApiReferencePage() {
         <div className="stack">
           <p className="lede">
             {reference.operationCount} operations in {reference.groups.length} groups, rendered
-            from the OpenAPI document this deployment serves at{" "}
+            from the OpenAPI document TAVONEL serves at{" "}
             <a href="/api/openapi">/api/openapi</a>. Nothing here is written beside the contract:
             if an operation is on this page, the contract publishes it, and a build where the two
             disagree does not ship.

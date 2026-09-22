@@ -216,7 +216,7 @@ export default function EvidencePage() {
                 first tile rather than again after each one.
               */}
               <p className={styles.locatorState}>
-                Reader not shipped: none of these seven is read in this deployment today. They are
+                Reader not shipped: none of these seven is read today. They are
                 the locator shapes the evidence contract is defined for, so a format that gains a
                 reader gains a locator that was already specified rather than one invented at the
                 time.

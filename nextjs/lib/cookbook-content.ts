@@ -199,7 +199,7 @@ const NO_STRUCTURE_READER = READING.knownLimitations.includes("no_native_structu
  */
 export const READING_LIMIT_SENTENCE = [
   NO_TABLE_EXTRACTION
-    ? "Tables and formulas are not extracted as tables on this deployment: a figure arrives as the paragraph it was printed in, with the page and the box it sat in, so a number is readable and the grid that arranged it is not."
+    ? "Tables and formulas are not extracted as tables: a figure arrives as the paragraph it was printed in, with the page and the box it sat in, so a number is readable and the grid that arranged it is not."
     : "Tables and formulas are extracted, and the capability manifest names the fields that survive.",
   NO_STRUCTURE_READER
     ? "Heading levels, sections and columns are not recovered as typed structure; what the compiler receives is a paragraph and where it sat."
@@ -349,8 +349,8 @@ export const COOKBOOKS: readonly CookbookRecord[] = [
           would be this lane inventing one, and no figure appears at all.
         */
         "If you would rather not run it yourself, the World Build is a fixed-scope engagement on your own corpus. The scope and what it leaves behind are below; pricing is set with you — talk to us.",
-        "The structure: customer provides representative corpus, TAVONEL compiles, evidence / gaps / review states shown, current World, one update/change test, grounded Ask, architecture + economics review. What it leaves behind: the compiled World itself as a reviewable candidate, a source and evidence report, a report of what could not be compiled and why, one update demonstration, a latency and cost snapshot for that corpus on this deployment, and an implementation plan for going beyond the pilot.",
-        "Two things are settled before any document moves: every format in the corpus has to be one this deployment accepts, and the corpus may not need the customer-data gate that is off by default.",
+        "The structure: customer provides representative corpus, TAVONEL compiles, evidence / gaps / review states shown, current World, one update/change test, grounded Ask, architecture + economics review. What it leaves behind: the compiled World itself as a reviewable candidate, a source and evidence report, a report of what could not be compiled and why, one update demonstration, a latency and cost snapshot for that corpus, and an implementation plan for going beyond the pilot.",
+        "Two things are settled before any document moves: every format in the corpus has to be one TAVONEL accepts, and the corpus may not need the customer-data gate that is off by default.",
       ].join(PARAGRAPH),
     }),
   },
@@ -369,14 +369,14 @@ export const COOKBOOKS: readonly CookbookRecord[] = [
       outcome:
         "Read a figure out of a financial report and keep the page and region it came from, so the number can be checked against the document rather than believed.",
       prerequisitesExtra:
-        "Read the limit above twice before you plan this one: a financial report is mostly tables, and tables are the part this deployment does not read as tables. Expect to check every figure at its source location, and expect a person to do it.",
+        "Read the limit above twice before you plan this one: a financial report is mostly tables, and tables are the part TAVONEL does not read as tables. Expect to check every figure at its source location, and expect a person to do it.",
       code:
         "Asking the active World a question and reading back which regions supported the answer is the Ask contract, including what it does when nothing matched.",
       docsSlug: "ask",
       limitsExtra:
         "A figure that only exists as a cell in a rendered table can arrive attached to the paragraph beside it, and a footnote that qualifies it is a separate region that nothing links to it automatically. This workflow does not produce an audited number and is not used as one.",
       next:
-        "If your reports are mostly tables, the honest next step is a conversation about whether this deployment reads them well enough for your work, not a trial upload. The read-only sample shows what the evidence view looks like on documents we can publish.",
+        "If your reports are mostly tables, the honest next step is a conversation about whether TAVONEL reads them well enough for your work, not a trial upload. The read-only sample shows what the evidence view looks like on documents we can publish.",
     }),
   },
   {
