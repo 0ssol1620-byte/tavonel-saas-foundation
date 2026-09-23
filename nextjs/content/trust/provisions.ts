@@ -57,7 +57,7 @@ export type TrustProvision = {
 const SECURITY = { label: "Security", href: "/security" } as const;
 const PRIVACY = { label: "Privacy notice", href: "/privacy" } as const;
 const SUBPROCESSORS = { label: "Subprocessors", href: "/subprocessors" } as const;
-const DPA = { label: "Data processing agreement (draft)", href: "/policy/TAVONEL_DPA_v1_2026-09-11.md" } as const;
+const DPA = { label: "Data processing agreement (draft)", href: "/policy/TAVONEL_DPA_v2_2026-09-23.md" } as const;
 const PRICING = { label: "Pricing", href: "/pricing#pricing-limits-title" } as const;
 const CONTACT = { label: "Contact", href: "/contact" } as const;
 const DISCLOSURE = { label: "security.txt", href: "/.well-known/security.txt" } as const;
@@ -158,7 +158,7 @@ export const TRUST_PROVISIONS: readonly TrustProvision[] = [
     id: "dpa",
     subject: "Signed data processing agreement",
     state: "roadmap",
-    line: "Draft v1 (2026-09-11) is published in full for review and is labelled as a draft, not a signed agreement. The clauses still open say so in place, and the standard contractual clauses are incorporated at signature.",
+    line: "Draft v2 (2026-09-23) is published in full for review and is labelled as a draft, not a signed agreement. The clauses still open say so in place, and the standard contractual clauses are incorporated at signature.",
     source: DPA,
   },
   {

@@ -19,13 +19,12 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-/** The five the header publishes, in the order `CUSTOMER_NAV` declares them. */
+/** The four section links; Pricing is the separate emphasized header control. */
 const CUSTOMER_NAV = [
   { href: "/product", label: "Product" },
   { href: "/knowledge-compiler", label: "How it works" },
   { href: "/resources", label: "Resources" },
   { href: "/docs", label: "Docs" },
-  { href: "/pricing", label: "Pricing" },
 ] as const;
 
 const HEADER = "header.nav";
@@ -74,7 +73,7 @@ test.describe("at 1440", () => {
     await expect(action).toHaveCount(1);
     await expect(action).toHaveClass(/\bbtn\b/);
     await expect(action).not.toHaveClass(/\bghost\b/);
-    await expect(action).toHaveAttribute("href", "/contact");
+    await expect(action).toHaveAttribute("href", "/pricing");
 
     const filled = await page.locator(`${HEADER} a, ${HEADER} button`).evaluateAll((elements) =>
       elements

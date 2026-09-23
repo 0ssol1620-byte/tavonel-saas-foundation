@@ -40,8 +40,8 @@ test("the entry page keeps its public product routes actionable, with no console
   await expect(close.locator('a[href="/pricing"]')).toHaveCount(1);
 
   // The commercial posture's own destination is on the page twice: the hero and the close.
-  const access = page.locator('main a[href="/contact"], main a[href="/login"], main a[href="/workspace"]');
-  expect(await access.count(), "the access action is offered in the hero and again in the close")
+  const access = page.locator('main a[href="/pricing"]');
+  expect(await access.count(), "Pricing is reachable from the hero and the close")
     .toBeGreaterThanOrEqual(2);
 
   // Every one of those next actions clears the touch floor.

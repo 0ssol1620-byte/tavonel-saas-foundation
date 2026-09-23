@@ -80,6 +80,94 @@
   color: var(--text-hi);
 }
 
+:global(.public-page) :global(.scene.doc).benchmarkScene {
+  padding-top: clamp(72px, 6vw, 96px);
+}
+
+.recovery {
+  display: grid;
+  gap: 18px;
+  padding-block: clamp(24px, 4vw, 48px);
+  border-block: 1px solid var(--hairline-hi);
+}
+
+.recoveryLabel {
+  margin: 0;
+  color: var(--text-lo);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recoveryMeasures {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-block: 1px solid var(--hairline);
+}
+
+.recoveryMeasures div {
+  display: grid;
+  gap: 8px;
+  padding: 18px 0;
+}
+.recoveryMeasures div + div {
+  border-top: 1px solid var(--hairline);
+}
+
+.recoveryMeasures strong {
+  color: var(--text-hi);
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+
+.recoveryMeasures span {
+  color: var(--text-mid);
+  font-size: 13px;
+}
+.recoveryMeasures .recoveryTrack {
+  display: block;
+  height: 5px;
+  margin-top: 10px;
+  background: var(--hairline-hi);
+  overflow: hidden;
+}
+.recoveryTrack > span {
+  display: block;
+  height: 100%;
+  background: var(--source);
+}
+@media (min-width: 900px) {
+  .recovery {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    column-gap: clamp(36px, 6vw, 88px);
+    align-items: start;
+  }
+  .recoveryLabel, .recovery > .sectionTitle, .recovery > .para,
+  .recoveryDetails, .recovery > a { grid-column: 1; }
+  .recoveryMeasures { grid-column: 2; grid-row: 1 / span 5; }
+}
+
+.recoveryDetails {
+  max-width: 72ch;
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.66;
+}
+
+.recoveryDetails summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+  color: var(--text-hi);
+}
+
+.recovery > a {
+  width: fit-content;
+  min-height: 44px;
+  align-content: center;
+}
+
 /*
   The metric names inside a family tile: taxonomy, not readings.
 

@@ -3722,6 +3722,7 @@
     wall of text on the commercial page. Same 18px, applied where this hero actually is.
   */
   .pricing-page .scene.doc > .shell > .document-title { margin-bottom: 18px; }
+  .pricing-page .scene.doc { padding-top: 76px; }
   .pricing-page .scene.doc > .shell > .lede + .lede { margin-top: 18px; }
 
   /* Pricing is an editorial choice surface, not a wall of equal technical cards.

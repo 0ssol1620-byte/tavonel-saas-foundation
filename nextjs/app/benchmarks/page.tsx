@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { EVIDENCE } from "@/lib/evidence-record";
+import recoveryReceipt from "@/public/research/receipts/R-01-recovery-counterfactual-olmocr-2026-08-08.json";
 import { TrustNext } from "@/components/trust-next";
 import {
   BENCHMARK_FAMILIES,
@@ -35,7 +36,7 @@ import styles from "./benchmarks.module.css";
 
   What the results are and are not:
 
-  - They are the Model Arena campaign of 2026-09-03: thirteen document-reading models run here,
+  - They are the Model Arena campaign of 2026-09-03: ten document-reading models run here,
     on one corpus, through one evaluator revision, with a canary proof per model. OmniDocBench
     scores the first stage of the work -- reading a page -- and nothing more. It does not measure
     identity, lineage, temporal integrity or recompilation, which is why the eight-family
@@ -183,10 +184,12 @@ export default function BenchmarksPage() {
     about what was and was not supported.
   */
   const notSupported = EVIDENCE.filter((entry) => entry.state === "unsupported");
+  const recovery = EVIDENCE.find((entry) => entry.receipt?.id === "R-01");
+  if (!recovery?.receipt) throw new Error("The published recovery result requires receipt R-01");
 
   return (
     <PublicSitePage>
-      <section className="scene doc">
+      <section className={"scene doc " + styles.benchmarkScene}>
         <div className="shell">
           <div className="body">
             <div className="stack">
@@ -195,16 +198,36 @@ export default function BenchmarksPage() {
 
             <div className="stack">
               <p className="lede">
-                A document-reading leaderboard scores the first stage of the work, and the run
-                below is ours: {settled.length} models read the same{" "}
+                The reader study compares {settled.length} models on the same{" "}
                 <span data-derived="1">{arena.benchmark.gt_pages.toLocaleString("en-US")}</span>{" "}
-                benchmark pages through one evaluator revision, with the model revision, the
-                hardware and the listed price snapshot recorded for each. Compiling knowledge also
-                has to bind each statement to the region that supports it, decide when two mentions
-                are one thing, keep track of which revision is current, and refuse to answer what
-                the world cannot support — the protocol for measuring all of that is published
-                under the results.
+                benchmark pages. The recovery study below tests our own pipeline with and without
+                one lane. Both publish methods and limits; neither is a current-service score.
               </p>
+
+              <section className={styles.recovery} aria-labelledby="recovery-title">
+                <p className={styles.recoveryLabel}>TAVONEL research · same-pipeline comparison</p>
+                <h2 className={styles.sectionTitle} id="recovery-title">Recovery makes a measurable difference on difficult pages.</h2>
+                <div className={styles.recoveryMeasures} aria-label="olmOCR-Bench recovery comparison">
+                  <div>
+                    <strong>{(recoveryReceipt.with_recovery.overall_score * 100).toFixed(1)}</strong>
+                    <span>with recovery</span>
+                    <span className={styles.recoveryTrack} aria-hidden="true"><span style={{ width: (recoveryReceipt.with_recovery.overall_score * 100).toFixed(1) + "%" }} /></span>
+                  </div>
+                  <div>
+                    <strong>{(recoveryReceipt.without_recovery.overall_score * 100).toFixed(1)}</strong>
+                    <span>without recovery</span>
+                    <span className={styles.recoveryTrack} aria-hidden="true"><span style={{ width: (recoveryReceipt.without_recovery.overall_score * 100).toFixed(1) + "%" }} /></span>
+                  </div>
+                </div>
+                <p className={styles.para}>
+                  olmOCR-Bench score across {recoveryReceipt.held_constant.input_count.toLocaleString("en-US")} documents and {recoveryReceipt.held_constant.test_count.toLocaleString("en-US")} checks, measured {recovery.receipt.date}. This isolates one recovery lane in a historical research pipeline. It is not a current-service score or a competitor comparison. Low-quality old scans reached {(recoveryReceipt.per_category["old_scans.jsonl"].with_recovery * 100).toFixed(1)}% even with recovery.
+                </p>
+                <details className={styles.recoveryDetails}>
+                  <summary>Method and limits</summary>
+                  <p>{recovery.body}</p>
+                </details>
+                <a href={recovery.receipt.url}>Download the R-01 result and receipt</a>
+              </section>
 
               {/* ------------------------------------------------- the completed run */}
 

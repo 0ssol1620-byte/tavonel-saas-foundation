@@ -4,6 +4,7 @@ import {
 } from "@/components/public-site-chrome";
 import CompilerSpecimen from "./compiler-specimen";
 import HeroFilm from "./hero-film";
+import HeroActions from "./hero-actions";
 import HeroProof from "./hero-proof";
 import HeroStatement from "./hero-statement";
 import LandingAnalytics from "./landing-analytics";
@@ -11,8 +12,7 @@ import ProofScene from "./scenes/proof";
 import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
-import { KO_EXPLORE_LABEL, WORKSPACE_LABEL } from "./scene-actions";
-import { primaryCallToAction } from "@/lib/commercial-state";
+import { KO_EXPLORE_LABEL } from "./scene-actions";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import {
   buildProofTabs,
@@ -20,7 +20,7 @@ import {
   type ProofTab,
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
-import { EXPLORE_CTA, KO_CHROME } from "@/lib/site-navigation";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 import {
   landingVariantState,
   type LandingVariantState,
@@ -29,7 +29,7 @@ import {
 /*
   Landing V2 (blueprint 2026-09-19, contract D1/D9/D10/D11). One composition, two languages.
 
-  Six beats move from the hero film through the compiler specimen, proof, change, trust, and close.
+  Six beats move from the source-linked specimen through public proof, change, trust, and close.
 
   WHERE THE SCENES LIVE
   The hero is built here because it is the only scene whose text column, action row and demo are
@@ -44,13 +44,7 @@ import {
   The data builders run the collection compiler through `lib/explore-sample.ts`, which is
   server-only. The old landing was a client component that took two scalars as props; this one
   reads the compiled public World and hands each scene a flat, serializable projection of it. The
-  two things that genuinely need a browser -- the session-aware action row and the demo's
-  play/pause control -- are the two client components this file renders.
-
-  The consequence worth naming: the header no longer knows whether the reader is signed in. It
-  did on the old landing and on no other page of the site, and the inconsistency is resolved
-  toward the site rather than toward this page. The hero's own action row still resolves it,
-  which is where it changes what a reader is offered.
+  browser interactions are isolated in the action row and the specimen's play/pause control.
 */
 
 /*
@@ -97,29 +91,21 @@ export default function LandingPage({
   const proof = proofData();
   const locale = korean ? "ko" : "en";
 
-  /*
-    The commercial posture, resolved on the server (BA-232). `primaryCallToAction()` chooses
-    between the site's two access actions; nothing here writes a third, and the Korean label is
-    that action's own, keyed by destination in `KO_CHROME.cta`.
-  */
-  const access = primaryCallToAction();
-  const accessLabel = korean
-    ? (KO_CHROME.cta[access.href] ?? access.label)
-    : access.label;
+  /* A reader can inspect the sample before choosing a plan. */
   const heroActions = {
     exploreLabel: korean ? KO_EXPLORE_LABEL : EXPLORE_CTA.label,
     exploreHref: EXPLORE_CTA.href,
-    accessLabel,
-    accessHref: access.href,
-    workspaceLabel: WORKSPACE_LABEL[locale],
   };
   const specimenCopy = korean
     ? { eyebrow: "작동 방식", title: "한 원문이 지식이 되는 다섯 단계" }
     : { eyebrow: "How it compiles", title: "One source. Five transformations." };
+  const sampleCopy = korean
+    ? { eyebrow: "공개 샘플", title: "원문과 결과를 직접 확인하세요." }
+    : { eyebrow: "Public sample", title: "Inspect the result and its source." };
 
   return (
     <div className="page lv2" lang={korean ? "ko" : undefined}>
-      <PublicSiteHeader cta={access} korean={korean} />
+      <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
         {/*
@@ -133,15 +119,8 @@ export default function LandingPage({
         {/*
           01 Hero -- one centered statement, then the product itself on the public sample World.
 
-          2026-09-22, gap #1. What sat here was the four-cut film: a recording of the product,
-          above the fold, on the one page where a reader decides whether this works. The film is
-          not removed -- it moves into Scene 02, the "How it compiles" landmark it was always
-          explaining -- and the hero now carries `HeroProof`: the same Evidence Inspector panel
-          /evidence and /product/document-understanding already share, live, with no login, over
-          the public sample World, and the four counts that World actually holds under it.
-
-          The founder's 2026-09-20 composition is unchanged: one centered statement, then one
-          visual. Which visual it is, is what changed.
+          The first visual is a source-linked specimen that opens on its Evidence stage.
+          The public sample inspector and film follow in Scene 02.
         */}
         <section
           id="s1"
@@ -155,27 +134,31 @@ export default function LandingPage({
               copy={copy.hero}
               titleId="lv2-hero-title"
               /* D3 allows the serif on one phrase of the H1; Instrument Serif has no Hangul. */
-              accent={korean ? undefined : "every source"}
+              accent={korean ? undefined : "Knowledge you can verify"}
               headlineVariant={experiment.headlineVariant}
-              /*
-                D8 Test 02 applies to the hero row only. The close keeps the access action
-                filled on both arms: that is §19's composition and not the variable under test,
-                and swapping two rows at once would make the result unattributable.
-              */
-              actions={{
-                ...heroActions,
-                scene: "1",
-                ctaOrderVariant: experiment.ctaOrderVariant,
-              }}
             />
-            <HeroProof korean={korean} />
+            <div className="lv2-scene-head lv2-how-head">
+              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
+              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
+            </div>
+            <CompilerSpecimen korean={korean} />
+            <HeroActions
+              exploreLabel={heroActions.exploreLabel}
+              exploreHref={heroActions.exploreHref}
+              pricingLabel={korean ? "요금 보기" : "View pricing"}
+              scene="1"
+              ctaOrderVariant={experiment.ctaOrderVariant}
+            />
+            <p className="lv2-hero-intake lv2-meta">
+              {copy.hero.microProofFormats}{" "}
+              <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
+            </p>
           </div>
         </section>
 
         {/*
-          02 How it compiles -- the four-cut film, then one committed public source through five
-          transformations. The film leads because it is the overview and the specimen is the
-          detail; both are now in the landmark whose heading says they are the explanation.
+          02 Public sample -- the Evidence Inspector over the committed World, then the
+          four-cut film as an optional deeper explanation.
         */}
         <section
           id="s2"
@@ -186,11 +169,11 @@ export default function LandingPage({
         >
           <div className="lv2-wrap">
             <div className="lv2-scene-head">
-              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
-              <h2 className="lv2-h2" id="lv2-s2-title">{specimenCopy.title}</h2>
+              <p className="lv2-eyebrow lv2-meta">{sampleCopy.eyebrow}</p>
+              <h2 className="lv2-h2" id="lv2-s2-title">{sampleCopy.title}</h2>
             </div>
+            <HeroProof korean={korean} />
             <HeroFilm korean={korean} />
-            <CompilerSpecimen korean={korean} />
           </div>
         </section>
 

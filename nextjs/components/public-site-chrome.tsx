@@ -4,9 +4,8 @@ import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
-import { primaryCallToAction } from "@/lib/commercial-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
-import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME, type SiteLink } from "@/lib/site-navigation";
+import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME } from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
 
 /**
@@ -56,16 +55,14 @@ import chrome from "./public-site-chrome.module.css";
  * header's is on no ground at all.
  */
 export function PublicSiteHeader({
-  cta,
   signedIn,
   korean = false,
 }: {
-  cta: SiteLink;
   signedIn?: boolean;
   /** G1-043: /ko is the site's one Korean URL, and it rendered an English header around it. */
   korean?: boolean;
 }) {
-  const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;
+  const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";
   return (
     <header className={`nav chrome-v2-header ${chrome.header}`}>
       <HeaderScrollState />
@@ -76,7 +73,7 @@ export function PublicSiteHeader({
       <DesktopPrimaryNav korean={korean} />
       <MobilePrimaryNav korean={korean} signedIn={signedIn} />
       <span className="nav-actions">
-        <Link className="btn small" href={cta.href as Route}>{ctaLabel}</Link>
+        <Link className="btn small" href="/pricing">{pricingLabel}</Link>
         {/*
           Below the desktop switch this link is in the phone sheet instead, where it gets a 44px
           row of its own. At 360px the row was wordmark + toggle + a 109px filled button + Sign in
@@ -207,7 +204,7 @@ export function PublicSitePage({ children, korean = false }: { children: React.R
   */
   return (
     <div className="page public-page" lang={korean ? "ko" : undefined}>
-      <PublicSiteHeader cta={primaryCallToAction()} korean={korean} />
+      <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1}>{children}</main>
       <PublicSiteFooter korean={korean} />
     </div>

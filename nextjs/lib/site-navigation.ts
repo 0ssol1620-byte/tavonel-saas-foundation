@@ -43,6 +43,9 @@ export const CUSTOMER_NAV: readonly SiteLink[] = [
   { href: "/pricing", label: "Pricing" },
 ] as const;
 
+/** Pricing stays one tap away; the header renders it as its single emphasized link. */
+export const HEADER_NAV: readonly SiteLink[] = CUSTOMER_NAV.filter((link) => link.href !== "/pricing");
+
 /*
   The routes a bar item speaks for that do not sit underneath it.
 
@@ -112,7 +115,7 @@ export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compi
  * sentence on the site. The descriptor is unchanged.
  */
 export const BRAND_LINE = {
-  headline: "AI-ready knowledge. Traceable to every source.",
+  headline: "Your documents. Knowledge you can verify.",
   descriptor: "Knowledge compiled with a traceable path back to every source.",
 } as const;
 

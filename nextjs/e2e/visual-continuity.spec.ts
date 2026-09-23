@@ -55,9 +55,9 @@ test.describe("visual continuity — locked film side", () => {
       one-path-works-film) still stays out.
     */
     await expect(page.getByRole("tablist")).toHaveCount(3);
-    await expect(page.locator("#s1").getByRole("tab")).toHaveCount(0);
+    await expect(page.locator("#s1 [data-compiler-specimen]").getByRole("tab")).toHaveCount(5);
     await expect(page.locator("#s2 .compile-film-stages").getByRole("tab")).toHaveCount(4);
-    await expect(page.locator("#s2 [data-compiler-specimen]").getByRole("tab")).toHaveCount(5);
+    await expect(page.locator("#s2 [data-compiler-specimen]").getByRole("tab")).toHaveCount(0);
     await expect(page.locator("#s3").getByRole("tab")).toHaveCount(3);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);

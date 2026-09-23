@@ -448,7 +448,7 @@ describe("public copy", () => {
   */
   it("keeps the brand line the hero is written from, and writes it in no second place", () => {
     expect(BRAND_LINE.headline).toBe(
-      "AI-ready knowledge. Traceable to every source."
+      "Your documents. Knowledge you can verify."
     );
     expect(BRAND_LINE.descriptor).toBe(
       "Knowledge compiled with a traceable path back to every source."
@@ -498,16 +498,17 @@ describe("public copy", () => {
     /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
        film opens the landmark that explains how the World was compiled. The entry pages preload
        the hero's own raster because that is the image above the fold now. */
+    expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
+    expect(page.indexOf("<CompilerSpecimen")).toBeLessThan(page.indexOf("<HeroProof"));
     expect(page.indexOf("<HeroProof")).toBeLessThan(page.indexOf("<HeroFilm"));
-    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
     expect(page).toContain("CompilerSpecimen");
     expect(read("components/landing-v2/compiler-specimen.tsx")).not.toContain(
       "<video"
     );
-    expect(read("app/page.tsx")).toContain("HERO_PROOF_IMAGE");
-    expect(read("app/ko/page.tsx")).toContain("HERO_PROOF_IMAGE");
+    expect(read("app/page.tsx")).not.toContain("HERO_PROOF_IMAGE");
+    expect(read("app/ko/page.tsx")).not.toContain("HERO_PROOF_IMAGE");
     expect(read("components/landing-v2/hero-film.tsx")).not.toContain("lv2-film-note");
   });
 
@@ -1317,10 +1318,11 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<HeroProof",
-      'id="s2"',
-      "<HeroFilm",
       "<CompilerSpecimen",
+      "<HeroActions",
+      'id="s2"',
+      "<HeroProof",
+      "<HeroFilm",
       "<ProofScene",
       "copy.recompile",
       "copy.trust",
@@ -1608,11 +1610,11 @@ describe("the site's own vocabulary", () => {
     */
     expect(
       chrome,
-      "the header derives its label from the action it was given"
+      "the header derives the Pricing label from the navigation model"
     ).toContain(
-      "const ctaLabel = korean ? KO_CHROME.cta[cta.href] ?? cta.label : cta.label;"
+      'const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";'
     );
-    expect(chrome, "and renders that").toContain("{ctaLabel}");
+    expect(chrome, "and renders that").toContain("{pricingLabel}");
     for (const literal of ["Request access", "Start with your files"]) {
       expect(
         chrome,

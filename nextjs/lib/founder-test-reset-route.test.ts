@@ -38,12 +38,12 @@ describe("founder test reset route", () => {
   });
 
   it("returns the dry-run manifest only to the exact founder account and active owner", async () => {
-    mocks.prepareFounderTestReset.mockResolvedValue({ manifest: { resetId: "reset" }, manifestDigest: `sha256:${"a".repeat(64)}` });
+    mocks.prepareFounderTestReset.mockResolvedValue({ resetId: "reset", manifest: { resetId: "reset" }, manifestDigest: `sha256:${"a".repeat(64)}` });
     const response = await POST(request({ mode: "dry-run" }));
     expect(response.status).toBe(200);
     expect(mocks.requireWorkspaceMembership).toHaveBeenCalledWith(expect.any(Request), principal.workspaceKey, ["owner"]);
     expect(mocks.revalidateWorkspaceMembership).toHaveBeenCalled();
-    expect(await response.json()).toMatchObject({ code: "OK", dryRun: true, manifestDigest: `sha256:${"a".repeat(64)}` });
+    expect(await response.json()).toMatchObject({ code: "OK", dryRun: true, resetId: "reset", manifestDigest: `sha256:${"a".repeat(64)}` });
   });
 
   it("refuses a different authenticated account before reset preparation", async () => {

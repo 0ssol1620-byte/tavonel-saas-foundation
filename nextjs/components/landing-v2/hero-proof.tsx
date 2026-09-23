@@ -67,7 +67,6 @@ export default function HeroProof({ korean = false }: { korean?: boolean }) {
             on this page, and a page number is a digit.
           */
           imageAlt=""
-          imageEager
         />
       </div>
       <ul className="lv2-hero-stats" aria-label={copy.stripLabel}>

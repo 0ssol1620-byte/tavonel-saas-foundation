@@ -12,7 +12,7 @@ import {
   COMPILER_SPECIMEN_STAGES,
 } from "../lib/compiler-specimen";
 
-const HEADLINE = "AI-ready knowledge. Traceable to every source.";
+const HEADLINE = "Your documents. Knowledge you can verify.";
 const REQUIRED_WIDTHS = new Set(["1920", "1440", "1280", "1024", "768", "390", "360"]);
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"] as const;
 /* Gap #1, 2026-09-22: the film explains how it compiles, from Scene 02. The hero is the live
@@ -28,9 +28,9 @@ async function horizontalOverflow(page: Page): Promise<number> {
 }
 
 async function selectedStage(page: Page): Promise<number> {
-  const selected = page.locator('#s2 [data-compiler-specimen] [role="tab"][aria-selected="true"]');
+  const selected = page.locator('#s1 [data-compiler-specimen] [role="tab"][aria-selected="true"]');
   await expect(selected).toHaveCount(1);
-  return page.locator('#s2 [data-compiler-specimen] [role="tab"]').evaluateAll(
+  return page.locator('#s1 [data-compiler-specimen] [role="tab"]').evaluateAll(
     (tabs, selectedId) => tabs.findIndex(tab => tab.id === selectedId),
     await selected.getAttribute("id"),
   );
@@ -58,7 +58,7 @@ test.describe("six-beat page structure", () => {
       await expect(page.locator("main#main")).toHaveCount(1);
       await expect(page.locator("main section section")).toHaveCount(0);
       await expect(page.locator("h1")).toHaveCount(1);
-      await expect(page.locator("main h2")).toHaveCount(SECTIONS.length - 1);
+      await expect(page.locator("main h2")).toHaveCount(SECTIONS.length);
     });
   }
 
@@ -98,11 +98,11 @@ test.describe("HeroFilm", () => {
     const film = page.locator(FILM);
     await expect(film).toHaveCount(1);
     await expect(film.getByRole("tab")).toHaveCount(4);
-    await expect(page.locator("#s1 [data-compiler-specimen]")).toHaveCount(0);
+    await expect(page.locator("#s1 [data-compiler-specimen]")).toHaveCount(1);
     await expect(page.locator("#s1 .compile-film-sequence")).toHaveCount(0);
     await expect(page.locator("#s2 .lv2-film-note")).toHaveCount(0);
     /* The hero's own visual, in the landmark the film left. */
-    await expect(page.locator("#s1 .lv2-hero-inspector")).toHaveCount(1);
+    await expect(page.locator("#s2 .lv2-hero-inspector")).toHaveCount(1);
     await expect(page.locator("#s1 canvas")).toHaveCount(0);
     expect(await page.locator("main").innerText()).not.toContain(
       ["A directed film", "not a screen recording."].join(", "),
@@ -132,11 +132,12 @@ test.describe("HeroFilm", () => {
     */
     expect(poster).not.toMatch(/fetchpriority="high"/i);
     expect(poster).not.toMatch(/loading="eager"/i);
-    const heroRaster = html.match(/<img[^>]*src="\/explore-sample\/pages\/[^"]*"[^>]*>/)?.[0] ?? "";
-    expect(heroRaster, "the hero server-renders no sample-World page raster").not.toBe("");
-    expect(heroRaster).toMatch(/loading="eager"/i);
-    expect(heroRaster).toMatch(/ width="[1-9]\d*"/);
-    expect(heroRaster).toMatch(/ height="[1-9]\d*"/);
+    const heroCrop = html.match(/<img[^>]*data-source-image="region"[^>]*>/)?.[0] ?? "";
+    expect(heroCrop, "the hero server-renders no source-linked crop").not.toBe("");
+    expect(heroCrop).toMatch(/loading="eager"/i);
+    expect(heroCrop).toMatch(/fetchpriority="high"/i);
+    expect(heroCrop).toMatch(/ width="[1-9]\d*"/);
+    expect(heroCrop).toMatch(/ height="[1-9]\d*"/);
   });
 
   test("selects the verified locked master on desktop", async ({ page }, testInfo) => {
@@ -159,7 +160,7 @@ test.describe("HeroFilm", () => {
 test.describe("lower CompilerSpecimen explanation", () => {
   test("renders five selectable stages and preserves one source identity through them", async ({ page }) => {
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await expect(tabs).toHaveCount(COMPILER_SPECIMEN_STAGES.length);
     await expect(tabs).toHaveText(COMPILER_SPECIMEN_STAGES.map(stage => stage.label));
@@ -196,7 +197,7 @@ test.describe("lower CompilerSpecimen explanation", () => {
 
   test("supports roving-tab keyboard selection", async ({ page }) => {
     await page.goto("/");
-    const tabs = page.locator('#s2 [data-compiler-specimen] [role="tab"]');
+    const tabs = page.locator('#s1 [data-compiler-specimen] [role="tab"]');
     await tabs.first().focus();
     await page.keyboard.press("ArrowRight");
     await expect(tabs.nth(1)).toBeFocused();
@@ -214,9 +215,10 @@ test.describe("lower CompilerSpecimen explanation", () => {
   test("moves from the actual page render to its exact region crop", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "one desktop browser verifies the camera contract");
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await specimen.scrollIntoViewIfNeeded();
+    await tabs.first().click();
     const pageAsset = specimen.locator('[data-source-image="page"]');
     const regionAsset = specimen.locator('[data-source-image="region"]');
     const fullFrame = pageAsset.locator("..");
@@ -249,7 +251,7 @@ test.describe("lower CompilerSpecimen explanation", () => {
   test("manual selection pauses playback and remains paused after leaving and returning", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "one desktop browser settles the finite timer contract");
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await specimen.scrollIntoViewIfNeeded();
     await tabs.nth(2).click();
@@ -269,7 +271,7 @@ test.describe("lower CompilerSpecimen explanation", () => {
   test("auto-advance sleeps offscreen and resumes only after returning", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "one desktop browser settles the observer contract");
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await specimen.scrollIntoViewIfNeeded();
     await tabs.first().click();
@@ -284,7 +286,7 @@ test.describe("lower CompilerSpecimen explanation", () => {
   test("auto-advance sleeps while the document is hidden", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "one desktop browser settles the visibility contract");
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     await specimen.scrollIntoViewIfNeeded();
     const tabs = specimen.getByRole("tab");
     await tabs.first().click();
@@ -323,7 +325,7 @@ test.describe("responsive and reduced-motion parity", () => {
   test("all specimen controls clear the phone touch floor", async ({ page }, testInfo) => {
     test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
     await page.goto("/");
-    const short = await page.locator("#s2 [data-compiler-specimen] button").evaluateAll(nodes =>
+    const short = await page.locator("#s1 [data-compiler-specimen] button").evaluateAll(nodes =>
       nodes.map(node => ({ text: node.textContent?.trim(), height: node.getBoundingClientRect().height }))
         .filter(item => item.height < 43.99),
     );
@@ -333,7 +335,7 @@ test.describe("responsive and reduced-motion parity", () => {
   test("each stage keeps source values inside its phone viewport", async ({ page }, testInfo) => {
     test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await specimen.scrollIntoViewIfNeeded();
 
@@ -371,12 +373,12 @@ test.describe("responsive and reduced-motion parity", () => {
     test.skip(testInfo.project.name !== "reduced-motion", "the reduced-motion project");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await expect(tabs).toHaveCount(COMPILER_SPECIMEN_STAGES.length);
     await expect(specimen.getByRole("button", { name: "Play" })).toBeVisible();
     await page.waitForTimeout(2_850);
-    expect(await selectedStage(page)).toBe(0);
+    expect(await selectedStage(page)).toBe(2);
     await tabs.last().click();
     await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);

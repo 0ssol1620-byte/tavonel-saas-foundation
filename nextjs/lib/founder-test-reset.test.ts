@@ -48,6 +48,7 @@ describe("founder test reset service", () => {
     mocks.listObjects.mockResolvedValue({ ok: true, keys: [KEY] });
 
     const result = await prepareFounderTestReset(USER);
+    expect(result.resetId).toBe(RESET_ID);
 
     expect(result.manifest).toMatchObject({ resetId: RESET_ID, dbManifestDigest: DB_DIGEST, r2Keys: [KEY] });
     expect(mocks.adminRequest).toHaveBeenCalledTimes(1);

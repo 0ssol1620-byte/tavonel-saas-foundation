@@ -288,6 +288,9 @@
     height: 340px;
     margin: 14px;
   }
+  .sourceViewport:not([data-camera-stage="0"]) .fullPage {
+    transform: translate3d(0, -12%, 0) scale(1);
+  }
   .sourceAsset { inset: 12px; }
   .regionCrop,
   .sourceViewport:not([data-camera-stage="0"]) .region { inset: auto 12px 40px; }

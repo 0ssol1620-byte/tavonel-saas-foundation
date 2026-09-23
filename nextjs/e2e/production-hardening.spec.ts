@@ -28,8 +28,9 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
     every section the bar offers is reachable on a phone.
   */
   const direct = menu.locator(":scope > nav a.mobile-nav-direct");
-  await expect(direct).toHaveCount(5);
-  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
+  await expect(direct).toHaveCount(4);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs"]);
+  await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
   // BQ-059: the header keeps the action at every width; the sheet is the sections and Sign in.
   await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
   await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);

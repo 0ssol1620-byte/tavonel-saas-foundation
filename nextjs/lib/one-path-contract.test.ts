@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { COMPILE_STAGES } from "./compile-stages";
-import { CUSTOMER_NAV, customerNavOwns } from "./site-navigation";
+import { CUSTOMER_NAV, HEADER_NAV, customerNavOwns } from "./site-navigation";
 import films from "./locked-film-assets.json";
 
 const text = (relative: string) => readFileSync(fileURLToPath(new URL(`../${relative}`, import.meta.url)), "utf8");
@@ -25,8 +25,10 @@ describe("approved one-path experience", () => {
       { href: "/docs", label: "Docs" },
       { href: "/pricing", label: "Pricing" },
     ]);
-    expect(text("components/site-nav/desktop-primary-nav.tsx")).toContain("CUSTOMER_NAV.map");
-    expect(text("components/mobile-primary-nav.tsx")).toContain("CUSTOMER_NAV.map");
+    expect(HEADER_NAV).toEqual(CUSTOMER_NAV.filter((item) => item.href !== "/pricing"));
+    expect(text("components/site-nav/desktop-primary-nav.tsx")).toContain("HEADER_NAV.map");
+    expect(text("components/mobile-primary-nav.tsx")).toContain("HEADER_NAV.map");
+    expect(text("components/public-site-chrome.tsx")).toContain('href="/pricing"');
   });
   it("does not confuse a prefix with an unrelated route", () => {
     expect(customerNavOwns("/product", "/product/document-intelligence/")).toBe(true);
@@ -74,10 +76,12 @@ describe("approved one-path experience", () => {
     expect(page).toContain("<CompilerSpecimen");
     const order = [
       'id="s1"',
-      "<HeroProof",
-      'id="s2"',
-      "<HeroFilm",
+      "<HeroStatement",
       "<CompilerSpecimen",
+      "<HeroActions",
+      'id="s2"',
+      "<HeroProof",
+      "<HeroFilm",
       "<ProofScene",
       "<RecompileScene",
       "<TrustScene",
@@ -187,10 +191,8 @@ describe("approved one-path experience", () => {
       rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
     const composition = text("components/landing-v2/landing-page.tsx");
-    expect(composition, "the posture is resolved where the flags are readable")
-      .toContain("primaryCallToAction()");
-    expect(composition, "and the Korean label is that action's own, keyed by destination")
-      .toContain("KO_CHROME.cta[access.href]");
+    expect(composition, "the commercial path goes through Pricing")
+      .toContain('pricingLabel={korean ? "요금 보기" : "View pricing"}');
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');

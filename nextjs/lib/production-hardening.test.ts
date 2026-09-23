@@ -146,7 +146,7 @@ describe("2026-09-05 production hardening", () => {
     const css = read("app/tavonel.css");
     const nav = read("components/mobile-primary-nav.tsx");
     expect(css).toContain(".mobile-primary-nav { display: block; }");
-    expect(nav).toContain("CUSTOMER_NAV.map");
+    expect(nav).toContain("HEADER_NAV.map");
     /*
       BQ-013. The landmark still has a name; the name is now in the language of the page.
 
@@ -163,7 +163,7 @@ describe("2026-09-05 production hardening", () => {
 
   it("keeps the simplified desktop section row as direct links, not false menu controls", () => {
     const nav = read("components/site-nav/desktop-primary-nav.tsx");
-    expect(nav).toContain("CUSTOMER_NAV.map");
+    expect(nav).toContain("HEADER_NAV.map");
     // BQ-013: the landmark keeps its name, in the language of the page it is on.
     expect(nav).toContain('aria-label={korean ? "섹션" : "Sections"}');
     // `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"` promising arrow keys

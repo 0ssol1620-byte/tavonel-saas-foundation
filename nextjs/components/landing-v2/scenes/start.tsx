@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { activationPolicy } from "@/lib/activation-policy";
 import { LANDING_V2_SCENE_ORDER, type LandingV2Locale, type LandingV2StartCopy } from "@/lib/landing-v2-copy";
 import styles from "./start.module.css";
 
@@ -57,8 +56,6 @@ const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: 
 export type StartActions = {
   exploreLabel: string;
   exploreHref: string;
-  accessLabel: string;
-  accessHref: string;
 };
 
 export default function Scene({
@@ -100,11 +97,11 @@ export default function Scene({
             {/* §39's one next action for this scene, and the page's conversion. */}
             <Link
               className={`btn lv2-cta ${styles.cta}`}
-              href={actions.accessHref as Route}
+              href={"/pricing" as Route}
               prefetch={false}
               data-scene-next="start"
             >
-              {actions.accessLabel}
+              {PRICING_LABEL[locale]}
             </Link>
             {/*
               `EXPLORE_CTA.label` as the page resolved it. "Explore the public World" -- the wording
@@ -116,18 +113,6 @@ export default function Scene({
             </Link>
           </div>
 
-          {activationPolicy.customerData.enabled ? null : (
-            <p className="lv2-scene-note lv2-small" data-customer-data="arranged">
-              {copy.microtext}
-            </p>
-          )}
-
-          <p className={`lv2-small ${styles.pricing}`}>
-            <Link className={styles.pricingLink} href={"/pricing" as Route} prefetch={false}>
-              {PRICING_LABEL[locale]}
-              <span aria-hidden="true">→</span>
-            </Link>
-          </p>
         </div>
       </div>
     </section>

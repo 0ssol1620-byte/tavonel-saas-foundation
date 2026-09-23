@@ -285,3 +285,17 @@ The repository does not define `interactions:check` or an Impeccable script; the
 This evidence validates the candidate bytes locally. Exact-SHA CI, merge, production deployment, and live route verification remain release gates. Automated evidence does not constitute aesthetic approval.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-23 — Buyer journey, pricing and source-bound benchmark candidate
+
+The entry now centers the outcome and places “How it compiles” directly below it. The five-stage source specimen opens on Evidence without automatic motion; the public source inspector and optional film follow in the next scene. Pricing is the persistent header action and owns consultation. The benchmark entry leads with the R-01 same-pipeline recovery result (80.6 versus 53.7 over 1,403 documents and 8,413 checks), its receipt, and its weak-scan limitation; it explicitly excludes a live-service or competitor-superiority interpretation. A versioned DPA v2 draft replaces the customer-facing v1 links while preserving v1.
+
+The final local production build passed strict TypeScript, ESLint, the type floor, 368 Vitest files / 5,226 tests, and 145 static-generation steps. The focused Playwright production matrix passed **268 tests with 508 intentional project skips and zero failures** across 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion. It covered the landing, source evidence, global navigation including WebKit, mobile layout, scene continuity, pricing links, and visual continuity. The local server was rebuilt with the repository's `PLAYWRIGHT_LOCAL_HTTP=1` setting: its CSP omits `upgrade-insecure-requests` so WebKit can load the HTTP test assets. That setting does not weaken the production CSP.
+
+Current viewport captures are in the untracked `qa-captures/` directory: `home-{width}-final.png`, `pricing-{width}-final.png`, and `benchmarks-{width}-final.png` at all seven widths, plus `home-reduced-motion-final.png`. All 21 route-width combinations had zero horizontal overflow. Direct inspection of the 1440 and 360 pixel folds found no text overlap in the revised hero, Pricing, or benchmark entry. These captures are local visual evidence, not founder aesthetic acceptance.
+
+Lighthouse 12.8 three-run medians passed all enforced launch budgets: `/` performance 0.93, accessibility 1.00, LCP 2640 ms and CLS 0; `/pricing` 0.97/1.00, LCP 2136 ms and CLS 0; `/explore` 0.95/1.00, LCP 2347 ms and CLS 0. `/privacy` and `/security` both measured performance 0.98 and accessibility 1.00. Login and auth callback remain measure-only for SEO (0.66), as defined by the existing gate.
+
+The DPA v2 is a draft pending legal review. The recovery comparison is historical research and does not certify a deployed model. The work remains a review candidate until exact-SHA CI, immutable preview, live deployment checks, and founder visual acceptance pass.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

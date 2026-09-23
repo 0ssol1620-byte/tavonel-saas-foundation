@@ -155,7 +155,7 @@ describe("landing v2 -- the composition", () => {
       const levels = [...main.matchAll(/<h([1-6])(\s[^>]*)?>/g)].map(match =>
         Number(match[1])
       );
-      expect(levels.filter(level => level === 2)).toHaveLength(5);
+      expect(levels.filter(level => level === 2)).toHaveLength(6);
       expect(levels[0]).toBe(1);
       // An h3 may only appear under a heading one level above it: no h1 -> h3 jump anywhere.
       levels.reduce((previous, level) => {
