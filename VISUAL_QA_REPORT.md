@@ -315,3 +315,23 @@ The first authorized production reset sealed a manifest of 134 database rows and
 The focused reset service, route, panel, and R2 tests passed (29/29). The complete hermetic unit suite passed (368 files, 5,230 tests), as did the brand, type-floor, TypeScript, and ESLint checks. The local production build generated 145 static pages. Authenticated live recovery is still in progress. The reset is **not yet complete**; the sealed ledger must reach `completed`, and the two workspace R2 prefixes must list empty before completion can be reported.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-23 — Reset closeout and Pricing conversion candidate
+
+The preceding reset entry was written during the failed first attempt. The authorized sealed reset was resumed after the R2 retention rule was handled, then the original 365-day `immutable/` lock was restored. A fresh authenticated workspace check showed **0 database rows and 0 stored objects**; login, owner access, and billing exemption remained. The production evidence is in `docs/evidence/production/TAVONEL_FOUNDER_TEST_RESET_2026-09-23.md` (merged as PR #101). This verifies the live workspace inventory, not any backup or replica purge.
+
+The Pricing candidate presents the public World as the free action while own-source intake is closed, links Enterprise and assisted evaluation to `/contact`, and aligns FAQPage JSON-LD with the same self-service gate as the visible FAQ. Team's single-member scope stays visible; its detailed exclusions and the Enterprise quote variables are disclosures instead of an always-open wall of text. A busy checkout link now blocks navigation as its disabled state says.
+
+The final local `pnpm build` passed brand assets, the 12px type floor, strict TypeScript, ESLint, **368 test files / 5,230 tests**, and 145 static-generation steps. A production-server Playwright check passed the closed-intake pricing journey at 1440px and 390px, including CTA destinations, expandable limits, Enterprise contact navigation, and the server-rendered FAQ answer in JSON-LD. Full-page captures of `/pricing` at 1920, 1440, 1280, 1024, 768, 390, 360, and 1440 reduced-motion are in the ignored local directory `nextjs/test-results/pricing-truth-20260923/`; all eight returned HTTP 200 with zero horizontal overflow. The 1440px and 390px captures were inspected directly.
+
+This is a candidate, not a production deployment or a completed paid transaction. Customer-data self-service remains closed, the exact-head PR browser/Lighthouse checks remain to be assessed, and visual acceptance is still required.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-23 — Pricing exact-head QA correction
+
+PR #102's first exact-head Product QA run found one Pricing touch target below the 44px floor at 390px and 360px: the new “Discuss your sources” link measured about 22px high. Its link box now has a 44px minimum height; the two affected production-server Playwright cases pass locally (2/2). The first exact-head run passed Chromium, Firefox, WebKit, Next.js, Lighthouse, DB rehearsal and qualification, but its launch gate correctly stayed red because Product QA failed.
+
+A separate read-only Claude Code Opus review found a second truth error before release: Pricing called the public sample World a signed export. The public `/reproducibility` contract says the sample download is SHA-256 digest-bound and unsigned; signatures apply to workspace exports. The Evaluation card and both visible and JSON-LD FAQ answers now make that distinction, with a browser assertion for the public sample. The final changed-head browser and CI checks are pending; no production deployment or founder aesthetic acceptance is claimed.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

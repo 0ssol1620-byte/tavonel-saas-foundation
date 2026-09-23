@@ -154,6 +154,12 @@
 .pricing-page .plan-features { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
 .pricing-page .plan-action { display: flex; flex-direction: column; gap: 10px; align-items: stretch; align-self: end; }
 .pricing-page .plan-action .btn { width: 100%; }
+.pricing-page .plan-action .pricing-secondary-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+}
 
 /*
   BQ-110. The section headings under "How your plan works" had no scale between them: `h3` came
