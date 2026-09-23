@@ -202,8 +202,9 @@ test("keeps the header's primary action reachable at the width the section row a
   Product / How it works / Resources / Docs / Pricing, so the bar has no /integrations link at
   all and this test failed in four CI projects -- which is main's required Launch gate, because
   Product QA runs every spec. `lib/site-navigation.ts` states the new arrangement and its reason:
-  no item in the five-link bar is the section /sources belongs to, so marking one of them current
-  on this page would tell a reader something false about where they are.
+  no item in the four-link section bar is the section /sources belongs to, so marking one of them
+  current on this page would tell a reader something false about where they are. Pricing now has
+  its own persistent header action.
 
   So what is asserted is what the resolution actually protects, under the IA that exists: the
   page is one click from the footer's Product group with no menu open at all, no bar item claims

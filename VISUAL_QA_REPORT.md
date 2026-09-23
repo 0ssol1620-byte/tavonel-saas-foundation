@@ -300,4 +300,6 @@ The DPA v2 is a draft pending legal review. The recovery comparison is historica
 
 The authenticated founder-workspace reset dry run exposed two release defects: its ledger had no initial `prepared` state default and its API omitted the top-level reset ID the panel requires. The production default is now `prepared` and the migration ledger records version `20260923034853`; the response contract is fixed in this branch and covered by service/route unit assertions. The actual test-data reset has not run and requires this code to deploy before the guarded UI can finish.
 
+The full hermetic Playwright run exercised 2,111 cases: **1,476 passed, 608 intentionally skipped, 27 failed**. All 27 failures were stale assertions in five browser scenarios: the now-receipted R-01 percentage, the four-link section bar with separate Pricing, the phone sheet's new link count, and the Scene 02 film's 960px mid-desktop cap. Those assertions were updated to test the new contracts, then all four affected spec files passed across the same seven widths and reduced motion: **163 passed, 5 intentionally skipped, 0 failed**. This is targeted closure of every observed full-run failure; the full suite was not repeated after the test-only corrections.
+
 **FOUNDER VISUAL REVIEW REQUIRED**
