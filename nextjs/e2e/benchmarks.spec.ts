@@ -6,9 +6,8 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   /benchmarks, in a browser.
 
   The unit tests in lib/benchmark-registry.test.ts hold the validator and the page source. What
-  they cannot see is the thing this route was a 404 to avoid: a page that looks like it is
-  reporting results. So the assertions here are mostly about absence -- no table, no percentage,
-  no competitor -- alongside the protocol content that is the reason to publish the page at all.
+  they cannot see is whether a published result carries its limits and receipt. R-01 is the
+  historical same-pipeline recovery result; the compilation protocol has no qualified result.
 */
 
 const FAMILIES = [
@@ -22,7 +21,7 @@ const FAMILIES = [
   "Operations",
 ];
 
-test("publishes the compilation benchmark protocol and no table without a receipt", async ({ page }) => {
+test("publishes the compilation protocol and source-bound recovery without an unreceipted table", async ({ page }) => {
   await page.goto("/benchmarks");
   // The 2026-09-17 copy pass rewrote the imperative headline ("Measure the compile...") as a
   // statement. What this pins is unchanged: the H1 names the measurement, not a result.
@@ -76,7 +75,13 @@ test("publishes the compilation benchmark protocol and no table without a receip
   await expect(receiptTables.last()).toContainText("sha256");
 
   const body = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-  expect(body, "a percentage here would be a number with no receipt").not.toMatch(/\d+(\.\d+)?\s*%/);
+  const recovery = page.locator('section[aria-labelledby="recovery-title"]');
+  await expect(recovery).toContainText("80.6");
+  await expect(recovery).toContainText("53.7");
+  await expect(recovery).toContainText("1,403 documents and 8,413 checks");
+  await expect(recovery).toContainText("36.9% even with recovery");
+  await expect(recovery.getByRole("link", { name: /R-01 result and receipt/ })).toHaveAttribute("href", /R-01/);
+  expect(body.match(/\d+(?:\.\d+)?\s*%/g), "every public percentage needs a receipt and limitation").toEqual(["36.9%"]);
   /*
     OmniDocBench is the benchmark our own run was scored on, named beside its evaluator pin, so
     it is no longer barred here. A vendor's published leaderboard row still is: a figure someone

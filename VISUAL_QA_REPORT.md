@@ -298,4 +298,6 @@ Lighthouse 12.8 three-run medians passed all enforced launch budgets: `/` perfor
 
 The DPA v2 is a draft pending legal review. The recovery comparison is historical research and does not certify a deployed model. The work remains a review candidate until exact-SHA CI, immutable preview, live deployment checks, and founder visual acceptance pass.
 
+The authenticated founder-workspace reset dry run exposed two release defects: its ledger had no initial `prepared` state default and its API omitted the top-level reset ID the panel requires. The production default is now `prepared` and the migration ledger records version `20260923034853`; the response contract is fixed in this branch and covered by service/route unit assertions. The actual test-data reset has not run and requires this code to deploy before the guarded UI can finish.
+
 **FOUNDER VISUAL REVIEW REQUIRED**

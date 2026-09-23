@@ -3,7 +3,7 @@ const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 /* D2's five customer sections, read from the site's own table rather than typed into a test. */
-import { CUSTOMER_NAV } from "../lib/site-navigation";
+import { HEADER_NAV } from "../lib/site-navigation";
 
 /*
   /sources, in a browser.
@@ -222,10 +222,11 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
 
-  // The bar is the five customer sections, and /sources is not one of them -- nor is /integrations.
+  // The bar has four section links; Pricing is its separate emphasized action.
   const bar = page.locator("header.nav .one-path-primary-nav");
-  await expect(bar.locator("a")).toHaveCount(CUSTOMER_NAV.length);
-  for (const item of CUSTOMER_NAV) await expect(bar.locator(`a[href="${item.href}"]`)).toHaveCount(1);
+  await expect(bar.locator("a")).toHaveCount(HEADER_NAV.length);
+  for (const item of HEADER_NAV) await expect(bar.locator(`a[href="${item.href}"]`)).toHaveCount(1);
+  await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toHaveCount(1);
   await expect(bar.locator('a[href="/integrations"]')).toHaveCount(0);
   await expect(bar.locator('a[href="/sources"]')).toHaveCount(0);
   /*
@@ -239,11 +240,11 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
   await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
-  // Phone: the same five-choice customer IA, flat, and again nothing claiming this page.
+  // Phone: the same four section links, with Pricing still available in the header.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("header.nav details.mobile-primary-nav > summary").click();
   const sheet = page.locator("header.nav details.mobile-primary-nav > nav");
-  for (const item of CUSTOMER_NAV) {
+  for (const item of HEADER_NAV) {
     await expect(sheet.locator(`a.mobile-nav-direct[href="${item.href}"]`)).toHaveCount(1);
   }
   await expect(sheet.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);

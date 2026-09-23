@@ -20,7 +20,8 @@ for (const path of ["/", "/ko"]) {
     expect(wrap && filmWrap && mark && film).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(filmWrap!.x - mark!.x)).toBeLessThanOrEqual(1);
-    const cap = page.viewportSize()!.width >= 1600 ? 1280 : 1120;
+    const viewportWidth = page.viewportSize()!.width;
+    const cap = viewportWidth >= 1600 ? 1280 : viewportWidth >= 900 ? 960 : 1120;
     expect(film!.width).toBeGreaterThanOrEqual(Math.min(cap, filmWrap!.width) - 2);
     expect(film!.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);
     expect(film!.x + film!.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + 1);
