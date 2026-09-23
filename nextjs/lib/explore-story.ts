@@ -157,14 +157,12 @@ export const EXPLORE_COPY = {
     published as though it were what a customer's own compile would report, so the qualifier
     travels with the figure instead of sitting two clicks away on /product/compiled-world.
 
-    One string, because the figure has three points of use on public surfaces and three
-    separately-worded labels is how one of them ends up unlabelled: the technical drawer here,
-    `components/solution-proof-sample.tsx` (design-assets) and
-    `app/product/compiled-world/page.tsx` (copy-home-product). It lives in this file rather than
-    in `explore-sample.ts` because that module pulls the compiler and `node:crypto` with it and
-    two of the three consumers are reachable from a client bundle.
+    One string, because the figure is used in both the Explore technical drawer and the landing
+    recompile scene. Separately worded labels could let one of them lose the engine caveat. It
+    lives here rather than in `explore-sample.ts` because that module pulls the compiler and
+    `node:crypto` into code reached by the client bundle.
   */
-  countsQualifier: "as this repository’s TypeScript collection compiler emits them",
+  countsQualifier: "from the public sample compiler; customer workspace counts may differ",
   /* BQ-132: sentence case. Shouting a label does not make the drawer behind it more technical. */
   technical: "Technical details",
   /*

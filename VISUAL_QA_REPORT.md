@@ -362,4 +362,12 @@ Final local production build passed brand and type-floor checks, TypeScript, ESL
 
 Local ignored screenshots: `nextjs/test-results/landing-v2-prepared-proof--c0d57-swer-bearing-source-regions-{1920,1440,1280,1024,768,390,360,reduced-motion}/proof-sales.png`, plus `proof-sales-viewport.png` in each directory. The 1440 section and 390/360 phone captures were inspected directly. The section screenshot stitches a sticky header across the long mobile element; the 390 viewport capture shows the header at the viewport top with no fixed overlap. Automated browser checks do not replace founder visual acceptance. Exact-head CI, Vercel preview, and production verification follow the PR; the broader lexical-retrieval defect and unprepared questions remain open.
 
+## 2026-09-24 — Public sample count disclosure
+
+The homepage recompile scene and Explore technical drawer no longer describe the public sample counts as output from "this repository's TypeScript collection compiler." Their shared English qualifier and the Korean homepage translation explain that the figures come from a public sample compiler and may differ in a customer workspace. The drawer still identifies the build-time sample and customer Core runtime separately; the receipt keeps its precise runtime identifier for technical inspection.
+
+The first full production build passed brand/type-floor, TypeScript, ESLint, 368 test files / 5,230 tests, and 145 static pages. After the final Korean terminology correction, the affected 66 unit tests, `pnpm check`, and a fresh optimized Next.js build passed. The affected landing and Explore browser specs passed 217 tests with 95 intentional skips across 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion. Final English and Korean homepage captures at all seven widths found one visible qualifier and zero horizontal overflow. The 1440 English and 360 English/Korean captures were inspected directly; the Explore technical drawer was checked in the local browser. Captures remain local under `nextjs/test-results/count-qualifier-*.png`.
+
+An independent Claude Code Opus 5.5 read-only review found terminology inconsistency and a fragile line-break assertion, both corrected. This is copy and layout verification, not acceptance of the broader site design or customer runtime equivalence. Exact-head CI and founder visual acceptance are separate release gates.
+
 **FOUNDER VISUAL REVIEW REQUIRED**
