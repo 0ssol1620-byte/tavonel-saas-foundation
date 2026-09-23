@@ -409,21 +409,15 @@ test("Ask quotes the source and its citation lands in the Evidence act", async (
   const panel = page.getByRole("dialog", { name: "Ask this World" });
   await expect(panel).toBeVisible();
 
-  // Four prepared questions, reaching three different filings of the corpus.
-  await expect(panel.getByRole("button", { name: /\?$/ })).toHaveCount(4);
-  await panel.getByRole("button", { name: "What were net sales by reportable segment?" }).click();
-  /*
-    What is asserted here is the contract, not the sentence.
-
-    This used to expect the word "Americas", which was the top-scored region while the corpus was
-    three pages of each filing. Over 1,169 regions the same lexical retriever scores a different
-    region first -- still from the corpus, still cited to a filing and a page, and no longer the
-    segment table itself. Pinning the old word would have meant either tuning the question until
-    the retriever flattered it or asserting a result the retriever does not guarantee. What Ask
-    does guarantee is that the answer is source text with a citation a reader can open, so that
-    is what this checks; `explore-sample.ts` fails the build if any question stops being grounded.
-  */
-  await expect(panel.locator("blockquote")).not.toBeEmpty();
+  // Prepared questions must show a source excerpt that actually answers each question.
+  await expect(panel.getByRole("button", { name: /\?$/ })).toHaveCount(3);
+  await expect(panel).toContainText("Choose from the prepared questions above.");
+  await panel.getByRole("button", { name: "What were operating expenses for research and development?" }).click();
+  await expect(panel.locator("blockquote")).toContainText("Research and development 10,887");
+  await panel.getByRole("button", { name: "What were Products and Services net sales for the three months ended in December?" }).click();
+  await expect(panel.locator("blockquote")).toContainText("Net sales: Products $ 113,743");
+  await panel.getByRole("button", { name: "What products does Apple's Company Background say it designs and markets?" }).click();
+  await expect(panel.locator("blockquote")).toContainText("designs, manufactures and markets smartphones");
   await expect(panel.getByText(/^\d+ SOURCE REGIONS?$/)).toBeVisible();
   await expect(panel.getByRole("button", { name: /^apple-.*\.pdf/ }).first()).toBeVisible();
   // §49 keeps the relevance decimal off the stage.

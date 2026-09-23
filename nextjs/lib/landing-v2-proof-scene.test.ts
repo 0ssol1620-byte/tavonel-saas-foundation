@@ -107,7 +107,7 @@ describe("landing scene 02 -- instant proof", () => {
     expect(panels.filter((panel) => /hidden=""/.test(panel))).toHaveLength(tabs.length - 1);
     expect(panels[0]).not.toMatch(/hidden=""/);
     // The questions are the labels; no invented category reaches the page.
-    for (const tab of tabs) expect(html).toContain(tab.question);
+    for (const tab of tabs) expect(html.replace(/&#x27;/g, "'")).toContain(tab.question);
   });
 
   it.each(LOCALES)("%s opens each tab's own source region, and says so in the page's language", (locale) => {
@@ -121,6 +121,13 @@ describe("landing scene 02 -- instant proof", () => {
     expect(html).toContain(copy.openSource);
     expect(html).toContain(copy.answerLabel);
     expect(html).toContain(copy.sourceLabel);
+  });
+
+  it.each(LOCALES)("%s identifies a reference render separately from an original PDF", (locale) => {
+    const html = render(locale);
+    expect(html).toContain(locale === "ko" ? "원문 페이지 · 기준 렌더" : "Source page · reference render");
+    expect(html).toContain(locale === "ko" ? "원문 페이지 · 원본 PDF" : "Source page · original PDF");
+    expect(html).not.toContain("Original filing");
   });
 
   it.each(LOCALES)("%s quotes the source rather than composing an answer", (locale) => {

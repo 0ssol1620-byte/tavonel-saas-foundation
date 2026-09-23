@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import EvidenceConnector from "../evidence-connector";
 import SourcePage from "../source-page";
-import { HERO_PAGE_ALT, SCENE_ACTIONS } from "../scene-actions";
+import { SCENE_ACTIONS } from "../scene-actions";
 import ProofTabs from "./proof-tabs";
 import styles from "./proof.module.css";
 import {
@@ -89,6 +89,14 @@ function Panel({
   pageOfFormat: string;
 }) {
   const { source, rasters } = tab;
+  const isReferenceRender = source.representationKind === "reference_render";
+  const pageAlt = locale === "ko"
+    ? isReferenceRender
+      ? "이 Compiled World가 읽은 SEC 공시 페이지의 기준 렌더."
+      : "이 Compiled World가 읽은 원본 PDF 페이지."
+    : isReferenceRender
+      ? "A reference render of the SEC filing page this Compiled World was read from."
+      : "A page of the original PDF this Compiled World was read from.";
   return (
     <div className={styles.grid} data-evidence-pair>
       <EvidenceConnector />
@@ -102,12 +110,12 @@ function Panel({
         {/*
           The citation, in mono (§22: page number and source version as metadata outside the
           page). The digest is the full value in `title` rather than a truncation in the line --
-          a receipt printed short is not a receipt, and the four visible fields are the ones a
-          reader can check against the filing itself.
+          a receipt printed short is not a receipt, and the three visible fields are the ones a
+          reader can check against the filing itself. The representation qualifier appears once,
+          directly on the source-page figure below.
         */}
         <p className={`lv2-meta ${styles.citation}`} data-derived="1" title={source.digest}>
-          {source.form} · {source.filingDate} · {fill(pageOfFormat, { page: source.page, pageCount: source.pageCount })} ·{" "}
-          {sourcePageQualifier(source.representationKind, locale === "ko")}
+          {source.form} · {source.filingDate} · {fill(pageOfFormat, { page: source.page, pageCount: source.pageCount })}
         </p>
         <Link
           className={`lv2-text-link ${styles.open}`}
@@ -124,7 +132,9 @@ function Panel({
 
 
       <figure className={styles.doc}>
-        <figcaption className={`lv2-meta ${styles.label}`}>{copy.sourceLabel}</figcaption>
+        <figcaption className={`lv2-meta ${styles.label}`}>
+          {copy.sourceLabel} · {sourcePageQualifier(source.representationKind, locale === "ko")}
+        </figcaption>
         <div className={styles.frames}>
           <span className={styles.pageCell}>
             <SourcePage
@@ -133,7 +143,7 @@ function Panel({
               sizes={PAGE_SIZES}
               width={rasters.page.width}
               height={rasters.page.height}
-              alt={HERO_PAGE_ALT[locale]}
+              alt={pageAlt}
               bbox1000={tab.region.bbox1000}
             />
           </span>

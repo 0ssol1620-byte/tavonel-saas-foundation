@@ -31,6 +31,7 @@ describe("the Landing V2 proof scenes", () => {
       for (const tab of tabs) {
         expect(EXPLORE_SAMPLE_QUESTIONS).toContain(tab.question);
         expect(tab.citationIndex).toBeGreaterThanOrEqual(0);
+        expect(tab.citationIndex).toBe(0);
         expect(tab.citationIndex).toBeLessThan(tab.citationCount);
         expect(tab.answerExcerpt.length).toBeGreaterThan(0);
         expect(tab.answerExcerpt.length).toBeLessThanOrEqual(240);
@@ -54,18 +55,12 @@ describe("the Landing V2 proof scenes", () => {
       }
     });
 
-    /*
-      §12 wants three tabs over three filings. This corpus gives three tabs over two: the fourth
-      prepared question cites no region on a page with a committed render, and of the three that
-      do, two land on the Q1 10-Q. The count is asserted as measured rather than loosened to a
-      range -- a third filing arrives when `scripts/render-source-pages.mjs` renders a page one
-      of the other answers cites, which is a corpus change and should fail here first.
-    */
+    /* The three answer-bearing regions occupy two pages across two filings. */
     it("reaches the filings the committed renders allow, and says how many", () => {
       const filings = new Set(tabs.map((tab) => tab.source.digest));
       expect(tabs).toHaveLength(3);
       expect(filings.size).toBe(2);
-      expect(new Set(tabs.map((tab) => `${tab.source.digest}:${tab.source.page}`)).size).toBe(3);
+      expect(new Set(tabs.map((tab) => `${tab.source.digest}:${tab.source.page}`)).size).toBe(2);
     });
   });
 

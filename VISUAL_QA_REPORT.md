@@ -71,6 +71,8 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+
+
 ## 2026-09-21 — Original-source compiler specimen and mobile film inspection
 
 The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
@@ -343,10 +345,21 @@ This is a candidate, not a production deployment or a completed paid transaction
 PR #102's first exact-head Product QA run found one Pricing touch target below the 44px floor at 390px and 360px: the new “Discuss your sources” link measured about 22px high. Its link box now has a 44px minimum height; the two affected production-server Playwright cases pass locally (2/2). The first exact-head run passed Chromium, Firefox, WebKit, Next.js, Lighthouse, DB rehearsal and qualification, but its launch gate correctly stayed red because Product QA failed.
 
 A separate read-only Claude Code Opus review found a second truth error before release: Pricing called the public sample World a signed export. The public `/reproducibility` contract says the sample download is SHA-256 digest-bound and unsigned; signatures apply to workspace exports. The Evaluation card and both visible and JSON-LD FAQ answers now make that distinction, with a browser assertion for the public sample. The final changed-head browser and CI checks are pending; no production deployment or founder aesthetic acceptance is claimed.
+
 ## 2026-09-23 — MCP count on the Compiler Contract page
 
 The interchange-standards row on `/product/continuous-knowledge` said the published MCP server exposed eight tools, while its shipped tool list has nine. The sentence now reads the count from the shared tool list instead of copying a number. The developer-distribution test keeps that list pinned to the published server artifact.
 
 `compiler-contract` and developer-distribution unit checks passed (43/43), as did TypeScript and ESLint on the changed files. The managed production-server browser spec passed at 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion (56/56). Full-page captures for those eight states are in the ignored local directory `nextjs/test-results/mcp-copy-20260923/`: every route returned HTTP 200, all seven widths had zero document overflow, and the rendered MCP row said “nine tools”. The 1440 and 390 captures were inspected directly. This copy correction does not claim to resolve the route's broader text density or final aesthetic approval; exact-head CI and production deployment remain pending.
+
+## 2026-09-24 — Public Explore answer relevance and landing proof
+
+The audit's TAV-005 was reproduced against the committed W4 corpus. The public Products/Services question ranked a 10-K footnote above the quarterly sales table, and the Board-oversight question ranked a proxy navigation block. The retriever returned citations, but their leading excerpts did not answer the questions. The public sample now offers three prepared questions with independently checked top-ranked regions: Q1 R&D expense on the Q1 10-Q page 4 (`[64,476,932,538]`), Products/Services net sales on that filing's page 4 (`[64,249,932,352]`), and product categories in the 2025 10-K Company Background page 4 (`[30,291,971,380]`). The two misleading questions were removed from the public sample; no general retrieval-quality improvement is claimed. Unit tests pin the source, page, box and answer-bearing excerpt for each prepared question.
+
+The homepage proof tabs now quote the same top-ranked region as `/explore` Ask. A missing page or crop fails the builder rather than substituting a lower-ranked citation. A new crop was rendered from the committed Q1 source PDF and re-encoded into responsive WebP/AVIF derivatives; both manifests record SHA-256 and byte counts. The Sources stack retains all three source thumbnails, including DEF 14A. Source-page captions and image alt text distinguish an issuer PDF from a reference render of SEC HTML. The Ask explanation says the questions are prepared without a stale count.
+
+Final local production build passed brand and type-floor checks, TypeScript, ESLint, **368 unit/contract files and 5,233 tests**, and generation of 145 static pages. Full affected `landing-v2.spec.ts` and `explore.spec.ts` production-browser runs passed **225 cases with 95 intentional skips** across 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion. The final focused proof capture passed 8/8. `/explore` Ask's desktop/reduced-motion path verified all three displayed excerpts and evidence navigation; its existing narrow-layout skip remains, while the homepage proof was exercised at every width.
+
+Local ignored screenshots: `nextjs/test-results/landing-v2-prepared-proof--c0d57-swer-bearing-source-regions-{1920,1440,1280,1024,768,390,360,reduced-motion}/proof-sales.png`, plus `proof-sales-viewport.png` in each directory. The 1440 section and 390/360 phone captures were inspected directly. The section screenshot stitches a sticky header across the long mobile element; the 390 viewport capture shows the header at the viewport top with no fixed overlap. Automated browser checks do not replace founder visual acceptance. Exact-head CI, Vercel preview, and production verification follow the PR; the broader lexical-retrieval defect and unprepared questions remain open.
 
 **FOUNDER VISUAL REVIEW REQUIRED**

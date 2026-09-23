@@ -92,6 +92,32 @@ test.describe("six-beat page structure", () => {
   }
 });
 
+test("prepared proof tabs show answer-bearing source regions", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const proof = page.locator("#s3");
+  const tabs = proof.getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+
+  await tabs.nth(1).click();
+  const sales = proof.getByRole("tabpanel").filter({ visible: true });
+  await expect(sales.getByText("Net sales: Products $ 113,743", { exact: false })).toBeVisible();
+  await expect(sales.getByText("Source page · reference render")).toBeVisible();
+  const salesCrop = sales.locator('img[src*="r64-249-932-352"]');
+  await expect(salesCrop).toBeVisible();
+  await salesCrop.scrollIntoViewIfNeeded();
+  await expect.poll(() => salesCrop.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  if (process.env.TAVONEL_CAPTURE_EXPLORE_QA === "1") {
+    await proof.screenshot({ path: testInfo.outputPath("proof-sales.png") });
+    await page.screenshot({ path: testInfo.outputPath("proof-sales-viewport.png") });
+  }
+
+  await tabs.nth(2).click();
+  const background = proof.getByRole("tabpanel").filter({ visible: true });
+  await expect(background.getByText("designs, manufactures and markets smartphones", { exact: false })).toBeVisible();
+  await expect(background.getByText("Source page · original PDF")).toBeVisible();
+  await expect(background.getByRole("link", { name: /Open the source region/ })).toHaveAttribute("href", /\/explore\?act=evidence/);
+});
+
 test.describe("HeroFilm", () => {
   test("opens with one four-cut film and removes the internal recreation disclaimer", async ({ page }) => {
     await page.goto("/");
