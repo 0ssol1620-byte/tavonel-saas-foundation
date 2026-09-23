@@ -18,8 +18,10 @@ import type { WorldFreshness } from "@/lib/world-store";
   substituted one.
 */
 
-const CANDIDATE_WAITING_NOTICE =
+const CANDIDATE_WAITING_WITH_ACTIVE_NOTICE =
   "A newer candidate is waiting for activation; consumers are reading the previous active World";
+const CANDIDATE_WAITING_WITHOUT_ACTIVE_NOTICE =
+  "A compiled candidate is waiting for activation; no active World exists for Ask, API or MCP to read";
 
 function nullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
@@ -88,11 +90,13 @@ export default function WorldFreshness({ freshness }: { freshness: unknown }) {
       </div>
       {read.candidateAwaitingActivation ? (
         <p className="fine held" role="status">
-          {CANDIDATE_WAITING_NOTICE}
+          {read.activeManifestDigest
+            ? CANDIDATE_WAITING_WITH_ACTIVE_NOTICE
+            : CANDIDATE_WAITING_WITHOUT_ACTIVE_NOTICE}
           {read.candidateManifestDigest
             ? `. The waiting candidate is ${read.candidateManifestDigest.replace("sha256:", "").slice(0, 12)}.`
             : "."}
-          {" "}Activation is a human decision and nothing reads the candidate until it is made.
+          {" "}Activation is a human decision; consumer queries do not read the candidate until then.
         </p>
       ) : null}
     </section>

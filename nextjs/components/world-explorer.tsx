@@ -228,8 +228,7 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
         <p className="fine id">Manifest {collection.manifestDigest}</p>
       ) : null}
       <p className="fine">
-        A candidate structure. Nothing here is activated as the live World without an explicit
-        human decision.
+        This is the compiled package structure. Activation is a separate, recorded human decision.
       </p>
     </section>
   );

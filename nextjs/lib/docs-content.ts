@@ -890,7 +890,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["reviewedAt", "When a person answered a compile blocker. This is the only review instant recorded — it is not a general 'someone reviewed this World' timestamp, and it stays null when a compile had no blockers."],
           ["activatedAt", "When a person made this version the active World."],
           ["activeManifestDigest", "The version this answer came from."],
-          ["candidateAwaitingActivation / candidateManifestDigest", "True, with the digest, when a newer compiled version exists that nobody has activated. You are reading the previous active World until a person activates it."],
+          ["candidateAwaitingActivation / candidateManifestDigest", "True, with the digest, when a compiled candidate awaits activation. If an active World exists, consumers continue reading it. If none exists, Ask, API and MCP have no active World to read until a person activates the candidate."],
         ],
       },
       { kind: "note", text: "A null in the freshness block means that value is not recorded, or could not be read. It is never a substitute drawn from one of the other clocks. `candidateAwaitingActivation` is also conservative: it is computed from versions the workspace has activated at least once, the manifest digest the latest compile recorded, and the candidate this request already loaded, so it can read false for a compile that ran before that digest was recorded." },

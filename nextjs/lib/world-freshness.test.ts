@@ -58,6 +58,17 @@ describe("the rendered block", () => {
     expect(markup).toContain("10 Sept 2026, 08:00 UTC");
   });
 
+  it("does not imply an active World exists when the first candidate awaits activation", () => {
+    const markup = renderToStaticMarkup(createElement(WorldFreshness, {
+      freshness: { ...full, activeManifestDigest: null, activatedAt: null },
+    }));
+    expect(markup).toContain("no active World exists for Ask, API or MCP to read");
+    expect(markup).toContain("consumer queries do not read the candidate until then");
+    expect(markup).not.toContain("previous active World");
+    expect(markup).not.toContain("nothing reads the candidate");
+    expect(markup).not.toContain("Active digest");
+  });
+
   it("prints a missing time as not recorded rather than substituting one", () => {
     const markup = renderToStaticMarkup(createElement(WorldFreshness, { freshness: full }));
     // `full.reviewedAt` is null, which is the production value today.

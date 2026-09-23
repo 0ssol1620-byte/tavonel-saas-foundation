@@ -523,7 +523,7 @@ export default function WorkspacePage() {
     setAskEvidenceId(null);
   };
 
-  const loadWorldState = async (collectionId: string, token?: string) => {
+  const loadWorldState = async (collectionId: string, token?: string): Promise<ActiveWorld | null | undefined> => {
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
     const accessToken = token ?? await getAuthToken();
     if (!accessToken) return;
@@ -533,7 +533,7 @@ export default function WorkspacePage() {
     const json = await response.json() as { code?: string; activeWorld?: ActiveWorld; versions?: WorldVersion[] };
     if (response.status === 404 && json.code === "ACTIVE_WORLD_NOT_FOUND") {
       clearWorldState();
-      return;
+      return null;
     }
     if (!response.ok || !json.activeWorld || !Array.isArray(json.versions)) {
       setNotice(`Active world verification failed. ${failureSentence(json.code, response.status)}`);
@@ -543,6 +543,7 @@ export default function WorkspacePage() {
     setWorldVersions(json.versions);
     setAskResult(null);
     setAskEvidenceId(null);
+    return json.activeWorld;
   };
 
   const loadDocuments = async (): Promise<DocumentListItem[]> => {
@@ -638,8 +639,14 @@ export default function WorkspacePage() {
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
-    await loadWorldState(collectionId, token);
-    setNotice(`Compiled World ${collectionId} was restored and its evidence package verified.`);
+    const loadedActiveWorld = await loadWorldState(collectionId, token);
+    if (loadedActiveWorld === undefined) return artifact.lifecycle;
+    const verifiedPackage = "Its required package entries and state were checked.";
+    setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
+      ? `Active World loaded. ${verifiedPackage}`
+      : artifact.lifecycle === "review_required"
+        ? `Review-required package loaded. ${verifiedPackage} Resolve its blockers before activation.`
+        : `Compiled candidate loaded. ${verifiedPackage}`);
     /*
       The lifecycle of a candidate that actually verified, for the caller that needs to know one
       arrived. Every path above returns undefined, so a refused package cannot be counted as a

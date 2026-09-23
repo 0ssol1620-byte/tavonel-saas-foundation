@@ -1407,6 +1407,7 @@
   .chain .link h2 { font-size: 17px; letter-spacing: -0.012em; font-variation-settings: "wght" 560; }
   .processor-list p, .status-list p { margin: 4px 0; }
   .status-list article > span { display: inline-block; margin-bottom: 18px; font: 600 var(--t-1)/1 var(--f-sans); letter-spacing: 0.06em; color: var(--verified); }
+  .status-list article[data-state="configured"] > span { color: var(--text-mid); }
   /* A held-open decision reads as changed; an absent configuration reads as absent. `closed` and
      `disabled` replaced the single `restricted`, which covered both (RESOLVED A-6). */
   .status-list article[data-state="test_only"] > span,

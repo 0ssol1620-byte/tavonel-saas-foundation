@@ -316,15 +316,13 @@ describe("§77 /status scope", () => {
   const page = read("app/status/page.tsx");
 
   /*
-    BA-136. §77's requirement is that a reader cannot take "operational" on this page for a
-    request that succeeded. The page used to meet it with three negations before saying what it
-    was -- "not an uptime probe", "not that a request has just succeeded" -- and it now meets it
-    by stating both halves positively: what the word means, and which section answers the other
-    question. Both halves are pinned, so the distinction cannot be dropped by editing one line.
+    The configuration rows now display `configured` in a neutral color. A reader must also see
+    that these rows do not report a successful request; scheduled checks carry that evidence.
   */
-  it("says what its rows are, so 'operational' cannot be read as a probe", () => {
+  it("separates configured rows from successful requests", () => {
     expect(page).toContain("configured and its gate is open");
-    expect(page).toContain("the separate question the scheduled checks answer");
+    expect(page).toContain("it does not mean a request recently succeeded");
+    expect(page).toContain("Scheduled checks report request outcomes separately");
   });
 
   it("never claims all systems are operational", () => {
