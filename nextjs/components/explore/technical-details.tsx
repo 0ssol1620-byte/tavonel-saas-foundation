@@ -122,9 +122,9 @@ export default function TechnicalDetails({
             <div><dt>Source directory</dt><dd>{record.sourceDirectory}</dd></div>
           </dl>
           <p className={styles.drawerNote}>
-            This sample is compiled by this repository&rsquo;s TypeScript collection compiler at
-            build time over committed files, not dispatched to the Core runtime. The runtime name
-            above says which one ran.
+            This fixed sample was compiled at build time from the listed public filings, using a
+            public sample compiler. Customer workspaces use the Core runtime and may produce different
+            object counts from the same files. The runtime name above identifies this sample run.
           </p>
         </section>
 

@@ -293,13 +293,16 @@ describe("public copy on this lane's surfaces", () => {
     BA-034. /explore is compiled by this repository's TypeScript collection compiler and the Core
     a customer's compile is dispatched to does not emit the same object count over the same bytes.
     The figure may be published; it may not be published bare, as though it were what a customer's
-    compile would report. The qualifier is one shared string so that the three public points of
-    use cannot drift into three differently-hedged labels, or into two and one unlabelled.
+    compile would report. The qualifier is one shared string so the two public points of use
+    cannot drift.
   */
   it("labels the sample's object count with the engine that produced it", () => {
-    expect(EXPLORE_COPY.countsQualifier).toContain("TypeScript collection compiler");
+    expect(EXPLORE_COPY.countsQualifier).toContain("public sample compiler");
+    expect(EXPLORE_COPY.countsQualifier).toContain("customer workspace counts may differ");
+    expect(EXPLORE_COPY.countsQualifier).not.toContain("repository");
     const drawer = read("components/explore/technical-details.tsx");
     expect(drawer).toContain("EXPLORE_COPY.countsQualifier");
+    expect(drawer.replace(/\s+/g, " ")).toContain("Customer workspaces use the Core runtime");
     // Named beside the count, not in a paragraph somewhere under it.
     expect(drawer).toMatch(/<dt>Objects[^<]*<small>\{EXPLORE_COPY\.countsQualifier\}<\/small><\/dt>/);
   });
