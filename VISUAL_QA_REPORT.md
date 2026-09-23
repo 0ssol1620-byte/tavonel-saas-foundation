@@ -399,4 +399,6 @@ Claude Code Opus 5.5 performed independent read-only reviews of the homepage inf
 
 The first exact-head Product QA run for this candidate passed 859 cases with 238 intentional skips, but failed two 390/360 film-navigation cases. The film cuts remained present: the tests still looked for tabs without opening the new native cut-selector disclosure. The test now opens that disclosure before checking all four cuts, the selected video, and keyboard panning. The two affected cases passed against the deployed exact-head preview at 390 and 360 with two workers and no retry. The remaining remote checks on that first head passed: Chromium, Firefox, WebKit, Lighthouse, Next.js, qualification, analysis, and database rehearsal. A new exact-head CI run is required for this test correction.
 
+The corrected film-test head passed Product QA, all three browser matrices, Lighthouse, Next.js, and the launch gate. Its separate DB rehearsal failed before SQL execution on three attempts because GHCR throttled anonymous pulls of the pinned Supabase Postgres image (`toomanyrequests`). The workflow now authenticates GHCR with the job's read-only `GITHUB_TOKEN` before the pinned CLI starts its local database. This is a CI infrastructure change; the authenticated pull and migration rehearsal still require an exact-head run.
+
 **FOUNDER VISUAL REVIEW REQUIRED**
