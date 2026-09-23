@@ -48,6 +48,8 @@ export default function RegionHighlight({
   caption,
   imageAlt,
   imageEager = false,
+  progressiveIndex = false,
+  indexLabel = "Inspect all source regions",
 }: {
   view: EvidencePageView;
   /** One sentence from the page that uses this, saying what the reader is looking at. */
@@ -62,14 +64,40 @@ export default function RegionHighlight({
   imageAlt?: string;
   /** This panel is the first paint of its page: load the raster eagerly rather than lazily. */
   imageEager?: boolean;
+  /** Keep the full region picker available on the landing after one source/result pair. */
+  progressiveIndex?: boolean;
+  /** Localized disclosure label; the count is inserted from the committed view. */
+  indexLabel?: string;
 }) {
   const [selected, setSelected] = useState(0);
   const detailId = useId();
   const active = view.regions[selected] ?? view.regions[0]!;
   const index = view.regions.indexOf(active);
+  const regionList = (
+    <ul className={styles.list}>
+      {view.regions.map((region, position) => (
+        <li key={region.id}>
+          <button
+            type="button"
+            className={styles.row}
+            aria-pressed={position === index}
+            aria-describedby={detailId}
+            onFocus={() => setSelected(position)}
+            onClick={() => setSelected(position)}
+          >
+            <span className={styles.regionName} data-derived="1">
+              Evidence region {position + 1} of {view.regions.length}, page {view.source.page}
+            </span>
+            {/* The excerpt is source text. data-derived keeps its figures tied to the locator. */}
+            <span className={styles.rowExcerpt} data-derived="1">{region.excerpt}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
-    <figure className={styles.frame}>
+    <figure className={styles.frame} data-progressive={progressiveIndex ? "1" : undefined}>
       <div className={styles.page}>
         {view.image ? (
           /* eslint-disable-next-line @next/next/no-img-element -- the raster is already sized and
@@ -129,37 +157,12 @@ export default function RegionHighlight({
         lines so no label is written or invented. Row order is the page's region order, which is
         the order the boxes are drawn in.
       */}
-      <ul className={styles.list}>
-        {view.regions.map((region, position) => (
-          <li key={region.id}>
-            <button
-              type="button"
-              className={styles.row}
-              aria-pressed={position === index}
-              aria-describedby={detailId}
-              onFocus={() => setSelected(position)}
-              onClick={() => setSelected(position)}
-            >
-              {/*
-                `data-derived="1"`: every number in this accessible name -- the position, the
-                count and the page -- is read from the view above, and the panel beside it
-                prints the same three with their locator. The landing's figure guard walks the
-                rendered page for a digit that has no receipt, and it cannot see an aria name
-                apart from painted copy.
-              */}
-              <span className={styles.regionName} data-derived="1">
-                Evidence region {position + 1} of {view.regions.length}, page {view.source.page}
-              </span>
-              {/*
-                And the same attribute on the row's painted half, for the same reason the
-                quotation below carries it: the text is the filing's own sentence, and the
-                locator that receipts it is printed in the panel beside this list.
-              */}
-              <span className={styles.rowExcerpt} data-derived="1">{region.excerpt}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {progressiveIndex ? (
+        <details className={styles.disclosure}>
+          <summary>{indexLabel} <span data-derived="1">({view.regions.length})</span></summary>
+          {regionList}
+        </details>
+      ) : regionList}
 
       <figcaption className={styles.detail} id={detailId}>
         {caption ? <p className={styles.caption}>{caption}</p> : null}

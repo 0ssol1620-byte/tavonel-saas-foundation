@@ -79,7 +79,7 @@ function heroStages(korean: boolean): CompileStage[] {
 export default function HeroFilm({ korean = false }: { korean?: boolean }) {
   return (
     <div className="lv2-film">
-      <CompileStagePlayer stages={heroStages(korean)} preferVideo korean={korean} />
+      <CompileStagePlayer stages={heroStages(korean)} preferVideo korean={korean} stageDisclosureLabel={korean ? "영상 단계 선택" : "Choose a film cut"} />
     </div>
   );
 }

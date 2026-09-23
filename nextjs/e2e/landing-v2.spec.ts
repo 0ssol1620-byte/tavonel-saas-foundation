@@ -38,6 +38,24 @@ async function selectedStage(page: Page): Promise<number> {
 
 test.describe("six-beat page structure", () => {
   for (const path of ["/", "/ko"]) {
+    test(`${path} offers the next action before the How it compiles explanation`, async ({ page }) => {
+      await page.goto(path);
+      const actions = page.locator("#s1 .lv2-actions");
+      const heading = page.locator("#s1 .lv2-how-head");
+      const specimen = page.locator("#s1 [data-compiler-specimen]");
+      const actionBox = await actions.boundingBox();
+      const headingBox = await heading.boundingBox();
+      const specimenBox = await specimen.boundingBox();
+      expect(actionBox).not.toBeNull();
+      expect(headingBox).not.toBeNull();
+      expect(specimenBox).not.toBeNull();
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+      expect(actionBox!.y + actionBox!.height).toBeLessThan(headingBox!.y);
+      expect(headingBox!.y + headingBox!.height).toBeLessThan(specimenBox!.y);
+    });
+  }
+
+  for (const path of ["/", "/ko"]) {
     test(`${path} renders six ordered, named scene landmarks`, async ({ page }) => {
       await page.goto(path);
       const sections = page.locator("main > section[data-scene]");
@@ -118,11 +136,31 @@ test("prepared proof tabs show answer-bearing source regions", async ({ page }, 
   await expect(background.getByRole("link", { name: /Open the source region/ })).toHaveAttribute("href", /\/explore\?act=evidence/);
 });
 
+for (const [path, label] of [["/", "Inspect all source regions"], ["/ko", "모든 원문 영역 살펴보기"]] as const) {
+  test(`${path} opens the source index by keyboard and keeps regions linked to evidence`, async ({ page }) => {
+    await page.goto(path);
+    const inspector = page.locator("#s2 [data-progressive='1']");
+    const summary = inspector.locator("summary");
+    await expect(summary).toContainText(`${label} (10)`);
+    await expect(inspector.getByRole("button", { name: /^Evidence region/ })).toHaveCount(0);
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    const regions = inspector.getByRole("button", { name: /^Evidence region/ });
+    await expect(regions).toHaveCount(10);
+    await regions.nth(1).click();
+    await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
+    await expect(inspector.getByRole("link", { name: "Open this region in Explore" })).toHaveAttribute("href", /\/explore\?act=evidence/);
+  });
+}
+
 test.describe("HeroFilm", () => {
   test("opens with one four-cut film and removes the internal recreation disclaimer", async ({ page }) => {
     await page.goto("/");
     const film = page.locator(FILM);
     await expect(film).toHaveCount(1);
+    await expect(film.locator(".compile-film-viewport")).toBeVisible();
+    await expect(film.getByRole("tab")).toHaveCount(0);
+    await film.locator(".compile-film-stage-disclosure summary").click();
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(page.locator("#s1 [data-compiler-specimen]")).toHaveCount(1);
     await expect(page.locator("#s1 .compile-film-sequence")).toHaveCount(0);
@@ -213,6 +251,8 @@ test.describe("lower CompilerSpecimen explanation", () => {
 
     await tabs.nth(2).click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.excerpt);
+    await expect(specimen.locator("[data-stage-composition] details")).not.toHaveAttribute("open", "");
+    await specimen.locator("[data-stage-composition] summary").click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.digest);
     await tabs.nth(3).click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);

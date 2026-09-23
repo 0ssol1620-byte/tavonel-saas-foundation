@@ -73,9 +73,10 @@
 .canvas {
   display: grid;
   grid-template-columns: minmax(300px, 0.88fr) minmax(0, 1.12fr);
-  min-height: 520px;
+  min-height: 360px;
   overflow: clip;
 }
+.canvas[data-stage="page"] { min-height: 520px; }
 .sourceViewport {
   position: relative;
   min-width: 0;
@@ -213,6 +214,10 @@
 .rowName { color: var(--text-hi); overflow-wrap: anywhere; }
 .cell { color: var(--source); text-align: right; white-space: nowrap; }
 .coordinateRow { display: grid; gap: 7px; margin-top: 12px; color: var(--text-lo); font: 12px/1.45 var(--f-mono); overflow-wrap: anywhere; }
+.sourceLocator { margin: 14px 0 0; color: var(--source); font: 12px/1.45 var(--f-mono); overflow-wrap: anywhere; }
+.sourceDetails { margin-top: 12px; color: var(--text-mid); font: 12px/1.45 var(--f-sans); }
+.sourceDetails summary { min-height: 44px; padding-block: 11px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sourceDetails summary:focus-visible { outline: 2px solid var(--source); outline-offset: 2px; }
 .evidenceComposition blockquote {
   margin: 0;
   padding: 16px 18px;
@@ -287,6 +292,7 @@
     grid-template-columns: 1fr;
     min-height: 0;
   }
+  .canvas[data-stage="page"] { min-height: 0; }
   .sourceViewport {
     height: 340px;
     margin: 14px;

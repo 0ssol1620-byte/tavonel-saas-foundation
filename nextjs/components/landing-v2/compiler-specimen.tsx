@@ -110,7 +110,7 @@ function SourceSheet({ index }: { index: number }) {
   );
 }
 
-function StageComposition({ index }: { index: number }) {
+function StageComposition({ index, korean }: { index: number; korean: boolean }) {
   if (index === 0) {
     return (
       <div className={styles.pageComposition} data-stage-composition="page">
@@ -132,10 +132,13 @@ function StageComposition({ index }: { index: number }) {
           <span className={styles.cell} data-derived="1" data-critical-value="structured-current">{source.currentValue}</span>
           <span className={styles.cell} data-derived="1">{source.priorValue}</span>
         </div>
-        <div className={styles.coordinateRow}>
-          <span>row · operating_expenses.r_and_d</span>
-          <span data-derived="1">bbox · {source.bbox1000.join(" / ")}</span>
-        </div>
+        <details className={styles.sourceDetails}>
+          <summary>{korean ? "원문 좌표 살펴보기" : "Inspect the source coordinates"}</summary>
+          <div className={styles.coordinateRow}>
+            <span>row · operating_expenses.r_and_d</span>
+            <span data-derived="1">bbox · {source.bbox1000.join(" / ")}</span>
+          </div>
+        </details>
       </div>
     );
   }
@@ -144,12 +147,16 @@ function StageComposition({ index }: { index: number }) {
       <div className={styles.evidenceComposition} data-stage-composition="evidence">
         <p className={styles.compositionLabel}>Evidence address</p>
         <blockquote data-derived="1">{source.excerpt}</blockquote>
-        <div className={styles.addressGrid}>
-          <span>document</span><b data-derived="1">{source.id}</b>
-          <span>page</span><b data-derived="1">{source.page}</b>
-          <span>region</span><b data-derived="1">{source.regionId}</b>
-          <span>version</span><b data-derived="1">{source.digest}</b>
-        </div>
+        <p className={styles.sourceLocator} data-derived="1">{source.filename} · page {source.page} · {source.regionId}</p>
+        <details className={styles.sourceDetails}>
+          <summary>{korean ? "전체 원문 주소 살펴보기" : "Inspect the full source address"}</summary>
+          <div className={styles.addressGrid}>
+            <span>document</span><b data-derived="1">{source.id}</b>
+            <span>page</span><b data-derived="1">{source.page}</b>
+            <span>region</span><b data-derived="1">{source.regionId}</b>
+            <span>version</span><b data-derived="1">{source.digest}</b>
+          </div>
+        </details>
       </div>
     );
   }
@@ -346,7 +353,7 @@ export default function CompilerSpecimen({
           <p className={styles.eyebrow}>{active.label}</p>
           <p className={styles.title}>{copy.titles[index]}</p>
           <p className={styles.body}>{copy.bodies[index]}</p>
-          <StageComposition key={active.id} index={index} />
+          <StageComposition key={active.id} index={index} korean={korean} />
         </div>
       </div>
     </div>

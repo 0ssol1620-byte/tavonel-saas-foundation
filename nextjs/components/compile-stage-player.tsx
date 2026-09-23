@@ -174,6 +174,7 @@ export default function CompileStagePlayer({
   preferVideo = false,
   playbackRate = 1,
   compact = false,
+  stageDisclosureLabel,
   priorityPoster = false,
   korean = false,
 }: {
@@ -185,6 +186,8 @@ export default function CompileStagePlayer({
   playbackRate?: number;
   /** Hide chapter navigation/caption for a single-purpose hero presentation. */
   compact?: boolean;
+  /** Keep a film visible while making its secondary cut selector optional. */
+  stageDisclosureLabel?: string;
   /** Mark an above-the-fold poster as the page's priority image without changing its bytes. */
   priorityPoster?: boolean;
   /** BQ-013. Name the controls and the fallback in the page's language. The stage list carries its own. */
@@ -397,15 +400,20 @@ export default function CompileStagePlayer({
     ? fallbackVideoSrc
     : preferredVideoSrc;
 
+  const stageTabs = !compact ? <div className="compile-film-stages" role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
+    {stages.map((stage, position) => (
+      <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
+    ))}
+  </div> : null;
+
   return (
-    /* Below 900px the horizontal gesture pans the film (G1-012), so it may not also change the
-       stage -- the tab strip above stays the way to do that. */
+    /* Below 900px the horizontal gesture pans the film (G1-012). The separate tab strip chooses
+       the cut and may sit behind a native disclosure on the landing page. */
     <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={MOBILE_FOCUS_PANE[index] ?? 0}>
-      {!compact ? <div className="compile-film-stages" role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
-        {stages.map((stage, position) => (
-          <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
-        ))}
-      </div> : null}
+      {stageDisclosureLabel && stageTabs ? <details className="compile-film-stage-disclosure">
+        <summary>{stageDisclosureLabel}</summary>
+        {stageTabs}
+      </details> : stageTabs}
 
       {/*
         G1-012. The live canvas already refuses to mount below 900px (NARROW_FRAME above), but the

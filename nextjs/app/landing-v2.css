@@ -285,6 +285,7 @@
   color: var(--text-lo);
   max-width: none;
   overflow-wrap: normal;
+  text-align: center;
 }
 .lv2-hero-intake-tail { white-space: nowrap; }
 .lv2-film {
@@ -298,6 +299,21 @@
   .lv2-film { --lv2-film-w: 1120px; }
 }
 .lv2-film .compile-film-sequence { gap: 16px; }
+.lv2-film .compile-film-stage-disclosure {
+  width: min(100%, var(--lv2-film-w));
+  margin-inline: auto;
+}
+.lv2-film .compile-film-stage-disclosure summary {
+  display: list-item;
+  min-height: 44px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-hi);
+  cursor: pointer;
+  font: 600 14px/20px var(--f-sans);
+}
+.lv2-film .compile-film-stage-disclosure[open] .compile-film-stages { margin-top: 12px; }
 .lv2-film .compile-film-stages,
 .lv2-film .compile-film-viewport,
 .lv2-film .compile-film-caption {

@@ -137,11 +137,6 @@ export default function LandingPage({
               accent={korean ? undefined : "Knowledge you can verify"}
               headlineVariant={experiment.headlineVariant}
             />
-            <div className="lv2-scene-head lv2-how-head">
-              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
-              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
-            </div>
-            <CompilerSpecimen korean={korean} />
             <HeroActions
               exploreLabel={heroActions.exploreLabel}
               exploreHref={heroActions.exploreHref}
@@ -153,6 +148,11 @@ export default function LandingPage({
               {copy.hero.microProofFormats}{" "}
               <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
             </p>
+            <div className="lv2-scene-head lv2-how-head">
+              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
+              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
+            </div>
+            <CompilerSpecimen korean={korean} />
           </div>
         </section>
 
