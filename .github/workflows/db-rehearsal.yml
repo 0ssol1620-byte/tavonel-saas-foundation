@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: db-rehearsal-${{ github.ref }}
@@ -42,22 +41,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The throwaway Postgres image comes from GHCR. Anonymous pulls hit the registry's
-      # request limit on fresh runners even before the SQL rehearsal begins; authenticate
-      # with this job's read-only token so a registry throttle is not mistaken for a
-      # migration failure. No credential for the live Supabase project is introduced.
-      - name: Authenticate GHCR for the local Postgres image
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
       # release change what this receipt means without a commit saying so.
       - uses: supabase/setup-cli@v1
         with:
           version: 2.116.0
+
+      # setup-cli selects GHCR by default. GHCR throttled this public image on four fresh
+      # runners, including one authenticated pull, before any SQL ran. The same pinned
+      # supabase/postgres:17.6.1.165 tag is published on Docker Hub (digest verified at the
+      # registry). Override the setup action for all subsequent local-CLI steps.
+      - name: Use the official Docker Hub image registry for the local stack
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io" >> "$GITHUB_ENV"
 
       # Artifact names are derived, never typed. `schema-after-0050` was hard-coded and went
       # stale the day 0051 was written; a receipt whose name lies about its contents is worse
