@@ -55,6 +55,16 @@ All Lighthouse release budgets passed.
 
 The first production smoke exposed a Vercel Analytics script `404` because observability build variables were present while the collector was disabled. Commit `b91796c` made analytics explicitly opt-in, and the same eight-condition browser matrix then passed with zero errors. This report-only follow-up changes no runtime code.
 
+## 2026-09-23 — configuration and candidate state truth
+
+The public `/status` page now shows configuration-only rows as neutral `configured`; scheduled request outcomes remain separate, and its billing configuration check no longer borrows the green successful-request state. The authenticated Knowledge graph now distinguishes a first compiled candidate with no active World, an active World reopened later, a review-required package, and an unreadable active pointer. Its load notice and World Studio intro follow the actual state; the architecture note does not assume activation. The public Ask documentation makes the same candidate-versus-active distinction.
+
+- The final production-mode build passed its brand, type-floor, TypeScript, ESLint, and 5,232 unit/contract tests across 368 files.
+- The new browser regressions passed 40/40 at 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. The existing docs-reading and World-lifecycle tests also passed 80/80 at those conditions before the final state-copy refinements.
+- Aside inspection of the first exact preview revealed that Billing was still green `operational` in the scheduled-check section even though its check is configuration-only. The configuration row now renders neutral `configured`; its unsuccessful configuration state renders `not configured`, and the section explains the exception. The production-mode build and focused `/status` browser test were rerun on this final change; the latter passed 8/8 at the same seven widths plus reduced motion.
+- Four full-page images were captured per condition under ignored `nextjs/test-results/`: `status-configured-versus-probed.png`, `first-candidate-freshness.png`, `active-world-state.png`, and `review-required-state.png`. The 1440 and 390 captures were visually inspected; they exposed two further state-copy contradictions that were corrected before the final 40/40 run. Workspace images use an intercepted test session and fixture; they do not prove a live customer or production pipeline.
+- The status page still has a narrow reading column and substantial unused desktop width. This change resolves state semantics, not that broader layout and text-density issue. Founder visual acceptance remains required before release.
+
 ## Truth boundary
 
 Automated evidence confirms rendering, interaction, accessibility, responsive behavior, product contracts, and measured performance. It does not establish aesthetic approval, customer consent, benchmark qualification, certification, or a real paid transaction. Customer stories and benchmarks remain private until qualified evidence exists.

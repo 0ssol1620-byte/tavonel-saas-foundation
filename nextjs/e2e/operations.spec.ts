@@ -22,6 +22,18 @@ test("publishes the operating record without horizontal overflow", async ({ page
   }
 });
 
+test("separates configured components from measured request outcomes", async ({ page }, testInfo) => {
+  await page.goto("/status");
+  const configuration = page.locator(".status-list").first();
+  await expect(configuration.locator('article[data-state="configured"]').first().locator("span")).toHaveText("configured");
+  await expect(configuration.locator('article[data-state="operational"]')).toHaveCount(0);
+  await expect(configuration.locator("article > span", { hasText: /^operational$/ })).toHaveCount(0);
+  await expect(page.getByText("it does not mean a request recently succeeded")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scheduled dependency checks" })).toBeVisible();
+  await expect(page.getByText("Billing is a configuration-only check; it sends no request through a payment flow.")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("status-configured-versus-probed.png"), fullPage: true });
+});
+
 test("exposes liveness, fail-closed readiness and crawl boundaries", async ({ request }) => {
   const health = await request.get("/api/healthz");
   expect(health.status()).toBe(200);

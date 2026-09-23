@@ -110,7 +110,7 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   return (
     <section className={styles.studio} aria-labelledby="world-studio-title">
       <header className={styles.header}>
-        <div><span className="eyebrow">Compiled World</span><h2 id="world-studio-title">World Studio</h2><p>Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail.</p></div>
+        <div><span className="eyebrow">{!model ? "World not loaded" : model.world.status === "candidate" ? "Compiled candidate" : "Compiled World"}</span><h2 id="world-studio-title">World Studio</h2><p>{!model ? "A readable compiled model appears here when one is available." : model.world.status === "candidate" ? "Inspect this candidate before activation, then open its graph, directory, ontology or source evidence." : "Inspect the current World first, then open the graph, directory, ontology or exact source evidence when you need the detail."}</p></div>
         <dl>
           <div><dt>State</dt><dd>{model ? model.world.status : "Not compiled"}</dd></div>
           <div><dt>Sources</dt><dd>{overview ? overview.sources : NOT_YET}</dd></div>
