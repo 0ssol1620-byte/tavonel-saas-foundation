@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 const DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md";
 const DPA_LABEL =
-  "Draft v1 (2026-09-11) — under review; not a signed agreement";
+  "Draft v2 (2026-09-23) — under review; not a signed agreement";
 
 const DESTINATIONS: Array<[string, string, Route]> = [
   ["Security", "The customer-facing safeguards for document intake, workspace access, evidence, activation, retention, and deletion.", "/security" as Route],

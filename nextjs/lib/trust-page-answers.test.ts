@@ -137,7 +137,7 @@ describe("/trust indexes the six published surfaces", () => {
   */
   it("links the DPA with its draft label in the same tile", () => {
     expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md"');
-    expect(page).toContain("Draft v1 (2026-09-11)");
+    expect(page).toContain("Draft v2 (2026-09-23)");
     expect(page).toContain("under review");
     expect(page).toContain("not a signed agreement");
     expect(page, "no copy here may present a delegated decision as the founder's own").not.toMatch(
