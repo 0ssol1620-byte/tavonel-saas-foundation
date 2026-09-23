@@ -330,6 +330,9 @@ test.describe("responsive and reduced-motion parity", () => {
         .filter(item => item.height < 43.99),
     );
     expect(short).toEqual([]);
+    const rail = page.locator("#s1 [data-compiler-specimen] [role='tablist']");
+    const railHeight = await rail.evaluate(node => node.getBoundingClientRect().height);
+    expect(railHeight, "the phone stage picker should leave room for the source visual").toBeLessThanOrEqual(100);
   });
 
   test("each stage keeps source values inside its phone viewport", async ({ page }, testInfo) => {

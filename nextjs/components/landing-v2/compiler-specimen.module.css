@@ -260,17 +260,20 @@
     margin-top: 28px;
   }
   .rail {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--border-dark);
   }
   .stage {
-    min-height: 44px;
-    border-right: 0;
-    border-bottom: 1px solid var(--border-dark);
-    text-align: left;
-    padding-inline: 18px;
+    grid-column: span 2;
+    min-height: 48px;
+    border: 0;
+    background: var(--ink-900);
+    text-align: center;
+    padding-inline: 4px;
   }
-  .stage:last-child {
-    border-bottom: 0;
+  .stage:nth-child(n + 4) {
+    grid-column: span 3;
   }
   .sourceBar {
     align-items: flex-start;
