@@ -71,8 +71,6 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
-
-
 ## 2026-09-21 — Original-source compiler specimen and mobile film inspection
 
 The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
@@ -377,5 +375,15 @@ The live `/changelog` still presented three already shipped entries as "release 
 The first local production build passed brand/type-floor, TypeScript, ESLint, 368 test files / 5,231 tests, and 145 static pages. After receipt and copy refinements, the focused changelog suite passed 20/20, `pnpm check` passed, and a fresh optimized build passed. The public-layout browser suite passed 40/40 across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. Local HTTP returned 200 for the page and Atom feed; the rendered page has no pending-merge text, all three old anchors remain, and the feed carries the exact latest timestamp with eight entries. Captures at 1440, 390, and 360 found no horizontal overflow; 1440 and 360 were inspected directly. Captures remain local under `nextjs/test-results/changelog-*.png`.
 
 An independent Claude Code Opus 5.5 read-only review checked the old fragments and feed IDs and identified missing deployment-time evidence and a UTC/KST mismatch, both closed using production deployment receipts. These checks do not replace founder visual acceptance or a further editorial reduction of the older long release notes.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-24 — Integrated buyer-path truth candidate
+
+The six source changes in PRs #102–#107 were merged from the current `main` into one isolated integration branch. The merge conflicts were limited to additive sections of this report; all six source heads are ancestors of the integration head. An independent, read-only Claude Code Opus 5.5 review then found two buyer-facing copy errors that survived the individual PR checks: Pricing and Product still said the MCP server had eight tools, and Pricing described the public sample as having MCP access despite the workspace API-key gate. Both pages now derive the nine-tool count from the published tool list. Pricing distinguishes the unauthenticated public HTTP sample from MCP access to an arranged workspace.
+
+The final integrated production build passed brand assets, the 12px type floor, TypeScript, ESLint, **368 test files / 5,237 tests**, and generation of 145 static pages. Public landing, Explore, login-capability, operations, and layout Playwright specs passed **345 cases with 95 intentional skips** across the seven required widths and reduced motion against the production server. A separate route census covered `/`, `/ko`, `/pricing`, `/product`, `/explore`, `/status`, and `/changelog` at all seven widths plus reduced motion: **56/56 HTTP 200, zero horizontal overflow, and the corrected Pricing/Product copy present in the DOM**. Local screenshots at 1440, 390, and 360 are under ignored `nextjs/test-results/site-truth-integration/`; the homepage, Pricing, Product, Explore, Status, and Changelog desktop/phone captures were inspected.
+
+The authenticated World-lifecycle specs require the repository's managed browser test session. An attempted external-server run redirected those scenarios to `/login`; it was stopped and is not counted as product validation. The source PR #104 exercised those scenarios with its managed setup, and the integrated exact-head CI must still run them. The screenshots also confirm that `/status` keeps a narrow desktop reading column and older `/changelog` entries remain long on a phone. Those are open composition/editorial issues, not resolved by this truth integration. Founder visual acceptance, exact-head CI, and production verification remain separate release gates.
 
 **FOUNDER VISUAL REVIEW REQUIRED**

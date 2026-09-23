@@ -17,6 +17,7 @@ import {
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import {
@@ -550,10 +551,10 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["Can I verify an answer?", "Every object carries the regions that support it, and an export carries a manifest with a digest for each file, signed on the way out. The public key is published, so a recipient can check a package without asking us.", "/evidence" as Route, "How evidence is bound", "What a review will find"],
   ["What happens when a source document changes?", "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person activates it, and the previous one stays readable.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Can it read Office files, images and tables?", "It accepts them. Every accepted source is sanitized to PDF and read by OCR, and what survives is the page, the paragraph text and the bounding box — a spreadsheet's cells and formulas do not.", "/sources" as Route, "What TAVONEL reads", "What a review will find"],
-  ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP", "What a review will find"],
+  ["Can my agent use it?", `A read-only MCP server and an HTTP API are published, with ${MCP_TOOL_COUNT_WORD} tools over sources, Worlds, one World, search, Ask, objects, relations, evidence and package. There is no write tool.`, "/developers" as Route, "API and MCP", "What a review will find"],
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents today.", "/security" as Route, "Where your documents go", "What happens to my data"],
-  ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, API/MCP access and a digest-bound sample download. Compiling your own sources is arranged with us. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
+  ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, a public HTTP API and a digest-bound sample download. MCP access to your own workspace requires an API key and an arranged evaluation. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
   ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
   ["How much setup is required?", "Explore the public World and its evidence without a card. To evaluate your own sources, contact us to agree the scope and intake path before any processing or payment.", "/docs" as Route, "Documentation", "What it costs"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format", "What happens to my data"],
