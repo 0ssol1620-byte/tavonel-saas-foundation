@@ -307,3 +307,11 @@ The final phone refinement puts the five compiler stages into two rows at 360px 
 The later full hermetic Playwright rerun on product commit `41d99a9` finished with **1,503 passed, 608 intended skips, 0 failed** across all 2,111 cases (`qa-captures/full-e2e-post-mobile.log`). Exact-commit GitHub Actions passed Next.js, Product QA, Chromium, Firefox, WebKit, Lighthouse, DB rehearsal, qualification, analysis, root checks and the launch gate. Vercel preview deployed that commit. Claude Code Opus performed a separate read-only diff review, ran 826 relevant unit tests, and found no code-level merge blocker; this does not replace legal review or human aesthetic acceptance.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-23 — Founder test-data reset recovery
+
+The first authorized production reset sealed a manifest of 134 database rows and 349 R2 objects, then stopped on the first R2 deletion batch before database finalization. The recovery flow reopens that same sealed reset ID, shows the original and remaining object counts without exposing object keys to the browser, and retains the typed confirmation. R2 failures now report a safe HTTP status and provider error code; only network, rate-limit, and server failures receive bounded retries. A permission or retention failure leaves database rows intact for diagnosis.
+
+The focused reset service, route, panel, and R2 tests passed (29/29). The complete hermetic unit suite passed (368 files, 5,230 tests), as did the brand, type-floor, TypeScript, and ESLint checks. The local production build generated 145 static pages. Authenticated live recovery is still in progress. The reset is **not yet complete**; the sealed ledger must reach `completed`, and the two workspace R2 prefixes must list empty before completion can be reported.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

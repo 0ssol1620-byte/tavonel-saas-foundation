@@ -7,6 +7,7 @@ import { FOUNDER_TEST_RESET_EMAIL } from "./founder-test-reset-contract";
 export { FOUNDER_TEST_RESET_EMAIL } from "./founder-test-reset-contract";
 
 type PreparedReset = { resetId: string; dbManifestDigest: string; dbCounts: Record<string, number> };
+type ActiveReset = PreparedReset & { state: "sealed" | "db_finalized_pending_object_verify"; manifestDigest: string; r2Keys: string[] };
 type ResetManifest = PreparedReset & {
   schemaVersion: "tavonel.founder_test_reset_manifest.v1";
   workspaceKey: string;
@@ -47,6 +48,50 @@ function prepared(value: Record<string, unknown>): PreparedReset {
     dbCounts: value.dbCounts as Record<string, number> };
 }
 
+async function activeReset(workspaceKey: string, userId: string): Promise<ActiveReset | null> {
+  const config = readSupabaseAdminConfig();
+  if (!config) throw new Error("FOUNDER_TEST_RESET_DB_NOT_CONFIGURED");
+  const query = new URLSearchParams({
+    select: "reset_id,state,db_manifest_digest,db_counts,manifest_digest,r2_keys",
+    workspace_key: `eq.${workspaceKey}`, user_id: `eq.${userId}`,
+    state: "in.(sealed,db_finalized_pending_object_verify)", order: "prepared_at.desc", limit: "1",
+  });
+  const response = await supabaseAdminRequest(config, `/rest/v1/founder_test_reset_ledger?${query}`, {
+    method: "GET", signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error("FOUNDER_TEST_RESET_DB_FAILED");
+  const rows = await response.json() as Record<string, unknown>[];
+  const row = rows[0];
+  if (!row) return null;
+  if ((row.state !== "sealed" && row.state !== "db_finalized_pending_object_verify")
+    || typeof row.reset_id !== "string" || typeof row.db_manifest_digest !== "string"
+    || typeof row.manifest_digest !== "string" || !row.db_counts || typeof row.db_counts !== "object"
+    || !Array.isArray(row.r2_keys) || !row.r2_keys.every((key) => typeof key === "string")) {
+    throw new Error("FOUNDER_TEST_RESET_DB_RESPONSE_INVALID");
+  }
+  return { resetId: row.reset_id, state: row.state, dbManifestDigest: row.db_manifest_digest,
+    dbCounts: row.db_counts as Record<string, number>, manifestDigest: row.manifest_digest,
+    r2Keys: row.r2_keys as string[] };
+}
+
+async function deleteWithRetry(
+  signer: NonNullable<ReturnType<typeof readR2SignerEnv>>, workspaceKey: string, key: string,
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = await deleteFounderResetObject(signer, workspaceKey, key);
+    if (result.ok) return;
+    const status = result.status;
+    const retryable = status === 0 || status === 429 || (typeof status === "number" && status >= 500);
+    if (!retryable || attempt === 2) {
+      if (typeof status === "number") console.error("founder reset R2 delete failed", {
+        status, providerCode: result.providerCode ?? null,
+      });
+      throw new Error(typeof status === "number" ? `SOURCE_DELETE_FAILED_HTTP_${status}` : result.code);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
+  }
+}
+
 async function drainFounderResetObjects(
   signer: NonNullable<ReturnType<typeof readR2SignerEnv>>, workspaceKey: string,
   sealedKeys: readonly string[], deleted: Set<string>,
@@ -62,9 +107,7 @@ async function drainFounderResetObjects(
     if (remaining.length === 0) return;
     for (let offset = 0; offset < remaining.length; offset += 8) {
       const batch = remaining.slice(offset, offset + 8);
-      const removed = await Promise.all(batch.map((key) => deleteFounderResetObject(signer, workspaceKey, key)));
-      const failed = removed.find((result) => !result.ok);
-      if (failed && !failed.ok) throw new Error(failed.code);
+      await Promise.all(batch.map((key) => deleteWithRetry(signer, workspaceKey, key)));
       batch.forEach((key) => deleted.add(key));
     }
   }
@@ -78,6 +121,16 @@ export async function prepareFounderTestReset(user: { id: string; email?: string
   const prefixes = founderResetPrefixes(workspaceKey);
   const signer = readR2SignerEnv();
   if (!prefixes || !signer) throw new Error("FOUNDER_TEST_RESET_R2_NOT_CONFIGURED");
+  const active = await activeReset(workspaceKey, user.id);
+  if (active) {
+    const listed = await listFounderResetObjects(signer, workspaceKey);
+    if (!listed.ok) throw new Error(listed.code);
+    const sealed = new Set(active.r2Keys);
+    if (listed.keys.some((key) => !sealed.has(key))) throw new Error("FOUNDER_TEST_RESET_R2_MANIFEST_DRIFT");
+    return { resetId: active.resetId, manifestDigest: active.manifestDigest, resumable: true,
+      manifest: { dbCounts: active.dbCounts, objectCount: active.r2Keys.length,
+        remainingObjectCount: listed.keys.length } };
+  }
   const db = prepared(await rpc("prepare_founder_test_reset", {
     p_email: email, p_user_id: user.id, p_workspace_key: workspaceKey,
   }));
@@ -85,7 +138,9 @@ export async function prepareFounderTestReset(user: { id: string; email?: string
   if (!listed.ok) throw new Error(listed.code);
   const manifest: ResetManifest = { schemaVersion: "tavonel.founder_test_reset_manifest.v1",
     workspaceKey, prefixes, r2Keys: listed.keys, ...db };
-  return { resetId: manifest.resetId, manifest, manifestDigest: manifestDigest(manifest) };
+  return { resetId: manifest.resetId, manifestDigest: manifestDigest(manifest), resumable: false,
+    manifest: { dbCounts: manifest.dbCounts, objectCount: manifest.r2Keys.length,
+      remainingObjectCount: manifest.r2Keys.length } };
 }
 
 export async function executeFounderTestReset(

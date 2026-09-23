@@ -70,6 +70,17 @@ describe("r2 synthetic canary guards", () => {
     expect(fetcher.mock.calls.map(call => call[1]?.method)).toEqual(["DELETE"]);
   });
 
+  it("retains a safe R2 error status and provider code for a failed DELETE", async () => {
+    const workspace = "pilot-969dc192daa24119";
+    const key = `immutable/${workspace}/${workspace}/doc-1/source`;
+    const env = { accountId: "account", bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "access", secretAccessKey: "secret" };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<Error><Code>AccessDenied</Code></Error>", { status: 403 })));
+    await expect(deleteFoundationSourceObject(env, workspace, key)).resolves.toEqual({
+      ok: false, code: "SOURCE_DELETE_FAILED", status: 403, providerCode: "AccessDenied",
+    });
+  });
+
   it("does not issue DELETE when HEAD is ambiguous", async () => {
     const workspace = "pilot-969dc192daa24119";
     const key = `quarantine/${workspace}/doc-1/source`;

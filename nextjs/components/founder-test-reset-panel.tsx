@@ -9,8 +9,10 @@ const CONFIRMATION = "DELETE TEST DATA";
 type PreparedReset = {
   resetId: string;
   manifestDigest: string;
+  resumable: boolean;
   manifest: {
-    r2Keys: string[];
+    objectCount: number;
+    remainingObjectCount: number;
     dbCounts: Record<string, number>;
   };
 };
@@ -59,7 +61,8 @@ export default function FounderTestResetPanel() {
     if (state.kind !== "prepared") return null;
     return {
       databaseRows: Object.values(state.value.manifest.dbCounts).reduce((sum, count) => sum + count, 0),
-      objects: state.value.manifest.r2Keys.length,
+      objects: state.value.manifest.objectCount,
+      remainingObjects: state.value.manifest.remainingObjectCount,
     };
   }, [state]);
 
@@ -105,7 +108,9 @@ export default function FounderTestResetPanel() {
       {state.kind === "failed" ? <p className="billing-hold" role="alert">Reset stopped: {state.code}</p> : null}
       {state.kind === "prepared" && totals ? (
         <div>
-          <p role="status">Ready to remove {totals.databaseRows.toLocaleString()} database rows and {totals.objects.toLocaleString()} stored objects from this test workspace.</p>
+          <p role="status">{state.value.resumable ? "Resume the sealed test-data reset: " : "Ready to remove "}
+            {totals.databaseRows.toLocaleString()} database rows and {totals.remainingObjects.toLocaleString()} stored objects
+            {state.value.resumable ? ` remain of the original ${totals.objects.toLocaleString()}.` : " from this test workspace."}</p>
           <label htmlFor="founder-reset-confirmation">Type <strong>{CONFIRMATION}</strong> to confirm.</label>
           <input id="founder-reset-confirmation" value={confirmation}
             onChange={(event) => setConfirmation(event.currentTarget.value)} autoComplete="off" />
