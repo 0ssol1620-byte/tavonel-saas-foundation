@@ -19,6 +19,7 @@
 
 import { CLAIM_STATE } from "./claim-state";
 import { readCapabilities } from "./capabilities";
+import { MCP_TOOL_COUNT_WORD } from "./mcp-tools";
 
 /**
  * The exact word the capability grid uses, read from the grid rather than retyped.
@@ -247,7 +248,7 @@ export const INTEROP_STANDARDS: readonly InteropStandard[] = [
   {
     name: "MCP",
     state: "demonstrated",
-    note: "A read-only stdio server is published at /developer/tavonel-mcp.mjs. It exposes eight tools and refuses to start if a write tool is added.",
+    note: `A read-only stdio server is published at /developer/tavonel-mcp.mjs. It exposes ${MCP_TOOL_COUNT_WORD} tools and refuses to start if a write tool is added.`,
   },
 ];
 

@@ -315,3 +315,11 @@ The first authorized production reset sealed a manifest of 134 database rows and
 The focused reset service, route, panel, and R2 tests passed (29/29). The complete hermetic unit suite passed (368 files, 5,230 tests), as did the brand, type-floor, TypeScript, and ESLint checks. The local production build generated 145 static pages. Authenticated live recovery is still in progress. The reset is **not yet complete**; the sealed ledger must reach `completed`, and the two workspace R2 prefixes must list empty before completion can be reported.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-23 — MCP count on the Compiler Contract page
+
+The interchange-standards row on `/product/continuous-knowledge` said the published MCP server exposed eight tools, while its shipped tool list has nine. The sentence now reads the count from the shared tool list instead of copying a number. The developer-distribution test keeps that list pinned to the published server artifact.
+
+`compiler-contract` and developer-distribution unit checks passed (43/43), as did TypeScript and ESLint on the changed files. The managed production-server browser spec passed at 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion (56/56). Full-page captures for those eight states are in the ignored local directory `nextjs/test-results/mcp-copy-20260923/`: every route returned HTTP 200, all seven widths had zero document overflow, and the rendered MCP row said “nine tools”. The 1440 and 390 captures were inspected directly. This copy correction does not claim to resolve the route's broader text density or final aesthetic approval; exact-head CI and production deployment remain pending.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
