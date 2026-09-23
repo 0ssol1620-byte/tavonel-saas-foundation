@@ -327,3 +327,11 @@ The final local `pnpm build` passed brand assets, the 12px type floor, strict Ty
 This is a candidate, not a production deployment or a completed paid transaction. Customer-data self-service remains closed, the exact-head PR browser/Lighthouse checks remain to be assessed, and visual acceptance is still required.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-23 — Pricing exact-head QA correction
+
+PR #102's first exact-head Product QA run found one Pricing touch target below the 44px floor at 390px and 360px: the new “Discuss your sources” link measured about 22px high. Its link box now has a 44px minimum height; the two affected production-server Playwright cases pass locally (2/2). The first exact-head run passed Chromium, Firefox, WebKit, Next.js, Lighthouse, DB rehearsal and qualification, but its launch gate correctly stayed red because Product QA failed.
+
+A separate read-only Claude Code Opus review found a second truth error before release: Pricing called the public sample World a signed export. The public `/reproducibility` contract says the sample download is SHA-256 digest-bound and unsigned; signatures apply to workspace exports. The Evaluation card and both visible and JSON-LD FAQ answers now make that distinction, with a browser assertion for the public sample. The final changed-head browser and CI checks are pending; no production deployment or founder aesthetic acceptance is claimed.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

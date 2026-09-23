@@ -98,8 +98,14 @@ test("closed intake offers a working public evaluation and an Enterprise convers
   const setupAnswer = pricingSchema["@graph"]?.find((entry) => entry["@type"] === "FAQPage")
     ?.mainEntity?.find((entry) => entry.name === "How much setup is required?")?.acceptedAnswer.text;
   expect(setupAnswer).toContain("Explore the public World");
+  const exportAnswer = pricingSchema["@graph"]?.find((entry) => entry["@type"] === "FAQPage")
+    ?.mainEntity?.find((entry) => entry.name === "Can I export?")?.acceptedAnswer.text;
+  expect(exportAnswer).toContain("digest-bound public sample World");
+  expect(exportAnswer).not.toContain("signed export of the public World");
   const evaluation = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Evaluation" }) });
   await expect(evaluation).toContainText("No card or file upload required");
+  await expect(evaluation).toContainText("Digest-bound sample World download");
+  await expect(evaluation).not.toContainText("Signed export of the public World");
   await expect(evaluation).not.toContainText("Up to 3 files and 50 standard pages");
   await expect(evaluation.getByRole("link", { name: "Explore a Compiled World" })).toHaveAttribute("href", "/explore");
   await expect(evaluation.getByRole("link", { name: "Discuss your sources" })).toHaveAttribute("href", "/contact");

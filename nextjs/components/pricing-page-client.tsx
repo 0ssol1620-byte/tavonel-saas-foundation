@@ -74,11 +74,11 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
 
 /** Shown on the Evaluation card while `activationPolicy.customerData` is closed (SD-01). */
 const EVALUATION_GATED_DESCRIPTION =
-  "Explore a complete public Compiled World with Evidence, Ask and signed export. We can scope an assisted evaluation with your own sources.";
+  "Explore a complete public Compiled World with Evidence and Ask, then download its digest-bound sample. We can scope an assisted evaluation with your own sources.";
 const EVALUATION_GATED_FEATURES = [
   "A complete public World with source-linked Evidence",
   "Ask grounded in the public World",
-  "Signed export of the public World",
+  "Digest-bound sample World download",
   "No card or file upload required",
 ] as const;
 
@@ -553,11 +553,11 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP", "What a review will find"],
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents today.", "/security" as Route, "Where your documents go", "What happens to my data"],
-  ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, API/MCP access and signed export. Compiling your own sources is arranged with us. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
+  ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, API/MCP access and a digest-bound sample download. Compiling your own sources is arranged with us. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
   ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
   ["How much setup is required?", "Explore the public World and its evidence without a card. To evaluate your own sources, contact us to agree the scope and intake path before any processing or payment.", "/docs" as Route, "Documentation", "What it costs"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format", "What happens to my data"],
-  ["Can I export?", "Yes. You can inspect a signed export of the public World today. An evaluation of your own sources and its export are arranged with us.", "/docs/exports" as Route, "What is in the package", "What happens to my data"],
+  ["Can I export?", "You can download the digest-bound public sample World today. Workspace exports are signed; compiling and exporting your own sources requires an arranged evaluation.", "/reproducibility" as Route, "Public sample and checksums", "What happens to my data"],
   ["Can I delete my data?", "Source material, derived artifacts and compiled packages are deleted on a verified request to privacy@tavonel.com. The categories and purposes are set out in the privacy notice.", "/privacy" as Route, "Storage and lifecycle", "What happens to my data"],
   /*
     BA-126 and BA-164. This row counted our own gaps on the page where a purchase is decided, and
@@ -578,7 +578,7 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
 const SELF_SERVICE_FAQ_ANSWERS: Record<string, string> = {
   "What is ready to use?": "A finished public World is open today. Sign in to evaluate your own files with source-linked Evidence, grounded Ask and signed export. The plan comparison above shows which capabilities each plan includes.",
   "How much setup is required?": "Sign in to start a free seven-day Evaluation with up to 3 files and 50 standard pages. No card is needed; nothing is charged until you choose a plan.",
-  "Can I export?": "Yes. The public World has a signed export, and a signed export is included with a World compiled during your free Evaluation.",
+  "Can I export?": "Yes. The public sample World is digest-bound, and a signed workspace export is included with a World compiled during your free Evaluation.",
 };
 
 function purchaseFaqRows(selfService: boolean): typeof PURCHASE_FAQ {
@@ -939,7 +939,7 @@ export default function PricingPageClient({
                             : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access, via sign-in`}
                   </a>
                   {plan.name === "Evaluation" && !selfService ? (
-                    <Link className="fine" href="/contact">Discuss your sources</Link>
+                    <Link className="fine pricing-secondary-link" href="/contact">Discuss your sources</Link>
                   ) : null}
                   <p className="fine">{planPath(plan, { liveCheckout, selfService })}</p>
                   </div>
