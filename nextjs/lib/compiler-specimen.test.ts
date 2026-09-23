@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import CompilerSpecimen from "../components/landing-v2/compiler-specimen";
 import {
   COMPILER_SPECIMEN_SOURCE,
   COMPILER_SPECIMEN_STAGES,
@@ -20,6 +23,16 @@ describe("homepage compiler specimen", () => {
       "Knowledge",
       "Intelligence",
     ]);
+  });
+
+  it("keeps the Korean stage and evidence controls in Korean without rewriting the source", () => {
+    const korean = renderToStaticMarkup(createElement(CompilerSpecimen, { korean: true }));
+    expect(korean).toContain("원문</button>");
+    expect(korean).toContain("근거의 원문 주소");
+    expect(korean).toContain("전체 원문 주소 살펴보기");
+    expect(korean).toContain(COMPILER_SPECIMEN_SOURCE.excerpt);
+    expect(korean).not.toContain("Evidence address");
+    expect(korean).not.toContain("exact crop");
   });
 
   it("keeps one committed public-sample identity and exact region", () => {

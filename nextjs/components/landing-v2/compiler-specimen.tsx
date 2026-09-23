@@ -10,6 +10,8 @@ import {
 import styles from "./compiler-specimen.module.css";
 
 const FRAME_MS = 2600;
+const STAGE_LABELS_KO = ["원문", "구조", "근거", "지식", "활용"] as const;
+const ui = (korean: boolean, ko: string, en: string) => korean ? ko : en;
 
 const COPY = {
   en: {
@@ -56,9 +58,9 @@ const COPY = {
   },
 } as const;
 
-function SourceSheet({ index }: { index: number }) {
+function SourceSheet({ index, korean }: { index: number; korean: boolean }) {
   return (
-    <div className={styles.sourceViewport} data-camera-stage={index} aria-label={`Source page ${source.page}`}>
+    <div className={styles.sourceViewport} data-camera-stage={index} aria-label={ui(korean, `원문 ${source.page}쪽`, `Source page ${source.page}`)}>
       <picture className={`${styles.sourceAsset} ${styles.fullPage}`}>
         <source
           type="image/avif"
@@ -73,7 +75,7 @@ function SourceSheet({ index }: { index: number }) {
         <img
           data-source-image="page"
           src="/explore-sample/pages/apple-2026-q1-10-q-reference-p004.webp"
-          alt="Apple quarterly filing page showing the condensed consolidated statements of operations"
+          alt={ui(korean, "연결재무제표가 있는 Apple 분기 공시 페이지", "Apple quarterly filing page showing the condensed consolidated statements of operations")}
           width="1080"
           height="1398"
           loading="lazy"
@@ -94,7 +96,7 @@ function SourceSheet({ index }: { index: number }) {
         <img
           data-source-image="region"
           src="/landing/v2/apple-2026-q1-10-q-reference-p004-r64-476-932-538-560.webp"
-          alt="Exact operating expenses table region from the same filing page"
+          alt={ui(korean, "같은 공시 페이지에서 잘라 낸 영업비용 표 영역", "Exact operating expenses table region from the same filing page")}
           width="1120"
           height="103"
           loading="eager"
@@ -104,7 +106,9 @@ function SourceSheet({ index }: { index: number }) {
       </picture>
       <span className={styles.region} aria-hidden="true" />
       <p className={styles.sourceCaption} data-derived="1">
-        {index === 0 ? `Page ${source.page} · original render` : `${source.regionId} · exact crop`}
+        {index === 0
+          ? ui(korean, `${source.page}쪽 · 원문 렌더`, `Page ${source.page} · original render`)
+          : `${source.regionId} · ${ui(korean, "원문 영역", "exact crop")}`}
       </p>
     </div>
   );
@@ -114,11 +118,11 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
   if (index === 0) {
     return (
       <div className={styles.pageComposition} data-stage-composition="page">
-        <p className={styles.compositionLabel}>Original page · unchanged</p>
-        <p className={styles.compositionLead}>One filing page enters before interpretation.</p>
+        <p className={styles.compositionLabel}>{ui(korean, "원문 페이지 · 변경 없음", "Original page · unchanged")}</p>
+        <p className={styles.compositionLead}>{ui(korean, "해석하기 전의 공시 페이지입니다.", "One filing page enters before interpretation.")}</p>
         <dl className={styles.compactLedger}>
-          <div><dt>File</dt><dd data-derived="1">{source.filename}</dd></div>
-          <div><dt>Page</dt><dd data-derived="1">{source.page} of {source.pageCount}</dd></div>
+          <div><dt>{ui(korean, "파일", "File")}</dt><dd data-derived="1">{source.filename}</dd></div>
+          <div><dt>{ui(korean, "페이지", "Page")}</dt><dd data-derived="1">{ui(korean, `${source.page}/${source.pageCount}쪽`, `${source.page} of ${source.pageCount}`)}</dd></div>
         </dl>
       </div>
     );
@@ -126,9 +130,9 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
   if (index === 1) {
     return (
       <div className={styles.structureComposition} data-stage-composition="structure">
-        <p className={styles.compositionLabel}>Located table region</p>
+        <p className={styles.compositionLabel}>{ui(korean, "위치를 확인한 표 영역", "Located table region")}</p>
         <div className={styles.cellMap}>
-          <span className={styles.rowName}>Research and development</span>
+          <span className={styles.rowName}>{ui(korean, "연구개발비", "Research and development")}</span>
           <span className={styles.cell} data-derived="1" data-critical-value="structured-current">{source.currentValue}</span>
           <span className={styles.cell} data-derived="1">{source.priorValue}</span>
         </div>
@@ -145,16 +149,16 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
   if (index === 2) {
     return (
       <div className={styles.evidenceComposition} data-stage-composition="evidence">
-        <p className={styles.compositionLabel}>Evidence address</p>
+        <p className={styles.compositionLabel}>{ui(korean, "근거의 원문 주소", "Evidence address")}</p>
         <blockquote data-derived="1">{source.excerpt}</blockquote>
-        <p className={styles.sourceLocator} data-derived="1">{source.filename} · page {source.page} · {source.regionId}</p>
+        <p className={styles.sourceLocator} data-derived="1">{source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}</p>
         <details className={styles.sourceDetails}>
           <summary>{korean ? "전체 원문 주소 살펴보기" : "Inspect the full source address"}</summary>
           <div className={styles.addressGrid}>
-            <span>document</span><b data-derived="1">{source.id}</b>
-            <span>page</span><b data-derived="1">{source.page}</b>
-            <span>region</span><b data-derived="1">{source.regionId}</b>
-            <span>version</span><b data-derived="1">{source.digest}</b>
+            <span>{ui(korean, "문서", "document")}</span><b data-derived="1">{source.id}</b>
+            <span>{ui(korean, "페이지", "page")}</span><b data-derived="1">{source.page}</b>
+            <span>{ui(korean, "영역", "region")}</span><b data-derived="1">{source.regionId}</b>
+            <span>{ui(korean, "버전", "version")}</span><b data-derived="1">{source.digest}</b>
           </div>
         </details>
       </div>
@@ -163,29 +167,29 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
   if (index === 3) {
     return (
       <div className={styles.knowledgeComposition} data-stage-composition="knowledge">
-        <p className={styles.compositionLabel}>Reusable knowledge object</p>
+        <p className={styles.compositionLabel}>{ui(korean, "재사용 가능한 지식 객체", "Reusable knowledge object")}</p>
         <div className={styles.knowledgeObject}>
-          <span className={styles.objectType}>Operating expense</span>
-          <strong>Research and development</strong>
+          <span className={styles.objectType}>{ui(korean, "영업비용", "Operating expense")}</span>
+          <strong>{ui(korean, "연구개발비", "Research and development")}</strong>
           <span className={styles.objectValue} data-derived="1" data-critical-value="knowledge-current">{source.currentValue}</span>
           <span className={styles.objectUnit} data-derived="1">{source.unit} · {source.currentPeriod}</span>
         </div>
         <div className={styles.sourceTether}>
           <span aria-hidden="true" />
-          <p data-derived="1">Grounded in {source.regionId}</p>
+          <p data-derived="1">{ui(korean, "근거 영역", "Grounded in")} {source.regionId}</p>
         </div>
       </div>
     );
   }
   return (
     <div className={styles.intelligenceComposition} data-stage-composition="intelligence">
-      <p className={styles.compositionLabel}>Grounded answer</p>
-      <p className={styles.question}>{source.question}</p>
+      <p className={styles.compositionLabel}>{ui(korean, "원문에 근거한 답", "Grounded answer")}</p>
+      <p className={styles.question}>{ui(korean, "연구개발비는 얼마였나요?", source.question)}</p>
       <p className={styles.answer}>
         <strong data-derived="1" data-critical-value="answer-current">{source.currentValue}</strong>
         <span data-derived="1">{source.unit} · {source.currentPeriod}</span>
       </p>
-      <p className={styles.citation} data-derived="1">↗ {source.filename} · page {source.page} · {source.regionId}</p>
+      <p className={styles.citation} data-derived="1">↗ {source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}</p>
     </div>
   );
 }
@@ -323,7 +327,7 @@ export default function CompilerSpecimen({
             tabIndex={position === index ? 0 : -1}
             type="button"
           >
-            {stage.label}
+            {korean ? STAGE_LABELS_KO[position] : stage.label}
           </button>
         ))}
       </div>
@@ -348,9 +352,9 @@ export default function CompilerSpecimen({
         role="tabpanel"
         aria-labelledby={`compiler-stage-${active.id}`}
       >
-        <SourceSheet index={index} />
+        <SourceSheet index={index} korean={korean} />
         <div className={styles.output}>
-          <p className={styles.eyebrow}>{active.label}</p>
+          <p className={styles.eyebrow}>{korean ? STAGE_LABELS_KO[index] : active.label}</p>
           <p className={styles.title}>{copy.titles[index]}</p>
           <p className={styles.body}>{copy.bodies[index]}</p>
           <StageComposition key={active.id} index={index} korean={korean} />

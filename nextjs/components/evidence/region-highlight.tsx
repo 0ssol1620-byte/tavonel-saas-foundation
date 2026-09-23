@@ -50,6 +50,7 @@ export default function RegionHighlight({
   imageEager = false,
   progressiveIndex = false,
   indexLabel = "Inspect all source regions",
+  locale = "en",
 }: {
   view: EvidencePageView;
   /** One sentence from the page that uses this, saying what the reader is looking at. */
@@ -68,11 +69,18 @@ export default function RegionHighlight({
   progressiveIndex?: boolean;
   /** Localized disclosure label; the count is inserted from the committed view. */
   indexLabel?: string;
+  /** Only interface chrome is translated; excerpts and locators remain source records. */
+  locale?: "en" | "ko";
 }) {
+  const korean = locale === "ko";
   const [selected, setSelected] = useState(0);
   const detailId = useId();
   const active = view.regions[selected] ?? view.regions[0]!;
   const index = view.regions.indexOf(active);
+  const qualifier = korean
+    ? view.source.qualifier === "reference render" ? "기준 렌더" :
+      view.source.qualifier === "original PDF" ? "원본 PDF" : view.source.qualifier
+    : view.source.qualifier;
   const regionList = (
     <ul className={styles.list}>
       {view.regions.map((region, position) => (
@@ -86,7 +94,8 @@ export default function RegionHighlight({
             onClick={() => setSelected(position)}
           >
             <span className={styles.regionName} data-derived="1">
-              Evidence region {position + 1} of {view.regions.length}, page {view.source.page}
+              {korean ? `근거 영역 ${position + 1}/${view.regions.length}, ${view.source.page}쪽` :
+                `Evidence region ${position + 1} of ${view.regions.length}, page ${view.source.page}`}
             </span>
             {/* The excerpt is source text. data-derived keeps its figures tied to the locator. */}
             <span className={styles.rowExcerpt} data-derived="1">{region.excerpt}</span>
@@ -111,7 +120,9 @@ export default function RegionHighlight({
                where a reader can see which number counts what. */
             alt={
               imageAlt ??
-              `Page ${view.source.page} of ${view.source.filename}, ${view.source.qualifier}`
+              (korean
+                ? `${view.source.filename} ${view.source.page}쪽, ${qualifier}`
+                : `Page ${view.source.page} of ${view.source.filename}, ${view.source.qualifier}`)
             }
             decoding="async"
             loading={imageEager ? "eager" : "lazy"}
@@ -123,7 +134,7 @@ export default function RegionHighlight({
               in their real positions over it -- the coordinates are measured even when the
               picture is not published.
             */}
-            <p>{view.imageAbsentReason ?? "page image not published for this sample"}</p>
+            <p>{view.imageAbsentReason ?? (korean ? "이 샘플의 페이지 이미지는 공개되지 않았습니다" : "page image not published for this sample")}</p>
           </div>
         )}
         {view.regions.map((region, position) =>
@@ -167,8 +178,11 @@ export default function RegionHighlight({
       <figcaption className={styles.detail} id={detailId}>
         {caption ? <p className={styles.caption}>{caption}</p> : null}
         <p className={styles.mark}>
-          Evidence region <span data-derived="1">{index + 1}</span> of{" "}
-          <span data-derived="1">{view.regions.length}</span> on this page
+          {korean ? "이 페이지의 근거 영역 " : "Evidence region "}
+          <span data-derived="1">{index + 1}</span>
+          {korean ? "/" : " of "}
+          <span data-derived="1">{view.regions.length}</span>
+          {korean ? "" : " on this page"}
         </p>
         {/*
           The source's own words. A quotation, trimmed at a word boundary with the truncation
@@ -186,12 +200,14 @@ export default function RegionHighlight({
         </blockquote>
         <p className={styles.locator} data-derived="1">{active.locator}</p>
         <p className={styles.source} data-derived="1">
-          {view.source.filename} · {view.source.qualifier} · page{" "}
-          <span data-derived="1">{view.source.page}</span> of{" "}
+          {view.source.filename} · {qualifier} · {korean ? "" : "page "}
+          <span data-derived="1">{view.source.page}</span>
+          {korean ? "쪽 / " : " of "}
           <span data-derived="1">{view.source.pageCount}</span>
+          {korean ? "쪽" : ""}
         </p>
         <p className={styles.open}>
-          <a href={active.href}>Open this region in Explore</a>
+          <a href={active.href}>{korean ? "Explore에서 이 영역 열기" : "Open this region in Explore"}</a>
         </p>
       </figcaption>
     </figure>

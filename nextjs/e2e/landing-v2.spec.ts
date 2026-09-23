@@ -139,17 +139,19 @@ test("prepared proof tabs show answer-bearing source regions", async ({ page }, 
 for (const [path, label] of [["/", "Inspect all source regions"], ["/ko", "모든 원문 영역 살펴보기"]] as const) {
   test(`${path} opens the source index by keyboard and keeps regions linked to evidence`, async ({ page }) => {
     await page.goto(path);
+    const regionName = path === "/ko" ? /^근거 영역/ : /^Evidence region/;
+    const openLabel = path === "/ko" ? "Explore에서 이 영역 열기" : "Open this region in Explore";
     const inspector = page.locator("#s2 [data-progressive='1']");
     const summary = inspector.locator("summary");
     await expect(summary).toContainText(`${label} (10)`);
-    await expect(inspector.getByRole("button", { name: /^Evidence region/ })).toHaveCount(0);
+    await expect(inspector.getByRole("button", { name: regionName })).toHaveCount(0);
     await summary.focus();
     await page.keyboard.press("Enter");
-    const regions = inspector.getByRole("button", { name: /^Evidence region/ });
+    const regions = inspector.getByRole("button", { name: regionName });
     await expect(regions).toHaveCount(10);
     await regions.nth(1).click();
     await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
-    await expect(inspector.getByRole("link", { name: "Open this region in Explore" })).toHaveAttribute("href", /\/explore\?act=evidence/);
+    await expect(inspector.getByRole("link", { name: openLabel })).toHaveAttribute("href", /\/explore\?act=evidence/);
   });
 }
 

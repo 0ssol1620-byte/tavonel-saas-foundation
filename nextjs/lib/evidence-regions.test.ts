@@ -165,6 +165,15 @@ describe("the rendered region highlight", () => {
     expect(html).toContain(`id="${described}"`);
   });
 
+  it("translates the Korean inspector controls while preserving the source excerpt", () => {
+    const korean = renderToStaticMarkup(createElement(RegionHighlight, { view, locale: "ko" }));
+    expect(korean).toContain("이 페이지의 근거 영역");
+    expect(korean).toContain("Explore에서 이 영역 열기");
+    expect(korean).toContain(`${view.source.page}쪽`);
+    expect(korean).toContain(view.regions[0]!.excerpt);
+    expect(korean).not.toContain("Open this region in Explore");
+  });
+
   it("renders no table, no row and no cell", () => {
     for (const tag of ["<table", "<thead", "<tbody", "<tr", "<td", "<th", 'role="grid"', 'role="cell"']) {
       expect(html).not.toContain(tag);

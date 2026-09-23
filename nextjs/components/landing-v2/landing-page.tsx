@@ -145,7 +145,7 @@ export default function LandingPage({
               ctaOrderVariant={experiment.ctaOrderVariant}
             />
             <p className="lv2-hero-intake lv2-meta">
-              {copy.hero.microProofFormats}{" "}
+              {korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats}{" "}
               <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
             </p>
             <div className="lv2-scene-head lv2-how-head">
