@@ -114,7 +114,20 @@ export default async function StatusPage() {
     they are seeing rather than wait for it to appear -- then offered them a link to a
     marketing index. The reporting route is the closing action.
   */
-  return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+  return <PublicSitePage><PolicyDocument
+    closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>}
+    title="TAVONEL service status"
+    summary={<dl className="status-summary" aria-label="Service status at a glance">
+      <div><dt>Read at</dt><dd>{stamp(status.generatedAt)}</dd></div>
+      <div><dt>Last passed request check</dt><dd>{stamp(probe.lastSuccessfulAt)}</dd></div>
+      <div data-state={probe.lastRunOk === null ? "unreported" : probe.lastRunOk ? "passed" : "failed"}>
+        <dt>Most recent request check</dt>
+        <dd>{stamp(probe.lastRunAt)}{probe.lastRunOk === null ? null : probe.lastRunOk ? " · passed" : " · did not pass"}</dd>
+      </div>
+      <div><dt>Published record starts</dt><dd>{DAY.format(new Date(`${RECORD_STARTS}T00:00:00+09:00`))}</dd></div>
+    </dl>}
+    intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}
+  >
     <h2>Configuration and activation state</h2>
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state === "operational" ? "configured" : value.state}><span>{value.state === "operational" ? "configured" : value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 

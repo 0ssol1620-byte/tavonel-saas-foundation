@@ -9,6 +9,8 @@ type PolicyDocumentProps = {
   effective?: string;
   lastUpdated?: string;
   intro: React.ReactNode;
+  /** Optional at-a-glance facts beside the title, used by the live status record. */
+  summary?: React.ReactNode;
   children: React.ReactNode;
   /** One extra ghost action, for a page that has a second obvious next step. */
   closing?: React.ReactNode;
@@ -29,6 +31,7 @@ export function PolicyDocument({
   effective,
   lastUpdated,
   intro,
+  summary,
   children,
   closing,
 }: PolicyDocumentProps) {
@@ -40,6 +43,7 @@ export function PolicyDocument({
               {effective ? (
                 <p className="fine">Effective {effective}{lastUpdated ? <> &middot; Last updated {lastUpdated}</> : null}</p>
               ) : null}
+              {summary}
             </div>
             <div className="stack">
               <p className="lede">{intro}</p>
