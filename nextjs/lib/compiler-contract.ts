@@ -228,7 +228,7 @@ export const INTEROP_STANDARDS: readonly InteropStandard[] = [
   {
     name: "SHACL",
     state: "direction",
-    note: "Package validation is a rule set in this repository with named error codes, not a published shapes graph.",
+    note: "Package validation uses named error codes. A published SHACL shapes graph is not available.",
   },
   {
     name: "PROV-O",
