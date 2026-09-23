@@ -387,3 +387,13 @@ The final integrated production build passed brand assets, the 12px type floor, 
 The authenticated World-lifecycle specs require the repository's managed browser test session. An attempted external-server run redirected those scenarios to `/login`; it was stopped and is not counted as product validation. The source PR #104 exercised those scenarios with its managed setup, and the integrated exact-head CI must still run them. The screenshots also confirm that `/status` keeps a narrow desktop reading column and older `/changelog` entries remain long on a phone. Those are open composition/editorial issues, not resolved by this truth integration. Founder visual acceptance, exact-head CI, and production verification remain separate release gates.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-24 — Status reading composition candidate
+
+The status page previously had a title-only first column, so a shared document rule collapsed the entire page to one left-aligned column on wide screens. The status route now gives that title a four-row reading summary: the page render time, the last passed request check, the most recent request check with an explicit pass or non-pass result, and the start of the published record. Every value comes from the same live operations, stored probe, and changelog data already used below. The summary does not infer uptime or full-pipeline success; the configuration and request-result sections remain separate. `PolicyDocument` accepts the summary optionally, leaving legal pages' structure unchanged.
+
+After an initial guard caught shortened wording that no longer explicitly distinguished configured components from successful requests, the original truth boundary was restored. The final production build passed brand/type-floor checks, TypeScript, ESLint, **368 test files / 5,237 tests**, and 145 static pages. The public-layout browser spec passed **48/48** across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. A separate production-browser capture returned **10/10 HTTP 200 with zero horizontal overflow** for eight status conditions and two unchanged Privacy reference widths. The status title and summary occupy the first column at 1440; the body uses the second column. At 390, the four facts stack ahead of the explanation without clipped text. The 1440/390 Status and 1440 Privacy captures were inspected; screenshots and measurements are under ignored `nextjs/test-results/status-summary/`.
+
+This improves reading and factual scope, not live availability. The branch depends on the buyer-path truth integration; its own exact-head CI, Vercel preview, and founder visual acceptance remain required.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

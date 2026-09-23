@@ -6,6 +6,7 @@ const ROUTES = [
   "/docs",
   "/docs/quickstart",
   "/changelog",
+  "/status",
   "/evidence",
   "/security",
   "/benchmarks",
@@ -45,6 +46,29 @@ test("long-form public pages keep supporting content in the reading column", asy
     expect(result.bodies.every((body) => body.directChildren <= 2), `${route} preserves the two-column body contract`).toBe(true);
     expect(result.narrowParagraphs, `${route} has no long paragraph trapped in a narrow desktop column`).toEqual([]);
   }
+});
+
+test("status leads with bounded request facts and keeps the reading columns usable", async ({ page }) => {
+  await page.goto("/status");
+  const summary = page.locator(".status-summary");
+  await expect(summary).toBeVisible();
+  await expect(summary).toHaveAttribute("aria-label", "Service status at a glance");
+  await expect(summary.locator("dt")).toHaveText([
+    "Read at",
+    "Last passed request check",
+    "Most recent request check",
+    "Published record starts",
+  ]);
+  await expect(summary.locator("dd")).toHaveCount(4);
+  await expect(summary.locator("dd").first()).toContainText("KST");
+  await expect(summary.locator("dd").last()).toContainText(/\d{1,2} [A-Za-z]+ 20\d{2}/);
+
+  const layout = await page.locator(".policy-page .body").evaluate((body) => {
+    const columns = getComputedStyle(body).gridTemplateColumns.split(" ").filter(Boolean);
+    return { columnCount: columns.length, overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth) };
+  });
+  expect(layout.columnCount).toBe((page.viewportSize()?.width ?? 0) > 1320 ? 2 : 1);
+  expect(layout.overflow).toBeLessThanOrEqual(1);
 });
 
 test("integration marketing copy uses access modes instead of beta badges", async ({ page }) => {

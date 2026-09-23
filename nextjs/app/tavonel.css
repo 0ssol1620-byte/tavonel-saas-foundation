@@ -1386,6 +1386,11 @@
      block, and the link colour (0,1,1) outranked `.btn`'s `color: var(--ground)` (0,1,0) -- three
      primary buttons rendered cream on cream, 1.00:1, with no readable label. */
   .policy-copy a:not(.btn) { color: var(--text-hi); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .status-summary { display: grid; gap: 0; margin: 14px 0 0; border-top: 1px solid var(--hairline); }
+  .status-summary > div { padding: 13px 0; border-bottom: 1px solid var(--hairline); min-width: 0; }
+  .status-summary dt { color: var(--text-lo); font: 600 var(--t-1)/1.4 var(--f-sans); letter-spacing: 0.04em; }
+  .status-summary dd { margin: 5px 0 0; color: var(--text-hi); font: 500 var(--t-3)/1.45 var(--f-sans); overflow-wrap: anywhere; }
+  .status-summary > div[data-state="failed"] dd { color: var(--changed); }
   .processor-list, .status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 8px 0 18px; background: var(--seam); border: 1px solid var(--hairline); }
   /* pages-07. The odd last card keeps the span -- an unfilled cell in a seam grid paints as a
      hairline block -- but not the second layout. Deciding a card's inner shape by whether the
