@@ -52,6 +52,7 @@ export type EvidencePageView = Readonly<{
     pageCount: number;
     /** "original PDF" or "reference render" -- which bytes the page is a picture of. */
     qualifier: string;
+    qualifierKo: string;
   }>;
   /** The committed render of the page, or null with a reason when none is published. */
   image: Readonly<{ src: string; width: number; height: number }> | null;
@@ -121,6 +122,7 @@ export function sampleEvidencePage(): EvidencePageView {
       page: first.page,
       pageCount: first.pageCount,
       qualifier: sourcePageQualifier(first.representationKind),
+      qualifierKo: sourcePageQualifier(first.representationKind, true),
     },
     image: chosen.raster
       ? { src: chosen.raster.file, width: chosen.raster.width, height: chosen.raster.height }

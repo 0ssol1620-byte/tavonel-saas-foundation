@@ -224,6 +224,24 @@ test.describe("HeroFilm", () => {
 });
 
 test.describe("lower CompilerSpecimen explanation", () => {
+  test("keeps all Korean stages and panel names localized while retaining one source", async ({ page }) => {
+    await page.goto("/ko");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
+    const tabs = specimen.getByRole("tab");
+    const labels = ["원문", "구조", "근거", "지식", "활용"];
+    await expect(tabs).toHaveText(labels);
+    for (let index = 0; index < labels.length; index += 1) {
+      await tabs.nth(index).click();
+      await expect(specimen.getByRole("tabpanel", { name: labels[index] })).toBeVisible();
+      await expect(specimen).toContainText(COMPILER_SPECIMEN_SOURCE.id);
+    }
+    await expect(specimen.getByRole("tabpanel")).toContainText("백만 달러 · 2025년 12월 27일");
+    await tabs.first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tabs.nth(1)).toBeFocused();
+    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  });
+
   test("renders five selectable stages and preserves one source identity through them", async ({ page }) => {
     await page.goto("/");
     const specimen = page.locator("#s1 [data-compiler-specimen]");

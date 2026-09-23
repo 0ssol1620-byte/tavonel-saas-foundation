@@ -77,10 +77,10 @@ export default function RegionHighlight({
   const detailId = useId();
   const active = view.regions[selected] ?? view.regions[0]!;
   const index = view.regions.indexOf(active);
-  const qualifier = korean
-    ? view.source.qualifier === "reference render" ? "기준 렌더" :
-      view.source.qualifier === "original PDF" ? "원본 PDF" : view.source.qualifier
-    : view.source.qualifier;
+  const qualifier = korean ? view.source.qualifierKo : view.source.qualifier;
+  const imageAbsentReason = korean && view.imageAbsentReason === "page image not published for this sample"
+    ? "이 샘플의 페이지 이미지는 공개되지 않았습니다"
+    : view.imageAbsentReason ?? (korean ? "이 샘플의 페이지 이미지는 공개되지 않았습니다" : "page image not published for this sample");
   const regionList = (
     <ul className={styles.list}>
       {view.regions.map((region, position) => (
@@ -134,7 +134,7 @@ export default function RegionHighlight({
               in their real positions over it -- the coordinates are measured even when the
               picture is not published.
             */}
-            <p>{view.imageAbsentReason ?? (korean ? "이 샘플의 페이지 이미지는 공개되지 않았습니다" : "page image not published for this sample")}</p>
+            <p>{imageAbsentReason}</p>
           </div>
         )}
         {view.regions.map((region, position) =>

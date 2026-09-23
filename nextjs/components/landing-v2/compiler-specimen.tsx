@@ -75,7 +75,7 @@ function SourceSheet({ index, korean }: { index: number; korean: boolean }) {
         <img
           data-source-image="page"
           src="/explore-sample/pages/apple-2026-q1-10-q-reference-p004.webp"
-          alt={ui(korean, "연결재무제표가 있는 Apple 분기 공시 페이지", "Apple quarterly filing page showing the condensed consolidated statements of operations")}
+          alt={ui(korean, "요약 연결손익계산서가 있는 Apple 분기 공시 페이지", "Apple quarterly filing page showing the condensed consolidated statements of operations")}
           width="1080"
           height="1398"
           loading="lazy"
@@ -108,7 +108,7 @@ function SourceSheet({ index, korean }: { index: number; korean: boolean }) {
       <p className={styles.sourceCaption} data-derived="1">
         {index === 0
           ? ui(korean, `${source.page}쪽 · 원문 렌더`, `Page ${source.page} · original render`)
-          : `${source.regionId} · ${ui(korean, "원문 영역", "exact crop")}`}
+          : `${source.regionId} · ${ui(korean, "정확히 잘라 낸 영역", "exact crop")}`}
       </p>
     </div>
   );
@@ -172,7 +172,7 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
           <span className={styles.objectType}>{ui(korean, "영업비용", "Operating expense")}</span>
           <strong>{ui(korean, "연구개발비", "Research and development")}</strong>
           <span className={styles.objectValue} data-derived="1" data-critical-value="knowledge-current">{source.currentValue}</span>
-          <span className={styles.objectUnit} data-derived="1">{source.unit} · {source.currentPeriod}</span>
+          <span className={styles.objectUnit} data-derived="1">{ui(korean, source.unitKo, source.unit)} · {ui(korean, source.currentPeriodKo, source.currentPeriod)}</span>
         </div>
         <div className={styles.sourceTether}>
           <span aria-hidden="true" />
@@ -187,7 +187,7 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
       <p className={styles.question}>{ui(korean, "연구개발비는 얼마였나요?", source.question)}</p>
       <p className={styles.answer}>
         <strong data-derived="1" data-critical-value="answer-current">{source.currentValue}</strong>
-        <span data-derived="1">{source.unit} · {source.currentPeriod}</span>
+        <span data-derived="1">{ui(korean, source.unitKo, source.unit)} · {ui(korean, source.currentPeriodKo, source.currentPeriod)}</span>
       </p>
       <p className={styles.citation} data-derived="1">↗ {source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}</p>
     </div>

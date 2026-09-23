@@ -170,6 +170,7 @@ describe("the rendered region highlight", () => {
     expect(korean).toContain("이 페이지의 근거 영역");
     expect(korean).toContain("Explore에서 이 영역 열기");
     expect(korean).toContain(`${view.source.page}쪽`);
+    expect(korean).toContain(view.source.qualifierKo);
     expect(korean).toContain(view.regions[0]!.excerpt);
     expect(korean).not.toContain("Open this region in Explore");
   });
@@ -190,6 +191,9 @@ describe("the rendered region highlight", () => {
     const drawn = renderToStaticMarkup(createElement(RegionHighlight, { view: absent }));
     expect(drawn).not.toContain("<img");
     expect(drawn).toContain("page image not published for this sample");
+    const korean = renderToStaticMarkup(createElement(RegionHighlight, { view: absent, locale: "ko" }));
+    expect(korean).toContain("이 샘플의 페이지 이미지는 공개되지 않았습니다");
+    expect(korean).not.toContain("page image not published for this sample");
     /* The boxes are still at their measured positions: the coordinates exist, the picture does not. */
     const [x0] = absent.regions[0]!.bbox1000;
     expect(drawn).toContain(`left:${x0 / 10}%`);
