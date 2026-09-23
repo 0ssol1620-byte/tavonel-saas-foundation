@@ -22,8 +22,12 @@ export const CHANGELOG_SURFACES: readonly ChangelogSurface[] = [
 ];
 
 export type ChangelogEntry = {
-  /** ISO date, and the fragment a permalink points at. */
+  /** Calendar date in Asia/Seoul of a successful production deployment. */
   date: string;
+  /** Exact UTC deployment timestamp where a production receipt is available. */
+  releasedAt?: string;
+  /** Preserve an older published fragment when correcting a release date. */
+  id?: string;
   title: string;
   /** The released version, where the thing released carries one. */
   version?: string;
@@ -39,22 +43,31 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   /*
-    G2-014. The newest entry was twelve days old at audit time and the production redeploy of
-    15 September was unrecorded, so a buyer checking whether the product is alive got the wrong
-    answer from the one page built to tell them. The rule this sets: every production release is
-    recorded, infrastructure-only ones included.
-
-    The three release-candidate entries below say "release candidate, pending merge" in their own
-    text rather than being dated as live. They describe work that is reviewed and not yet merged,
-    and a changelog that announces unmerged work as shipped is the same defect as one that omits
-    shipped work, in the other direction.
+    The release-candidate copy on three entries was left behind after their changes reached main.
+    The API and commerce work deployed successfully as 22e47f5 at 2026-09-18T04:35:46Z; the
+    landing work as 1b14d27 at 2026-09-19T22:41:11Z; the buyer-path change as 0cc99a4 at
+    2026-09-23T05:10:07Z. Dates below are KST calendar dates; Atom uses these exact UTC times.
+    The old date fragments remain stable, while the displayed dates now state when they shipped.
   */
   {
-    date: "2026-09-19",
+    date: "2026-09-23",
+    releasedAt: "2026-09-23T05:10:07Z",
+    title: "A clearer path from public proof to pricing",
+    surfaces: ["Website", "Billing"],
+    improved: [
+      "The homepage leads with a source-verifiable outcome, puts How it compiles beneath the headline, and opens the five-stage specimen on Evidence.",
+      "The new first screen supersedes the 20 September entry-page opening; the source-linked sample remains available further down the page.",
+      "Visitors can move from the public Compiled World and its source regions to Pricing, where the consultation path is explained.",
+      "The historical R-01 research result names its denominator, receipt and weak-scan limitation instead of suggesting live-service model superiority.",
+    ],
+  },
+  {
+    date: "2026-09-20",
+    releasedAt: "2026-09-19T22:41:11Z",
+    id: "2026-09-19",
     title: "A rebuilt entry page: nine scenes, and every figure on them read out of the public Compiled World",
     surfaces: ["Website"],
     added: [
-      "Release candidate, pending merge. Everything in this entry is reviewed and not yet merged, so it is not live on tavonel.com today. It is recorded before it lands for the reason the entry below gives.",
       "The entry pages at / and /ko are rebuilt as nine scenes, each one a keyboard-reachable landmark that answers a single question and offers a single next action: what TAVONEL is, whether it works, what happens to your files, whether the result can be trusted, what happens when a source changes, why a compiler rather than a parser, how work comes in and goes out, what is safe to assume, and what to do next.",
       "The first screen is the product rather than a picture of it: a real page of a real SEC filing, the region the compiler read on it, a line from that region to the passage compiled out of it, and the objects bound to that passage — every one of them read out of the public Compiled World when the page is built. It plays no video.",
       "An evidence inspector on the entry page prints the five things a citation needs — the object's state, the file, the page, the region as coordinates on that page, and the source version's digest — with Copy citation and a link that opens the original document at the right page.",
@@ -72,11 +85,12 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     ],
   },
   {
-    date: "2026-09-16",
+    date: "2026-09-18",
+    releasedAt: "2026-09-18T04:35:46Z",
+    id: "2026-09-16",
     title: "A rendered API reference, published error codes, and the limits that were already enforced",
     surfaces: ["API", "Developer tools", "Website", "Billing"],
     added: [
-      "Release candidate, pending merge. Everything in this entry is reviewed and not yet merged, so it is not live on tavonel.com today. It is recorded here before it lands rather than after, because a changelog that only appears after the fact is the one nobody can plan against — and dating it as shipped would be the same defect in the other direction.",
       "An API reference at /api: every operation in the contract with its parameters, request and response schemas, a worked example, and the error codes it can return. It is generated from the OpenAPI document rather than written beside it.",
       "A try-it on that page for the three reads that need no key — the capability manifest, the deployment status, and the public sample World.",
       "The full error catalogue on /docs/errors: every code the API can return, what it means and what to do about it, including AUTH_REQUIRED, which is what a missing or wrong key gets.",
@@ -93,18 +107,20 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     ],
     fixed: [
       "The OpenAPI document resolved the seven compile-job operations against a base URL that returns 404. They carry their own server entry now, and a test resolves every path in the contract against a route handler so the contract cannot describe a URL the API does not serve.",
-      "The MCP server's tool count is nine everywhere. list_worlds shipped on 3 September and was never announced, so three pages and that entry said eight.",
+      "The read-only MCP release record now names list_worlds, which was included in the 3 September tool set.",
       "The signed package's file list was three different lists on three pages, one of them naming a file the exporter does not write. All three read the exporter's own list now.",
       "The scope description for ask:read said lexical retrieval while the Search page documented the same endpoint as hybrid retrieval.",
       "Internal review shorthand was published verbatim in a sentence on /docs/search.",
     ],
   },
   {
-    date: "2026-09-14",
-    title: "Pricing, legal texts and trust surfaces — release candidate, pending merge",
+    date: "2026-09-18",
+    releasedAt: "2026-09-18T04:35:46Z",
+    id: "2026-09-14",
+    title: "Pricing, legal texts and trust surfaces",
     surfaces: ["Website", "Billing"],
     added: [
-      "Release candidate, pending merge, and not live today. The pricing page separates plans that can be paid for now from those that start with a conversation; the terms gain governing law, a limitation of liability and a notice period; refunds are stated as one rule rather than two that disagreed; and the privacy text names the regimes it is written against. Dated by the day the work was completed, not by a release that has not happened.",
+      "Pricing shows plan limits and access conditions. The Terms name governing law, liability limits and price-change notice; Refunds distinguishes invitation-only access from paid-plan rules; Privacy names the data-protection regimes it addresses; Trust lists the scope of provided controls.",
     ],
   },
   {
@@ -203,12 +219,22 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   },
 ];
 
+/** A published fragment remains stable if the entry's release date was corrected. */
+export function changelogEntryId(entry: ChangelogEntry): string {
+  return entry.id ?? entry.date;
+}
+
+/** Older date-only entries keep their existing feed timestamp until a receipt is recovered. */
+export function changelogEntryUpdatedAt(entry: ChangelogEntry): string {
+  return entry.releasedAt ?? `${entry.date}T00:00:00Z`;
+}
+
 /** Newest first, which is the order the page and the feed both want. */
 export function changelogEntries(surface?: ChangelogSurface): ChangelogEntry[] {
   // `filter` already copies, so the sort is not mutating the exported array.
   return CHANGELOG
     .filter((entry) => !surface || entry.surfaces.includes(surface))
-    .sort((left, right) => right.date.localeCompare(left.date));
+    .sort((left, right) => right.date.localeCompare(left.date) || changelogEntryId(right).localeCompare(changelogEntryId(left)));
 }
 
 export function changelogSections(entry: ChangelogEntry): Array<[string, string[]]> {
@@ -221,5 +247,5 @@ export function changelogSections(entry: ChangelogEntry): Array<[string, string[
 
 /** The most recent change, which is what a feed's own timestamp should be. */
 export function changelogUpdatedAt() {
-  return changelogEntries()[0].date;
+  return changelogEntryUpdatedAt(changelogEntries()[0]);
 }

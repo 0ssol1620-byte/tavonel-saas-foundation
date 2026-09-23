@@ -315,3 +315,13 @@ The first authorized production reset sealed a manifest of 134 database rows and
 The focused reset service, route, panel, and R2 tests passed (29/29). The complete hermetic unit suite passed (368 files, 5,230 tests), as did the brand, type-floor, TypeScript, and ESLint checks. The local production build generated 145 static pages. Authenticated live recovery is still in progress. The reset is **not yet complete**; the sealed ledger must reach `completed`, and the two workspace R2 prefixes must list empty before completion can be reported.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-24 — Changelog release-state correction
+
+The live `/changelog` still presented three already shipped entries as "release candidate, pending merge" and "not live today." GitHub-linked Vercel Production deployment statuses were successful for `22e47f5` at 2026-09-18 04:35:46 UTC (API and commerce), `1b14d27` at 2026-09-19 22:41:11 UTC (landing), and `0cc99a4` at 2026-09-23 05:10:07 UTC (buyer path). The page now uses their Asia/Seoul release dates, retains the old date fragments so shared links and Atom IDs continue resolving, and uses exact UTC timestamps in Atom for these receipted entries. The new 23 September entry records only buyer-visible PR #99 behavior; older pending claims and an incorrect "pay now" line were removed.
+
+The first local production build passed brand/type-floor, TypeScript, ESLint, 368 test files / 5,231 tests, and 145 static pages. After receipt and copy refinements, the focused changelog suite passed 20/20, `pnpm check` passed, and a fresh optimized build passed. The public-layout browser suite passed 40/40 across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. Local HTTP returned 200 for the page and Atom feed; the rendered page has no pending-merge text, all three old anchors remain, and the feed carries the exact latest timestamp with eight entries. Captures at 1440, 390, and 360 found no horizontal overflow; 1440 and 360 were inspected directly. Captures remain local under `nextjs/test-results/changelog-*.png`.
+
+An independent Claude Code Opus 5.5 read-only review checked the old fragments and feed IDs and identified missing deployment-time evidence and a UTC/KST mismatch, both closed using production deployment receipts. These checks do not replace founder visual acceptance or a further editorial reduction of the older long release notes.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

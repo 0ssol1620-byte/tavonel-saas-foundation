@@ -1,4 +1,4 @@
-import { changelogEntries, changelogSections, changelogUpdatedAt } from "@/lib/changelog";
+import { changelogEntries, changelogEntryId, changelogEntryUpdatedAt, changelogSections, changelogUpdatedAt } from "@/lib/changelog";
 
 /*
   The Atom feed masterplan 13.3 asks for.
@@ -29,10 +29,10 @@ export function GET() {
       ...changelogSections(entry).flatMap(([label, items]) => [`${label}:`, ...items.map((item) => `- ${item}`)]),
     ];
     return `  <entry>
-    <id>${ORIGIN}/changelog#${entry.date}</id>
+    <id>${ORIGIN}/changelog#${changelogEntryId(entry)}</id>
     <title>${escapeXml(entry.title)}</title>
-    <link rel="alternate" href="${ORIGIN}/changelog#${entry.date}"/>
-    <updated>${entry.date}T00:00:00Z</updated>
+    <link rel="alternate" href="${ORIGIN}/changelog#${changelogEntryId(entry)}"/>
+    <updated>${changelogEntryUpdatedAt(entry)}</updated>
     ${entry.surfaces.map((surface) => `<category term="${escapeXml(surface)}"/>`).join("\n    ")}
     <content type="text">${escapeXml(paragraphs.join("\n"))}</content>
   </entry>`;
@@ -44,7 +44,7 @@ export function GET() {
   <title>TAVONEL changelog</title>
   <link rel="self" href="${ORIGIN}/changelog/feed.xml"/>
   <link rel="alternate" href="${ORIGIN}/changelog"/>
-  <updated>${changelogUpdatedAt()}T00:00:00Z</updated>
+  <updated>${changelogUpdatedAt()}</updated>
 ${body}
 </feed>
 `;
