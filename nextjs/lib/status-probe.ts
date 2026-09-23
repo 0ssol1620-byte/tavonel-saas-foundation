@@ -2,9 +2,9 @@
   The /status view of a probe run, kept out of the page so it can be tested.
 
   The whole point of the section is that a reader can tell two things apart at a glance: the rows
-  above it, which say a component is configured and its gate is open, and these rows, which say a
-  request was sent through it and what came back. So every sentence this file produces names which
-  one it is, and nothing here can render blank:
+  above it, which say a component is configured and its gate is open, and request rows here,
+  which say what a request returned. Billing is a configuration-only exception and must carry
+  that label instead of borrowing a successful-request state. Nothing here can render blank:
 
   - No stored run at all is "Not yet reported". Not an empty cell, not a dash, not "unknown".
   - A history that could not be read is a named failure, never "Not yet reported". "It has not
@@ -60,7 +60,7 @@ export type ProbeRow = {
   name: ProbeDependency;
   label: string;
   /** Rendered verbatim. `NOT RUN` is a value, not an absence. */
-  state: "operational" | "failed" | "not probed" | typeof NOT_RUN;
+  state: "operational" | "failed" | "configured" | "not configured" | "not probed" | typeof NOT_RUN;
   detail: string;
 };
 
@@ -90,7 +90,7 @@ function describe(check: ProbeCheck): ProbeRow {
     return {
       name: check.name,
       label,
-      state: check.status === "ok" ? "operational" : "failed",
+      state: check.status === "ok" ? "configured" : "not configured",
       detail: "configuration only; no request is sent through it",
     };
   }

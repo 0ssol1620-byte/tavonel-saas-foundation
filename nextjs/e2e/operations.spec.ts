@@ -30,6 +30,7 @@ test("separates configured components from measured request outcomes", async ({ 
   await expect(configuration.locator("article > span", { hasText: /^operational$/ })).toHaveCount(0);
   await expect(page.getByText("it does not mean a request recently succeeded")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Scheduled dependency checks" })).toBeVisible();
+  await expect(page.getByText("Billing is a configuration-only check; it sends no request through a payment flow.")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("status-configured-versus-probed.png"), fullPage: true });
 });
 

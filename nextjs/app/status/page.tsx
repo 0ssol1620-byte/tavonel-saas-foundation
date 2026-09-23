@@ -119,7 +119,7 @@ export default async function StatusPage() {
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state === "operational" ? "configured" : value.state}><span>{value.state === "operational" ? "configured" : value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 
     <h2>Scheduled dependency checks</h2>
-    <p>Each check here is a request TAVONEL sent through the dependency on a schedule, carrying no customer data, and it reports what came back. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
+    <p>Request checks here run on a schedule without customer data and report what came back. Billing is a configuration-only check; it sends no request through a payment flow. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
       Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
       of any outcome: <strong>{stamp(probe.lastRunAt)}</strong>
@@ -136,7 +136,7 @@ export default async function StatusPage() {
     */}
     {probe.rows.every((row) => row.state === NOT_RUN)
       ? <p>Scheduled dependency checks begin reporting here with the next run: {DEPENDENCIES_SENTENCE}</p>
-      : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
+      : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : row.state === "configured" ? "configured" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
     <p>Full pipeline check: {probe.fixtureE2E}</p>
 
     {/*
