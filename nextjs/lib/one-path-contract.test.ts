@@ -77,8 +77,8 @@ describe("approved one-path experience", () => {
     const order = [
       'id="s1"',
       "<HeroStatement",
-      "<CompilerSpecimen",
       "<HeroActions",
+      "<CompilerSpecimen",
       'id="s2"',
       "<HeroProof",
       "<HeroFilm",

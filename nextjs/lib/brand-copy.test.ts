@@ -1318,8 +1318,8 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<CompilerSpecimen",
       "<HeroActions",
+      "<CompilerSpecimen",
       'id="s2"',
       "<HeroProof",
       "<HeroFilm",
