@@ -61,6 +61,8 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+
+
 ## 2026-09-21 — Original-source compiler specimen and mobile film inspection
 
 The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
@@ -313,5 +315,17 @@ The later full hermetic Playwright rerun on product commit `41d99a9` finished wi
 The first authorized production reset sealed a manifest of 134 database rows and 349 R2 objects, then stopped on the first R2 deletion batch before database finalization. The recovery flow reopens that same sealed reset ID, shows the original and remaining object counts without exposing object keys to the browser, and retains the typed confirmation. R2 failures now report a safe HTTP status and provider error code; only network, rate-limit, and server failures receive bounded retries. A permission or retention failure leaves database rows intact for diagnosis.
 
 The focused reset service, route, panel, and R2 tests passed (29/29). The complete hermetic unit suite passed (368 files, 5,230 tests), as did the brand, type-floor, TypeScript, and ESLint checks. The local production build generated 145 static pages. Authenticated live recovery is still in progress. The reset is **not yet complete**; the sealed ledger must reach `completed`, and the two workspace R2 prefixes must list empty before completion can be reported.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-24 — Public Explore answer relevance and landing proof
+
+The audit's TAV-005 was reproduced against the committed W4 corpus. The public Products/Services question ranked a 10-K footnote above the quarterly sales table, and the Board-oversight question ranked a proxy navigation block. The retriever returned citations, but their leading excerpts did not answer the questions. The public sample now offers three prepared questions with independently checked top-ranked regions: Q1 R&D expense on the Q1 10-Q page 4 (`[64,476,932,538]`), Products/Services net sales on that filing's page 4 (`[64,249,932,352]`), and product categories in the 2025 10-K Company Background page 4 (`[30,291,971,380]`). The two misleading questions were removed from the public sample; no general retrieval-quality improvement is claimed. Unit tests pin the source, page, box and answer-bearing excerpt for each prepared question.
+
+The homepage proof tabs now quote the same top-ranked region as `/explore` Ask. A missing page or crop fails the builder rather than substituting a lower-ranked citation. A new crop was rendered from the committed Q1 source PDF and re-encoded into responsive WebP/AVIF derivatives; both manifests record SHA-256 and byte counts. The Sources stack retains all three source thumbnails, including DEF 14A. Source-page captions and image alt text distinguish an issuer PDF from a reference render of SEC HTML. The Ask explanation says the questions are prepared without a stale count.
+
+Final local production build passed brand and type-floor checks, TypeScript, ESLint, **368 unit/contract files and 5,233 tests**, and generation of 145 static pages. Full affected `landing-v2.spec.ts` and `explore.spec.ts` production-browser runs passed **225 cases with 95 intentional skips** across 1920, 1440, 1280, 1024, 768, 390, 360 and reduced motion. The final focused proof capture passed 8/8. `/explore` Ask's desktop/reduced-motion path verified all three displayed excerpts and evidence navigation; its existing narrow-layout skip remains, while the homepage proof was exercised at every width.
+
+Local ignored screenshots: `nextjs/test-results/landing-v2-prepared-proof--c0d57-swer-bearing-source-regions-{1920,1440,1280,1024,768,390,360,reduced-motion}/proof-sales.png`, plus `proof-sales-viewport.png` in each directory. The 1440 section and 390/360 phone captures were inspected directly. The section screenshot stitches a sticky header across the long mobile element; the 390 viewport capture shows the header at the viewport top with no fixed overlap. Automated browser checks do not replace founder visual acceptance. Exact-head CI, Vercel preview, and production verification follow the PR; the broader lexical-retrieval defect and unprepared questions remain open.
 
 **FOUNDER VISUAL REVIEW REQUIRED**

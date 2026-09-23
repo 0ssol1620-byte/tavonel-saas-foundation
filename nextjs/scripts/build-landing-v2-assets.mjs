@@ -78,13 +78,12 @@ const RENDER_SET = [
     half is drawn from roughly 708 source pixels as well.
   */
   { file: "apple-2025-form-10-k-p004.webp", kind: "region", bbox1000: [30, 291, 971, 380], widths: [708, 1416] },
-  // Scene 02 -- the three grounded questions whose cited region sits on a committed page.
-  { file: "apple-2026-q1-10-q-reference-p019.webp", kind: "page", widths: [720, 1080] },
-  { file: "apple-2026-q1-10-q-reference-p019.webp", kind: "region", bbox1000: [62, 621, 939, 667], widths: [560, 1120] },
+  // Scene 02 -- the three answer-bearing top regions, from the Q1 filing and annual filing.
   { file: "apple-2026-q1-10-q-reference-p004.webp", kind: "page", widths: [720, 1080] },
   { file: "apple-2026-q1-10-q-reference-p004.webp", kind: "region", bbox1000: [64, 476, 932, 538], widths: [560, 1120] },
+  { file: "apple-2026-q1-10-q-reference-p004.webp", kind: "region", bbox1000: [64, 249, 932, 352], widths: [560, 1120] },
+  // Scene 07 Sources stack retains a third, separately acquired filing.
   { file: "apple-2026-proxy-def14a-reference-p017.webp", kind: "page", widths: [720, 1080] },
-  { file: "apple-2026-proxy-def14a-reference-p017.webp", kind: "region", bbox1000: [62, 40, 949, 521], widths: [560, 1120] },
 ];
 
 const manifest = JSON.parse(readFileSync(join(pagesDir, "pages.manifest.json"), "utf8"));

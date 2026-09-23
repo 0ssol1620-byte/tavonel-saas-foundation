@@ -146,7 +146,7 @@ export const EXPLORE_COPY = {
     "Each step is a full compile of the corpus as it stood, compared with the one before it. Steps run in reporting-period order.",
   askPlaceholder: "Ask this World…",
   askNote:
-    "This sample answers four prepared questions. Each answer is the source text the retriever scored, not a rewrite of it.",
+    "Choose from the prepared questions above. Each answer is the source text the retriever scored, not a rewrite of it.",
   /*
     BA-034. What the object, relation and region counts of this sample are counts *of*.
 

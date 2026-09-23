@@ -89,14 +89,7 @@ export type ProofTab = {
   answerTruncated: boolean;
   source: ProofSource;
   region: { id: string; bbox1000: number[] };
-  /**
-   * Which of the answer's citations this tab opens.
-   *
-   * Usually the first. When the retriever's leading citation sits on a page this repository has
-   * no committed render of, the tab shows the first cited region that does -- still a region the
-   * retriever cited for this question, and the index says which one it is rather than letting a
-   * third-ranked region pass for the top one.
-   */
+  /** Always zero: the tab quotes the same top-ranked region as /explore Ask. */
   citationIndex: number;
   citationCount: number;
   rasters: { page: ProofRaster; crop: ProofRaster };
@@ -208,30 +201,19 @@ function sourceOf(region: { form?: string; filingDate?: string; filename: string
 /**
  * Scene 02's tabs: prepared questions this World answers, each opened onto the page it cites.
  *
- * The selection rule is structural, in question order, and has exactly one requirement a reader
- * can see: the region the tab opens must be a region the retriever cited for that question AND
- * sit on a page this repository has a committed render of. A tab whose source page could only be
- * drawn is not a tab.
- *
- * §12 asks for three tabs reaching three filings. This corpus gives three tabs reaching two:
- * of the four prepared questions, one cites no region on any page with a committed render, and
- * the remaining three land on the Q1 10-Q twice and the proxy once. Rendering a fourth page to
- * make the number three is a corpus job (`scripts/render-source-pages.mjs`), not a copy job, so
- * the tabs say which filing and which page each one is and the count stands as measured.
+ * Each tab quotes its top-ranked Ask region. A missing committed derivative fails the build;
+ * silently falling back to a lower-ranked citation would show a different answer on the landing
+ * than /explore. The three verified questions reach two filings and two pages.
  */
 export function buildProofTabs(): ProofTab[] {
   const tabs: ProofTab[] = [];
   for (const answer of answers) {
-    const index = answer.regions.findIndex((cited) => {
-      const evidence = world.evidence.find((item) => item.id === cited.evidenceId);
-      return evidence ? rasterOf(evidence.digest, evidence.page, evidence.bbox1000) !== null : false;
-    });
-    if (index < 0) continue;
-    const cited = answer.regions[index];
+    const cited = answer.regions[0];
+    if (!cited) throw new Error(`landing_v2_proof_answer_has_no_region: ${answer.question}`);
     const evidence = world.evidence.find((item) => item.id === cited.evidenceId);
     if (!evidence) throw new Error(`landing_v2_proof_citation_unresolved: ${answer.question}`);
     const rasters = rasterOf(evidence.digest, evidence.page, evidence.bbox1000);
-    if (!rasters) throw new Error(`landing_v2_proof_rasters_vanished: ${cited.evidenceId}`);
+    if (!rasters) throw new Error(`landing_v2_proof_top_region_has_no_raster: ${cited.evidenceId}`);
     const preview = excerptPreview(cited.excerpt, EXCERPT_LIMIT);
     tabs.push({
       question: answer.question,
@@ -239,7 +221,7 @@ export function buildProofTabs(): ProofTab[] {
       answerTruncated: preview.truncated,
       source: sourceOf(evidence),
       region: { id: evidence.id, bbox1000: [...evidence.bbox1000] },
-      citationIndex: index,
+      citationIndex: 0,
       citationCount: answer.regions.length,
       rasters,
       openHref: `/explore?act=evidence&evidence=${encodeURIComponent(evidence.id)}`,

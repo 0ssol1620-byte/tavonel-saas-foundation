@@ -318,17 +318,20 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
 ];
 
 /*
-  Four questions the page can put to the World, answered by the retriever the workspace uses.
+  Three questions the page can put to the World, answered by the retriever the workspace uses.
 
   Not a scripted answer with a citation drawn on afterwards: `answerGroundedQuestion` reads
   `rag/chunks.jsonl` out of this artifact and returns the regions it scored, and the page shows
   whichever region came first along with the score that put it there. Picking the questions is a
   demo choice; the answers are not a choice.
 
-  The four reach three different filings -- a quarterly income statement, the annual segment
-  table, and the proxy's account of what the Audit Committee reviews -- which is the point of a
-  multi-filing corpus and the reason they are asked in the corpus's own words rather than in
-  words that would flatter it.
+  These reach two different filings: a quarterly income statement and the annual filing's
+  Company Background. The public sample offers only questions whose top-ranked excerpt answers
+  the question. A grounded citation alone is not proof of answer relevance; the segment and
+  Board-oversight questions were removed when the retriever returned a paragraph without the
+  requested figures and a table-of-contents fragment, respectively. Reintroducing those
+  questions requires a retrieval correction and verified source-region regression evidence.
+  These curated examples demonstrate source traceability, not open-ended retrieval accuracy.
 
   One question §11.8 offers is deliberately absent. "What changed since the annual filing?" is
   answerable by the Change act and not by this contract: the retriever scores region text
@@ -336,33 +339,21 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
   region that merely contains the words. Asking it here would put a confident citation under an
   answer nothing computed. It stays out until Ask can reach the diff.
 
-  Fail-closed: if the retriever abstains on any of them -- which is what it should do when the
-  corpus stops supporting the question -- the build stops rather than the page rendering an
-  empty panel.
+  Fail-closed: if the retriever abstains on any of them, the build stops. The accompanying tests
+  also pin each top-ranked source region and answer-bearing excerpt.
 */
 /*
-  F6, 2026-09-19: WHICH QUESTION LEADS, AND WHY THAT IS A PRESENTATION CHOICE.
+  The research-and-development question leads because its passage opens on the table's own label
+  and the figures, rather than a repeated heading or navigation fragment. This is a presentation
+  choice; the retriever still chooses and scores every cited region.
 
-  Scene 02 opens on the first of these that has a committed region raster, and the passage it
-  quoted began "Americas Americas net sales increased ..." -- the filing's own section heading
-  immediately followed by the sentence under it, which is what this deployment emits for that
-  region and is not something a landing may rewrite (rule 7: the paragraph as printed). A reader
-  meeting the product's output for the first time reads a doubled word as a bug in the compiler.
-
-  So the order changed and nothing else did. The research-and-development question leads because
-  its passage opens on the table's own label -- "Operating expenses: Research and development
-  10,887 ..." -- with no repeated token. The set of three tabs is unchanged: the segment question
-  has no committed raster and is skipped either way, and the Board question's passage opens on a
-  DEF 14A page header, which is the artifact this ordering moves off the first tab.
-
-  The order is read by /explore as well, and by nothing else that ranks: chooseExploreEntryProof
-  keys off a set of cited ids and a 10-K preference, so the hero's entry region is unchanged.
+  The order is read by /explore; chooseExploreEntryProof separately prefers a supported 10-K
+  Company Background region for the opening proof.
 */
 export const EXPLORE_SAMPLE_QUESTIONS = [
   "What were operating expenses for research and development?",
-  "What were Products and Services net sales in the quarter?",
-  "What were net sales by reportable segment?",
-  "How does the Board oversee privacy and data security?",
+  "What were Products and Services net sales for the three months ended in December?",
+  "What products does Apple's Company Background say it designs and markets?",
 ] as const;
 
 export type ExploreSampleAnswer = {

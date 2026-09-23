@@ -296,7 +296,7 @@ const EN: LandingV2Copy = {
     support: "Open a finished Compiled World and read the source behind every answer in it.",
     tabsLabel: "Questions answered from this Compiled World",
     answerLabel: "From the source",
-    sourceLabel: "Original filing",
+    sourceLabel: "Source page",
     /*
       Not §12's "Open source ↗". "Open source" reads first as the software licence, and this site
       already has one name for this act: /explore's Evidence pane says "Open the source region".
@@ -564,7 +564,7 @@ const KO: LandingV2Copy = {
     support: "완성된 Compiled World를 열어, 모든 답 뒤에 있는 원문을 직접 읽어 보세요.",
     tabsLabel: "이 Compiled World에서 답한 질문",
     answerLabel: "원문에서",
-    sourceLabel: "원문 공시 문서",
+    sourceLabel: "원문 페이지",
     openSource: "원문 영역 열기",
     note: "각 답은 검색기가 점수를 매긴 원문 그대로이며, 다시 쓴 문장이 아닙니다.",
   },
