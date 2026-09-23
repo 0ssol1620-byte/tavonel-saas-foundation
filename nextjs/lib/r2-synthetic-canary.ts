@@ -159,13 +159,17 @@ export async function deleteFoundationSourceObject(
   workspaceKey: string,
   key: string,
   now = new Date(),
-): Promise<{ ok: true; alreadyAbsent: boolean } | { ok: false; code: string }> {
+): Promise<{ ok: true; alreadyAbsent: boolean } | { ok: false; code: string; status?: number; providerCode?: string }> {
   const blocked = assertFoundationDeletionKey(env.bucket, workspaceKey, key);
   if (blocked) return { ok: false, code: blocked };
   const removed = await signedS3Response(env, "DELETE", key, undefined, now);
-  if (!removed) return { ok: false, code: "SOURCE_DELETE_FAILED" };
+  if (!removed) return { ok: false, code: "SOURCE_DELETE_FAILED", status: 0 };
   if (removed.status === 404) return { ok: true, alreadyAbsent: true };
-  if (removed.status !== 200 && removed.status !== 204) return { ok: false, code: "SOURCE_DELETE_FAILED" };
+  if (removed.status !== 200 && removed.status !== 204) {
+    const body = await removed.text().catch(() => "");
+    const providerCode = /<Code>([A-Za-z0-9]+)<\/Code>/.exec(body)?.[1];
+    return { ok: false, code: "SOURCE_DELETE_FAILED", status: removed.status, providerCode };
+  }
   return { ok: true, alreadyAbsent: false };
 }
 
