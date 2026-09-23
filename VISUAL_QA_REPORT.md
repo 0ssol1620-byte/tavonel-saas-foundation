@@ -402,3 +402,11 @@ The first exact-head Product QA run for this candidate passed 859 cases with 238
 The corrected film-test head passed Product QA, all three browser matrices, Lighthouse, Next.js, and the launch gate. Its separate DB rehearsal failed before SQL execution on three attempts because GHCR throttled pulls of the pinned Supabase Postgres image (`toomanyrequests`). An authenticated GHCR attempt failed the same way. The workflow now overrides the setup action's GHCR default with Docker Hub, where the exact `supabase/postgres:17.6.1.165` tag and digest were verified through the registry API. This is a CI infrastructure change; the alternate registry and migration rehearsal still require an exact-head run.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-24 — Korean first-visit proof labels
+
+The `/ko` first visit now uses Korean for the five compiler-stage controls, specimen explanations, source-address field names, and the source-region index. Source excerpts, filenames, locators, digests, measured values, and linked page images remain the committed evidence. The hero's accepted-format sentence now uses a Korean conjunction without changing the manifest-derived formats. Shared evidence controls keep their English default on other routes.
+
+The final local `pnpm build` passed the brand and type-floor guards, TypeScript, ESLint, **368 unit files / 5,239 tests**, and 145 generated pages. Focused landing and evidence Playwright passed **170 cases with 62 intentional skips** across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. Fresh production-server captures of `/` and `/ko` at all seven widths returned HTTP 200 with zero horizontal overflow; `/ko` was also captured with reduced motion. Local screenshots and measurements are ignored under `nextjs/test-results/ko-first-visit/`. The Korean 1440px and 360px first-view captures were inspected directly. Exact-head CI, deployed-preview review, and founder visual acceptance remain open.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
