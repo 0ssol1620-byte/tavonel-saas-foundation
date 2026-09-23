@@ -3,7 +3,6 @@ import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
 import Logomark from "@/components/logomark";
 import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
 import { PublicSiteHeader } from "@/components/public-site-chrome";
-import { primaryCallToAction } from "@/lib/commercial-state";
 
 type PolicyDocumentProps = {
   title: string;
@@ -86,7 +85,7 @@ export default function PolicyLayout(props: PolicyDocumentProps) {
       */}
       {/* BA-232 (nav-global CROSS-LANE 1): the header's action is resolved here now. The
           placeholder-then-replace client fallback that used to supply it is gone. */}
-      <PublicSiteHeader cta={primaryCallToAction()} />
+      <PublicSiteHeader />
       <main id="main" tabIndex={-1}>
         <PolicyDocument {...props} />
       </main>

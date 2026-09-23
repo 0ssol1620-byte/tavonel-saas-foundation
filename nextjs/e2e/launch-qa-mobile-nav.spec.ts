@@ -1,8 +1,8 @@
 /**
  * The customer mobile menu, exercised in Chromium, Firefox and WebKit.
  *
- * The public header exposes five customer choices: Product, How it works, Resources, Docs and
- * Pricing (Landing V2, 2026-09-19 -- it was three until then). Trust, legal and the remaining
+ * The public header exposes four section choices: Product, How it works, Resources and Docs.
+ * Pricing is the one emphasized header action. Trust, legal and the remaining
  * technical destinations stay in the footer/docs instead of becoming nested disclosures in the
  * phone menu. These tests keep the parts
  * only a browser can prove: viewport containment, 44px targets, keyboard escape/focus behaviour,
@@ -22,7 +22,6 @@ const CUSTOMER_LINKS = [
   { label: "How it works", href: "/knowledge-compiler" },
   { label: "Resources", href: "/resources" },
   { label: "Docs", href: "/docs" },
-  { label: "Pricing", href: "/pricing" },
 ] as const;
 
 async function openMenu(page: Page) {
@@ -91,15 +90,15 @@ test("Escape closes the menu and returns focus to the control that opened it", a
 test("following a customer link closes the menu", async ({ page }) => {
   await page.goto("/");
   const { panel } = await openMenu(page);
-  const pricing = panel.getByRole("link", { name: "Pricing", exact: true });
+  const docs = panel.getByRole("link", { name: "Docs", exact: true });
   // The destination is separately direct-entry tested by the launch route suite. Abort this one
   // navigation so the assertion measures the interaction contract itself: the disclosure closes
   // synchronously on activation, before the destination network request can complete or fail.
-  await page.route("**/pricing", route => route.abort());
+  await page.route("**/docs", route => route.abort());
   // Windows WebKit's headless compositor can stall while Playwright performs a forced pointer
   // click on a native <details> descendant. dispatchEvent still sends the real DOM click that
   // React handles here, but removes the unrelated compositor/actionability bridge from this test.
-  await pricing.dispatchEvent("click");
+  await docs.dispatchEvent("click");
   await expect(panel).toBeHidden();
 });
 

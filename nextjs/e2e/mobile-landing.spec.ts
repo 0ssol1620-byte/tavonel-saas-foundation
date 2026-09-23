@@ -74,8 +74,8 @@ test("the mobile menu exposes the five customer choices plus Sign in, and the ac
   const panel = menu.locator(":scope > nav");
   await expect(panel).toBeVisible();
   const direct = panel.locator("a.mobile-nav-direct");
-  await expect(direct).toHaveCount(5);
-  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
+  await expect(direct).toHaveCount(4);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs"]);
   // BQ-059: the header keeps the action at every width; the sheet is the sections.
   await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
   await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
@@ -112,7 +112,7 @@ test("Resources owns the hub routes and using a mobile customer link closes the 
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
   await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "page");
-  await menu.getByRole("link", { name: "Pricing", exact: true }).click({ noWaitAfter: true });
+  await page.locator('header.nav .nav-actions a[href="/pricing"]').click({ noWaitAfter: true });
   await expect(menu.locator(":scope > nav")).toBeHidden();
 
   await page.goto("/sources");

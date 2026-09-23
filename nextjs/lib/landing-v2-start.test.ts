@@ -2,11 +2,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import StartScene, { type StartActions } from "../components/landing-v2/scenes/start";
-import { activationPolicy } from "./activation-policy";
-import { primaryCallToAction } from "./commercial-state";
 import { landingV2Copy, type LandingV2Locale } from "./landing-v2-copy";
 import { LANDING_V2_FORBIDDEN } from "./landing-v2-copy.test";
-import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { EXPLORE_CTA } from "./site-navigation";
 
 /*
   The guard over Scene 09 (§19, D5, D6).
@@ -28,13 +26,10 @@ const LOCALES: LandingV2Locale[] = ["en", "ko"];
 
 /** The props `landing-page.tsx` already builds for the hero, in the language under test. */
 function actionsFor(locale: LandingV2Locale): StartActions {
-  const access = primaryCallToAction();
   const korean = locale === "ko";
   return {
     exploreLabel: korean ? "공개 Compiled World 열기" : EXPLORE_CTA.label,
     exploreHref: EXPLORE_CTA.href,
-    accessLabel: korean ? KO_CHROME.cta[access.href] ?? access.label : access.label,
-    accessHref: access.href,
   };
 }
 
@@ -58,15 +53,13 @@ describe("landing scene 09 -- start", () => {
 
   it.each(LOCALES)("%s offers one next action, the commercial one, as the filled control", (locale) => {
     const html = render(locale);
-    const access = primaryCallToAction();
     expect(html.match(/data-scene-next="start"/g)).toHaveLength(1);
     // The marked action, the filled button and the destination are one element. Matched on the
     // whole tag rather than on an attribute order no renderer promises.
     const tag = html.match(/<a[^>]*data-scene-next="start"[^>]*>/)?.[0] ?? "";
-    expect(tag).toContain(`href="${access.href}"`);
+    expect(tag).toContain('href="/pricing"');
     expect(tag).toContain('class="btn lv2-cta');
-    expect([ACCESS_CTA.href, SELF_SERVE_CTA.href]).toContain(access.href);
-    expect(text(html)).toContain(actionsFor(locale).accessLabel);
+    expect(text(html)).toContain(locale === "ko" ? "요금 보기" : "See pricing");
   });
 
   it.each(LOCALES)("%s names Explore from the constant and never by a retired name", (locale) => {
@@ -80,16 +73,13 @@ describe("landing scene 09 -- start", () => {
   it.each(LOCALES)("%s carries the price line and links only to routes this site publishes", (locale) => {
     const html = render(locale);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    expect(hrefs).toEqual([primaryCallToAction().href, EXPLORE_CTA.href, "/pricing"]);
+    expect(hrefs).toEqual(["/pricing", EXPLORE_CTA.href]);
   });
 
-  it.each(LOCALES)("%s states the deployment gate verbatim, and marks it", (locale) => {
+  it.each(LOCALES)("%s keeps deployment detail on Pricing rather than in the closing scene", (locale) => {
     const html = render(locale);
-    // Rule 5: the gate is `activationPolicy.customerData.reason`, never a second spelling of it.
-    expect(activationPolicy.customerData.enabled).toBe(false);
-    expect(html).toContain('data-customer-data="arranged"');
-    const gate = locale === "ko" ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason;
-    expect(text(html)).toContain(gate);
+    expect(html).not.toContain('data-customer-data="arranged"');
+    expect(html).toContain('href="/pricing"');
   });
 
   it.each(LOCALES)("%s prints no figure, because this scene measured nothing", (locale) => {

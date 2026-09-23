@@ -158,7 +158,7 @@ describe("design token contract", () => {
     expect(PIPELINE_STAGES.every((stage) => stage.ko.length > 0)).toBe(true);
     // D5 / blueprint §0: the founder's new headline, approved through the 2026-09-19 Landing V2
     // design master blueprint. `lib/site-navigation.ts` carries the decision beside the constant.
-    expect(BRAND_LINE.headline).toBe("AI-ready knowledge. Traceable to every source.");
+    expect(BRAND_LINE.headline).toBe("Your documents. Knowledge you can verify.");
     expect(BRAND_LINE.descriptor).toBe("Knowledge compiled with a traceable path back to every source.");
   });
 

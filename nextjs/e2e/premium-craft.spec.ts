@@ -108,16 +108,16 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     return { width: r.width, height: r.height, inside: hit === e || e.contains(hit) };
   }));
   /*
-    Six, not three, and still not the commercial action. BQ-059 stopped drawing the header's
+    Five, not three, and still not the commercial action. BQ-059 stopped drawing the header's
     action a second time inside the sheet, forty pixels below the first copy of it --
     `e2e/mobile-landing.spec.ts` and `e2e/production-hardening.spec.ts` both assert
     `a.mobile-nav-cta` is gone, and both still do. What changed is the bar: Landing V2's §8
-    navigation is five destinations rather than three (contract D2), and the sheet carries a
-    Sign-in row of its own because the header hides that link below the desktop switch. So the
-    rows a thumb lands on are five links plus Sign in. What this test measures is unchanged:
+    navigation is four section destinations after Pricing moved to the persistent header action,
+    and the sheet carries a Sign-in row because the header hides it below the desktop switch.
+    The rows a thumb lands on are four sections plus Sign in. What this test measures is unchanged:
     every one of them is a real target, and the point at its centre belongs to the row.
   */
-  expect(targets.length).toBe(6);
+  expect(targets.length).toBe(5);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);

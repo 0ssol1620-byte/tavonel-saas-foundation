@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { preload } from "react-dom";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
-import { HERO_PROOF_IMAGE } from "@/components/landing-v2/hero-proof";
 import LandingPage from "@/components/landing-v2/landing-page";
 import DocumentLangKo from "./document-lang";
 import {
@@ -66,17 +64,6 @@ export default async function KoreanEntryPage({
     cookie: (await cookies()).get(LANDING_VARIANT_COOKIE)?.value,
     query: Array.isArray(query) ? query[0] : query,
   });
-  /*
-    The one image above the fold, preloaded.
-
-    This named the film poster while the film was the hero. Gap #1 moved the film into Scene 02,
-    so the poster is now below the fold and the hero's own raster -- the sample World page the
-    Evidence Inspector draws its regions on -- is what the first paint is waiting for. Preloading
-    a below-fold video poster at high priority while the LCP element waits is the regression this
-    line exists to avoid, not one to keep. `HERO_PROOF_IMAGE` is null only when the sample World
-    publishes no render for its chosen page, in which case there is no raster to preload.
-  */
-  if (HERO_PROOF_IMAGE) preload(HERO_PROOF_IMAGE, { as: "image", fetchPriority: "high" });
   return (
     <>
       <LandingPage korean experiment={experiment}>

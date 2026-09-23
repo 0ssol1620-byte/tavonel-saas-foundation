@@ -125,7 +125,7 @@ export default function EnterprisePage() {
                 Review the maintained public record in the <Link href={"/trust" as Route}>Trust Center</Link> and{" "}
                 <Link href={"/security" as Route}>Security</Link>. Deployment-specific architecture,
                 control evidence and questionnaire responses are provided during a qualified review.
-                The <a href="/policy/TAVONEL_DPA_v1_2026-09-11.md">data processing agreement</a> is
+                The <a href="/policy/TAVONEL_DPA_v2_2026-09-23.md">data processing agreement</a> is
                 available as a draft for review and is not presented as a signed agreement.
               </p>
 

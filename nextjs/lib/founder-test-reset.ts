@@ -85,7 +85,7 @@ export async function prepareFounderTestReset(user: { id: string; email?: string
   if (!listed.ok) throw new Error(listed.code);
   const manifest: ResetManifest = { schemaVersion: "tavonel.founder_test_reset_manifest.v1",
     workspaceKey, prefixes, r2Keys: listed.keys, ...db };
-  return { manifest, manifestDigest: manifestDigest(manifest) };
+  return { resetId: manifest.resetId, manifest, manifestDigest: manifestDigest(manifest) };
 }
 
 export async function executeFounderTestReset(

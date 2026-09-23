@@ -238,13 +238,7 @@
 .lv2-proof-note { margin: 8px 0 0; color: var(--text-mid); }
 .lv2 .btn.lv2-cta { min-height: 48px; padding-inline: 22px; }
 .lv2-paper .btn { color: var(--paper-50); }
-.lv2-hero { padding-block: 88px 40px; }
-@media (min-width: 768px) {
-  .lv2-hero { padding-block: 96px 48px; }
-}
-@media (min-width: 1200px) {
-  .lv2-hero { padding-block: 96px 48px; }
-}
+.lv2-hero { padding-block: clamp(32px, 4vw, 64px) 48px; }
 .lv2-hero-text {
   max-width: 1080px;
   margin-inline: auto;
@@ -272,6 +266,12 @@
   max-width: 780px;
   color: var(--text-mid);
 }
+.lv2-how-head {
+  max-width: 780px;
+  margin: 26px auto 0;
+  text-align: center;
+}
+.lv2-hero [data-compiler-specimen] { margin-top: 16px; }
 .lv2-actions {
   display: flex;
   flex-wrap: wrap;
@@ -472,6 +472,7 @@
   .lv2-film { --lv2-film-w: 1280px; }
 }
 @media (max-width: 767px) {
+  .lv2-hero { padding-top: 76px; }
   .lv2-scene-support { margin-top: 16px; }
   .lv2-film { margin-top: 28px; }
   .lv2-hero-support { font-size: 18px; line-height: 1.55; }
@@ -510,6 +511,11 @@
   gap: 28px;
   /* The hero text is centred; the panel is reading matter and is not. */
   text-align: left;
+}
+@media (min-width: 900px) and (max-width: 1599px) {
+  .lv2-scene[data-scene="2"] { padding-block: 48px; }
+  .lv2-scene[data-scene="2"] .lv2-hero-proof { margin-top: 24px; }
+  .lv2-scene[data-scene="2"] .lv2-film { margin-top: 24px; --lv2-film-w: 960px; }
 }
 @media (min-width: 900px) {
   .lv2-hero-proof { margin-top: 48px; }

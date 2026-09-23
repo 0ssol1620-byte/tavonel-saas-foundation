@@ -136,8 +136,8 @@ describe("/trust indexes the six published surfaces", () => {
     and the provenance has to remain findable in the source.
   */
   it("links the DPA with its draft label in the same tile", () => {
-    expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v1_2026-09-11.md"');
-    expect(page).toContain("Draft v1 (2026-09-11)");
+    expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md"');
+    expect(page).toContain("Draft v2 (2026-09-23)");
     expect(page).toContain("under review");
     expect(page).toContain("not a signed agreement");
     expect(page, "no copy here may present a delegated decision as the founder's own").not.toMatch(
@@ -174,9 +174,9 @@ describe("/trust indexes the six published surfaces", () => {
   });
 
   it("serves a DPA whose commitments match the ones the page advertises", () => {
-    const document = read("public/policy/TAVONEL_DPA_v1_2026-09-11.md");
+    const document = read("public/policy/TAVONEL_DPA_v2_2026-09-23.md");
     expect(document).toContain(
-      "**Draft v1 (2026-09-11) — under review; not a signed agreement.**",
+      "**Draft v2 (2026-09-23) — under review; not a signed agreement.**",
     );
     /*
       BA-147. The served document is a public artefact and the rule now applies to all of it,
@@ -599,7 +599,7 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
     expect(page).toContain("applicable legal hold or retention duty");
     expect(page).toContain("provider-backup lifecycle");
     expect(page).not.toContain("deletion request is completed within 30 days");
-    expect(read("public/policy/TAVONEL_DPA_v1_2026-09-11.md"))
+    expect(read("public/policy/TAVONEL_DPA_v2_2026-09-23.md"))
       .not.toContain("completed within 30 days of the verified request");
     expect(page, "the part with no number still says it has none").toContain("we publish no day count for it");
     expect(page).toContain("have no published retention period");

@@ -85,8 +85,8 @@ const TASKS = [
   },
 ] as const;
 
-/** The five the header publishes, in the order `CUSTOMER_NAV` declares them. */
-const CUSTOMER_HREFS = ["/product", "/knowledge-compiler", "/resources", "/docs", "/pricing"] as const;
+/** The four section links; Pricing has its own emphasized header control. */
+const CUSTOMER_HREFS = ["/product", "/knowledge-compiler", "/resources", "/docs"] as const;
 
 const BAR = 'header.nav nav[aria-label="Sections"]';
 const SHEET = "header.nav details.mobile-primary-nav";
@@ -120,7 +120,11 @@ const followTrail = async (page: Page, trail: readonly string[]) => {
   }
 };
 
-const openPhoneMenu = (page: Page) => page.locator(`${SHEET} > summary`).click();
+const openPhoneMenu = async (page: Page) => {
+  // Escape is React-enhanced; wait for hydration before testing its listener.
+  await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
+  await page.locator(`${SHEET} > summary`).click();
+};
 const hrefsOf = (locator: ReturnType<Page["locator"]>) =>
   locator.evaluateAll((elements) => elements.map((element) => element.getAttribute("href")));
 
@@ -133,13 +137,14 @@ const DESKTOP: Scenario[] = [
     run: (page: Page) => followTrail(page, task.trail),
   })),
   {
-    name: "the bar publishes the five customer destinations and nothing else",
+    name: "the bar publishes the four sections and the header offers Pricing",
     width: 1440,
     run: async (page) => {
       await page.goto("/");
       const links = page.locator(`${BAR} a.site-nav-direct`);
       await expect(links).toHaveCount(CUSTOMER_HREFS.length);
       expect(await hrefsOf(links)).toEqual([...CUSTOMER_HREFS]);
+      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
     },
   },
   {
@@ -148,9 +153,9 @@ const DESKTOP: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       // Pricing is a destination, not a disclosure: the page owns the answer.
-      await activateLink(page, page.locator(`${BAR} a[href="/pricing"]`));
+      await activateLink(page, page.locator('header.nav .nav-actions a[href="/pricing"]'));
       await expect(page).toHaveURL(/\/pricing$/);
-      await expect(page.locator(`${BAR} a[href="/pricing"]`)).toHaveAttribute("aria-current", "page");
+      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
     },
   },
   {
@@ -205,7 +210,7 @@ const DESKTOP: Scenario[] = [
 
 const PHONE: Scenario[] = [
   {
-    name: "the phone sheet offers the same five destinations as the bar, flat",
+    name: "the phone sheet offers the same four sections as the bar, flat",
     width: 390,
     touch: true,
     run: async (page) => {
@@ -228,7 +233,7 @@ const PHONE: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      await activateLink(page, page.locator(`${SHEET} > nav a[href="/pricing"]`));
+      await activateLink(page, page.locator('header.nav .nav-actions a[href="/pricing"]'));
       await expect(page).toHaveURL(/\/pricing$/);
     },
   },

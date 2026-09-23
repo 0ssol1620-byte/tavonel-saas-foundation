@@ -52,8 +52,8 @@ export const PUBLIC_TRUST_DISCLOSURES = [
     id: "dpa",
     subject: "Data processing agreement",
     status: "published",
-    line: "A draft v1 data processing agreement is published for review and is clearly labelled as a draft, not a signed agreement.",
-    href: "/policy/TAVONEL_DPA_v1_2026-09-11.md",
+    line: "A draft v2 data processing agreement is published for review and is clearly labelled as a draft, not a signed agreement.",
+    href: "/policy/TAVONEL_DPA_v2_2026-09-23.md",
   },
   {
     id: "responsible_disclosure",

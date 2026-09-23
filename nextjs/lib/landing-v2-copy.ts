@@ -245,7 +245,7 @@ const EN: LandingV2Copy = {
       files you already have" is the same invitation with nothing promised that is not built.
     */
     support:
-      "Bring the files you already have. TAVONEL compiles them into structured, versioned knowledge your AI can use — and you can verify.",
+      "Turn supported files and connected sources into structured, versioned knowledge. Follow a result back to its source, then use it with your AI.",
     microProofFormats: ACCEPTED_FORMATS,
     microProofConnected: "connected sources",
     regionLabelFormat: "SOURCE · {form} · p.{page} · {coordinates}",
@@ -516,8 +516,8 @@ const EN: LandingV2Copy = {
     id: "start",
     eyebrow: "CHOOSE THE NEXT STEP",
     headline: "Inspect the public result.",
-    headlineAccent: "Bring your sources when it fits.",
-    support: "Read a finished Compiled World first. Bring your own sources when you are ready.",
+    headlineAccent: "See the plan that fits.",
+    support: "Read the finished Compiled World, then check the plan and current access conditions that fit your sources.",
     /* D5: the gate sentence is the deployment's own, verbatim, not a paraphrase of it. */
     microtext: activationPolicy.customerData.reason,
   },
@@ -530,14 +530,14 @@ const KO: LandingV2Copy = {
     id: "hero",
     eyebrow: "얻게 되는 결과",
     /* A literal translation of `BRAND_LINE.headline`, not a second claim. */
-    headline: "AI가 바로 사용할 수 있는 지식. 모든 원문까지 추적됩니다.",
+    headline: "흩어진 문서를, AI가 활용할 수 있는 지식으로.",
     /* D12: the literal translation of each arm. The subject is dropped, as the deck does. */
     headlineExperiment: {
       b: "지식을 컴파일하세요.",
       c: "AI가 신뢰할 수 있는 지식, 원문까지 추적됩니다.",
     },
     support:
-      "이미 가지고 있는 파일을 가져오세요. TAVONEL은 그것을 AI가 사용할 수 있고, 직접 검증할 수 있는 구조화된 버전 관리 지식으로 컴파일합니다.",
+      "지원되는 파일과 연결 소스를 구조화하고 버전을 기록합니다. 결과에서 원문으로 돌아가 확인한 뒤, 쓰던 AI에서 활용하세요.",
     microProofFormats: ACCEPTED_FORMATS,
     microProofConnected: "연결 소스",
     /* 원문 is KO_TERMS' spelling of "source"; 쪽 is the page counter the filing metadata uses. */
@@ -689,8 +689,8 @@ const KO: LandingV2Copy = {
     id: "start",
     eyebrow: "다음 단계 선택하기",
     headline: "공개 결과를 살펴보세요.",
-    headlineAccent: "맞는다면 직접 가진 원문을 가져오세요.",
-    support: "먼저 완성된 Compiled World를 읽어 보세요. 준비되면 직접 가진 원문을 가져오시면 됩니다.",
+    headlineAccent: "맞는 요금제를 확인하세요.",
+    support: "완성된 Compiled World를 읽어 본 뒤, 내 자료에 맞는 요금과 현재 이용 조건을 확인하세요.",
     /*
       The English microtext is `activationPolicy.customerData.reason` verbatim; this is its one
       Korean translation, and it lives in `KO_CHROME` because the footer states the same sentence

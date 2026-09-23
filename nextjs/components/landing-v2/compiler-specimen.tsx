@@ -97,7 +97,8 @@ function SourceSheet({ index }: { index: number }) {
           alt="Exact operating expenses table region from the same filing page"
           width="1120"
           height="103"
-          loading="lazy"
+          loading="eager"
+          fetchPriority="high"
           decoding="async"
         />
       </picture>
@@ -188,8 +189,9 @@ export default function CompilerSpecimen({
   korean?: boolean;
 }) {
   const copy = COPY[korean ? "ko" : "en"];
-  const [index, setIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  // Show the source-linked result on first paint. Playback begins only on request.
+  const [index, setIndex] = useState(2);
+  const [playing, setPlaying] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [inView, setInView] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
@@ -275,12 +277,13 @@ export default function CompilerSpecimen({
   };
 
   const toggle = () => {
-    if (ended) {
-      setIndex(0);
-      setPlaying(true);
-    } else {
-      setPlaying(value => !value);
+    if (reducedMotion) return;
+    if (playing) {
+      setPlaying(false);
+      return;
     }
+    setIndex(0);
+    setPlaying(true);
   };
 
   const active = COMPILER_SPECIMEN_STAGES[index];
@@ -326,6 +329,7 @@ export default function CompilerSpecimen({
           type="button"
           onClick={toggle}
           aria-pressed={playing}
+          disabled={reducedMotion}
         >
           {ended ? copy.replay : playing ? copy.pause : copy.play}
         </button>

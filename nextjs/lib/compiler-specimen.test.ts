@@ -159,7 +159,7 @@ describe("homepage compiler specimen", () => {
     }
     expect(component).not.toMatch(/aria-live|role=["']status/);
     expect(css).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?\.stage\s*\{[\s\S]*?min-height:\s*44px/
+      /@media \(max-width: 767px\)[\s\S]*?\.stage\s*\{[\s\S]*?min-height:\s*48px/
     );
     expect(css).toMatch(/\.specimen\s*\{[\s\S]*?min-width:\s*0/);
     expect(css).toMatch(/\.addressGrid b\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);

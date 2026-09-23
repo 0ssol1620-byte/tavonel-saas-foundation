@@ -17,7 +17,7 @@ import {
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
 import { activationPolicy } from "@/lib/activation-policy";
-import { ACCESS_CTA, type SiteLink } from "@/lib/site-navigation";
+import { ACCESS_CTA } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import {
@@ -626,17 +626,11 @@ const pricingJsonLd = (purchaseReady: boolean) => ({
 export default function PricingPageClient({
   initialLiveCheckout,
   initialSelfService,
-  cta,
   gates,
   planCapabilities,
 }: {
   initialLiveCheckout: boolean;
   initialSelfService: boolean;
-  /**
-   * G1-010 / G2-026: the header action, resolved on the server by `primaryCallToAction()` so this
-   * page shows the same primary CTA as every other public page while `customerData` is closed.
-   */
-  cta: SiteLink;
   /** Read on the server from `lib/activation-policy`, the object /api/status serves verbatim. */
   gates: readonly PurchaseGate[];
   planCapabilities: readonly PlanCapabilityRow[];
@@ -783,7 +777,7 @@ export default function PricingPageClient({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout)) }}
       />
-      <PublicSiteHeader cta={cta} />
+      <PublicSiteHeader />
       <main id="main">
         <section className="scene doc">
           <div className="shell">
