@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   CHANGELOG_SURFACES,
+  changelogEntryId,
   changelogEntries,
   changelogSections,
   type ChangelogSurface,
@@ -42,12 +43,13 @@ export function ChangelogList() {
         {entries.map((entry) => (
           <article
             className="policy-section changelog-entry"
-            key={entry.date}
-            id={entry.date}
+            key={changelogEntryId(entry)}
+            id={changelogEntryId(entry)}
             hidden={surface !== null && !entry.surfaces.includes(surface)}
           >
             {/*
-              BQ-136. The date is the permalink, and the surface chips are gone.
+              BQ-136. The date is the visible permalink label, and the surface chips are gone.
+              Corrected release dates retain their old fragment IDs so published links resolve.
 
               The link to an entry was a bare "#" pushed to the right-hand end of the row: a
               one-character target with an aria-label doing all the work, which a screen
@@ -60,7 +62,7 @@ export function ChangelogList() {
               /resources: the control encodes it, so the card does not repeat it.
             */}
             <header>
-              <a href={`#${entry.date}`}>
+              <a href={`#${changelogEntryId(entry)}`} aria-label={`${entry.date} — ${entry.title}`}>
                 <time dateTime={entry.date}>
                   {new Date(`${entry.date}T00:00:00Z`).toLocaleDateString("en-GB", {
                     day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
@@ -70,11 +72,10 @@ export function ChangelogList() {
               {/*
                 BA-117, taking the audit's own alternative rather than its first choice.
 
-                It asks for a version chip on every entry or none, because one of three reads
-                as accidental versioning. Neither is available honestly: two of the three
-                changes were not releases and carry no version, so putting a number on them
-                would invent one, and deleting 2026.9.3.1 would remove a real fact the
-                migration note beside it tells the reader to pin. So the chip says what it is.
+                A website release does not necessarily carry a product version. Adding a version
+                to every entry would invent one; deleting 2026.9.3.1 would remove the real
+                version the MCP migration note tells readers to pin. The chip names only releases
+                that carry a version.
               */}
               {entry.version ? <b>Release {entry.version}</b> : null}
             </header>
