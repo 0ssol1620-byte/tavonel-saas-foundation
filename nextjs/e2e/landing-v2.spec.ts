@@ -37,6 +37,23 @@ async function selectedStage(page: Page): Promise<number> {
 }
 
 test.describe("six-beat page structure", () => {
+  test("Korean close leads to a Korean inquiry, with pricing clearly marked as English", async ({ page }) => {
+    await page.goto("/ko");
+    const close = page.locator("#s6");
+    await expect(close.locator('[data-scene-next="start"]')).toHaveAttribute("href", "/ko/contact");
+    await expect(close.getByRole("link", { name: "요금 보기 (영문)" })).toHaveAttribute("hreflang", "en");
+    await close.locator('[data-scene-next="start"]').click();
+    await expect(page).toHaveURL(/\/ko\/contact$/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("도입을 함께 검토합니다");
+    await expect(page.getByRole("button", { name: "문의 보내기" })).toBeVisible();
+    await expect(page.locator('input[name="name"]')).toHaveAttribute("required", "");
+    await expect(page.getByRole("contentinfo").getByRole("link", { name: "English" })).toHaveAttribute("href", "/contact");
+    if ((page.viewportSize()?.width ?? 1440) <= 390) {
+      const formTop = await page.locator("form").evaluate((form) => form.getBoundingClientRect().top);
+      expect(formTop, "the mobile inquiry form should begin in the first viewport").toBeLessThan(844);
+    }
+  });
+
   for (const path of ["/", "/ko"]) {
     test(`${path} offers the next action before the How it compiles explanation`, async ({ page }) => {
       await page.goto(path);

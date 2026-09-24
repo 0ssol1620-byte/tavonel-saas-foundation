@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import StartScene, { type StartActions } from "../components/landing-v2/scenes/start";
 import { landingV2Copy, type LandingV2Locale } from "./landing-v2-copy";
 import { LANDING_V2_FORBIDDEN } from "./landing-v2-copy.test";
-import { EXPLORE_CTA } from "./site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME } from "./site-navigation";
 
 /*
   The guard over Scene 09 (§19, D5, D6).
@@ -30,6 +30,8 @@ function actionsFor(locale: LandingV2Locale): StartActions {
   return {
     exploreLabel: korean ? "공개 Compiled World 열기" : EXPLORE_CTA.label,
     exploreHref: EXPLORE_CTA.href,
+    accessHref: korean ? "/ko/contact" : ACCESS_CTA.href,
+    accessLabel: korean ? KO_CHROME.cta[ACCESS_CTA.href] : ACCESS_CTA.label,
   };
 }
 
@@ -57,15 +59,15 @@ describe("landing scene 09 -- start", () => {
     // The marked action, the filled button and the destination are one element. Matched on the
     // whole tag rather than on an attribute order no renderer promises.
     const tag = html.match(/<a[^>]*data-scene-next="start"[^>]*>/)?.[0] ?? "";
-    expect(tag).toContain('href="/pricing"');
+    expect(tag).toContain(`href="${locale === "ko" ? "/ko/contact" : "/pricing"}"`);
     expect(tag).toContain('class="btn lv2-cta');
-    expect(text(html)).toContain(locale === "ko" ? "요금 보기" : "See pricing");
+    expect(text(html)).toContain(locale === "ko" ? "이용 문의" : "See pricing");
   });
 
   it.each(LOCALES)("%s names Explore from the constant and never by a retired name", (locale) => {
     const html = render(locale);
-    expect(html).toContain(`href="${EXPLORE_CTA.href}"`);
-    expect(text(html)).toContain(actionsFor(locale).exploreLabel);
+    expect(html).toContain(`href="${locale === "ko" ? "/pricing" : EXPLORE_CTA.href}"`);
+    expect(text(html)).toContain(locale === "ko" ? "요금 보기 (영문)" : actionsFor(locale).exploreLabel);
     // §19 types "Explore the public World". It is a RETIRED_NAME; the constant is the one spelling.
     expect(text(html)).not.toContain("Explore the public World");
   });
@@ -73,7 +75,7 @@ describe("landing scene 09 -- start", () => {
   it.each(LOCALES)("%s carries the price line and links only to routes this site publishes", (locale) => {
     const html = render(locale);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/pricing", EXPLORE_CTA.href]);
+    expect(hrefs).toEqual(locale === "ko" ? ["/ko/contact", "/pricing"] : ["/pricing", EXPLORE_CTA.href]);
   });
 
   it.each(LOCALES)("%s keeps deployment detail on Pricing rather than in the closing scene", (locale) => {

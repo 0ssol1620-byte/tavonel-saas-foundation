@@ -21,6 +21,8 @@ import {
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { KO_CHROME } from "@/lib/site-navigation";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import {
   landingVariantState,
   type LandingVariantState,
@@ -96,6 +98,12 @@ export default function LandingPage({
     exploreLabel: korean ? KO_EXPLORE_LABEL : EXPLORE_CTA.label,
     exploreHref: EXPLORE_CTA.href,
   };
+  const access = primaryCallToAction();
+  const startActions = {
+    ...heroActions,
+    accessHref: korean && access.href === "/contact" ? "/ko/contact" : access.href,
+    accessLabel: korean ? KO_CHROME.cta[access.href] : access.label,
+  };
   const specimenCopy = korean
     ? { eyebrow: "작동 방식", title: "한 원문이 지식이 되는 다섯 단계" }
     : { eyebrow: "How it compiles", title: "One source. Five transformations." };
@@ -140,7 +148,8 @@ export default function LandingPage({
             <HeroActions
               exploreLabel={heroActions.exploreLabel}
               exploreHref={heroActions.exploreHref}
-              pricingLabel={korean ? "요금 보기" : "View pricing"}
+              pricingLabel={korean ? "요금 보기 (영문)" : "View pricing"}
+              pricingHrefLang={korean ? "en" : undefined}
               scene="1"
               ctaOrderVariant={experiment.ctaOrderVariant}
             />
@@ -186,7 +195,7 @@ export default function LandingPage({
           sceneIndex={4}
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
-        <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
+        <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />
     </div>

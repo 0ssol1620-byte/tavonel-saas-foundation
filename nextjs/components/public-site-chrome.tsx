@@ -73,7 +73,7 @@ export function PublicSiteHeader({
       <DesktopPrimaryNav korean={korean} />
       <MobilePrimaryNav korean={korean} signedIn={signedIn} />
       <span className="nav-actions">
-        <Link className="btn small" href="/pricing">{pricingLabel}</Link>
+        <Link className="btn small" href="/pricing" hrefLang={korean ? "en" : undefined}>{pricingLabel}</Link>
         {/*
           Below the desktop switch this link is in the phone sheet instead, where it gets a 44px
           row of its own. At 360px the row was wordmark + toggle + a 109px filled button + Sign in
@@ -105,7 +105,7 @@ export function PublicSiteHeader({
  * `.nav > nav` child selectors two sheets rely on), which is what puts the wordmark on the same
  * left edge as the content below it.
  */
-export function PublicSiteFooter({ korean = false, onePath = false }: { korean?: boolean; onePath?: boolean } = {}) {
+export function PublicSiteFooter({ korean = false, onePath = false, languageHref }: { korean?: boolean; onePath?: boolean; languageHref?: string } = {}) {
   /* chrome-06: the switch points at the language the reader is not reading. */
   const language = korean ? FOOTER_LEGAL_ROW.languageBack : FOOTER_LEGAL_ROW.language;
   return (
@@ -120,7 +120,7 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
               <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
               {/* T1-014: the footer is always below the fold; prefetching every group wasted ~185KB on a cold home load. */}
               {group.links.map((link) => (
-                <Link key={link.href} href={link.href as Route} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
+                <Link key={link.href} href={(korean && link.href === "/contact" ? "/ko/contact" : link.href) as Route} hrefLang={korean && link.href !== "/contact" ? "en" : undefined} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
               ))}
             </nav>
           ))}
@@ -176,7 +176,7 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
             {"· "}
             {/* T1-014 again (ROUND3-P2): the one footer link that was missing the flag, so /ko
                 fired an RSC prefetch for `/` that the browser then aborted. */}
-            <Link href={language.href as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"} prefetch={false}>{language.label}</Link>
+            <Link href={(languageHref ?? language.href) as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"} prefetch={false}>{language.label}</Link>
           </span>{" "}
           <span className="site-footer-legal-pair">
             {"· "}
@@ -192,7 +192,7 @@ export function PublicSiteFooter({ korean = false, onePath = false }: { korean?:
   );
 }
 
-export function PublicSitePage({ children, korean = false }: { children: React.ReactNode; korean?: boolean }) {
+export function PublicSitePage({ children, korean = false, languageHref }: { children: React.ReactNode; korean?: boolean; languageHref?: string }) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -206,7 +206,7 @@ export function PublicSitePage({ children, korean = false }: { children: React.R
     <div className="page public-page" lang={korean ? "ko" : undefined}>
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1}>{children}</main>
-      <PublicSiteFooter korean={korean} />
+      <PublicSiteFooter korean={korean} languageHref={languageHref} />
     </div>
   );
 }

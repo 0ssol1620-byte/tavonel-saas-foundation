@@ -49,7 +49,7 @@ import { DOCS_SECTIONS } from "@/lib/docs-content";
   keeps it, because a reading map is not a request to index and `lib/seo-surface.test.ts` allows
   an llms-only URL exactly where the page declares itself noindex.
 */
-const ROUTES = ["", "/api", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
+const ROUTES = ["", "/api", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/ko", "/ko/contact", "/pricing", "/privacy", "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding", "/refunds", "/research", "/research/notes", "/resources", "/security", "/solutions", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence", "/solutions/knowledge-graph", "/solutions/source-grounded-assistants", "/solutions/knowledge-operations", "/sources", "/status", "/subprocessors", "/terms", "/trust"];
 /*
   The documentation sections come from the documentation rather than being listed again here.
 

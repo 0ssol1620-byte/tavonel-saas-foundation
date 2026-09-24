@@ -26,6 +26,7 @@ type Contact = {
   message: string;
   website: string;
   startedAt: number;
+  locale: "en" | "ko";
   /* Closed-list answers only, validated against the same lists the form renders. */
   qualification: Record<string, string[]>;
 };
@@ -124,13 +125,13 @@ export async function POST(request: Request) {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "Idempotency-Key": contactId(contact.email, contact.message),
+      "Idempotency-Key": contactId(contact.email, contact.message, contact.locale),
     },
     body: JSON.stringify({
       from,
       to: [to],
       reply_to: contact.email,
-      subject: `[TAVONEL inquiry] ${TOPICS[contact.topic]} - ${contact.name}`,
+      subject: `[TAVONEL inquiry]${contact.locale === "ko" ? " [KO]" : ""} ${TOPICS[contact.topic]} - ${contact.name}`,
       text: plainText(contact),
       html: htmlBody(contact),
     }),
@@ -150,6 +151,7 @@ function parseContact(raw: unknown): Contact | null {
   const topic = text(value.topic);
   const message = text(value.message);
   const website = text(value.website);
+  const locale = value.locale === "ko" ? "ko" : "en";
   const startedAt = value.startedAt;
   /*
     A submission carrying an option this form never offered is not an unusual visitor. It is
@@ -169,7 +171,7 @@ function parseContact(raw: unknown): Contact | null {
     typeof startedAt !== "number" || !Number.isInteger(startedAt) || startedAt <= 0
   ) return null;
 
-  return { name, email, company, topic: topic as Topic, message, website, startedAt, qualification };
+  return { name, email, company, topic: topic as Topic, message, website, startedAt, locale, qualification };
 }
 
 function text(value: unknown) {
@@ -186,9 +188,9 @@ function isRateLimited(key: string) {
   return false;
 }
 
-function contactId(email: string, message: string) {
+function contactId(email: string, message: string, locale: Contact["locale"]) {
   const digest = createHash("sha256")
-    .update(`${email}\n${message}`)
+    .update(`${email}\n${message}\n${locale}`)
     .digest("hex")
     .slice(0, 32);
   return `contact/${digest}`;
@@ -199,9 +201,11 @@ function plainText(contact: Contact) {
     "TAVONEL website inquiry",
     "",
     `Type: ${TOPICS[contact.topic]}`,
+    `Language: ${contact.locale}`,
     `Name: ${contact.name}`,
     `Email: ${contact.email}`,
     `Company: ${contact.company || "Not provided"}`,
+    ...qualificationLines(contact.qualification).map((line) => `${line.label}: ${line.value}`),
     "",
     contact.message,
   ].join("\n");
@@ -213,6 +217,7 @@ function htmlBody(contact: Contact) {
     <h1 style="font-size:24px">${escapeHtml(TOPICS[contact.topic])}</h1>
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Name</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.name)}</td></tr>
+      <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Language</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${contact.locale}</td></tr>
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Email</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.email)}</td></tr>
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Company</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.company || "Not provided")}</td></tr>
       ${qualificationLines(contact.qualification).map((line) => `<tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(line.label)}</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(line.value)}</td></tr>`).join("")}

@@ -60,6 +60,22 @@ describe("contact route", () => {
     expect(JSON.stringify(payload)).not.toContain("secret-test-key");
   });
 
+  it("marks a Korean inquiry for the recipient without translating validated values", async () => {
+    vi.stubEnv("AKC_RESEND_API_KEY", "secret-test-key");
+    vi.stubEnv("AKC_CONTACT_FROM", "TAVONEL <no-reply@tavonel.com>");
+    vi.stubEnv("AKC_CONTACT_TO", "hello@tavonel.com");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+
+    expect((await POST(request({ ...valid, locale: "ko", volume: "Under 100" },
+      "http://localhost:3000", "203.0.113.29"))).status).toBe(202);
+    const [, options] = fetchMock.mock.calls[0]!;
+    const payload = JSON.parse(String(options?.body)) as Record<string, string>;
+    expect(payload.subject).toContain("[KO]");
+    expect(payload.text).toContain("Language: ko");
+    expect(payload.text).toContain("Under 100");
+    expect(payload.html).toContain(">ko</td>");
+  });
+
   it("rejects cross-origin submissions", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("AKC_CONTACT_ALLOWED_ORIGINS", "https://tavonel.com");

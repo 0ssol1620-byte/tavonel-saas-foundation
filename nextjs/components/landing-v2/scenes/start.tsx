@@ -43,7 +43,7 @@ const TITLE_ID = "lv2-start-title";
   copy module is the shared deck, and this is the only surface that says this. "요금" is the
   spelling `KO_CHROME.nav` already uses for /pricing, so the close and the bar agree.
 */
-const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: "요금 보기" };
+const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: "요금 보기 (영문)" };
 
 /**
  * The two site-wide actions, already resolved by the server.
@@ -56,6 +56,8 @@ const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: 
 export type StartActions = {
   exploreLabel: string;
   exploreHref: string;
+  accessLabel: string;
+  accessHref: string;
 };
 
 export default function Scene({
@@ -97,18 +99,19 @@ export default function Scene({
             {/* §39's one next action for this scene, and the page's conversion. */}
             <Link
               className={`btn lv2-cta ${styles.cta}`}
-              href={"/pricing" as Route}
+              href={(locale === "ko" ? actions.accessHref : "/pricing") as Route}
+              hrefLang={locale === "ko" && actions.accessHref !== "/ko/contact" ? "en" : undefined}
               prefetch={false}
               data-scene-next="start"
             >
-              {PRICING_LABEL[locale]}
+              {locale === "ko" ? actions.accessLabel : PRICING_LABEL.en}
             </Link>
             {/*
               `EXPLORE_CTA.label` as the page resolved it. "Explore the public World" -- the wording
               §19 types -- is on `RETIRED_NAMES`; the constant is the only spelling of this action.
             */}
-            <Link className={`lv2-text-link ${styles.link}`} href={actions.exploreHref as Route} prefetch={false}>
-              {actions.exploreLabel}
+            <Link className={`lv2-text-link ${styles.link}`} href={(locale === "ko" ? "/pricing" : actions.exploreHref) as Route} hrefLang={locale === "ko" ? "en" : undefined} prefetch={false}>
+              {locale === "ko" ? PRICING_LABEL.ko : actions.exploreLabel}
               <span aria-hidden="true">→</span>
             </Link>
           </div>

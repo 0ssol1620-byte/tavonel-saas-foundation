@@ -191,8 +191,8 @@ describe("approved one-path experience", () => {
       rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
     const composition = text("components/landing-v2/landing-page.tsx");
-    expect(composition, "the commercial path goes through Pricing")
-      .toContain('pricingLabel={korean ? "요금 보기" : "View pricing"}');
+    expect(composition, "the pricing link names its English destination in the Korean journey")
+      .toContain('pricingLabel={korean ? "요금 보기 (영문)" : "View pricing"}');
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');
