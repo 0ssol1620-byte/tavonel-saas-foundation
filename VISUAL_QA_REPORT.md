@@ -456,4 +456,6 @@ The workspace now reads its per-workspace source-admission decision at access bo
 
 The final production build passed brand verification, type floor, TypeScript, ESLint, **371 Vitest files / 5,269 tests**, and generation of 149 pages. The 53 script tests passed separately. A production-server Playwright run passed **16/16** admission cases at **1920, 1440, 1280, 1024, 768, 390, 360**, and **1440 reduced motion**. The affected existing workspace suites passed 28 cases with one intentional skip at 1440. Full-page captures for the closed state at all eight viewport settings are in ignored `nextjs/test-results/workspace-admission-state-*/workspace-admission-closed.png`; the final 1440 and 390 captures were inspected directly for readable text, visible actions, and no overlap. This automated and agent inspection does not constitute founder visual approval. Exact-head CI and deployed-preview review remain required.
 
+The first exact-head Product QA run passed 883 cases but found two 390/360 mobile layout tests that assumed an approved workspace without mocking access bootstrap. Their fixture now explicitly returns approved access; both mobile geometry tests passed locally against the production build with no retry. The amended head requires a fresh exact-head CI run.
+
 **FOUNDER VISUAL REVIEW REQUIRED**

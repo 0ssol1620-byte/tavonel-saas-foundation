@@ -12,6 +12,12 @@ async function installWorkspace(page: import("@playwright/test").Page) {
     const now = Math.floor(Date.now() / 1000);
     localStorage.setItem("sb-test-auth-token", JSON.stringify({ access_token: accessToken, token_type: "bearer", expires_in: 3600, expires_at: now + 3600, refresh_token: "e2e-refresh", user: { id: "55555555-5555-4555-8555-555555555555", aud: "authenticated", role: "authenticated", email: "ultimate@example.invalid", app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() } }));
   }, { accessToken: token() });
+  // This suite exercises an approved workspace's mobile layout. Keep its access
+  // state explicit so a closed production intake cannot alter the fixture.
+  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: {
+    code: "ACCESS_READY",
+    access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled: true },
+  } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: [
     { documentId: "source-ready-a", versionKey: "a".repeat(64), sanitizedKey: "immutable/ws/source-ready-a/a/sanitized.pdf", sanitizedSize: 1000, ocrJsonKey: "immutable/ws/source-ready-a/a/ocr.json", ocrJsonSize: 500, hasOcrJson: true, cdrReceiptKey: "immutable/ws/source-ready-a/a/cdr-receipt.json", ocrReviewKey: null, processingState: "ocr_ready" },
     { documentId: "source-held-b", versionKey: "b".repeat(64), sanitizedKey: "immutable/ws/source-held-b/b/sanitized.pdf", sanitizedSize: 1000, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "immutable/ws/source-held-b/b/cdr-receipt.json", ocrReviewKey: "immutable/ws/source-held-b/b/ocr-review.json", processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD" },
