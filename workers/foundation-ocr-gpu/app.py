@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import hmac
+import json
 import os
 import re
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Lock, Thread
 from time import monotonic
-from collections.abc import Iterator
 from typing import Final, TypedDict
 
 import pypdfium2 as pdfium
@@ -53,7 +53,20 @@ def rapidocr_engine():
     global _rapidocr
     if _rapidocr is None:
         from rapidocr_onnxruntime import RapidOCR
-        _rapidocr = RapidOCR()
+
+        # The packaged RapidOCR defaults all three ONNX sessions to CPU, even
+        # when this worker has a CUDA device. Never accept that silent fallback.
+        engine = RapidOCR(det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True)
+        sessions = {
+            "detection": engine.text_det.infer.session,
+            "classification": engine.text_cls.infer.session,
+            "recognition": engine.text_rec.session.session,
+        }
+        for name, session in sessions.items():
+            providers = session.get_providers()
+            if not providers or providers[0] != "CUDAExecutionProvider":
+                raise RuntimeError(f"RapidOCR {name} session did not select CUDAExecutionProvider")
+        _rapidocr = engine
     return _rapidocr
 
 
@@ -338,7 +351,12 @@ async def http_exception_no_store(_: Request, exc: HTTPException) -> JSONRespons
 @app.get("/health")
 def healthz() -> JSONResponse:
     return JSONResponse(
-        content={"status": "ok", "port": LISTEN_PORT, "ssh": False, "gpu": cuda_available(), "engine": "rapidocr"},
+        content={
+            "status": "ok", "port": LISTEN_PORT, "ssh": False,
+            "gpu": cuda_available(), "engine": "rapidocr",
+            # Availability alone says nothing about the actual model sessions.
+            "cudaSessionsSelected": _rapidocr is not None,
+        },
         headers={"cache-control": "no-store"},
     )
 
