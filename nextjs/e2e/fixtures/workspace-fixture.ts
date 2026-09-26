@@ -94,11 +94,12 @@ export type WorkspaceRouteOptions = {
   billing?: BillingAccountFixture | null;
   jobs?: unknown[];
   accessSource?: "owner" | "paid" | "trial";
+  customerDataEnabled?: boolean;
 };
 
 /** The routes a workspace surface reads on mount. Anything a spec cares about it re-routes after. */
 export async function installWorkspaceRoutes(page: Page, options: WorkspaceRouteOptions = {}): Promise<void> {
-  const { documents = [], billing = INACTIVE_BILLING, jobs = [], accessSource = "owner" } = options;
+  const { documents = [], billing = INACTIVE_BILLING, jobs = [], accessSource = "owner", customerDataEnabled = true } = options;
   await page.route("**/api/access/bootstrap", route => route.fulfill({
     json: {
       code: "ACCESS_READY",
@@ -108,6 +109,7 @@ export async function installWorkspaceRoutes(page: Page, options: WorkspaceRoute
         billingExempt: accessSource === "owner",
         expiresAt: accessSource === "trial" ? new Date(Date.now() + 7 * 86_400_000).toISOString() : null,
         limits: accessSource === "trial" ? { files: 3, pages: 80, worlds: 1 } : null,
+        customerDataEnabled,
       },
     },
   }));

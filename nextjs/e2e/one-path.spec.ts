@@ -27,7 +27,7 @@ async function localWorkspace(page: Page, baseURL: string | undefined, source: "
   const jwt = `${encode({ alg: "none", typ: "JWT" })}.${encode({ sub: user.id, role: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 })}.test-signature`;
   await page.addInitScript(({ jwt, user }) => localStorage.setItem("sb-test-auth-token", JSON.stringify({ access_token: jwt, token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "fixture-not-valid", user })), { jwt, user });
   await page.route("https://test.supabase.co/**", route => route.fulfill({ json: user }));
-  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source, accessPlan: "studio_access", billingExempt: source === "owner", expiresAt: null, limits: null } } }));
+  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source, accessPlan: "studio_access", billingExempt: source === "owner", expiresAt: null, limits: null, customerDataEnabled: true } } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));

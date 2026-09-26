@@ -62,6 +62,7 @@ type AccessSummary = {
   billingExempt: boolean;
   expiresAt: string | null;
   limits: { files: number; pages: number; worlds: number } | null;
+  customerDataEnabled: boolean;
 };
 
 type Props = {
@@ -84,7 +85,7 @@ type Props = {
   stateHero?: boolean;
   nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void };
   /** The access source from /api/access/bootstrap, so the page can gate surface bodies the same way the rail is gated. */
-  onAccess?: (source: AccessSummary["source"]) => void;
+  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null) => void;
   onNavigate: (surface: WorkspaceSurface) => void;
   onUpload: () => void;
   onRefresh: () => void;
@@ -136,15 +137,18 @@ export default function WorkspaceUltimateShell({
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) return;
+      if (!token) { if (current) onAccess?.(null, null); return; }
       const response = await fetch("/api/access/bootstrap", {
         method: "POST",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
       });
       const body = await response.json().catch(() => null) as { access?: AccessSummary } | null;
-      if (current && response.ok && body?.access) { setAccess(body.access); onAccess?.(body.access.source); }
-    })().catch(() => undefined);
+      if (current && response.ok && body?.access) {
+        setAccess(body.access);
+        onAccess?.(body.access.source, body.access.customerDataEnabled === true);
+      } else if (current) onAccess?.(null, null);
+    })().catch(() => { if (current) onAccess?.(null, null); });
     return () => { current = false; };
     // onAccess is a state setter from the page; bootstrap runs once per mount on purpose.
     // eslint-disable-next-line react-hooks/exhaustive-deps

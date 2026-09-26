@@ -47,7 +47,7 @@ async function installSession(page: import("@playwright/test").Page) {
 
 async function installCommonRoutes(page: import("@playwright/test").Page) {
   await page.route("**/api/access/bootstrap", route => route.fulfill({
-    json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null } },
+    json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled: true } },
   }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/billing/status", route => route.fulfill({ json: {
