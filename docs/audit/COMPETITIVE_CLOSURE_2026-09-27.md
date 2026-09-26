@@ -18,7 +18,7 @@ Film Cut 4 was re-recorded from the edited code-based canvas in a production bui
 ## Evidence and limits
 
 - `pnpm build`: brand asset check, type floor, TypeScript, ESLint, hermetic Vitest (369 files, 5,261 tests), and optimized Next build passed.
-- The landing and benchmark browser sweep first ran 264 cases across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. It exposed one common source-link defect in eight cases. The eight corrected cases passed on a rebuilt production server; full-suite and Lighthouse results are recorded in `VISUAL_QA_REPORT.md` when finished.
+- The landing and benchmark browser sweep first ran 264 cases across 1920, 1440, 1280, 1024, 768, 390, 360, and reduced motion. It exposed one common source-link defect in eight cases. The eight corrected cases passed on a rebuilt production server. A 63-capture route/width pass and the local Lighthouse result are recorded in `VISUAL_QA_REPORT.md`; this branch adds the Korean Pricing and Contact routes to the enforced Lighthouse budget for exact-head CI.
 - A logged-in buyer, paid checkout, real custom-data intake, GPU processing, and legal review are separate acceptance gates. No test here turns a public sample into evidence that those gated flows are available.
 - The 63 atlas findings are not all closed. In particular, the legal effect of draft terms, privacy retention decisions, manual accessibility review, field performance, buyer comprehension study, and founder visual review require their own evidence. The atlas remains the open backlog for them; this branch closes the specific contradictions and links described above.
 
