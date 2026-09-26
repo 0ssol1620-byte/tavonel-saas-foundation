@@ -348,16 +348,18 @@ const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
   those routes. A buyer reading six ✓ / ✓ rows learned nothing about why one plan costs more
   than the other, and the things that do differ were spread between a card, a tile and a fold.
 
-  Every value is read from `lib/billing-catalog.ts` -- the included pages, the sale channel, the
-  onboarding bullet and the not-yet-sold list -- so a catalog change moves the table. A row that
-  is the same on both plans belongs in "Limits" below, not in a column here.
+  Included pages, sale channels and onboarding come from `lib/billing-catalog.ts`; the displayed
+  purchase path also respects the effective live checkout action. A catalog change moves the
+  table, but a closed purchase gate never leaves a visible "Checkout" promise behind. A row
+  that is the same on both plans belongs in "Limits" below, not in a column here.
 */
-/** Takes the channel as a string so a catalog with one channel per plan still type-checks. */
-function howYouBuy(saleChannel: string) {
-  return saleChannel === "self_serve" ? "Checkout" : "A conversation";
+/** A catalog channel cannot promise checkout while the effective purchase action is closed. */
+function howYouBuy(saleChannel: string, checkoutOpen: boolean) {
+  return checkoutOpen && saleChannel === "self_serve" ? "Checkout" : "A conversation";
 }
 
-const PLAN_DIFFERENCES: ReadonlyArray<readonly [string, string, string]> = [
+function planDifferences(checkoutOpen: boolean): ReadonlyArray<readonly [string, string, string]> {
+  return [
   [
     "Included standard pages each month",
     BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US"),
@@ -365,15 +367,16 @@ const PLAN_DIFFERENCES: ReadonlyArray<readonly [string, string, string]> = [
   ],
   [
     "How you buy it",
-    howYouBuy(BILLING_OFFERS.observer_access.saleChannel),
-    howYouBuy(BILLING_OFFERS.studio_access.saleChannel),
+    howYouBuy(BILLING_OFFERS.observer_access.saleChannel, checkoutOpen),
+    howYouBuy(BILLING_OFFERS.studio_access.saleChannel, checkoutOpen),
   ],
   [
     "Guided onboarding for your documents",
     BILLING_OFFERS.observer_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
     BILLING_OFFERS.studio_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
   ],
-];
+  ];
+}
 
 /*
   G2-008. The hard limits, stated where the money decision is made rather than only on /sources.
@@ -1008,7 +1011,7 @@ export default function PricingPageClient({
                 </tr>
               </thead>
               <tbody>
-                {PLAN_DIFFERENCES.map(([label, developer, team]) => (
+                {planDifferences(liveCheckout).map(([label, developer, team]) => (
                   <tr key={label}>
                     <th scope="row">{label}</th>
                     <td data-label={BILLING_OFFERS.observer_access.label}>{developer}</td>
@@ -1019,11 +1022,12 @@ export default function PricingPageClient({
             </table>
             </div>
             <p className="fine">
-              Those are the differences. Everything else — compiling, evidence, Ask, signed export,
-              API and MCP access, reviewing a candidate, activating a World and rolling one back —
-              is reached by both plans, at the same per-page rate past the included pages, under
-              the same limits below. The capability table under this one is the proof: it is
-              answered by the function the API calls, and it reads the same for both.
+              Those are the plan differences. Once your source-processing access is approved,
+              both plans include compiling, evidence, Ask, signed export, API and MCP access,
+              reviewing a candidate, activating a World and rolling one back, at the same
+              per-page rate past the included pages and under the same limits below. The
+              capability table compares those plan entitlements; it does not open a closed
+              customer-data gate.
             </p>
             {/*
               G2-008. The ceilings a buyer has to know before they buy, and the three they will
