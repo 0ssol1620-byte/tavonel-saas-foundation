@@ -25,6 +25,7 @@ const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientS
 const readOAuthSecretBrokerConfig = vi.fn<(...args: any[]) => any>(() => ({ kind: "vault" }));
 const readOAuthSecret = vi.fn(async () => "secret");
 const readR2SignerEnv = vi.fn<(...args: any[]) => any>(() => ({ accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }));
+const canAdmitCustomerSource = vi.fn<(...args: any[]) => Promise<boolean>>();
 
 vi.mock("./job-store", () => ({ completeJobBatch }));
 vi.mock("./connector-oauth-store", () => ({ getOAuthConnectionSecretReference, markOAuthConnectionReauthorizationRequired }));
@@ -33,6 +34,7 @@ vi.mock("./source-import", () => ({ importSourceObject }));
 vi.mock("./connector-oauth", () => ({ refreshOAuthAccessToken, readOAuthProviderRuntime }));
 vi.mock("./connector-oauth-secrets", () => ({ readOAuthSecret, readOAuthSecretBrokerConfig }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv }));
+vi.mock("./customer-data-admission", () => ({ canAdmitCustomerSource }));
 
 const { runSourceImportBatch, SYNC_BATCH_SIZE, SYNC_IMPORT_LIMIT } = await import("./sync-worker");
 
@@ -56,6 +58,7 @@ function sourceItem(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  canAdmitCustomerSource.mockResolvedValue(true);
   loadConnectorSyncPage.mockImplementation(async (_job, _worker, _cursor, _offset, list) => list());
   suspendConnectorSource.mockResolvedValue({ ok: true });
   requestConnectorSourceDeletion.mockResolvedValue({ ok: true, receiptId: `sha256:${"d".repeat(64)}`, replayed: false, held: false });
@@ -76,6 +79,15 @@ afterEach(() => {
 });
 
 describe("cursor safety", () => {
+  it("settles a revoked workspace before opening the connector", async () => {
+    canAdmitCustomerSource.mockResolvedValue(false);
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(completeJobBatch).toHaveBeenCalledWith(JOB.workspaceKey, JOB.jobId, "worker-1", {
+      outcome: "failed", errorCode: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE",
+    });
+    expect(getOAuthConnectionSecretReference).not.toHaveBeenCalled();
+    expect(importSourceObject).not.toHaveBeenCalled();
+  });
   it("executes the versioned Google watermark, snapshot and changes chain through the worker", async () => {
     const file = { id: "google-file", name: "report.pdf", version: "7", mimeType: "application/pdf", size: "100" };
     const responses = [{ startPageToken: "before-snapshot" }, { files: [file] },

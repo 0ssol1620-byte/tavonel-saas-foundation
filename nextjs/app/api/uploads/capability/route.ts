@@ -3,6 +3,7 @@ import { activationPolicy } from "@/lib/activation-policy";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { reserveFoundationCompute } from "@/lib/compute-reservation";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
 import {
@@ -77,6 +78,11 @@ export async function POST(request: Request) {
   if (!qualified.valid) {
     return NextResponse.json({ code: qualified.code }, { status: 400, headers: NO_STORE });
   }
+  // A signed PUT URL admits bytes and reserves compute. Check before issuing either.
+  const workspaceId = auth.principal.workspaceKey;
+  if (!await canAdmitCustomerSource(workspaceId)) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
+  }
 
   /*
     The reservation, not a page count. `reservationPageCeiling` falls back to the deployment's
@@ -93,7 +99,6 @@ export async function POST(request: Request) {
     && body.estimatedPages >= 1 ? body.estimatedPages : serverEstimate;
   const reservationPages = Math.max(serverEstimate, clientEstimate);
 
-  const workspaceId = auth.principal.workspaceKey;
   const signer = readR2SignerEnv();
   if (!signer) {
     return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });

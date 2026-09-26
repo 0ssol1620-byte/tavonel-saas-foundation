@@ -1,4 +1,5 @@
 import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
+import { canAdmitCustomerSource } from "./customer-data-admission";
 import { readOAuthProviderRuntime, refreshOAuthAccessToken } from "./connector-oauth";
 import { readOAuthSecret, readOAuthSecretBrokerConfig } from "./connector-oauth-secrets";
 import { getOAuthConnectionSecretReference, markOAuthConnectionReauthorizationRequired } from "./connector-oauth-store";
@@ -101,6 +102,16 @@ export async function runSourceImportBatch(
       errorCode: "JOB_CONNECTION_MISSING",
     });
     return { ok: false, code: "JOB_CONNECTION_MISSING" };
+  }
+
+  // A queued job can be claimed after its workspace approval was revoked. Settle it before
+  // refreshing credentials, listing source metadata, or moving any provider bytes.
+  if (!await canAdmitCustomerSource(job.workspaceKey)) {
+    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE",
+    });
+    return { ok: false, code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" };
   }
 
   const binding = await getOAuthConnectionSecretReference(job.workspaceKey, job.oauthConnectionId);

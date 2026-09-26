@@ -13,10 +13,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, authorizeSession, head, headSignature, assessSource, adminConfig, adminRequest } =
+const { authorize, authorizeSession, gate, head, headSignature, assessSource, adminConfig, adminRequest } =
   vi.hoisted(() => ({
     authorize: vi.fn(),
     authorizeSession: vi.fn(),
+    gate: vi.fn(),
     head: vi.fn(),
     headSignature: vi.fn(),
     assessSource: vi.fn(),
@@ -25,6 +26,7 @@ const { authorize, authorizeSession, head, headSignature, assessSource, adminCon
   }));
 
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
+vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: gate }));
 vi.mock("@/lib/self-service-trial", () => ({ authorizeFoundationSessionProduct: authorizeSession }));
 vi.mock("@/lib/trial-source-risk", () => ({ assessTrialSourceReuse: assessSource }));
 vi.mock("@/lib/supabase-admin", () => ({
@@ -84,6 +86,7 @@ function trial() {
 
 beforeEach(() => {
   authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId } });
+  gate.mockReset().mockResolvedValue(true);
   authorizeSession.mockReset().mockResolvedValue({
     ok: true,
     access: { source: "paid", accessPlan: "observer_access", billingExempt: false, expiresAt: null },

@@ -1,4 +1,5 @@
 import { reserveFoundationCompute } from "./compute-reservation";
+import { canAdmitCustomerSource } from "./customer-data-admission";
 import { reservationPageCeiling } from "./usage-pricing";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { type OAuthConnectorProvider } from "./connector-oauth";
@@ -66,6 +67,10 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   if (!descriptor) return { ok: false, nativeId: item.nativeId, code: "SOURCE_NOT_QUALIFIED" };
   if (item.sizeBytes !== null && item.sizeBytes > FOUNDATION_INTAKE_MAX_BYTES) {
     return { ok: false, nativeId: item.nativeId, code: "SOURCE_TOO_LARGE" };
+  }
+  // A queued sync can outlive its approval. Recheck before reading provider bytes.
+  if (!await canAdmitCustomerSource(context.workspaceKey)) {
+    return { ok: false, nativeId: item.nativeId, code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" };
   }
   let identity: ConnectorSourceIdentity;
   try { identity = await connectorSourceIdentity({ ...context, nativeId: item.nativeId, revision: item.revision }); }

@@ -6,7 +6,9 @@ const reserveFoundationCompute = vi.fn<(...args: any[]) => Promise<any>>();
 const confirmFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const presignFoundationQuarantinePut = vi.fn<(...args: any[]) => any>();
 const recordConnectorDocumentBinding = vi.fn<(...args: any[]) => Promise<any>>();
+const canAdmitCustomerSource = vi.fn<(...args: any[]) => Promise<boolean>>();
 vi.mock("./connector-binding-store", () => ({ recordConnectorDocumentBinding }));
+vi.mock("./customer-data-admission", () => ({ canAdmitCustomerSource }));
 
 vi.mock("./intake-admission", () => ({ confirmFoundationIntake, reserveFoundationIntake }));
 vi.mock("./compute-reservation", () => ({ reserveFoundationCompute }));
@@ -28,6 +30,7 @@ function withGoogleMetadata(fetcher: typeof fetch): typeof fetch {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  canAdmitCustomerSource.mockResolvedValue(true);
   recordConnectorDocumentBinding.mockResolvedValue({ ok: true });
   reserveFoundationIntake.mockResolvedValue({
     ok: true,
@@ -44,6 +47,17 @@ beforeEach(() => {
 });
 
 describe("source import replay safety", () => {
+  it("does not read provider bytes or reserve intake after workspace approval is revoked", async () => {
+    canAdmitCustomerSource.mockResolvedValue(false);
+    const fetcher = vi.fn();
+    const result = await importSourceObject({ workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
+      connectionId: "22222222-2222-4222-8222-222222222222", provider: "google_drive", accessToken: "access", target: {},
+      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher },
+    { nativeId: "file", name: "file.pdf", revision: "1", mimeType: "application/pdf", sizeBytes: 3, modifiedAt: null, kind: "file" });
+    expect(result).toEqual({ ok: false, nativeId: "file", code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(reserveFoundationIntake).not.toHaveBeenCalled();
+  });
   it("refuses a Google change during download before source binding or intake", async () => {
     const metadata = { id: "file", version: "1", mimeType: "application/pdf", size: "3",
       md5Checksum: "900150983cd24fb0d6963f7d28e17f72", capabilities: { canDownload: true } };

@@ -48,6 +48,7 @@ const {
   sourceIds,
   sourceAccess,
   revalidate,
+  customerDataAdmission,
 } = vi.hoisted(() => ({
   authorize: vi.fn(),
   enqueue: vi.fn(),
@@ -60,6 +61,7 @@ const {
   sourceIds: vi.fn(),
   sourceAccess: vi.fn(),
   revalidate: vi.fn(),
+  customerDataAdmission: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -75,6 +77,7 @@ vi.mock("@/lib/intake-admission", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./intake-admission")>()),
   reserveFoundationIntake: admission,
 }));
+vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: customerDataAdmission }));
 vi.mock("@/lib/compute-reservation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./compute-reservation")>()),
   reserveFoundationCompute: compute,
@@ -273,6 +276,7 @@ describe("documented response shapes", () => {
     expect(required).toEqual(["originalFilename", "declaredMimeType", "requestedBytes"]);
 
     grantKey();
+    customerDataAdmission.mockResolvedValue(true);
     signerEnv.mockReturnValue({ accessKeyId: "k", secretAccessKey: "s", bucket: "b", endpoint: "https://r2.test" });
     admission.mockResolvedValue({ ok: true, result: { expiresAt: "2026-09-11T00:05:00.000Z" } });
     compute.mockResolvedValue({
@@ -314,6 +318,26 @@ describe("documented response shapes", () => {
     }
   });
 
+  it("refuses intake and compile before reserving compute or enqueueing when workspace approval is absent", async () => {
+    vi.clearAllMocks();
+    grantKey({ accessSource: "subscription" });
+    customerDataAdmission.mockResolvedValue(false);
+    const upload = await uploadCapability(apiRequest("/api/v1/uploads/capability", {
+      originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184_320,
+    }));
+    expect(upload.status).toBe(403);
+    await expect(upload.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(admission).not.toHaveBeenCalled();
+    expect(compute).not.toHaveBeenCalled();
+    expect(presign).not.toHaveBeenCalled();
+
+    const compile = await startCompile(apiRequest("/api/compile-jobs", { documentIds: [DOCUMENT] }));
+    expect(compile.status).toBe(403);
+    await expect(compile.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(customerDataAdmission).toHaveBeenCalledWith(WORKSPACE);
+  });
+
   it("startCompileJob answers the 202 the spec describes, and refuses an empty documentIds", async () => {
     const { path, operation: published } = await operation("startCompileJob");
     expect(path).toBe("/compile-jobs");
@@ -322,6 +346,7 @@ describe("documented response shapes", () => {
     expect(described, "the 202 description no longer names the accepted-job fields").toContain("jobId");
 
     grantKey({ accessSource: "subscription" });
+    customerDataAdmission.mockResolvedValue(true);
     enqueue.mockResolvedValue({ ok: true, value: { jobId: "job-shape-1", state: "draft" } });
 
     const response = await startCompile(apiRequest("/api/compile-jobs", { documentIds: [DOCUMENT] }));

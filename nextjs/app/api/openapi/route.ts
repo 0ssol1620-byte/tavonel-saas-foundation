@@ -197,7 +197,7 @@ export function GET(request: Request) {
           summary: "Request a direct upload URL",
           tags: ["Documents"],
           "x-tavonel-scope": "documents:intake",
-          description: "Returns a short-lived browser/agent-direct R2 PUT URL. Document bytes never pass through the application server. `requestedBytes` is checked against the deployment's per-source ceiling here, before any byte is stored: above it the answer is 413 SOURCE_EXCEEDS_PROCESSING_CEILING carrying `maxBytes`, `maxPages` and a sentence you can show a customer. Send `x-tavonel-source-idempotency-key` (a sha256 hex digest of the source event) to make the document id deterministic, so a retried intake converges on one document rather than two.",
+          description: "Returns a short-lived browser/agent-direct R2 PUT URL only when this workspace is approved for source processing. A closed workspace receives 403 CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE before any URL or compute reservation is issued. Document bytes never pass through the application server. `requestedBytes` is checked against the deployment's per-source ceiling here, before any byte is stored: above it the answer is 413 SOURCE_EXCEEDS_PROCESSING_CEILING carrying `maxBytes`, `maxPages` and a sentence you can show a customer. Send `x-tavonel-source-idempotency-key` (a sha256 hex digest of the source event) to make the document id deterministic, so a retried intake converges on one document rather than two.",
           requestBody: {
             required: true,
             content: {
@@ -236,6 +236,7 @@ export function GET(request: Request) {
             "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "FILE_NAME_INVALID", "SOURCE_IDEMPOTENCY_KEY_INVALID"),
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
             "402": err("STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FILE_LIMIT_EXCEEDED", "GPU_CREDITS_REQUIRED"),
+            "403": err("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
             "409": err("INTAKE_IDEMPOTENCY_CONFLICT", "COMPUTE_IDEMPOTENCY_CONFLICT"),
             "413": err("SOURCE_EXCEEDS_PROCESSING_CEILING", "TRIAL_FILE_TOO_LARGE"),
             "429": err("API_RATE_LIMITED", "INTAKE_RATE_LIMITED", "INTAKE_DAILY_QUOTA_EXCEEDED"),

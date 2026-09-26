@@ -9,6 +9,7 @@ import {
 } from "@/lib/compile-job-store";
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
@@ -62,6 +63,11 @@ export async function POST(request: Request) {
       },
       { status: 400, headers: HEADERS },
     );
+  }
+
+  // Do not enqueue work the compiler must later reject for a missing or revoked receipt.
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
   }
 
   // The evaluation includes one Compiled World. A retry of the exact same document set must
