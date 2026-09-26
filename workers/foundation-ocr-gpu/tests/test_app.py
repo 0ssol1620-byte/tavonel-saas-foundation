@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import os
 import secrets
+import sys
+import types
 from datetime import UTC, datetime
 from pathlib import Path
-import sys
 
 import pytest
 from fastapi.testclient import TestClient
@@ -71,7 +73,37 @@ def test_health_reports_ok_port_and_no_ssh(client: TestClient) -> None:
     assert body["port"] == 8001
     assert body["ssh"] is False
     assert "gpu" in body
+    assert isinstance(body["cudaSessionsSelected"], bool)
     assert "22" not in response.text
+
+
+@pytest.mark.parametrize("failed_stage", [None, "detection", "classification", "recognition"])
+def test_raster_ocr_selects_cuda_for_every_model(monkeypatch: pytest.MonkeyPatch, failed_stage: str | None) -> None:
+    worker = importlib.import_module("app")
+    monkeypatch.setattr(worker, "_rapidocr", None)
+    calls: list[dict[str, bool]] = []
+
+    def stage(name: str):
+        provider = "CPUExecutionProvider" if name == failed_stage else "CUDAExecutionProvider"
+        return types.SimpleNamespace(session=types.SimpleNamespace(get_providers=lambda: [provider, "CPUExecutionProvider"]))
+
+    class FakeRapidOCR:
+        def __init__(self, **kwargs: bool) -> None:
+            calls.append(kwargs)
+            self.text_det = types.SimpleNamespace(infer=stage("detection"))
+            self.text_cls = types.SimpleNamespace(infer=stage("classification"))
+            self.text_rec = types.SimpleNamespace(session=stage("recognition"))
+
+    monkeypatch.setitem(sys.modules, "rapidocr_onnxruntime", types.SimpleNamespace(RapidOCR=FakeRapidOCR))
+    if failed_stage:
+        with pytest.raises(RuntimeError, match=f"RapidOCR {failed_stage} session did not select CUDA"):
+            worker.rapidocr_engine()
+        assert worker._rapidocr is None
+    else:
+        engine = worker.rapidocr_engine()
+        assert worker.rapidocr_engine() is engine
+        assert len(calls) == 1
+    assert calls == [{"det_use_cuda": True, "cls_use_cuda": True, "rec_use_cuda": True}]
 
 
 def test_rejects_non_pdf(client: TestClient) -> None:
