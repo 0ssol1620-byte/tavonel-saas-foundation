@@ -123,6 +123,6 @@ test("closed intake offers a working public evaluation and an Enterprise convers
   await quote.getByText("How the quote is built").click();
   await expect(quote.getByRole("heading", { name: "What moves the quote" })).toBeVisible();
   await quote.getByRole("link", { name: "Scope an Enterprise pilot" }).click();
-  await expect(page).toHaveURL(/\/contact$/);
+  await expect(page).toHaveURL(/\/contact\?plan=Enterprise$/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
