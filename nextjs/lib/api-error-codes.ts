@@ -244,6 +244,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "SOURCE_TOO_LARGE", meaning: "A connected source's bytes are above the per-source ceiling.", whatToDo: "Exclude it from the sync, or split it at the source." },
       { code: "INTAKE_FILE_TOO_LARGE", meaning: "The admission ledger refused the size. Answered to the caller as `SOURCE_EXCEEDS_PROCESSING_CEILING`.", whatToDo: "Split the document." },
       { code: "INTAKE_DISABLED", status: 503, meaning: "Intake is closed today.", whatToDo: "Nothing a caller can send opens it. /api/status publishes the current state." },
+      { code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", status: 403, meaning: "This workspace has no current approval to process its sources.", whatToDo: "Contact TAVONEL to arrange a scoped pilot before uploading or syncing files." },
       { code: "INTAKE_IDEMPOTENCY_CONFLICT", status: 409, meaning: "The same source idempotency key was already used for different bytes.", whatToDo: "Use a fresh key, or re-send the original bytes." },
       { code: "UNQUALIFIED_DOCUMENT", status: 400, meaning: "The document id does not name a document in this workspace, or it is not in a state this operation accepts.", whatToDo: "List documents and use an id from the response." },
       { code: "UNQUALIFIED_MIME", status: 400, meaning: "The declared MIME type is not in the capability manifest.", whatToDo: "Read `GET /capabilities`: a format absent from it is refused at upload rather than accepted and dropped." },

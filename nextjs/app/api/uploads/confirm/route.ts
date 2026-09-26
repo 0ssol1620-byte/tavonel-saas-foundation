@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
@@ -120,6 +121,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INVALID_SOURCE_DIGEST" }, { status: 400, headers });
   }
   const sourceSha256 = typeof body.sourceSha256 === "string" ? body.sourceSha256 : null;
+
+  // Approval may be revoked after a short-lived capability was issued.
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers });
+  }
 
   const signer = readR2SignerEnv();
   if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers });

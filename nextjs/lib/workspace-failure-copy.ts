@@ -18,6 +18,7 @@ const FAILURE_COPY: Record<string, string> = {
   TENANT_MISMATCH: "That record belongs to another workspace.",
   NOT_FOUND: "That record is no longer in this workspace.",
   INTAKE_DISABLED: "Source intake is paused right now. Work already compiled stays available.",
+  CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE: "This workspace is not yet set up to process your files. Contact us to arrange a pilot.",
   INTAKE_RATE_LIMITED: "Too many source bytes arrived at once. Wait a minute and try again; what was accepted is safe.",
   INTAKE_DAILY_QUOTA_EXCEEDED: "This workspace has reached its 24-hour direct-upload bound. Connect a source system, or retry after the window resets.",
   BILLING_HOLD: "A billing hold is active on this workspace, so new processing cannot start.",

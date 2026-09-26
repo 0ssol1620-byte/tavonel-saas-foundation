@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { enqueueConnectorSync, listConnectionJobs } from "@/lib/job-store";
 
@@ -59,6 +60,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!read.ok) return NextResponse.json({ code: "OAUTH_SYNC_INPUT_INVALID" }, { status: 400, headers: HEADERS });
   const parsed = parseBody(read.value);
   if (!parsed) return NextResponse.json({ code: "OAUTH_SYNC_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
+  }
 
   // The idempotency key is (job type, connection) with no timestamp or nonce. A second
   // click while a sync is running must collapse onto the running job: two concurrent

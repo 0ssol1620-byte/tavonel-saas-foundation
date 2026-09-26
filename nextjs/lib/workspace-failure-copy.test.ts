@@ -10,6 +10,7 @@ describe("workspace failure copy", () => {
   it("turns a known code into a sentence and never prints the code on its own", () => {
     expect(failureSentence("AUTH_REQUIRED", 401)).toBe("Your session has expired. Sign in again.");
     expect(failureSentence("AUTH_REQUIRED", 401)).not.toContain("AUTH_REQUIRED");
+    expect(failureSentence("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", 403)).toContain("arrange a pilot");
   });
 
   it("keeps an unmapped code reachable as a reference rather than dropping it", () => {
