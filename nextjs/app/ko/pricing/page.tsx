@@ -38,7 +38,7 @@ export default function KoreanPricingPage() {
                 <Link className="btn ghost" href="/explore" hrefLang="en">공개 World 확인 (영문)</Link>
               </div>
               {!activationPolicy.customerData.enabled ? (
-                <p className="fine">현재 자체 자료 컴파일은 요금제를 구매하는 것만으로 열리지 않습니다. 자료 도입과 첫 컴파일은 상담 후 설정합니다.</p>
+                <p className="fine">현재 자체 자료 컴파일은 요금제를 구매하는 것만으로 열리지 않습니다. 도입 가능 여부와 시범 운영 범위를 상담으로 확인합니다.</p>
               ) : null}
             </div>
             <div className={styles.plans} aria-labelledby="ko-pricing-plans">
@@ -54,7 +54,7 @@ export default function KoreanPricingPage() {
                   <h3>{developer.label}</h3>
                   <p className={styles.price}>${developer.priceUsd}<span className={styles.unit}> /월, USD</span></p>
                   <p>월 {developer.includedPages.toLocaleString("en-US")} 표준 페이지, 증거 연결·Ask·서명된 내보내기, API·MCP 접근.</p>
-                  <p className="fine">자체 자료 컴파일은 상담 후 설정합니다.</p>
+                  <p className="fine">자체 자료 컴파일은 승인된 시범 운영 범위에서만 진행합니다.</p>
                   <Link href="/ko/contact?plan=Developer">Developer 도입 상담</Link>
                 </article>
                 <article className={styles.card}>

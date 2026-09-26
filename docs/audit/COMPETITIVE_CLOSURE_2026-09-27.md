@@ -9,9 +9,10 @@ Reducto's [live homepage](https://reducto.ai/) was checked again on 2026-09-27. 
 1. `/` and `/ko`: a centered brand claim, a direct public source specimen, then “How it compiles.” The specimen's Explore link now uses the compiled World's evidence ID for the same OCR source region; the previous link opened an unrelated default filing.
 2. `/explore`: the public, compiled sample is available without purchase. Sample and illustration labels remain visible. A custom-source compile is still gated.
 3. `/benchmarks`: the two published GDP.pdf arms are distinguished from the two unrun arms. `/arena` points to the already-published document-reader board and does not call it unpublished.
-4. `/pricing` and `/ko/pricing`: plan selection goes to a plan-specific inquiry when checkout or own-source intake is closed. Korean visitors can reach the inquiry in Korean. The priced plans do not imply that purchase alone opens custom-source compilation; the Team card does not imply multi-user access.
+4. `/pricing` and `/ko/pricing`: plan selection goes to a plan-specific inquiry when checkout or own-source intake is closed. Korean visitors can reach the inquiry in Korean. The priced plans distinguish plan entitlements from currently enabled access, and direct own-source prospects to an approved pilot. The Team card does not imply multi-user access.
 5. `/contact` and `/ko/contact`: selected plan context is preserved through the form and validated by the API. The privacy page discloses that the chosen plan is included with an inquiry.
 6. `/status`: configuration is called “configured,” and a closed customer-data gate keeps the document pipeline “closed.” Configuration is not presented as a measured successful request.
+7. `/privacy` and `/subprocessors`: the inquiry processor disclosure names the selected plan sent to Resend. The international-transfer paragraph now describes the DPA and SCC terms as a draft rather than as an executed agreement. The shared legal last-updated date records this revision.
 
 Film Cut 4 was re-recorded from the edited code-based canvas in a production build: 450 frames at 25 fps, 2880×1800 capture, 18 seconds, x264 yuv444p. The locked MP4 is 614,533 bytes, SHA-256 `480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732`; its 1440×900 poster is SHA-256 `0657974791412db006d80e36171f45175508fa54421fd852489771d7f4e70208`. The visible MCP and CLI commands were checked against the shipped nine-tool distribution. The film is an illustrative flow, not a customer outcome or model-performance receipt.
 
@@ -24,4 +25,4 @@ Film Cut 4 was re-recorded from the edited code-based canvas in a production bui
 
 ## Release decision
 
-The implementation is reviewable in a stacked PR. Publication requires the existing founder visual gate and the repository's deployment checks. Keep the site copy scoped to observed capabilities until those gates are complete.
+The founder explicitly authorized publication on 2026-09-27. The public marketing and proof path can be published after the final exact-head checks and production smoke. That authorization does not turn on paid checkout or customer-source processing: the production V2 status contract currently reports both actions closed. The draft legal documents remain visibly marked as unreviewed; counsel and customer-specific transfer terms remain separate gates. The compiler/router PR has its own merge and canary gates and is not part of this website publication.

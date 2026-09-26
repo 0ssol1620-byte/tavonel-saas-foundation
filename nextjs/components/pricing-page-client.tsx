@@ -888,10 +888,10 @@ export default function PricingPageClient({
                   <div className="plan-features">
                     {plan.name === "Team" ? <p className="fine"><b>Single-member workspace</b></p> : null}
                     {!ownFilesOpen && (plan.name === "Developer" || plan.name === "Team") ? (
-                      <p className="fine">Your own sources are set up with us before the first compile.</p>
+                      <p className="fine">Ask us about an approved source-processing pilot before your first compile.</p>
                     ) : null}
                     <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
-                      <li key={feature}>{!ownFilesOpen && feature === "Compile your own worlds" ? "Compile your own worlds after assisted setup" : feature}</li>
+                      <li key={feature}>{!ownFilesOpen && feature === "Compile your own worlds" ? "Own-source compilation requires an approved pilot" : feature}</li>
                     ))}</ul>
                     {/* The single-member limit is on the card; detailed exclusions remain available on demand. */}
                     {plan.notYetSold.length > 0 ? (
@@ -1101,7 +1101,7 @@ export default function PricingPageClient({
               `billingProductDecision(plan, level)` from the server component, and the level on
               each row is read from the route that enforces it.
             */}
-            <h3 id="plan-capability-title">What each plan can do, and what it does not</h3>
+            <h3 id="plan-capability-title">What each plan includes once access is enabled</h3>
             <div className="table-scroll">
             <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-capability-title">
               <thead>
@@ -1146,10 +1146,12 @@ export default function PricingPageClient({
               One paragraph, said once.
             */}
             <p className="fine">
-              A row marked Planned is a capability the plan names in its own catalog entry as not
+              This table compares plan entitlements, not what a new visitor can start today.
+              {!ownFilesOpen ? " While source processing is closed, a tick does not open uploads or compilation; request an approved pilot first." : null}
+              {" "}A row marked Planned is a capability the plan names in its own catalog entry as not
               sold yet; it is not billed, not enabled by buying the plan, and not a date. A row
-              marked Not sold is not part of that plan at all. Only a capability the API admits
-              today carries a tick. Every row is answered for the workspace owner, the role a
+              marked Not sold is not part of that plan at all. Only a capability the plan&apos;s
+              authorization check admits carries a tick. Every row is answered for the workspace owner, the role a
               buyer of either plan holds in their own workspace. {selfService
                 ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities that do not activate a World, inside its file and page limits; activating one needs a paid plan, which is why it has no column here.`
                 : "An evaluation of your own sources is arranged with us while self-service intake is closed."}

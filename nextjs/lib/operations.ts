@@ -18,7 +18,7 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   the terms began to apply and does not move when wording changes; this is the day the wording
   last changed, and it is the date of the commit that changed it.
 */
-export const LEGAL_LAST_UPDATED = "2026-09-16";
+export const LEGAL_LAST_UPDATED = "2026-09-27";
 
 /*
   SD-07. One draft label, on every legal document, until counsel signs it off.
