@@ -111,7 +111,7 @@ test("closed intake offers a working public evaluation and an Enterprise convers
   await expect(evaluation.getByRole("link", { name: "Discuss your sources" })).toHaveAttribute("href", "/contact");
 
   const enterprise = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Enterprise" }) });
-  await expect(enterprise.getByRole("link", { name: "Scope an Enterprise pilot" })).toHaveAttribute("href", "/contact");
+  await expect(enterprise.getByRole("link", { name: "Scope an Enterprise pilot" })).toHaveAttribute("href", "/contact?plan=Enterprise");
   const team = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Team" }) });
   await expect(team.getByText("Single-member workspace", { exact: true })).toBeVisible();
   await expect(team.getByText("Shared members and roles")).not.toBeVisible();
