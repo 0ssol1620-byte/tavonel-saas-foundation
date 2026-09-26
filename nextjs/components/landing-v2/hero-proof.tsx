@@ -1,9 +1,8 @@
 import Link from "next/link";
 import type { Route } from "next";
 import RegionHighlight from "@/components/evidence/region-highlight";
-import { sampleEvidencePage } from "@/lib/evidence-regions";
 import { HERO_PROOF_COPY } from "@/lib/hero-proof-copy";
-import { HERO_STATS } from "@/lib/hero-stats";
+import { buildHeroStats, buildHeroView } from "@/lib/landing-v2-runtime";
 
 /*
   The home hero's working surface: a live Evidence Inspector, and four counts under it.
@@ -42,12 +41,12 @@ import { HERO_STATS } from "@/lib/hero-stats";
 */
 
 /*
-  The view, resolved once per process. `sampleEvidencePage()` is pure over a World frozen at
-  build time, and `/` and `/ko` are `force-dynamic` for the commercial posture -- so without
-  this the page would re-derive it on every request to the two most-visited routes, for the same
-  answer. The same reasoning `landing-page.tsx` gives for its own memo.
+  The view and its counts are frozen build-time projections of the public World. The snapshot
+  parity test recomputes them from the compiler during CI, while the force-dynamic homepage reads
+  the committed projection without importing the corpus compiler on a cold request.
 */
-const view = sampleEvidencePage();
+const view = buildHeroView();
+const heroStats = buildHeroStats();
 
 /** The raster the hero paints first, so `app/page.tsx` can preload the one image above the fold. */
 export const HERO_PROOF_IMAGE: string | null = view.image?.src ?? null;
@@ -73,7 +72,7 @@ export default function HeroProof({ korean = false }: { korean?: boolean }) {
         />
       </div>
       <ul className="lv2-hero-stats" aria-label={copy.stripLabel}>
-        {HERO_STATS.map((stat, index) => (
+        {heroStats.map((stat, index) => (
           <li key={stat.id}>
             <Link href={stat.href as Route}>
               <span className="lv2-hero-stat-value" data-mono={stat.mono ? "1" : undefined} data-derived="1">
