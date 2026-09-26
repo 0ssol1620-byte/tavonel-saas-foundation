@@ -120,7 +120,7 @@ async function mockWorkspace(page: Page, options: { world?: boolean } = {}) {
   await page.route("**/api/compile-jobs", (route) => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/documents", (route) => route.fulfill({ json: { documents: [] } }));
   await page.route("**/api/access/bootstrap", (route) => route.fulfill({
-    json: { access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null } },
+    json: { access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled: true } },
   }));
   await page.route("**/api/billing/status", (route) => route.fulfill({
     json: {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { foundationPilotAccess, getRequestUser, readAccessMode } from "@/lib/foundation-pilot";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { ensureSelfServiceOrganization } from "@/lib/self-service-provisioning";
 import { bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
 
@@ -33,6 +34,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: access.code }, { status: access.status, headers });
   }
 
+  // The UI must learn the same per-workspace decision the upload routes enforce.
+  // A store outage is closed, never advertised as upload-ready.
+  const customerDataEnabled = await canAdmitCustomerSource(pilot.membership.workspaceId);
+
   return NextResponse.json({
     code: "ACCESS_READY",
     access: {
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
       billingExempt: access.access.billingExempt,
       expiresAt: access.access.expiresAt,
       limits: access.limits ?? null,
+      customerDataEnabled,
     },
   }, { headers });
 }

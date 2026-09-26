@@ -40,7 +40,7 @@ describe("workspace compile floor and ceiling", () => {
   it("refuses an over-ceiling selection before anything is uploaded", () => {
     expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);");
     // The button cannot start an upload the compile step would refuse...
-    expect(workspace).toContain("!stagedVerdict.ok} onClick={() => void startStagedCompile()}");
+    expect(workspace).toContain("!stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}");
     // ...and the handler refuses it too, so the contract does not depend on the disabled prop.
     expect(workspace).toContain("const verdict = judgeCorpusSet(stagedSelection.files.length);");
     // The reason is shown rather than the files being silently dropped.

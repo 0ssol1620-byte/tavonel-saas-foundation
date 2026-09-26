@@ -64,7 +64,7 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
    * and the console assertions below trip on a failure that has nothing to do with the World.
    */
   await page.route("**/api/access/bootstrap", route =>
-    route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null } } })
+    route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled: true } } })
   );
   await page.route("**/api/compile-jobs", route =>
     route.fulfill({ json: { code: "OK", jobs: [] } })

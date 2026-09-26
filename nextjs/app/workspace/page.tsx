@@ -251,6 +251,11 @@ export default function WorkspacePage() {
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | null>(null);
+  const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
+  const intakeOpen = customerDataAccess === "open";
+  const intakeClosedCopy = customerDataAccess === "closed"
+    ? "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
+    : "Source access could not be verified. Sign in again before choosing files.";
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
@@ -845,6 +850,7 @@ export default function WorkspacePage() {
     setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
 
   const uploadDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
+    if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
     const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
     if (manageBusy) setBusy(true);
     // The id is local until the capability call returns one. The board needs a row immediately,
@@ -895,6 +901,7 @@ export default function WorkspacePage() {
       });
       const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
       if (!capability.ok || !json.uploadUrl) {
+        if (json.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
         refuse(failureSentence(json.code, capability.status));
         setNotice(`Upload was not issued. ${failureSentence(json.code, capability.status)}`);
         return null;
@@ -963,8 +970,9 @@ export default function WorkspacePage() {
           // code, and say that the source stops here until it succeeds.
           const failure = await confirmed.json().catch(() => null) as { code?: string } | null;
           const code = failure?.code ?? `HTTP ${confirmed.status}`;
-          refuse(`source confirmation refused (${code})`);
-          setNotice(`${file.name} reached storage but was not confirmed (${code}). It is not queued for processing.`);
+          if (code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
+          refuse(failureSentence(code, confirmed.status));
+          setNotice(`${file.name} reached storage but was not confirmed. ${failureSentence(code, confirmed.status)} It is not queued for processing.`);
           await loadDocuments();
           return json.documentId;
         }
@@ -1134,6 +1142,7 @@ export default function WorkspacePage() {
     load, so a customer who never had the URL still finds the compile waiting.
   */
   const startDurableCompile = async (documentIds: string[]) => {
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     // A count, never the ids. Every compile route -- staged upload, selection, resume -- lands here.
     trackFunnel("workspace_compile_started", { sources: String(documentIds.length) });
     const token = await sessionToken();
@@ -1209,6 +1218,7 @@ export default function WorkspacePage() {
       return;
     }
     if (!response.ok || !json.jobId) {
+      if (json.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
       setNotice(json.message ?? `Compile could not be started. ${failureSentence(json.code, response.status)}`);
       return;
     }
@@ -1397,6 +1407,7 @@ export default function WorkspacePage() {
    */
   const uploadDocuments = async (files: File[]) => {
     if (files.length === 0) return;
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
@@ -1429,6 +1440,7 @@ export default function WorkspacePage() {
 
   const stageWorkspaceFiles = async (files: File[]) => {
     if (files.length === 0) return;
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     expanderRef.current ??= createArchiveExpander();
     stagingAbortRef.current?.abort();
     const controller = new AbortController();
@@ -1586,6 +1598,7 @@ export default function WorkspacePage() {
 
   const startStagedCompile = async () => {
     if (!stagedSelection?.files.length) return;
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     // The button is already disabled for this, but the guard is what makes it a contract
     // rather than a styling choice: nothing uploads a set the compile step will refuse.
     const verdict = judgeCorpusSet(stagedSelection.files.length);
@@ -2019,8 +2032,8 @@ export default function WorkspacePage() {
   const attentionItems = deriveAttentionItems(workspaceStateInput);
   const runIntent = (intent: WorkspaceIntent | undefined) => {
     if (intent === "upload") {
-      if (activationPolicy.customerIntake.enabled) fileRef.current?.click();
-      else setNotice("Upload remains locked by the current intake policy.");
+      if (activationPolicy.customerIntake.enabled && intakeOpen) fileRef.current?.click();
+      else setNotice(intakeClosedCopy);
       return;
     }
     if (intent === "refresh") void loadDocuments();
@@ -2088,7 +2101,7 @@ export default function WorkspacePage() {
       ) : null}
     </div>
   ) : null;
-  const gettingStarted = workspaceStartupReady ? (
+  const gettingStarted = workspaceStartupReady && intakeOpen ? (
     <WorkspaceGettingStarted
       autoOpenEligible={false}
       steps={onboardingSteps}
@@ -2112,14 +2125,17 @@ export default function WorkspacePage() {
       stateDescription={stateDescription}
       stateFacts={workspaceFacts}
       stateHero={workspaceState.mode !== "new"}
-      onAccess={setAccessSource}
+      onAccess={(source, enabled) => {
+        setAccessSource(source);
+        setCustomerDataAccess(enabled === null ? "unavailable" : enabled ? "open" : "closed");
+      }}
       nextAction={nextAction}
       onNavigate={navigateSurface}
-      onUpload={() => activationPolicy.customerIntake.enabled ? fileRef.current?.click() : setNotice("Upload remains locked by the current intake policy.")}
+      onUpload={() => activationPolicy.customerIntake.enabled && intakeOpen ? fileRef.current?.click() : setNotice(intakeClosedCopy)}
       onRefresh={() => void loadDocuments()}
       onSignOut={() => void signOut()}
       headerAction={
-        activationPolicy.customerIntake.enabled ? (
+        activationPolicy.customerIntake.enabled && intakeOpen ? (
           <>
             <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
             <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
@@ -2133,7 +2149,7 @@ export default function WorkspacePage() {
             )}
           </>
         ) : (
-          <button onClick={() => setNotice("Upload remains locked by the current intake policy.")}><UploadCloud size={16} /> Upload <LockKeyhole size={14} /></button>
+          <button type="button" disabled title={intakeClosedCopy}><UploadCloud size={16} /> Upload <LockKeyhole size={14} /></button>
         )
       }
     >
@@ -2259,13 +2275,14 @@ export default function WorkspacePage() {
               data-inventory-state={documentInventoryState}
               data-mode={workspaceState.mode}
               data-existing-documents={workspaceState.mode === "returning" ? "1" : "0"}
-              data-active={dropActive}
-              onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
-              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
+              data-active={dropActive && intakeOpen}
+              onDragEnter={(event) => { event.preventDefault(); if (intakeOpen) setDropActive(true); }}
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = intakeOpen ? "copy" : "none"; }}
               onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false); }}
               onDrop={(event) => {
                 event.preventDefault();
                 setDropActive(false);
+                if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
                 const items = Array.from(event.dataTransfer.items);
                 void collectDroppedWorkspaceFiles(items).then(stageWorkspaceFiles).catch((error: unknown) => {
                   setNotice(error instanceof Error ? `Source selection blocked (${error.message}).` : "Source selection could not be read.");
@@ -2291,6 +2308,23 @@ export default function WorkspacePage() {
                   <div className="workspace-intake-actions">
                     <button type="button" onClick={() => void loadDocuments()}>Retry loading sources</button>
                   </div>
+                </div>
+              ) : !intakeOpen ? (
+                <div className="workspace-intake-copy workspace-intake-loading" role="status" aria-live="polite">
+                  {workspaceState.mode === "new" && surface === "home"
+                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "Bring your knowledge to TAVONEL"}</h1>
+                    : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "Source intake"}</h2>}
+                  <p>{customerDataAccess === "checking"
+                    ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
+                    : customerDataAccess === "closed"
+                      ? "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
+                      : "Source access could not be verified. Sign in again before choosing files."}</p>
+                  {customerDataAccess === "closed" ? (
+                    <div className="workspace-intake-gated-actions">
+                      <Link className="btn" href="/contact">Arrange a pilot</Link>
+                      <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
               <div className="workspace-intake-copy">
@@ -2366,7 +2400,7 @@ export default function WorkspacePage() {
                   <button type="button" onClick={() => stagingAbortRef.current?.abort()}>Cancel</button>
                 </div>
               ) : null}
-              {stagedSelection ? (
+              {stagedSelection && intakeOpen ? (
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
                   <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
@@ -2447,7 +2481,7 @@ export default function WorkspacePage() {
                       blocks is a corpus the compile step would refuse and a count still in
                       flight, both of which are answers rather than the absence of one.
                     */}
-                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
+                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
                     <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
                   </div>
                 </div>
@@ -2573,7 +2607,7 @@ export default function WorkspacePage() {
                 {collectionResult ? (
                   <WorldExplorer
                     collection={collectionResult}
-                    onUpload={activationPolicy.customerIntake.enabled ? () => fileRef.current?.click() : undefined}
+                    onUpload={activationPolicy.customerIntake.enabled && intakeOpen ? () => fileRef.current?.click() : undefined}
                   />
                 ) : null}
               </div>
