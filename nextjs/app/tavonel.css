@@ -4804,7 +4804,7 @@
   .public-page .scene.doc {
     min-height: auto;
     justify-content: flex-start;
-    padding: clamp(112px, 11vw, 156px) 0 clamp(72px, 8vw, 112px);
+    padding: var(--doc-section-padding-top, clamp(112px, 11vw, 156px)) 0 var(--doc-section-padding-bottom, clamp(72px, 8vw, 112px));
   }
   .public-page .scene.doc .body { gap: var(--content-gap); }
   .public-page .scene.doc .body + .body { margin-top: var(--section-gap); }
@@ -4936,7 +4936,7 @@
   }
 
   @media (max-width: 720px) {
-    .public-page .scene, .public-page .scene.doc { padding: 92px 0 68px; }
+    .public-page .scene, .public-page .scene.doc { padding: var(--doc-section-padding-top, 92px) 0 var(--doc-section-padding-bottom, 68px); }
     .public-page .scene.doc .body + .body { margin-top: 66px; }
     .compile-film-viewport { min-height: 58vw; }
     .board-failure-banner { grid-template-columns: 1fr; }

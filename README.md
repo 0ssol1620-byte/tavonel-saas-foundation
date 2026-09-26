@@ -226,7 +226,7 @@ until both are settled.
 - **REST** — versioned endpoints under `nextjs/app/api/v1`, bearer-token authenticated, documented
   with a request in cURL, Python and TypeScript per endpoint at `/docs`. Machine-readable contract
   at `/openapi.json`.
-- **MCP** — eight read-only stdio tools (`list_sources`, `get_world`, `search_world`,
+- **MCP** — nine read-only stdio tools (`list_sources`, `list_worlds`, `get_world`, `search_world`,
   `ask_world`, `get_object`, `get_relation`, `get_evidence`, `download_package`) over the same
   World a human sees. No write tool exists, and the server refuses to start if one is added; both
   the exact tool list and the read-only refusal are asserted by `nextjs/lib/mcp-server.test.ts`.

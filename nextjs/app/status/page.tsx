@@ -59,8 +59,8 @@ function stamp(iso: string | null) {
 
   Every row in the first list comes from `readPublicOperations`, which reads this deployment's own
   configuration and activation gates at render time. Not one of them sends a request through the
-  component it describes. The source value `operational` is shown here as `configured`, in a
-  neutral color: it means configured and open, not reachable. Before this separation a reader
+  component it describes. The source value `configured` is shown in a neutral color: it means
+  configured and open, not reachable. Before this separation a reader
   saw green operational rows from the active deployment and could not tell they might remain
   unchanged through an outage.
 
@@ -116,7 +116,7 @@ export default async function StatusPage() {
   */
   return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
     <h2>Configuration and activation state</h2>
-    <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state === "operational" ? "configured" : value.state}><span>{value.state === "operational" ? "configured" : value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
+    <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 
     <h2>Scheduled dependency checks</h2>
     <p>Request checks here run on a schedule without customer data and report what came back. Billing is a configuration-only check; it sends no request through a payment flow. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>

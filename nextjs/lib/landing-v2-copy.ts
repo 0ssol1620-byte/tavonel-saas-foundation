@@ -245,9 +245,9 @@ const EN: LandingV2Copy = {
       files you already have" is the same invitation with nothing promised that is not built.
     */
     support:
-      "Turn supported files and connected sources into structured, versioned knowledge. Follow a result back to its source, then use it with your AI.",
+      "Explore a finished Compiled World: versioned knowledge you can trace back to its source and use with your AI. We arrange intake for your own sources with you.",
     microProofFormats: ACCEPTED_FORMATS,
-    microProofConnected: "connected sources",
+    microProofConnected: "Own-source intake arranged with us",
     regionLabelFormat: "SOURCE · {form} · p.{page} · {coordinates}",
     pageOfFormat: "p.{page} of {pageCount}",
     demoLabel: "What the compiler does with one page",
@@ -537,9 +537,9 @@ const KO: LandingV2Copy = {
       c: "AI가 신뢰할 수 있는 지식, 원문까지 추적됩니다.",
     },
     support:
-      "지원되는 파일과 연결 소스를 구조화하고 버전을 기록합니다. 결과에서 원문으로 돌아가 확인한 뒤, 쓰던 AI에서 활용하세요.",
+      "완성된 Compiled World에서 원문까지 확인할 수 있는 지식을 살펴보세요. 내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",
     microProofFormats: ACCEPTED_FORMATS,
-    microProofConnected: "연결 소스",
+    microProofConnected: "내 자료 연결은 상담 후 설정",
     /* 원문 is KO_TERMS' spelling of "source"; 쪽 is the page counter the filing metadata uses. */
     regionLabelFormat: "원문 · {form} · {page}쪽 · {coordinates}",
     pageOfFormat: "{pageCount}쪽 중 {page}쪽",

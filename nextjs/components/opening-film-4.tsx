@@ -10,12 +10,9 @@
  * instead — an assistant, an editor, a terminal, and the world all three are touching. They
  * hand off to each other across the 18 seconds rather than running in lockstep.
  *
- * Everything protocol-shaped here was executed against the real clients before it was drawn:
- * the MCP handshake and its four tool names, the vendor Accept header, the CLI's verbs and its
- * `Wrote <file> (archive=…; manifest=…)` line, and the GroundedAnswer shape from
- * `lib/grounded-ask.ts` — status / answer / citations[] with pageNumber1, bbox1000, authority
- * and excerpt. The tenant's documents are fixture, as everywhere else on the landing page,
- * which states that once under the hero. This cut carries no caption of its own.
+ * The interface names follow the shipped read-only MCP distribution. The tenant's documents
+ * and responses are illustrative fixtures; the surrounding page labels this as a walkthrough,
+ * not a customer's measured result.
  *
  * Do not retune cuts 1–3 from here.
  */
@@ -65,13 +62,11 @@ const CITED_EXCERPT =
   "Either party may end employment with thirty (30) days' written notice.";
 
 const MCP_TOOLS = [
-  "list_documents",
-  "get_collection",
-  "get_active_world",
-  "ask_active_world",
+  "list_worlds",
+  "get_world",
+  "ask_world",
+  "get_evidence",
 ];
-
-const COLLECTION = "collection-8f2ad41c";
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -113,9 +108,9 @@ type Line = { at: number; text: string; ink?: string; mono?: boolean; indent?: n
 /** Column 3 — the assistant panel: handshake, tools, the ask, the grounded answer. */
 const MCP_LINES: Line[] = [
   { at: 0.15, text: "→ initialize", ink: INK.dim },
-  { at: 0.7, text: "← tavonel-readonly  2026.8.30.1", ink: INK.text },
+  { at: 0.7, text: "← tavonel-readonly", ink: INK.text },
   { at: 1.1, text: "  protocolVersion 2025-06-18", ink: INK.faint },
-  { at: 1.5, text: "→ tools/list", ink: INK.dim },
+  { at: 1.5, text: "→ tools/list · 4 of 9 shown", ink: INK.dim },
 ];
 
 /*
@@ -128,11 +123,11 @@ const MCP_LINES: Line[] = [
 */
 const TERM_LINES: Line[] = [
   { at: 0.15, text: "$ export TAVONEL_API_KEY=tvnl_live_••••", ink: INK.text },
-  { at: 0.6, text: "$ tavonel status", ink: INK.hi },
-  { at: 1.0, text: "  collection  " + COLLECTION, ink: INK.text },
-  { at: 1.2, text: "  world       compiled · 4 sources", ink: INK.text },
-  { at: 1.4, text: "  ocr.gpu     enabled", ink: INK.text },
-  { at: 1.6, text: "  promotion   explicit human decision", ink: INK.dim },
+  { at: 0.6, text: "$ tavonel worlds", ink: INK.hi },
+  { at: 1.0, text: "  active World · 4 sources", ink: INK.text },
+  { at: 1.2, text: "  choose its collection id", ink: INK.dim },
+  { at: 1.4, text: "$ export COLLECTION_ID=<world-id>", ink: INK.text },
+  { at: 1.6, text: "  human-activated revision", ink: INK.dim },
   { at: 1.9, text: "$ tavonel documents", ink: INK.hi },
   { at: 2.3, text: "  handbook-2026.pdf        v1  official", ink: INK.text },
   { at: 2.5, text: "  MSA_v4.pdf               v2  contractual", ink: INK.text },
@@ -241,7 +236,7 @@ export default function OpeningFilm4() {
 
       iy = lines(ix, iy, w, t, MCP_LINES);
 
-      // The four tools arrive as a list, one per frame-ish, after tools/list.
+      // Four examples from the shipped read-only tool set arrive after tools/list.
       if (t > 2.3) {
         const count = Math.min(MCP_TOOLS.length, Math.floor((t - 2.3) / 0.16) + 1);
         for (let i = 0; i < count; i += 1) {
@@ -257,7 +252,7 @@ export default function OpeningFilm4() {
         iy += 6;
         context.fillStyle = INK.hi;
         context.font = `500 ${BODY}px ui-monospace, Menlo, monospace`;
-        context.fillText(typed(`→ ask_active_world`, t, ACT.attach + 0.3), ix, iy);
+        context.fillText(typed(`→ ask_world`, t, ACT.attach + 0.3), ix, iy);
         iy += ROW;
         context.fillStyle = INK.text;
         context.font = `400 ${BODY}px ui-monospace, Menlo, monospace`;
@@ -289,17 +284,17 @@ export default function OpeningFilm4() {
         const at = ACT.code + 0.2;
         iy += 8;
         const rows: Line[] = [
-          { at: at, text: `→ ask_active_world`, ink: INK.dim },
+          { at: at, text: `→ ask_world`, ink: INK.dim },
           { at: at + 0.35, text: `  "What is our AWS spend?"`, ink: INK.dim },
           { at: at + 0.85, text: `← "status": "abstained"`, ink: INK.amber },
           { at: at + 1.15, text: `  NO_REGION_BOUND_EVIDENCE_MATCH`, ink: INK.amber },
           { at: at + 1.45, text: `  "citations": []`, ink: INK.faint },
           { at: at + 2.0, text: ``, ink: INK.text },
-          { at: at + 2.1, text: `→ get_active_world`, ink: INK.dim },
-          { at: at + 2.5, text: `← "promotedAt": "2026-08-31"`, ink: INK.text },
-          { at: at + 2.8, text: `  "retainedVersions": 3`, ink: INK.text },
+          { at: at + 2.1, text: `→ get_world`, ink: INK.dim },
+          { at: at + 2.5, text: `← active World with citations`, ink: INK.text },
+          { at: at + 2.8, text: `  source versions retained`, ink: INK.text },
           { at: at + 3.1, text: ``, ink: INK.text },
-          { at: at + 3.2, text: `→ list_documents`, ink: INK.dim },
+          { at: at + 3.2, text: `→ list_sources`, ink: INK.dim },
           { at: at + 3.5, text: `← 4 documents · 4 versions`, ink: INK.text },
           { at: at + 3.8, text: `  every answer names one`, ink: INK.faint },
         ];
@@ -331,7 +326,7 @@ export default function OpeningFilm4() {
         { at: 0.6, text: ``, ink: INK.text },
         { at: 0.7, text: `const base = process.env.TAVONEL_URL;`, ink: INK.text },
         { at: 1.0, text: `const key = process.env.TAVONEL_API_KEY;`, ink: INK.text },
-        { at: 1.3, text: `const id = "${COLLECTION}";`, ink: INK.text },
+        { at: 1.3, text: `const id = process.env.COLLECTION_ID;`, ink: INK.text },
         { at: 1.7, text: ``, ink: INK.text },
         { at: 1.8, text: `// one endpoint, one shape, versioned`, ink: INK.faint },
       ];
@@ -403,7 +398,7 @@ export default function OpeningFilm4() {
         const at = ACT.assistant + 0.6;
         iy += 8;
         const rows: Line[] = [
-          { at: at, text: `$ tavonel ask ${COLLECTION} \\`, ink: INK.hi },
+          { at: at, text: `$ tavonel ask "$COLLECTION_ID" \\`, ink: INK.hi },
           { at: at + 0.5, text: `    "${QUESTION}"`, ink: INK.hi },
           { at: at + 1.3, text: `  "status": "grounded"`, ink: INK.green },
           { at: at + 1.7, text: `  ${CITED_DOC}  p.${CITED_PAGE}`, ink: INK.text },
@@ -420,7 +415,7 @@ export default function OpeningFilm4() {
         const at = ACT.abstain - 0.9;
         iy += 10;
         const rows: Line[] = [
-          { at: at, text: `$ tavonel download ${COLLECTION} \\`, ink: INK.hi },
+          { at: at, text: `$ tavonel download "$COLLECTION_ID" \\`, ink: INK.hi },
           { at: at + 0.3, text: `    world.zip`, ink: INK.hi },
           { at: at + 0.75, text: `Wrote world.zip`, ink: INK.green },
           { at: at + 1.0, text: `  archive=sha256:9f4c…`, ink: INK.text },
@@ -451,7 +446,7 @@ export default function OpeningFilm4() {
      * evidence to point at. That is the whole reason this column is in the frame.
      */
     const drawWorld = (x: number, y: number, w: number, h: number, t: number) => {
-      pane(x, y, w, h, "WORLD", t > ACT.attach ? COLLECTION : "");
+      pane(x, y, w, h, "WORLD", t > ACT.attach ? "active" : "");
       if (!graph) return;
       const g = graph;
       const ox = x + 10;
@@ -477,7 +472,7 @@ export default function OpeningFilm4() {
         The window closes at `ACT.abstain + 0.9` rather than at `ACT.abstain`, because the
         assistant is still showing the refusal while the terminal types the download — and a
         graph that relights under a visible `"citations": []` is the one contradiction this
-        column exists to prevent. It comes back for `get_active_world`, which is a real read of
+        column exists to prevent. It comes back for `get_world`, which is a real read of
         a real promoted world and therefore genuinely has something to light.
       */
       const grounded =

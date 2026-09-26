@@ -1,0 +1,105 @@
+@layer components {
+  .scene {
+    --doc-section-padding-top: clamp(48px, 5vw, 72px);
+    --doc-section-padding-bottom: 64px;
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(42px, 5vw, 64px);
+    width: 100%;
+  }
+
+  .intro {
+    width: min(100%, 790px);
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .intro h1 {
+    max-width: 790px;
+    margin: 18px auto 24px;
+  }
+
+  .intro p {
+    max-width: 660px;
+    margin-inline: auto;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 34px 0 24px;
+  }
+
+  .plans {
+    width: 100%;
+  }
+
+  .plans > h2 {
+    margin: 0 0 24px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-paper-lg);
+    background: var(--seam);
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 255px;
+    padding: clamp(22px, 3vw, 38px);
+    background: var(--g1);
+  }
+
+  .card h3 {
+    margin: 0 0 20px;
+    font-size: clamp(20px, 2vw, 27px);
+  }
+
+  .price {
+    margin: 0 0 20px;
+    font-size: clamp(32px, 3vw, 42px);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  .unit {
+    font-size: 14px;
+    letter-spacing: 0;
+  }
+
+  .card p:not(.price) {
+    margin: 0 0 12px;
+    line-height: 1.6;
+  }
+
+  .card a:last-child {
+    align-self: flex-start;
+    margin-top: auto;
+    padding-top: 18px;
+  }
+
+  .terms {
+    max-width: 850px;
+    margin-top: 26px;
+  }
+
+  @media (max-width: 700px) {
+    .scene { --doc-section-padding-top: 36px; --doc-section-padding-bottom: 52px; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .card { min-height: 0; }
+    .actions { align-items: stretch; }
+    .actions a { flex: 1 1 100%; text-align: center; }
+  }
+}

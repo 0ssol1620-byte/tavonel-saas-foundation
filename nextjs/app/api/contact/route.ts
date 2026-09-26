@@ -18,11 +18,13 @@ const TOPICS = {
 } as const;
 
 type Topic = keyof typeof TOPICS;
+type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
 type Contact = {
   name: string;
   email: string;
   company: string;
   topic: Topic;
+  plan: PlanIntent;
   message: string;
   website: string;
   startedAt: number;
@@ -125,7 +127,7 @@ export async function POST(request: Request) {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "Idempotency-Key": contactId(contact.email, contact.message, contact.locale),
+      "Idempotency-Key": contactId(contact.email, contact.message, contact.locale, contact.plan),
     },
     body: JSON.stringify({
       from,
@@ -149,6 +151,7 @@ function parseContact(raw: unknown): Contact | null {
   const email = text(value.email).toLowerCase();
   const company = text(value.company);
   const topic = text(value.topic);
+  const plan = text(value.plan);
   const message = text(value.message);
   const website = text(value.website);
   const locale = value.locale === "ko" ? "ko" : "en";
@@ -166,12 +169,13 @@ function parseContact(raw: unknown): Contact | null {
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
     company.length > 120 ||
     !(topic in TOPICS) ||
+    !["", "Developer", "Team", "Enterprise"].includes(plan) ||
     message.length < 20 || message.length > 5_000 ||
     website.length > 200 ||
     typeof startedAt !== "number" || !Number.isInteger(startedAt) || startedAt <= 0
   ) return null;
 
-  return { name, email, company, topic: topic as Topic, message, website, startedAt, locale, qualification };
+  return { name, email, company, topic: topic as Topic, plan: plan as PlanIntent, message, website, startedAt, locale, qualification };
 }
 
 function text(value: unknown) {
@@ -188,9 +192,9 @@ function isRateLimited(key: string) {
   return false;
 }
 
-function contactId(email: string, message: string, locale: Contact["locale"]) {
+function contactId(email: string, message: string, locale: Contact["locale"], plan: PlanIntent) {
   const digest = createHash("sha256")
-    .update(`${email}\n${message}\n${locale}`)
+    .update(`${email}\n${message}\n${locale}\n${plan}`)
     .digest("hex")
     .slice(0, 32);
   return `contact/${digest}`;
@@ -201,6 +205,7 @@ function plainText(contact: Contact) {
     "TAVONEL website inquiry",
     "",
     `Type: ${TOPICS[contact.topic]}`,
+    ...(contact.plan ? [`Plan: ${contact.plan}`] : []),
     `Language: ${contact.locale}`,
     `Name: ${contact.name}`,
     `Email: ${contact.email}`,
@@ -218,6 +223,7 @@ function htmlBody(contact: Contact) {
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Name</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.name)}</td></tr>
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Language</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${contact.locale}</td></tr>
+      ${contact.plan ? `<tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Plan</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${contact.plan}</td></tr>` : ""}
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Email</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.email)}</td></tr>
       <tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">Company</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(contact.company || "Not provided")}</td></tr>
       ${qualificationLines(contact.qualification).map((line) => `<tr><th style="text-align:left;padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(line.label)}</th><td style="padding:10px 0;border-bottom:1px solid #ddd">${escapeHtml(line.value)}</td></tr>`).join("")}

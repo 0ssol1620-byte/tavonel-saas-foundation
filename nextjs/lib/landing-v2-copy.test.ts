@@ -181,6 +181,9 @@ describe("the Landing V2 copy", () => {
       }
       expect(LANDING_V2_COPY[locale].hero.microProofConnected.length).toBeGreaterThan(0);
     }
+    expect(LANDING_V2_COPY.en.hero.support).not.toContain("and connected sources");
+    expect(LANDING_V2_COPY.en.hero.microProofConnected).toContain("arranged with us");
+    expect(LANDING_V2_COPY.ko.hero.microProofConnected).toContain("상담 후");
   });
 
   it("links only to routes this site has -- and never to /architecture (rule 7)", () => {

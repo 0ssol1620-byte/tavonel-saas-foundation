@@ -12,6 +12,7 @@ import styles from "./compiler-specimen.module.css";
 const FRAME_MS = 2600;
 const STAGE_LABELS_KO = ["원문", "구조", "근거", "지식", "활용"] as const;
 const ui = (korean: boolean, ko: string, en: string) => korean ? ko : en;
+const EVIDENCE_HREF = `/explore?act=evidence&evidence=${encodeURIComponent(source.exploreEvidenceId)}`;
 
 const COPY = {
   en: {
@@ -151,7 +152,11 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
       <div className={styles.evidenceComposition} data-stage-composition="evidence">
         <p className={styles.compositionLabel}>{ui(korean, "근거의 원문 주소", "Evidence address")}</p>
         <blockquote data-derived="1">{source.excerpt}</blockquote>
-        <p className={styles.sourceLocator} data-derived="1">{source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}</p>
+        <p className={styles.sourceLocator} data-derived="1">
+          <a href={EVIDENCE_HREF} hrefLang={korean ? "en" : undefined}>
+            {ui(korean, "Explore에서 원문 열기 (영문)", "Open the source in Explore")} ↗ {source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}
+          </a>
+        </p>
         <details className={styles.sourceDetails}>
           <summary>{korean ? "전체 원문 주소 살펴보기" : "Inspect the full source address"}</summary>
           <div className={styles.addressGrid}>
@@ -189,7 +194,11 @@ function StageComposition({ index, korean }: { index: number; korean: boolean })
         <strong data-derived="1" data-critical-value="answer-current">{source.currentValue}</strong>
         <span data-derived="1">{ui(korean, source.unitKo, source.unit)} · {ui(korean, source.currentPeriodKo, source.currentPeriod)}</span>
       </p>
-      <p className={styles.citation} data-derived="1">↗ {source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}</p>
+      <p className={styles.citation} data-derived="1">
+        <a href={EVIDENCE_HREF} hrefLang={korean ? "en" : undefined}>
+          {ui(korean, "Explore에서 원문 열기 (영문)", "Open the source in Explore")} ↗ {source.filename} · {ui(korean, `${source.page}쪽`, `page ${source.page}`)} · {source.regionId}
+        </a>
+      </p>
     </div>
   );
 }
@@ -335,15 +344,14 @@ export default function CompilerSpecimen({
         <span className={styles.identity}>
           {copy.source} · <span data-derived="1">{source.id}</span>
         </span>
-        <button
+        {!reducedMotion ? <button
           className={styles.motion}
           type="button"
           onClick={toggle}
           aria-pressed={playing}
-          disabled={reducedMotion}
         >
           {ended ? copy.replay : playing ? copy.pause : copy.play}
-        </button>
+        </button> : null}
       </div>
       <div
         className={styles.canvas}

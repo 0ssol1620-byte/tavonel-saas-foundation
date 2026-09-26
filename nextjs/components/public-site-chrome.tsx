@@ -59,7 +59,7 @@ export function PublicSiteHeader({
   korean = false,
 }: {
   signedIn?: boolean;
-  /** G1-043: /ko is the site's one Korean URL, and it rendered an English header around it. */
+  /** Korean entry, pricing, and contact share the localized chrome. */
   korean?: boolean;
 }) {
   const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";
@@ -73,7 +73,7 @@ export function PublicSiteHeader({
       <DesktopPrimaryNav korean={korean} />
       <MobilePrimaryNav korean={korean} signedIn={signedIn} />
       <span className="nav-actions">
-        <Link className="btn small" href="/pricing" hrefLang={korean ? "en" : undefined}>{pricingLabel}</Link>
+        <Link className="btn small" href={korean ? "/ko/pricing" : "/pricing"}>{pricingLabel}</Link>
         {/*
           Below the desktop switch this link is in the phone sheet instead, where it gets a 44px
           row of its own. At 360px the row was wordmark + toggle + a 109px filled button + Sign in
@@ -120,7 +120,7 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
               <p className="site-footer-title">{korean ? KO_CHROME.footerGroups[group.title] ?? group.title : group.title}</p>
               {/* T1-014: the footer is always below the fold; prefetching every group wasted ~185KB on a cold home load. */}
               {group.links.map((link) => (
-                <Link key={link.href} href={(korean && link.href === "/contact" ? "/ko/contact" : link.href) as Route} hrefLang={korean && link.href !== "/contact" ? "en" : undefined} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
+                <Link key={link.href} href={(korean && (link.href === "/contact" || link.href === "/pricing") ? `/ko${link.href}` : link.href) as Route} hrefLang={korean && link.href !== "/contact" && link.href !== "/pricing" ? "en" : undefined} prefetch={false}>{korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label}</Link>
               ))}
             </nav>
           ))}

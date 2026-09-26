@@ -17,7 +17,7 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 */
 export const metadata: Metadata = {
   title: "Arena — TAVONEL",
-  description: "The public model-comparison results are not published yet. The benchmark protocol is.",
+  description: "Document-reader comparison results are published on Benchmarks. A separate Arena leaderboard is not published here.",
   alternates: { canonical: "/arena" },
   // Still its own address when someone shares the link. `noindex` governs the crawl; it does not
   // make the page preview as the homepage.
@@ -32,18 +32,17 @@ export default function ArenaPage() {
         <div className="shell">
           <div className="body">
             <div className="stack">
-              <h1 className="document-title">TAVONEL Arena is not published yet.</h1>
+              <h1 className="document-title">Document-reader results are on Benchmarks.</h1>
               <p className="lede">
-                Arena is where processing paths will be compared on the same corpus, with model
-                versions, failure accounting and price snapshots recorded per run. Nothing is
-                published here until a run exists that a reader can reproduce.
+                The Model Arena document-reading board is already published on Benchmarks, with
+                model versions, failures and price snapshots for that run. A separate Arena
+                leaderboard is not published at this address.
               </p>
               <p>
-                The protocol those runs will follow is published now, and so are the research
-                notes behind it.
+                Read the measured board and its limits before using a result to compare readers.
               </p>
               <div className="actions">
-                <Link className="btn" href="/benchmarks">Read the benchmark protocol</Link>
+                <Link className="btn" href="/benchmarks">Read the measured results</Link>
                 <Link className="btn ghost" href="/research">Research notes</Link>
               </div>
             </div>

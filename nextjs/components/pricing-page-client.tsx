@@ -786,11 +786,11 @@ export default function PricingPageClient({
     /contact. Nothing about the destination depends on JavaScript having run.
   */
   const planHref = (plan: (typeof PLANS)[number]) => {
-    if (plan.name === "Enterprise") return "/contact";
+    if (plan.name === "Enterprise") return "/contact?plan=Enterprise";
     if (plan.anchor) return `#${plan.anchor}`;
     if (plan.name === "Evaluation") return selfService ? "/login" : EXPLORE_CTA.href;
     if (ownerBillingExempt && plan.offerCode) return "/workspace";
-    if (!plan.offerCode || !liveCheckout) return "/contact";
+    if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`;
     return loginUrlForOffer(plan.offerCode);
   };
 
@@ -887,7 +887,12 @@ export default function PricingPageClient({
                   </p>
                   <div className="plan-features">
                     {plan.name === "Team" ? <p className="fine"><b>Single-member workspace</b></p> : null}
-                    <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                    {!ownFilesOpen && (plan.name === "Developer" || plan.name === "Team") ? (
+                      <p className="fine">Your own sources are set up with us before the first compile.</p>
+                    ) : null}
+                    <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
+                      <li key={feature}>{!ownFilesOpen && feature === "Compile your own worlds" ? "Compile your own worlds after assisted setup" : feature}</li>
+                    ))}</ul>
                     {/* The single-member limit is on the card; detailed exclusions remain available on demand. */}
                     {plan.notYetSold.length > 0 ? (
                       <details className="status-fold">
@@ -1276,7 +1281,7 @@ export default function PricingPageClient({
                 onboarding, and support, then send a written quote in US dollars, excluding tax.
               </p>
               <div className="actions">
-                <Link className="btn" href="/contact">Scope an Enterprise pilot</Link>
+                <Link className="btn" href="/contact?plan=Enterprise">Scope an Enterprise pilot</Link>
                 <Link className="btn ghost" href={"/trust" as Route}>Review public trust resources</Link>
               </div>
               <details className="status-fold pricing-depth">

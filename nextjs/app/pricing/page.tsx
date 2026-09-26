@@ -3,6 +3,7 @@ import PricingPageClient, {
   type PlanFeatureState,
   type PurchaseGate,
 } from "@/components/pricing-page-client";
+import type { Metadata } from "next";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
@@ -10,6 +11,13 @@ import type { FoundationBillingAccount } from "@/lib/billing-store";
 import { readPublicStatusV2 } from "@/lib/public-status";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Pricing — TAVONEL",
+  description: "Plans and measured compute for the TAVONEL Knowledge Compiler. Hard spend limits.",
+  alternates: { canonical: "/pricing", languages: { en: "/pricing", ko: "/ko/pricing", "x-default": "/pricing" } },
+  openGraph: { url: "/pricing" },
+};
 
 /*
   Audit M04 and P05: the two gates a buyer meets after paying, disclosed before they pay.

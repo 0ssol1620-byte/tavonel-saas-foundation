@@ -66,8 +66,8 @@ describe("landing scene 09 -- start", () => {
 
   it.each(LOCALES)("%s names Explore from the constant and never by a retired name", (locale) => {
     const html = render(locale);
-    expect(html).toContain(`href="${locale === "ko" ? "/pricing" : EXPLORE_CTA.href}"`);
-    expect(text(html)).toContain(locale === "ko" ? "요금 보기 (영문)" : actionsFor(locale).exploreLabel);
+    expect(html).toContain(`href="${locale === "ko" ? "/ko/pricing" : EXPLORE_CTA.href}"`);
+    expect(text(html)).toContain(locale === "ko" ? "요금 보기" : actionsFor(locale).exploreLabel);
     // §19 types "Explore the public World". It is a RETIRED_NAME; the constant is the one spelling.
     expect(text(html)).not.toContain("Explore the public World");
   });
@@ -75,13 +75,13 @@ describe("landing scene 09 -- start", () => {
   it.each(LOCALES)("%s carries the price line and links only to routes this site publishes", (locale) => {
     const html = render(locale);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(locale === "ko" ? ["/ko/contact", "/pricing"] : ["/pricing", EXPLORE_CTA.href]);
+    expect(hrefs).toEqual(locale === "ko" ? ["/ko/contact", "/ko/pricing"] : ["/pricing", EXPLORE_CTA.href]);
   });
 
   it.each(LOCALES)("%s keeps deployment detail on Pricing rather than in the closing scene", (locale) => {
     const html = render(locale);
     expect(html).not.toContain('data-customer-data="arranged"');
-    expect(html).toContain('href="/pricing"');
+    expect(html).toContain(`href="${locale === "ko" ? "/ko/pricing" : "/pricing"}"`);
   });
 
   it.each(LOCALES)("%s prints no figure, because this scene measured nothing", (locale) => {

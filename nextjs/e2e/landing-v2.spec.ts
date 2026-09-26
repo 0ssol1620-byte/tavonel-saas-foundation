@@ -37,11 +37,11 @@ async function selectedStage(page: Page): Promise<number> {
 }
 
 test.describe("six-beat page structure", () => {
-  test("Korean close leads to a Korean inquiry, with pricing clearly marked as English", async ({ page }) => {
+  test("Korean close leads to a Korean inquiry and Korean pricing", async ({ page }) => {
     await page.goto("/ko");
     const close = page.locator("#s6");
     await expect(close.locator('[data-scene-next="start"]')).toHaveAttribute("href", "/ko/contact");
-    await expect(close.getByRole("link", { name: "요금 보기 (영문)" })).toHaveAttribute("hreflang", "en");
+    await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
     await close.locator('[data-scene-next="start"]').click();
     await expect(page).toHaveURL(/\/ko\/contact$/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("도입을 함께 검토합니다");
@@ -298,6 +298,24 @@ test.describe("lower CompilerSpecimen explanation", () => {
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);
   });
 
+  test("Korean pricing carries the selected plan into the inquiry", async ({ page }) => {
+    await page.goto("/ko/pricing");
+    await page.getByRole("link", { name: "Developer 도입 상담" }).click();
+    await expect(page).toHaveURL(/\/ko\/contact\?plan=Developer$/);
+    await expect(page.locator("[data-plan-intent]")).toHaveText("Developer 요금제 문의");
+    await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
+  });
+
+  test("opens the exact source region from the specimen answer", async ({ page }) => {
+    await page.goto("/");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
+    await specimen.getByRole("tab", { name: "Intelligence" }).click();
+    await specimen.getByRole("link", { name: /Open the source in Explore/ }).click();
+    await expect(page).toHaveURL(new RegExp(`evidence=${COMPILER_SPECIMEN_SOURCE.exploreEvidenceId.split(":")[0]}`));
+    await expect(page.locator("main")).toContainText(COMPILER_SPECIMEN_SOURCE.filename);
+    await expect(page.locator("main")).toContainText("Research and development 10,887");
+  });
+
   test("supports roving-tab keyboard selection", async ({ page }) => {
     await page.goto("/");
     const tabs = page.locator('#s1 [data-compiler-specimen] [role="tab"]');
@@ -482,7 +500,7 @@ test.describe("responsive and reduced-motion parity", () => {
     const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await expect(tabs).toHaveCount(COMPILER_SPECIMEN_STAGES.length);
-    await expect(specimen.getByRole("button", { name: "Play" })).toBeVisible();
+    await expect(specimen.getByRole("button", { name: "Play" })).toHaveCount(0);
     await page.waitForTimeout(2_850);
     expect(await selectedStage(page)).toBe(2);
     await tabs.last().click();

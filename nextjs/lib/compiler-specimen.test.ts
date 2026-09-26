@@ -47,6 +47,7 @@ describe("homepage compiler specimen", () => {
     expect(COMPILER_SPECIMEN_SOURCE.excerpt).toContain(
       "Research and development 10,887 8,268"
     );
+    expect(COMPILER_SPECIMEN_SOURCE.exploreEvidenceId).toBe(landingSnapshot.tabs[0]?.region.id);
 
     const document = publicSample.find(
       entry => entry.documentId === COMPILER_SPECIMEN_SOURCE.id

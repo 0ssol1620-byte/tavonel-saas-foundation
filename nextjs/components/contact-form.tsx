@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { QUALIFICATION } from "@/lib/contact-qualification";
 import { contactText, koreanContactError, type ContactLocale } from "@/lib/contact-locale";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
+type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
 
 export default function ContactForm({ locale = "en" }: { locale?: ContactLocale }) {
   const [state, setState] = useState<State>("idle");
   const [message, setMessage] = useState("");
+  const [planIntent, setPlanIntent] = useState<PlanIntent>("");
   const [startedAt] = useState(() => Date.now());
+
+  useEffect(() => {
+    const plan = new URLSearchParams(window.location.search).get("plan");
+    setPlanIntent(plan === "Developer" || plan === "Team" || plan === "Enterprise" ? plan : "");
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +95,10 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         rather than left as a bare asterisk.
       */}
       <p className="fine">{contactText("Three fields are needed for a reply. They are marked Required.", locale)}</p>
+      {planIntent ? (
+        <p className="fine" data-plan-intent>{locale === "ko" ? `${planIntent} 요금제 문의` : `Inquiry about the ${planIntent} plan`}</p>
+      ) : null}
+      <input type="hidden" name="plan" value={planIntent} />
       <div className="contact-pair">
         <Field label={contactText("Name", locale)} requiredLabel={contactText("Required", locale)} name="name" autoComplete="name" minLength={2} maxLength={80} required />
         <Field label={contactText("Work email", locale)} requiredLabel={contactText("Required", locale)} name="email" type="email" autoComplete="email" maxLength={254} required />

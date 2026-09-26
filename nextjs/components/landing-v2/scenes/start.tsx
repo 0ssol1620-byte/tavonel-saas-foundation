@@ -43,7 +43,7 @@ const TITLE_ID = "lv2-start-title";
   copy module is the shared deck, and this is the only surface that says this. "요금" is the
   spelling `KO_CHROME.nav` already uses for /pricing, so the close and the bar agree.
 */
-const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: "요금 보기 (영문)" };
+const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: "요금 보기" };
 
 /**
  * The two site-wide actions, already resolved by the server.
@@ -110,7 +110,7 @@ export default function Scene({
               `EXPLORE_CTA.label` as the page resolved it. "Explore the public World" -- the wording
               §19 types -- is on `RETIRED_NAMES`; the constant is the only spelling of this action.
             */}
-            <Link className={`lv2-text-link ${styles.link}`} href={(locale === "ko" ? "/pricing" : actions.exploreHref) as Route} hrefLang={locale === "ko" ? "en" : undefined} prefetch={false}>
+            <Link className={`lv2-text-link ${styles.link}`} href={(locale === "ko" ? "/ko/pricing" : actions.exploreHref) as Route} prefetch={false}>
               {locale === "ko" ? PRICING_LABEL.ko : actions.exploreLabel}
               <span aria-hidden="true">→</span>
             </Link>

@@ -68,6 +68,7 @@ nextjs/scripts/qa/*.mjs text eol=lf
 # above predate this line and are kept; this one covers the class, including the three scripts a
 # fresh Windows checkout was still getting CRLF hashbangs on.
 nextjs/scripts/**/*.mjs text eol=lf
+nextjs/scripts/encode-cut-2x.sh text eol=lf
 
 # The two reference verifiers are copied verbatim to nextjs/public/developer/ as
 # tavonel-verify-export.mjs and tavonel-verify-package.mjs, pinned by sha256 in

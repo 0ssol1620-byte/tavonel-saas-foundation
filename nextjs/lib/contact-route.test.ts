@@ -76,6 +76,20 @@ describe("contact route", () => {
     expect(payload.html).toContain(">ko</td>");
   });
 
+  it("carries a selected plan into the inquiry and rejects invented plan names", async () => {
+    vi.stubEnv("AKC_RESEND_API_KEY", "secret-test-key");
+    vi.stubEnv("AKC_CONTACT_FROM", "TAVONEL <no-reply@tavonel.com>");
+    vi.stubEnv("AKC_CONTACT_TO", "hello@tavonel.com");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+
+    expect((await POST(request({ ...valid, plan: "Developer" }))).status).toBe(202);
+    const [, options] = fetchMock.mock.calls[0]!;
+    const payload = JSON.parse(String(options?.body)) as Record<string, string>;
+    expect(payload.text).toContain("Plan: Developer");
+    expect(payload.html).toContain(">Developer</td>");
+    expect((await POST(request({ ...valid, plan: "Administrator" }))).status).toBe(400);
+  });
+
   it("rejects cross-origin submissions", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("AKC_CONTACT_ALLOWED_ORIGINS", "https://tavonel.com");

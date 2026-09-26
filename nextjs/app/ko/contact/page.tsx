@@ -51,7 +51,7 @@ export default function KoreanContactPage() {
                   <a className="link" href={`tel:${operator.phone}`}>{operator.phone}</a>
                 </div>
               ) : null}
-              <p className="fine">요금과 제공 범위는 <Link href="/pricing" hrefLang="en">영문 요금 안내</Link>에서 확인할 수 있습니다. <Link href="/explore" hrefLang="en">공개 World (영문)</Link>는 로그인 없이 살펴볼 수 있습니다.</p>
+              <p className="fine">요금과 제공 범위는 <Link href="/ko/pricing">요금 안내</Link>에서 확인할 수 있습니다. <Link href="/explore" hrefLang="en">공개 World (영문)</Link>는 로그인 없이 살펴볼 수 있습니다.</p>
               <p className="fine">보안과 개인정보 처리는 <Link href="/security" hrefLang="en">보안 안내 (영문)</Link>에 설명되어 있습니다.</p>
             </div>
           </div>

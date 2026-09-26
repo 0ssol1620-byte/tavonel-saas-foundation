@@ -27,4 +27,26 @@ describe("opening film cut", () => {
       );
     }
   });
+
+  it("shows only shipped read-only MCP tool names in cut four", () => {
+    const film = read("components/opening-film-4.tsx");
+    const distribution = read("public/developer/tavonel-mcp.mjs");
+    const names = [...distribution.matchAll(/name: "([a-z_]+)"/g)].map((match) => match[1]);
+    const shown = film.match(/const MCP_TOOLS = \[([\s\S]*?)\];/)?.[1] ?? "";
+    const shownNames = [...shown.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]);
+    expect(shownNames.length).toBeGreaterThan(0);
+    for (const name of shownNames) expect(names).toContain(name);
+    for (const name of [...film.matchAll(/`→ ([a-z_]+)`/g)].map((match) => match[1])) {
+      expect(names).toContain(name);
+    }
+  });
+
+  it("uses commands published by the downloadable CLI in cut four", () => {
+    const film = read("components/opening-film-4.tsx");
+    const cli = read("public/developer/tavonel-cli.mjs");
+    for (const command of ["worlds", "documents", "ask", "download"]) {
+      expect(film).toContain(`tavonel ${command}`);
+      expect(cli).toContain(`tavonel-cli.mjs ${command}`);
+    }
+  });
 });

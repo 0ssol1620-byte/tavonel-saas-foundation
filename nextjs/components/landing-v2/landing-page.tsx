@@ -148,8 +148,8 @@ export default function LandingPage({
             <HeroActions
               exploreLabel={heroActions.exploreLabel}
               exploreHref={heroActions.exploreHref}
-              pricingLabel={korean ? "요금 보기 (영문)" : "View pricing"}
-              pricingHrefLang={korean ? "en" : undefined}
+              pricingLabel={korean ? "요금 보기" : "View pricing"}
+              pricingHref={korean ? "/ko/pricing" : "/pricing"}
               scene="1"
               ctaOrderVariant={experiment.ctaOrderVariant}
             />

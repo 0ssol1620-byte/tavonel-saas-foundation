@@ -120,7 +120,7 @@ describe("plan entitlement", () => {
     expect(pricing, "the pricing card must derive checkout from saleChannel")
       .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');
     expect(pricing, "contact-only plans must never enter checkout")
-      .toContain('if (!plan.offerCode || !liveCheckout) return "/contact"');
+      .toContain('if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`');
     expect(pricing, "a signed-out Developer buyer must carry the offer through sign-in")
       .toContain("return loginUrlForOffer(plan.offerCode)");
     expect(pricing, "a signed-in Developer buyer must open the existing checkout")
