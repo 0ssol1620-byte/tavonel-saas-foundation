@@ -138,7 +138,9 @@ jobs:
   lighthouse:
     name: Lighthouse budgets
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Three production-build measurements per route plus the build exceed 20 minutes
+    # after the Korean pricing/contact routes joined the enforced route set.
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: nextjs
