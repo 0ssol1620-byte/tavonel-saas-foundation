@@ -282,6 +282,180 @@
       "contract": "/product/continuous-knowledge"
     }
   },
+  "heroView": {
+    "source": {
+      "filename": "apple-2026-q1-10-q-reference.pdf",
+      "digest": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+      "page": 4,
+      "pageCount": 30,
+      "qualifier": "reference render",
+      "qualifierKo": "기준 렌더"
+    },
+    "image": {
+      "src": "/explore-sample/pages/apple-2026-q1-10-q-reference-p004.webp",
+      "width": 1400,
+      "height": 1812
+    },
+    "imageAbsentReason": null,
+    "regions": [
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-2ec1c8a2c5821d9e8d83ad89fd2eeb07",
+        "bbox1000": [
+          62,
+          116,
+          318,
+          156
+        ],
+        "excerpt": "PART I — FINANCIAL INFORMATION Item 1. Financial Statements",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 62,116,318,156 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-2ec1c8a2c5821d9e8d83ad89fd2eeb07"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-80ffb9ca9af382babdfdaf00cd735d01",
+        "bbox1000": [
+          188,
+          174,
+          813,
+          224
+        ],
+        "excerpt": "Apple Inc. CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited) (In millions, except number of shares, which are reflected in thousands, and per-share amounts)",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 188,174,813,224 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-80ffb9ca9af382babdfdaf00cd735d01"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-b51f1e7299e0b66328a3337d9c3a5b93",
+        "bbox1000": [
+          64,
+          249,
+          932,
+          352
+        ],
+        "excerpt": "Three Months Ended December 27, December 28, 2025 2024 Net sales: Products $ 113,743 $ 97,960 Services 30,013 26,340 Total net sales 143,756 124,300",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 64,249,932,352 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-b51f1e7299e0b66328a3337d9c3a5b93"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-55cfc87f8cb254c6b8b72655e30cc777",
+        "bbox1000": [
+          64,
+          375,
+          932,
+          454
+        ],
+        "excerpt": "Cost of sales: Products 67,478 59,447 Services 7,047 6,578 Total cost of sales 74,525 66,025 Gross margin 69,231 58,275",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 64,375,932,454 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-55cfc87f8cb254c6b8b72655e30cc777"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-80ce9cad00306cf5d7cb85c911bdff20",
+        "bbox1000": [
+          64,
+          476,
+          932,
+          538
+        ],
+        "excerpt": "Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 64,476,932,538 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-80ce9cad00306cf5d7cb85c911bdff20"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-2e72eec8edbec4804ad5c16219c33935",
+        "bbox1000": [
+          64,
+          561,
+          936,
+          639
+        ],
+        "excerpt": "Operating income 50,852 42,832 Other income/(expense), net 150 (248) Income before provision for income taxes 51,002 42,584 Provision for income taxes 8,905 6,254 Net income $ 42,097 $ 36,330",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 64,561,936,639 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-2e72eec8edbec4804ad5c16219c33935"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-81607ea579198dc97f20a18b4f00a981",
+        "bbox1000": [
+          64,
+          664,
+          932,
+          707
+        ],
+        "excerpt": "Earnings per share: Basic $ 2.85 $ 2.41 Diluted $ 2.84 $ 2.40",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 64,664,932,707 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-81607ea579198dc97f20a18b4f00a981"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-21f91030a4b1412ded621b71355147aa",
+        "bbox1000": [
+          64,
+          730,
+          932,
+          775
+        ],
+        "excerpt": "Shares used in computing earnings per share: Basic 14,748,158 15,081,724 Diluted 14,810,356 15,150,865",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 64,730,932,775 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-21f91030a4b1412ded621b71355147aa"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-370051727d9ce9e29eb984d4ccef8155",
+        "bbox1000": [
+          251,
+          800,
+          750,
+          812
+        ],
+        "excerpt": "See accompanying Notes to Condensed Consolidated Financial Statements.",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 251,800,750,812 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-370051727d9ce9e29eb984d4ccef8155"
+      },
+      {
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-bece577756c0fe700f49308069e02fcd",
+        "bbox1000": [
+          399,
+          855,
+          602,
+          866
+        ],
+        "excerpt": "Apple Inc. | Q1 2026 Form 10-Q | 1",
+        "excerptTruncated": false,
+        "locator": "p.4 of 30 · bbox 399,855,602,866 (per mille) · sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+        "href": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-bece577756c0fe700f49308069e02fcd"
+      }
+    ]
+  },
+  "heroStats": [
+    {
+      "id": "filings",
+      "value": "5",
+      "href": "/explore?act=world",
+      "mono": false
+    },
+    {
+      "id": "pages",
+      "value": "287 / 290",
+      "href": "/explore?act=world",
+      "mono": false
+    },
+    {
+      "id": "regions",
+      "value": "1,281",
+      "href": "/explore?act=evidence",
+      "mono": false
+    },
+    {
+      "id": "digest",
+      "value": "sha256 aff67d5c",
+      "href": "/explore?act=world",
+      "mono": true
+    }
+  ],
   "sources": {
     "stack": [
       {

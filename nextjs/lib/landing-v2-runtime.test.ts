@@ -6,6 +6,8 @@ import {
   LANDING_V2_STATE_WORD, LANDING_V2_STATE_WORD_KO,
 } from "./landing-v2-proof";
 import { buildSourcesScene, SOURCES_COPY } from "./landing-v2-sources";
+import { sampleEvidencePage } from "./evidence-regions";
+import { HERO_STATS } from "./hero-stats";
 
 const file = path.resolve(process.cwd(), "lib/landing-v2-snapshot.json");
 
@@ -14,6 +16,7 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     const expected = {
       schema: "tavonel.landing-public-proof.v1",
       tabs: buildProofTabs(), record: buildEvidenceRecord(), recompile: buildRecompileView(),
+      heroView: sampleEvidencePage(), heroStats: HERO_STATS,
       sources: buildSourcesScene(), sourcesCopy: SOURCES_COPY,
       stateWords: { en: LANDING_V2_STATE_WORD, ko: LANDING_V2_STATE_WORD_KO },
     };
@@ -42,7 +45,7 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
         if (entry.isDirectory()) walk(location);
         else if (/\.tsx?$/.test(entry.name)) {
           const source = readFileSync(location, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-          expect(source, location).not.toMatch(/from ["']@\/lib\/landing-v2-(?:proof|sources)["']/);
+          expect(source, location).not.toMatch(/from ["']@\/lib\/(?:landing-v2-(?:proof|sources)|evidence-regions|hero-stats)["']/);
         }
       }
     }
@@ -53,6 +56,8 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     expect(runtime.buildProofTabs()).toEqual(buildProofTabs());
     expect(runtime.buildEvidenceRecord()).toEqual(buildEvidenceRecord());
     expect(runtime.buildRecompileView()).toEqual(buildRecompileView());
+    expect(runtime.buildHeroView()).toEqual(sampleEvidencePage());
+    expect(runtime.buildHeroStats()).toEqual(HERO_STATS);
     expect(runtime.sourcesScene()).toEqual(buildSourcesScene());
     expect(runtime.SOURCES_COPY).toEqual(SOURCES_COPY);
     for (const key of Object.keys(LANDING_V2_STATE_WORD) as (keyof typeof LANDING_V2_STATE_WORD)[]) {

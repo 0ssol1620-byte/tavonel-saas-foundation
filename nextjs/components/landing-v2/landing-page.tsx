@@ -43,20 +43,14 @@ import {
   decide what a scene's landmark looks like.
 
   WHY THIS IS A SERVER COMPONENT
-  The data builders run the collection compiler through `lib/explore-sample.ts`, which is
-  server-only. The old landing was a client component that took two scalars as props; this one
-  reads the compiled public World and hands each scene a flat, serializable projection of it. The
-  browser interactions are isolated in the action row and the specimen's play/pause control.
+  The public World is compiled into a committed snapshot and checked against the source at build
+  time. This component reads the snapshot and hands each scene a flat, serializable projection.
+  Browser interactions stay in the action row and the specimen's play/pause control.
 */
 
 /*
-  The compiled World's projections, read once per process rather than once per render.
-
-  `/` and `/ko` are `force-dynamic` (the commercial posture has to be resolved per request), so
-  without this the two builders would run the collection compiler on every request to the two
-  most-visited routes. The World behind them is frozen at build time and every builder is pure
-  over it, so a module-level memo is the whole of what is needed -- not a cache with an
-  invalidation story, because there is nothing that can change it while the process lives.
+  The immutable snapshot projections are shared across `/` and `/ko` renders. Both routes stay
+  `force-dynamic` so their commercial posture is resolved for each request.
 */
 type ProofData = {
   tabs: ProofTab[];
