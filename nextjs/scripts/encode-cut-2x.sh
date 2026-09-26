@@ -17,11 +17,13 @@
 # keeps peak memory low enough to finish; the halves are concatenated with -c copy, no re-encode.
 set -euo pipefail
 
-FF="C:/Users/yspow/AppData/Local/uv/cache/archive-v0/yuHZO4Uo1Wx2lqkQ/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe"
-ROOT="C:/Users/yspow/work/tavonel-saas-foundation"
-FRAMES="$ROOT/docs/audit/$1/frames-2x"
-TMP="${LOCALAPPDATA}/Temp/enc-$2"
-mkdir -p "$TMP"
+FF="${FILM_FFMPEG:-C:/Users/yspow/AppData/Local/uv/cache/archive-v0/yuHZO4Uo1Wx2lqkQ/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+[ -x "$FF" ] || { echo "ffmpeg is not executable: $FF" >&2; exit 1; }
+[[ "$1" =~ ^[a-z0-9-]+$ && "$2" =~ ^[a-z0-9-]+$ ]] || { echo "capture and output names must be simple lowercase names" >&2; exit 1; }
+FRAMES="${FILM_CAPTURE_ROOT:-$ROOT/docs/audit}/$1/frames-2x"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
 
 count=$(ls -1 "$FRAMES"/f*.png | wc -l)
 echo "frames: $count"

@@ -5,6 +5,8 @@ import { GET as feedRoute } from "@/app/changelog/feed.xml/route";
 import {
   CHANGELOG,
   CHANGELOG_SURFACES,
+  changelogEntryId,
+  changelogEntryUpdatedAt,
   changelogEntries,
   changelogSections,
   changelogUpdatedAt,
@@ -41,9 +43,14 @@ describe("every entry", () => {
     }
   });
 
-  it("has a unique date, because the date is the permalink", () => {
-    const dates = CHANGELOG.map((entry) => entry.date);
-    expect(new Set(dates).size).toBe(dates.length);
+  it("keeps stable, unique permalinks when two releases share a date", () => {
+    const ids = CHANGELOG.map(changelogEntryId);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(CHANGELOG.filter((entry) => entry.date === "2026-09-18").map(changelogEntryId))
+      .toEqual(["2026-09-16", "2026-09-14"]);
+    expect(CHANGELOG.find((entry) => entry.id === "2026-09-19")?.date).toBe("2026-09-20");
+    expect(CHANGELOG.find((entry) => entry.id === "2026-09-19")?.releasedAt)
+      .toBe("2026-09-19T22:41:11Z");
   });
 
   it("promises nothing", () => {
@@ -53,6 +60,9 @@ describe("every entry", () => {
     for (const phrase of ["coming soon", "will be available", "we plan", "in the coming"]) {
       expect(text, phrase).not.toContain(phrase);
     }
+    expect(text).not.toContain("release candidate");
+    expect(text).not.toContain("pending merge");
+    expect(text).not.toContain("not live today");
   });
 
   /*
@@ -120,10 +130,11 @@ describe("the feed", () => {
     */
     const xml = await feedRoute().text();
     for (const entry of CHANGELOG) {
-      expect(xml, entry.date).toContain(`#${entry.date}`);
+      expect(xml, changelogEntryId(entry)).toContain(`#${changelogEntryId(entry)}`);
       expect(xml, entry.title).toContain(entry.title.replace(/&/g, "&amp;"));
+      expect(xml, entry.date).toContain(`<updated>${changelogEntryUpdatedAt(entry)}</updated>`);
     }
-    expect(xml).toContain(`<updated>${changelogUpdatedAt()}T00:00:00Z</updated>`);
+    expect(xml).toContain(`<updated>${changelogUpdatedAt()}</updated>`);
   });
 
   it("is well-formed Atom with an escaped body", async () => {
@@ -153,8 +164,8 @@ describe("the page that renders it", () => {
     expect(page).toContain("/changelog/feed.xml");
     expect(page).toContain('types: { "application/atom+xml"');
     expect(list).toContain("changelog-filter");
-    expect(list).toContain("id={entry.date}");
-    expect(list).toContain('href={`#${entry.date}`}');
+    expect(list).toContain("id={changelogEntryId(entry)}");
+    expect(list).toContain('href={`#${changelogEntryId(entry)}`}');
     expect(list).toContain("changelog-breaking");
   });
 

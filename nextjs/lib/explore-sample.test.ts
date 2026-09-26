@@ -333,6 +333,24 @@ describe("the Ask panel is answered by the retriever", () => {
       }
     }
   });
+
+  it("quotes answer-bearing top regions for every public sample question", () => {
+    const expected = [
+      { sourceId: "apple-2026-q1-10-q", page: 4, bbox: [64, 476, 932, 538], contains: "Research and development 10,887" },
+      { sourceId: "apple-2026-q1-10-q", page: 4, bbox: [64, 249, 932, 352], contains: "Net sales: Products $ 113,743" },
+      { sourceId: "apple-form-10-k", page: 4, bbox: [30, 291, 971, 380], contains: "designs, manufactures and markets smartphones" },
+    ];
+    expect(exploreSampleAnswers).toHaveLength(expected.length);
+    for (const [index, answer] of exploreSampleAnswers.entries()) {
+      const top = answer.citations[0];
+      const proof = expected[index];
+      expect(top.sourceId, answer.question).toBe(proof.sourceId);
+      expect(top.pageNumber1, answer.question).toBe(proof.page);
+      expect(top.bbox1000, answer.question).toEqual(proof.bbox);
+      expect(top.excerpt, answer.question).toContain(proof.contains);
+      expect(top.excerpt.trim(), answer.question).not.toMatch(/^(?:\(\d+\)|table of contents|[●•])/i);
+    }
+  });
 });
 
 /** Comments explain the values that were removed and must not count as the values. */

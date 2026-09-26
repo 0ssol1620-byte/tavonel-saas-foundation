@@ -149,11 +149,11 @@ describe("landing scene 08 -- trust", () => {
       carries the held-for-review FAQ answer the `review` proof states, word for word. Neither is
       invented -- both are routes in `app/` -- and an invented one still fails here.
     */
-    const allowed = ["/security", "/trust", "/subprocessors", "/status", "/evidence", "/docs/exports", "/contact"];
+    const allowed = ["/security", "/trust", "/subprocessors", "/status", "/evidence", "/docs/exports", "/contact", "/ko/contact"];
     for (const href of hrefs) expect(allowed, `trust scene links ${href}`).toContain(href);
     for (const proof of copy.proofs) {
       expect(allowed, `proof "${proof.id}" points at ${proof.href}`).toContain(proof.href);
-      expect(hrefs).toContain(proof.href);
+      expect(hrefs).toContain(locale === "ko" && proof.href === "/contact" ? "/ko/contact" : proof.href);
     }
     expect(hrefs).toContain("/status");
     // There is no /architecture route, and a security deep-dive is not this scene's job.

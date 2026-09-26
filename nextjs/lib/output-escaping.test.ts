@@ -52,21 +52,20 @@ describe("raw HTML injection", () => {
       The third arrived on 2026-09-16 with G2-032, from the commerce-legal lane, and this is the
       justification the message above asks for. /pricing publishes four prices and seventeen
       questions and emitted no Offer, PriceSpecification or FAQPage, so a crawler and an answer
-      engine read the page as prose. The block is a module-scope constant built by mapping over
-      `BILLING_OFFERS` and `PURCHASE_FAQ` -- both authored literals in this repository, both
-      already rendered as visible text on the same page -- which puts the sink's input in the same
-      class as the other two: nothing from a request, a document, a connector or a model, and
-      nothing a visitor can influence. It goes through `jsonLdHtml` like the others, which is the
-      property that contains the risk if the first sentence ever stops being true.
+      engine read the page as prose. The block maps over `BILLING_OFFERS` and the FAQ rows the
+      page also renders. Those answers are selected from authored literals by the same boolean
+      self-service gate as the plan cards: nothing comes from a request, a document, a connector
+      or a model. It goes through `jsonLdHtml` like the other emitters.
     */
     const byPath = new Map(users.map((file) => [file.path, file.text]));
     expect(byPath.get("app/layout.tsx")).toMatch(/__html: jsonLdHtml\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(breadcrumbList\(trail\)\)/);
-    expect(byPath.get("components/pricing-page-client.tsx")).toMatch(/__html: jsonLdHtml\(pricingJsonLd\(initialLiveCheckout\)\)/);
+    expect(byPath.get("components/pricing-page-client.tsx")).toMatch(/__html: jsonLdHtml\(pricingJsonLd\(initialLiveCheckout, faqRows\)\)/);
     expect(
       byPath.get("components/pricing-page-client.tsx"),
-      "the pricing block is a module constant over the catalog, never assembled from a prop or a fetch",
-    ).toMatch(/const pricingJsonLd = \(purchaseReady: boolean\) => \(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
+      "the pricing block uses authored FAQ rows selected by the product gate",
+    ).toMatch(/const pricingJsonLd = \(purchaseReady: boolean, faqRows: typeof PURCHASE_FAQ\) => \(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
+    expect(byPath.get("components/pricing-page-client.tsx")).toContain("const faqRows = purchaseFaqRows(selfService)");
     // G1-018 (truth lane, 2026-09-16): /knowledge-compiler emits FAQPage from the same five questions it renders.
     expect(byPath.get("app/knowledge-compiler/page.tsx")).toMatch(/__html: jsonLdHtml\(faqPageJsonLd\)/);
     expect(byPath.get("app/knowledge-compiler/page.tsx"), "built from the page's own literal")

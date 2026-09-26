@@ -23,7 +23,8 @@
  */
 import { chromium } from "@playwright/test";
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, isAbsolute, join, parse, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const route = process.argv[2] || "/film";
 const dirName = process.argv[3] || "film-capture";
@@ -31,7 +32,16 @@ const BASE = process.env.FILM_BASE || "http://127.0.0.1:3057";
 const FPS = 25;
 const RUN = 18;
 
-const frameDir = `C:/Users/yspow/work/tavonel-saas-foundation/docs/audit/${dirName}/frames-2x`;
+if (!/^[a-z0-9-]+$/.test(dirName)) throw new Error("capture-dir must be a simple lowercase directory name");
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const captureRoot = process.env.FILM_CAPTURE_ROOT
+  ? resolve(process.env.FILM_CAPTURE_ROOT)
+  : join(repositoryRoot, "docs", "audit");
+const frameDir = join(captureRoot, dirName, "frames-2x");
+const relativeFrames = relative(captureRoot, frameDir);
+if (captureRoot === parse(captureRoot).root || relativeFrames.startsWith("..") || isAbsolute(relativeFrames)) {
+  throw new Error("frame directory must stay inside a non-root capture directory");
+}
 rmSync(frameDir, { recursive: true, force: true });
 mkdirSync(frameDir, { recursive: true });
 

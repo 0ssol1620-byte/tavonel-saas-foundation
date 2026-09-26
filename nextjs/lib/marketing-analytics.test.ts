@@ -120,7 +120,10 @@ describe("the consent banner speaks the page's language", () => {
     }
     expect(consentCopy("/ko/anything-later")).toEqual(KO);
     for (const path of PUBLIC_MARKETING_PATHS) {
-      if (path === "/ko") continue;
+      if (path === "/ko" || path.startsWith("/ko/")) {
+        expect(consentCopy(path), `${path} must keep the Korean banner`).toEqual(KO);
+        continue;
+      }
       expect(consentCopy(path), `${path} must keep the English banner`).toEqual(EN);
     }
     // A prefix match that was too loose would take these with it.

@@ -316,15 +316,13 @@ describe("§77 /status scope", () => {
   const page = read("app/status/page.tsx");
 
   /*
-    BA-136. §77's requirement is that a reader cannot take "operational" on this page for a
-    request that succeeded. The page used to meet it with three negations before saying what it
-    was -- "not an uptime probe", "not that a request has just succeeded" -- and it now meets it
-    by stating both halves positively: what the word means, and which section answers the other
-    question. Both halves are pinned, so the distinction cannot be dropped by editing one line.
+    The configuration rows now display `configured` in a neutral color. A reader must also see
+    that these rows do not report a successful request; scheduled checks carry that evidence.
   */
-  it("says what its rows are, so 'operational' cannot be read as a probe", () => {
+  it("separates configured rows from successful requests", () => {
     expect(page).toContain("configured and its gate is open");
-    expect(page).toContain("the separate question the scheduled checks answer");
+    expect(page).toContain("it does not mean a request recently succeeded");
+    expect(page).toContain("Scheduled checks report request outcomes separately");
   });
 
   it("never claims all systems are operational", () => {
@@ -816,9 +814,9 @@ describe("the public trust contract keeps topology in the maintained legal recor
 /*
   G2-012 / SD-04. A page called Benchmarks with nothing to compare.
 
-  The page now names the planned GDP.pdf evaluation, its four controlled arms, and the public
-  source material needed to reproduce it. It also retains the two supporting research findings
-  already published with their denominators and receipts.
+  The page names the published two-arm GDP.pdf result, the two remaining arms of its four-arm
+  design, and the public source material. It also retains supporting research findings with
+  their denominators and receipts.
 
   So the block is derived from the same record /research/notes renders, and the guard is that a
   score cannot be typed into it. A figure that arrives as a literal on this page is a figure with
@@ -836,14 +834,16 @@ describe("G2-012 /benchmarks publishes the GDP.pdf evaluation design", () => {
     expect(block).toContain("Download the receipt");
   });
 
-  it("defines a public four-arm evaluation without presenting a result", () => {
+  it("distinguishes the published two-arm result from the unrun arms", () => {
     expect(block).toContain("100 held-out tasks across ten professional domains");
     expect(block).toContain("GDP_PDF_ARMS.map");
     expect(page).toContain('"Native PDF"');
     expect(page).toContain('"Compiled context"');
     expect(page).toContain('"Fixed retrieval"');
     expect(page).toContain('"Adaptive routing"');
-    expect(block).toContain("only with a qualified run");
+    expect(block).toContain("have published the PDF-alone and PDF-plus-compiled-context arms");
+    expect(block).toContain("remain unrun");
+    expect(page).toContain('"Not run"');
     expect(block).toContain("https://huggingface.co/datasets/surgeai/GDP.pdf");
     expect(block).toContain("https://github.com/surge-ai/gdp-pdf");
   });

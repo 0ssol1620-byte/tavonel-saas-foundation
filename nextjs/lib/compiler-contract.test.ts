@@ -7,6 +7,7 @@ import { crc32, deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { readCapabilities } from "./capabilities";
 import { CLAIM_STATE } from "./claim-state";
+import { MCP_TOOL_COUNT_WORD } from "./mcp-tools";
 import {
   CONTRACT_CLAUSES,
   CONTRACT_STATE,
@@ -900,6 +901,11 @@ describe("portable world formats", () => {
 });
 
 describe("interoperability standards", () => {
+  it("describes the published MCP tool count from the server's tool list", () => {
+    const mcp = INTEROP_STANDARDS.find((entry) => entry.name === "MCP");
+    expect(mcp?.note).toContain(`${MCP_TOOL_COUNT_WORD} tools`);
+  });
+
   it("lists the nine standards of the interoperability section", () => {
     expect(INTEROP_STANDARDS.map((entry) => entry.name)).toEqual([
       "RDF",

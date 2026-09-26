@@ -158,18 +158,22 @@ const GDP_PDF_ARMS = [
   [
     "Native PDF",
     "The provider receives the native PDF and the benchmark prompt, with no added context.",
+    "Two-arm run published",
   ],
   [
     "Compiled context",
     "The same native PDF and prompt are paired with TAVONEL's sealed compiled context. This is the primary comparison with Native PDF.",
+    "Two-arm run published",
   ],
   [
     "Fixed retrieval",
     "The same compiled corpus is queried through a fixed embedder and reranker, then cited evidence is passed to the same target model.",
+    "Not run",
   ],
   [
     "Adaptive routing",
     "The same corpus and query pass through a sealed eligible routing policy. The receipt records the chosen candidate and, where available, its control counterfactual or shadow run.",
+    "Not run",
   ],
 ] as const;
 
@@ -430,19 +434,19 @@ export default function BenchmarksPage() {
               */}
 
               {/*
-                G2-012. This block publishes a reproducible GDP.pdf evaluation design without
-                implying that a run has happened. The external corpus and reference harness are
-                linked directly; the four arms hold the corpus, prompts, models and rubric fixed.
+                G2-012. This block distinguishes the completed two-arm GDP.pdf run from the
+                remaining two arms of the four-arm design. The external corpus and reference
+                harness are linked directly; the published result names its protocol deviations.
 
                 The supporting research below remains derived from the evidence registry, with
                 dates and downloadable receipts carried by each record.
               */}
               <h2 className={styles.sectionTitle}>GDP.pdf evaluation design</h2>
               <p className={styles.para}>
-                GDP.pdf is a public set of 100 held-out tasks across ten professional domains. Our
-                planned evaluation keeps the corpus, prompts, target models, and scoring rubric
-                fixed across four arms. Results will be published here only with a qualified run
-                receipt.
+                GDP.pdf is a public set of 100 held-out tasks across ten professional domains. We
+                have published the PDF-alone and PDF-plus-compiled-context arms with their actual
+                conditions and deviations. Fixed retrieval and adaptive routing remain unrun; the
+                four-arm design is not a completed benchmark or a leaderboard score.
               </p>
               <p className={styles.para}>
                 Review the{" "}
@@ -464,8 +468,9 @@ export default function BenchmarksPage() {
                 receipts. It is not comparable with any published GDP.pdf score.
               </p>
               <div className="chain">
-                {GDP_PDF_ARMS.map(([title, body]) => (
+                {GDP_PDF_ARMS.map(([title, body, state]) => (
                   <article className="link" key={title}>
+                    <span className="st">{state}</span>
                     <h3>{title}</h3>
                     <p>{body}</p>
                   </article>

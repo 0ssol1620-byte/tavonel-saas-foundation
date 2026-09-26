@@ -148,6 +148,19 @@
         {
           "bbox1000": [
             64,
+            249,
+            932,
+            352
+          ],
+          "file": "/explore-sample/pages/apple-2026-q1-10-q-reference-p004-r64-249-932-352.webp",
+          "width": 2430,
+          "height": 373,
+          "bytes": 25142,
+          "sha256": "sha256:a9d1ea2352f8a6e37ec85bbb0a2234b2c0ff898b5f987261bb5c0f0b7555864c"
+        },
+        {
+          "bbox1000": [
+            64,
             561,
             936,
             639

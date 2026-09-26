@@ -28,7 +28,7 @@ describe("approved one-path experience", () => {
     expect(HEADER_NAV).toEqual(CUSTOMER_NAV.filter((item) => item.href !== "/pricing"));
     expect(text("components/site-nav/desktop-primary-nav.tsx")).toContain("HEADER_NAV.map");
     expect(text("components/mobile-primary-nav.tsx")).toContain("HEADER_NAV.map");
-    expect(text("components/public-site-chrome.tsx")).toContain('href="/pricing"');
+    expect(text("components/public-site-chrome.tsx")).toContain('href={korean ? "/ko/pricing" : "/pricing"}');
   });
   it("does not confuse a prefix with an unrelated route", () => {
     expect(customerNavOwns("/product", "/product/document-intelligence/")).toBe(true);
@@ -77,8 +77,8 @@ describe("approved one-path experience", () => {
     const order = [
       'id="s1"',
       "<HeroStatement",
-      "<CompilerSpecimen",
       "<HeroActions",
+      "<CompilerSpecimen",
       'id="s2"',
       "<HeroProof",
       "<HeroFilm",
@@ -191,8 +191,8 @@ describe("approved one-path experience", () => {
       rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
     const composition = text("components/landing-v2/landing-page.tsx");
-    expect(composition, "the commercial path goes through Pricing")
-      .toContain('pricingLabel={korean ? "요금 보기" : "View pricing"}');
+    expect(composition, "the pricing link remains in the Korean journey")
+      .toContain('pricingHref={korean ? "/ko/pricing" : "/pricing"}');
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');

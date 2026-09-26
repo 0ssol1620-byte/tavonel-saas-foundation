@@ -12,7 +12,7 @@ type Page = {
   route: (
     url: string,
     handler: (route: {
-      fulfill: (options: { json: unknown }) => Promise<void>;
+      fulfill: (options: { json: unknown; status?: number }) => Promise<void>;
       request: () => { headers: () => Record<string, string> };
     }) => Promise<void>
   ) => Promise<void>;
@@ -57,7 +57,7 @@ async function installSession(page: Page) {
   );
 }
 
-async function mockWorkspace(page: Page, reviewRequired = false) {
+async function mockWorkspace(page: Page, reviewRequired = false, artifactManifest = candidateManifest) {
   /*
    * On mount the workspace asks whether a compile run is still open, so a reloaded tab rejoins
    * it rather than starting a second one. Unanswered, that request 401s against the fake session
@@ -96,11 +96,11 @@ async function mockWorkspace(page: Page, reviewRequired = false) {
     route.fulfill({
       json: {
         candidatePromotion: false,
-        artifactKey: `immutable/pilot-test/pilot-test/collections/${collectionId}/${"b".repeat(64)}/candidate-world.json`,
+        artifactKey: `immutable/pilot-test/pilot-test/collections/${collectionId}/${artifactManifest.replace("sha256:", "")}/candidate-world.json`,
         artifact: {
           schemaVersion: "tavonel.collection_candidate.v1",
           collectionId,
-          manifestDigest: candidateManifest,
+          manifestDigest: artifactManifest,
           lifecycle: reviewRequired ? "review_required" : "candidate",
           candidatePromotion: false,
           reviewReasons: reviewRequired ? ["CONTRADICTION_CANDIDATE:claim-a:claim-b"] : [],
@@ -263,6 +263,70 @@ async function withCompiledWorld(page: Page) {
 }
 
 const NARROW_STAGE_MAX = 820;
+
+test("a first candidate does not claim consumers are reading a previous active World", async ({ page }, testInfo) => {
+  await installSession(page);
+  await mockWorkspace(page);
+  await page.route(`**/api/collections/${collectionId}/world`, route =>
+    route.fulfill({ status: 404, json: { code: "ACTIVE_WORLD_NOT_FOUND" } })
+  );
+  await page.route(`**/api/v1/world/${collectionId}`, route =>
+    route.fulfill({ json: { model: {
+      ...worldModel,
+      world: { ...worldModel.world, status: "candidate", revision: null },
+      freshness: {
+        observedAt: "2026-09-10T08:00:00.000Z",
+        processedAt: "2026-09-10T09:30:00.000Z",
+        reviewedAt: null,
+        activatedAt: null,
+        activeManifestDigest: null,
+        candidateAwaitingActivation: true,
+        candidateManifestDigest: candidateManifest,
+      },
+    } } })
+  );
+  await page.goto(`/workspace/world?collection=${collectionId}`);
+  const freshness = page.locator('[aria-labelledby="world-freshness-title"]');
+  await expect(freshness).toContainText("no active World exists for Ask, API or MCP to read");
+  await expect(freshness).not.toContainText("previous active World");
+  await expect(page.getByText("Compiled candidate loaded. Its required package entries and state were checked.")).toBeVisible();
+  await expect(page.locator('[aria-labelledby="world-studio-title"]')).toContainText("Inspect this candidate before activation");
+  await page.screenshot({ path: testInfo.outputPath("first-candidate-freshness.png"), fullPage: true });
+});
+
+test("reopening the active World does not label it as a waiting candidate", async ({ page }, testInfo) => {
+  await installSession(page);
+  await mockWorkspace(page, false, activeManifest);
+  await withCompiledWorld(page);
+  await page.goto(`/workspace/world?collection=${collectionId}`);
+  await expect(page.getByText("Active World loaded. Its required package entries and state were checked.")).toBeVisible();
+  await expect(page.locator('[aria-labelledby="world-studio-title"]')).toContainText("Inspect the current World first");
+  await expect(page.getByText("Compiled candidate loaded.")).toHaveCount(0);
+  await expect(page.getByText("This is the compiled package structure. Activation is a separate, recorded human decision.")).toBeVisible();
+  await expect(page.getByText("Nothing here is activated as the live World")).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("active-world-state.png"), fullPage: true });
+});
+
+test("a review-required package is not announced as activatable", async ({ page }, testInfo) => {
+  await installSession(page);
+  await mockWorkspace(page, true);
+  await page.goto(`/workspace/world?collection=${collectionId}`);
+  await expect(page.getByText("Review-required package loaded. Its required package entries and state were checked. Resolve its blockers before activation.")).toBeVisible();
+  await expect(page.getByText("Compiled candidate loaded.")).toHaveCount(0);
+  await expect(page.locator('[aria-labelledby="world-studio-title"]')).toContainText("A readable compiled model appears here when one is available.");
+  await page.screenshot({ path: testInfo.outputPath("review-required-state.png"), fullPage: true });
+});
+
+test("an unreadable active pointer is reported instead of guessing candidate state", async ({ page }) => {
+  await installSession(page);
+  await mockWorkspace(page);
+  await page.route(`**/api/collections/${collectionId}/world`, route =>
+    route.fulfill({ status: 503, json: { code: "WORLD_STORE_UNAVAILABLE" } })
+  );
+  await page.goto(`/workspace/world?collection=${collectionId}`);
+  await expect(page.getByText(/Active world verification failed/)).toBeVisible();
+  await expect(page.getByText("Compiled candidate loaded.")).toHaveCount(0);
+});
 
 // Deterministic two-page PDF fixture for renderer mechanics, not product evidence.
 function sourcePreviewPdfFixture() {

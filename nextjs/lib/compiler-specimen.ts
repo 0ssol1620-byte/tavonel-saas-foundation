@@ -5,6 +5,9 @@ export const COMPILER_SPECIMEN_SOURCE = {
   page: 4,
   pageCount: 30,
   regionId: "apple-2026-q1-10-q-p4-r14",
+  // The public World addresses compiled evidence by this id; regionId is the
+  // original OCR region id. Both resolve to the same source box.
+  exploreEvidenceId: "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-80ce9cad00306cf5d7cb85c911bdff20",
   bbox1000: [64, 476, 932, 538] as const,
   digest:
     "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
@@ -13,7 +16,9 @@ export const COMPILER_SPECIMEN_SOURCE = {
   question: "What were operating expenses for research and development?",
   statement: "Condensed consolidated statements of operations",
   unit: "USD millions",
+  unitKo: "백만 달러",
   currentPeriod: "Dec 27, 2025",
+  currentPeriodKo: "2025년 12월 27일",
   priorPeriod: "Dec 28, 2024",
   currentValue: "10,887",
   priorValue: "8,268",

@@ -18,7 +18,7 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   the terms began to apply and does not move when wording changes; this is the day the wording
   last changed, and it is the date of the commit that changed it.
 */
-export const LEGAL_LAST_UPDATED = "2026-09-16";
+export const LEGAL_LAST_UPDATED = "2026-09-27";
 
 /*
   SD-07. One draft label, on every legal document, until counsel signs it off.
@@ -64,9 +64,9 @@ export function readPublicOperations() {
     // made a production-keyed pilot deployment describe itself as "live".
     phase: commercial.mode === "live" ? "live" : "private_pilot",
     components: {
-      website: { state: "operational", detail: "Public site and authenticated workspace" },
+      website: { state: "configured", detail: "Public site and authenticated workspace" },
       authentication: {
-        state: auth ? "operational" : "not_configured",
+        state: auth ? "configured" : "not_configured",
         detail: "Google OAuth through the dedicated Supabase project",
       },
       /*
@@ -77,17 +77,18 @@ export function readPublicOperations() {
         anyone yet. Neither is a degraded service, and "restricted" reads like one.
 
         They are now named by what this function actually knows about each. The pipeline row is
-        `closed`: an activation gate in `activation-policy.ts` is false, and a closed gate is a
-        decision rather than a fault. The billing row is `disabled`: every check passes and the
+        `closed`: customer document admission is held shut by `customerData` even when the
+        processing components are configured. The billing row is `disabled`: every check passes and the
         live-charge switch is off. No branch may produce an empty state -- `operations.test.ts`
         holds that -- so no row on /status renders without a word.
       */
       documentPipeline: {
         state:
           activationPolicy.customerIntake.enabled &&
+          activationPolicy.customerData.enabled &&
           activationPolicy.cdr.enabled &&
           activationPolicy.ocrGpu.enabled
-            ? "operational"
+            ? "configured"
             : "closed",
         detail: "Quarantine, CDR and GPU OCR candidate processing",
       },
@@ -96,7 +97,7 @@ export function readPublicOperations() {
           ? sandbox
             ? "test_only"
             : billingLaunchApproved
-              ? "operational"
+              ? "configured"
               : "disabled"
           : "not_configured",
         detail: sandbox
@@ -106,7 +107,7 @@ export function readPublicOperations() {
             : "Paddle live checkout configured; launch approval pending",
       },
       export: {
-        state: readExportSignerEnv() ? "operational" : "not_configured",
+        state: readExportSignerEnv() ? "configured" : "not_configured",
         detail: "Signed portable knowledge packages",
       },
     },

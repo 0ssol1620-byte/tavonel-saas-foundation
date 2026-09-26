@@ -245,9 +245,9 @@ const EN: LandingV2Copy = {
       files you already have" is the same invitation with nothing promised that is not built.
     */
     support:
-      "Turn supported files and connected sources into structured, versioned knowledge. Follow a result back to its source, then use it with your AI.",
+      "Explore a finished Compiled World: versioned knowledge you can trace back to its source and use with your AI. We arrange intake for your own sources with you.",
     microProofFormats: ACCEPTED_FORMATS,
-    microProofConnected: "connected sources",
+    microProofConnected: "Own-source intake arranged with us",
     regionLabelFormat: "SOURCE · {form} · p.{page} · {coordinates}",
     pageOfFormat: "p.{page} of {pageCount}",
     demoLabel: "What the compiler does with one page",
@@ -296,7 +296,7 @@ const EN: LandingV2Copy = {
     support: "Open a finished Compiled World and read the source behind every answer in it.",
     tabsLabel: "Questions answered from this Compiled World",
     answerLabel: "From the source",
-    sourceLabel: "Original filing",
+    sourceLabel: "Source page",
     /*
       Not §12's "Open source ↗". "Open source" reads first as the software licence, and this site
       already has one name for this act: /explore's Evidence pane says "Open the source region".
@@ -537,9 +537,9 @@ const KO: LandingV2Copy = {
       c: "AI가 신뢰할 수 있는 지식, 원문까지 추적됩니다.",
     },
     support:
-      "지원되는 파일과 연결 소스를 구조화하고 버전을 기록합니다. 결과에서 원문으로 돌아가 확인한 뒤, 쓰던 AI에서 활용하세요.",
+      "완성된 Compiled World에서 원문까지 확인할 수 있는 지식을 살펴보세요. 내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",
     microProofFormats: ACCEPTED_FORMATS,
-    microProofConnected: "연결 소스",
+    microProofConnected: "내 자료 연결은 상담 후 설정",
     /* 원문 is KO_TERMS' spelling of "source"; 쪽 is the page counter the filing metadata uses. */
     regionLabelFormat: "원문 · {form} · {page}쪽 · {coordinates}",
     pageOfFormat: "{pageCount}쪽 중 {page}쪽",
@@ -564,7 +564,7 @@ const KO: LandingV2Copy = {
     support: "완성된 Compiled World를 열어, 모든 답 뒤에 있는 원문을 직접 읽어 보세요.",
     tabsLabel: "이 Compiled World에서 답한 질문",
     answerLabel: "원문에서",
-    sourceLabel: "원문 공시 문서",
+    sourceLabel: "원문 페이지",
     openSource: "원문 영역 열기",
     note: "각 답은 검색기가 점수를 매긴 원문 그대로이며, 다시 쓴 문장이 아닙니다.",
   },

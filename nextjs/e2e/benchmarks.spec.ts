@@ -53,7 +53,8 @@ test("publishes the compilation protocol and source-bound recovery without an un
   const stated = page.locator("main");
   await expect(stated).toContainText("The qualification contract defines what a knowledge-compilation result has to carry");
   await expect(page.getByRole("heading", { name: "GDP.pdf evaluation design" })).toBeVisible();
-  await expect(stated).toContainText("Results will be published here only with a qualified run receipt");
+  await expect(stated).toContainText("Fixed retrieval and adaptive routing remain unrun");
+  await expect(stated.getByRole("link", { name: /Read the two-arm run/ })).toHaveAttribute("href", "/benchmarks/gdp-pdf");
   for (const arm of ["Native PDF", "Compiled context", "Fixed retrieval", "Adaptive routing"]) {
     await expect(page.getByRole("heading", { name: arm, exact: true })).toBeVisible();
   }

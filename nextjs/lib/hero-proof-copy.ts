@@ -23,6 +23,7 @@ export const HERO_PROOF_COPY: Readonly<
   Record<HeroProofLocale, {
     /** One sentence under the panel, saying what a reader is looking at. */
     caption: string;
+    indexLabel: string;
     /** The strip's accessible name. Read aloud, never painted. */
     stripLabel: string;
     /** In the order `lib/hero-stats.ts` emits them. */
@@ -31,7 +32,8 @@ export const HERO_PROOF_COPY: Readonly<
 > = {
   en: {
     caption:
-      "A page of the public sample World, with the regions this compile read out of it. Move through them with Tab or a pointer; each one opens at its own id in Explore.",
+      "A page of the public sample World with one source region and its passage. Open the region index to inspect the other locations; each one opens at its own id in Explore.",
+    indexLabel: "Inspect all source regions",
     stripLabel: "What the public sample World holds",
     stats: [
       "public filings compiled",
@@ -42,7 +44,8 @@ export const HERO_PROOF_COPY: Readonly<
   },
   ko: {
     caption:
-      "공개 샘플 World의 한 페이지와, 이 컴파일이 그 페이지에서 읽어낸 근거 영역입니다. Tab 또는 포인터로 이동하며, 각 영역은 Explore에서 자기 id로 열립니다.",
+      "공개 샘플 World의 한 페이지와 그 안의 근거 영역 하나, 그리고 해당 문단입니다. 영역 목록을 열면 다른 위치도 확인할 수 있으며, 각 영역은 Explore에서 자기 id로 열립니다.",
+    indexLabel: "모든 원문 영역 살펴보기",
     stripLabel: "공개 샘플 World가 담고 있는 것",
     stats: [
       "컴파일된 공개 공시 문서",

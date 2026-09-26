@@ -9,17 +9,19 @@ export default function HeroActions({
   exploreLabel,
   exploreHref,
   pricingLabel,
+  pricingHref = "/pricing",
   scene,
   ctaOrderVariant = "a",
 }: {
   exploreLabel: string;
   exploreHref: string;
   pricingLabel: string;
+  pricingHref?: string;
   scene: string;
   ctaOrderVariant?: "a" | "b" | "c";
 }) {
   const explore = { label: exploreLabel, href: exploreHref, cta: "explore" } as const;
-  const pricing = { label: pricingLabel, href: "/pricing", cta: "pricing" } as const;
+  const pricing = { label: pricingLabel, href: pricingHref, cta: "pricing" } as const;
   const [primary, secondary] = ctaOrderVariant === "b" ? [pricing, explore] : [explore, pricing];
   const onSelect = (action: typeof explore | typeof pricing) => () => {
     if (scene === "1" && action.cta === "explore") trackFunnel("hero_explore_clicked");

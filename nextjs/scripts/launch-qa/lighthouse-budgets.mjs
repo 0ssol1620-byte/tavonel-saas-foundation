@@ -35,7 +35,7 @@ const serverMode = process.env.QA_SERVER_MODE ?? "production";
   measured on every run, its summary line is printed like any other, and it starts failing the
   build the day the shift is fixed and it is moved into `routes`.
 */
-const routes = ["/", "/privacy", "/security", "/pricing", "/explore"];
+const routes = ["/", "/privacy", "/security", "/pricing", "/ko/pricing", "/ko/contact", "/explore"];
 /*
   `/login` and `/auth/callback` are here because of a regression that nothing caught.
 

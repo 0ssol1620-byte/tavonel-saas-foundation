@@ -21,6 +21,8 @@ import {
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { KO_CHROME } from "@/lib/site-navigation";
+import { primaryCallToAction } from "@/lib/commercial-state";
 import {
   landingVariantState,
   type LandingVariantState,
@@ -96,6 +98,12 @@ export default function LandingPage({
     exploreLabel: korean ? KO_EXPLORE_LABEL : EXPLORE_CTA.label,
     exploreHref: EXPLORE_CTA.href,
   };
+  const access = primaryCallToAction();
+  const startActions = {
+    ...heroActions,
+    accessHref: korean && access.href === "/contact" ? "/ko/contact" : access.href,
+    accessLabel: korean ? KO_CHROME.cta[access.href] : access.label,
+  };
   const specimenCopy = korean
     ? { eyebrow: "작동 방식", title: "한 원문이 지식이 되는 다섯 단계" }
     : { eyebrow: "How it compiles", title: "One source. Five transformations." };
@@ -137,22 +145,23 @@ export default function LandingPage({
               accent={korean ? undefined : "Knowledge you can verify"}
               headlineVariant={experiment.headlineVariant}
             />
+            <HeroActions
+              exploreLabel={heroActions.exploreLabel}
+              exploreHref={heroActions.exploreHref}
+              pricingLabel={korean ? "요금 보기" : "View pricing"}
+              pricingHref={korean ? "/ko/pricing" : "/pricing"}
+              scene="1"
+              ctaOrderVariant={experiment.ctaOrderVariant}
+            />
+            <p className="lv2-hero-intake lv2-meta">
+              {korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats}{" "}
+              <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
+            </p>
             <div className="lv2-scene-head lv2-how-head">
               <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
             </div>
             <CompilerSpecimen korean={korean} />
-            <HeroActions
-              exploreLabel={heroActions.exploreLabel}
-              exploreHref={heroActions.exploreHref}
-              pricingLabel={korean ? "요금 보기" : "View pricing"}
-              scene="1"
-              ctaOrderVariant={experiment.ctaOrderVariant}
-            />
-            <p className="lv2-hero-intake lv2-meta">
-              {copy.hero.microProofFormats}{" "}
-              <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
-            </p>
           </div>
         </section>
 
@@ -186,7 +195,7 @@ export default function LandingPage({
           sceneIndex={4}
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
-        <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
+        <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />
     </div>

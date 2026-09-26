@@ -5,6 +5,7 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import ExploreFrame from "@/components/explore/explore-frame";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import tableStyles from "@/components/docs/docs-table.module.css";
 
 export const metadata: Metadata = {
@@ -65,7 +66,7 @@ const LAYERS = [
   ["Ingestion and cleanup scripts", "Replaced", "One compile over a collection, versioned, producing a candidate a person activates, with the revision it replaces still readable."],
   ["Enterprise search", "Connects to", "The package carries a retrieval-ready index, and the API and MCP are read-only. An existing search product keeps its index; what changes is that a result can name the source version behind it."],
   ["Ontology and knowledge platforms", "Connects to", "Turtle, JSON-LD and CSV leave in a signed package that a graph database or an ontology tool imports, so modelling and business rules stay in the tool your team already runs."],
-  ["Agent and workflow orchestration", "Connects to", "Eight read-only MCP tools and an HTTP API: an agent reads a World, and the actions it takes stay in the orchestrator that took them."],
+  ["Agent and workflow orchestration", "Connects to", `The ${MCP_TOOL_COUNT_WORD} read-only MCP tools and an HTTP API let an agent read a World; the actions it takes stay in the orchestrator that took them.`],
 ] as const;
 
 export default function ProductPage() {

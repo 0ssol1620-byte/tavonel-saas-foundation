@@ -12,14 +12,14 @@ import { readPublicOperations } from "./operations";
   no fallback of its own.
 
   The vocabulary is closed on purpose. A-6 names NOT CONFIGURED, CLOSED, DISABLED and NOT
-  QUALIFIED as the words for a component that is not serving; `operational` and `test_only` are
-  the two serving states this deployment can be in. A new word has to be added here, which is
+  QUALIFIED as the words for a component that is not serving; `configured` names an open gate
+  without implying a successful request, and `test_only` names a sandbox. A new word has to be added here, which is
   the moment to ask whether the reader will understand it -- the reason `restricted` is gone: it
   covered both a policy gate held shut and a fully configured billing integration that is
   deliberately not charging, and told the reader neither.
 */
 const ALLOWED_STATES = [
-  "operational",
+  "configured",
   "test_only",
   "not_configured",
   "closed",
@@ -45,5 +45,10 @@ describe("public operations", () => {
     expect(["live", "private_pilot"]).toContain(status.phase);
     expect(status.service).toBe("TAVONEL Foundation");
     expect(Number.isNaN(Date.parse(status.generatedAt))).toBe(false);
+  });
+
+  it("does not describe a closed customer-data path as a working pipeline", () => {
+    const status = readPublicOperations();
+    expect(status.components.documentPipeline.state).toBe("closed");
   });
 });

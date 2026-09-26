@@ -1,15 +1,24 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { QUALIFICATION } from "@/lib/contact-qualification";
+import { contactText, koreanContactError, type ContactLocale } from "@/lib/contact-locale";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
+type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
 
-export default function ContactForm() {
+export default function ContactForm({ locale = "en" }: { locale?: ContactLocale }) {
   const [state, setState] = useState<State>("idle");
   const [message, setMessage] = useState("");
+  const [planIntent, setPlanIntent] = useState<PlanIntent>("");
   const [startedAt] = useState(() => Date.now());
+
+  useEffect(() => {
+    const plan = new URLSearchParams(window.location.search).get("plan");
+    setPlanIntent(plan === "Developer" || plan === "Team" || plan === "Enterprise" ? plan : "");
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,10 +38,16 @@ export default function ContactForm() {
           name, and fromEntries keeps only the last of them -- so a visitor who ticked four
           boxes would have been reported as having ticked one.
         */
-        body: JSON.stringify({ ...collect(formData), startedAt }),
+        body: JSON.stringify({ ...collect(formData), startedAt, locale }),
       });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "We could not send your inquiry.");
+      if (!response.ok) {
+        setState("error");
+        setMessage(locale === "ko"
+          ? koreanContactError(response.status)
+          : result.error || "We could not send your inquiry.");
+        return;
+      }
       const topic = formData.get("topic");
       // Count only a received commercial inquiry; no form values enter analytics.
       if (eligibleLead && (topic === "sales" || topic === "partnership")) trackFunnel("generate_lead");
@@ -52,7 +67,9 @@ export default function ContactForm() {
       setState("sent");
     } catch (reason) {
       setState("error");
-      setMessage(reason instanceof Error ? reason.message : "We could not send your inquiry.");
+      setMessage(locale === "ko"
+        ? koreanContactError()
+        : reason instanceof Error ? reason.message : "We could not send your inquiry.");
     }
   }
 
@@ -77,20 +94,24 @@ export default function ContactForm() {
         inside the label beside the field name, and the word is spelled out for a screen reader
         rather than left as a bare asterisk.
       */}
-      <p className="fine">Three fields are needed for a reply. They are marked Required.</p>
+      <p className="fine">{contactText("Three fields are needed for a reply. They are marked Required.", locale)}</p>
+      {planIntent ? (
+        <p className="fine" data-plan-intent>{locale === "ko" ? `${planIntent} 요금제 문의` : `Inquiry about the ${planIntent} plan`}</p>
+      ) : null}
+      <input type="hidden" name="plan" value={planIntent} />
       <div className="contact-pair">
-        <Field label="Name" name="name" autoComplete="name" minLength={2} maxLength={80} required />
-        <Field label="Work email" name="email" type="email" autoComplete="email" maxLength={254} required />
+        <Field label={contactText("Name", locale)} requiredLabel={contactText("Required", locale)} name="name" autoComplete="name" minLength={2} maxLength={80} required />
+        <Field label={contactText("Work email", locale)} requiredLabel={contactText("Required", locale)} name="email" type="email" autoComplete="email" maxLength={254} required />
       </div>
-      <Field label="Company or organization" name="company" autoComplete="organization" maxLength={120} />
+      <Field label={contactText("Company or organization", locale)} name="company" autoComplete="organization" maxLength={120} />
       <label className="contact-field">
-        <span>Inquiry type</span>
+        <span>{contactText("Inquiry type", locale)}</span>
         <select name="topic" defaultValue="sales">
-          <option value="sales">Product and pricing</option>
-          <option value="support">Product support</option>
-          <option value="security">Security review</option>
-          <option value="privacy">Privacy</option>
-          <option value="partnership">Partnership</option>
+          <option value="sales">{contactText("Product and pricing", locale)}</option>
+          <option value="support">{contactText("Product support", locale)}</option>
+          <option value="security">{contactText("Security review", locale)}</option>
+          <option value="privacy">{contactText("Privacy", locale)}</option>
+          <option value="partnership">{contactText("Partnership", locale)}</option>
         </select>
       </label>
       {/*
@@ -99,29 +120,29 @@ export default function ContactForm() {
         without typing anything a customer document could end up inside.
       */}
       <details className="contact-qualification-fold">
-        <summary>Help us prepare a better reply <span>Optional</span></summary>
+        <summary>{contactText("Help us prepare a better reply", locale)} <span>{contactText("Optional", locale)}</span></summary>
         <fieldset className="contact-qualify">
-          <legend>About the material</legend>
+          <legend>{contactText("About the material", locale)}</legend>
           {QUALIFICATION.map((field) => (
             field.multiple ? (
               <fieldset className="contact-field" key={field.name}>
-                <legend>{field.label}</legend>
-                {field.hint ? <small>{field.hint}</small> : null}
+                <legend>{contactText(field.label, locale)}</legend>
+                {field.hint ? <small>{contactText(field.hint, locale)}</small> : null}
                 <div className="contact-checks">
                   {field.options.map((option) => (
                     <label key={option}>
                       <input type="checkbox" name={field.name} value={option} />
-                      <span>{option}</span>
+                      <span>{contactText(option, locale)}</span>
                     </label>
                   ))}
                 </div>
               </fieldset>
             ) : (
               <label className="contact-field" key={field.name}>
-                <span>{field.label}</span>
+                <span>{contactText(field.label, locale)}</span>
                 <select name={field.name} defaultValue="">
-                  <option value="">No answer</option>
-                  {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                  <option value="">{contactText("No answer", locale)}</option>
+                  {field.options.map((option) => <option key={option} value={option}>{contactText(option, locale)}</option>)}
                 </select>
               </label>
             )
@@ -130,7 +151,7 @@ export default function ContactForm() {
       </details>
       <label className="contact-field">
         {/* BA-141. The abstract question asked for an essay; the concrete one gets an answer. */}
-        <span>What are you trying to do? <RequiredMark /></span>
+        <span>{contactText("What are you trying to do?", locale)} <RequiredMark label={contactText("Required", locale)} /></span>
         {/*
           BQ-113. The one rule about this field, said once and kept on screen.
 
@@ -138,29 +159,34 @@ export default function ContactForm() {
           gone as soon as there is a character in the box, so the copy that mattered most was the
           copy that vanished first. The description is tied to the field for a screen reader.
         */}
-        <small className="fine" id="contact-message-rule">Do not attach or paste customer documents here.</small>
+        <small className="fine" id="contact-message-rule">{contactText("Do not attach or paste customer documents here.", locale)}</small>
         <textarea
           name="message"
           rows={8}
           minLength={20}
           maxLength={5000}
           aria-describedby="contact-message-rule"
-          placeholder="What the material is, who needs to answer from it, and anything the questions above did not cover."
+          placeholder={contactText("What the material is, who needs to answer from it, and anything the questions above did not cover.", locale)}
           required
         />
       </label>
       <label className="contact-trap" aria-hidden="true">
-        Website
+        {contactText("Website", locale)}
         <input name="website" tabIndex={-1} autoComplete="off" />
       </label>
       <div className="contact-submit">
         <button className="btn" type="submit" disabled={state === "sending"}>
-          {state === "sending" ? "Sending..." : "Send inquiry"}
+          {contactText(state === "sending" ? "Sending..." : "Send inquiry", locale)}
         </button>
-        <span>Your information is used only to answer this inquiry.</span>
+        <span>
+          {contactText("We use this information to answer your inquiry.", locale)}{" "}
+          <Link href="/privacy" hrefLang={locale === "ko" ? "en" : undefined}>
+            {locale === "ko" ? "개인정보 처리방침 (영문)" : "Privacy notice"}
+          </Link>
+        </span>
       </div>
       <div className="contact-status" aria-live="polite">
-        {state === "sent" && <p data-state="sent">Received. We will reply from an official TAVONEL address.</p>}
+        {state === "sent" && <p data-state="sent">{contactText("Received. We will reply from an official TAVONEL address.", locale)}</p>}
         {state === "error" && <p data-state="error">{message}</p>}
       </div>
     </form>
@@ -186,14 +212,14 @@ function collect(data: FormData) {
   is visibly a qualifier. It stays a word inside the label element, which is what keeps it in the
   accessible name and what the sentence above the form promises ("They are marked Required").
 */
-function RequiredMark() {
-  return <small className="contact-required">Required</small>;
+function RequiredMark({ label = "Required" }: { label?: string }) {
+  return <small className="contact-required">{label}</small>;
 }
 
-function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+function Field({ label, requiredLabel, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string; requiredLabel?: string }) {
   return (
     <label className="contact-field">
-      <span>{label}{props.required ? <> <RequiredMark /></> : null}</span>
+      <span>{label}{props.required ? <> <RequiredMark label={requiredLabel} /></> : null}</span>
       <input {...props} />
     </label>
   );

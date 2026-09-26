@@ -16,8 +16,9 @@ import { describe, expect, it } from "vitest";
 
   (First-load JS from `next build`, same tree, same three builds recorded in the stage-B report.)
 
-  Nothing failed, because no budget watches either route -- `scripts/launch-qa/lighthouse-budgets.mjs`
-  gates `/`, `/privacy`, `/security`, `/pricing` and `/explore`. A byte ceiling here would need a
+  Nothing failed, because no enforced budget watches either route --
+  `scripts/launch-qa/lighthouse-budgets.mjs` measures them but gates public buyer routes.
+  A byte ceiling here would need a
   build to measure and would drift with every dependency's own size, so this asserts the cause
   instead: the two heavy modules must not be reachable from either route's static import graph.
   That is the thing that regressed, it fails in milliseconds, and it names the fix in the message.

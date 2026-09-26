@@ -16,8 +16,8 @@ import {
 } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "@/lib/compile-limits";
 import { trackFunnel } from "@/lib/funnel-events";
-import { activationPolicy } from "@/lib/activation-policy";
-import { ACCESS_CTA } from "@/lib/site-navigation";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
+import { MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { jsonLdHtml } from "@/lib/structured-data";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import {
@@ -75,7 +75,13 @@ const PAID_PLANS = (Object.entries(BILLING_OFFERS) as Array<[BillingOfferCode, (
 
 /** Shown on the Evaluation card while `activationPolicy.customerData` is closed (SD-01). */
 const EVALUATION_GATED_DESCRIPTION =
-  "Read the public Compiled World in full today, with Evidence, Ask and a signed export. Compiling your own files is arranged with us, not switched on by this card.";
+  "Explore a complete public Compiled World with Evidence and Ask, then download its digest-bound sample. We can scope an assisted evaluation with your own sources.";
+const EVALUATION_GATED_FEATURES = [
+  "A complete public World with source-linked Evidence",
+  "Ask grounded in the public World",
+  "Digest-bound sample World download",
+  "No card or file upload required",
+] as const;
 
 const EVALUATION = {
   name: "Evaluation",
@@ -164,13 +170,13 @@ function planPath(
   if (plan.name === "Evaluation") {
     return state.selfService
       ? "Sign in → 3 files and 50 pages → your first World"
-      : "Request access → we arrange intake with you → your first World";
+      : "Explore the public World → inspect its evidence → discuss your sources";
   }
   if (plan.name === "Enterprise") return "Talk to us → we scope it against your material → a written quote";
-  if (!plan.offerCode) return `Talk to us → we agree the volume and the onboarding session → first compile`;
+  if (!plan.offerCode) return "Talk to us → scope volume and onboarding → agree a pilot";
   return state.liveCheckout
     ? "Sign in → checkout → first compile"
-    : "Request access → we open checkout for you → first compile";
+    : "Request access → scope your sources → agree a pilot";
 }
 
 /*
@@ -220,13 +226,13 @@ const REFUND_MAX_CONSUMED_PERCENT = Math.round(REFUND_MAX_CONSUMED_FRACTION * 10
   It is now read off the same rows the table renders: the plans listed as reaching World
   activation are the plans the function admits, and nothing here can say otherwise.
 */
-function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
+function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceEvaluation: boolean) {
   const activation = planCapabilities.find((row) => row.level === "activation");
   const activationPlans = activation?.plans.filter((plan) => plan.state === "provided").map((plan) => plan.label) ?? [];
   return [
     [
       "Base subscription",
-      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. The seven-day evaluation is free and needs no card.`,
+      `${BILLING_OFFERS.observer_access.label}: $${BILLING_OFFERS.observer_access.priceUsd}/month. ${BILLING_OFFERS.studio_access.label}: $${BILLING_OFFERS.studio_access.priceUsd}/month. ${selfServiceEvaluation ? "The seven-day evaluation is free and needs no card." : "The public World is free to explore; an evaluation with your own sources is arranged with us."}`,
     ],
     [
       "Included pages",
@@ -269,7 +275,9 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[]) {
     ],
     [
       "How to start",
-      "Start with your own files. Nothing is charged until you choose a plan.",
+      selfServiceEvaluation
+        ? "Start with your own files. Nothing is charged until you choose a plan."
+        : "Explore the public World and its evidence, then contact us to scope your own sources. Nothing is charged for exploring.",
     ],
   ] as const;
 }
@@ -340,16 +348,18 @@ const SCENARIOS = SCENARIO_PAGES.map((pages) => ({
   those routes. A buyer reading six ✓ / ✓ rows learned nothing about why one plan costs more
   than the other, and the things that do differ were spread between a card, a tile and a fold.
 
-  Every value is read from `lib/billing-catalog.ts` -- the included pages, the sale channel, the
-  onboarding bullet and the not-yet-sold list -- so a catalog change moves the table. A row that
-  is the same on both plans belongs in "Limits" below, not in a column here.
+  Included pages, sale channels and onboarding come from `lib/billing-catalog.ts`; the displayed
+  purchase path also respects the effective live checkout action. A catalog change moves the
+  table, but a closed purchase gate never leaves a visible "Checkout" promise behind. A row
+  that is the same on both plans belongs in "Limits" below, not in a column here.
 */
-/** Takes the channel as a string so a catalog with one channel per plan still type-checks. */
-function howYouBuy(saleChannel: string) {
-  return saleChannel === "self_serve" ? "Checkout" : "A conversation";
+/** A catalog channel cannot promise checkout while the effective purchase action is closed. */
+function howYouBuy(saleChannel: string, checkoutOpen: boolean) {
+  return checkoutOpen && saleChannel === "self_serve" ? "Checkout" : "A conversation";
 }
 
-const PLAN_DIFFERENCES: ReadonlyArray<readonly [string, string, string]> = [
+function planDifferences(checkoutOpen: boolean): ReadonlyArray<readonly [string, string, string]> {
+  return [
   [
     "Included standard pages each month",
     BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US"),
@@ -357,15 +367,16 @@ const PLAN_DIFFERENCES: ReadonlyArray<readonly [string, string, string]> = [
   ],
   [
     "How you buy it",
-    howYouBuy(BILLING_OFFERS.observer_access.saleChannel),
-    howYouBuy(BILLING_OFFERS.studio_access.saleChannel),
+    howYouBuy(BILLING_OFFERS.observer_access.saleChannel, checkoutOpen),
+    howYouBuy(BILLING_OFFERS.studio_access.saleChannel, checkoutOpen),
   ],
   [
     "Guided onboarding for your documents",
     BILLING_OFFERS.observer_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
     BILLING_OFFERS.studio_access.features.some((feature) => feature.includes("onboarding")) ? "Included" : "—",
   ],
-];
+  ];
+}
 
 /*
   G2-008. The hard limits, stated where the money decision is made rather than only on /sources.
@@ -543,14 +554,14 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   ["Can I verify an answer?", "Every object carries the regions that support it, and an export carries a manifest with a digest for each file, signed on the way out. The public key is published, so a recipient can check a package without asking us.", "/evidence" as Route, "How evidence is bound", "What a review will find"],
   ["What happens when a source document changes?", "The new bytes are a new version, and compiling produces a new candidate rather than editing the World in place. The active revision moves only when a person activates it, and the previous one stays readable.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Can it read Office files, images and tables?", "It accepts them. Every accepted source is sanitized to PDF and read by OCR, and what survives is the page, the paragraph text and the bounding box — a spreadsheet's cells and formulas do not.", "/sources" as Route, "What TAVONEL reads", "What a review will find"],
-  ["Can my agent use it?", "A read-only MCP server and an HTTP API are published, with eight tools over sources, World, search, Ask, objects, relations, evidence and package. There is no write tool.", "/developers" as Route, "API and MCP", "What a review will find"],
+  ["Can my agent use it?", `A read-only MCP server and an HTTP API are published, with ${MCP_TOOL_COUNT_WORD} tools over sources, Worlds, one World, search, Ask, objects, relations, evidence and package. There is no write tool.`, "/developers" as Route, "API and MCP", "What a review will find"],
   ["What does it do when it is uncertain?", "It abstains and says which sources it looked at. A composed answer with no region behind it would be indistinguishable from a correct one, which is the failure the whole contract exists to prevent.", "/knowledge-compiler" as Route, "Questions people ask", "What it is"],
   ["Is my data safe?", "Your sources go to a tenant-scoped quarantine, are sanitized before anything reads them, and are not used to train shared models. No third-party model API receives your documents today.", "/security" as Route, "Where your documents go", "What happens to my data"],
-  ["What is ready to use?", "Upload, security inspection, document reading, reviewed World activation, grounded Ask, API/MCP access and signed export are available. Current source and service status stays visible on the linked pages.", "/status" as Route, "Current service status", "What it costs"],
+  ["What is ready to use?", "A finished public World is available to read today, with source-linked Evidence, Ask, a public HTTP API and a digest-bound sample download. MCP access to your own workspace requires an API key and an arranged evaluation. Current service status stays visible on the linked page.", "/status" as Route, "Current service status", "What it costs"],
   ["How much does it cost?", "A monthly subscription with included pages, then a per-page rate past them. Both numbers are above, and the maximum for any page is shown before a run starts.", "/refunds" as Route, "Cancellation and refunds", "What it costs"],
-  ["How much setup is required?", "Upload your own files and compile. Evaluation takes no card, and nothing is charged until you choose a plan.", "/docs" as Route, "Documentation", "What it costs"],
+  ["How much setup is required?", "Explore the public World and its evidence without a card. To evaluate your own sources, contact us to agree the scope and intake path before any processing or payment.", "/docs" as Route, "Documentation", "What it costs"],
   ["Will I be locked in?", "The package is open formats — canonical JSON, Turtle, JSON-LD, CSV and JSONL — and the two verifiers are readable scripts rather than a service, so a package can be checked and loaded without us.", "/docs/exports" as Route, "The package format", "What happens to my data"],
-  ["Can I export?", "Yes. Signed export is included from the free evaluation up, and the export is the whole World rather than a report about it.", "/docs/exports" as Route, "What is in the package", "What happens to my data"],
+  ["Can I export?", "You can download the digest-bound public sample World today. Workspace exports are signed; compiling and exporting your own sources requires an arranged evaluation.", "/reproducibility" as Route, "Public sample and checksums", "What happens to my data"],
   ["Can I delete my data?", "Source material, derived artifacts and compiled packages are deleted on a verified request to privacy@tavonel.com. The categories and purposes are set out in the privacy notice.", "/privacy" as Route, "Storage and lifecycle", "What happens to my data"],
   /*
     BA-126 and BA-164. This row counted our own gaps on the page where a purchase is decided, and
@@ -566,6 +577,23 @@ const PURCHASE_FAQ: Array<[string, string, Route, string, string]> = [
   */
   ["Can an enterprise security review approve it?", "The Trust Center provides the public policies, processor record, legal terms, and reporting contacts. Deployment-specific architecture, control evidence, assurance scope, and questionnaire responses are provided through a qualified review; the reviewer makes the approval decision.", "/trust" as Route, "Trust Center", "What a review will find"],
 ];
+
+/** Keep the visible FAQ and its JSON-LD aligned with the same self-service gate as the cards. */
+const SELF_SERVICE_FAQ_ANSWERS: Record<string, string> = {
+  "What is ready to use?": "A finished public World is open today. Sign in to evaluate your own files with source-linked Evidence, grounded Ask and signed export. The plan comparison above shows which capabilities each plan includes.",
+  "How much setup is required?": "Sign in to start a free seven-day Evaluation with up to 3 files and 50 standard pages. No card is needed; nothing is charged until you choose a plan.",
+  "Can I export?": "Yes. The public sample World is digest-bound, and a signed workspace export is included with a World compiled during your free Evaluation.",
+};
+
+function purchaseFaqRows(selfService: boolean): typeof PURCHASE_FAQ {
+  return PURCHASE_FAQ.map(([question, answer, href, label, group]): [string, string, Route, string, string] => [
+    question,
+    selfService ? SELF_SERVICE_FAQ_ANSWERS[question] ?? answer : answer,
+    href,
+    label,
+    group,
+  ]);
+}
 
 /** The order the groups are shown in. Declared rather than derived, because it is an argument. */
 const FAQ_GROUPS = ["What it is", "What it costs", "What happens to my data", "What a review will find"] as const;
@@ -589,7 +617,7 @@ const FAQ_GROUPS = ["What it is", "What it costs", "What happens to my data", "W
   "use client" module's non-component exports are client references in the server bundle, so the
   server component cannot read `PURCHASE_FAQ`. Next server-renders this into the HTML either way.
 */
-const pricingJsonLd = (purchaseReady: boolean) => ({
+const pricingJsonLd = (purchaseReady: boolean, faqRows: typeof PURCHASE_FAQ) => ({
   "@context": "https://schema.org",
   "@graph": [
     ...Object.values(BILLING_OFFERS).map((offer) => ({
@@ -614,7 +642,7 @@ const pricingJsonLd = (purchaseReady: boolean) => ({
     })),
     {
       "@type": "FAQPage",
-      mainEntity: PURCHASE_FAQ.map(([question, answer]) => ({
+      mainEntity: faqRows.map(([question, answer]) => ({
         "@type": "Question",
         name: question,
         acceptedAnswer: { "@type": "Answer", text: answer },
@@ -656,7 +684,8 @@ export default function PricingPageClient({
     nowhere. The page offers the site's one access action instead -- the same action the
     header and the landing page offer, from the same constant.
   */
-  const selfService = selfServiceFlag && activationPolicy.customerData.enabled;
+  const selfService = selfServiceFlag && ownFilesOpen;
+  const faqRows = purchaseFaqRows(selfService);
   /*
     BA-128. 348 read as leftover test data. The default is now the Developer plan's included
     pages, so the control opens on "your plan already covers this" rather than on a figure
@@ -760,10 +789,11 @@ export default function PricingPageClient({
     /contact. Nothing about the destination depends on JavaScript having run.
   */
   const planHref = (plan: (typeof PLANS)[number]) => {
+    if (plan.name === "Enterprise") return "/contact?plan=Enterprise";
     if (plan.anchor) return `#${plan.anchor}`;
-    if (plan.name === "Evaluation") return selfService ? "/login" : ACCESS_CTA.href;
+    if (plan.name === "Evaluation") return selfService ? "/login" : EXPLORE_CTA.href;
     if (ownerBillingExempt && plan.offerCode) return "/workspace";
-    if (!plan.offerCode || !liveCheckout) return "/contact";
+    if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`;
     return loginUrlForOffer(plan.offerCode);
   };
 
@@ -775,7 +805,7 @@ export default function PricingPageClient({
     <div className="page pricing-page">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout)) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}
       />
       <PublicSiteHeader />
       <main id="main">
@@ -848,7 +878,7 @@ export default function PricingPageClient({
                       you" wrapped mid-phrase and left "you" alone on its own line.
                     */}
                     <span className="price">{plan.price}</span>
-                    <p className="fine">{plan.unit}</p>
+                    <p className="fine">{plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit}</p>
                   </div>
                   {/*
                     SD-01 (G1-001 on this page). The Evaluation card promised "your own files"
@@ -856,21 +886,22 @@ export default function PricingPageClient({
                     print under the grid reads, and describes what the trial reaches today.
                   */}
                   <p className="plan-body">
-                    {plan.name === EVALUATION.name && !ownFilesOpen ? EVALUATION_GATED_DESCRIPTION : plan.description}
+                    {plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_DESCRIPTION : plan.description}
                   </p>
                   <div className="plan-features">
-                    <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-                    {/*
-                      SD-02 (G2-002). What this plan does not include, on the card, in the same
-                      type as the rest of it. Team's differentiator used to be shared membership,
-                      which `/security` and `/trust` deny; a buyer now reads that here instead of
-                      after they have paid.
-                    */}
+                    {plan.name === "Team" ? <p className="fine"><b>Single-member workspace</b></p> : null}
+                    {!ownFilesOpen && (plan.name === "Developer" || plan.name === "Team") ? (
+                      <p className="fine">Ask us about an approved source-processing pilot before your first compile.</p>
+                    ) : null}
+                    <ul>{(plan.name === EVALUATION.name && !selfService ? EVALUATION_GATED_FEATURES : plan.features).map((feature) => (
+                      <li key={feature}>{!ownFilesOpen && feature === "Compile your own worlds" ? "Own-source compilation requires an approved pilot" : feature}</li>
+                    ))}</ul>
+                    {/* The single-member limit is on the card; detailed exclusions remain available on demand. */}
                     {plan.notYetSold.length > 0 ? (
-                      <>
-                        <p className="fine"><b>Not sold with this plan</b></p>
+                      <details className="status-fold">
+                        <summary>Plan limits</summary>
                         <ul>{plan.notYetSold.map((item) => <li key={item}>{item}</li>)}</ul>
-                      </>
+                      </details>
                     ) : null}
                     {plan.note ? (
                       <p className="fine"><Link href={plan.note.href}>{plan.note.label}</Link></p>
@@ -891,8 +922,12 @@ export default function PricingPageClient({
                   <a
                     className={plan.name === "Developer" ? "btn" : "btn ghost"}
                     href={planHref(plan)}
-                    aria-disabled={billingBusy === plan.offerCode ? true : undefined}
+                    aria-disabled={billingBusy !== null && billingBusy === plan.offerCode ? true : undefined}
                     onClick={(event) => {
+                      if (billingBusy !== null && billingBusy === plan.offerCode) {
+                        event.preventDefault();
+                        return;
+                      }
                       // The plan name is an enumerated UI state, not customer data.
                       trackFunnel("pricing_start_clicked", { plan: plan.name });
                       if (!opensOverlay(plan) || !plan.offerCode) return;
@@ -903,15 +938,18 @@ export default function PricingPageClient({
                     {ownerBillingExempt && plan.offerCode
                       ? "Open your workspace"
                       : plan.name === "Evaluation"
-                      ? selfService ? "Start free evaluation" : ACCESS_CTA.label
+                      ? selfService ? "Start free evaluation" : EXPLORE_CTA.label
                       : !plan.offerCode
-                        ? plan.name === "Enterprise" ? "How an Enterprise quote is built" : `Talk to us about ${plan.name}`
+                        ? plan.name === "Enterprise" ? "Scope an Enterprise pilot" : `Talk to us about ${plan.name}`
                         : !liveCheckout
                           ? `Request ${plan.name} access`
                           : billingBusy === plan.offerCode
                             ? "Opening checkout…"
                             : signedIn ? `Get ${plan.name} access` : `Get ${plan.name} access, via sign-in`}
                   </a>
+                  {plan.name === "Evaluation" && !selfService ? (
+                    <Link className="fine pricing-secondary-link" href="/contact">Discuss your sources</Link>
+                  ) : null}
                   <p className="fine">{planPath(plan, { liveCheckout, selfService })}</p>
                   </div>
                 </article>
@@ -932,7 +970,7 @@ export default function PricingPageClient({
             {gates.filter((gate) => gate.id === "customerData" && !gate.enabled).map((gate) => (
               <p className="fine" key={gate.id} data-purchase-gate={gate.id}>
                 {gate.reason}{" "}
-                <Link href={"/status" as Route}>Current deployment state</Link>
+                <Link href={"/status" as Route}>See current availability</Link>
               </p>
             ))}
             <details className="status-fold pricing-depth" id="plan-details">
@@ -940,7 +978,7 @@ export default function PricingPageClient({
             <section className="pricing-details" aria-labelledby="pricing-details-title">
               <h2 id="pricing-details-title">How your plan works</h2>
             <div className="tiles pricing-glance">
-              {glanceRows(planCapabilities).map(([title, body]) => (
+              {glanceRows(planCapabilities, selfService).map(([title, body]) => (
                 <article className="tile" key={title}>
                   <h3>{title}</h3>
                   <p>{body}</p>
@@ -973,7 +1011,7 @@ export default function PricingPageClient({
                 </tr>
               </thead>
               <tbody>
-                {PLAN_DIFFERENCES.map(([label, developer, team]) => (
+                {planDifferences(liveCheckout).map(([label, developer, team]) => (
                   <tr key={label}>
                     <th scope="row">{label}</th>
                     <td data-label={BILLING_OFFERS.observer_access.label}>{developer}</td>
@@ -984,11 +1022,12 @@ export default function PricingPageClient({
             </table>
             </div>
             <p className="fine">
-              Those are the differences. Everything else — compiling, evidence, Ask, signed export,
-              API and MCP access, reviewing a candidate, activating a World and rolling one back —
-              is reached by both plans, at the same per-page rate past the included pages, under
-              the same limits below. The capability table under this one is the proof: it is
-              answered by the function the API calls, and it reads the same for both.
+              Those are the plan differences. Once your source-processing access is approved,
+              both plans include compiling, evidence, Ask, signed export, API and MCP access,
+              reviewing a candidate, activating a World and rolling one back, at the same
+              per-page rate past the included pages and under the same limits below. The
+              capability table compares those plan entitlements; it does not open a closed
+              customer-data gate.
             </p>
             {/*
               G2-008. The ceilings a buyer has to know before they buy, and the three they will
@@ -1066,7 +1105,7 @@ export default function PricingPageClient({
               `billingProductDecision(plan, level)` from the server component, and the level on
               each row is read from the route that enforces it.
             */}
-            <h3 id="plan-capability-title">What each plan can do, and what it does not</h3>
+            <h3 id="plan-capability-title">What each plan includes once access is enabled</h3>
             <div className="table-scroll">
             <table className={`docs-table ${tableStyles.rowHeader}`} aria-labelledby="plan-capability-title">
               <thead>
@@ -1111,14 +1150,16 @@ export default function PricingPageClient({
               One paragraph, said once.
             */}
             <p className="fine">
-              A row marked Planned is a capability the plan names in its own catalog entry as not
+              This table compares plan entitlements, not what a new visitor can start today.
+              {!ownFilesOpen ? " While source processing is closed, a tick does not open uploads or compilation; request an approved pilot first." : null}
+              {" "}A row marked Planned is a capability the plan names in its own catalog entry as not
               sold yet; it is not billed, not enabled by buying the plan, and not a date. A row
-              marked Not sold is not part of that plan at all. Only a capability the API admits
-              today carries a tick. Every row is answered for the workspace owner, the role a
-              buyer of either plan holds in their own workspace. The free evaluation reaches the{" "}
-              {BILLING_OFFERS.observer_access.label} rows that do not activate a World, inside its
-              file and page limits; activating one needs a paid plan, which is why it has no column
-              here. An Enterprise scope is agreed in the conversation rather than compared against
+              marked Not sold is not part of that plan at all. Only a capability the plan&apos;s
+              authorization check admits carries a tick. Every row is answered for the workspace owner, the role a
+              buyer of either plan holds in their own workspace. {selfService
+                ? `The free evaluation reaches ${BILLING_OFFERS.observer_access.label} capabilities that do not activate a World, inside its file and page limits; activating one needs a paid plan, which is why it has no column here.`
+                : "An evaluation of your own sources is arranged with us while self-service intake is closed."}
+              {" "}An Enterprise scope is agreed in the conversation rather than compared against
               these two. Nothing an Ask answer returns is invented for it: every answer names the
               retrieval path it took, and{" "}
               <Link href={"/docs/ask" as Route}>the Ask reference</Link> states which paths exist
@@ -1242,27 +1283,33 @@ export default function PricingPageClient({
             <section id="enterprise-pricing" aria-labelledby="enterprise-pricing-title">
               <h2 id="enterprise-pricing-title">Enterprise</h2>
               <p className="lede">
-                Enterprise quotes start from {formatUsd(STANDARD_PAGE_USD)} per standard page,
-                capped at {formatUsd(MAXIMUM_PAGE_USD)} for complex processing. Volume, source
-                types, deployment needs, onboarding, and support define the final scope. Quotes
-                are written in US dollars, excluding tax.
+                Scope a larger corpus with us. We will review the source mix, deployment needs,
+                onboarding, and support, then send a written quote in US dollars, excluding tax.
               </p>
-              <h3 id="enterprise-variables-title">What moves the quote</h3>
-              <ul aria-labelledby="enterprise-variables-title">
-                {ENTERPRISE_VARIABLES.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-              <h3 id="enterprise-needs-title">What we need to write one</h3>
-              <ul aria-labelledby="enterprise-needs-title">
-                {ENTERPRISE_QUOTE_NEEDS.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-              <h3 id="enterprise-absent-title">What an Enterprise scope does not include today</h3>
-              <ul aria-labelledby="enterprise-absent-title">
-                {ENTERPRISE_NOT_INCLUDED.map((item) => <li key={item}>{item}</li>)}
-              </ul>
               <div className="actions">
-                <Link className="btn" href="/contact">Scope an Enterprise pilot</Link>
+                <Link className="btn" href="/contact?plan=Enterprise">Scope an Enterprise pilot</Link>
                 <Link className="btn ghost" href={"/trust" as Route}>Review public trust resources</Link>
               </div>
+              <details className="status-fold pricing-depth">
+                <summary>How the quote is built</summary>
+                <p>
+                  Processing starts from {formatUsd(STANDARD_PAGE_USD)} per standard page and is
+                  capped at {formatUsd(MAXIMUM_PAGE_USD)} for a complex page. The final scope is
+                  agreed in writing before processing.
+                </p>
+                <h3 id="enterprise-variables-title">What moves the quote</h3>
+                <ul aria-labelledby="enterprise-variables-title">
+                  {ENTERPRISE_VARIABLES.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                <h3 id="enterprise-needs-title">What we need to write one</h3>
+                <ul aria-labelledby="enterprise-needs-title">
+                  {ENTERPRISE_QUOTE_NEEDS.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                <h3 id="enterprise-absent-title">What an Enterprise scope does not include today</h3>
+                <ul aria-labelledby="enterprise-absent-title">
+                  {ENTERPRISE_NOT_INCLUDED.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </details>
             </section>
             <details className="status-fold pricing-depth" id="pricing-faq">
               <summary id="pricing-faq-title">Questions before you buy</summary>
@@ -1271,7 +1318,7 @@ export default function PricingPageClient({
                 <div key={group}>
                   <h3>{group}</h3>
                   <div className="pricing-faq">
-                    {PURCHASE_FAQ.filter(([,,,, rowGroup]) => rowGroup === group).map(([question, answer, href, label]) => (
+                    {faqRows.filter(([,,,, rowGroup]) => rowGroup === group).map(([question, answer, href, label]) => (
                       <details className="status-fold" key={question}>
                         <summary>{question}</summary>
                         <p>{answer}</p>

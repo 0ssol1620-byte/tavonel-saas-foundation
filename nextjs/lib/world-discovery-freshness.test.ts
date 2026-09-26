@@ -294,6 +294,19 @@ describe("freshness keeps four clocks apart", () => {
     expect(requests.some((href) => href.includes("candidate_manifest_digest"))).toBe(true);
   });
 
+  it("reports a waiting first candidate without inventing an active World", async () => {
+    tables.foundation_active_worlds.length = 0;
+    tables.foundation_world_versions.length = 0;
+    tables.foundation_compile_jobs[0].candidate_manifest_digest = MANIFEST_2;
+    const freshness = await getWorldFreshness(WORKSPACE, COLLECTION_A);
+    expect(freshness).toMatchObject({
+      activeManifestDigest: null,
+      activatedAt: null,
+      candidateAwaitingActivation: true,
+      candidateManifestDigest: MANIFEST_2,
+    });
+  });
+
   it("prefers the caller's candidate over the recorded one, and ignores a recorded active digest", async () => {
     tables.foundation_compile_jobs[0].candidate_manifest_digest = MANIFEST_2;
     const hinted = await getWorldFreshness(WORKSPACE, COLLECTION_A, {

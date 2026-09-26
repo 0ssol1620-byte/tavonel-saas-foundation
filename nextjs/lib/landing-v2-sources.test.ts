@@ -116,7 +116,11 @@ describe("landing v2 scene 03 -- sources into a World", () => {
 describe("landing v2 scene 03 -- the data behind it", () => {
   it("shows only filings this repository holds a committed page render of", () => {
     const { stack } = buildSourcesScene();
-    expect(stack.length).toBeLessThanOrEqual(3);
+    expect(stack.map((source) => source.documentId)).toEqual([
+      "apple-form-10-k",
+      "apple-2026-proxy-def14a",
+      "apple-2026-q1-10-q",
+    ]);
     for (const source of stack) {
       expect(source.raster.src.startsWith("/landing/v2/")).toBe(true);
       expect(source.page).toBeGreaterThan(0);

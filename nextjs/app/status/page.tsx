@@ -59,10 +59,10 @@ function stamp(iso: string | null) {
 
   Every row in the first list comes from `readPublicOperations`, which reads this deployment's own
   configuration and activation gates at render time. Not one of them sends a request through the
-  component it describes, so "operational" there means configured and open, not reachable. Before
-  that sentence a reader had "Last checked ... from the active production deployment" and no way
-  to tell the difference -- which is the exact shape §77 warns about, a page that can keep saying
-  operational through an outage.
+  component it describes. The source value `configured` is shown in a neutral color: it means
+  configured and open, not reachable. Before this separation a reader
+  saw green operational rows from the active deployment and could not tell they might remain
+  unchanged through an outage.
 
   O02 adds the other half rather than replacing the sentence. The second list is the last
   synthetic probe: results of requests actually sent through the dependencies, on a schedule, with
@@ -86,7 +86,8 @@ function stamp(iso: string | null) {
 /*
   BA-134(d). Until a check reports, the six rows were six identical grey cards each saying nothing
   had happened -- the largest thing on the page, and all of it an absence. One line replaces them,
-  naming what will report, and the page opens on the configuration rows that are green.
+  naming what will report, and the page opens on configuration rows whose color does not imply
+  a successful request.
 */
 const DEPENDENCIES_SENTENCE = "the document sanitizer, GPU OCR, the compiler core, object storage, the database and billing.";
 
@@ -113,12 +114,12 @@ export default async function StatusPage() {
     they are seeing rather than wait for it to appear -- then offered them a link to a
     marketing index. The reporting route is the closing action.
   */
-  return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>Each row below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered: &ldquo;operational&rdquo; means a component is configured and its gate is open. Whether a request recently succeeded through one is the separate question the scheduled checks answer further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+  return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
     <h2>Configuration and activation state</h2>
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
 
     <h2>Scheduled dependency checks</h2>
-    <p>Each check here is a request TAVONEL sent through the dependency on a schedule, carrying no customer data, and it reports what came back. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
+    <p>Request checks here run on a schedule without customer data and report what came back. Billing is a configuration-only check; it sends no request through a payment flow. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
       Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
       of any outcome: <strong>{stamp(probe.lastRunAt)}</strong>
@@ -135,7 +136,7 @@ export default async function StatusPage() {
     */}
     {probe.rows.every((row) => row.state === NOT_RUN)
       ? <p>Scheduled dependency checks begin reporting here with the next run: {DEPENDENCIES_SENTENCE}</p>
-      : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
+      : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : row.state === "configured" ? "configured" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
     <p>Full pipeline check: {probe.fixtureE2E}</p>
 
     {/*

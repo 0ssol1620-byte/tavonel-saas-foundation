@@ -37,6 +37,41 @@ async function selectedStage(page: Page): Promise<number> {
 }
 
 test.describe("six-beat page structure", () => {
+  test("Korean close leads to a Korean inquiry and Korean pricing", async ({ page }) => {
+    await page.goto("/ko");
+    const close = page.locator("#s6");
+    await expect(close.locator('[data-scene-next="start"]')).toHaveAttribute("href", "/ko/contact");
+    await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
+    await close.locator('[data-scene-next="start"]').click();
+    await expect(page).toHaveURL(/\/ko\/contact$/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("도입을 함께 검토합니다");
+    await expect(page.getByRole("button", { name: "문의 보내기" })).toBeVisible();
+    await expect(page.locator('input[name="name"]')).toHaveAttribute("required", "");
+    await expect(page.getByRole("contentinfo").getByRole("link", { name: "English" })).toHaveAttribute("href", "/contact");
+    if ((page.viewportSize()?.width ?? 1440) <= 390) {
+      const formTop = await page.locator("form").evaluate((form) => form.getBoundingClientRect().top);
+      expect(formTop, "the mobile inquiry form should begin in the first viewport").toBeLessThan(844);
+    }
+  });
+
+  for (const path of ["/", "/ko"]) {
+    test(`${path} offers the next action before the How it compiles explanation`, async ({ page }) => {
+      await page.goto(path);
+      const actions = page.locator("#s1 .lv2-actions");
+      const heading = page.locator("#s1 .lv2-how-head");
+      const specimen = page.locator("#s1 [data-compiler-specimen]");
+      const actionBox = await actions.boundingBox();
+      const headingBox = await heading.boundingBox();
+      const specimenBox = await specimen.boundingBox();
+      expect(actionBox).not.toBeNull();
+      expect(headingBox).not.toBeNull();
+      expect(specimenBox).not.toBeNull();
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+      expect(actionBox!.y + actionBox!.height).toBeLessThan(headingBox!.y);
+      expect(headingBox!.y + headingBox!.height).toBeLessThan(specimenBox!.y);
+    });
+  }
+
   for (const path of ["/", "/ko"]) {
     test(`${path} renders six ordered, named scene landmarks`, async ({ page }) => {
       await page.goto(path);
@@ -92,11 +127,59 @@ test.describe("six-beat page structure", () => {
   }
 });
 
+test("prepared proof tabs show answer-bearing source regions", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const proof = page.locator("#s3");
+  const tabs = proof.getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+
+  await tabs.nth(1).click();
+  const sales = proof.getByRole("tabpanel").filter({ visible: true });
+  await expect(sales.getByText("Net sales: Products $ 113,743", { exact: false })).toBeVisible();
+  await expect(sales.getByText("Source page · reference render")).toBeVisible();
+  const salesCrop = sales.locator('img[src*="r64-249-932-352"]');
+  await expect(salesCrop).toBeVisible();
+  await salesCrop.scrollIntoViewIfNeeded();
+  await expect.poll(() => salesCrop.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  if (process.env.TAVONEL_CAPTURE_EXPLORE_QA === "1") {
+    await proof.screenshot({ path: testInfo.outputPath("proof-sales.png") });
+    await page.screenshot({ path: testInfo.outputPath("proof-sales-viewport.png") });
+  }
+
+  await tabs.nth(2).click();
+  const background = proof.getByRole("tabpanel").filter({ visible: true });
+  await expect(background.getByText("designs, manufactures and markets smartphones", { exact: false })).toBeVisible();
+  await expect(background.getByText("Source page · original PDF")).toBeVisible();
+  await expect(background.getByRole("link", { name: /Open the source region/ })).toHaveAttribute("href", /\/explore\?act=evidence/);
+});
+
+for (const [path, label] of [["/", "Inspect all source regions"], ["/ko", "모든 원문 영역 살펴보기"]] as const) {
+  test(`${path} opens the source index by keyboard and keeps regions linked to evidence`, async ({ page }) => {
+    await page.goto(path);
+    const regionName = path === "/ko" ? /^근거 영역/ : /^Evidence region/;
+    const openLabel = path === "/ko" ? "Explore에서 이 영역 열기" : "Open this region in Explore";
+    const inspector = page.locator("#s2 [data-progressive='1']");
+    const summary = inspector.locator("summary");
+    await expect(summary).toContainText(`${label} (10)`);
+    await expect(inspector.getByRole("button", { name: regionName })).toHaveCount(0);
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    const regions = inspector.getByRole("button", { name: regionName });
+    await expect(regions).toHaveCount(10);
+    await regions.nth(1).click();
+    await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
+    await expect(inspector.getByRole("link", { name: openLabel })).toHaveAttribute("href", /\/explore\?act=evidence/);
+  });
+}
+
 test.describe("HeroFilm", () => {
   test("opens with one four-cut film and removes the internal recreation disclaimer", async ({ page }) => {
     await page.goto("/");
     const film = page.locator(FILM);
     await expect(film).toHaveCount(1);
+    await expect(film.locator(".compile-film-viewport")).toBeVisible();
+    await expect(film.getByRole("tab")).toHaveCount(0);
+    await film.locator(".compile-film-stage-disclosure summary").click();
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(page.locator("#s1 [data-compiler-specimen]")).toHaveCount(1);
     await expect(page.locator("#s1 .compile-film-sequence")).toHaveCount(0);
@@ -158,6 +241,24 @@ test.describe("HeroFilm", () => {
 });
 
 test.describe("lower CompilerSpecimen explanation", () => {
+  test("keeps all Korean stages and panel names localized while retaining one source", async ({ page }) => {
+    await page.goto("/ko");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
+    const tabs = specimen.getByRole("tab");
+    const labels = ["원문", "구조", "근거", "지식", "활용"];
+    await expect(tabs).toHaveText(labels);
+    for (let index = 0; index < labels.length; index += 1) {
+      await tabs.nth(index).click();
+      await expect(specimen.getByRole("tabpanel", { name: labels[index] })).toBeVisible();
+      await expect(specimen).toContainText(COMPILER_SPECIMEN_SOURCE.id);
+    }
+    await expect(specimen.getByRole("tabpanel")).toContainText("백만 달러 · 2025년 12월 27일");
+    await tabs.first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tabs.nth(1)).toBeFocused();
+    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  });
+
   test("renders five selectable stages and preserves one source identity through them", async ({ page }) => {
     await page.goto("/");
     const specimen = page.locator("#s1 [data-compiler-specimen]");
@@ -187,12 +288,32 @@ test.describe("lower CompilerSpecimen explanation", () => {
 
     await tabs.nth(2).click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.excerpt);
+    await expect(specimen.locator("[data-stage-composition] details")).not.toHaveAttribute("open", "");
+    await specimen.locator("[data-stage-composition] summary").click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.digest);
     await tabs.nth(3).click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);
     await tabs.last().click();
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.filename);
     await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);
+  });
+
+  test("Korean pricing carries the selected plan into the inquiry", async ({ page }) => {
+    await page.goto("/ko/pricing");
+    await page.getByRole("link", { name: "Developer 도입 상담" }).click();
+    await expect(page).toHaveURL(/\/ko\/contact\?plan=Developer$/);
+    await expect(page.locator("[data-plan-intent]")).toHaveText("Developer 요금제 문의");
+    await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
+  });
+
+  test("opens the exact source region from the specimen answer", async ({ page }) => {
+    await page.goto("/");
+    const specimen = page.locator("#s1 [data-compiler-specimen]");
+    await specimen.getByRole("tab", { name: "Intelligence" }).click();
+    await specimen.getByRole("link", { name: /Open the source in Explore/ }).click();
+    await expect(page).toHaveURL(new RegExp(`evidence=${COMPILER_SPECIMEN_SOURCE.exploreEvidenceId.split(":")[0]}`));
+    await expect(page.locator("main")).toContainText(COMPILER_SPECIMEN_SOURCE.filename);
+    await expect(page.locator("main")).toContainText("Research and development 10,887");
   });
 
   test("supports roving-tab keyboard selection", async ({ page }) => {
@@ -379,7 +500,7 @@ test.describe("responsive and reduced-motion parity", () => {
     const specimen = page.locator("#s1 [data-compiler-specimen]");
     const tabs = specimen.getByRole("tab");
     await expect(tabs).toHaveCount(COMPILER_SPECIMEN_STAGES.length);
-    await expect(specimen.getByRole("button", { name: "Play" })).toBeVisible();
+    await expect(specimen.getByRole("button", { name: "Play" })).toHaveCount(0);
     await page.waitForTimeout(2_850);
     expect(await selectedStage(page)).toBe(2);
     await tabs.last().click();

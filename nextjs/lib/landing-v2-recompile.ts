@@ -25,14 +25,13 @@ export const RECOMPILE_ACTIONS = {
 /**
  * BA-034: the engine qualifier travels with the counts, at every point that publishes them.
  *
- * English is `EXPLORE_COPY.countsQualifier` by reference, not a copy of it -- /explore and the
- * product pages already print that exact sentence beside the same figures, and a second spelling
- * of it here would be a second claim about which compiler produced them. Korean is its literal
- * translation, which is why it is a pair rather than one string.
+ * English references `EXPLORE_COPY.countsQualifier` so the landing scene and /explore use the
+ * same engine caveat. Korean is its translation, which is why this is a pair rather than one
+ * string.
  */
 export const RECOMPILE_COUNTS_QUALIFIER = {
   en: EXPLORE_COPY.countsQualifier,
-  ko: "이 저장소의 TypeScript 컬렉션 컴파일러가 내보내는 그대로입니다",
+  ko: "공개 샘플 컴파일러 기준이며, 고객 워크스페이스에서는 개수가 다를 수 있습니다",
 } as const;
 
 /*

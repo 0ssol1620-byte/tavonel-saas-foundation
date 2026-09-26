@@ -44,88 +44,88 @@
       "openHref": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-80ce9cad00306cf5d7cb85c911bdff20"
     },
     {
-      "question": "What were Products and Services net sales in the quarter?",
-      "answerExcerpt": "Americas Americas net sales increased during the first quarter of 2026 compared to the same quarter in 2025 primarily due to higher net sales of iPhone and Services.",
+      "question": "What were Products and Services net sales for the three months ended in December?",
+      "answerExcerpt": "Three Months Ended December 27, December 28, 2025 2024 Net sales: Products $ 113,743 $ 97,960 Services 30,013 26,340 Total net sales 143,756 124,300",
       "answerTruncated": false,
       "source": {
         "form": "10-Q",
         "filingDate": "2026-01-30",
         "filename": "apple-2026-q1-10-q-reference.pdf",
-        "page": 19,
+        "page": 4,
         "pageCount": 30,
         "digest": "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
         "representationKind": "reference_render"
       },
       "region": {
-        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-b89dd34e25c1a4bdb8f4a277dcc4bb20",
+        "id": "evidence-274e80464ffc891ce2ed3077e7d67934:chunk-b51f1e7299e0b66328a3337d9c3a5b93",
         "bbox1000": [
-          62,
-          621,
-          939,
-          667
-        ]
-      },
-      "citationIndex": 2,
-      "citationCount": 3,
-      "rasters": {
-        "page": {
-          "src": "/landing/v2/apple-2026-q1-10-q-reference-p019-1080.webp",
-          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-720.webp 720w, /landing/v2/apple-2026-q1-10-q-reference-p019-1080.webp 1080w",
-          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-720.avif 720w, /landing/v2/apple-2026-q1-10-q-reference-p019-1080.avif 1080w",
-          "width": 1080,
-          "height": 1398
-        },
-        "crop": {
-          "src": "/landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-1120.webp",
-          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-560.webp 560w, /landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-1120.webp 1120w",
-          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-560.avif 560w, /landing/v2/apple-2026-q1-10-q-reference-p019-r62-621-939-667-1120.avif 1120w",
-          "width": 1120,
-          "height": 77
-        }
-      },
-      "openHref": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-b89dd34e25c1a4bdb8f4a277dcc4bb20"
-    },
-    {
-      "question": "How does the Board oversee privacy and data security?",
-      "answerExcerpt": "Table of Contents Summary Governance Directors Compensation Proposals Other Information Audit Committee Ron Sugar (Chair) Primary Responsibilities: Wanda Austin Monica Lozano ● Assist the Board in oversight and monitoring of Apple’s",
-      "answerTruncated": true,
-      "source": {
-        "form": "DEF 14A",
-        "filingDate": "2026-01-08",
-        "filename": "apple-2026-proxy-def14a-reference.pdf",
-        "page": 17,
-        "pageCount": 103,
-        "digest": "sha256:aa84ce73eb0f181844ccd0bb8a4a53f670fae6a007c086ccdb55f705f8d7a0c2",
-        "representationKind": "reference_render"
-      },
-      "region": {
-        "id": "evidence-5a70ec70f7b1a1726a25ed51a5dc716a:chunk-c4c371ac7a6bdf15dbc49c6fde1ae315",
-        "bbox1000": [
-          62,
-          40,
-          949,
-          521
+          64,
+          249,
+          932,
+          352
         ]
       },
       "citationIndex": 0,
       "citationCount": 3,
       "rasters": {
         "page": {
-          "src": "/landing/v2/apple-2026-proxy-def14a-reference-p017-1080.webp",
-          "srcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-720.webp 720w, /landing/v2/apple-2026-proxy-def14a-reference-p017-1080.webp 1080w",
-          "avifSrcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-720.avif 720w, /landing/v2/apple-2026-proxy-def14a-reference-p017-1080.avif 1080w",
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-720.webp 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.webp 1080w",
+          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-720.avif 720w, /landing/v2/apple-2026-q1-10-q-reference-p004-1080.avif 1080w",
           "width": 1080,
           "height": 1398
         },
         "crop": {
-          "src": "/landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-1120.webp",
-          "srcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-560.webp 560w, /landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-1120.webp 1120w",
-          "avifSrcSet": "/landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-560.avif 560w, /landing/v2/apple-2026-proxy-def14a-reference-p017-r62-40-949-521-1120.avif 1120w",
+          "src": "/landing/v2/apple-2026-q1-10-q-reference-p004-r64-249-932-352-1120.webp",
+          "srcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-r64-249-932-352-560.webp 560w, /landing/v2/apple-2026-q1-10-q-reference-p004-r64-249-932-352-1120.webp 1120w",
+          "avifSrcSet": "/landing/v2/apple-2026-q1-10-q-reference-p004-r64-249-932-352-560.avif 560w, /landing/v2/apple-2026-q1-10-q-reference-p004-r64-249-932-352-1120.avif 1120w",
           "width": 1120,
-          "height": 786
+          "height": 172
         }
       },
-      "openHref": "/explore?act=evidence&evidence=evidence-5a70ec70f7b1a1726a25ed51a5dc716a%3Achunk-c4c371ac7a6bdf15dbc49c6fde1ae315"
+      "openHref": "/explore?act=evidence&evidence=evidence-274e80464ffc891ce2ed3077e7d67934%3Achunk-b51f1e7299e0b66328a3337d9c3a5b93"
+    },
+    {
+      "question": "What products does Apple's Company Background say it designs and markets?",
+      "answerExcerpt": "PART I Item 1. Business Company Background The Company designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services. The Company’s fiscal year is the 52- or",
+      "answerTruncated": true,
+      "source": {
+        "form": "10-K",
+        "filingDate": "2025-10-31",
+        "filename": "apple-2025-form-10-k.pdf",
+        "page": 4,
+        "pageCount": 80,
+        "digest": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+        "representationKind": "original"
+      },
+      "region": {
+        "id": "evidence-0dffdde3c8def7d25da7d9eb4bd303d3:chunk-a511a0ea39e95b6dd5872ac3ef0115f1",
+        "bbox1000": [
+          30,
+          291,
+          971,
+          380
+        ]
+      },
+      "citationIndex": 0,
+      "citationCount": 3,
+      "rasters": {
+        "page": {
+          "src": "/landing/v2/apple-2025-form-10-k-p004-1120.webp",
+          "srcSet": "/landing/v2/apple-2025-form-10-k-p004-560.webp 560w, /landing/v2/apple-2025-form-10-k-p004-840.webp 840w, /landing/v2/apple-2025-form-10-k-p004-1120.webp 1120w",
+          "avifSrcSet": "/landing/v2/apple-2025-form-10-k-p004-560.avif 560w, /landing/v2/apple-2025-form-10-k-p004-840.avif 840w, /landing/v2/apple-2025-form-10-k-p004-1120.avif 1120w",
+          "width": 1120,
+          "height": 1450
+        },
+        "crop": {
+          "src": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.webp",
+          "srcSet": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-708.webp 708w, /landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.webp 1317w",
+          "avifSrcSet": "/landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-708.avif 708w, /landing/v2/apple-2025-form-10-k-p004-r30-291-971-380-1416.avif 1317w",
+          "width": 1317,
+          "height": 162
+        }
+      },
+      "openHref": "/explore?act=evidence&evidence=evidence-0dffdde3c8def7d25da7d9eb4bd303d3%3Achunk-a511a0ea39e95b6dd5872ac3ef0115f1"
     }
   ],
   "record": {

@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import ContactForm from "@/components/contact-form";
 import { parseQualification, QUALIFICATION, qualificationLines } from "./contact-qualification";
 
 /*
@@ -29,7 +32,10 @@ describe("the questions masterplan 13.4 asked for", () => {
     // A visitor who only wants to ask a question should not face a qualification questionnaire.
     expect(parseQualification({})).toEqual({});
     const form = readFileSync(resolve(import.meta.dirname, "../components/contact-form.tsx"), "utf8");
-    expect(form).toContain('<option value="">No answer</option>');
+    const english = renderToStaticMarkup(createElement(ContactForm, { locale: "en" }));
+    const korean = renderToStaticMarkup(createElement(ContactForm, { locale: "ko" }));
+    expect(english.match(/<option[^>]*value=""[^>]*>No answer<\/option>/g)).toHaveLength(5);
+    expect(korean.match(/<option[^>]*value=""[^>]*>응답하지 않음<\/option>/g)).toHaveLength(5);
     expect(form).not.toMatch(/name=\{field\.name\}[^>]*required/);
   });
 

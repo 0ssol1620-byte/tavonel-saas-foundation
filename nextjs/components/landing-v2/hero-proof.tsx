@@ -60,6 +60,9 @@ export default function HeroProof({ korean = false }: { korean?: boolean }) {
         <RegionHighlight
           view={view}
           caption={copy.caption}
+          progressiveIndex
+          indexLabel={copy.indexLabel}
+          locale={korean ? "ko" : "en"}
           /*
             The figcaption below the raster already names the filename, the representation and
             the page out of its page count, so an alt repeating them makes a screen reader read

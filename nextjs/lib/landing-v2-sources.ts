@@ -60,8 +60,8 @@ function firstPageImage(digest: string): LandingV2Image | null {
 /**
  * The source stack: real filings, real filenames, real committed page renders.
  *
- * The selection rule is the one Scene 02's tabs also use, and it has a single requirement a
- * reader can see: a filing is in the stack only if this repository holds a rendered page of it.
+ * A filing is in this stack only if this repository holds a rendered page of it. Scene 02's
+ * proof tabs apply a stricter rule: their top-ranked answer region must also have a crop.
  * §13 asks the stack to say "bring the mess" -- a spreadsheet, a deck, a scan -- and this World
  * holds none of those, so the stack shows what the World actually holds and the breadth claim is
  * made by the accepted-format sentence underneath it, where it has a receipt (contract rules 2

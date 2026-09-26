@@ -47,6 +47,13 @@ jobs:
         with:
           version: 2.116.0
 
+      # setup-cli selects GHCR by default. GHCR throttled this public image on four fresh
+      # runners, including one authenticated pull, before any SQL ran. The same pinned
+      # supabase/postgres:17.6.1.165 tag is published on Docker Hub (digest verified at the
+      # registry). Override the setup action for all subsequent local-CLI steps.
+      - name: Use the official Docker Hub image registry for the local stack
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io" >> "$GITHUB_ENV"
+
       # Artifact names are derived, never typed. `schema-after-0050` was hard-coded and went
       # stale the day 0051 was written; a receipt whose name lies about its contents is worse
       # than one with an awkward name.

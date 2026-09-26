@@ -30,12 +30,12 @@ import { LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-hero-copy";
   `preferVideo` routes every stage to the locked recording instead, so what the page paints is the
   approved bytes and the dynamic imports for the canvases are never fetched.
 
-  THE STAGE TABLE IS COMPOSED HERE AND THE FILMS ARE NOT TOUCHED
+  THE STAGE TABLE IS COMPOSED HERE
   `lib/compile-stages.ts` owns the four cuts. This file overrides exactly three fields on the
   first stage -- the re-rendered master and its hero-sized poster, which is what the previous
   landing played and what `app/page.tsx` preloads -- and supplies the Korean label and caption for
-  each stage from the copy module. Nothing here re-encodes, replaces or renames a locked asset
-  (`lib/locked-film-assets.json`, `lib/one-path-contract.test.ts`).
+  each stage from the copy module. Film files are pinned by
+  `lib/locked-film-assets.json` and `lib/one-path-contract.test.ts`.
 */
 
 /**
@@ -79,7 +79,8 @@ function heroStages(korean: boolean): CompileStage[] {
 export default function HeroFilm({ korean = false }: { korean?: boolean }) {
   return (
     <div className="lv2-film">
-      <CompileStagePlayer stages={heroStages(korean)} preferVideo korean={korean} />
+      <CompileStagePlayer stages={heroStages(korean)} preferVideo korean={korean} stageDisclosureLabel={korean ? "영상 단계 선택" : "Choose a film cut"} />
+      <p className="fine">{korean ? "영상은 제품 인터페이스를 설명하기 위한 예시입니다. 표시된 자료와 응답은 고객 결과가 아닙니다." : "Illustrative product walkthrough. The displayed documents and answers are examples, not customer results."}</p>
     </div>
   );
 }

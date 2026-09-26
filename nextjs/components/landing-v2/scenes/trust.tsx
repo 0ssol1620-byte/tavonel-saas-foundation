@@ -128,7 +128,11 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
                 moved there, every proof is an `lv2-inline-link`, and no destination is twice.
               */}
               <p className="lv2-proof-label">
-                <Link className="lv2-inline-link" href={proof.href as Route} prefetch={false}>
+                <Link className="lv2-inline-link"
+                  href={(locale === "ko" && proof.href === "/contact" ? "/ko/contact" : proof.href) as Route}
+                  hrefLang={locale === "ko" && proof.href !== "/contact" ? "en" : undefined}
+                  aria-label={locale === "ko" && proof.href !== "/contact" ? `${proof.label} (영문 페이지)` : undefined}
+                  prefetch={false}>
                   {proof.label}
                 </Link>
               </p>
@@ -141,6 +145,8 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
             <Link
               className={`lv2-text-link ${styles.next}`}
               href={next.href as Route}
+              hrefLang={locale === "ko" ? "en" : undefined}
+              aria-label={locale === "ko" ? `${next.label} (영문 페이지)` : undefined}
               prefetch={false}
               data-scene-next="trust"
             >
@@ -150,11 +156,11 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
           </p>
         ) : null}
         <p className={`lv2-meta ${styles.footnote}`}>
-          <Link className={styles.footnoteLink} href={"/status" as Route} prefetch={false}>
+          <Link className={styles.footnoteLink} href={"/status" as Route} hrefLang={locale === "ko" ? "en" : undefined} prefetch={false}>
             {FOOTNOTE[locale]}
           </Link>
           {references.map((link) => (
-            <Link key={link.href} className={styles.footnoteLink} href={link.href as Route} prefetch={false}>
+            <Link key={link.href} className={styles.footnoteLink} href={link.href as Route} hrefLang={locale === "ko" ? "en" : undefined} prefetch={false}>
               {link.label}
             </Link>
           ))}

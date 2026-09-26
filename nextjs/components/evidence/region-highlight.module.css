@@ -19,6 +19,21 @@
 .page { grid-area: page; }
 .list { grid-area: list; }
 .detail { grid-area: detail; }
+.disclosure { grid-area: list; min-width: 0; }
+.disclosure summary {
+  display: list-item;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-hi);
+  cursor: pointer;
+  font: 600 12px/24px var(--f-sans);
+}
+.disclosure summary span { margin: 0 3px; }
+.disclosure summary:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 2px; }
+.disclosure[open] .list { margin-top: 12px; }
+.frame[data-progressive="1"] { grid-template-areas: "page" "detail" "list"; }
 
 /*
   Stacked at phone width, page beside excerpt from 880px. The page column is capped so a tall
@@ -43,15 +58,19 @@
   900px viewport, and `production-hardening.spec.ts` rightly calls a scene past two viewports an
   ocean rather than a composed frame.
 
-  Three columns cost nothing here: the picture keeps its 320px cap, the index keeps the same 44px
-  rows in the same order, and the frame's height becomes the tallest single column instead of the
-  sum of two. No row is hidden, nothing scrolls inside the frame, and the phone and laptop
-  layouts above are untouched.
+  Three columns cost nothing on the full index: the picture keeps its 320px cap, the index keeps
+  the same 44px rows in order, and the frame's height becomes the tallest single column instead
+  of the sum of two. The landing's progressive variant keeps two columns and the index below the
+  page; its rows remain available through the disclosure.
 */
 @media (min-width: 1200px) {
   .frame {
     grid-template-columns: minmax(0, 320px) minmax(0, 320px) minmax(0, 1fr);
     grid-template-areas: "page list detail";
+  }
+  .frame[data-progressive="1"] {
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    grid-template-areas: "page detail" "list detail";
   }
 }
 

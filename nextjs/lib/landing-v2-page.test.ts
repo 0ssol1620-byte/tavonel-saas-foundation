@@ -259,8 +259,9 @@ describe("landing v2 -- the composition", () => {
       expect(main).not.toContain("<video");
       expect(main).not.toContain("<iframe");
       expect(main).toContain("data-compiler-specimen");
-      expect(main).toContain("Page");
-      expect(main).toContain("Intelligence");
+      expect(main).toContain(locale === "ko" ? ">원문</button>" : ">Page</button>");
+      expect(main).toContain(locale === "ko" ? ">활용</button>" : ">Intelligence</button>");
+      expect(main).toContain(locale === "ko" ? "TIF 또는 GIF" : "TIF or GIF");
       expect(main).not.toContain('fetchpriority="high"');
     }
   );
