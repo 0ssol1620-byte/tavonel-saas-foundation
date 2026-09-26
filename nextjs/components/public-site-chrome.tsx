@@ -66,7 +66,7 @@ export function PublicSiteHeader({
   return (
     <header className={`nav chrome-v2-header ${chrome.header}`}>
       <HeaderScrollState />
-      <Link href="/" className={`wordmark ${chrome.wordmark}`} aria-label="TAVONEL home">
+      <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}>
         <Logomark />
         <b>TAVONEL</b>
       </Link>
@@ -113,7 +113,7 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
       <div className={`${onePath ? "one-path-wrap" : "shell"} chrome-v2-wrap`}>
         {/* BQ-131: the wordmark at the bottom of a page is where a reader goes home from. It was
             a bare <span> -- the one instance of the lockup on the site that was not a link. */}
-        <Link href="/" className={`wordmark ${chrome.wordmark}`} aria-label="TAVONEL home"><Logomark /><b>TAVONEL</b></Link>
+        <Link href={korean ? "/ko" : "/"} className={`wordmark ${chrome.wordmark}`} aria-label={korean ? "TAVONEL 홈" : "TAVONEL home"}><Logomark /><b>TAVONEL</b></Link>
         <div className={`site-footer-groups ${chrome.footerGroups}`}>
           {FOOTER_GROUPS.map((group) => (
             <nav key={group.title} aria-label={group.title}>
