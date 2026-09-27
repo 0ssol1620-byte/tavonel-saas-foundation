@@ -119,7 +119,7 @@ select throws_ok($$do $d$ begin
   perform public.seal_founder_test_reset((select (r->>'resetId')::uuid from prepared), '0ssol1620@gmail.com',
     'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'pilot-f0f0f0f0f0f04f0f', (select r->>'dbManifestDigest' from prepared),
     'sha256:' || repeat('b', 64), '[]'::jsonb);
-end $d$$$, 'P0001', 'founder_test_reset_database_drift', 'a failure recorded after prepare is database drift');
+end $d$;$$, 'P0001', 'founder_test_reset_database_drift', 'a failure recorded after prepare is database drift');
 
 -- A hold placed between prepare and seal refuses the seal.
 insert into public.source_operator_legal_holds (workspace_key, reason) values ('pilot-f0f0f0f0f0f04f0f', 'fixture: hold two');
