@@ -94,7 +94,33 @@ export type CustomerSourceDeletionStatus = {
     lastPurgeFailureCode?: string | null;
     lastPurgeFailureAt?: string | null;
   }[];
+  /** 20260927104000: the derived closure's receipt, or null until it ran. */
+  derived?: DerivedClosure | null;
 };
+
+export type DerivedClosure = {
+  receiptId: string;
+  closedAt: string;
+  retrievalUnitsErased: number;
+  retrievalEmbeddingsErased: number;
+  expiredOperationCacheRowsErased: number;
+  retrievalUnitsRetainedUnproven: number;
+  worldVersionsRetained: number;
+  /** Read live, not from the receipt. */
+  retrievalUnitsRemaining: number;
+};
+
+const DERIVED_COUNTS = ["retrievalUnitsErased", "retrievalEmbeddingsErased", "expiredOperationCacheRowsErased",
+  "retrievalUnitsRetainedUnproven", "worldVersionsRetained", "retrievalUnitsRemaining"] as const;
+
+function validDerived(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.receiptId === "string" && SHA256.test(row.receiptId)
+    && typeof row.closedAt === "string" && Number.isFinite(Date.parse(row.closedAt))
+    && DERIVED_COUNTS.every(key => Number.isSafeInteger(row[key]) && (row[key] as number) >= 0);
+}
 
 /** R2 refused the DELETE under a bucket object-lock rule (see r2-synthetic-canary.ts). */
 export const OBJECT_LOCKED_CODE = "SOURCE_DELETE_OBJECT_LOCKED";
@@ -129,6 +155,7 @@ function deletionStatus(value: unknown, workspaceKey: string, documentId: string
     || !SHA256.test(row.tombstoneReceiptId ?? "") || !optionalSha(row.requestManifestSha256)
     || !optionalSha(row.inventoryManifestSha256)
     || (row.artifactCount !== null && !Number.isSafeInteger(row.artifactCount))
+    || !validDerived(row.derived)
     || !Array.isArray(row.objects)
     || !row.objects.every(o => o && typeof o.objectKey === "string" && SHA256.test(o.objectSha256)
       && optionalSha(o.receiptId) && (o.purgedAt === null) === (o.receiptId === null)
@@ -276,8 +303,10 @@ export async function runRetentionTombstones(candidates: readonly RetentionCandi
 }
 
 /**
- * The customer-facing receipt attests only the document's R2 source objects. Derived artifacts
- * remain stored and are blocked at serving, so this must never claim full document deletion.
+ * The customer-facing receipt attests the document's R2 source objects and, once the derived
+ * closure ran, the retrieval rows it provably owned (`derivedClosure`). Compiled Worlds, their
+ * provenance and any retrieval row of unprovable ownership remain stored and are blocked at
+ * serving, so `derivedArtifactsRetained` stays true and this never claims full document deletion.
  * An object whose last purge attempt R2 refused under an object lock is reported as retained
  * (`purge_blocked_by_storage_lock`), not as "purging": no retry can succeed before the lock ends.
  */
@@ -297,11 +326,21 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
   return {
     state,
     payload: {
-      schemaVersion: "tavonel.customer_source_deletion_receipt.v3" as const,
+      schemaVersion: "tavonel.customer_source_deletion_receipt.v4" as const,
       state,
-      scope: "document_r2_objects_only" as const,
+      scope: "document_r2_objects_and_exclusive_retrieval_rows" as const,
       derivedArtifactsRetained: true,
       objectsRetainedUnderStorageLock: lockRetained.length,
+      derivedClosure: status.derived ? {
+        receiptId: status.derived.receiptId,
+        closedAt: status.derived.closedAt,
+        retrievalUnitsErased: status.derived.retrievalUnitsErased,
+        retrievalEmbeddingsErased: status.derived.retrievalEmbeddingsErased,
+        expiredOperationCacheRowsErased: status.derived.expiredOperationCacheRowsErased,
+        retrievalUnitsRetainedUnproven: status.derived.retrievalUnitsRetainedUnproven,
+        worldVersionsRetained: status.derived.worldVersionsRetained,
+        retrievalUnitsRemaining: status.derived.retrievalUnitsRemaining,
+      } : null,
       deletionId: status.deletionId,
       workspaceKey: status.workspaceKey,
       documentId: status.documentId,

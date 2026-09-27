@@ -77,11 +77,23 @@ describe("customer deletion receipt", () => {
     expect(customerDeletionReceipt({ ...attested, objects: [object("a", true)] }).state).toBe("purging");
     const done = customerDeletionReceipt({ ...attested, objects: [object("a", true), object("bb", true)] });
     expect(done).toMatchObject({ state: "source_objects_purged", payload: {
-      schemaVersion: "tavonel.customer_source_deletion_receipt.v3",
-      scope: "document_r2_objects_only", derivedArtifactsRetained: true,
-      objectsRetainedUnderStorageLock: 0,
+      schemaVersion: "tavonel.customer_source_deletion_receipt.v4",
+      scope: "document_r2_objects_and_exclusive_retrieval_rows", derivedArtifactsRetained: true,
+      objectsRetainedUnderStorageLock: 0, derivedClosure: null,
       sourceObjectsPurgedAt: "2026-09-27T01:02:00Z",
     } });
+  });
+
+  it("reports the derived closure with what it erased and what it kept, never full deletion", () => {
+    const derived = { receiptId: sha("c"), closedAt: "2026-09-27T00:30:00Z", retrievalUnitsErased: 3,
+      retrievalEmbeddingsErased: 1, expiredOperationCacheRowsErased: 1, retrievalUnitsRetainedUnproven: 1,
+      worldVersionsRetained: 1, retrievalUnitsRemaining: 1, unexpected: "dropped" };
+    const receipt = customerDeletionReceipt({ ...base, derived });
+    expect(receipt.state).toBe("scheduled");
+    expect(receipt.payload.derivedArtifactsRetained).toBe(true);
+    expect(receipt.payload.derivedClosure).toEqual({ receiptId: sha("c"), closedAt: "2026-09-27T00:30:00Z",
+      retrievalUnitsErased: 3, retrievalEmbeddingsErased: 1, expiredOperationCacheRowsErased: 1,
+      retrievalUnitsRetainedUnproven: 1, worldVersionsRetained: 1, retrievalUnitsRemaining: 1 });
   });
 
   it("reports a storage-lock refusal as retained, never as purging or purged", () => {
@@ -185,6 +197,37 @@ describe("source deletion purge failure migration", () => {
     expect(status).toMatch(/'lastPurgeFailureCode', case when r\.receipt_id is null then f\.last_code end/);
     expect(status).toMatch(/w\.stage = 'purge' and w\.object_key = o\.object_key/);
     expect(sql).toMatch(/record_source_deletion_purge_failure\(text, text, uuid, text\),[\s\S]+from public, anon, authenticated;/);
+    expect(sql).not.toMatch(/grant [^;]+ to (anon|authenticated)/);
+  });
+});
+
+describe("source deletion derived closure migration", () => {
+  const sql = readFileSync("../supabase/migrations/20260927104000_source_deletion_derived_closure.sql", "utf8");
+  const fn = (name: string) => sql.match(new RegExp(`create (?:or replace )?function public\\.${name}\\([\\s\\S]+?\\n\\$\\$;`))?.[0] ?? "";
+  const close = fn("close_source_deletion_derived");
+
+  it("erases only single-chunk retrieval units and expired cache rows", () => {
+    expect(fn("source_deletion_exclusive_unit_types")).toMatch(/array\['section', 'claim', 'entity'\]/);
+    const deletes = close.match(/delete from public\.\w+/g);
+    expect(deletes).toEqual(["delete from public.foundation_retrieval_units", "delete from public.foundation_operation_leases"]);
+    expect(close).toMatch(/u\.unit_type = any\(public\.source_deletion_exclusive_unit_types\(\)\);\s+get diagnostics v_units/);
+    expect(close).toMatch(/l\.expires_at <= pg_catalog\.clock_timestamp\(\)/);
+    // World, compile and provenance rows are never touched.
+    expect(close).not.toMatch(/(delete from|update) public\.(foundation_world|foundation_active_worlds|foundation_retrieval_compile_runs|source_deletion_objects)/);
+  });
+
+  it("runs only after eligibility and attestation, outside a retrieval compile, under an inactive hold", () => {
+    expect(close).toMatch(/t\.eligible_at <= pg_catalog\.clock_timestamp\(\)[\s\S]+source_deletion_inventory_attestations[\s\S]+source_legal_hold_state\(t\.workspace_key\) = 'inactive'/);
+    expect(close).toMatch(/status in \('pending', 'running'\)/);
+    const lock = close.indexOf("tavonel.source_legal_hold.v1");
+    expect(lock).toBeGreaterThan(close.indexOf("hashtextextended(v_tombstone.deletion_id, 0)"));
+    expect(close.indexOf("<> 'inactive'", lock)).toBeLessThan(close.indexOf("delete from"));
+  });
+
+  it("records one append-only receipt and keeps the closure off browser roles", () => {
+    expect(sql).toMatch(/source_deletion_receipts_derived_once_idx\s+on public\.source_deletion_receipts \(deletion_id\) where action = 'derived_purged'/);
+    expect(close).toMatch(/insert into public\.source_deletion_receipts[\s\S]+'derived_purged'/);
+    expect(fn("customer_source_deletion_status")).toMatch(/'retrievalUnitsRemaining', \(select pg_catalog\.count/);
     expect(sql).not.toMatch(/grant [^;]+ to (anon|authenticated)/);
   });
 });

@@ -6,7 +6,7 @@ import {
   inspectFoundationSourceObject,
   readR2SignerEnv,
 } from "@/lib/r2-synthetic-canary";
-import { createSourceDeletionSweepStore } from "@/lib/source-deletion-store";
+import { closeSourceDeletionDerived, createSourceDeletionSweepStore } from "@/lib/source-deletion-store";
 import { runSourceDeletionSweep } from "@/lib/source-deletion-sweeper";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +27,13 @@ async function runOneDeletion(request: Request) {
     return NextResponse.json({ code: "DELETION_WORKER_NOT_AUTHORIZED" }, { status: 401, headers: HEADERS });
   }
 
+  // Database-only and independent of R2, so an object under a storage lock never blocks it.
+  const closure = await closeSourceDeletionDerived();
+  const derived = closure.ok ? closure.status : closure.code;
+
   const signer = readR2SignerEnv();
   if (!signer || signer.bucket !== FOUNDATION_R2_BUCKET) {
-    return NextResponse.json({ code: "SOURCE_DELETE_NOT_CONFIGURED", processed: 0 },
+    return NextResponse.json({ code: "SOURCE_DELETE_NOT_CONFIGURED", processed: 0, derived },
       { status: 503, headers: HEADERS });
   }
   const deletions = await runSourceDeletionSweep({
@@ -43,9 +47,9 @@ async function runOneDeletion(request: Request) {
 
   return NextResponse.json(
     deletions.ok
-      ? { code: "OK", processed: deletions.receipts.length }
-      : { code: deletions.code, processed: deletions.receipts.length, failureRecorded: deletions.failureRecorded },
-    { status: deletions.ok ? 200 : 503, headers: HEADERS },
+      ? { code: closure.ok ? "OK" : closure.code, processed: deletions.receipts.length, derived }
+      : { code: deletions.code, processed: deletions.receipts.length, failureRecorded: deletions.failureRecorded, derived },
+    { status: deletions.ok && closure.ok ? 200 : 503, headers: HEADERS },
   );
 }
 

@@ -480,3 +480,57 @@ fixture still require CI database rehearsal before this is relied on.
   decision on the promised retention;
 - CI PostgreSQL rehearsal of 20260927102000 and 20260927103000;
 - a real synthetic R2 canary through tombstone → attest → purge, including one locked object.
+
+### 10.2 Derived-artifact closure, 2026-09-27 (local code only, not executed)
+
+Migration `20260927104000_source_deletion_derived_closure.sql` adds `close_source_deletion_derived()`.
+The deletion worker (`/api/internal/deletions/run`) calls it once per run before the R2 sweep, so a
+locked object does not hold it back. One call closes one deletion in one transaction. It erases only
+what ownership can be proven for:
+
+- `foundation_retrieval_units` of type `section`, `claim` or `entity` that name the document, and
+  their embeddings (cascade). `nextjs/lib/retrieval-units.ts` builds each of these from exactly one
+  chunk of exactly one document, so no other document's content is removed. A shared entity keeps
+  its units in the other documents.
+- expired rows of the workspace's Ask/export replay cache (`foundation_operation_leases`). A cached
+  response names no document, so ownership is bounded by time instead. A response completes within
+  the 75-second lease and expires 10 minutes later (0055), and `eligible_at` is at least 15 minutes
+  after the tombstone. Every response that could hold the document is therefore expired, and
+  expired rows are never replayed.
+
+It keeps and counts, without erasing:
+
+- retrieval units of any other type that name the document (`retrievalUnitsRetainedUnproven`).
+  None is produced today;
+- Compiled World candidates in R2, `foundation_world_*` rows, compile runs and every receipt. A World
+  can combine several documents and is provenance for each, and its R2 object is under the 365-day
+  `immutable/` lock. `worldVersionsRetained` counts the Worlds whose retrieval index named the
+  document. A World with no retrieval index cannot be enumerated from the database, and no claim
+  is made about it.
+
+Preconditions, re-read under the deletion lock and the legal-hold lock: the tombstone is eligible,
+its inventory is attested, the hold is readable and inactive, and no retrieval compile is pending
+or running in the workspace. The result is one append-only `derived_purged` row in
+`source_deletion_receipts`, with its counts in `derived_summary`. The customer status returns it as
+`derived`, plus a live `retrievalUnitsRemaining` count. The signed receipt is now schema v4. Its
+scope is `document_r2_objects_and_exclusive_retrieval_rows`, it carries `derivedClosure`, and
+`derivedArtifactsRetained` stays `true`.
+
+Checks written, not run by this change: `supabase/tests/source_deletion_derived_closure.sql`
+(pgTAP, 20 assertions), plus Vitest text and route tests in `customer-source-lifecycle.test.ts`
+and `source-deletion-route.test.ts`.
+
+**Still open after 10.2:**
+
+- Compiled World candidates that include a deleted document stay in R2 and in World history. Erasing
+  them needs a recompile-without-the-document plus a decision on the `immutable/` lock and on World
+  provenance. It is not done here.
+- A retrieval run stuck in `running` defers the closure for its whole workspace. The deferral is
+  visible (`derived: null`) but is not alerted.
+- `completed` retrieval runs keep their original `unit_count` after the erase.
+- Legacy `knowledge_graph_candidates` (0001) are keyed to legacy `documents`, not upload ids, and are
+  not covered.
+- The founder test reset does not delete `source_deletion_worker_failures`
+  (20260927102000/103000), so the tombstone delete would hit that table's foreign key. The reset
+  aborts, failing closed. This predates 10.2 and is not changed here.
+- CI PostgreSQL rehearsal of 20260927104000, and a synthetic canary through the closure.

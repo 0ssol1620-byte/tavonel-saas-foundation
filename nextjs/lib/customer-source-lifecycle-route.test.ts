@@ -194,7 +194,7 @@ describe("customer source lifecycle route", () => {
     const body = await response.json();
     expect(body).toMatchObject({ code: "DELETION_RECORDED", deletion: { state: "source_objects_purged" } });
     expect(JSON.parse(body.receiptPayload)).toMatchObject({ state: "source_objects_purged",
-      scope: "document_r2_objects_only", derivedArtifactsRetained: true,
+      scope: "document_r2_objects_and_exclusive_retrieval_rows", derivedArtifactsRetained: true, derivedClosure: null,
       sourceObjectsPurgedAt: "2026-09-27T00:21:00Z",
       workspaceKey: "pilot-acme01", documentId: DOC });
     expect(signPayload.mock.calls[0]![0].toString("utf8")).toBe(body.receiptPayload);
