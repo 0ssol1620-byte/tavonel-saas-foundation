@@ -16,6 +16,8 @@ import type { CompileState } from "./compile-job-store";
 export type WorkspaceInventoryState = "loading" | "ready" | "unavailable";
 
 export type WorkspaceStateInput = {
+  /** Per-workspace admission is distinct from having saved, readable sources. */
+  customerDataAccess: "checking" | "open" | "closed" | "unavailable";
   /** Whether the source inventory is known. Never assume "loading" means "empty". */
   inventoryState: WorkspaceInventoryState;
   documentCount: number;
@@ -173,6 +175,22 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     return { mode, stateTitle: "The last compile stopped.",
       stateDescription: "The run did not finish. Inspect its recorded status before retrying; no error detail was provided.",
       nextAction: { label: "Open activity", surface: "activity" } };
+  }
+
+  if (input.customerDataAccess !== "open") {
+    if (input.customerDataAccess === "checking") {
+      return { mode, stateTitle: "Checking source access.",
+        stateDescription: "Your saved work remains available while we verify whether this workspace can process files.",
+        nextAction: { label: "Checking access" } };
+    }
+    if (input.customerDataAccess === "unavailable") {
+      return { mode, stateTitle: "Source access could not be verified.",
+        stateDescription: "Your saved work remains available. Sign in again before processing files.",
+        nextAction: { label: "Access unavailable" } };
+    }
+    return { mode, stateTitle: `${input.documentCount} saved source${input.documentCount === 1 ? "" : "s"}.`,
+      stateDescription: "Your saved sources remain available to inspect.",
+      nextAction: { label: "View saved sources", surface: "sources" } };
   }
 
   if (input.readyDocumentCount > 0) {
