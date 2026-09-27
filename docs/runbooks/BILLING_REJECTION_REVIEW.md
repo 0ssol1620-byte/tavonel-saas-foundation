@@ -41,8 +41,10 @@ Use the Paddle dashboard for the production account (sandbox rows only exist in 
 3. For subscription rows, open `subscriptionId` (or `GET /subscriptions/{sub_id}`) and record its
    status and scheduled change.
 
-If the transaction is not `completed`/`paid`, no money was taken: go to closure with
-`operator_no_charge`.
+If the transaction is `paid`, funds were received but Paddle has not finished processing it;
+wait for `completed` before requesting a refund. If it is neither `paid` nor `completed`,
+check payment attempts and adjustments before concluding no charge occurred. Use
+`operator_no_charge` only after that check confirms no funds were captured.
 
 ## 3. Decide by reason
 
@@ -70,6 +72,9 @@ Only for rows whose cause has disappeared (dependency ordering, association now 
 - Paddle dashboard → Developer tools → Notifications → the `ntf_…` for this event → **Replay**,
   or `POST /notifications/{ntf_id}/replay`.
 
+Paddle retains notifications for 90 days and permits replay only when the notification's origin
+is `event`; use the original notification ID, not the ID returned by an earlier replay.
+
 Replay resends the same signed payload. v6 either applies it and closes the row with the
 projected status, answers `duplicate` and closes it, or refuses again and leaves the row
 unchanged (`on conflict do nothing`). Re-run the CLI to confirm. Never replay to "try again" a
@@ -80,6 +85,8 @@ reason the table above says will refuse again.
 A human with Paddle dashboard access, never a script: Transactions → the `txn_…` → Refund (full),
 reason "payment could not be applied to an account". Record the `adj_…` id. Paddle's own
 `adjustment` webhook then arrives as a normal event; it does not close the rejection row.
+Paddle accepts refund adjustments only for `completed` transactions. A live refund may remain
+`pending_approval`; do not close the row as refunded until Paddle confirms the refund outcome.
 
 For a reissue, confirm the new checkout applied (customer sees the plan, a new
 `foundation_billing_events` row exists) before refunding the original.
@@ -106,3 +113,7 @@ ids, `resolution_status`, operator, reviewer. Re-run the CLI; the row must be go
 - Any unresolved `purchase`/`allowance` row older than 24 h, or `unresolvedTotal` growing across
   two runs: founder, same day.
 - Any `investigate` row: founder before any customer contact.
+
+Paddle API references: [transaction status](https://developer.paddle.com/api-reference/transactions/get-transaction/),
+[notification replay](https://developer.paddle.com/api-reference/notifications/replay-notification/),
+and [refund adjustments](https://developer.paddle.com/api-reference/adjustments/create-adjustment/).
