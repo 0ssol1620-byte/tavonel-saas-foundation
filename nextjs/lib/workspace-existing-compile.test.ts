@@ -19,7 +19,7 @@ describe("existing immutable document compilation", () => {
     // page -- still `hasOcrJson`, and still the only thing the board will let anyone tick.
     expect(source).toContain("documents?.filter((document) => document.hasOcrJson).map((document) => document.documentId)");
     expect(source).toContain("selectableIds={intakeOpen ? compilableDocumentIds : []}");
-    expect(source).toContain("canCompile={intakeOpen}");
+    expect(source).toContain("customerDataAccess={customerDataAccess}");
     expect(source).toContain("judgeCorpusSet(selectedDocumentIds.length).ok");
     // The sentence is now computed from what this browser can actually expand.
     expect(source).toContain("compileLimitsNotice(archiveCeilingMb)");

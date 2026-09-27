@@ -15,6 +15,7 @@ import { countNoun } from "@/lib/plural";
 import { formatTimestamp } from "@/lib/format";
 
 type Filter = "all" | "attention" | "processing" | "ready" | "failed";
+type CustomerDataAccess = "checking" | "open" | "closed" | "unavailable";
 /*
   "Ready for compilation" is a resting state, not a running one.
 
@@ -27,7 +28,12 @@ type Filter = "all" | "attention" | "processing" | "ready" | "failed";
   (`stages.slice(0, 3)` in app/workspace/page.tsx); the board is the sibling it missed.
 */
 function statusOf(row: PipelineRow): Exclude<Filter, "all"> { if (row.stages.some((stage) => stage.state === "failed")) return "failed"; if (row.needsPerson) return "attention"; if (row.transfer || row.stages.slice(0, 3).some((stage) => stage.state === "active")) return "processing"; return "ready"; }
-function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>, canCompile: boolean): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return canCompile ? "Ready to compile" : "Source ready"; if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
+function compileAvailabilityLabel(access: CustomerDataAccess): string {
+  if (access === "open") return "Ready to compile";
+  if (access === "closed") return "Source ready";
+  return access === "checking" ? "Checking access" : "Access unavailable";
+}
+function statusLabel(row: PipelineRow, reading: Record<string, OcrProgress>, access: CustomerDataAccess): string { const status = statusOf(row); if (status === "attention") return "Needs review"; if (status === "failed") return "Failed"; if (row.transfer) return "Uploading"; if (row.stages[2].state === "active") return reading[row.id]?.pagesRead ? `Reading page ${reading[row.id].pagesRead}` : "Reading"; if (row.stages[1].state === "active") return "Preparing"; if (row.stages[3].state === "active") return compileAvailabilityLabel(access); if (row.stages[3].state === "done") return "Compiled"; return status === "processing" ? "Processing" : "Ready"; }
 /* Which chapter this source is in. The board's four internal stage keys collapse onto the
    four the rest of the product says out loud. */
 function stageLabel(row: PipelineRow): string {
@@ -55,7 +61,7 @@ function failureCopy(detail: string) {
   name. The board does not decide which rows are eligible -- the page passes the ids it read
   from the document list, so eligibility and the compile call cannot drift apart.
 */
-export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, canCompile = true }: {
+export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, customerDataAccess }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
@@ -63,7 +69,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   selectableIds?: readonly string[];
   selectedIds?: readonly string[];
   onToggleSelected?: (documentId: string) => void;
-  canCompile?: boolean;
+  customerDataAccess: CustomerDataAccess;
 }) {
   const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
   const selectable = new Set(selectableIds ?? []);
@@ -105,7 +111,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   <span className="sr-only">Include {displayName(row.id, names, row.filename)} in the next candidate</span>
                 </label>
               ) : null}
-              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading, canCompile)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading, customerDataAccess)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
             </div>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>
@@ -115,7 +121,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   nothing. */}
               {row.observedAt ? <p className="fine board-row-observed">Source ready <time dateTime={row.observedAt}>{formatTimestamp(row.observedAt)}</time></p> : null}
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
-              <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.key === "compile" && stageItem.state === "active" && !canCompile ? "Reading complete · compilation unavailable in this workspace" : stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
+              <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.key === "compile" && stageItem.state === "active" && customerDataAccess !== "open" ? customerDataAccess === "closed" ? "Reading complete · compilation requires a scoped pilot" : customerDataAccess === "checking" ? "Reading complete · checking access" : "Reading complete · source access unavailable" : stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
             </div>
           </li>
         ); })}

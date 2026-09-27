@@ -8,6 +8,7 @@ import {
 } from "./workspace-onboarding";
 
 const base: WorkspaceStateInput = {
+  customerDataAccess: "open",
   inventoryState: "ready",
   documentCount: 0,
   readyDocumentCount: 0,
@@ -54,6 +55,18 @@ describe("workspace mode", () => {
 });
 
 describe("workspace state", () => {
+  it("does not promise compilation of saved sources while admission is closed or unresolved", () => {
+    const saved = { documentCount: 3, readyDocumentCount: 2 };
+    const closed = deriveWorkspaceState(input({ ...saved, customerDataAccess: "closed" }));
+    expect(closed.stateTitle).toBe("3 saved sources.");
+    expect(closed.nextAction).toEqual({ label: "View saved sources", surface: "sources" });
+    expect(closed.stateDescription).toContain("available to inspect");
+    const checking = deriveWorkspaceState(input({ ...saved, customerDataAccess: "checking" }));
+    expect(checking.stateTitle).toBe("Checking source access.");
+    expect(checking.nextAction.surface).toBeUndefined();
+    const unavailable = deriveWorkspaceState(input({ ...saved, customerDataAccess: "unavailable" }));
+    expect(unavailable.stateTitle).toBe("Source access could not be verified.");
+  });
   it("offers no action while the state is still being read", () => {
     const state = deriveWorkspaceState(input({ inventoryState: "loading" }));
     expect(state.stateTitle).toBe("Loading your knowledge.");

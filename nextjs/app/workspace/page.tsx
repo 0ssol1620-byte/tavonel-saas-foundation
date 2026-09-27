@@ -336,6 +336,9 @@ export default function WorkspacePage() {
   const [documentInventoryState, setDocumentInventoryState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [workspaceStartupReady, setWorkspaceStartupReady] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (!intakeOpen) setSelectedDocumentIds([]);
+  }, [intakeOpen]);
   /**
    * D9 -- the tab keeps counting after you look away.
    *
@@ -2012,6 +2015,7 @@ export default function WorkspacePage() {
     the first paint claim an empty workspace and then collapse (§13.4).
   */
   const workspaceStateInput: WorkspaceStateInput = {
+    customerDataAccess,
     inventoryState: documentInventoryState,
     documentCount,
     readyDocumentCount,
@@ -2512,7 +2516,7 @@ export default function WorkspacePage() {
               rows={pipelineRows}
               reading={reading}
               names={names}
-              canCompile={intakeOpen}
+              customerDataAccess={customerDataAccess}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
@@ -2555,9 +2559,9 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
-                {!intakeOpen ? <p id="workspace-recompile-access">{intakeClosedCopy}</p> : null}
+                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "This workspace cannot run Core on your sources yet. Arrange a scoped pilot to continue." : "Source access could not be verified. Sign in again before running Core."}</p> : null}
                 <div className="billing-actions">
-                  <button disabled={busy || !intakeOpen} aria-describedby={!intakeOpen ? "workspace-recompile-access" : undefined} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
+                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <Link href="/contact">Arrange a pilot</Link> : null}
                 </div>
               </section>
             ) : null}
