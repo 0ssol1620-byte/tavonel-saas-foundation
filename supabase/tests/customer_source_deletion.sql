@@ -8,7 +8,7 @@
 --   pilot-c2c2c2c2c2c24c2c  owner c2, grace 0, hold ON
 --   c3 is a plain member of the first workspace.
 begin;
-select plan(55);
+select plan(56);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -82,6 +82,8 @@ select throws_ok($$select public.request_customer_source_deletion('pilot-c2c2c2c
   'P0001', 'SOURCE_LEGAL_HOLD_ACTIVE', 'legal hold refuses the request');
 select throws_ok($$delete from public.enterprise_workspaces where workspace_key = 'pilot-c2c2c2c2c2c24c2c'$$,
   'P0001', 'SOURCE_LEGAL_HOLD_ACTIVE_OR_UNKNOWN', 'enterprise assignment cannot be removed to evade an active hold');
+select throws_ok($$update public.enterprise_workspaces set workspace_key = 'pilot-renamed' where workspace_key = 'pilot-c2c2c2c2c2c24c2c'$$,
+  'P0001', 'ENTERPRISE_WORKSPACE_KEY_IMMUTABLE', 'enterprise workspace identity cannot be renamed to evade a hold');
 select is((select count(*)::integer from public.source_deletion_tombstones where document_id is not null), 0,
   'no refusal left a tombstone behind');
 

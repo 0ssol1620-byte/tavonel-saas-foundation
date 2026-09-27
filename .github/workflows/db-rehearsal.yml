@@ -181,6 +181,9 @@ jobs:
       # the four `20260909*` connector migrations are `create table` without `if not exists` and
       # are correctly create-once.
       #
+      # 0053 is also excluded: its global service_role revoke/regrant matrix predates later table
+      # grants, so replaying it would erase those grants and leave the rehearsal in a state that a
+      # sequential production migration never reaches.
       # The old deletion-inventory migrations are not replayed here: 20260927102000 supersedes
       # their function bodies for uploaded sources. Replaying them after that create-once migration
       # would silently restore connector-only inventory logic. The first pass and pgTAP suite still
@@ -188,7 +191,7 @@ jobs:
       - name: Apply the repair migrations a second time and re-run the suite
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
-          for file in supabase/migrations/005[2345]_*.sql supabase/migrations/20260911*_*.sql; do
+          for file in supabase/migrations/005[245]_*.sql supabase/migrations/20260911*_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done

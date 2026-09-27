@@ -163,12 +163,18 @@ end;
 $$;
 
 -- An enterprise assignment can change the effective hold state without updating the policy.
--- Serialize INSERT/DELETE with an in-flight purge and never turn an active or unreadable
+-- Workspace identity is immutable. Serialize INSERT/DELETE with an in-flight purge and never turn an active or unreadable
 -- enterprise hold into an inactive self-service state by deleting its assignment.
 create function public.guard_enterprise_workspace_source_hold_transition()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare v_workspace_key text;
 begin
+  if tg_op = 'UPDATE' then
+    if old.workspace_key is distinct from new.workspace_key then
+      raise exception 'ENTERPRISE_WORKSPACE_KEY_IMMUTABLE';
+    end if;
+    return new;
+  end if;
   v_workspace_key := case when tg_op = 'DELETE' then old.workspace_key else new.workspace_key end;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
     'tavonel.source_legal_hold.v1' || pg_catalog.chr(10) || v_workspace_key, 0));
@@ -190,7 +196,7 @@ end;
 $$;
 
 create trigger enterprise_workspace_source_hold_transition
-  before insert or delete on public.enterprise_workspaces
+  before insert or update or delete on public.enterprise_workspaces
   for each row execute function public.guard_enterprise_workspace_source_hold_transition();
 revoke all on function public.guard_enterprise_workspace_source_hold_transition()
   from public, anon, authenticated, service_role;

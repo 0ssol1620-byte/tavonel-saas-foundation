@@ -276,7 +276,7 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
   return {
     state,
     payload: {
-      schemaVersion: "tavonel.customer_source_deletion_receipt.v1" as const,
+      schemaVersion: "tavonel.customer_source_deletion_receipt.v2" as const,
       state,
       scope: "document_r2_objects_only" as const,
       derivedArtifactsRetained: true,

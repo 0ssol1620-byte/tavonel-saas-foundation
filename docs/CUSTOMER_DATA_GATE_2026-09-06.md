@@ -426,5 +426,8 @@ the effective hold, the signed receipt overstated deletion scope, and rehearsal 
 old connector-only inventory functions. The follow-up adds a hold-transition trigger, makes the
 receipt say `source_objects_purged` with its limited scope, and removes superseded files from the
 replay pass. The follow-up still needs CI PostgreSQL rehearsal and a synthetic R2 canary.
+The second independent read found a workspace-key UPDATE route around the hold trigger; the key
+is now immutable. It also found that replaying old migration 0053 would erase later service-role
+grants, so that file is excluded from the replay pass. The signed receipt schema is v2.
 These gaps must be closed or explicitly bounded before
 customer-data activation; this code does not change `activationPolicy.customerData`.
