@@ -78,7 +78,7 @@ describe("customer deletion receipt", () => {
     const done = customerDeletionReceipt({ ...attested, objects: [object("a", true), object("bb", true)] });
     expect(done).toMatchObject({ state: "source_objects_purged", payload: {
       schemaVersion: "tavonel.customer_source_deletion_receipt.v4",
-      scope: "document_r2_objects_and_exclusive_retrieval_rows", derivedArtifactsRetained: true,
+      scope: "document_r2_objects_only", derivedArtifactsRetained: true,
       objectsRetainedUnderStorageLock: 0, derivedClosure: null,
       sourceObjectsPurgedAt: "2026-09-27T01:02:00Z",
     } });
@@ -86,14 +86,16 @@ describe("customer deletion receipt", () => {
 
   it("reports the derived closure with what it erased and what it kept, never full deletion", () => {
     const derived = { receiptId: sha("c"), closedAt: "2026-09-27T00:30:00Z", retrievalUnitsErased: 3,
-      retrievalEmbeddingsErased: 1, expiredOperationCacheRowsErased: 1, retrievalUnitsRetainedUnproven: 1,
-      worldVersionsRetained: 1, retrievalUnitsRemaining: 1, unexpected: "dropped" };
+      retrievalEmbeddingsErased: 1, expiredWorkspaceCacheRowsErased: 1, retrievalUnitsRetainedUnproven: 1,
+      indexedWorldVersionsRetained: 1, retrievalUnitsRemaining: 1, unexpected: "dropped" };
     const receipt = customerDeletionReceipt({ ...base, derived });
     expect(receipt.state).toBe("scheduled");
+    expect(receipt.payload.scope).toBe("document_r2_objects_and_exclusive_retrieval_rows");
     expect(receipt.payload.derivedArtifactsRetained).toBe(true);
     expect(receipt.payload.derivedClosure).toEqual({ receiptId: sha("c"), closedAt: "2026-09-27T00:30:00Z",
-      retrievalUnitsErased: 3, retrievalEmbeddingsErased: 1, expiredOperationCacheRowsErased: 1,
-      retrievalUnitsRetainedUnproven: 1, worldVersionsRetained: 1, retrievalUnitsRemaining: 1 });
+      retrievalUnitsErased: 3, retrievalEmbeddingsErased: 1, expiredWorkspaceCacheRowsErased: 1,
+      retrievalUnitsRetainedUnproven: 1, indexedWorldVersionsRetained: 1,
+      worldVersionCountCoverage: "retrieval_index_only", retrievalUnitsRemaining: 1 });
   });
 
   it("reports a storage-lock refusal as retained, never as purging or purged", () => {

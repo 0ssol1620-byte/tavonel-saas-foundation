@@ -504,21 +504,22 @@ It keeps and counts, without erasing:
   None is produced today;
 - Compiled World candidates in R2, `foundation_world_*` rows, compile runs and every receipt. A World
   can combine several documents and is provenance for each, and its R2 object is under the 365-day
-  `immutable/` lock. `worldVersionsRetained` counts the Worlds whose retrieval index named the
-  document. A World with no retrieval index cannot be enumerated from the database, and no claim
-  is made about it.
+  `immutable/` lock. `indexedWorldVersionsRetained` counts only Worlds whose retrieval index named
+  the document. The receipt labels this `retrieval_index_only`; a World with no retrieval index
+  cannot be enumerated from the database, so zero is not a claim that no World remains.
 
 Preconditions, re-read under the deletion lock and the legal-hold lock: the tombstone is eligible,
 its inventory is attested, the hold is readable and inactive, and no retrieval compile is pending
 or running in the workspace. The result is one append-only `derived_purged` row in
 `source_deletion_receipts`, with its counts in `derived_summary`. The customer status returns it as
 `derived`, plus a live `retrievalUnitsRemaining` count. The signed receipt is now schema v4. Its
-scope is `document_r2_objects_and_exclusive_retrieval_rows`, it carries `derivedClosure`, and
+scope is `document_r2_objects_and_exclusive_retrieval_rows` only after the derived closure ran;
+before that it is `document_r2_objects_only`. It carries `derivedClosure` when present, and
 `derivedArtifactsRetained` stays `true`.
 
-Checks written, not run by this change: `supabase/tests/source_deletion_derived_closure.sql`
-(pgTAP, 20 assertions), plus Vitest text and route tests in `customer-source-lifecycle.test.ts`
-and `source-deletion-route.test.ts`.
+Checks: 78 focused Vitest tests, TypeScript and ESLint passed locally. The 20-assertion pgTAP
+fixture in `supabase/tests/source_deletion_derived_closure.sql` passed CI DB rehearsal twice;
+full CI for the latest receipt-wording update remains pending.
 
 **Still open after 10.2:**
 
@@ -533,4 +534,4 @@ and `source-deletion-route.test.ts`.
 - The founder test reset does not delete `source_deletion_worker_failures`
   (20260927102000/103000), so the tombstone delete would hit that table's foreign key. The reset
   aborts, failing closed. This predates 10.2 and is not changed here.
-- CI PostgreSQL rehearsal of 20260927104000, and a synthetic canary through the closure.
+- A production synthetic canary through the closure, including one object refused by the R2 lock.

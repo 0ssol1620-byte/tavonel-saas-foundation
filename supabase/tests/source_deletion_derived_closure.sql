@@ -110,8 +110,8 @@ select is((select r->>'status' from closed), 'recorded', 'the closure records');
 select is((select (r->>'retrievalUnitsErased')::integer from closed), 3, 'section, claim and entity units of A are erased');
 select is((select (r->>'retrievalEmbeddingsErased')::integer from closed), 1, 'with their embeddings');
 select is((select (r->>'retrievalUnitsRetainedUnproven')::integer from closed), 1, 'the summary is counted as retained');
-select is((select (r->>'worldVersionsRetained')::integer from closed), 1, 'the shared World is counted as retained');
-select is((select (r->>'expiredOperationCacheRowsErased')::integer from closed), 1, 'the expired cache row is erased');
+select is((select (r->>'indexedWorldVersionsRetained')::integer from closed), 1, 'the indexed shared World is counted as retained');
+select is((select (r->>'expiredWorkspaceCacheRowsErased')::integer from closed), 1, 'the expired workspace cache row is erased');
 
 select is((select array_agg(unit_id order by unit_id) from public.foundation_retrieval_units
   where workspace_key = 'pilot-e5e5e5e5e5e54e5e'),

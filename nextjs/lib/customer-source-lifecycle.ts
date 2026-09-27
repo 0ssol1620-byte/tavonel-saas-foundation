@@ -103,15 +103,15 @@ export type DerivedClosure = {
   closedAt: string;
   retrievalUnitsErased: number;
   retrievalEmbeddingsErased: number;
-  expiredOperationCacheRowsErased: number;
+  expiredWorkspaceCacheRowsErased: number;
   retrievalUnitsRetainedUnproven: number;
-  worldVersionsRetained: number;
+  indexedWorldVersionsRetained: number;
   /** Read live, not from the receipt. */
   retrievalUnitsRemaining: number;
 };
 
-const DERIVED_COUNTS = ["retrievalUnitsErased", "retrievalEmbeddingsErased", "expiredOperationCacheRowsErased",
-  "retrievalUnitsRetainedUnproven", "worldVersionsRetained", "retrievalUnitsRemaining"] as const;
+const DERIVED_COUNTS = ["retrievalUnitsErased", "retrievalEmbeddingsErased", "expiredWorkspaceCacheRowsErased",
+  "retrievalUnitsRetainedUnproven", "indexedWorldVersionsRetained", "retrievalUnitsRemaining"] as const;
 
 function validDerived(value: unknown): boolean {
   if (value === undefined || value === null) return true;
@@ -328,7 +328,9 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
     payload: {
       schemaVersion: "tavonel.customer_source_deletion_receipt.v4" as const,
       state,
-      scope: "document_r2_objects_and_exclusive_retrieval_rows" as const,
+      scope: status.derived
+        ? "document_r2_objects_and_exclusive_retrieval_rows" as const
+        : "document_r2_objects_only" as const,
       derivedArtifactsRetained: true,
       objectsRetainedUnderStorageLock: lockRetained.length,
       derivedClosure: status.derived ? {
@@ -336,9 +338,10 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
         closedAt: status.derived.closedAt,
         retrievalUnitsErased: status.derived.retrievalUnitsErased,
         retrievalEmbeddingsErased: status.derived.retrievalEmbeddingsErased,
-        expiredOperationCacheRowsErased: status.derived.expiredOperationCacheRowsErased,
+        expiredWorkspaceCacheRowsErased: status.derived.expiredWorkspaceCacheRowsErased,
         retrievalUnitsRetainedUnproven: status.derived.retrievalUnitsRetainedUnproven,
-        worldVersionsRetained: status.derived.worldVersionsRetained,
+        indexedWorldVersionsRetained: status.derived.indexedWorldVersionsRetained,
+        worldVersionCountCoverage: "retrieval_index_only" as const,
         retrievalUnitsRemaining: status.derived.retrievalUnitsRemaining,
       } : null,
       deletionId: status.deletionId,

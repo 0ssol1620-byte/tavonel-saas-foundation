@@ -148,9 +148,9 @@ begin
     v_summary := pg_catalog.jsonb_build_object(
       'retrievalUnitsErased', v_units,
       'retrievalEmbeddingsErased', v_embeddings,
-      'expiredOperationCacheRowsErased', v_cache,
+      'expiredWorkspaceCacheRowsErased', v_cache,
       'retrievalUnitsRetainedUnproven', v_unproven,
-      'worldVersionsRetained', v_worlds);
+      'indexedWorldVersionsRetained', v_worlds);
     v_payload := pg_catalog.jsonb_build_object('schemaVersion', 'tavonel.source_deletion_receipt.v1',
       'deletionId', v_tombstone.deletion_id, 'workspaceKey', v_tombstone.workspace_key,
       'sourceId', v_tombstone.source_id, 'action', 'derived_purged',
