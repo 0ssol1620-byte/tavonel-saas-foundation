@@ -240,3 +240,74 @@ is a question, and this lane re-opens none of it.
 7. **`docs/SECURITY_BOUNDARIES.md` is appended, not struck.** Contract §8.1. The statements that went stale stay, and the dated "Current state" section stands beside them; historical text is not overwritten. Settled.
 8. **Precondition 17 is recorded only by the founder — a fact, not a question.** Contract §8.2. No agent creates a founder approval receipt: a gate that can be closed by the thing it gates is not a gate. Row 17 is `MISSING by design` and stays so until the founder records one.
 9. **The gate receipt digest binds its subject — done.** Contract §8.1 amended §4.3 so the digest covers `tenantId` and `workspaceId` together with the preconditions; repair round 2 implements it in `shared/customerDataGate.ts`, so a receipt is not portable between tenants.
+
+---
+
+## 7. Addendum 2026-09-27 — preconditions 8 and 12 in code
+
+Rows 8 and 12 above are left as written; this records what changed since.
+
+- **Signed compile receipts.** `nextjs/lib/compile-receipt-signing.ts` builds a `tavonel.compile_receipt.v1`
+  payload from an allowlist of identifiers and digests (tenant, workspace, collection, manifest, Core
+  request id and output digest, the gate receipt digest that admitted the compile, document/version
+  ids, `compiledAt`) and signs it with the export Ed25519 key under its own protected-header scope,
+  `tavonel.signed_compile_receipt.v1`. Only a trust-store (v2) signer is accepted. `verifyCompileReceipt`
+  checks the signature over the exact stored bytes, then the shape, then that the tenant and workspace
+  are the ones asked about. An export-scope signature does not verify as a compile receipt and vice versa.
+- **Audited compiles.** `runCollectionCompile` refuses with `COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED`
+  before reading the gate, R2 or the Core when no signer exists, and after the Core answers it signs the
+  receipt and appends `compile.receipt_signed` to `enterprise_audit_events` (via `appendServiceAuditEvent`,
+  `actor_kind = 'service'`) **before** the candidate is written. An audit write failure returns the
+  audit code and persists no collection candidate. The Core may already have run.
+
+Still open, so neither row is claimed as satisfied: no production key, trust store or compile has
+produced a receipt (the gate is closed, so no customer compile can run); receipts inherit the export
+trust store's expiry, so a receipt stops verifying once its key's `expiresAt` passes; a failed or
+refused compile writes no audit row; and document reads outside the compile path are still unaudited.
+
+---
+
+## 8. Update 2026-09-27 — rows 9 and 14 (appended; the table above is the 2026-09-06 state)
+
+Code and mocked-provider tests only. No production,
+provider account, or flag was touched, and `customerData.enabled` stays `false`.
+
+**Row 9 → PARTIAL (code-complete for Google on the mocked contract; not VERIFIED).** The
+`q = trashed = false` listing cited above is removed. `listOAuthSourcePage` now refuses
+`google_drive` with `OAUTH_SOURCE_READER_RETIRED` before any network I/O. Google is read only
+through the change feed in `nextjs/lib/google-drive-lifecycle.ts`. That reader takes its watermark
+before the snapshot, replays changes, and emits `kind: "deleted"` for both trash and removal.
+`sync-worker.ts` now fails a Google job that does not name `google-lifecycle-v2` (a legacy
+`google-files-v1` or reader-less job) as `SOURCE_READER_PROVIDER_MISMATCH`. That happens before
+any credential is read. Before this change, such a job fell through to the trashed-filtered
+listing. The following are tested through the real reader in `sync-worker.test.ts`:
+- Trash becomes a suspension plus a `provider_deleted` tombstone.
+- Unshare or move-out becomes `provider_inaccessible`.
+- A move or rename (a Drive `version` bump) re-imports under the same stable id.
+- An interrupted tombstone write retries from the unadvanced change token and replays idempotently.
+
+What is still open:
+- Google sources imported by the retired reader before their connection's first lifecycle job,
+  and then deleted before its watermark. No reconciliation diffs the snapshot against prior
+  bindings.
+- Deletions under a previously selected target after the target changes.
+- An expired or invalid change token. It retries to dead, which fails closed, but there is no
+  rebaseline.
+- Per-user ACL capture for permission changes that do not remove the connected account's
+  access (row 16).
+- Live-account qualification. B-7 stands: no connector is `VERIFIED`.
+
+**Row 14 → PARTIAL.** `nextjs/lib/connector-provider-isolation.test.ts` pins the following:
+- Downloads, listings and version reads each go only to their own provider's origin, with that
+  provider's bearer.
+- A cursor from one provider is refused by every other provider's path without a request.
+- One provider's OAuth configuration does not configure another.
+- The binding trigger and the deletion RPC require `provider` to equal the connection's provider.
+
+The worker takes the provider from the stored connection, never from the job payload, and
+refuses a reader/provider mismatch before refreshing a token. This is not a live cross-account
+test.
+
+**Row 13, restated as a separate blocker.** Microsoft still requests `Files.Read.All` +
+`Sites.Read.All` (tenant-wide read). Scopes were deliberately not changed here; narrowing them
+remains P2.

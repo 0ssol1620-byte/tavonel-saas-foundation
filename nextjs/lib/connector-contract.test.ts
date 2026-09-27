@@ -8,7 +8,7 @@ import {
 import type { OAuthConnectorProvider } from "./connector-oauth";
 
 /*
-  One contract, three providers.
+  One contract, every files-listing provider (Google reads a change feed instead; see PROVIDERS).
 
   The per-adapter tests next door check what each provider's payload turns into, one provider
   at a time, one page at a time. What nothing checked is the property the sync worker actually
@@ -32,7 +32,9 @@ import type { OAuthConnectorProvider } from "./connector-oauth";
   quietly implied by a green suite here.
 */
 
-const PROVIDERS: OAuthConnectorProvider[] = ["google_drive", "dropbox", "microsoft_graph"];
+// Google is not a files-listing provider any more: its listing hid trashed files, so it reads
+// only the change feed, whose contract is google-drive-lifecycle.test.ts and sync-worker.test.ts.
+const PROVIDERS: OAuthConnectorProvider[] = ["dropbox", "microsoft_graph"];
 
 type Recorded = { url: string; init: RequestInit | undefined };
 
@@ -52,15 +54,6 @@ function fakeProvider(provider: OAuthConnectorProvider, pages = 3) {
     const last = served >= pages;
     const index = served;
 
-    if (provider === "google_drive") {
-      return Response.json({
-        nextPageToken: last ? undefined : `google-page-${index + 1}`,
-        files: [
-          { id: `file-${index}`, name: `Report ${index}.pdf`, mimeType: "application/pdf", size: String(1024 * index), modifiedTime: "2026-08-30T00:00:00Z", md5Checksum: `md5-${index}` },
-          { id: `folder-${index}`, name: `Folder ${index}`, mimeType: "application/vnd.google-apps.folder", modifiedTime: "2026-08-30T00:00:00Z", version: `v${index}` },
-        ],
-      });
-    }
     if (provider === "dropbox") {
       return Response.json({
         cursor: `dropbox-page-${index + 1}`,
@@ -147,13 +140,6 @@ describe.each(PROVIDERS)("connector contract: %s", (provider) => {
     */
     const { fetcher } = fakeProvider(provider);
     const items = (await drain(provider, fetcher)).flatMap((page) => page.items);
-    if (provider === "google_drive") {
-      // Drive's list endpoint filters trashed files rather than reporting them; deletions
-      // arrive as absence. Asserting a `deleted` item here would be asserting a behaviour the
-      // provider does not have.
-      expect(items.some((item) => item.kind === "deleted")).toBe(false);
-      return;
-    }
     expect(items.some((item) => item.kind === "deleted")).toBe(true);
   });
 

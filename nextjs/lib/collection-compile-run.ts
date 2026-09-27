@@ -1,6 +1,12 @@
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import type { CustomerDataGateDecision } from "../../shared/customerDataGate";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
+import {
+  compileReceiptAuditDetails,
+  readCompileReceiptSigner,
+  signCompileReceipt,
+  type SignedCompileReceipt,
+} from "./compile-receipt-signing";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import {
@@ -13,6 +19,7 @@ import {
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
 import { readVerifiedCustomerDataGateDecision } from "./customer-data-gate-store";
+import { appendServiceAuditEvent } from "./enterprise-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
@@ -53,6 +60,7 @@ export type CollectionCompileSuccess = {
   validation: CollectionCandidateArtifact["validation"];
   reviewReasons: readonly string[];
   lifecycle: CollectionCandidateArtifact["lifecycle"];
+  signedReceipt: SignedCompileReceipt;
 };
 
 export type CollectionCompileRun =
@@ -81,9 +89,14 @@ export async function runCollectionCompile(
   if (!coreV2) {
     return { ok: false, status: 503, code: "CUSTOMER_DATA_CORE_V2_REQUIRED", payload: {} };
   }
+  // Gate precondition 8: a compile whose receipt could not be signed is not run at all, rather
+  // than run, paid for, and then left without a receipt.
+  if (!readCompileReceiptSigner()) {
+    return { ok: false, status: 503, code: "COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED", payload: {} };
+  }
   const gate = await readVerifiedCustomerDataGateDecision(workspaceId, workspaceId);
   if (!gate.ok) return { ok: false, status: 503, code: gate.code, payload: {} };
-  let customerDataGate: CustomerDataGateDecision = gate.decision;
+  let customerDataGate: Extract<CustomerDataGateDecision, { allowed: true }> = gate.decision;
 
   const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
   if (!listed.ok) return { ok: false, status: 503, code: listed.code, payload: {} };
@@ -280,7 +293,41 @@ export async function runCollectionCompile(
   const key = collectionCandidateKey(workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
   if (!key) return { ok: false, status: 500, code: "COLLECTION_KEY_INVALID", payload: {} };
 
-  const storedArtifact = { ...artifact, coreExecution };
+  /*
+    Gate preconditions 8 and 12. The receipt is signed, and its audit row is written, before the
+    candidate becomes durable: a candidate without an audit record never exists. A retry of the
+    same receipt lands on the same deterministic event id; a later compile signs a new receipt
+    and so gets a row of its own.
+  */
+  const compiledAt = new Date();
+  const receiptSigner = readCompileReceiptSigner(process.env, compiledAt);
+  if (!receiptSigner) return { ok: false, status: 503, code: "COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED", payload: {} };
+  const signed = signCompileReceipt(receiptSigner, {
+    tenantId: workspaceId,
+    workspaceId,
+    collectionId: artifact.collectionId,
+    manifestDigest: artifact.manifestDigest,
+    lifecycle: artifact.lifecycle,
+    coreRuntime: coreExecution.runtime,
+    worldStateId: coreExecution.worldStateId,
+    coreRequestId: coreExecution.receipt.requestId,
+    coreOutputSha256: coreExecution.receipt.outputSha256,
+    customerDataGateReceiptSha256: customerDataGate.receiptSha256,
+    sourceDocuments: expectedVersions,
+    compiledAt: compiledAt.toISOString(),
+  });
+  if (!signed) return { ok: false, status: 502, code: "COMPILE_RECEIPT_INVALID", payload: {} };
+  const audited = await appendServiceAuditEvent({
+    workspaceKey: workspaceId,
+    action: "compile.receipt_signed",
+    targetType: "compile_receipt",
+    targetId: signed.receipt.signature.signedPayloadSha256,
+    outcome: "succeeded",
+    details: compileReceiptAuditDetails(signed.receipt, signed.payload),
+  });
+  if (!audited.ok) return { ok: false, status: 503, code: audited.code, payload: {} };
+
+  const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
   const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
   if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };
 
@@ -303,6 +350,7 @@ export async function runCollectionCompile(
       validation: artifact.validation,
       reviewReasons: artifact.reviewReasons ?? [],
       lifecycle: artifact.lifecycle,
+      signedReceipt: signed.receipt,
     },
   };
 }

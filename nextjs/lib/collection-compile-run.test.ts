@@ -1,3 +1,4 @@
+import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -63,8 +64,36 @@ vi.mock("./connector-source-access", () => ({
 vi.mock("./customer-data-gate-store", () => ({
   readVerifiedCustomerDataGateDecision: (...args: unknown[]) => customerDataGate(...args),
 }));
+const audited = vi.fn();
+vi.mock("./enterprise-store", () => ({
+  appendServiceAuditEvent: (...args: unknown[]) => audited(...args),
+}));
 
 const { runCollectionCompile } = await import("./collection-compile-run");
+const { verifyCompileReceipt } = await import("./compile-receipt-signing");
+const { readExportTrustStoreEnv } = await import("./export-signing");
+
+/** A real Ed25519 key and the trust store that names it: the receipt is signed, not stubbed. */
+function receiptSigningEnv() {
+  const pair = generateKeyPairSync("ed25519");
+  const spki = createPublicKey(pair.privateKey).export({ format: "der", type: "spki" });
+  return {
+    TAVONEL_EXPORT_SIGNING_KEY_ID: "foundation-receipts-2026",
+    TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64: pair.privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+    TAVONEL_EXPORT_SIGNING_TRUST_STORE_JSON: JSON.stringify({
+      schemaVersion: "tavonel.export_trust.v2",
+      minimumSignatureVersion: 2,
+      activeKeyId: "foundation-receipts-2026",
+      keys: [{
+        keyId: "foundation-receipts-2026", keyVersion: 1, algorithm: "Ed25519", status: "active",
+        notBefore: "2026-01-01T00:00:00.000Z", expiresAt: "2099-01-01T00:00:00.000Z",
+        publicKeySpkiDerBase64: spki.toString("base64"),
+        publicKeySpkiSha256: `sha256:${createHash("sha256").update(spki).digest("hex")}`,
+      }],
+    }),
+  };
+}
+let signingEnv = receiptSigningEnv();
 
 const WS = "pilot";
 const VERSION = "a".repeat(64);
@@ -96,11 +125,15 @@ function ocrResult(schemaVersion: string, regions: unknown) {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 beforeEach(() => {
   sourceAccess.mockReset().mockResolvedValue({ ok: true });
   customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
+  audited.mockReset().mockResolvedValue({ ok: true, eventId: "00000000-0000-4000-8000-000000000000" });
+  signingEnv = receiptSigningEnv();
+  for (const [name, value] of Object.entries(signingEnv)) vi.stubEnv(name, value);
 });
 
 function readyWorkspace() {
@@ -156,6 +189,84 @@ describe("customer-data approval before source access", () => {
     });
     expect(customerDataGate).toHaveBeenCalledTimes(2);
     expect(dispatched).not.toHaveBeenCalled();
+  });
+});
+
+describe("signed and audited compile receipts (gate preconditions 8 and 12)", () => {
+  function compilableSource() {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({
+      ok: true,
+      result: {
+        status: "completed",
+        runtime: "tavonel-python-core-v2",
+        candidate: { worldStateId: "world-1", reviewReasons: [] },
+        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+      },
+    });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+
+  it("signs the receipt, audits it, then persists it -- in that order", async () => {
+    compilableSource();
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    const receipt = run.payload.signedReceipt;
+    const verified = verifyCompileReceipt(receipt, { tenantId: WS, workspaceId: WS }, readExportTrustStoreEnv(signingEnv)!);
+    expect(verified).toMatchObject({ ok: true, payload: {
+      tenantId: WS,
+      workspaceId: WS,
+      manifestDigest: `sha256:${"a".repeat(64)}`,
+      coreRequestId: "request-1",
+      customerDataGateReceiptSha256: APPROVED_GATE.decision.receiptSha256,
+      sourceDocuments: [{ documentId: DOCUMENT, versionKey: VERSION }],
+    } });
+    expect(receipt.payloadJson).not.toContain("pump");
+
+    expect(audited).toHaveBeenCalledOnce();
+    const event = audited.mock.calls[0]![0] as { details: Record<string, unknown> };
+    expect(event).toMatchObject({
+      workspaceKey: WS,
+      action: "compile.receipt_signed",
+      targetType: "compile_receipt",
+      targetId: receipt.signature.signedPayloadSha256,
+      outcome: "succeeded",
+    });
+    expect(JSON.stringify(event.details)).not.toMatch(/"(content|text|secret|password|token|credential|private[_-]?key)"\s*:|pump/i);
+    expect(audited.mock.invocationCallOrder[0]).toBeLessThan(put.mock.invocationCallOrder[0]!);
+    expect(put.mock.calls[0]?.[3]).toMatchObject({ signedReceipt: receipt });
+  });
+
+  it("persists nothing when the audit row cannot be written", async () => {
+    compilableSource();
+    audited.mockResolvedValue({ ok: false, code: "ENTERPRISE_AUDIT_WRITE_FAILED" });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run).toEqual({ ok: false, status: 503, code: "ENTERPRISE_AUDIT_WRITE_FAILED", payload: {} });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("refuses before the gate, R2 or the Core when no receipt signer is configured", async () => {
+    vi.stubEnv("TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64", "");
+    vi.stubEnv("TAVONEL_EXPORT_SIGNING_KEY_ID", "");
+    compilableSource();
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run).toEqual({ ok: false, status: 503, code: "COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED", payload: {} });
+    expect(customerDataGate).not.toHaveBeenCalled();
+    expect(listed).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+    expect(audited).not.toHaveBeenCalled();
   });
 });
 

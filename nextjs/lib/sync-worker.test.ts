@@ -52,6 +52,11 @@ const JOB = {
   itemsDone: 0,
 };
 
+const GOOGLE = { ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" };
+const GOOGLE_JOB = { ...JOB, payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } };
+const changesCursor = (start: string) =>
+  "tv-drive-v2:" + Buffer.from(JSON.stringify({ phase: "changes", drive: null, start, page: null })).toString("base64url");
+
 function sourceItem(id: string) {
   return { nativeId: id, name: `${id}.pdf`, revision: "r1", mimeType: "application/pdf", sizeBytes: 100, modifiedAt: null, kind: "file" as const };
 }
@@ -63,7 +68,8 @@ beforeEach(() => {
   suspendConnectorSource.mockResolvedValue({ ok: true });
   requestConnectorSourceDeletion.mockResolvedValue({ ok: true, receiptId: `sha256:${"d".repeat(64)}`, replayed: false, held: false });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
-  getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
+  // Files-listing tests run on Dropbox; Google jobs must name the lifecycle reader (see GOOGLE).
+  getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "dropbox", refreshTokenReference: "vault://refresh" });
   markOAuthConnectionReauthorizationRequired.mockResolvedValue({ ok: true });
   refreshOAuthAccessToken.mockResolvedValue({ accessToken: "at-1" });
   readOAuthProviderRuntime.mockReturnValue({ clientSecretReference: "vault://client" });
@@ -89,6 +95,7 @@ describe("cursor safety", () => {
     expect(importSourceObject).not.toHaveBeenCalled();
   });
   it("executes the versioned Google watermark, snapshot and changes chain through the worker", async () => {
+    getOAuthConnectionSecretReference.mockResolvedValue(GOOGLE);
     const file = { id: "google-file", name: "report.pdf", version: "7", mimeType: "application/pdf", size: "100" };
     const responses = [{ startPageToken: "before-snapshot" }, { files: [file] },
       { changes: [{ fileId: file.id, file: { ...file, version: "8", name: "renamed.pdf" } }], newStartPageToken: "after-changes" },
@@ -114,6 +121,7 @@ describe("cursor safety", () => {
   });
 
   it("routes a Google removal to the suspension guard instead of acknowledging it as imported", async () => {
+    getOAuthConnectionSecretReference.mockResolvedValue(GOOGLE);
     const cursorToken = "tv-drive-v2:" + Buffer.from(JSON.stringify({ phase: "changes", drive: null, start: "checkpoint", page: null })).toString("base64url");
     const result = await runSourceImportBatch({ ...JOB, cursorToken,
       payload: { ...JOB.payload, sourceReaderVersion: "google-lifecycle-v2" } }, "worker-1",
@@ -438,7 +446,7 @@ describe("failure classification", () => {
       () => listOAuthSourcePage.mockRejectedValue(new Error("x")),
     ]) {
       vi.clearAllMocks();
-      getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "google_drive", refreshTokenReference: "vault://refresh" });
+      getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "dropbox", refreshTokenReference: "vault://refresh" });
       readOAuthSecretBrokerConfig.mockReturnValue({ kind: "vault" });
       refreshOAuthAccessToken.mockResolvedValue({ accessToken: "at-1" });
       listOAuthSourcePage.mockResolvedValue({ items: [], cursor: null, complete: true });
@@ -453,5 +461,77 @@ describe("failure classification", () => {
   it("fails a job that names no connection", async () => {
     await runSourceImportBatch({ ...JOB, oauthConnectionId: null }, "worker-1");
     expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "failed", errorCode: "JOB_CONNECTION_MISSING" });
+  });
+});
+
+describe("Google tombstones and per-provider isolation (gate #9, #14)", () => {
+  // A files-v1 or reader-less Google job would list with `trashed = false` and turn every
+  // deletion into silence. It fails permanently; re-enqueueing selects the change-feed reader.
+  it.each([undefined, "google-files-v1"])("refuses a Google job on reader %s before reading any credential", async sourceReaderVersion => {
+    getOAuthConnectionSecretReference.mockResolvedValue(GOOGLE);
+    const payload = sourceReaderVersion ? { ...JOB.payload, sourceReaderVersion } : JOB.payload;
+    expect(await runSourceImportBatch({ ...JOB, payload }, "worker-1")).toEqual({ ok: false, code: "SOURCE_READER_PROVIDER_MISMATCH" });
+    expect(completeJobBatch).toHaveBeenCalledExactlyOnceWith(JOB.workspaceKey, JOB.jobId, "worker-1",
+      { outcome: "failed", errorCode: "SOURCE_READER_PROVIDER_MISMATCH" });
+    expect(readOAuthSecret).not.toHaveBeenCalled();
+    expect(refreshOAuthAccessToken).not.toHaveBeenCalled();
+    expect(listOAuthSourcePage).not.toHaveBeenCalled();
+    expect(importSourceObject).not.toHaveBeenCalled();
+  });
+
+  it.each(["dropbox", "microsoft_graph"])("refuses a Google reader job bound to a %s connection before refreshing its token", async provider => {
+    getOAuthConnectionSecretReference.mockResolvedValue({ ...GOOGLE, provider });
+    const fetcher = vi.fn();
+    expect(await runSourceImportBatch({ ...GOOGLE_JOB, cursorToken: changesCursor("c") }, "worker-1", { fetcher }))
+      .toEqual({ ok: false, code: "SOURCE_READER_PROVIDER_MISMATCH" });
+    expect(readOAuthSecret).not.toHaveBeenCalled();
+    expect(refreshOAuthAccessToken).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("tombstones trash and access loss, and re-imports a moved or renamed file under its stable id", async () => {
+    getOAuthConnectionSecretReference.mockResolvedValue(GOOGLE);
+    const calls: Array<{ url: string; auth: string | null }> = [];
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), auth: new Headers(init?.headers).get("authorization") });
+      return Response.json({ changes: [
+        // A move (new parent) or rename bumps Drive's `version`; identity is the file id.
+        { fileId: "moved", file: { id: "moved", name: "Renamed.pdf", version: "9", mimeType: "application/pdf", size: "10" } },
+        { fileId: "trashed", file: { id: "trashed", name: "t.pdf", version: "3", mimeType: "application/pdf", trashed: true } },
+        // Unsharing (permission loss) and moving out of the visible corpus both arrive as removal.
+        { fileId: "unshared", removed: true },
+      ], newStartPageToken: "after" });
+    }) as unknown as typeof fetch;
+    // The payload cannot choose the provider: the stored connection does.
+    const job = { ...GOOGLE_JOB, cursorToken: changesCursor("before"), payload: { ...GOOGLE_JOB.payload, provider: "dropbox" } };
+    expect((await runSourceImportBatch(job, "worker-1", { fetcher })).ok).toBe(true);
+    expect(requestConnectorSourceDeletion.mock.calls.map(call => [call[0].nativeId, call[0].reason, call[0].provider])).toEqual([
+      ["trashed", "provider_deleted", "google_drive"], ["unshared", "provider_inaccessible", "google_drive"],
+    ]);
+    expect(suspendConnectorSource.mock.calls.map(call => call[0].nativeId)).toEqual(["trashed", "unshared"]);
+    expect(importSourceObject).toHaveBeenCalledOnce();
+    expect(importSourceObject.mock.calls[0][0]).toMatchObject({ provider: "google_drive", accessToken: "at-1" });
+    expect(importSourceObject.mock.calls[0][1]).toMatchObject({ nativeId: "moved", revision: "9", name: "Renamed.pdf" });
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every(call => new URL(call.url).origin === "https://www.googleapis.com" && call.auth === "Bearer at-1")).toBe(true);
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "succeeded", itemsSeen: 3, itemsDone: 1,
+      cursorToken: changesCursor("after") });
+  });
+
+  it("replays an interrupted tombstone from the same change token instead of skipping it", async () => {
+    getOAuthConnectionSecretReference.mockResolvedValue(GOOGLE);
+    const fetcher = vi.fn(async () => Response.json({ changes: [{ fileId: "gone", removed: true, time: "2026-09-27T00:00:00Z" }],
+      newStartPageToken: "after" })) as unknown as typeof fetch;
+    const job = { ...GOOGLE_JOB, cursorToken: changesCursor("before") };
+    requestConnectorSourceDeletion.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
+    expect(await runSourceImportBatch(job, "worker-1", { fetcher })).toEqual({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: "SOURCE_DELETION_WRITE_FAILED" });
+    // The retry resumes from the unadvanced token, re-reads the same removal and records it
+    // idempotently (the suspension ignores duplicates; the deletion RPC replays its receipt).
+    expect((await runSourceImportBatch(job, "worker-2", { fetcher })).ok).toBe(true);
+    const tokens = vi.mocked(fetcher).mock.calls.map(call => new URL(String(call[0])).searchParams.get("pageToken"));
+    expect(tokens).toEqual(["before", "before"]);
+    expect(requestConnectorSourceDeletion.mock.calls[1][0]).toEqual(requestConnectorSourceDeletion.mock.calls[0][0]);
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "succeeded", cursorToken: changesCursor("after") });
   });
 });
