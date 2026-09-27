@@ -11,6 +11,16 @@ insert into auth.users (
   '{"provider":"email","providers":["email"]}', '{}', now(), now()
 );
 
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000000',
+  '88888888-8888-4888-8888-888888888888',
+  'authenticated', 'authenticated', 'checkout-order@example.invalid', '$2a$10$fixture', now(),
+  '{"provider":"email","providers":["email"]}', '{}', now(), now()
+);
+
 -- Boundaries: only the service role reaches the RPCs, nobody reads the tables directly, and v5
 -- (which re-read the live checkout gate) is no longer callable.
 select ok(
@@ -229,14 +239,14 @@ select is(
 -- Paddle may deliver subscription.created before transaction.completed. The signed, matching
 -- subscription establishes the association; the later transaction grants the allowance once.
 do $$ begin perform public.issue_foundation_checkout_intent(
-  'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6', 'pilot-orderj1', '99999999-9999-4999-8999-999999999999',
+  'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6', 'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
   'observer_access', 'checkout-v1', 'pri_' || repeat('j', 26), 2000, now()
 ); end $$;
 select is(
   public.apply_foundation_billing_event_v6(
     'evt_' || repeat('j', 26), 'subscription.created', now() + interval '1 minute',
     'sha256:' || repeat('a', 64), 'subscription',
-    'pilot-orderj1', '99999999-9999-4999-8999-999999999999',
+    'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
     'observer_access', null, 'ctm_' || repeat('j', 26),
     'sub_' || repeat('j', 26), 'active', null,
     'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6', now(), 'checkout-v1',
@@ -255,7 +265,7 @@ select is(
   public.apply_foundation_billing_event_v6(
     'evt_' || repeat('k', 26), 'transaction.completed', now() + interval '2 minutes',
     'sha256:' || repeat('b', 64), 'allowance',
-    'pilot-orderj1', '99999999-9999-4999-8999-999999999999',
+    'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
     'observer_access', 'txn_' || repeat('j', 26), 'ctm_' || repeat('j', 26),
     'sub_' || repeat('j', 26), null, null,
     'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6', now(), 'checkout-v1',
