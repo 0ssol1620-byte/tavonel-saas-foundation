@@ -58,9 +58,10 @@ describe("Paddle billing event projection", () => {
     expect(action).toMatchObject({
       action: "allowance",
       offerCode: "observer_access",
-      creditDelta: 2_000,
+      priceId: OBSERVER_PRICE,
+      configuredCreditDelta: 2_000,
       workspaceId: bindingInput.workspaceId,
-      checkoutBindingFresh: true,
+      checkoutBindingNonce: binding.tavonel_nonce,
     });
 
     const tampered = parsePaddleBillingAction(body("transaction.completed", {
@@ -94,9 +95,52 @@ describe("Paddle billing event projection", () => {
     }), env)).toMatchObject({
       action: "allowance",
       offerCode: "observer_access",
-      creditDelta: 2_000,
+      configuredCreditDelta: 2_000,
       transactionId: `txn_${"r".repeat(26)}`,
     });
+  });
+
+  it("forwards a paid transaction whose price was rotated out of configuration after checkout", () => {
+    const binding = checkoutBinding();
+    const rotatedEnv = { ...env, PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"n".repeat(26)}` };
+    expect(parsePaddleBillingAction(body("transaction.completed", {
+      id: `txn_${"t".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
+    }), rotatedEnv)).toMatchObject({
+      action: "allowance",
+      offerCode: "observer_access",
+      priceId: OBSERVER_PRICE,
+      configuredCreditDelta: null,
+    });
+  });
+
+  it("does not credit another offer's configured price to the bound offer", () => {
+    const studioPrice = `pri_${"s".repeat(26)}`;
+    expect(parsePaddleBillingAction(body("transaction.completed", {
+      id: `txn_${"t".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
+      custom_data: checkoutBinding(),
+      items: [{ quantity: 1, price: { id: studioPrice } }],
+    }), { ...env, PADDLE_PRICE_STUDIO_ACCESS: studioPrice })).toMatchObject({
+      action: "allowance",
+      offerCode: "observer_access",
+      priceId: studioPrice,
+      configuredCreditDelta: null,
+    });
+  });
+
+  it("ignores a transaction whose item is not a single well-formed price", () => {
+    expect(parsePaddleBillingAction(body("transaction.completed", {
+      id: `txn_${"t".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      subscription_id: `sub_${"s".repeat(26)}`,
+      custom_data: checkoutBinding(),
+      items: [{ quantity: 1, price: { id: "pri_not-a-price" } }],
+    }), env)).toMatchObject({ action: "ignored", reason: "transaction_contract_invalid" });
   });
 
   it.each([
@@ -143,18 +187,20 @@ describe("Paddle billing event projection", () => {
     }), env)).toMatchObject({ action: "ignored", reason: "subscription_contract_invalid" });
   });
 
-  it("marks an old authentic binding stale while preserving it for stored-subscription reconciliation", () => {
-    const binding = checkoutBinding(new Date("2026-08-29T06:44:59.999Z"));
-    expect(parsePaddleBillingAction(body("subscription.updated", {
+  it("preserves an old authentic binding for stored-subscription reconciliation after a price rotation", () => {
+    const binding = checkoutBinding(new Date("2026-06-29T06:44:59.999Z"));
+    expect(parsePaddleBillingAction(body("subscription.canceled", {
       id: `sub_${"s".repeat(26)}`,
       customer_id: `ctm_${"c".repeat(26)}`,
-      status: "active",
+      status: "canceled",
       custom_data: binding,
       items: [{ quantity: 1, price: { id: OBSERVER_PRICE } }],
-    }), env)).toMatchObject({
+    }), { ...env, PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"n".repeat(26)}` })).toMatchObject({
       action: "subscription",
-      checkoutBindingFresh: false,
+      subscriptionStatus: "canceled",
       checkoutBindingNonce: binding.tavonel_nonce,
+      priceId: OBSERVER_PRICE,
+      configuredCreditDelta: null,
     });
   });
 
@@ -169,7 +215,6 @@ describe("Paddle billing event projection", () => {
     }), env)).toMatchObject({
       action: "subscription",
       checkoutBindingPolicyVersion: "legacy-v2",
-      checkoutBindingFresh: false,
       checkoutBindingNonce: binding.tavonel_nonce,
     });
   });

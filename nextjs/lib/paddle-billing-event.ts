@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
-import { findOfferByPriceId, type BillingOfferCode } from "./billing-catalog";
-import { authenticateCheckoutBinding, isCheckoutBindingFresh } from "./billing-binding";
+import { BILLING_OFFERS, findOfferByPriceId, type BillingOfferCode } from "./billing-catalog";
+import { authenticateCheckoutBinding, type CheckoutBinding } from "./billing-binding";
 
 const EVENT_ID = /^evt_[a-z0-9]{26}$/;
 const TRANSACTION_ID = /^txn_[a-z0-9]{26}$/;
 const CUSTOMER_ID = /^ctm_[a-z0-9]{26}$/;
 const SUBSCRIPTION_ID = /^sub_[a-z0-9]{26}$/;
 const ADJUSTMENT_ID = /^adj_[a-z0-9]{26}$/;
+const PRICE_ID = /^pri_[a-z0-9]{26}$/;
 const SUBSCRIPTION_EVENTS = new Set([
   "subscription.activated",
   "subscription.created",
@@ -28,11 +29,19 @@ type CommonAction = {
   payloadSha256: string;
 };
 
+/*
+  The price and credits that decide an entitling event live in the durable checkout intent and
+  binding consumption (20260927120000), not here. The parser only reports what the event carries:
+  its single price id, and the credits current configuration gives that price for the bound offer
+  (null when it is not the offer's configured price). Dropping an event because the deployment's
+  price ids changed after checkout is how a paid transaction used to go missing.
+*/
 type CheckoutAuthorization = {
   checkoutBindingNonce: string;
   checkoutBindingIssuedAt: string;
   checkoutBindingPolicyVersion: string;
-  checkoutBindingFresh: boolean;
+  priceId: string;
+  configuredCreditDelta: number | null;
 };
 
 export type PaddleBillingAction =
@@ -44,7 +53,6 @@ export type PaddleBillingAction =
       transactionId: string;
       subscriptionId: string | null;
       customerId: string;
-      creditDelta: number;
     })
   | (CommonAction & CheckoutAuthorization & {
       action: "subscription";
@@ -64,7 +72,6 @@ export type PaddleBillingAction =
       transactionId: string;
       subscriptionId: string;
       customerId: string;
-      creditDelta: number;
     })
   | (CommonAction & {
       action: "reversal";
@@ -99,6 +106,21 @@ function eventEnvelope(rawBody: string) {
   };
 }
 
+function checkoutAuthorization(
+  binding: CheckoutBinding,
+  priceId: string,
+  env: Readonly<Record<string, string | undefined>>,
+): CheckoutAuthorization {
+  const configured = findOfferByPriceId(priceId, env);
+  return {
+    checkoutBindingNonce: binding.tavonel_nonce,
+    checkoutBindingIssuedAt: binding.tavonel_issued_at,
+    checkoutBindingPolicyVersion: binding.tavonel_policy_version,
+    priceId,
+    configuredCreditDelta: configured?.code === binding.tavonel_offer_code ? configured.credits : null,
+  };
+}
+
 function itemPriceIds(data: Record<string, unknown>) {
   if (!Array.isArray(data.items)) return [];
   return data.items.flatMap((item) => {
@@ -122,48 +144,26 @@ export function parsePaddleBillingAction(
     const subscriptionId = typeof data.subscription_id === "string" ? data.subscription_id : "";
     const prices = itemPriceIds(data);
     if (!binding) return { ...common, action: "ignored", reason: "binding_invalid" };
-    if (!TRANSACTION_ID.test(transactionId) || !CUSTOMER_ID.test(customerId) || prices.length !== 1) {
+    if (!TRANSACTION_ID.test(transactionId) || !CUSTOMER_ID.test(customerId) || prices.length !== 1 || !PRICE_ID.test(prices[0])) {
       return { ...common, action: "ignored", reason: "transaction_contract_invalid" };
     }
-    const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.code !== binding.tavonel_offer_code) {
-      return { ...common, action: "ignored", reason: "transaction_price_not_allowed" };
-    }
-    if (offer.kind === "subscription" && !SUBSCRIPTION_ID.test(subscriptionId)) {
+    const offerCode = binding.tavonel_offer_code;
+    const recurring = BILLING_OFFERS[offerCode].kind === "subscription";
+    if (recurring && !SUBSCRIPTION_ID.test(subscriptionId)) {
       return { ...common, action: "ignored", reason: "transaction_subscription_binding_invalid" };
     }
-    const checkoutAuthorization = {
-      checkoutBindingNonce: binding.tavonel_nonce,
-      checkoutBindingIssuedAt: binding.tavonel_issued_at,
-      checkoutBindingPolicyVersion: binding.tavonel_policy_version,
-      checkoutBindingFresh: isCheckoutBindingFresh(binding, new Date(common.occurredAt)),
-    };
-    if (offer.kind === "subscription") {
-      return {
-        ...common,
-        ...checkoutAuthorization,
-        action: "allowance",
-        userId: binding.tavonel_user_id,
-        workspaceId: binding.tavonel_workspace_id,
-        offerCode: offer.code,
-        transactionId,
-        subscriptionId,
-        customerId,
-        creditDelta: offer.credits,
-      };
-    }
-    return {
+    const bound = {
       ...common,
-      ...checkoutAuthorization,
-      action: "purchase",
+      ...checkoutAuthorization(binding, prices[0], env),
       userId: binding.tavonel_user_id,
       workspaceId: binding.tavonel_workspace_id,
-      offerCode: offer.code,
+      offerCode,
       transactionId,
-      subscriptionId: SUBSCRIPTION_ID.test(subscriptionId) ? subscriptionId : null,
       customerId,
-      creditDelta: offer.credits,
     };
+    return recurring
+      ? { ...bound, action: "allowance", subscriptionId }
+      : { ...bound, action: "purchase", subscriptionId: SUBSCRIPTION_ID.test(subscriptionId) ? subscriptionId : null };
   }
 
   if (SUBSCRIPTION_EVENTS.has(common.eventType)) {
@@ -186,23 +186,19 @@ export function parsePaddleBillingAction(
     }
     const prices = itemPriceIds(data);
     if (!binding) return { ...common, action: "ignored", reason: "binding_invalid" };
-    if (!SUBSCRIPTION_ID.test(subscriptionId) || !CUSTOMER_ID.test(customerId) || !SUBSCRIPTION_STATUSES.has(status) || prices.length !== 1) {
+    if (
+      !SUBSCRIPTION_ID.test(subscriptionId) || !CUSTOMER_ID.test(customerId) || !SUBSCRIPTION_STATUSES.has(status) ||
+      prices.length !== 1 || !PRICE_ID.test(prices[0]) || BILLING_OFFERS[binding.tavonel_offer_code].kind !== "subscription"
+    ) {
       return { ...common, action: "ignored", reason: "subscription_contract_invalid" };
-    }
-    const offer = findOfferByPriceId(prices[0], env);
-    if (!offer || offer.kind !== "subscription" || offer.code !== binding.tavonel_offer_code) {
-      return { ...common, action: "ignored", reason: "subscription_price_not_allowed" };
     }
     return {
       ...common,
-      checkoutBindingNonce: binding.tavonel_nonce,
-      checkoutBindingIssuedAt: binding.tavonel_issued_at,
-      checkoutBindingPolicyVersion: binding.tavonel_policy_version,
-      checkoutBindingFresh: isCheckoutBindingFresh(binding, new Date(common.occurredAt)),
+      ...checkoutAuthorization(binding, prices[0], env),
       action: "subscription",
       userId: binding.tavonel_user_id,
       workspaceId: binding.tavonel_workspace_id,
-      offerCode: offer.code,
+      offerCode: binding.tavonel_offer_code,
       subscriptionId,
       customerId,
       subscriptionStatus: status,

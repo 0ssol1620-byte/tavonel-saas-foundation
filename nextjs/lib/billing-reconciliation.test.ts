@@ -30,7 +30,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCheckoutBinding } from "./billing-binding";
-import { applyFoundationBillingAction } from "./billing-store";
+import { applyFoundationBillingAction, quarantineFoundationBillingEnvelope } from "./billing-store";
 import { reserveFoundationCompute, settleFoundationCompute } from "./compute-reservation";
 import { parsePaddleBillingAction } from "./paddle-billing-event";
 
@@ -118,7 +118,7 @@ describe("O04 duplicate webhook delivery", () => {
     const raw = allowanceWebhookBody();
     const first = parsePaddleBillingAction(raw, paddleEnv);
     const second = parsePaddleBillingAction(raw, paddleEnv);
-    expect(first).toMatchObject({ action: "allowance", creditDelta: 2_000 });
+    expect(first).toMatchObject({ action: "allowance", priceId: OBSERVER_PRICE, configuredCreditDelta: 2_000 });
     // The dedupe key is the pair the SQL function compares. If either half varied per delivery,
     // the second delivery would look like a different event and grant a second allowance.
     expect(second).toEqual(first);
@@ -135,9 +135,8 @@ describe("O04 duplicate webhook delivery", () => {
     expect(replay).toMatchObject({ ok: true, result: { status: "duplicate" } });
     expect(sentBodies(fetchMock)[0]).toBe(sentBodies(duplicateMock)[0]);
     expect(sentBodies(duplicateMock)[0]).toContain(`"p_event_id":"${first!.eventId}"`);
-    expect(sentBodies(duplicateMock)[0]).toContain('"p_binding_fresh":true');
-    expect(sentBodies(duplicateMock)[0]).toContain('"p_bootstrap_allowed":true');
-    expect(String(duplicateMock.mock.calls[0]?.[0])).toContain("/apply_foundation_billing_event_v5");
+    expect(sentBodies(duplicateMock)[0]).toContain(`"p_price_id":"${OBSERVER_PRICE}"`);
+    expect(String(duplicateMock.mock.calls[0]?.[0])).toContain("/apply_foundation_billing_event_v6");
     expect(duplicateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -153,26 +152,43 @@ describe("O04 duplicate webhook delivery", () => {
     });
   });
 
-  it("re-evaluates global and per-offer policy before the RPC consumes a new binding", async () => {
+  it("sends the same projection whether or not checkout is still open, so a closed gate cannot drop a paid event", async () => {
     configureLedger();
-    const closedAction = parsePaddleBillingAction(allowanceWebhookBody(), paddleEnv);
-    vi.stubEnv("PADDLE_SANDBOX", "false");
-    const closedFetch = respond({ status: "binding_rejected", reason: "checkout_policy_closed" });
-    vi.stubGlobal("fetch", closedFetch);
-    await expect(applyFoundationBillingAction(closedAction as never)).resolves.toMatchObject({ ok: true });
-    expect(sentBodies(closedFetch)[0]).toContain('"p_bootstrap_allowed":false');
+    const raw = allowanceWebhookBody();
+    const openFetch = respond({ status: "allowance_granted" });
+    vi.stubGlobal("fetch", openFetch);
+    await applyFoundationBillingAction(parsePaddleBillingAction(raw, paddleEnv) as never);
 
-    vi.stubEnv("PADDLE_SANDBOX", "true");
+    // Production provider in pilot mode without launch approval: the public checkout gate is shut.
+    vi.stubEnv("PADDLE_SANDBOX", "false");
+    vi.stubEnv("COMMERCIAL_MODE", "pilot");
+    vi.stubEnv("TAVONEL_BILLING_LAUNCH_APPROVED", "false");
+    const closedFetch = respond({ status: "allowance_granted" });
+    vi.stubGlobal("fetch", closedFetch);
+    await applyFoundationBillingAction(parsePaddleBillingAction(raw, paddleEnv) as never);
+    expect(sentBodies(closedFetch)[0]).toBe(sentBodies(openFetch)[0]);
+    expect(sentBodies(closedFetch)[0]).not.toContain("p_bootstrap_allowed");
+  });
+
+  it("forwards a rotated or foreign price to the ledger instead of dropping it before the intent is consulted", async () => {
+    configureLedger();
+    const rotated = parsePaddleBillingAction(allowanceWebhookBody(), {
+      ...paddleEnv,
+      PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"n".repeat(26)}`,
+    });
+    expect(rotated).toMatchObject({ action: "allowance", priceId: OBSERVER_PRICE, configuredCreditDelta: null });
+    const fetchMock = respond({ status: "allowance_granted" });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(applyFoundationBillingAction(rotated as never)).resolves.toMatchObject({ ok: true });
+    expect(sentBodies(fetchMock)[0]).toContain('"p_configured_credit_delta":null');
+
     const contactAction = parsePaddleBillingAction(contactOnlyWebhookBody(), paddleEnv);
-    const contactFetch = respond({ status: "binding_rejected", reason: "checkout_policy_closed" });
-    vi.stubGlobal("fetch", contactFetch);
-    await expect(applyFoundationBillingAction(contactAction as never)).resolves.toMatchObject({ ok: true });
-    expect(sentBodies(contactFetch)[0]).toContain('"p_bootstrap_allowed":false');
+    expect(contactAction).toMatchObject({ action: "allowance", offerCode: "studio_access", configuredCreditDelta: 10_000 });
   });
 
   it("does not schedule a subscription event that the binding boundary rejected", async () => {
     configureLedger();
-    const rejected = respond({ status: "binding_rejected", reason: "checkout_policy_closed" });
+    const rejected = respond({ status: "binding_rejected", reason: "checkout_intent_missing" });
     vi.stubGlobal("fetch", rejected);
     await expect(applyFoundationBillingAction({
       action: "subscription",
@@ -190,9 +206,29 @@ describe("O04 duplicate webhook delivery", () => {
       checkoutBindingNonce: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       checkoutBindingIssuedAt: "2026-09-11T07:00:00.000Z",
       checkoutBindingPolicyVersion: "checkout-v1",
-      checkoutBindingFresh: true,
+      priceId: OBSERVER_PRICE,
+      configuredCreditDelta: 2_000,
     })).resolves.toMatchObject({ ok: true, result: { status: "binding_rejected" } });
     expect(rejected).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists an unmappable paid provider event before acknowledging delivery", async () => {
+    configureLedger();
+    const ignored = parsePaddleBillingAction(allowanceWebhookBody(), {
+      ...paddleEnv,
+      FOUNDATION_BILLING_HMAC: "wrong-secret-that-is-at-least-32-characters",
+    });
+    expect(ignored).toMatchObject({ action: "ignored", reason: "binding_invalid" });
+    const fetchMock = respond({ status: "binding_rejected" });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(quarantineFoundationBillingEnvelope(ignored as Extract<NonNullable<typeof ignored>, { action: "ignored" }>))
+      .resolves.toEqual({ ok: true });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/quarantine_foundation_billing_envelope");
+    expect(sentBodies(fetchMock)[0]).toContain(`"p_event_id":"evt_${"a".repeat(26)}"`);
+
+    vi.stubGlobal("fetch", respond({ message: "database unavailable" }, 503));
+    await expect(quarantineFoundationBillingEnvelope(ignored as Extract<NonNullable<typeof ignored>, { action: "ignored" }>))
+      .resolves.toEqual({ ok: false, code: "BILLING_QUARANTINE_FAILED" });
   });
 });
 

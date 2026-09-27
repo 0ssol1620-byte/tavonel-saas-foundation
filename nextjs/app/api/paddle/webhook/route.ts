@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyFoundationBillingAction } from "@/lib/billing-store";
+import { applyFoundationBillingAction, quarantineFoundationBillingEnvelope } from "@/lib/billing-store";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { parsePaddleBillingAction } from "@/lib/paddle-billing-event";
 import { verifyPaddleSignature } from "@/lib/paddle-webhook";
@@ -22,18 +22,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INVALID_SIGNATURE" }, { status: 401, headers });
   }
   const action = parsePaddleBillingAction(rawBody);
-  if (!action) return NextResponse.json({ code: "EVENT_ENVELOPE_INVALID" }, { status: 200, headers });
+  if (!action) return NextResponse.json({ code: "EVENT_ENVELOPE_INVALID" }, { status: 422, headers });
   if (action.action === "ignored") {
+    if (action.eventType === "transaction.completed" || action.eventType.startsWith("subscription.")) {
+      const quarantined = await quarantineFoundationBillingEnvelope(action);
+      if (!quarantined.ok) return NextResponse.json({ code: quarantined.code }, { status: 503, headers });
+      console.error("foundation_billing_envelope_quarantined", { eventType: action.eventType, reason: action.reason });
+      return NextResponse.json({ code: "EVENT_QUARANTINED", eventId: action.eventId, reason: action.reason }, { status: 200, headers });
+    }
     return NextResponse.json({ code: "EVENT_IGNORED", eventId: action.eventId, reason: action.reason }, { status: 200, headers });
   }
   const applied = await applyFoundationBillingAction(action);
   if (!applied.ok) return NextResponse.json({ code: applied.code }, { status: 503, headers });
   if (applied.result.status === "binding_rejected") {
-    return NextResponse.json({
-      code: "EVENT_IGNORED",
-      eventId: action.eventId,
-      reason: typeof applied.result.reason === "string" ? applied.result.reason : "checkout_binding_rejected",
-    }, { status: 200, headers });
+    /*
+      Acknowledged, not dropped: v6 wrote this refusal to `foundation_billing_event_rejections`
+      in the same transaction, so a redelivery cannot change the answer and a 5xx would only buy
+      Paddle retries. A refused payment is money received without an entitlement, so it is an
+      error-level signal for whoever reconciles or refunds it.
+    */
+    const reason = typeof applied.result.reason === "string" ? applied.result.reason : "checkout_binding_rejected";
+    const log = action.action === "purchase" || action.action === "allowance" ? console.error : console.warn;
+    log("foundation_billing_event_quarantined", { eventType: action.eventType, action: action.action, reason });
+    if (action.action === "subscription" && reason === "checkout_binding_bootstrap_event_invalid") {
+      // A lifecycle notification may arrive before the completed transaction. Ask Paddle to
+      // redeliver after the bootstrap; the first refusal remains in the private review ledger.
+      return NextResponse.json({ code: "EVENT_DEPENDENCY_PENDING", eventId: action.eventId }, { status: 503, headers });
+    }
+    return NextResponse.json({ code: "EVENT_QUARANTINED", eventId: action.eventId, reason }, { status: 200, headers });
   }
   /*
     The paid hop, from the receipt rather than from the browser that came back from checkout.
@@ -45,14 +61,13 @@ export async function POST(request: Request) {
     §15.2's `subscription_retained` is not derivable here -- it is a cohort reading, and
     `lib/activation-cohorts.ts` is where repeat value is computed.
 
-    And only on the application that persisted the event. Paddle redelivers, so the projection
-    answers an event it has already stored with `status: "duplicate"`
-    (`apply_foundation_billing_event_v3`, migration 0011, reached through v4) -- a redelivery is
-    the same subscription arriving twice, not a second one starting.
+    Count only a status actually projected into the account. v6 returns `duplicate` for normal
+    redelivery, while v3 can return `stale_or_mismatched_subscription` until an upgrade can be
+    replayed. Neither represents a newly started subscription.
   */
   if (action.action === "subscription"
     && action.eventType === "subscription.activated"
-    && applied.result.status !== "duplicate") {
+    && (applied.result.status === "processed" || applied.result.status === "processed_subscription_upgrade")) {
     recordServerFunnel("subscription_started", { offer: action.offerCode });
   }
   console.info("foundation_billing_event_applied", {
