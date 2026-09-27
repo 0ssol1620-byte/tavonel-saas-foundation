@@ -42,7 +42,9 @@ async function runOneDeletion(request: Request) {
   });
 
   return NextResponse.json(
-    { code: deletions.ok ? "OK" : deletions.code, processed: deletions.receipts.length },
+    deletions.ok
+      ? { code: "OK", processed: deletions.receipts.length }
+      : { code: deletions.code, processed: deletions.receipts.length, failureRecorded: deletions.failureRecorded },
     { status: deletions.ok ? 200 : 503, headers: HEADERS },
   );
 }

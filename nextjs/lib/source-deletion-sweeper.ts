@@ -20,6 +20,8 @@ export type DeletionSweepStore = {
   finalize(input: DeletionCandidate & { objectAlreadyAbsent: boolean }): Promise<
     { ok: true; receipt: DeletionReceipt } | { ok: false; code: string }
   >;
+  /** Append-only purge-stage failure, bound to this candidate's claim. */
+  recordFailure(input: DeletionCandidate & { code: string }): Promise<{ ok: true } | { ok: false; code: string }>;
 };
 
 export type InspectImmutableObject = (candidate: DeletionCandidate) => Promise<
@@ -50,7 +52,9 @@ function validCandidate(value: DeletionCandidate): boolean {
  * Claim and finalize are separate durable transactions because object storage cannot join a
  * Postgres transaction. Finalize rechecks legal hold in the database. Object deletion must be
  * idempotent: an absent object is success, and the immutable receipt records that fact. The
- * first ambiguous state stops the batch so later objects cannot overtake it.
+ * first ambiguous state stops the batch so later objects cannot overtake it. Once object I/O has
+ * been attempted, a failure is also written as append-only evidence (`failureRecorded` says
+ * whether that write landed); the returned code is always the original failure.
  */
 export async function runSourceDeletionSweep(input: {
   limit?: number;
@@ -59,7 +63,7 @@ export async function runSourceDeletionSweep(input: {
   deleteObject: DeleteImmutableObject;
 }): Promise<
   | { ok: true; receipts: DeletionReceipt[] }
-  | { ok: false; code: string; receipts: DeletionReceipt[] }
+  | { ok: false; code: string; receipts: DeletionReceipt[]; failureRecorded?: boolean }
 > {
   const limit = input.limit ?? 1;
   if (limit !== 1) {
@@ -84,19 +88,24 @@ export async function runSourceDeletionSweep(input: {
     if (Date.parse(candidate.claimExpiresAt) - Date.now() < MIN_LEASE_REMAINING_MS) {
       return { ok: false, code: "SOURCE_DELETION_LEASE_EXPIRED", receipts };
     }
+    const fail = async (code: string) => {
+      const recorded = await input.store.recordFailure({ ...candidate, code })
+        .catch(() => ({ ok: false as const, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" }));
+      return { ok: false as const, code, receipts, failureRecorded: recorded.ok };
+    };
     const inspected = await input.inspectObject(candidate);
-    if (!inspected.ok) return { ok: false, code: inspected.code, receipts };
+    if (!inspected.ok) return fail(inspected.code);
     const begun = await input.store.beginDelete(candidate);
-    if (!begun.ok) return { ok: false, code: begun.code, receipts };
+    if (!begun.ok) return fail(begun.code);
     const removed = inspected.exists
       ? await input.deleteObject(candidate)
       : { ok: true as const, alreadyAbsent: true };
-    if (!removed.ok) return { ok: false, code: removed.code, receipts };
+    if (!removed.ok) return fail(removed.code);
     const finalized = await input.store.finalize({ ...candidate, objectAlreadyAbsent: removed.alreadyAbsent });
-    if (!finalized.ok) return { ok: false, code: finalized.code, receipts };
+    if (!finalized.ok) return fail(finalized.code);
     if (!ID.test(finalized.receipt.receiptId) ||
         (finalized.receipt.status !== "recorded" && finalized.receipt.status !== "replayed")) {
-      return { ok: false, code: "SOURCE_DELETION_RECEIPT_INVALID", receipts };
+      return fail("SOURCE_DELETION_RECEIPT_INVALID");
     }
     receipts.push(finalized.receipt);
   }

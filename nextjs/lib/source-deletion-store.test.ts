@@ -58,4 +58,19 @@ describe("source deletion store", () => {
       p_claim_id: row.claimId, p_object_sha256: row.objectSha256,
     });
   });
+
+  it("records a purge failure against the object and the claim that attempted it", async () => {
+    request.mockResolvedValueOnce(Response.json({ failureId: 7 }))
+      .mockResolvedValueOnce(new Response(null, { status: 400 }));
+    const store = createSourceDeletionSweepStore();
+    await expect(store.recordFailure({ ...row, code: "SOURCE_DELETE_OBJECT_LOCKED" })).resolves.toEqual({ ok: true });
+    expect(request.mock.calls[0]![1]).toBe("/rest/v1/rpc/record_source_deletion_purge_failure");
+    expect(JSON.parse(request.mock.calls[0]![2].body)).toEqual({
+      p_deletion_id: row.deletionId, p_object_key: row.objectKey, p_claim_id: row.claimId,
+      p_code: "SOURCE_DELETE_OBJECT_LOCKED",
+    });
+    await expect(store.recordFailure({ ...row, code: "X" })).resolves.toEqual({
+      ok: false, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED",
+    });
+  });
 });

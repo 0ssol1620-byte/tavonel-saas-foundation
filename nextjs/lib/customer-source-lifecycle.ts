@@ -89,8 +89,15 @@ export type CustomerSourceDeletionStatus = {
     purgedAt: string | null;
     receiptId: string | null;
     objectAlreadyAbsent: boolean | null;
+    /** 20260927103000: purge failures of an object still waiting for its receipt. */
+    purgeFailureCount?: number;
+    lastPurgeFailureCode?: string | null;
+    lastPurgeFailureAt?: string | null;
   }[];
 };
+
+/** R2 refused the DELETE under a bucket object-lock rule (see r2-synthetic-canary.ts). */
+export const OBJECT_LOCKED_CODE = "SOURCE_DELETE_OBJECT_LOCKED";
 
 async function rpc(name: string, body: Record<string, unknown>) {
   const config = readSupabaseAdminConfig();
@@ -124,7 +131,10 @@ function deletionStatus(value: unknown, workspaceKey: string, documentId: string
     || (row.artifactCount !== null && !Number.isSafeInteger(row.artifactCount))
     || !Array.isArray(row.objects)
     || !row.objects.every(o => o && typeof o.objectKey === "string" && SHA256.test(o.objectSha256)
-      && optionalSha(o.receiptId) && (o.purgedAt === null) === (o.receiptId === null))) return null;
+      && optionalSha(o.receiptId) && (o.purgedAt === null) === (o.receiptId === null)
+      && (o.purgeFailureCount === undefined || (Number.isSafeInteger(o.purgeFailureCount) && o.purgeFailureCount >= 0))
+      && (o.lastPurgeFailureCode == null || /^[A-Z0-9_]{1,80}$/.test(o.lastPurgeFailureCode))
+      && (o.lastPurgeFailureAt == null || Number.isFinite(Date.parse(o.lastPurgeFailureAt))))) return null;
   return row;
 }
 
@@ -268,22 +278,30 @@ export async function runRetentionTombstones(candidates: readonly RetentionCandi
 /**
  * The customer-facing receipt attests only the document's R2 source objects. Derived artifacts
  * remain stored and are blocked at serving, so this must never claim full document deletion.
+ * An object whose last purge attempt R2 refused under an object lock is reported as retained
+ * (`purge_blocked_by_storage_lock`), not as "purging": no retry can succeed before the lock ends.
  */
 export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
   const attested = status.inventoryManifestSha256 !== null && status.artifactCount !== null;
   const purged = attested && status.objects.length >= status.artifactCount!
     && status.objects.every(object => object.receiptId !== null);
-  const state = !attested ? "scheduled" as const : purged ? "source_objects_purged" as const : "purging" as const;
+  const lockRetained = status.objects.filter(object =>
+    object.receiptId === null && object.lastPurgeFailureCode === OBJECT_LOCKED_CODE);
+  const state = !attested ? "scheduled" as const
+    : purged ? "source_objects_purged" as const
+    : lockRetained.length > 0 ? "purge_blocked_by_storage_lock" as const
+    : "purging" as const;
   const sourceObjectsPurgedAt = purged
     ? status.objects.map(object => object.purgedAt!).sort().pop() ?? status.attestedAt
     : null;
   return {
     state,
     payload: {
-      schemaVersion: "tavonel.customer_source_deletion_receipt.v2" as const,
+      schemaVersion: "tavonel.customer_source_deletion_receipt.v3" as const,
       state,
       scope: "document_r2_objects_only" as const,
       derivedArtifactsRetained: true,
+      objectsRetainedUnderStorageLock: lockRetained.length,
       deletionId: status.deletionId,
       workspaceKey: status.workspaceKey,
       documentId: status.documentId,
@@ -294,8 +312,12 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
       tombstoneReceiptId: status.tombstoneReceiptId,
       inventoryManifestSha256: status.inventoryManifestSha256,
       artifactCount: status.artifactCount,
-      objects: status.objects.map(({ objectKey, objectSha256, receiptId, objectAlreadyAbsent }) =>
-        ({ objectKey, objectSha256, receiptId, objectAlreadyAbsent })),
+      objects: status.objects.map(({ objectKey, objectSha256, receiptId, objectAlreadyAbsent,
+        purgeFailureCount, lastPurgeFailureCode, lastPurgeFailureAt }) =>
+        ({ objectKey, objectSha256, receiptId, objectAlreadyAbsent,
+          purgeFailureCount: receiptId === null ? purgeFailureCount ?? 0 : 0,
+          lastPurgeFailureCode: receiptId === null ? lastPurgeFailureCode ?? null : null,
+          lastPurgeFailureAt: receiptId === null ? lastPurgeFailureAt ?? null : null })),
       sourceObjectsPurgedAt,
     },
   };

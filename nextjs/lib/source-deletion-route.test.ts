@@ -101,6 +101,13 @@ describe("source deletion cron route", () => {
     const failure = await POST(request("POST", SECRET));
     expect(failure.status).toBe(503);
     expect(await failure.json()).toEqual({ code: "SOURCE_DELETE_FAILED", processed: 0 });
+
+    runSourceDeletionSweep.mockResolvedValueOnce({
+      ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: false,
+    });
+    const unrecorded = await POST(request("POST", SECRET));
+    expect(unrecorded.status).toBe(503);
+    expect(await unrecorded.json()).toEqual({ code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: false });
   });
 
   it("keeps credentials external and schedules inventory before physical purge", () => {

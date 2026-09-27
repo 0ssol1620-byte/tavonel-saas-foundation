@@ -77,10 +77,26 @@ describe("customer deletion receipt", () => {
     expect(customerDeletionReceipt({ ...attested, objects: [object("a", true)] }).state).toBe("purging");
     const done = customerDeletionReceipt({ ...attested, objects: [object("a", true), object("bb", true)] });
     expect(done).toMatchObject({ state: "source_objects_purged", payload: {
-      schemaVersion: "tavonel.customer_source_deletion_receipt.v2",
+      schemaVersion: "tavonel.customer_source_deletion_receipt.v3",
       scope: "document_r2_objects_only", derivedArtifactsRetained: true,
+      objectsRetainedUnderStorageLock: 0,
       sourceObjectsPurgedAt: "2026-09-27T01:02:00Z",
     } });
+  });
+
+  it("reports a storage-lock refusal as retained, never as purging or purged", () => {
+    const attested = { ...base, inventoryManifestSha256: sha("m"), artifactCount: 2, attestedAt: "2026-09-27T00:20:00Z" };
+    const locked = { ...object("bb", false), purgeFailureCount: 3,
+      lastPurgeFailureCode: "SOURCE_DELETE_OBJECT_LOCKED", lastPurgeFailureAt: "2026-09-27T02:00:00Z" };
+    const receipt = customerDeletionReceipt({ ...attested, objects: [object("a", true), locked] });
+    expect(receipt).toMatchObject({ state: "purge_blocked_by_storage_lock", payload: {
+      objectsRetainedUnderStorageLock: 1, derivedArtifactsRetained: true, sourceObjectsPurgedAt: null,
+    } });
+    expect(receipt.payload.objects[1]).toMatchObject({ receiptId: null, purgeFailureCount: 3,
+      lastPurgeFailureCode: "SOURCE_DELETE_OBJECT_LOCKED" });
+
+    const transient = { ...locked, lastPurgeFailureCode: "SOURCE_DELETE_FAILED" };
+    expect(customerDeletionReceipt({ ...attested, objects: [object("a", true), transient] }).state).toBe("purging");
   });
 });
 
@@ -146,5 +162,29 @@ describe("customer source deletion migration", () => {
     expect(exact).toMatch(/document_id = p_document_id[\s\S]+created_at = p_expected_created_at[\s\S]+retention_days = p_expected_retention_days[\s\S]+deleted_object_grace_days = p_expected_grace_days/);
     expect(exact).toMatch(/if not found then return pg_catalog\.jsonb_build_object\('status', 'changed'\)/);
     expect(sql).toMatch(/revoke all on function public\.request_retention_expired_source_deletion\(text\) from service_role/);
+  });
+});
+
+describe("source deletion purge failure migration", () => {
+  const sql = readFileSync("../supabase/migrations/20260927103000_source_deletion_purge_failures.sql", "utf8");
+  const fn = (name: string) => sql.match(new RegExp(`create (?:or replace )?function public\\.${name}\\([\\s\\S]+?\\n\\$\\$;`))?.[0] ?? "";
+
+  it("binds each purge failure to one attested object and the claim that attempted it", () => {
+    expect(sql).toMatch(/check \(\(stage = 'inventory' and object_key is null\) or \(stage = 'purge' and object_key is not null\)\)/);
+    expect(sql).toMatch(/foreign key \(deletion_id, object_key\) references public\.source_deletion_objects\(deletion_id, object_key\)/);
+    const record = fn("record_source_deletion_purge_failure");
+    expect(record.indexOf("pg_advisory_xact_lock")).toBeLessThan(record.indexOf("for update"));
+    expect(record).toMatch(/purged_at is not null then raise exception 'SOURCE_DELETION_ALREADY_PURGED'/);
+    expect(record).toMatch(/purge_claim_id is distinct from p_claim_id then raise exception 'SOURCE_DELETION_LEASE_INVALID'/);
+    // Evidence only: it must never touch the object row, the claim, or a receipt.
+    expect(record).not.toMatch(/update public\.|delete from|source_deletion_receipts/);
+  });
+
+  it("reports failures only for objects still waiting for their receipt and stays service-only", () => {
+    const status = fn("customer_source_deletion_status");
+    expect(status).toMatch(/'lastPurgeFailureCode', case when r\.receipt_id is null then f\.last_code end/);
+    expect(status).toMatch(/w\.stage = 'purge' and w\.object_key = o\.object_key/);
+    expect(sql).toMatch(/record_source_deletion_purge_failure\(text, text, uuid, text\),[\s\S]+from public, anon, authenticated;/);
+    expect(sql).not.toMatch(/grant [^;]+ to (anon|authenticated)/);
   });
 });

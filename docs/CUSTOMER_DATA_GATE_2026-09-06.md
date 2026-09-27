@@ -443,3 +443,40 @@ Therefore the code's 30-day default grace is a scheduling value, not a verified 
 purge. Storage lock, retention promises, and legal holds must be reconciled before activation.
 These gaps must be closed or explicitly bounded before
 customer-data activation; this code does not change `activationPolicy.customerData`.
+
+### 10.1 Purge-stage failure evidence, 2026-09-27 (local verification)
+
+Migration `20260927103000_source_deletion_purge_failures.sql` closes the "purge-stage failures lack
+a dedicated append-only failure record" gap locally. `source_deletion_worker_failures` now accepts
+stage `purge`, bound by foreign key to one attested object. `record_source_deletion_purge_failure`
+writes it only for the claim that made the attempt, under the same per-object lock as begin and
+finalize. It never marks an object purged, releases a claim or writes a receipt. The deletion worker
+(`/api/internal/deletions/run`, already on the Vercel cron) records every failure after a claim.
+This covers HEAD, begin, DELETE, finalize and an invalid receipt. It returns `failureRecorded` so a
+lost evidence write is visible. Legal-hold and short-lease refusals happen before any object I/O.
+They are not recorded as purge failures.
+
+R2's `ObjectLockedByBucketPolicy` refusal now maps to `SOURCE_DELETE_OBJECT_LOCKED` instead of
+the generic `SOURCE_DELETE_FAILED`. The customer status reports each unpurged object's failure count
+and last failure. The signed receipt is now schema v3 and has a new state,
+`purge_blocked_by_storage_lock`, with `objectsRetainedUnderStorageLock`. An object that the bucket
+lock refuses is therefore reported as retained, never as purging or purged.
+
+Product decision taken, safest truthful path: no lock rule was changed, no retention claim was
+shortened, and a locked object is never skipped or marked done. The worker retries it on each claim
+rotation and records each refusal, until the lock lapses or an operator acts. Customer-facing copy
+must not promise a 30-day physical purge for anything stored under `immutable/`. The
+receipt now states the retention explicitly instead.
+
+Checks: 73 focused Vitest tests, TypeScript, and ESLint passed locally. The pgTAP file
+`supabase/tests/source_deletion_purge_failures.sql` has 19 assertions. The SQL migration and
+fixture still require CI database rehearsal before this is relied on.
+
+**Still open for rows 10 and 11:**
+
+- physical erasure of derived artifacts (collections, retrieval units, cached answers);
+- a grace-period source for self-service connector deletion;
+- reconciling the 365-day `immutable/` lock with the 30-day grace, which needs a legal/product
+  decision on the promised retention;
+- CI PostgreSQL rehearsal of 20260927102000 and 20260927103000;
+- a real synthetic R2 canary through tombstone → attest → purge, including one locked object.

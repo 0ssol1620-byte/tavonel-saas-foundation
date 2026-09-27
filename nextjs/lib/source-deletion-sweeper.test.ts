@@ -14,8 +14,9 @@ function store(rows: DeletionCandidate[]) {
     ok: true as const,
     receipt: { receiptId: sha(row.deletionId.at(-1) ?? "a"), status: "recorded" as const },
   }));
-  return { value: { claim: vi.fn(async () => ({ ok: true as const, candidates: rows })), beginDelete, finalize } satisfies DeletionSweepStore,
-    beginDelete, finalize };
+  const recordFailure = vi.fn<DeletionSweepStore["recordFailure"]>(async () => ({ ok: true as const }));
+  return { value: { claim: vi.fn(async () => ({ ok: true as const, candidates: rows })), beginDelete, finalize,
+    recordFailure } satisfies DeletionSweepStore, beginDelete, finalize, recordFailure };
 }
 
 const inspectObject = vi.fn(async () => ({ ok: true as const, exists: true }));
@@ -31,6 +32,7 @@ describe("source deletion sweeper", () => {
     });
     expect(deleteObject).not.toHaveBeenCalled();
     expect(state.finalize).not.toHaveBeenCalled();
+    expect(state.recordFailure).not.toHaveBeenCalled();
   });
 
   it("accepts an already absent object on retry and passes the durable claim to finalize", async () => {
@@ -53,10 +55,47 @@ describe("source deletion sweeper", () => {
       .mockResolvedValueOnce({ ok: false, code: "OBJECT_DELETE_TIMEOUT" })
       .mockResolvedValueOnce({ ok: true, alreadyAbsent: false });
     await expect(runSourceDeletionSweep({ store: state.value, inspectObject, deleteObject })).resolves.toEqual({
-      ok: false, code: "OBJECT_DELETE_TIMEOUT", receipts: [],
+      ok: false, code: "OBJECT_DELETE_TIMEOUT", receipts: [], failureRecorded: true,
     });
     expect(deleteObject).toHaveBeenCalledOnce();
     expect(state.finalize).not.toHaveBeenCalled();
+    expect(state.recordFailure).toHaveBeenCalledWith(expect.objectContaining({
+      objectKey: "one", claimId: "11111111-1111-4111-8111-111111111111", code: "OBJECT_DELETE_TIMEOUT",
+    }));
+  });
+
+  it("records an object-lock refusal as evidence and never finalizes the object", async () => {
+    const state = store([candidate("a", "immutable/pilot-acme01/pilot-acme01/doc/source")]);
+    const deleteObject = vi.fn(async () => ({ ok: false as const, code: "SOURCE_DELETE_OBJECT_LOCKED" }));
+    await expect(runSourceDeletionSweep({ store: state.value, inspectObject, deleteObject })).resolves.toEqual({
+      ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: true,
+    });
+    expect(state.recordFailure).toHaveBeenCalledOnce();
+    expect(state.finalize).not.toHaveBeenCalled();
+  });
+
+  it("records a finalize failure after the object is gone, so the missing receipt is explained", async () => {
+    const state = store([candidate("a", "one")]);
+    state.finalize.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_FINALIZE_FAILED" } as never);
+    const deleteObject = vi.fn(async () => ({ ok: true as const, alreadyAbsent: false }));
+    await expect(runSourceDeletionSweep({ store: state.value, inspectObject, deleteObject })).resolves.toEqual({
+      ok: false, code: "SOURCE_DELETION_FINALIZE_FAILED", receipts: [], failureRecorded: true,
+    });
+    expect(state.recordFailure.mock.calls[0]![0].code).toBe("SOURCE_DELETION_FINALIZE_FAILED");
+  });
+
+  it("keeps the original code when the evidence write itself fails or throws", async () => {
+    for (const outcome of [
+      async () => ({ ok: false as const, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" }),
+      async () => { throw new Error("network"); },
+    ]) {
+      const state = store([candidate("a", "one")]);
+      state.recordFailure.mockImplementationOnce(outcome);
+      const deleteObject = vi.fn(async () => ({ ok: false as const, code: "SOURCE_DELETE_FAILED" }));
+      await expect(runSourceDeletionSweep({ store: state.value, inspectObject, deleteObject })).resolves.toEqual({
+        ok: false, code: "SOURCE_DELETE_FAILED", receipts: [], failureRecorded: false,
+      });
+    }
   });
 
   it("enforces the 30-second external-I/O lease boundary before object I/O", async () => {
@@ -69,6 +108,7 @@ describe("source deletion sweeper", () => {
         ok: false, code: "SOURCE_DELETION_LEASE_EXPIRED", receipts: [],
       });
       expect(deleteObject).not.toHaveBeenCalled();
+      expect(tooShort.recordFailure).not.toHaveBeenCalled();
 
       const boundary = store([{ ...candidate("a", "one"), claimExpiresAt: "2030-01-01T00:00:30.000Z" }]);
       await expect(runSourceDeletionSweep({ store: boundary.value, inspectObject, deleteObject })).resolves.toMatchObject({ ok: true });
@@ -90,7 +130,7 @@ describe("source deletion sweeper", () => {
     const inspect = vi.fn(async () => ({ ok: false as const, code: "SOURCE_DELETE_HEAD_FAILED" }));
     const deleteObject = vi.fn();
     await expect(runSourceDeletionSweep({ store: state.value, inspectObject: inspect, deleteObject }))
-      .resolves.toEqual({ ok: false, code: "SOURCE_DELETE_HEAD_FAILED", receipts: [] });
+      .resolves.toEqual({ ok: false, code: "SOURCE_DELETE_HEAD_FAILED", receipts: [], failureRecorded: true });
     expect(state.beginDelete).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();
   });

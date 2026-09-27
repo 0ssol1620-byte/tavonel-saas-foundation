@@ -88,5 +88,21 @@ export function createSourceDeletionSweepStore(): DeletionSweepStore {
         return { ok: true, receipt: { receiptId, status } };
       } catch { return { ok: false, code: "SOURCE_DELETION_FINALIZE_FAILED" }; }
     },
+    async recordFailure(input) {
+      const config = readSupabaseAdminConfig();
+      if (!config) return { ok: false, code: "SOURCE_DELETION_STORE_UNAVAILABLE" };
+      try {
+        const response = await supabaseAdminRequest(config, "/rest/v1/rpc/record_source_deletion_purge_failure", {
+          method: "POST",
+          body: JSON.stringify({
+            p_deletion_id: input.deletionId,
+            p_object_key: input.objectKey,
+            p_claim_id: input.claimId,
+            p_code: input.code,
+          }),
+        });
+        return response.ok ? { ok: true } : { ok: false, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" };
+      } catch { return { ok: false, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" }; }
+    },
   };
 }
