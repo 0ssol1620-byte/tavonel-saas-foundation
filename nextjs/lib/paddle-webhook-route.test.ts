@@ -70,4 +70,11 @@ describe("Paddle webhook acknowledgement", () => {
     expect((await POST(request())).status).toBe(200);
     expect(mocks.funnel).toHaveBeenCalledOnce();
   });
+
+  it("does not count a duplicate Paddle activation as a new subscription", async () => {
+    mocks.parse.mockReturnValue({ action: "subscription", eventId, eventType: "subscription.activated", offerCode: "studio_access" });
+    mocks.apply.mockResolvedValue({ ok: true, result: { status: "duplicate" } });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.funnel).not.toHaveBeenCalled();
+  });
 });

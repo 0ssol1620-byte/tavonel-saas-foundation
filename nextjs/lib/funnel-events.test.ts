@@ -226,8 +226,7 @@ describe("server funnel events", () => {
     expect(compileJobs).toContain("corpus.value.parts.some((part) => part.created)");
     expect(compileJobs).toContain("if (enqueued.value.created) {");
     expect(route("app/api/collections/[id]/ask/route.ts")).toContain("!lease.replay");
-    // The billing projection answers an event it has already stored with this status.
-    expect(route("app/api/paddle/webhook/route.ts")).toContain('applied.result.status !== "duplicate"');
+    // Paddle redelivery is covered by the handler-level billing route test.
   });
 
   it.each(serverEvents)("%s fires from a route handler, not from a control", (event) => {
