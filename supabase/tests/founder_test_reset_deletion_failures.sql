@@ -49,10 +49,20 @@ insert into public.foundation_intake_admissions (
 -- ---------------------------------------------------------------------------
 -- Catalog
 -- ---------------------------------------------------------------------------
-select has_trigger('public', 'source_deletion_worker_failures', 'founder_reset_fence',
-  'worker failures are behind the sealed reset write fence');
-select has_trigger('public', 'source_operator_legal_holds', 'founder_test_reset_blocks_operator_legal_hold',
-  'operator holds wait for a sealed reset');
+select ok(exists (
+  select 1 from pg_catalog.pg_trigger t
+  join pg_catalog.pg_class c on c.oid = t.tgrelid
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relname = 'source_deletion_worker_failures'
+    and t.tgname = 'founder_reset_fence' and not t.tgisinternal
+), 'worker failures are behind the sealed reset write fence');
+select ok(exists (
+  select 1 from pg_catalog.pg_trigger t
+  join pg_catalog.pg_class c on c.oid = t.tgrelid
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relname = 'source_operator_legal_holds'
+    and t.tgname = 'founder_test_reset_blocks_operator_legal_hold' and not t.tgisinternal
+), 'operator holds wait for a sealed reset');
 
 -- ---------------------------------------------------------------------------
 -- Fixture: a founder deletion with one purge failure and one inventory failure (then purged,
@@ -104,12 +114,12 @@ select is((select (r->'dbCounts'->>'source_deletion_tombstones')::integer from p
   'and only the founder tombstone');
 
 -- A failure recorded after prepare changes the fingerprint; the whole attempt is rolled back.
-select throws_ok($q$do $d$ begin
+select throws_ok($$do $d$ begin
   perform public.record_source_deletion_worker_failure((select r->>'deletionId' from founder_request), 'inventory', 'SOURCE_DELETE_LIST_FAILED');
   perform public.seal_founder_test_reset((select (r->>'resetId')::uuid from prepared), '0ssol1620@gmail.com',
     'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'pilot-f0f0f0f0f0f04f0f', (select r->>'dbManifestDigest' from prepared),
     'sha256:' || repeat('b', 64), '[]'::jsonb);
-end $d$$q$, 'P0001', 'founder_test_reset_database_drift', 'a failure recorded after prepare is database drift');
+end $d$$$, 'P0001', 'founder_test_reset_database_drift', 'a failure recorded after prepare is database drift');
 
 -- A hold placed between prepare and seal refuses the seal.
 insert into public.source_operator_legal_holds (workspace_key, reason) values ('pilot-f0f0f0f0f0f04f0f', 'fixture: hold two');
