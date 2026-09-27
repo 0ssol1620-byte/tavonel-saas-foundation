@@ -71,6 +71,7 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+
 ## 2026-09-21 — Original-source compiler specimen and mobile film inspection
 
 The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
@@ -457,5 +458,15 @@ The workspace now reads its per-workspace source-admission decision at access bo
 The final production build passed brand verification, type floor, TypeScript, ESLint, **371 Vitest files / 5,269 tests**, and generation of 149 pages. The 53 script tests passed separately. A production-server Playwright run passed **16/16** admission cases at **1920, 1440, 1280, 1024, 768, 390, 360**, and **1440 reduced motion**. The affected existing workspace suites passed 28 cases with one intentional skip at 1440. Full-page captures for the closed state at all eight viewport settings are in ignored `nextjs/test-results/workspace-admission-state-*/workspace-admission-closed.png`; the final 1440 and 390 captures were inspected directly for readable text, visible actions, and no overlap. This automated and agent inspection does not constitute founder visual approval. Exact-head CI and deployed-preview review remain required.
 
 The first exact-head Product QA run passed 883 cases but found two 390/360 mobile layout tests that assumed an approved workspace without mocking access bootstrap. Their fixture now explicitly returns approved access; both mobile geometry tests passed locally against the production build with no retry. The amended head requires a fresh exact-head CI run.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-27 — Closed workspace source queue (PR #125)
+
+The live closed-admission path could still show a saved OCR-qualified source with a selection checkbox and a compile button. The board now describes it as a saved source, removes the selection and compile action while customer-data admission is closed, and keeps the pilot link visible. The existing enabled-workspace fixture retains selection and an active compile action. A separate Core recompile control is disabled with an explicit access reason while admission is closed. The server-side admission policy is unchanged.
+
+The final local TypeScript and ESLint checks passed. Vitest passed 377 files / 5,317 tests and the script suite passed 53 tests. The affected source-board Chromium suite passed 6/6 at 1440px. The closed-admission test then passed at **1920, 1440, 1280, 1024, 768, 390, and 360px**, plus 1440px reduced motion (8/8), including no horizontal overflow, no compile selection/action, and a visible pilot link. Full-page captures are attached to the local Playwright report under ignored `nextjs/playwright-report/data/`. The 1440px and 390px captures were inspected directly: the source state and pilot path are readable, and the compile affordance is absent. The screenshots use intercepted API fixtures and do not prove a real customer compile or GPU OCR run.
+
+Exact-head CI, deployed-preview review, and production smoke remain required before publication. Automated and agent review do not replace founder visual acceptance.
 
 **FOUNDER VISUAL REVIEW REQUIRED**

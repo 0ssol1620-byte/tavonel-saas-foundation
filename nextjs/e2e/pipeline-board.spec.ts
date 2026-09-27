@@ -66,6 +66,8 @@ test("a closed workspace shows saved sources without an actionable compile contr
   await expect(readySource.getByRole("checkbox")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Compile selected documents" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Arrange a pilot" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await testInfo.attach("closed-workspace-source-queue", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
