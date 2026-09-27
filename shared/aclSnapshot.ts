@@ -7,12 +7,12 @@ import { createHash } from "node:crypto";
  * source evidence that governs it. A compiled answer assembled from three documents is readable by
  * the people who could read all three -- not by the union, which is how a compiler leaks.
  *
- * What this is not: enforcement. No retrieval code in this repository filters by source ACL today
- * (`lib/retrieval-store.ts` and `lib/retrieval-pipeline.ts` filter by tenant and workspace only),
- * and no connector captures a snapshot at ingestion. Shipping the type without saying that would
- * create a field that looks like coverage and provides none, so it is said here and in
- * `docs/CUSTOMER_DATA_GATE_2026-09-06.md`, and `per_source_acl_preserved` is a MISSING row in the
- * gate's precondition matrix until a capture path and a consumer both exist.
+ * What this is not: enforcement. Serving enforcement lives in the database
+ * (`supabase/migrations/20260927100000_source_acl_admission.sql`, inside `connector_documents_blocked`)
+ * and denies every connector-bound document by default. No connector captures a snapshot at
+ * ingestion, and no viewer has a verified provider principal, so nothing is ever admitted by ACL
+ * today. `per_source_acl_preserved` stays unsatisfied until both exist; the blockers are in
+ * `docs/CUSTOMER_DATA_GATE_2026-09-06.md` §7.
  */
 
 export const ACL_SNAPSHOT_SCHEMA = "tavonel.acl_snapshot.v1" as const;
