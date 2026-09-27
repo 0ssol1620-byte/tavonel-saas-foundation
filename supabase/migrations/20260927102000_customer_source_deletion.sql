@@ -765,7 +765,7 @@ language sql stable security definer set search_path = '' as $$
      and not exists (select 1 from public.sources s where s.source_id = a.document_id::text
                       and (s.workspace_id is distinct from a.workspace_key or s.tenant_id is distinct from a.workspace_key))
    order by a.created_at, a.workspace_key, a.document_id
-   limit pg_catalog.least(pg_catalog.greatest(coalesce(p_limit, 0), 0), 100);
+   limit least(greatest(coalesce(p_limit, 0), 0), 100);
 $$;
 
 create or replace function public.request_retention_expired_source_deletion(p_workspace_key text default null)
