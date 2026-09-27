@@ -1295,6 +1295,7 @@ export default function WorkspacePage() {
   };
 
   const recompileWithCore = async () => {
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     const documentIds = collectionResult?.sourceDocuments.map((document) => document.documentId) ?? [];
     const recompileVerdict = judgeCompileSet(documentIds.length);
     if (!recompileVerdict.ok) {
@@ -2511,7 +2512,8 @@ export default function WorkspacePage() {
               rows={pipelineRows}
               reading={reading}
               names={names}
-              selectableIds={compilableDocumentIds}
+              canCompile={intakeOpen}
+              selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
                 ? current.filter((id) => id !== documentId)
@@ -2519,7 +2521,8 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
             />
           </div>
-          <div className="workspace-grid">
+          {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
+            {intakeOpen ? (
             <section id="workspace-sources" className="card document-card">
               <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
@@ -2543,6 +2546,7 @@ export default function WorkspacePage() {
                 </div>
               )}
             </section>
+            ) : null}
             {/*
               A candidate that exists but was never run through Core is the one case Home cannot
               act on, so the control stays here beside the sources it would read.
@@ -2551,12 +2555,13 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
+                {!intakeOpen ? <p id="workspace-recompile-access">{intakeClosedCopy}</p> : null}
                 <div className="billing-actions">
-                  <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
+                  <button disabled={busy || !intakeOpen} aria-describedby={!intakeOpen ? "workspace-recompile-access" : undefined} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
                 </div>
               </section>
             ) : null}
-          </div>
+          </div> : null}
           </> : null}
           </>
           ) : null}

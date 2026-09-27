@@ -29,8 +29,8 @@ const DOCUMENTS = [
   { documentId: "doc-held", versionKey: "v1", sanitizedKey: "w/doc-held/v1/sanitized.pdf", sanitizedSize: 903_211, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "w/doc-held/v1/cdr-receipt.json", ocrReviewKey: "w/doc-held/v1/ocr-review.json", processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD" },
 ];
 
-async function mockWorkspace(page: Page) {
-  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled: true } } }));
+async function mockWorkspace(page: Page, customerDataEnabled = true) {
+  await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled } } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: DOCUMENTS } }));
   await page.route("**/api/documents/*/progress", route => route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
@@ -57,6 +57,26 @@ async function mockWorkspace(page: Page) {
   /workspace: it asserts the absence of a panel, which Home must honour too.
 */
 const BOARD_URL = "/workspace/sources";
+
+test("a closed workspace shows saved sources without an actionable compile control", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page, false); await page.goto(BOARD_URL);
+  await page.getByRole("button", { name: "All 3" }).click();
+  const readySource = page.locator('[data-document-id="doc-read"]');
+  await expect(readySource.locator(".board-row-status")).toHaveText("Source ready");
+  await expect(readySource.getByRole("checkbox")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Compile selected documents" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Arrange a pilot" })).toBeVisible();
+  await testInfo.attach("closed-workspace-source-queue", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("an enabled workspace can select an OCR-qualified source for compilation", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page); await page.goto(BOARD_URL);
+  await page.getByRole("button", { name: "All 3" }).click();
+  const readySource = page.locator('[data-document-id="doc-read"]');
+  await expect(readySource.locator(".board-row-status")).toHaveText("Ready to compile");
+  await readySource.getByRole("checkbox").check();
+  await expect(page.getByRole("button", { name: "Compile selected documents" })).toBeEnabled();
+});
 
 test("source queue opens on exceptions instead of dumping every document", async ({ page }, testInfo) => {
   await installSession(page); await mockWorkspace(page); await page.goto(BOARD_URL);
