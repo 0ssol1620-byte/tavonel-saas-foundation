@@ -214,14 +214,21 @@ begin
   select * into previously_applied
     from public.foundation_billing_events where event_id = p_event_id for update;
   if found then
-    if previously_applied.payload_sha256 <> p_payload_sha256
-      or previously_applied.action <> p_action then
-      raise exception 'foundation_billing_event_id_conflict';
+    if previously_applied.processing_result = 'stale_or_mismatched_subscription'
+      and p_action = 'subscription' then
+      -- v3 deliberately retries a stale Studio upgrade after the old subscription gains a
+      -- cancellation schedule. Continue through the nonce/price checks, then let v3 decide.
+      null;
+    else
+      if previously_applied.payload_sha256 <> p_payload_sha256
+        or previously_applied.action <> p_action then
+        raise exception 'foundation_billing_event_id_conflict';
+      end if;
+      update public.foundation_billing_event_rejections
+        set resolved_at = now(), resolution_status = 'duplicate'
+        where event_id = p_event_id and resolved_at is null;
+      return jsonb_build_object('status', 'duplicate', 'eventId', p_event_id);
     end if;
-    update public.foundation_billing_event_rejections
-      set resolved_at = now(), resolution_status = 'duplicate'
-      where event_id = p_event_id and resolved_at is null;
-    return jsonb_build_object('status', 'duplicate', 'eventId', p_event_id);
   end if;
 
   if p_action not in ('purchase', 'allowance', 'subscription')

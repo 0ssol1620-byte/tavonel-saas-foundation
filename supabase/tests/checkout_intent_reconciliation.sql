@@ -1,5 +1,5 @@
 begin;
-select plan(37);
+select plan(39);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -347,6 +347,46 @@ select is(
   (select credit_balance from public.foundation_billing_accounts where workspace_key = 'pilot-skewk1'),
   2000,
   'clock skew tolerance does not lose a paid allowance'
+);
+
+-- A Studio upgrade may initially be stale until Observer cancellation is scheduled. v3's
+-- deliberate redelivery repair must remain reachable through v6's duplicate guard.
+update public.foundation_billing_accounts
+  set subscription_status = 'active', access_plan = 'observer_access',
+      subscription_cancel_at = null
+  where workspace_key = 'pilot-orderj1';
+do $$ begin perform public.issue_foundation_checkout_intent(
+  'b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8', 'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
+  'studio_access', 'checkout-v1', 'pri_' || repeat('s', 26), 10000, now()
+); end $$;
+select is(
+  public.apply_foundation_billing_event_v6(
+    'evt_' || repeat('n', 26), 'subscription.created', now() + interval '4 minutes',
+    'sha256:' || repeat('f', 64), 'subscription',
+    'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
+    'studio_access', null, 'ctm_' || repeat('j', 26),
+    'sub_' || repeat('s', 26), 'active', null,
+    'b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8', now(), 'checkout-v1',
+    'pri_' || repeat('s', 26), 10000
+  )->>'status',
+  'stale_or_mismatched_subscription',
+  'a Studio event can wait for the Observer cancellation schedule'
+);
+update public.foundation_billing_accounts
+  set subscription_cancel_at = now() + interval '30 days'
+  where workspace_key = 'pilot-orderj1';
+select is(
+  public.apply_foundation_billing_event_v6(
+    'evt_' || repeat('n', 26), 'subscription.created', now() + interval '4 minutes',
+    'sha256:' || repeat('f', 64), 'subscription',
+    'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
+    'studio_access', null, 'ctm_' || repeat('j', 26),
+    'sub_' || repeat('s', 26), 'active', null,
+    'b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8', now(), 'checkout-v1',
+    'pri_' || repeat('s', 26), 10000
+  )->>'status',
+  'processed_subscription_upgrade',
+  'redelivery after cancellation scheduling upgrades the paid Studio subscription'
 );
 
 do $$ begin perform public.issue_foundation_checkout_intent(

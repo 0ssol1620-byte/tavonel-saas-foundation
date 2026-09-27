@@ -60,4 +60,14 @@ describe("Paddle webhook acknowledgement", () => {
     expect(await response.json()).toMatchObject({ code: "EVENT_QUARANTINED", eventId });
     expect(mocks.quarantine).toHaveBeenCalledTimes(2);
   });
+
+  it("counts only an applied activation, not a stale upgrade awaiting replay", async () => {
+    mocks.parse.mockReturnValue({ action: "subscription", eventId, eventType: "subscription.activated", offerCode: "studio_access" });
+    mocks.apply.mockResolvedValueOnce({ ok: true, result: { status: "stale_or_mismatched_subscription" } })
+      .mockResolvedValueOnce({ ok: true, result: { status: "processed_subscription_upgrade" } });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.funnel).not.toHaveBeenCalled();
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.funnel).toHaveBeenCalledOnce();
+  });
 });

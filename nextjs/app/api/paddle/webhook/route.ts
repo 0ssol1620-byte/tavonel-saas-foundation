@@ -61,14 +61,13 @@ export async function POST(request: Request) {
     §15.2's `subscription_retained` is not derivable here -- it is a cohort reading, and
     `lib/activation-cohorts.ts` is where repeat value is computed.
 
-    And only on the application that persisted the event. Paddle redelivers, so the projection
-    answers an event it has already stored with `status: "duplicate"`
-    (`apply_foundation_billing_event_v3`, migration 0011, reached through v4) -- a redelivery is
-    the same subscription arriving twice, not a second one starting.
+    Count only a status actually projected into the account. v6 returns `duplicate` for normal
+    redelivery, while v3 can return `stale_or_mismatched_subscription` until an upgrade can be
+    replayed. Neither represents a newly started subscription.
   */
   if (action.action === "subscription"
     && action.eventType === "subscription.activated"
-    && applied.result.status !== "duplicate") {
+    && (applied.result.status === "processed" || applied.result.status === "processed_subscription_upgrade")) {
     recordServerFunnel("subscription_started", { offer: action.offerCode });
   }
   console.info("foundation_billing_event_applied", {
