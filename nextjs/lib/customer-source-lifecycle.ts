@@ -211,7 +211,8 @@ export async function requestCustomerSourceDeletion(input: {
   return { ok: true, receipt: { receiptId: row.receiptId, deletionId: row.deletionId, status: row.status, eligibleAt: row.eligibleAt } };
 }
 
-export type RetentionCandidate = { workspaceKey: string; documentId: string; createdAt: string; retentionDays: number };
+export type RetentionCandidate = { workspaceKey: string; documentId: string; createdAt: string;
+  retentionDays: number; graceDays: number };
 
 /**
  * What a retention run would tombstone right now, and a digest of it. The same SQL selection
@@ -227,38 +228,41 @@ export async function previewRetentionCandidates(workspaceKey: string | null, li
   for (const row of result.value as Record<string, unknown>[]) {
     if (typeof row?.workspace_key !== "string" || (workspaceKey !== null && row.workspace_key !== workspaceKey)
       || typeof row.document_id !== "string" || !UPLOAD_DOCUMENT_ID.test(row.document_id)
-      || typeof row.created_at !== "string" || !Number.isSafeInteger(row.retention_days)) {
+      || typeof row.created_at !== "string" || !Number.isFinite(Date.parse(row.created_at))
+      || !Number.isSafeInteger(row.retention_days) || !Number.isSafeInteger(row.deleted_object_grace_days)) {
       return { ok: false, code: "RETENTION_RESULT_INVALID" };
     }
     candidates.push({ workspaceKey: row.workspace_key, documentId: row.document_id, createdAt: row.created_at,
-      retentionDays: row.retention_days as number });
+      retentionDays: row.retention_days as number, graceDays: row.deleted_object_grace_days as number });
   }
-  const canonical = JSON.stringify(["tavonel.retention_candidates.v1", workspaceKey,
-    candidates.map(c => [c.workspaceKey, c.documentId.toLowerCase()])]);
+  const canonical = JSON.stringify(["tavonel.retention_candidates.v2", workspaceKey,
+    candidates.map(c => [c.workspaceKey, c.documentId.toLowerCase(), c.createdAt, c.retentionDays, c.graceDays])]);
   return { ok: true, candidates, candidatesSha256: `sha256:${createHash("sha256").update(canonical, "utf8").digest("hex")}` };
 }
 
 /**
- * Gate 10: tombstones at most `limit` confirmed uploads older than their workspace's
- * `retention_days`, one database transaction each, scoped to one workspace unless `workspaceKey`
- * is null. The attest and sweep workers purge them after `deleted_object_grace_days`, exactly as
+ * Gate 10: tombstones only the reviewed, exact candidates older than their workspace's
+ * `retention_days`, one database transaction each. The attest and sweep workers purge them after
+ * `deleted_object_grace_days`, exactly as
  * they do a customer request. Nothing schedules this: see docs/CUSTOMER_DATA_GATE_2026-09-06.md §7.
  */
-export async function runRetentionTombstones(limit: number, workspaceKey: string | null): Promise<
+export async function runRetentionTombstones(candidates: readonly RetentionCandidate[]): Promise<
   { ok: true; recorded: number; held: number } | { ok: false; code: string; recorded: number }
 > {
   let recorded = 0;
-  let held = 0;
-  for (let i = 0; i < limit; i += 1) {
-    const result = await rpc("request_retention_expired_source_deletion", { p_workspace_key: workspaceKey });
+  for (const candidate of candidates) {
+    const result = await rpc("request_retention_expired_source_deletion_exact", {
+      p_workspace_key: candidate.workspaceKey, p_document_id: candidate.documentId,
+      p_expected_created_at: candidate.createdAt, p_expected_retention_days: candidate.retentionDays,
+      p_expected_grace_days: candidate.graceDays,
+    });
     if (!result.ok) return { ok: false, code: result.code, recorded };
     const status = (result.value as { status?: unknown } | null)?.status;
-    if (status === "idle") break;
     if (status === "recorded") recorded += 1;
-    else if (status === "held" || status === "raced") held += 1;
+    else if (status === "changed") return { ok: false, code: "RETENTION_CANDIDATES_CHANGED", recorded };
     else return { ok: false, code: "RETENTION_RESULT_INVALID", recorded };
   }
-  return { ok: true, recorded, held };
+  return { ok: true, recorded, held: 0 };
 }
 
 /**

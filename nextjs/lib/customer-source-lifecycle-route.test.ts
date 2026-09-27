@@ -7,6 +7,7 @@ const listFoundationSourceInventory = vi.fn<(...args: any[]) => any>();
 const appendServiceAuditEvent = vi.fn<(...args: any[]) => any>();
 const readR2SignerEnv = vi.fn<(...args: any[]) => any>();
 const readExportSignerEnv = vi.fn<(...args: any[]) => any>();
+const checkConnectorSourceAccess = vi.fn<(...args: any[]) => any>();
 const rpc = vi.fn<(name: string, body: any) => { status: number; body: unknown }>();
 
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest, revalidateFoundationAuthorization }));
@@ -15,6 +16,7 @@ vi.mock("@/lib/enterprise-store", () => ({ appendServiceAuditEvent }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({ FOUNDATION_R2_BUCKET: "foundation", readR2SignerEnv,
   authorizeSyntheticCanary: (header: string | null, secret: string) => header === `Bearer ${secret}` }));
 vi.mock("@/lib/export-signing", () => ({ readExportSignerEnv }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess }));
 vi.mock("@/lib/supabase-admin", () => ({
   readSupabaseAdminConfig: () => ({}),
   supabaseAdminRequest: async (_config: unknown, path: string, init: { body: string }) => {
@@ -61,6 +63,7 @@ beforeEach(() => {
   revalidateFoundationAuthorization.mockResolvedValue({ ok: true, principal });
   readR2SignerEnv.mockReturnValue({ bucket: "foundation" });
   readExportSignerEnv.mockReturnValue(null);
+  checkConnectorSourceAccess.mockResolvedValue({ ok: true });
   listFoundationSourceInventory.mockResolvedValue({ ok: true, objects });
   hold = "inactive";
   appendServiceAuditEvent.mockResolvedValue({ ok: true, eventId: "evt" });
@@ -76,6 +79,15 @@ describe("customer source lifecycle route", () => {
     expect((await response.json()).export).toMatchObject({ workspaceKey: "pilot-acme01", objects });
     expect(listFoundationSourceInventory.mock.calls.every(call => call[1] === "pilot-acme01")).toBe(true);
     expect(rpcCalls("customer_source_deletion_status")).toEqual([{ p_workspace_key: "pilot-acme01", p_document_id: DOC }]);
+    expect(checkConnectorSourceAccess).toHaveBeenCalledWith("pilot-acme01", [DOC]);
+  });
+
+  it("does not reveal inventory metadata for a connector document whose ACL denies access", async () => {
+    checkConnectorSourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect((await GET(new Request("https://tavonel.com/x"), params())).status).toBe(403);
+    expect((await post({ mode: "dry_run" })).status).toBe(403);
+    expect(listFoundationSourceInventory).not.toHaveBeenCalled();
+    expect(appendServiceAuditEvent).not.toHaveBeenCalled();
   });
 
   it("answers another tenant's document as not found and writes nothing", async () => {
@@ -216,9 +228,9 @@ describe("retention worker preconditions", () => {
     tombstoned = 0;
     rpc.mockImplementation((name) => {
       if (name === "retention_expired_source_candidates") return { status: 200, body: tombstoned ? [] : expired };
-      if (name === "request_retention_expired_source_deletion") {
+      if (name === "request_retention_expired_source_deletion_exact") {
         tombstoned += 1;
-        return { status: 200, body: tombstoned === 1 ? { status: "recorded" } : { status: "idle" } };
+        return { status: 200, body: { status: "recorded" } };
       }
       return defaultRpc(name);
     });
@@ -233,9 +245,10 @@ describe("retention worker preconditions", () => {
     const response = await run({ mode: "dry_run", workspaceKey: "pilot-acme01" });
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.candidates).toEqual([{ workspaceKey: "pilot-acme01", documentId: DOC, createdAt: "2025-08-01T00:00:00Z", retentionDays: 365 }]);
+    expect(body.candidates).toEqual([{ workspaceKey: "pilot-acme01", documentId: DOC,
+      createdAt: "2025-08-01T00:00:00Z", retentionDays: 365, graceDays: 30 }]);
     expect(body.candidatesSha256).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(rpcCalls("request_retention_expired_source_deletion")).toEqual([]);
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([]);
     expect((await run({})).status).toBe(400);
   });
 
@@ -243,7 +256,7 @@ describe("retention worker preconditions", () => {
     const response = await run({ mode: "execute" });
     expect(response.status).toBe(409);
     expect((await response.json()).code).toBe("RETENTION_FLEET_NOT_ARMED");
-    expect(rpcCalls("request_retention_expired_source_deletion")).toEqual([]);
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([]);
   });
 
   it("runs the canary for one workspace only, and only the set the operator reviewed", async () => {
@@ -251,13 +264,29 @@ describe("retention worker preconditions", () => {
     const changed = await run({ mode: "execute", workspaceKey: "pilot-acme01", confirmCandidatesSha256: sha("0") });
     expect(changed.status).toBe(409);
     expect((await changed.json()).code).toBe("RETENTION_CANDIDATES_CHANGED");
-    expect(rpcCalls("request_retention_expired_source_deletion")).toEqual([]);
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([]);
 
     const { candidatesSha256 } = await (await run({ mode: "dry_run", workspaceKey: "pilot-acme01" })).json();
     const response = await run({ mode: "execute", workspaceKey: "pilot-acme01", confirmCandidatesSha256: candidatesSha256 });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ok: true, recorded: 1, mode: "execute", workspaceKey: "pilot-acme01" });
-    expect(rpcCalls("request_retention_expired_source_deletion")).toEqual([{ p_workspace_key: "pilot-acme01" }]);
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([{
+      p_workspace_key: "pilot-acme01", p_document_id: DOC,
+      p_expected_created_at: "2025-08-01T00:00:00Z", p_expected_retention_days: 365,
+      p_expected_grace_days: 30,
+    }]);
+  });
+
+  it("refuses a reviewed candidate that changed before the database tombstone", async () => {
+    const { candidatesSha256 } = await (await run({ mode: "dry_run", workspaceKey: "pilot-acme01" })).json();
+    rpc.mockImplementation((name) => name === "retention_expired_source_candidates"
+      ? { status: 200, body: expired }
+      : name === "request_retention_expired_source_deletion_exact"
+        ? { status: 200, body: { status: "changed" } } : defaultRpc(name));
+    const response = await run({ mode: "execute", workspaceKey: "pilot-acme01", confirmCandidatesSha256: candidatesSha256 });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ ok: false, code: "RETENTION_CANDIDATES_CHANGED", recorded: 0 });
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toHaveLength(1);
   });
 
   it("refuses a candidate list that names another workspace than the canary", async () => {

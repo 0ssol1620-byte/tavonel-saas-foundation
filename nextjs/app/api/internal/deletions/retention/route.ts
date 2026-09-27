@@ -54,6 +54,7 @@ export async function POST(request: Request) {
     }
   }
   if (preview.candidates.length === 0) return reply({ code: "OK", mode: "execute", recorded: 0, held: 0 });
-  const result = await runRetentionTombstones(preview.candidates.length, workspaceKey);
-  return reply({ ...result, mode: "execute", workspaceKey }, result.ok ? 200 : 503);
+  const result = await runRetentionTombstones(preview.candidates);
+  return reply({ ...result, mode: "execute", workspaceKey },
+    result.ok ? 200 : result.code === "RETENTION_CANDIDATES_CHANGED" ? 409 : 503);
 }

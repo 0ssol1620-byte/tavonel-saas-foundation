@@ -429,5 +429,10 @@ replay pass. The follow-up still needs CI PostgreSQL rehearsal and a synthetic R
 The second independent read found a workspace-key UPDATE route around the hold trigger; the key
 is now immutable. It also found that replaying old migration 0053 would erase later service-role
 grants, so that file is excluded from the replay pass. The signed receipt schema is v2.
+The last review found two bounded issues: the lifecycle inventory route could expose connector
+metadata without ACL admission, and retention execution could select a different document after
+the reviewed candidate set changed. The route now checks source access before exposing a live
+inventory, and the retention worker calls an exact candidate RPC carrying its workspace, document,
+creation time, retention policy and grace period. A changed candidate fails closed.
 These gaps must be closed or explicitly bounded before
 customer-data activation; this code does not change `activationPolicy.customerData`.

@@ -139,4 +139,12 @@ describe("customer source deletion migration", () => {
     }
     expect(sql).toMatch(/revoke all on function public\.reserve_foundation_intake_admission_unchecked[\s\S]+from public, anon, authenticated, service_role;/);
   });
+
+  it("tombstones only the exact reviewed retention candidate", () => {
+    const exact = fn("request_retention_expired_source_deletion_exact");
+    expect(exact).toMatch(/lock_upload_source_deletion\(p_workspace_key, p_document_id\)/);
+    expect(exact).toMatch(/document_id = p_document_id[\s\S]+created_at = p_expected_created_at[\s\S]+retention_days = p_expected_retention_days[\s\S]+deleted_object_grace_days = p_expected_grace_days/);
+    expect(exact).toMatch(/if not found then return pg_catalog\.jsonb_build_object\('status', 'changed'\)/);
+    expect(sql).toMatch(/revoke all on function public\.request_retention_expired_source_deletion\(text\) from service_role/);
+  });
 });

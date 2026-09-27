@@ -8,7 +8,7 @@
 --   pilot-c2c2c2c2c2c24c2c  owner c2, grace 0, hold ON
 --   c3 is a plain member of the first workspace.
 begin;
-select plan(56);
+select plan(59);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -64,6 +64,11 @@ select ok(not has_function_privilege('service_role', 'public.reserve_foundation_
   'the server cannot reach the unchecked reserve underneath the tombstone guard');
 select ok(has_function_privilege('service_role', 'public.reserve_foundation_intake_admission(text,uuid,uuid,text,integer,text)', 'execute'),
   'the server still reserves through the guarded wrapper');
+select ok(not has_function_privilege('service_role', 'public.request_retention_expired_source_deletion(text)', 'execute'),
+  'the server cannot invoke the next-eligible retention RPC after a reviewed candidate changes');
+select ok(has_function_privilege('service_role',
+  'public.request_retention_expired_source_deletion_exact(text,uuid,timestamptz,integer,integer)', 'execute'),
+  'the server can tombstone only an exact reviewed retention candidate');
 
 -- ---------------------------------------------------------------------------
 -- Who may ask, and for what
@@ -165,7 +170,14 @@ select is(public.customer_source_deletion_status('pilot-c2c2c2c2c2c24c2c', '0e00
 -- ---------------------------------------------------------------------------
 -- Retention
 -- ---------------------------------------------------------------------------
-create temp table retained as select public.request_retention_expired_source_deletion() as r;
+select is(public.request_retention_expired_source_deletion_exact('pilot-c1c1c1c1c1c14c1c',
+  '0e000000-0000-4000-8000-00000000000b', now(), 365, 0)->>'status', 'changed',
+  'a candidate with a changed creation time is never silently replaced by another document');
+create temp table retained as
+  select public.request_retention_expired_source_deletion_exact(c.workspace_key, c.document_id,
+    c.created_at, c.retention_days, c.deleted_object_grace_days) as r
+  from public.retention_expired_source_candidates('pilot-c1c1c1c1c1c14c1c', 25) c
+  where c.document_id = '0e000000-0000-4000-8000-00000000000b';
 select is((select (r->>'status') || ':' || (r->>'documentId') from retained),
   'recorded:0e000000-0000-4000-8000-00000000000b', 'the upload past retention_days is tombstoned');
 select is((select reason from public.source_deletion_tombstones where document_id = '0e000000-0000-4000-8000-00000000000b'),

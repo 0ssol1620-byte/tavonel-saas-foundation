@@ -801,6 +801,36 @@ begin
 end;
 $$;
 
+-- The server uses this exact candidate form. A reviewed candidate is never silently replaced by
+-- the next eligible document if a concurrent request removes it or governance values change.
+create function public.request_retention_expired_source_deletion_exact(
+  p_workspace_key text, p_document_id uuid, p_expected_created_at timestamptz,
+  p_expected_retention_days integer, p_expected_grace_days integer
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_row record;
+  v_now timestamptz;
+begin
+  if p_workspace_key is null or p_document_id is null or p_expected_created_at is null
+    or p_expected_retention_days is null or p_expected_grace_days is null then
+    return pg_catalog.jsonb_build_object('status', 'changed');
+  end if;
+  perform public.lock_upload_source_deletion(p_workspace_key, p_document_id);
+  select * into v_row from public.retention_expired_source_candidates(p_workspace_key, 25)
+    where workspace_key = p_workspace_key and document_id = p_document_id
+      and created_at = p_expected_created_at and retention_days = p_expected_retention_days
+      and deleted_object_grace_days = p_expected_grace_days;
+  if not found then return pg_catalog.jsonb_build_object('status', 'changed'); end if;
+  v_now := pg_catalog.clock_timestamp();
+  return public.record_upload_source_tombstone(p_workspace_key, p_document_id, 'retention_expired',
+    null, null,
+    greatest(v_now + pg_catalog.make_interval(days => v_row.deleted_object_grace_days),
+      v_now + interval '15 minutes', v_row.expires_at + interval '15 minutes'))
+    || pg_catalog.jsonb_build_object('workspaceKey', p_workspace_key, 'documentId', p_document_id,
+      'retentionDays', v_row.retention_days);
+end;
+$$;
+
 -- ---------------------------------------------------------------------------------------------
 -- 6. Status, for the customer's receipt
 -- ---------------------------------------------------------------------------------------------
@@ -887,6 +917,7 @@ revoke all on function public.reserve_foundation_intake_admission(text, uuid, uu
   public.confirm_foundation_intake_admission(text, uuid, uuid, text, bigint, text),
   public.request_customer_source_deletion(text, uuid, uuid, text),
   public.request_retention_expired_source_deletion(text),
+  public.request_retention_expired_source_deletion_exact(text, uuid, timestamptz, integer, integer),
   public.retention_expired_source_candidates(text, integer),
   public.customer_source_deletion_status(text, uuid),
   public.source_deletion_inventory_candidate(),
@@ -896,10 +927,11 @@ revoke all on function public.reserve_foundation_intake_admission(text, uuid, uu
   public.connector_documents_blocked(text, text[]),
   public.claim_source_deletion_sweep(integer)
   from public, anon, authenticated;
+revoke all on function public.request_retention_expired_source_deletion(text) from service_role;
 grant execute on function public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text),
   public.confirm_foundation_intake_admission(text, uuid, uuid, text, bigint, text),
   public.request_customer_source_deletion(text, uuid, uuid, text),
-  public.request_retention_expired_source_deletion(text),
+  public.request_retention_expired_source_deletion_exact(text, uuid, timestamptz, integer, integer),
   public.retention_expired_source_candidates(text, integer),
   public.customer_source_deletion_status(text, uuid),
   public.source_deletion_inventory_candidate(),
