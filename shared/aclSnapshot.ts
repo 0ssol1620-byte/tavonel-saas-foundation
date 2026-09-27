@@ -8,11 +8,11 @@ import { createHash } from "node:crypto";
  * the people who could read all three -- not by the union, which is how a compiler leaks.
  *
  * What this is not: enforcement. Serving enforcement lives in the database
- * (`supabase/migrations/20260927100000_source_acl_admission.sql`, inside `connector_documents_blocked`)
+ * (`supabase/migrations/20260927101000_source_acl_admission.sql`, inside `connector_documents_blocked`)
  * and denies every connector-bound document by default. No connector captures a snapshot at
  * ingestion, and no viewer has a verified provider principal, so nothing is ever admitted by ACL
  * today. `per_source_acl_preserved` stays unsatisfied until both exist; the blockers are in
- * `docs/CUSTOMER_DATA_GATE_2026-09-06.md` §7.
+ * `docs/CUSTOMER_DATA_GATE_2026-09-06.md` section 9.
  */
 
 export const ACL_SNAPSHOT_SCHEMA = "tavonel.acl_snapshot.v1" as const;
