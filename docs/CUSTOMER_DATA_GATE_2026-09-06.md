@@ -434,5 +434,10 @@ metadata without ACL admission, and retention execution could select a different
 the reviewed candidate set changed. The route now checks source access before exposing a live
 inventory, and the retention worker calls an exact candidate RPC carrying its workspace, document,
 creation time, retention policy and grace period. A changed candidate fails closed.
+The production R2 bucket's `immutable/` prefix remains under a 365-day object lock. The founder
+test reset on 2026-09-23 hit `ObjectLockedByBucketPolicy`; it completed only after a temporary
+scoped change, and the broad lock was restored (`docs/evidence/production/TAVONEL_FOUNDER_TEST_RESET_2026-09-23.md`).
+Therefore the code's 30-day default grace is a scheduling value, not a verified 30-day physical
+purge. Storage lock, retention promises, and legal holds must be reconciled before activation.
 These gaps must be closed or explicitly bounded before
 customer-data activation; this code does not change `activationPolicy.customerData`.
