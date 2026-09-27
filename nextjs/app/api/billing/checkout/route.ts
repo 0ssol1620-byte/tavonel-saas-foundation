@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { issueFoundationCheckoutIntent } from "@/lib/billing-store";
 import { readCommercialState } from "@/lib/commercial-state";
 import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "@/lib/checkout-policy";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
@@ -63,6 +64,15 @@ export async function POST(request: Request) {
     { userId: user.id, workspaceId: membership.workspaceId, offerCode: body.offerCode },
     secret,
   );
+  // No binding leaves this route without a durable record of what it authorized; the webhook
+  // settles against that record, not against whatever the gate says when payment lands.
+  const intent = await issueFoundationCheckoutIntent(customData, offer);
+  if (!intent.ok) {
+    return NextResponse.json(
+      { code: intent.code },
+      { status: intent.code === "OWNER_ACCESS_ACTIVE" ? 409 : 503, headers: NO_STORE },
+    );
+  }
   return NextResponse.json({
     code: "CHECKOUT_READY",
     environment: paddle.environment,

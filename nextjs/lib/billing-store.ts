@@ -1,8 +1,6 @@
 import type { PaddleBillingAction } from "./paddle-billing-event";
-import { BILLING_OFFERS } from "./billing-catalog";
-import { readCommercialState } from "./commercial-state";
-import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "./checkout-policy";
-import { readPublicStatusV2 } from "./public-status";
+import type { CheckoutBinding } from "./billing-binding";
+import type { BillingOffer } from "./billing-catalog";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 export type FoundationBillingAccount = {
@@ -37,7 +35,7 @@ export const EMPTY_BILLING_ACCOUNT: Omit<FoundationBillingAccount, "workspaceKey
   updatedAt: null,
 };
 
-async function reportBillingStoreFailure(stage: "projection" | "schedule", response: Response) {
+async function reportBillingStoreFailure(stage: "intent" | "projection" | "schedule", response: Response) {
   let databaseCode = "unknown";
   let databaseMessage = "unavailable";
   try {
@@ -101,20 +99,87 @@ export async function getFoundationBillingAccount(workspaceKey: string, userId: 
   };
 }
 
+/**
+ * Records what the checkout route authorized, while it is authorized: the binding's nonce and
+ * the price and credits offered. The webhook settles a new binding from this row, so a gate that
+ * closes or a price id that rotates after the buyer reached Paddle cannot drop their payment.
+ */
+export async function issueFoundationCheckoutIntent(
+  binding: CheckoutBinding,
+  offer: Pick<BillingOffer, "priceId" | "credits">,
+) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/issue_foundation_checkout_intent", {
+      method: "POST",
+      body: JSON.stringify({
+        p_nonce: binding.tavonel_nonce,
+        p_workspace_key: binding.tavonel_workspace_id,
+        p_user_id: binding.tavonel_user_id,
+        p_offer_code: binding.tavonel_offer_code,
+        p_policy_version: binding.tavonel_policy_version,
+        p_price_id: offer.priceId,
+        p_credit_delta: offer.credits,
+        p_issued_at: binding.tavonel_issued_at,
+      }),
+    });
+  } catch {
+    return { ok: false as const, code: "BILLING_INTENT_UNAVAILABLE" };
+  }
+  if (!response.ok) {
+    await reportBillingStoreFailure("intent", response);
+    return { ok: false as const, code: "BILLING_INTENT_UNAVAILABLE" };
+  }
+  const result = await response.json() as Record<string, unknown>;
+  if (result.status === "issued") return { ok: true as const };
+  return {
+    ok: false as const,
+    code: result.reason === "checkout_account_billing_exempt" ? "OWNER_ACCESS_ACTIVE" : "BILLING_INTENT_UNAVAILABLE",
+  };
+}
+
+/** Persist a signed provider event that cannot be mapped to a customer binding. */
+export async function quarantineFoundationBillingEnvelope(
+  action: Extract<PaddleBillingAction, { action: "ignored" }>,
+) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/quarantine_foundation_billing_envelope", {
+      method: "POST",
+      body: JSON.stringify({
+        p_event_id: action.eventId,
+        p_event_type: action.eventType,
+        p_occurred_at: action.occurredAt,
+        p_payload_sha256: action.payloadSha256,
+        p_reason: action.reason,
+      }),
+    });
+  } catch {
+    return { ok: false as const, code: "BILLING_QUARANTINE_FAILED" };
+  }
+  if (!response.ok) {
+    await reportBillingStoreFailure("projection", response);
+    return { ok: false as const, code: "BILLING_QUARANTINE_FAILED" };
+  }
+  const result = await response.json() as Record<string, unknown>;
+  return result.status === "binding_rejected"
+    ? { ok: true as const }
+    : { ok: false as const, code: "BILLING_QUARANTINE_FAILED" };
+}
+
 export async function applyFoundationBillingAction(action: Exclude<PaddleBillingAction, { action: "ignored" }>) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
   const isReversal = action.action === "reversal";
-  const bootstrapAllowed = isReversal ? false : (
-    decideOfferCheckoutPolicy(BILLING_OFFERS[action.offerCode]).allowed
-    && decideCheckoutPolicy(
-      readCommercialState(),
-      readPublicStatusV2().availableActions.purchasePlan.enabled,
-    ).allowed
-  );
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v5", {
+    // No checkout policy is read here: a new binding is judged against the intent the checkout
+    // route recorded while the gate was open (apply_foundation_billing_event_v6).
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/apply_foundation_billing_event_v6", {
       method: "POST",
       body: JSON.stringify({
         p_event_id: action.eventId,
@@ -129,13 +194,12 @@ export async function applyFoundationBillingAction(action: Exclude<PaddleBilling
         p_customer_id: isReversal ? null : action.customerId,
         p_subscription_id: isReversal ? null : action.subscriptionId,
         p_subscription_status: action.action === "subscription" ? action.subscriptionStatus : null,
-        p_credit_delta: action.action === "purchase" || action.action === "allowance" ? action.creditDelta : 0,
         p_adjustment_id: isReversal ? action.adjustmentId : null,
         p_binding_nonce: isReversal ? null : action.checkoutBindingNonce,
         p_binding_issued_at: isReversal ? null : action.checkoutBindingIssuedAt,
         p_binding_policy_version: isReversal ? null : action.checkoutBindingPolicyVersion,
-        p_binding_fresh: isReversal ? false : action.checkoutBindingFresh,
-        p_bootstrap_allowed: bootstrapAllowed,
+        p_price_id: isReversal ? null : action.priceId,
+        p_configured_credit_delta: isReversal ? null : action.configuredCreditDelta,
       }),
     });
   } catch {
