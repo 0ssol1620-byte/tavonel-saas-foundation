@@ -5,7 +5,7 @@ import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
-import { readAccessMode } from "@/lib/foundation-pilot";
+import { readPublicStatusV2 } from "@/lib/public-status";
 import { FOUNDATION_R2_BUCKET, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
 
@@ -18,6 +18,7 @@ export function GET() {
     ? "google_oauth_configured"
     : "not_configured";
   const commercial = readCommercialState();
+  const availableActions = readPublicStatusV2().availableActions;
   const sandbox = commercial.provider === "sandbox";
   const billingChecks = {
     webhook: Boolean(process.env.PADDLE_WEBHOOK_SECRET?.trim()),
@@ -32,7 +33,7 @@ export function GET() {
   const billing = billingConfigured
     ? sandbox
       ? "sandbox_checkout_ready"
-      : commercial.liveChargesEnabled
+      : availableActions.purchasePlan.enabled
         ? "live_checkout_ready"
         : "live_launch_pending"
     : sandbox
@@ -46,13 +47,10 @@ export function GET() {
     {
       mode: "foundation",
       commercialMode: commercial.mode,
-      // The pricing page gates its checkout buttons on this rather than re-deriving it from
-      // `commercialMode`, which is only one of the three inputs to whether a card can be charged.
-      liveCheckout: commercial.liveChargesEnabled,
-      // Public, non-sensitive product readiness. This keeps free-evaluation CTAs honest in
-      // preview/pilot deployments instead of assuming that a live billing switch also means
-      // public signup is open.
-      selfService: readAccessMode() === "self_service",
+      // Keep this compatibility response aligned with the action policy enforced by checkout.
+      // Live Paddle credentials alone cannot make a closed customer workflow purchasable.
+      liveCheckout: availableActions.purchasePlan.enabled,
+      selfService: availableActions.createAccount.enabled,
       activationPolicy,
       auth,
       billing,
