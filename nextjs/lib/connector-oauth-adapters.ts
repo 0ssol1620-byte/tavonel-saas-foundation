@@ -86,19 +86,19 @@ function boundedSize(value: unknown) {
 /*
   A continuation, checked per provider rather than for Graph alone (S-72).
 
-  The three providers continue in two different shapes and the check has to match the shape,
-  not merely exist:
+  The providers listed here continue in two different shapes and the check has to match the
+  shape, not merely exist (Google's change-feed cursor is checked in google-drive-lifecycle.ts):
 
     * Microsoft Graph hands back a whole URL and the adapter fetches it. That is a destination
       supplied by a response, so it goes through the central egress policy -- origin, path
       prefix, scheme, port, address -- exactly as the first page did.
 
-    * Google Drive and Dropbox hand back an opaque token which this adapter puts in a query
-      parameter and a JSON body respectively. A token cannot become a destination there, and
-      that is the property worth asserting rather than assuming, so the tests below drive a
-      hostile continuation through both and check where the request actually went.
+    * Dropbox hands back an opaque token which this adapter puts in a JSON body. A token cannot
+      become a destination there, and that is the property worth asserting rather than
+      assuming, so the tests below drive a hostile continuation through it and check where the
+      request actually went.
 
-  What is refused for the opaque two is what a token has no reason to contain and a smuggled
+  What is refused for an opaque token is what a token has no reason to contain and a smuggled
   URL does: a scheme, whitespace, or a control character. Refusing base64's own alphabet would
   break a legitimate cursor to buy no security, so it is not refused.
 */
@@ -149,45 +149,6 @@ async function jsonRequest(
   } catch {
     throw new Error("OAUTH_SOURCE_PAGE_INVALID");
   }
-}
-
-async function listGoogleDrive(accessToken: string, cursor: string | null, target: OAuthSourceTarget, fetcher: typeof fetch): Promise<OAuthSourcePage> {
-  // rootPath is a Dropbox path; Graph site IDs are not Drive targets. Never turn an
-  // unsupported selection into a broader all-files scan. Folder-tree support is separate.
-  if (target.rootPath || target.siteId || (target.driveId !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(target.driveId))) {
-    throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
-  }
-  const url = new URL(`${DRIVE_ORIGIN}/drive/v3/files`);
-  url.searchParams.set("pageSize", String(OAUTH_SOURCE_PAGE_SIZE));
-  url.searchParams.set("q", "trashed = false");
-  url.searchParams.set("fields", "nextPageToken,incompleteSearch,files(id,name,mimeType,size,modifiedTime,version,md5Checksum)");
-  url.searchParams.set("supportsAllDrives", "true");
-  url.searchParams.set("includeItemsFromAllDrives", "true");
-  url.searchParams.set("corpora", target.driveId ? "drive" : "user");
-  if (target.driveId) url.searchParams.set("driveId", target.driveId);
-  if (cursor !== null) {
-    const pageToken = safeOpaqueContinuation(cursor, 2_048);
-    if (pageToken === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
-    url.searchParams.set("pageToken", pageToken);
-  }
-  const payload = await jsonRequest(url.toString(), accessToken, {}, fetcher, LIST_POLICY.google_drive);
-  if (payload.incompleteSearch !== undefined && payload.incompleteSearch !== false) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
-  const rows = sourceRows(payload, "files");
-  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
-    if (!readableRow(row)) return null;
-    const nativeId = boundedString(row.id, 512);
-    const name = boundedString(row.name, 512);
-    if (!nativeId || !name) return null;
-    const mimeType = boundedString(row.mimeType, 127);
-    const folder = mimeType === "application/vnd.google-apps.folder";
-    const revision = boundedString(row.md5Checksum, 512) ?? boundedString(row.version, 512) ?? boundedString(row.modifiedTime, 512);
-    if (!revision) return null;
-    return { nativeId, name, revision, mimeType, sizeBytes: folder ? null : boundedSize(row.size), modifiedAt: boundedString(row.modifiedTime, 64), kind: folder ? "folder" : "file" };
-  }));
-  const next = payload.nextPageToken == null ? null : safeOpaqueContinuation(payload.nextPageToken, 2_048);
-  if (payload.nextPageToken != null && next === null) throw new Error("OAUTH_SOURCE_CURSOR_INVALID");
-  if (next !== null && next === cursor) throw new Error("OAUTH_SOURCE_CURSOR_STALLED");
-  return { items, cursor: next, complete: next === null };
 }
 
 async function listDropbox(accessToken: string, cursor: string | null, target: OAuthSourceTarget, fetcher: typeof fetch): Promise<OAuthSourcePage> {
@@ -272,7 +233,9 @@ export async function listOAuthSourcePage(input: {
   const target = input.target ?? {};
   if (!input.accessToken || !validTarget(target)) throw new Error("OAUTH_SOURCE_INPUT_INVALID");
   const fetcher = input.fetcher ?? fetch;
-  if (input.provider === "google_drive") return listGoogleDrive(input.accessToken, input.cursor, target, fetcher);
+  // Drive's files listing filters trashed files instead of reporting them, so a deletion would
+  // arrive as silence. Google is read only through the change feed in google-drive-lifecycle.ts.
+  if (input.provider === "google_drive") throw new Error("OAUTH_SOURCE_READER_RETIRED");
   if (input.provider === "dropbox") return listDropbox(input.accessToken, input.cursor, target, fetcher);
   return listMicrosoftGraph(input.accessToken, input.cursor, target, fetcher);
 }

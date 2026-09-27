@@ -4,6 +4,10 @@ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,80}$/;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const SIGNATURE_SCOPE = "tavonel.signed_export_manifest.v1" as const;
+// The same key signs compile receipts, so the scope sits in the protected header and each verifier
+// names the one it expects: a compile receipt signature never verifies as an export manifest.
+export const COMPILE_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_compile_receipt.v1" as const;
+export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE;
 
 export type ExportSignatureV1 = {
   schemaVersion: "tavonel.export_signature.v1";
@@ -18,7 +22,7 @@ export type ExportSignatureV1 = {
 export type ExportSignatureV2 = {
   schemaVersion: "tavonel.export_signature.v2";
   algorithm: "Ed25519";
-  signatureScope: typeof SIGNATURE_SCOPE;
+  signatureScope: SignatureScope;
   keyId: string;
   keyVersion: number;
   issuedAt: string;
@@ -72,6 +76,7 @@ type LifecycleSignerInput = {
   notBefore: string;
   expiresAt: string;
   issuedAt?: string;
+  signatureScope?: SignatureScope;
 };
 
 function sha256(value: Uint8Array) {
@@ -147,7 +152,7 @@ export function createExportSigner(input: {
     signPayload(payload) {
       const bytes = Buffer.from(payload);
       const protectedFields = lifecycle ? {
-        signatureScope: SIGNATURE_SCOPE,
+        signatureScope: lifecycle.signatureScope ?? SIGNATURE_SCOPE,
         keyId: input.keyId,
         keyVersion: lifecycle.keyVersion,
         issuedAt,
@@ -167,7 +172,7 @@ export function createExportSigner(input: {
       };
       return lifecycle ? {
         schemaVersion: "tavonel.export_signature.v2",
-        signatureScope: SIGNATURE_SCOPE,
+        signatureScope: lifecycle.signatureScope ?? SIGNATURE_SCOPE,
         keyVersion: lifecycle.keyVersion,
         issuedAt,
         expiresAt: lifecycle.expiresAt,
@@ -213,6 +218,7 @@ export function readExportTrustStoreEnv(env: Readonly<Record<string, string | un
 export function readExportSignerEnv(
   env: Readonly<Record<string, string | undefined>> = process.env,
   now = new Date(),
+  signatureScope: SignatureScope = SIGNATURE_SCOPE,
 ) {
   const keyId = env.TAVONEL_EXPORT_SIGNING_KEY_ID?.trim() ?? "";
   const privateKeyPkcs8DerBase64 = env.TAVONEL_EXPORT_SIGNING_PRIVATE_KEY_PKCS8_DER_B64?.trim() ?? "";
@@ -224,7 +230,7 @@ export function readExportSignerEnv(
   const key = trust.keys.find((candidate) => candidate.keyId === trust.activeKeyId && candidate.status === "active");
   if (!key || key.keyId !== keyId) return null;
   const signer = createExportSigner({ keyId, keyVersion: key.keyVersion, privateKeyPkcs8DerBase64,
-    notBefore: key.notBefore, expiresAt: key.expiresAt, issuedAt: now.toISOString() });
+    notBefore: key.notBefore, expiresAt: key.expiresAt, issuedAt: now.toISOString(), signatureScope });
   return signer && signer.publicKeySpkiSha256 === key.publicKeySpkiSha256 ? signer : null;
 }
 
@@ -250,11 +256,16 @@ function verifyBytes(payload: Uint8Array, signature: ExportSignature, publicKeyS
   }
 }
 
-export function verifyExportSignature(payload: Uint8Array, signature: ExportSignature, publicKeySpkiDer: Uint8Array) {
+export function verifyExportSignature(
+  payload: Uint8Array,
+  signature: ExportSignature,
+  publicKeySpkiDer: Uint8Array,
+  expectedScope: SignatureScope = SIGNATURE_SCOPE,
+) {
   if (signature.schemaVersion === "tavonel.export_signature.v1") return verifyBytes(payload, signature, publicKeySpkiDer);
   const issued = parseInstant(signature.issuedAt);
   const expires = parseInstant(signature.expiresAt);
-  return signature.schemaVersion === "tavonel.export_signature.v2" && signature.signatureScope === SIGNATURE_SCOPE
+  return signature.schemaVersion === "tavonel.export_signature.v2" && signature.signatureScope === expectedScope
     && Number.isSafeInteger(signature.keyVersion) && signature.keyVersion > 0
     && issued !== null && expires !== null && issued < expires && verifyBytes(payload, signature, publicKeySpkiDer);
 }
@@ -264,6 +275,7 @@ export function verifyExportSignatureWithTrustStore(
   signature: ExportSignature,
   trust: ExportTrustStore,
   now = new Date(),
+  expectedScope: SignatureScope = SIGNATURE_SCOPE,
 ) {
   if (trust.minimumSignatureVersion >= 2 && signature.schemaVersion !== "tavonel.export_signature.v2") return false;
   if (signature.schemaVersion !== "tavonel.export_signature.v2") return false;
@@ -276,5 +288,5 @@ export function verifyExportSignatureWithTrustStore(
     || key.publicKeySpkiSha256 !== signature.publicKeySpkiSha256
     || key.publicKeySpkiDerBase64 !== signature.publicKeySpkiDerBase64) return false;
   const publicKey = decodeCanonicalBase64(key.publicKeySpkiDerBase64);
-  return Boolean(publicKey && verifyExportSignature(payload, signature, publicKey));
+  return Boolean(publicKey && verifyExportSignature(payload, signature, publicKey, expectedScope));
 }

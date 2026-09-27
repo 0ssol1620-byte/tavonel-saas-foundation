@@ -2,51 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, oauthSourceDownloadRequest } from "./connector-oauth-adapters";
 
 describe("OAuth source adapters", () => {
-  it("keeps the selected shared drive on the first and following pages", async () => {
-    const fetcher = vi.fn(async () => Response.json({ files: [], nextPageToken: null }));
-    for (const cursor of [null, "next-page"]) {
-      await listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor,
-        target: { driveId: "shared-drive_1" }, fetcher });
-    }
-    for (const call of fetcher.mock.calls as unknown as Array<[string]>) {
-      const url = new URL(String(call[0]));
-      expect(url.searchParams.get("driveId")).toBe("shared-drive_1");
-      expect(url.searchParams.get("corpora")).toBe("drive");
-      expect(url.searchParams.get("supportsAllDrives")).toBe("true");
-      expect(url.searchParams.get("includeItemsFromAllDrives")).toBe("true");
-      expect(url.searchParams.get("fields")).toContain("incompleteSearch");
-    }
-    expect(fetcher).toHaveBeenCalledTimes(2);
-  });
-
-  it("refuses unsupported Google path/site selections before any all-files request", async () => {
+  it("refuses the retired Google files listing, whose trashed filter hides deletions, without network I/O", async () => {
+    // Gate #9: `q=trashed = false` turned a deletion into absence. Google now reads only the
+    // change feed (google-drive-lifecycle.ts), which reports removal and trash as tombstones.
     const fetcher = vi.fn();
-    for (const target of [{ rootPath: "/Research" }, { siteId: "site-one" }, { driveId: "" }, { driveId: "drive/other" }]) {
-      await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor: null, target, fetcher }))
-        .rejects.toThrow("OAUTH_SOURCE_TARGET_UNSUPPORTED");
+    for (const cursor of [null, "next-page"]) {
+      await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor, fetcher }))
+        .rejects.toThrow("OAUTH_SOURCE_READER_RETIRED");
     }
     expect(fetcher).not.toHaveBeenCalled();
-  });
-
-  it("does not present an incomplete Drive search or repeated page as finished work", async () => {
-    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor: null,
-      fetcher: async () => Response.json({ files: [], incompleteSearch: true }) })).rejects.toThrow("OAUTH_SOURCE_PAGE_INVALID");
-    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "test", cursor: "same",
-      fetcher: async () => Response.json({ files: [], nextPageToken: "same" }) })).rejects.toThrow("OAUTH_SOURCE_CURSOR_STALLED");
-  });
-
-  it("normalizes Google Drive files and preserves bounded pagination", async () => {
-    const fetcher = vi.fn(async () => Response.json({
-      nextPageToken: "next-google-page",
-      files: [{ id: "file-1", name: "Paper.pdf", mimeType: "application/pdf", size: "1024", modifiedTime: "2026-08-30T00:00:00Z", md5Checksum: "abc" }],
-    })) as unknown as typeof fetch;
-    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "access", cursor: null, fetcher })).resolves.toEqual({
-      items: [{ nativeId: "file-1", name: "Paper.pdf", revision: "abc", mimeType: "application/pdf", sizeBytes: 1024, modifiedAt: "2026-08-30T00:00:00Z", kind: "file" }],
-      cursor: "next-google-page",
-      complete: false,
-    });
-    const requestUrl = new URL(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]));
-    expect(requestUrl.searchParams.get("pageSize")).toBe(String(OAUTH_SOURCE_PAGE_SIZE));
   });
 
   it("bounds first-page Dropbox and Microsoft listings to the worker admission rate", async () => {
@@ -114,13 +78,6 @@ describe("connector egress policy", () => {
       .rejects.toThrow("OAUTH_SOURCE_CURSOR_INVALID");
   });
 
-  it("refuses a Google Drive page token that is a smuggled URL, without making the request", async () => {
-    const fetcher = vi.fn(async () => Response.json({ files: [] })) as unknown as typeof fetch;
-    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "access", cursor: METADATA, fetcher }))
-      .rejects.toThrow("OAUTH_SOURCE_CURSOR_INVALID");
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-
   it("refuses a Dropbox cursor that is a smuggled URL, without making the request", async () => {
     const fetcher = vi.fn(async () => Response.json({ entries: [], has_more: false })) as unknown as typeof fetch;
     await expect(listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: METADATA, fetcher }))
@@ -128,17 +85,17 @@ describe("connector egress policy", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("keeps a legitimate opaque token in the parameter it belongs in, never in the destination", async () => {
-    const drive = vi.fn(async () => Response.json({ files: [] })) as unknown as typeof fetch;
-    await listOAuthSourcePage({ provider: "google_drive", accessToken: "access", cursor: "~!!~AI9FV7QoPage2", fetcher: drive });
-    const url = new URL(String((drive as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]));
-    expect(url.origin).toBe("https://www.googleapis.com");
-    expect(url.searchParams.get("pageToken")).toBe("~!!~AI9FV7QoPage2");
+  it("keeps a legitimate opaque token in the body it belongs in, never in the destination", async () => {
+    const dropbox = vi.fn(async () => Response.json({ entries: [], cursor: "next", has_more: false })) as unknown as typeof fetch;
+    await listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: "~!!~AI9FV7QoPage2", fetcher: dropbox });
+    const [url, init] = (dropbox as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(new URL(String(url)).origin).toBe("https://api.dropboxapi.com");
+    expect(JSON.parse(String(init.body))).toEqual({ cursor: "~!!~AI9FV7QoPage2" });
   });
 
   it("refuses a redirect off the provider origin instead of following it", async () => {
     const fetcher = vi.fn(async () => new Response(null, { status: 302, headers: { location: METADATA } })) as unknown as typeof fetch;
-    await expect(listOAuthSourcePage({ provider: "google_drive", accessToken: "access", cursor: null, fetcher }))
+    await expect(listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: null, fetcher }))
       .rejects.toThrow(/OAUTH_SOURCE_EGRESS_REFUSED/);
     // One hop attempted, and the metadata address was never requested.
     expect((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);

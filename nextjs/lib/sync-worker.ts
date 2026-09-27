@@ -126,6 +126,19 @@ export async function runSourceImportBatch(
     return { ok: false, code: binding.code };
   }
 
+  // The provider comes from the stored connection, never from the job. A reader bound to one
+  // provider must not run on another provider's credential, and Google is readable only through
+  // the change-feed reader: its legacy files listing hides trashed files instead of reporting a
+  // tombstone. Refused before any credential is read, so a mismatched job never holds a token.
+  const lifecycleReader = job.payload.sourceReaderVersion === "google-lifecycle-v2";
+  if ((binding.provider === "google_drive") !== lifecycleReader) {
+    await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+      outcome: "failed",
+      errorCode: "SOURCE_READER_PROVIDER_MISMATCH",
+    });
+    return { ok: false, code: "SOURCE_READER_PROVIDER_MISMATCH" };
+  }
+
   const runtime = readOAuthProviderRuntime(binding.provider);
   const broker = readOAuthSecretBrokerConfig();
   const signer = readR2SignerEnv();
@@ -191,10 +204,8 @@ export async function runSourceImportBatch(
   let page: { items: OAuthSourceItem[]; cursor: string | null; complete: boolean };
   try {
     page = await loadConnectorSyncPage(job, workerId, resume.providerCursor, resume.pageOffset, () => {
-      if (job.payload.sourceReaderVersion === "google-lifecycle-v2") {
-        if (binding.provider !== "google_drive" || target.rootPath || target.siteId) {
-          throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
-        }
+      if (lifecycleReader) {
+        if (target.rootPath || target.siteId) throw new Error("OAUTH_SOURCE_TARGET_UNSUPPORTED");
         return listGoogleDriveLifecyclePage({ accessToken, cursor: resume.providerCursor,
           driveId: target.driveId, fetcher });
       }
