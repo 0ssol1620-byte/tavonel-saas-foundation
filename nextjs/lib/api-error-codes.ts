@@ -257,6 +257,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "SOURCE_NOT_QUALIFIED", meaning: "A connected source did not qualify for compilation.", whatToDo: "Check the source's format against `GET /capabilities`." },
       { code: "SOURCE_REVOKED", meaning: "The source's connection was revoked; its bytes are no longer reachable.", whatToDo: "Reconnect the source, or drop it from the set." },
       { code: "SOURCE_TOMBSTONED", meaning: "The source was deleted at origin and is recorded as gone rather than silently omitted.", whatToDo: "Remove it from the compile set." },
+      { code: "SOURCE_DELETED", status: 409, meaning: "The uploaded source has a deletion tombstone, so its bytes cannot be admitted or served again.", whatToDo: "Choose a different source; a deleted upload cannot be restored through this request." },
       { code: "TRIAL_FILE_TOO_LARGE", status: 413, meaning: "Above the free-evaluation per-file bound, which is lower than the deployment ceiling.", whatToDo: "The body carries `maxBytes`. Split the file, or move to a paid plan." },
       { code: "TRIAL_ARCHIVE_NOT_INCLUDED", status: 402, meaning: "ZIP upload is not included in the free evaluation.", whatToDo: "Upload the files individually, or move to a paid plan." },
       { code: "TRIAL_FILE_LIMIT_EXCEEDED", meaning: "The free evaluation's file count is spent.", whatToDo: "Move to a paid plan." },
@@ -446,6 +447,23 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
     ],
   },
   {
+    title: "Source export and deletion",
+    summary: "`/api/documents/{id}/lifecycle`: what a workspace manager is told when exporting or deleting an uploaded source.",
+    codes: [
+      { code: "CUSTOMER_SOURCE_DELETE_SESSION_REQUIRED", status: 403, meaning: "Deleting a source needs a signed-in person; an API key cannot delete.", whatToDo: "Sign in as a workspace owner or admin and retry from the workspace." },
+      { code: "WORKSPACE_MANAGER_REQUIRED", status: 403, meaning: "Only a workspace owner or admin can plan or request a deletion.", whatToDo: "Ask an owner or admin of this workspace." },
+      { code: "DELETION_MODE_INVALID", status: 400, meaning: "`mode` was neither `dry_run` nor `execute`.", whatToDo: "Send `dry_run` first, then `execute` with the plan's digest." },
+      { code: "CUSTOMER_SOURCE_NOT_AN_UPLOAD", status: 400, meaning: "The id is not an uploaded source, so this route cannot delete it. Connected sources are deleted at their origin.", whatToDo: "Delete the file in the connected provider." },
+      { code: "CONFIRM_MANIFEST_REQUIRED", status: 400, meaning: "`execute` must echo the `manifestSha256` of the dry-run plan.", whatToDo: "Run `dry_run`, then send its `manifestSha256` as `confirmManifestSha256`." },
+      { code: "CUSTOMER_SOURCE_MANIFEST_CHANGED", status: 409, meaning: "The stored objects changed since the plan you confirmed, so nothing was deleted. The body carries the new plan.", whatToDo: "Review the new plan and confirm its digest." },
+      { code: "CUSTOMER_SOURCE_DELETE_FORBIDDEN", status: 403, meaning: "The database re-checked membership and the caller is not an active owner or admin of this workspace.", whatToDo: "Ask an owner or admin of this workspace." },
+      { code: "CUSTOMER_SOURCE_CONNECTOR_BOUND", status: 409, meaning: "The document came from a connected provider; deleting it here would be undone by the next sync.", whatToDo: "Delete the file in the provider." },
+      { code: "SOURCE_LEGAL_HOLD_ACTIVE", status: 409, meaning: "A legal hold covers this workspace, so no source in it can be deleted.", whatToDo: "The hold has to be released first; contact your administrator or TAVONEL." },
+      { code: "SOURCE_LEGAL_HOLD_STATE_UNKNOWN", status: 409, meaning: "The workspace's legal-hold state could not be read, so deletion is refused rather than assumed safe.", whatToDo: "Contact TAVONEL; this is a configuration problem, not something a retry fixes." },
+      { code: "CUSTOMER_SOURCE_DELETE_STORE_FAILED", status: 503, meaning: "The deletion ledger could not be read or written. Nothing was recorded.", whatToDo: "Retry; a retry of a recorded request replays the same receipt." },
+    ],
+  },
+  {
     title: "Generic",
     summary: "Codes that are deliberately vague, and what that vagueness means.",
     codes: [
@@ -513,6 +531,9 @@ export const API_RESULT_CODES: readonly string[] = [
   "UPLOAD_CONFIRMED",
   "UPLOAD_ALREADY_STORED",
   "ONE_SHOT_QUALIFICATION_ALLOWED",
+  "DELETION_RECORDED",
+  "CUSTOMER_SOURCE_DELETION_ALREADY_RECORDED",
+  "CUSTOMER_SOURCE_DELETION_SCHEDULED",
 ];
 
 /**

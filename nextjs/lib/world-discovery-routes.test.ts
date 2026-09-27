@@ -43,6 +43,12 @@ vi.mock("@/lib/world-store", async (importOriginal) => ({
   getFoundationActiveWorld: activeWorld,
 }));
 vi.mock("@/lib/world-read-model", () => ({ loadWorldReadModel: readModel }));
+const { worldSourceIds, sourceAccess } = vi.hoisted(() => ({
+  worldSourceIds: vi.fn(async () => ({ ok: true, documentIds: ["doc-1"] })),
+  sourceAccess: vi.fn(async (): Promise<{ ok: boolean; code?: string }> => ({ ok: true })),
+}));
+vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: worldSourceIds }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 vi.mock("@/lib/foundation-pilot", () => ({ foundationPilotAccess: pilot, getRequestUser: vi.fn() }));
 vi.mock("@/lib/retrieval-index-status", () => ({
   ensureRetrievalIndexForActiveWorld: ensureIndex,
@@ -271,6 +277,14 @@ describe("POST /v1/collections/{id}/retrieval-index", () => {
     const response = await recompileIndex(post(), { params });
     expect(response.status).toBe(403);
     expect((await response.json()).code).toBe("PILOT_ACCESS_REQUIRED");
+    expect(ensureIndex).not.toHaveBeenCalled();
+  });
+
+  it("refuses to rebuild from a World whose source was deleted or suspended", async () => {
+    sourceAccess.mockResolvedValueOnce({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const response = await recompileIndex(post(), { params });
+    expect(response.status).toBe(403);
+    expect(sourceAccess).toHaveBeenCalledWith(WORKSPACE, ["doc-1"]);
     expect(ensureIndex).not.toHaveBeenCalled();
   });
 

@@ -31,7 +31,11 @@ async function runInventory(request: Request) {
           processed: result.processed,
           ...("artifactCount" in result ? { artifactCount: result.artifactCount } : {}),
         }
-      : { code: result.code, processed: 0 },
+      : {
+          code: result.code,
+          processed: 0,
+          ...(result.deletionId ? { deletionId: result.deletionId, failureRecorded: result.failureRecorded } : {}),
+        },
     { status: result.ok ? 200 : 503, headers: HEADERS },
   );
 }

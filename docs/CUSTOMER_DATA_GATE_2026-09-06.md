@@ -51,8 +51,8 @@ exists, with a named hole), or **MISSING** (no implementation in this repository
 | 7 | `archive_bomb_limits_enforced` | EXISTS | `nextjs/lib/archive-expand.ts`: `MAX_FILES` 128, `MAX_EXPANDED_BYTES` 500 MiB, decompression ratio ceiling 100, plus traversal, encryption and nested-archive refusals. Tested in `nextjs/lib/archive-expand.test.ts`. |
 | 8 | `compile_receipts_signed_and_audited` | MISSING | Ed25519 signing exists but only for the trust export (`nextjs/lib/export-signing.ts`, `app/api/export/trust/route.ts`). `CompileReceipt` is not signed, and no compile path writes an audit event: neither `nextjs/lib/compile-job-store.ts` nor `nextjs/lib/collection-compile-run.ts` references either audit table. |
 | 9 | `deletion_tombstone_propagation_verified` | MISSING | `nextjs/lib/connector-oauth-adapters.ts:80` lists Google Drive with `q=trashed = false`, so a trashed file leaves the listing with **no** downstream signal, while the Dropbox and Microsoft Graph adapters emit `kind: "deleted"` (`:114`, `:154`). No tombstone table, no propagation test. Blueprint §15.2 names this as a stale-knowledge failure. **RESOLVED B-7: not an acceptable production limitation — connector qualification is `BLOCKED` until tombstone, delete, permission-change and move/rename semantics are implemented and verified; no connector is `VERIFIED` before then (P2).** |
-| 10 | `retention_controls_configured` | PARTIAL | `enterprise_governance_policies` stores `retention_days`, `deleted_object_grace_days` and `audit_retention_days` (`0014:88-90`), applied through `apply_enterprise_governance_policy` and read by `nextjs/lib/enterprise-store.ts:122`. **Configuration only — no sweeper, no job, nothing deletes on schedule.** A retention sweeper that deletes wrongly is itself a stop-the-line event, so it needs a canary, not a checkbox. |
-| 11 | `data_export_and_delete_available` | MISSING | `/api/export/trust` exports a signed trust record and `/api/enterprise/audit/export` exports audit events. Neither exports customer sources. The only `DELETE` handlers in `nextjs/app/api/**` are for connections and developer API keys; customer-initiated source deletion is an "on request" process, not a self-service route. |
+| 10 | `retention_controls_configured` | PARTIAL | `enterprise_governance_policies` stores `retention_days`, `deleted_object_grace_days` and `audit_retention_days` (`0014:88-90`), applied through `apply_enterprise_governance_policy` and read by `nextjs/lib/enterprise-store.ts:122`. **Configuration only — no sweeper, no job, nothing deletes on schedule.** A retention sweeper that deletes wrongly is itself a stop-the-line event, so it needs a canary, not a checkbox. **Updated 2026-09-27 (§10): a guarded worker exists but is not scheduled or proven live.** |
+| 11 | `data_export_and_delete_available` | MISSING | `/api/export/trust` exports a signed trust record and `/api/enterprise/audit/export` exports audit events. Neither exports customer sources. The only `DELETE` handlers in `nextjs/app/api/**` are for connections and developer API keys; customer-initiated source deletion is an "on request" process, not a self-service route. **Updated 2026-09-27 (§10): PARTIAL — source inventory and deletion paths exist, but physical erasure of derived artifacts and live proof do not.** |
 | 12 | `audit_log_active` | PARTIAL | Two tables exist. `foundation_developer_audit_events` (`0012`) is written by `nextjs/lib/developer-store.ts:77` and `nextjs/lib/connector-oauth-store.ts:50`. `enterprise_audit_events` (`0014`) is written by `record_enterprise_audit_event` and read by `nextjs/lib/enterprise-store.ts:142`. Neither records a document read, a compile, or (before this lane) a gate decision. |
 | 13 | `least_privilege_connector_scopes_verified` | PARTIAL | Scopes are declared in code and published rather than discovered at the consent screen: `nextjs/lib/connector-oauth.ts:42,48,54`, exported as `OAUTH_CONNECTOR_SCOPES`. Google is `drive.readonly`. **Microsoft asks for `Files.Read.All` and `Sites.Read.All`, which is tenant-wide read**, not least privilege for one workspace. |
 | 14 | `per_provider_isolation_verified` | MISSING | Per-connection secret envelopes exist, but nothing tests that one provider's credential or content cannot reach another provider's code path. |
@@ -387,3 +387,38 @@ Not changed: `activationPolicy.customerData` stays `false`; no flag, secret, sco
 touched. The founder test reset deletes snapshots by `source_versions` membership, not by the new
 `workspace_key`; a snapshot whose version is only in `connector_document_bindings` survives a reset
 as an orphan that can admit nothing (the admission query starts from the binding).
+
+---
+
+## 10. Rows 10 and 11, 2026-09-27 — guarded source deletion prototype
+
+Migration `20260927102000_customer_source_deletion.sql` extends the existing connector tombstone,
+inventory attestation, and object-purge chain to uploaded sources. It adds customer-requested and
+retention-expired reasons, requires owner/admin membership and workspace-bound admission, rechecks
+legal hold under the deletion lock, and blocks re-upload with the same document ID after a tombstone.
+An operator-only legal-hold table permits a self-service workspace without an enterprise governance
+policy to distinguish a known inactive hold from an unknown state. Unknown or active holds still deny.
+
+`/api/documents/[id]/lifecycle` exposes a workspace-scoped export inventory, an audited dry run,
+and an execute request that must repeat the inventory digest. It returns an evolving deletion
+receipt. A `purged` receipt covers only the document's own attested R2 objects. The route signs
+the receipt with the export key when configured and reports an absent signer explicitly. The
+attestation worker records per-item failures so one blocked tombstone does not silently complete
+or halt the entire queue. Serving, compile, collection, retrieval-index, and Ask paths are denied
+for a tombstoned source; deleted documents are omitted from the document list.
+
+The retention worker is POST-only. A single-workspace execute requires the digest from dry run;
+fleet execution additionally requires `FOUNDATION_RETENTION_FLEET_ARMED=true`. There is no cron
+entry or production arm. Focused local Vitest checks passed 241 tests across seven files, and the
+Next.js type/lint check passed. The migration and 53-assertion pgTAP file still need a successful
+PostgreSQL rehearsal and a real synthetic canary through the complete deletion chain.
+
+**Rows 10 and 11 remain PARTIAL.** Derived collection artifacts, retrieval units, and cached
+answers are denied at serving but are not physically erased. A previously issued progress URL
+can remain valid for its 120-second lifetime. Connector deletion in self-service workspaces still
+lacks a grace-period source. Purge-stage failures lack a dedicated append-only failure record.
+No production R2 deletion receipt exists. The 2026-09-27 local check passed 5,324 Vitest cases,
+the type/lint check, and the Next.js production build after preserving ACL admission in the
+later deletion migration; CI database rehearsal and an independent review remain outstanding.
+These gaps must be closed or explicitly bounded before
+customer-data activation; this code does not change `activationPolicy.customerData`.

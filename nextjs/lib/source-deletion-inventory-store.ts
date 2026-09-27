@@ -2,7 +2,8 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
 import type { SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
-const SOURCE_ID = /^src-[a-f0-9]{64}$/;
+// Connector sources are `src-<sha256 hex>`; upload tombstones (20260927102000) use the document uuid.
+const SOURCE_ID = /^(src-[a-f0-9]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const WORKSPACE = /^[A-Za-z0-9_-]{1,80}$/;
 const DOCUMENT = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -83,6 +84,19 @@ export async function readSourceDeletionInventoryCandidate(): Promise<
   return parsed
     ? { ok: true, candidate: parsed }
     : { ok: false, code: "SOURCE_INVENTORY_CANDIDATE_INVALID" };
+}
+
+/** Append-only; moves this tombstone behind every other candidate until they have been tried. */
+export async function recordSourceDeletionInventoryFailure(deletionId: string, code: string): Promise<
+  { ok: true } | { ok: false; code: string }
+> {
+  if (!SHA256.test(deletionId) || !/^[A-Z0-9_]{1,80}$/.test(code)) {
+    return { ok: false, code: "SOURCE_INVENTORY_FAILURE_INVALID" };
+  }
+  const result = await rpc("record_source_deletion_worker_failure", {
+    p_deletion_id: deletionId, p_stage: "inventory", p_code: code,
+  });
+  return result.ok ? { ok: true } : result;
 }
 
 export async function recordSourceDeletionInventoryAttestation(

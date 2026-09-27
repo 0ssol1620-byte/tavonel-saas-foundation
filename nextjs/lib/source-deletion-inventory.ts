@@ -12,6 +12,8 @@ import {
 import {
   readSourceDeletionInventoryCandidate,
   recordSourceDeletionInventoryAttestation,
+  recordSourceDeletionInventoryFailure,
+  type SourceDeletionInventoryCandidate,
 } from "./source-deletion-inventory-store";
 
 export type SourceDeletionInventoryRun =
@@ -23,9 +25,10 @@ export type SourceDeletionInventoryRun =
       artifactCount: number;
       status: "recorded" | "replayed";
     }
-  | { ok: false; code: string; processed: 0 };
+  | { ok: false; code: string; processed: 0; deletionId?: string; failureRecorded?: boolean };
 
 type Dependencies = {
+  recordFailure?: typeof recordSourceDeletionInventoryFailure;
   signer?: R2SignerEnv | null;
   list?: typeof listFoundationSourceInventory;
   hash?: typeof hashFoundationSourceInventoryObject;
@@ -45,11 +48,29 @@ export async function runSourceDeletionInventoryAttestation(
   const hash = dependencies.hash ?? hashFoundationSourceInventoryObject;
   const attest = dependencies.attest ?? recordSourceDeletionInventoryAttestation;
 
+  const recordFailure = dependencies.recordFailure ?? recordSourceDeletionInventoryFailure;
+
   const candidateResult = await readCandidate();
   if (!candidateResult.ok) return { ok: false, code: candidateResult.code, processed: 0 };
   const candidate = candidateResult.candidate;
   if (!candidate) return { ok: true, code: "IDLE", processed: 0 };
 
+  const result = await attestCandidate(candidate, signer, listed, hash, attest);
+  if (result.ok) return result;
+  // Every failure after a candidate was chosen is recorded against that tombstone, which moves it
+  // behind every other candidate: one deletion that cannot be attested no longer stalls the rest,
+  // and it is retried on the next rotation rather than skipped.
+  const recorded = await recordFailure(candidate.deletionId, result.code);
+  return { ...result, deletionId: candidate.deletionId, failureRecorded: recorded.ok };
+}
+
+async function attestCandidate(
+  candidate: SourceDeletionInventoryCandidate,
+  signer: R2SignerEnv,
+  listed: typeof listFoundationSourceInventory,
+  hash: typeof hashFoundationSourceInventoryObject,
+  attest: typeof recordSourceDeletionInventoryAttestation,
+): Promise<SourceDeletionInventoryRun> {
   const before = await listed(signer, candidate.workspaceKey, candidate.documentIds);
   if (!before.ok) return { ok: false, code: before.code, processed: 0 };
 

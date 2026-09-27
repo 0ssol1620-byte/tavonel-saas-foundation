@@ -70,11 +70,47 @@ describe("source deletion inventory attestation", () => {
       candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId] },
     }));
     const attest = vi.fn();
+    const recordFailure = vi.fn(async () => ({ ok: true as const }));
 
     await expect(runSourceDeletionInventoryAttestation({
-      signer, list, readCandidate, attest,
-    })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_EMPTY_LISTING", processed: 0 });
+      signer, list, readCandidate, attest, recordFailure,
+    })).resolves.toEqual({ ok: false, code: "SOURCE_INVENTORY_EMPTY_LISTING", processed: 0,
+      deletionId, failureRecorded: true });
     expect(attest).not.toHaveBeenCalled();
+    expect(recordFailure).toHaveBeenCalledWith(deletionId, "SOURCE_INVENTORY_EMPTY_LISTING");
+  });
+
+  it("isolates a stuck tombstone: its failure is recorded so the next run takes the next one", async () => {
+    // Stand-in for source_deletion_inventory_candidate's order: least recently failed first.
+    const stuck = { deletionId, workspaceKey, sourceId, documentIds: [documentId] };
+    const other = { ...stuck, deletionId: `sha256:${"e".repeat(64)}`, documentIds: ["22222222-2222-4222-8222-222222222222"] };
+    const failures = new Map<string, number>();
+    const readCandidate = vi.fn(async () => ({
+      ok: true as const,
+      candidate: [stuck, other].sort((a, b) => (failures.get(a.deletionId) ?? 0) - (failures.get(b.deletionId) ?? 0))[0]!,
+    }));
+    const recordFailure = vi.fn(async (id: string) => {
+      failures.set(id, (failures.get(id) ?? 0) + 1);
+      return { ok: true as const };
+    });
+    const list = vi.fn(async (_s: unknown, _w: string, ids: readonly string[]) => ({
+      ok: true as const,
+      objects: ids[0] === documentId ? [] : [{ key: `quarantine/${workspaceKey}/${ids[0]}/source`, sizeBytes: 5 }],
+    }));
+    const hash = vi.fn(async (_s: unknown, _w: string, object: { key: string; sizeBytes: number }) => ({
+      ok: true as const, object: { ...object, sha256: `sha256:${"c".repeat(64)}` },
+    }));
+    const attest = vi.fn(async () => ({ ok: true as const,
+      attestation: { status: "recorded" as const, manifestSha256: `sha256:${"d".repeat(64)}`, artifactCount: 1 } }));
+    const deps = { signer, list, hash, readCandidate, attest, recordFailure };
+
+    expect(await runSourceDeletionInventoryAttestation(deps)).toMatchObject({ ok: false, deletionId });
+    expect(await runSourceDeletionInventoryAttestation(deps)).toMatchObject({ ok: true, code: "ATTESTED" });
+    expect(attest).toHaveBeenCalledWith(other.deletionId, expect.any(Array));
+    // The stuck one is still handed out again later: retried, never skipped or marked done.
+    failures.set(other.deletionId, 2);
+    expect(await runSourceDeletionInventoryAttestation(deps)).toMatchObject({ ok: false, deletionId });
+    expect(recordFailure).toHaveBeenCalledTimes(2);
   });
 
   it("refuses a prefix that changes while bytes are being hashed", async () => {
@@ -98,11 +134,12 @@ describe("source deletion inventory attestation", () => {
       candidate: { deletionId, workspaceKey, sourceId, documentIds: [documentId] },
     }));
     const attest = vi.fn();
+    const recordFailure = vi.fn(async () => ({ ok: false as const, code: "SOURCE_INVENTORY_STORE_FAILED" }));
 
     await expect(runSourceDeletionInventoryAttestation({
-      signer, list, hash, readCandidate, attest,
+      signer, list, hash, readCandidate, attest, recordFailure,
     })).resolves.toEqual({
-      ok: false, code: "SOURCE_INVENTORY_CHANGED_DURING_SCAN", processed: 0,
+      ok: false, code: "SOURCE_INVENTORY_CHANGED_DURING_SCAN", processed: 0, deletionId, failureRecorded: false,
     });
     expect(attest).not.toHaveBeenCalled();
   });
