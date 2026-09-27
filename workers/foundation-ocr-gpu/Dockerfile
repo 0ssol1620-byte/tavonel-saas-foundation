@@ -2,7 +2,9 @@
 # No OpenSSH, no port 22. Health and HMAC OCR listen on 8001.
 # Ubuntu 24.04 ships Python 3.12 so onnxruntime-gpu 1.20+ has wheels.
 # Cloud Build does not need a GPU.
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04@sha256:8aef630a54bc5c5146ae5ce68e6af5caa3df0fb690bb91544175c91f307e4356
+
+LABEL org.opencontainers.image.source="https://github.com/0ssol1620-byte/tavonel-saas-foundation"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
