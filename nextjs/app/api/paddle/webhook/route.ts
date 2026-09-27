@@ -44,6 +44,11 @@ export async function POST(request: Request) {
     const reason = typeof applied.result.reason === "string" ? applied.result.reason : "checkout_binding_rejected";
     const log = action.action === "purchase" || action.action === "allowance" ? console.error : console.warn;
     log("foundation_billing_event_quarantined", { eventType: action.eventType, action: action.action, reason });
+    if (action.action === "subscription" && reason === "checkout_binding_bootstrap_event_invalid") {
+      // A lifecycle notification may arrive before the completed transaction. Ask Paddle to
+      // redeliver after the bootstrap; the first refusal remains in the private review ledger.
+      return NextResponse.json({ code: "EVENT_DEPENDENCY_PENDING", eventId: action.eventId }, { status: 503, headers });
+    }
     return NextResponse.json({ code: "EVENT_QUARANTINED", eventId: action.eventId, reason }, { status: 200, headers });
   }
   /*

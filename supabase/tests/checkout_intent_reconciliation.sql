@@ -1,5 +1,5 @@
 begin;
-select plan(29);
+select plan(37);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -8,6 +8,16 @@ insert into auth.users (
   '00000000-0000-0000-0000-000000000000',
   '99999999-9999-4999-8999-999999999999',
   'authenticated', 'authenticated', 'checkout-intent@example.invalid', '$2a$10$fixture', now(),
+  '{"provider":"email","providers":["email"]}', '{}', now(), now()
+);
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  '00000000-0000-0000-0000-000000000000',
+  '77777777-7777-4777-8777-777777777777',
+  'authenticated', 'authenticated', 'checkout-skew@example.invalid', '$2a$10$fixture', now(),
   '{"provider":"email","providers":["email"]}', '{}', now(), now()
 );
 
@@ -244,6 +254,19 @@ do $$ begin perform public.issue_foundation_checkout_intent(
 ); end $$;
 select is(
   public.apply_foundation_billing_event_v6(
+    'evt_' || repeat('l', 26), 'subscription.canceled', now() + interval '3 minutes',
+    'sha256:' || repeat('d', 64), 'subscription',
+    'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
+    'observer_access', null, 'ctm_' || repeat('j', 26),
+    'sub_' || repeat('j', 26), 'canceled', null,
+    'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6', now(), 'checkout-v1',
+    'pri_' || repeat('j', 26), null
+  )->>'reason',
+  'checkout_binding_bootstrap_event_invalid',
+  'an early cancellation waits for the subscription binding'
+);
+select is(
+  public.apply_foundation_billing_event_v6(
     'evt_' || repeat('j', 26), 'subscription.created', now() + interval '1 minute',
     'sha256:' || repeat('a', 64), 'subscription',
     'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
@@ -278,6 +301,52 @@ select is(
   (select credit_balance from public.foundation_billing_accounts where workspace_key = 'pilot-orderj1'),
   2000,
   'out-of-order delivery grants one allowance'
+);
+select is(
+  public.apply_foundation_billing_event_v6(
+    'evt_' || repeat('l', 26), 'subscription.canceled', now() + interval '3 minutes',
+    'sha256:' || repeat('d', 64), 'subscription',
+    'pilot-orderj1', '88888888-8888-4888-8888-888888888888',
+    'observer_access', null, 'ctm_' || repeat('j', 26),
+    'sub_' || repeat('j', 26), 'canceled', null,
+    'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6', now(), 'checkout-v1',
+    'pri_' || repeat('j', 26), null
+  )->>'status',
+  'processed',
+  'redelivery of the early cancellation applies after bootstrap'
+);
+select ok(
+  (select resolved_at is not null from public.foundation_billing_event_rejections
+    where event_id = 'evt_' || repeat('l', 26)),
+  'the previously quarantined lifecycle event is marked resolved'
+);
+select is(
+  (select subscription_status from public.foundation_billing_accounts where workspace_key = 'pilot-orderj1'),
+  'canceled',
+  'the latest cancellation wins despite arrival order'
+);
+
+do $$ begin perform public.issue_foundation_checkout_intent(
+  'e7e7e7e7-e7e7-4e7e-8e7e-e7e7e7e7e7e7', 'pilot-skewk1', '77777777-7777-4777-8777-777777777777',
+  'observer_access', 'checkout-v1', 'pri_' || repeat('k', 26), 2000, now()
+); end $$;
+select is(
+  public.apply_foundation_billing_event_v6(
+    'evt_' || repeat('m', 26), 'transaction.completed', now() - interval '2 minutes',
+    'sha256:' || repeat('e', 64), 'allowance',
+    'pilot-skewk1', '77777777-7777-4777-8777-777777777777',
+    'observer_access', 'txn_' || repeat('m', 26), 'ctm_' || repeat('m', 26),
+    'sub_' || repeat('m', 26), null, null,
+    'e7e7e7e7-e7e7-4e7e-8e7e-e7e7e7e7e7e7', now(), 'checkout-v1',
+    'pri_' || repeat('k', 26), null
+  )->>'status',
+  'allowance_granted',
+  'a provider timestamp two minutes before the application clock remains within issuance skew'
+);
+select is(
+  (select credit_balance from public.foundation_billing_accounts where workspace_key = 'pilot-skewk1'),
+  2000,
+  'clock skew tolerance does not lose a paid allowance'
 );
 
 do $$ begin perform public.issue_foundation_checkout_intent(
@@ -314,9 +383,29 @@ select is(
 );
 
 select is(
+  public.apply_foundation_billing_event_v6(
+    'evt_' || repeat('a', 26), 'transaction.completed', now() + interval '2 hours',
+    'sha256:' || repeat('1', 64), 'allowance',
+    'pilot-intent9999', '99999999-9999-4999-8999-999999999999',
+    'observer_access', 'txn_' || repeat('a', 26), 'ctm_' || repeat('a', 26),
+    'sub_' || repeat('a', 26), null, null,
+    'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', now(), 'checkout-v1',
+    'pri_' || repeat('o', 26), null
+  )->>'status',
+  'duplicate',
+  'an already-applied payment remains duplicate after owner exemption'
+);
+select is(
+  (select count(*)::integer from public.foundation_billing_event_rejections
+    where event_id = 'evt_' || repeat('a', 26)),
+  0,
+  'a paid duplicate does not create a false unresolved rejection'
+);
+
+select is(
   (select count(*)::integer from public.foundation_billing_event_rejections),
-  6,
-  'every refusal is one durable row, redeliveries included once'
+  7,
+  'every refusal is one durable row, including the resolved early cancellation'
 );
 
 select is(

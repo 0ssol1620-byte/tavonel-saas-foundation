@@ -62,6 +62,8 @@ create table public.foundation_billing_event_rejections (
   subscription_id text,
   price_id text,
   binding_nonce text,
+  resolved_at timestamptz,
+  resolution_status text,
   recorded_at timestamptz not null default now()
 );
 
@@ -196,12 +198,30 @@ declare
   credit integer;
   snapshot_price text;
   snapshot_credit integer;
+  projected jsonb;
+  previously_applied public.foundation_billing_events%rowtype;
 begin
   if p_action = 'reversal' then
     return public.apply_foundation_billing_event_v4(
       p_event_id, p_event_type, p_occurred_at, p_payload_sha256, p_action,
       null, null, null, p_transaction_id, null, null, null, 0, p_adjustment_id
     );
+  end if;
+
+  -- A redelivery of an already-applied event must remain a duplicate even if an owner grant or
+  -- configured price changed meanwhile. Keep this under the same event lock as the projection.
+  perform pg_advisory_xact_lock(hashtextextended('foundation-billing-event:' || p_event_id, 0));
+  select * into previously_applied
+    from public.foundation_billing_events where event_id = p_event_id for update;
+  if found then
+    if previously_applied.payload_sha256 <> p_payload_sha256
+      or previously_applied.action <> p_action then
+      raise exception 'foundation_billing_event_id_conflict';
+    end if;
+    update public.foundation_billing_event_rejections
+      set resolved_at = now(), resolution_status = 'duplicate'
+      where event_id = p_event_id and resolved_at is null;
+    return jsonb_build_object('status', 'duplicate', 'eventId', p_event_id);
   end if;
 
   if p_action not in ('purchase', 'allowance', 'subscription')
@@ -290,7 +310,8 @@ begin
         or intent.policy_version <> p_binding_policy_version
         or intent.issued_at <> p_binding_issued_at then
         reason := 'checkout_intent_mismatch';
-      elsif p_occurred_at < intent.issued_at or p_occurred_at > intent.expires_at then
+      elsif p_occurred_at < intent.issued_at - interval '5 minutes'
+        or p_occurred_at > intent.expires_at then
         reason := 'checkout_intent_expired';
       elsif p_price_id is distinct from intent.price_id then
         reason := 'checkout_price_not_allowed';
@@ -344,13 +365,17 @@ begin
     );
   end if;
 
-  return public.apply_foundation_billing_event_v4(
+  projected := public.apply_foundation_billing_event_v4(
     p_event_id, p_event_type, p_occurred_at, p_payload_sha256, p_action,
     p_workspace_key, p_user_id, p_offer_code, p_transaction_id, p_customer_id,
     p_subscription_id, p_subscription_status,
     case when p_action in ('purchase', 'allowance') then credit else 0 end,
     p_adjustment_id
   );
+  update public.foundation_billing_event_rejections
+    set resolved_at = now(), resolution_status = projected->>'status'
+    where event_id = p_event_id and resolved_at is null;
+  return projected;
 end;
 $$;
 
