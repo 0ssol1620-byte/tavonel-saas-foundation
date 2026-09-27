@@ -57,7 +57,7 @@ exists, with a named hole), or **MISSING** (no implementation in this repository
 | 13 | `least_privilege_connector_scopes_verified` | PARTIAL | Scopes are declared in code and published rather than discovered at the consent screen: `nextjs/lib/connector-oauth.ts:42,48,54`, exported as `OAUTH_CONNECTOR_SCOPES`. Google is `drive.readonly`. **Microsoft asks for `Files.Read.All` and `Sites.Read.All`, which is tenant-wide read**, not least privilege for one workspace. |
 | 14 | `per_provider_isolation_verified` | MISSING | Per-connection secret envelopes exist, but nothing tests that one provider's credential or content cannot reach another provider's code path. |
 | 15 | `dpa_and_privacy_notice_published` | PARTIAL | `/privacy`, `/terms` and `/subprocessors` are published. No data processing agreement exists anywhere in the repository. `nextjs/app/subprocessors/page.tsx:13-19` lists Supabase, Vercel, Cloudflare, RunPod, Paddle and Google — **not Dropbox and not Microsoft**, although live connector code exists for both. RESOLVED A-5 settles that omission: source providers are not subprocessors, and neither is added until the production customer-data architecture delegates processing to them and legal review confirms. The DPA itself stays open until legal (RESOLVED B-10). |
-| 16 | `per_source_acl_preserved` | MISSING | This lane defines `shared/aclSnapshot.ts` and `public.source_acl_snapshots`. No connector captures an ACL at ingestion, and no retrieval path filters by one — `nextjs/lib/retrieval-store.ts` and `nextjs/lib/retrieval-pipeline.ts` filter by tenant and workspace only. Storage is not enforcement. |
+| 16 | `per_source_acl_preserved` | MISSING | This lane defines `shared/aclSnapshot.ts` and `public.source_acl_snapshots`. No connector captures an ACL at ingestion, and no retrieval path filters by one — `nextjs/lib/retrieval-store.ts` and `nextjs/lib/retrieval-pipeline.ts` filter by tenant and workspace only. Storage is not enforcement. **Updated 2026-09-27 (§9): PARTIAL — default-deny serving enforcement exists; capture and viewer identity do not.** |
 | 17 | `founder_approval_receipt_recorded` | MISSING by design | No receipt exists. Recording one is not an agent's act, in this campaign or any other. |
 
 Two rows EXIST (4, 7), eight are PARTIAL (1, 3, 5, 6, 10, 12, 13, 15) and seven are MISSING
@@ -311,3 +311,79 @@ test.
 **Row 13, restated as a separate blocker.** Microsoft still requests `Files.Read.All` +
 `Sites.Read.All` (tenant-wide read). Scopes were deliberately not changed here; narrowing them
 remains P2.
+
+---
+
+## 9. Row 16 update, 2026-09-27 — enforcement without capture
+
+Appended, not struck: §2 row 16 above keeps its
+original text and carries a one-line pointer here.
+
+**Status: PARTIAL.** The serving side is enforced and fails closed. The capture side and the viewer
+identity it needs do not exist, and neither was faked.
+
+### What exists
+
+`supabase/migrations/20260927101000_source_acl_admission.sql`:
+
+- `source_acl_snapshots` gains a `workspace_key` (NOT NULL, same pattern as every other workspace key).
+- A `before insert` trigger (`guard_source_acl_snapshot`) refuses a snapshot unless a
+  `connector_document_bindings` row exists for the same `source_version_id`, `workspace_key` **and**
+  provider (`SOURCE_ACL_SNAPSHOT_UNBOUND`), and refuses one captured in the future
+  (`SOURCE_ACL_SNAPSHOT_FUTURE`). A trigger and not a foreign key, because the founder test reset
+  deletes bindings before snapshots.
+- `source_version_acl_admits(workspace, source_version, provider, viewer_principals)` — service-role
+  only. Admits only when the newest snapshot for that exact version, in that workspace, from that
+  provider, captured within the last 24 hours, grants `read`/`write`/`owner` to one of the viewer's
+  principals by exact `(kind, principalId)`. If several snapshots share the newest instant, all must
+  admit. Missing, stale, superseded, cross-workspace, cross-provider or other-version snapshots admit
+  nobody. No containment (`anyone`/`domain`/`group` do not cover a user) — the §3 ceiling, unchanged.
+- `connector_documents_blocked` — the RPC behind `checkConnectorSourceAccess`, which already guards
+  document source/candidates/progress/list, collection read/ask/download/promote, retrieval, compile
+  and World reads — keeps every previous denial and adds
+  `or not source_version_acl_admits(..., '[]'::jsonb)`.
+
+Version binding follows from identity: a connector document id is derived from
+(workspace, connection, native id, revision), and each binding maps it to exactly one
+`source_version_id`, so a new provider revision is a new document that needs its own snapshot.
+
+**Consequence: every connector-bound document is denied at serving.** Documents with no connector
+binding (direct uploads) are not affected. Connector intake already requires a verified
+customer-data gate decision, which requires this row, so no workspace loses access that the gate
+ever granted.
+
+Tests: `supabase/tests/source_acl_admission.sql` (pgTAP, 17 assertions — write-time binding, missing /
+stale / superseded / cross-scope denial, overlay denial, privileges) and
+`nextjs/lib/source-acl-admission-migration.test.ts` (text contract, including a tripwire that no
+application module writes `source_acl_snapshots`). The 2026-09-27 integration check ran the five migration contract tests and the pgTAP fixture parser;
+the pgTAP file runs in `.github/workflows/db-rehearsal.yml`.
+
+### Blockers, exact
+
+1. **No viewer has a verified provider principal.** A TAVONEL member is a Supabase auth user. The
+   only provider identity on record is the account that authorised a connection
+   (`fetchOAuthProviderIdentity`, per connection), not per viewer. Matching a member's email string
+   to an ACL entry would be an unverified identity claim. Closing this needs each member to prove
+   their provider identity (an OAuth sign-in per member per provider) and a store for that link;
+   until then the overlay passes an empty principal set and nothing is admitted.
+2. **Dropbox — cannot capture with granted scopes.** The connector asks for `account_info.read`,
+   `files.metadata.read`, `files.content.read`. Reading file/folder members is a sharing API and
+   needs `sharing.read`, which is not requested. Adding it is a consent-screen change.
+3. **Google Drive — partial ACL only.** With `drive.readonly`, the file resource's `permissions`
+   field is populated only when the caller can share the file and is not populated for shared-drive
+   items (per Google's Drive v3 reference); group and domain grants cannot be expanded to members
+   without Admin SDK Directory scopes, which are not requested.
+4. **Microsoft Graph — partial ACL only.** Item permissions are listable under the existing
+   `Files.Read.All`, but group grants cannot be expanded without a group-membership scope, and
+   SharePoint inherited site permissions and organisation-scope sharing links do not map to named
+   principals. The existing scopes are already flagged as over-broad (row 13).
+
+Items 2–4 are from provider documentation, not from calls made in this change; no provider was
+contacted. A partial ACL is safe in the deny direction (an under-listed grant only denies), so
+Graph and Drive capture become worth building once item 1 exists — not before, since nothing could
+evaluate them.
+
+Not changed: `activationPolicy.customerData` stays `false`; no flag, secret, scope or deployment was
+touched. The founder test reset deletes snapshots by `source_versions` membership, not by the new
+`workspace_key`; a snapshot whose version is only in `connector_document_bindings` survives a reset
+as an orphan that can admit nothing (the admission query starts from the binding).
