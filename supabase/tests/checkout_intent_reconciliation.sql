@@ -1,5 +1,5 @@
 begin;
-select plan(39);
+select plan(43);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -466,6 +466,34 @@ select is(
   (select reason from public.foundation_billing_event_rejections where event_id = 'evt_' || repeat('z', 26)),
   'binding_invalid',
   'the unbound payment is reviewable by event id'
+);
+
+-- 20260927130000: the operator review read.
+select ok(
+  has_function_privilege('service_role', 'public.list_foundation_billing_event_rejections(integer)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.list_foundation_billing_event_rejections(integer)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.list_foundation_billing_event_rejections(integer)', 'EXECUTE'),
+  'the rejection review read is service-role only'
+);
+select is(
+  (public.list_foundation_billing_event_rejections(1000)->>'unresolvedTotal')::integer,
+  (select count(*)::integer from public.foundation_billing_event_rejections where resolved_at is null),
+  'the review counts every unresolved rejection'
+);
+select is(
+  jsonb_array_length(public.list_foundation_billing_event_rejections(1)->'rows'),
+  1,
+  'the review returns no more rows than asked'
+);
+select ok(
+  not exists (
+    select 1
+    from jsonb_array_elements(public.list_foundation_billing_event_rejections(50)->'rows') item
+    where item ?| array['userId', 'customerId', 'bindingNonce', 'payloadSha256', 'resolvedAt']
+       or (item->>'eventId') not in (
+         select event_id from public.foundation_billing_event_rejections where resolved_at is null)
+  ),
+  'the review returns only unresolved rows and no identity, customer, nonce or payload field'
 );
 
 select * from finish();
