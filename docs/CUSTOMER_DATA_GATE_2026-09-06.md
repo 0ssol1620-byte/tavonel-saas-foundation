@@ -437,6 +437,8 @@ creation time, retention policy and grace period. A changed candidate fails clos
 The production R2 bucket's `immutable/` prefix remains under a 365-day object lock. The founder
 test reset on 2026-09-23 hit `ObjectLockedByBucketPolicy`; it completed only after a temporary
 scoped change, and the broad lock was restored (`docs/evidence/production/TAVONEL_FOUNDER_TEST_RESET_2026-09-23.md`).
+The live Cloudflare bucket settings were read again at 2026-09-27 16:12 KST; the
+`Immutable 365 day lock` rule on `immutable/` was still enabled.
 Therefore the code's 30-day default grace is a scheduling value, not a verified 30-day physical
 purge. Storage lock, retention promises, and legal holds must be reconciled before activation.
 These gaps must be closed or explicitly bounded before
