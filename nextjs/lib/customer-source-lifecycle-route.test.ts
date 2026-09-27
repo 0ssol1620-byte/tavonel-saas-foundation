@@ -172,7 +172,7 @@ describe("customer source lifecycle route", () => {
     expect(rpcCalls("request_customer_source_deletion")).toEqual([]);
   });
 
-  it("returns a signed purge receipt once every attested object has its own receipt", async () => {
+  it("signs a source-object-only receipt once every attested object has its own receipt", async () => {
     const signPayload = vi.fn((bytes: Buffer) => ({ schemaVersion: "tavonel.export_signature.v1", signedBytes: bytes.length }));
     readExportSignerEnv.mockReturnValue({ signPayload });
     tombstone = status({ inventoryManifestSha256: sha("f"), artifactCount: 1, attestedAt: "2026-09-27T00:20:00Z",
@@ -180,8 +180,10 @@ describe("customer source lifecycle route", () => {
         receiptId: sha("2"), objectAlreadyAbsent: false }] });
     const response = await GET(new Request("https://tavonel.com/x"), params());
     const body = await response.json();
-    expect(body).toMatchObject({ code: "DELETION_RECORDED", deletion: { state: "purged" } });
-    expect(JSON.parse(body.receiptPayload)).toMatchObject({ state: "purged", completedAt: "2026-09-27T00:21:00Z",
+    expect(body).toMatchObject({ code: "DELETION_RECORDED", deletion: { state: "source_objects_purged" } });
+    expect(JSON.parse(body.receiptPayload)).toMatchObject({ state: "source_objects_purged",
+      scope: "document_r2_objects_only", derivedArtifactsRetained: true,
+      sourceObjectsPurgedAt: "2026-09-27T00:21:00Z",
       workspaceKey: "pilot-acme01", documentId: DOC });
     expect(signPayload.mock.calls[0]![0].toString("utf8")).toBe(body.receiptPayload);
   });

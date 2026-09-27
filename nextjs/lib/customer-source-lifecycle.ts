@@ -262,16 +262,15 @@ export async function runRetentionTombstones(limit: number, workspaceKey: string
 }
 
 /**
- * The customer-facing receipt. `purged` only when the complete R2 inventory was attested and
- * every object in it (and every ledger object enqueued beside it) carries an append-only purge
- * receipt; anything less is `scheduled` or `purging`, never a claim of deletion.
+ * The customer-facing receipt attests only the document's R2 source objects. Derived artifacts
+ * remain stored and are blocked at serving, so this must never claim full document deletion.
  */
 export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
   const attested = status.inventoryManifestSha256 !== null && status.artifactCount !== null;
   const purged = attested && status.objects.length >= status.artifactCount!
     && status.objects.every(object => object.receiptId !== null);
-  const state = !attested ? "scheduled" as const : purged ? "purged" as const : "purging" as const;
-  const completedAt = purged
+  const state = !attested ? "scheduled" as const : purged ? "source_objects_purged" as const : "purging" as const;
+  const sourceObjectsPurgedAt = purged
     ? status.objects.map(object => object.purgedAt!).sort().pop() ?? status.attestedAt
     : null;
   return {
@@ -279,6 +278,8 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
     payload: {
       schemaVersion: "tavonel.customer_source_deletion_receipt.v1" as const,
       state,
+      scope: "document_r2_objects_only" as const,
+      derivedArtifactsRetained: true,
       deletionId: status.deletionId,
       workspaceKey: status.workspaceKey,
       documentId: status.documentId,
@@ -291,7 +292,7 @@ export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
       artifactCount: status.artifactCount,
       objects: status.objects.map(({ objectKey, objectSha256, receiptId, objectAlreadyAbsent }) =>
         ({ objectKey, objectSha256, receiptId, objectAlreadyAbsent })),
-      completedAt,
+      sourceObjectsPurgedAt,
     },
   };
 }

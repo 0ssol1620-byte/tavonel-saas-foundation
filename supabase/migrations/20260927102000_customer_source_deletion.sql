@@ -162,6 +162,39 @@ begin
 end;
 $$;
 
+-- An enterprise assignment can change the effective hold state without updating the policy.
+-- Serialize INSERT/DELETE with an in-flight purge and never turn an active or unreadable
+-- enterprise hold into an inactive self-service state by deleting its assignment.
+create function public.guard_enterprise_workspace_source_hold_transition()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare v_workspace_key text;
+begin
+  v_workspace_key := case when tg_op = 'DELETE' then old.workspace_key else new.workspace_key end;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+    'tavonel.source_legal_hold.v1' || pg_catalog.chr(10) || v_workspace_key, 0));
+  if exists (
+    select 1 from public.source_deletion_objects
+     where workspace_key = v_workspace_key and purged_at is null
+       and (delete_started_at is not null or purge_claim_expires_at > pg_catalog.clock_timestamp())
+  ) then
+    raise exception 'SOURCE_DELETION_IN_PROGRESS';
+  end if;
+  if tg_op = 'DELETE' then
+    if public.source_legal_hold_state(v_workspace_key) <> 'inactive' then
+      raise exception 'SOURCE_LEGAL_HOLD_ACTIVE_OR_UNKNOWN';
+    end if;
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger enterprise_workspace_source_hold_transition
+  before insert or delete on public.enterprise_workspaces
+  for each row execute function public.guard_enterprise_workspace_source_hold_transition();
+revoke all on function public.guard_enterprise_workspace_source_hold_transition()
+  from public, anon, authenticated, service_role;
+
 -- ---------------------------------------------------------------------------------------------
 -- 1b. Serving deny: an upload tombstone blocks every read path at once
 -- ---------------------------------------------------------------------------------------------

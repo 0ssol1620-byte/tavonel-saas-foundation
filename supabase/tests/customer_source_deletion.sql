@@ -8,7 +8,7 @@
 --   pilot-c2c2c2c2c2c24c2c  owner c2, grace 0, hold ON
 --   c3 is a plain member of the first workspace.
 begin;
-select plan(53);
+select plan(55);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -80,6 +80,8 @@ select throws_ok($$select public.request_customer_source_deletion('pilot-c1c1c1c
 select throws_ok($$select public.request_customer_source_deletion('pilot-c2c2c2c2c2c24c2c',
   '0e000000-0000-4000-8000-00000000000c', 'c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2', 'sha256:' || repeat('a', 64))$$,
   'P0001', 'SOURCE_LEGAL_HOLD_ACTIVE', 'legal hold refuses the request');
+select throws_ok($$delete from public.enterprise_workspaces where workspace_key = 'pilot-c2c2c2c2c2c24c2c'$$,
+  'P0001', 'SOURCE_LEGAL_HOLD_ACTIVE_OR_UNKNOWN', 'enterprise assignment cannot be removed to evade an active hold');
 select is((select count(*)::integer from public.source_deletion_tombstones where document_id is not null), 0,
   'no refusal left a tombstone behind');
 
@@ -146,6 +148,8 @@ select is((select c->>'objectKey' from claimed),
   'quarantine/pilot-c1c1c1c1c1c14c1c/0e000000-0000-4000-8000-00000000000a/source', 'the sweeper claims the upload''s object');
 select is(public.begin_source_deletion_object((select c->>'deletionId' from claimed), (select c->>'objectKey' from claimed),
   (select c->>'objectSha256' from claimed), (select (c->>'claimId')::uuid from claimed))->>'status', 'started', 'delete intent is durable');
+select throws_ok($$delete from public.enterprise_workspaces where workspace_key = 'pilot-c1c1c1c1c1c14c1c'$$,
+  'P0001', 'SOURCE_DELETION_IN_PROGRESS', 'enterprise assignment cannot change while an object delete is in flight');
 select is(public.finalize_source_deletion_object((select c->>'deletionId' from claimed), (select c->>'objectKey' from claimed),
   (select c->>'objectSha256' from claimed), false, (select (c->>'claimId')::uuid from claimed))->>'status', 'recorded', 'the purge receipt is recorded');
 

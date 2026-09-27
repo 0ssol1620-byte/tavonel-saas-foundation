@@ -401,7 +401,8 @@ policy to distinguish a known inactive hold from an unknown state. Unknown or ac
 
 `/api/documents/[id]/lifecycle` exposes a workspace-scoped export inventory, an audited dry run,
 and an execute request that must repeat the inventory digest. It returns an evolving deletion
-receipt. A `purged` receipt covers only the document's own attested R2 objects. The route signs
+receipt. A `source_objects_purged` receipt covers only the document's own attested R2 objects and
+explicitly says derived artifacts remain. The route signs
 the receipt with the export key when configured and reports an absent signer explicitly. The
 attestation worker records per-item failures so one blocked tombstone does not silently complete
 or halt the entire queue. Serving, compile, collection, retrieval-index, and Ask paths are denied
@@ -419,6 +420,11 @@ can remain valid for its 120-second lifetime. Connector deletion in self-service
 lacks a grace-period source. Purge-stage failures lack a dedicated append-only failure record.
 No production R2 deletion receipt exists. The 2026-09-27 local check passed 5,324 Vitest cases,
 the type/lint check, and the Next.js production build after preserving ACL admission in the
-later deletion migration; CI database rehearsal and an independent review remain outstanding.
+later deletion migration; CI database rehearsal and a real canary remain outstanding.
+An Opus 5.5 code review then identified three defects: enterprise assignment changes could bypass
+the effective hold, the signed receipt overstated deletion scope, and rehearsal replay could restore
+old connector-only inventory functions. The follow-up adds a hold-transition trigger, makes the
+receipt say `source_objects_purged` with its limited scope, and removes superseded files from the
+replay pass. The follow-up still needs CI PostgreSQL rehearsal and a synthetic R2 canary.
 These gaps must be closed or explicitly bounded before
 customer-data activation; this code does not change `activationPolicy.customerData`.

@@ -70,13 +70,16 @@ describe("customer deletion receipt", () => {
     purgedAt: done ? `2026-09-27T01:0${key.length % 10}:00Z` : null, receiptId: done ? sha("2") : null,
     objectAlreadyAbsent: done ? false : null });
 
-  it("never says purged before the inventory is attested and every object has a purge receipt", () => {
-    expect(customerDeletionReceipt(base)).toMatchObject({ state: "scheduled", payload: { completedAt: null } });
+  it("attests only source-object purging after every object has a receipt", () => {
+    expect(customerDeletionReceipt(base)).toMatchObject({ state: "scheduled", payload: { sourceObjectsPurgedAt: null } });
     const attested = { ...base, inventoryManifestSha256: sha("m"), artifactCount: 2, attestedAt: "2026-09-27T00:20:00Z" };
     expect(customerDeletionReceipt({ ...attested, objects: [object("a", true), object("bb", false)] }).state).toBe("purging");
     expect(customerDeletionReceipt({ ...attested, objects: [object("a", true)] }).state).toBe("purging");
     const done = customerDeletionReceipt({ ...attested, objects: [object("a", true), object("bb", true)] });
-    expect(done).toMatchObject({ state: "purged", payload: { completedAt: "2026-09-27T01:02:00Z" } });
+    expect(done).toMatchObject({ state: "source_objects_purged", payload: {
+      scope: "document_r2_objects_only", derivedArtifactsRetained: true,
+      sourceObjectsPurgedAt: "2026-09-27T01:02:00Z",
+    } });
   });
 });
 
@@ -97,6 +100,21 @@ describe("customer source deletion migration", () => {
   it("preserves connector ACL admission when extending the shared serving deny", () => {
     expect(fn("connector_documents_blocked")).toMatch(/public\.source_version_acl_admits\(b\.workspace_key, b\.source_version_id, b\.provider, '\[\]'::jsonb\)/);
     expect(fn("connector_documents_blocked")).toMatch(/source_deletion_tombstones t/);
+  });
+
+  it("serializes enterprise hold scope changes with object deletion", () => {
+    const guard = fn("guard_enterprise_workspace_source_hold_transition");
+    expect(guard).toMatch(/tavonel\.source_legal_hold\.v1/);
+    expect(guard).toMatch(/SOURCE_DELETION_IN_PROGRESS/);
+    expect(guard).toMatch(/source_legal_hold_state\(v_workspace_key\)[\s\S]+SOURCE_LEGAL_HOLD_ACTIVE_OR_UNKNOWN/);
+    expect(sql).toMatch(/before insert or delete on public\.enterprise_workspaces/);
+  });
+
+  it("does not replay superseded inventory definitions after the upload migration", () => {
+    const rehearsal = readFileSync("../.github/workflows/db-rehearsal.yml", "utf8");
+    const replay = rehearsal.split("- name: Apply the repair migrations a second time and re-run the suite")[1] ?? "";
+    expect(replay).not.toMatch(/supabase\/migrations\/20260921110000_\*\.sql/);
+    expect(replay).not.toMatch(/supabase\/migrations\/20260921120000_\*\.sql/);
   });
 
   it("re-checks membership, ownership and legal hold under the hold lock before writing", () => {
