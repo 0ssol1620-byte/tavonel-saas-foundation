@@ -5,6 +5,7 @@ import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfi
 import { issueFoundationCheckoutIntent } from "@/lib/billing-store";
 import { readCommercialState } from "@/lib/commercial-state";
 import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "@/lib/checkout-policy";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { readPublicStatusV2 } from "@/lib/public-status";
 
@@ -60,6 +61,13 @@ export async function POST(request: Request) {
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
+  // A deployment-wide launch switch is not permission for this customer's sources. In live mode
+  // refuse payment before creating a durable checkout intent unless the same workspace receipt
+  // that intake and compilation require is current and valid. Sandbox qualification remains
+  // available without a customer-data receipt because it cannot charge a real card.
+  if (commercial.provider === "production" && !await canAdmitCustomerSource(membership.workspaceId)) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
+  }
   const customData = createCheckoutBinding(
     { userId: user.id, workspaceId: membership.workspaceId, offerCode: body.offerCode },
     secret,
