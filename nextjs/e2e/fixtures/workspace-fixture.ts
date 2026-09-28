@@ -93,7 +93,7 @@ export type WorkspaceRouteOptions = {
   documents?: unknown[];
   billing?: BillingAccountFixture | null;
   jobs?: unknown[];
-  accessSource?: "owner" | "paid" | "trial";
+  accessSource?: "owner" | "paid" | "trial" | "unentitled";
   customerDataEnabled?: boolean;
 };
 
@@ -102,10 +102,10 @@ export async function installWorkspaceRoutes(page: Page, options: WorkspaceRoute
   const { documents = [], billing = INACTIVE_BILLING, jobs = [], accessSource = "owner", customerDataEnabled = true } = options;
   await page.route("**/api/access/bootstrap", route => route.fulfill({
     json: {
-      code: "ACCESS_READY",
+      code: accessSource === "unentitled" ? "ACCESS_READY_NO_ENTITLEMENT" : "ACCESS_READY",
       access: {
         source: accessSource,
-        accessPlan: accessSource === "trial" ? "observer_access" : "studio_access",
+        accessPlan: accessSource === "unentitled" ? null : accessSource === "trial" ? "observer_access" : "studio_access",
         billingExempt: accessSource === "owner",
         expiresAt: accessSource === "trial" ? new Date(Date.now() + 7 * 86_400_000).toISOString() : null,
         limits: accessSource === "trial" ? { files: 3, pages: 80, worlds: 1 } : null,

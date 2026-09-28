@@ -271,7 +271,8 @@
   margin: 26px auto 0;
   text-align: center;
 }
-.lv2-hero [data-compiler-specimen] { margin-top: 16px; }
+.lv2-scene[data-scene="2"] [data-compiler-specimen] { margin-top: 16px; }
+.lv2-scene[data-scene="2"] [data-compiler-specimen] + .lv2-scene-head { margin-top: clamp(48px, 5vw, 72px); }
 .lv2-actions {
   display: flex;
   flex-wrap: wrap;

@@ -50,6 +50,7 @@ describe("workspace bootstrap source admission", () => {
     ["TRIAL_DEVICE_ALREADY_USED", 403],
     ["TRIAL_REVIEW_REQUIRED", 429],
     ["TRIAL_NOT_ACTIVE", 403],
+    ["TRIAL_DISABLED", 403],
   ])("allows sign-in without granting compute after %s", async (code, status) => {
     accessMode.mockReturnValue("self_service");
     bootstrap.mockResolvedValue({ ok: false, code, status });
@@ -67,5 +68,16 @@ describe("workspace bootstrap source admission", () => {
     bootstrap.mockResolvedValue({ ok: false, code: "TRIAL_RISK_GATE_NOT_CONFIGURED", status: 503 });
     const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
     expect(response.status).toBe(503);
+  });
+
+  it.each([
+    ["TRIAL_BOOTSTRAP_INVALID", 400],
+    ["TRIAL_UNKNOWN_RISK", 403],
+  ])("does not disguise invalid or unknown bootstrap errors as access-ready: %s", async (code, status) => {
+    accessMode.mockReturnValue("self_service");
+    bootstrap.mockResolvedValue({ ok: false, code, status });
+    const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
+    expect(response.status).toBe(status);
+    await expect(response.json()).resolves.toMatchObject({ code });
   });
 });

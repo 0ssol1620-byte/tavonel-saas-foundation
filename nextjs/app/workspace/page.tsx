@@ -254,7 +254,9 @@ export default function WorkspacePage() {
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
-    ? "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
+    ? accessSource === "unentitled"
+      ? "No compute access is active for this account. Review the current access options in Pricing."
+      : "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
     : "Source access could not be verified. Sign in again before choosing files.";
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
@@ -3025,21 +3027,29 @@ export default function WorkspacePage() {
           */}
           {tab === "connections" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>Source connections are part of Developer access.</h2>
-              <p>{accessSource === "trial"
+              <h2>{accessSource === null ? "Checking workspace access." : "Source connections are part of Developer access."}</h2>
+              <p>{accessSource === null
+                ? "The access check has not completed. Refresh if this message remains."
+                : accessSource === "trial"
                 ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
                 : "This account has no active compute access. Source connections require Developer access."}</p>
-              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+              <div className="billing-actions">{accessSource === null
+                ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <ConnectionsPanel />) : null}
 
           {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>API keys are part of Developer access.</h2>
-              <p>{accessSource === "trial"
+              <h2>{accessSource === null ? "Checking workspace access." : "API keys are part of Developer access."}</h2>
+              <p>{accessSource === null
+                ? "The access check has not completed. Refresh if this message remains."
+                : accessSource === "trial"
                 ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
                 : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
-              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+              <div className="billing-actions">{accessSource === null
+                ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}
 

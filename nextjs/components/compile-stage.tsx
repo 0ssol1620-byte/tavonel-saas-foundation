@@ -362,7 +362,9 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       data-tone={view.tone} data-visual={view.visual} data-framed={framed ? "true" : "false"}>
       <div className="compile-stage-status" role="status">
         <strong>{view.title}</strong>
-        <p>{hasVisual && view.tone === "active" ? "Observed content from this run, updated as sources are read." : view.detail}</p>
+        <p>{(view.visual === "page" || view.visual === "structure") && view.tone === "active"
+          ? "Observed content from this run, updated as sources are read."
+          : view.detail}</p>
       </div>
       {hasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
         style={canvasHeight ? { height: canvasHeight } : undefined} /> : null}

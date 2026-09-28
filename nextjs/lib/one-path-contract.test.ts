@@ -63,11 +63,9 @@ describe("approved one-path experience", () => {
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
   /*
-    2026-09-22, gap #1. The film is still the landing's overview and is still one component
-    mounted once -- what moved is which landmark it is in. The hero now carries the live Evidence
-    Inspector (`<HeroProof>`), and the film opens Scene 02, the "How it compiles" landmark whose
-    heading is the sentence it illustrates. The order below is read as positions, so it is the
-    assertion that had to move rather than a rule that had to be dropped.
+    The film opens under the centered hero message. Scene 02 follows with the source-linked
+    CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
+    this contract keeps the buyer's first-visit sequence explicit.
   */
   it("orders the landing as film, explanation, proof scene, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
@@ -79,8 +77,8 @@ describe("approved one-path experience", () => {
       "<HeroStatement",
       "<HeroActions",
       "<HeroFilm",
-      "<CompilerSpecimen",
       'id="s2"',
+      "<CompilerSpecimen",
       "<HeroProof",
       "<ProofScene",
       "<RecompileScene",

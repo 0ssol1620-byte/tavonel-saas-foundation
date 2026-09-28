@@ -22,14 +22,8 @@ test("filled navigation and hero actions keep readable labels", async ({ page })
 });
 
 /*
-  Gap #1, 2026-09-22: the film explains how it compiles, from Scene 02.
-
-  Both halves of this contract are unchanged and both are still asserted -- the scenes share one
-  measured outer edge with the wordmark, and the film fills that edge up to its readable cap. What
-  moved is which scene the film is in, so it is measured against Scene 02's wrap now, and the edge
-  assertion is made on BOTH wraps instead of on the hero's alone. That is a wider check than the
-  one it replaces, not a narrower one: a Scene 02 that had drifted off the shared edge was
-  invisible to the old version of this test.
+  The film sits under the centered opening statement in Scene 01. Both Scene 01 and the
+  source-linked explanation in Scene 02 keep the wordmark's measured outer edge.
 */
 for (const path of ["/", "/ko"]) {
   test(`${path} shares a measured outer edge and gives the film a readable width`, async ({ page }) => {

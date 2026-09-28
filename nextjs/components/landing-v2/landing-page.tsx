@@ -119,10 +119,7 @@ export default function LandingPage({
         <LandingAnalytics variant={experiment.tracked} />
 
         {/*
-          01 Hero -- one centered statement, then the product itself on the public sample World.
-
-          The four film cuts are the first visual. The source-linked specimen follows the film,
-          and the public sample inspector remains in Scene 02.
+          01 Hero -- one centered statement followed by the four-cut product film.
         */}
         <section
           id="s1"
@@ -152,25 +149,25 @@ export default function LandingPage({
               <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
             </p>
             <HeroFilm korean={korean} />
-            <div className="lv2-scene-head lv2-how-head">
-              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
-              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
-            </div>
-            <CompilerSpecimen korean={korean} />
           </div>
         </section>
 
         {/*
-          02 Public sample -- the Evidence Inspector over the committed World.
+          02 The source-linked specimen, then the Evidence Inspector over the committed World.
         */}
         <section
           id="s2"
           data-scene="2"
           tabIndex={-1}
-          aria-labelledby="lv2-s2-title"
+          aria-labelledby="lv2-how-title"
           className="lv2-scene lv2-obsidian"
         >
           <div className="lv2-wrap">
+            <div className="lv2-scene-head lv2-how-head">
+              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
+              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
+            </div>
+            <CompilerSpecimen korean={korean} />
             <div className="lv2-scene-head">
               <p className="lv2-eyebrow lv2-meta">{sampleCopy.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-s2-title">{sampleCopy.title}</h2>

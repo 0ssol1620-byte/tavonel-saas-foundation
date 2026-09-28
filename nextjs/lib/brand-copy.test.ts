@@ -776,9 +776,9 @@ describe("public copy", () => {
     The replan's answer to "where is the proof" was three screenshots of /explore under the film;
     the V2 answer put a committed render of a real filing page in the hero itself. The founder's
     2026-09-20 decision moves it once more: the hero is a centered statement over the four locked
-    films, and Scene 02 immediately under it is the proof -- three prepared questions this public
-    World answers, each with the passage the retriever scored and the page and box it was read
-    from, each opening the Evidence act of the route that holds both.
+    films. Scene 02 holds the source-linked compiler specimen and public inspector; Scene 03
+    gives three prepared questions this public World answers, each with the passage the retriever
+    scored and the page and box it was read from.
 
     So the assertion follows the proof rather than the hero. What it still owes is unchanged:
     the page reaches the real record rather than a picture of it, every figure on it declares
@@ -1320,8 +1320,8 @@ describe("public copy", () => {
       'id="s1"',
       "<HeroActions",
       "<HeroFilm",
-      "<CompilerSpecimen",
       'id="s2"',
+      "<CompilerSpecimen",
       "<HeroProof",
       "<ProofScene",
       "copy.recompile",

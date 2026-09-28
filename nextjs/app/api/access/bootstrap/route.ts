@@ -8,6 +8,13 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const NO_STORE = { "Cache-Control": "no-store" };
+const NO_ENTITLEMENT_TRIAL_CODES = new Set([
+  "TRIAL_DISABLED",
+  "TRIAL_NOT_AVAILABLE",
+  "TRIAL_NOT_ACTIVE",
+  "TRIAL_DEVICE_ALREADY_USED",
+  "TRIAL_REVIEW_REQUIRED",
+]);
 
 export async function POST(request: Request) {
   const user = await getRequestUser(request);
@@ -33,7 +40,8 @@ export async function POST(request: Request) {
     // A rejected free-compute grant is not a rejected identity. Keep the authenticated user in
     // their workspace so they can inspect the access state or purchase a plan, without issuing
     // trial limits or opening the separately verified customer-data gate.
-    if (readAccessMode() === "self_service" && access.status !== 503 && access.code.startsWith("TRIAL_")) {
+    if (readAccessMode() === "self_service" && (access.status === 403 || access.status === 429)
+      && NO_ENTITLEMENT_TRIAL_CODES.has(access.code)) {
       return NextResponse.json({
         code: "ACCESS_READY_NO_ENTITLEMENT",
         access: {
