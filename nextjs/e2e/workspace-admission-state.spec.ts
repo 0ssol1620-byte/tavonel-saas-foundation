@@ -35,13 +35,24 @@ test("an authenticated account without compute access sees one consistent next s
   await expect(page.getByText("Contact us to arrange a pilot.")).toHaveCount(0);
 });
 
+test("an unentitled workspace home points to access options instead of a pilot", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByText("Your workspace is available, but no compute access is active.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View access options" }).first()).toHaveAttribute("href", "/pricing");
+  await expect(page.getByRole("link", { name: "Arrange a pilot" })).toHaveCount(0);
+});
+
 test("an unavailable access check does not describe a paid account as unentitled", async ({ page }) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page);
   await page.route("**/api/access/bootstrap", route => route.fulfill({ status: 503, json: { code: "TRIAL_STORE_NOT_CONFIGURED" } }));
   await page.goto("/workspace/connections", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: "Checking workspace access." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Workspace access could not be verified." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh access" })).toBeVisible();
+  await expect(page.getByText("No plan state was confirmed.", { exact: false })).toBeVisible();
   await expect(page.getByText("This account has no active compute access.")).toHaveCount(0);
 });

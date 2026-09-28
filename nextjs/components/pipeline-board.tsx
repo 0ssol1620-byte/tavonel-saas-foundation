@@ -61,7 +61,7 @@ function failureCopy(detail: string) {
   name. The board does not decide which rows are eligible -- the page passes the ids it read
   from the document list, so eligibility and the compile call cannot drift apart.
 */
-export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, customerDataAccess }: {
+export default function PipelineBoard({ rows, reading = {}, names = {}, onDismiss, selectableIds, selectedIds, onToggleSelected, customerDataAccess, noComputeAccess = false }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
   names?: DocumentNames;
@@ -70,6 +70,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   selectedIds?: readonly string[];
   onToggleSelected?: (documentId: string) => void;
   customerDataAccess: CustomerDataAccess;
+  noComputeAccess?: boolean;
 }) {
   const firstFailed = rows.find((row) => statusOf(row) === "failed") ?? null;
   const selectable = new Set(selectableIds ?? []);
@@ -121,7 +122,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   nothing. */}
               {row.observedAt ? <p className="fine board-row-observed">Source ready <time dateTime={row.observedAt}>{formatTimestamp(row.observedAt)}</time></p> : null}
               {progress && row.stages[2].state === "active" ? <ReadingView progress={progress} /> : null}
-              <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.key === "compile" && stageItem.state === "active" && customerDataAccess !== "open" ? customerDataAccess === "closed" ? "Reading complete · compilation requires a scoped pilot" : customerDataAccess === "checking" ? "Reading complete · checking access" : "Reading complete · source access unavailable" : stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
+              <div className="board-stages board-stages-detail">{row.stages.map((stageItem) => <div className="board-stage" key={stageItem.key} data-s={stageItem.state}><span className="board-stage-k"><i aria-hidden="true" />{stageItem.label}</span><span className="board-stage-d">{stageItem.key === "compile" && stageItem.state === "active" && customerDataAccess !== "open" ? customerDataAccess === "closed" ? noComputeAccess ? "Reading complete · no active compute access" : "Reading complete · compilation requires a scoped pilot" : customerDataAccess === "checking" ? "Reading complete · checking access" : "Reading complete · source access unavailable" : stageItem.state === "failed" ? failureCopy(stageItem.detail) : stageItem.detail || "Not started"}</span></div>)}</div>
             </div>
           </li>
         ); })}

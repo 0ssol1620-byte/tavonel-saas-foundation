@@ -257,7 +257,9 @@ export default function WorkspacePage() {
     ? accessSource === "unentitled"
       ? "No compute access is active for this account. Review the current access options in Pricing."
       : "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
-    : "Source access could not be verified. Sign in again before choosing files.";
+    : customerDataAccess === "checking"
+      ? "Checking source access before choosing files."
+      : "Source access could not be verified. Sign in again before choosing files.";
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
@@ -2324,11 +2326,15 @@ export default function WorkspacePage() {
                   <p>{customerDataAccess === "checking"
                     ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
-                      ? "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
+                      ? accessSource === "unentitled"
+                        ? "Your workspace is available, but no compute access is active. Review current access options before processing files."
+                        : "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
                       : "Source access could not be verified. Sign in again before choosing files."}</p>
                   {customerDataAccess === "closed" ? (
                     <div className="workspace-intake-gated-actions">
-                      <Link className="btn" href="/contact">Arrange a pilot</Link>
+                      {accessSource === "unentitled"
+                        ? <Link className="btn" href="/pricing">View access options</Link>
+                        : <Link className="btn" href="/contact">Arrange a pilot</Link>}
                       <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
                     </div>
                   ) : null}
@@ -2519,6 +2525,7 @@ export default function WorkspacePage() {
               reading={reading}
               names={names}
               customerDataAccess={customerDataAccess}
+              noComputeAccess={accessSource === "unentitled"}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
@@ -2561,9 +2568,9 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
-                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "This workspace cannot run Core on your sources yet. Arrange a scoped pilot to continue." : "Source access could not be verified. Sign in again before running Core."}</p> : null}
+                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? accessSource === "unentitled" ? "No compute access is active for this account. Review current access options before running Core." : "This workspace cannot run Core on your sources yet. Arrange a scoped pilot to continue." : "Source access could not be verified. Sign in again before running Core."}</p> : null}
                 <div className="billing-actions">
-                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <Link href="/contact">Arrange a pilot</Link> : null}
+                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? accessSource === "unentitled" ? <Link href="/pricing">View access options</Link> : <Link href="/contact">Arrange a pilot</Link> : null}
                 </div>
               </section>
             ) : null}
@@ -3027,9 +3034,11 @@ export default function WorkspacePage() {
           */}
           {tab === "connections" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>{accessSource === null ? "Checking workspace access." : "Source connections are part of Developer access."}</h2>
+              <h2>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
+                : "Source connections are part of Developer access."}</h2>
               <p>{accessSource === null
-                ? "The access check has not completed. Refresh if this message remains."
+                ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : accessSource === "trial"
                 ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
                 : "This account has no active compute access. Source connections require Developer access."}</p>
@@ -3041,9 +3050,11 @@ export default function WorkspacePage() {
 
           {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>{accessSource === null ? "Checking workspace access." : "API keys are part of Developer access."}</h2>
+              <h2>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
+                : "API keys are part of Developer access."}</h2>
               <p>{accessSource === null
-                ? "The access check has not completed. Refresh if this message remains."
+                ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : accessSource === "trial"
                 ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
                 : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
