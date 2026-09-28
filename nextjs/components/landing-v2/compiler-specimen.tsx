@@ -100,8 +100,7 @@ function SourceSheet({ index, korean }: { index: number; korean: boolean }) {
           alt={ui(korean, "같은 공시 페이지에서 잘라 낸 영업비용 표 영역", "Exact operating expenses table region from the same filing page")}
           width="1120"
           height="103"
-          loading="eager"
-          fetchPriority="high"
+          loading="lazy"
           decoding="async"
         />
       </picture>

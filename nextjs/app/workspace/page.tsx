@@ -250,12 +250,16 @@ export default function WorkspacePage() {
   const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
-  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | null>(null);
+  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
-    ? "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
-    : "Source access could not be verified. Sign in again before choosing files.";
+    ? accessSource === "unentitled"
+      ? "No compute access is active for this account. Review the current access options in Pricing."
+      : "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
+    : customerDataAccess === "checking"
+      ? "Checking source access before choosing files."
+      : "Source access could not be verified. Sign in again before choosing files.";
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
@@ -2322,11 +2326,15 @@ export default function WorkspacePage() {
                   <p>{customerDataAccess === "checking"
                     ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
-                      ? "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
+                      ? accessSource === "unentitled"
+                        ? "Your workspace is available, but no compute access is active. Review current access options before processing files."
+                        : "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
                       : "Source access could not be verified. Sign in again before choosing files."}</p>
                   {customerDataAccess === "closed" ? (
                     <div className="workspace-intake-gated-actions">
-                      <Link className="btn" href="/contact">Arrange a pilot</Link>
+                      {accessSource === "unentitled"
+                        ? <Link className="btn" href="/pricing">View access options</Link>
+                        : <Link className="btn" href="/contact">Arrange a pilot</Link>}
                       <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
                     </div>
                   ) : null}
@@ -2517,6 +2525,7 @@ export default function WorkspacePage() {
               reading={reading}
               names={names}
               customerDataAccess={customerDataAccess}
+              noComputeAccess={accessSource === "unentitled"}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
@@ -2559,9 +2568,9 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
-                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "This workspace cannot run Core on your sources yet. Arrange a scoped pilot to continue." : "Source access could not be verified. Sign in again before running Core."}</p> : null}
+                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? accessSource === "unentitled" ? "No compute access is active for this account. Review current access options before running Core." : "This workspace cannot run Core on your sources yet. Arrange a scoped pilot to continue." : "Source access could not be verified. Sign in again before running Core."}</p> : null}
                 <div className="billing-actions">
-                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <Link href="/contact">Arrange a pilot</Link> : null}
+                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? accessSource === "unentitled" ? <Link href="/pricing">View access options</Link> : <Link href="/contact">Arrange a pilot</Link> : null}
                 </div>
               </section>
             ) : null}
@@ -3023,19 +3032,35 @@ export default function WorkspacePage() {
             and the palette; the URL has to agree with the rail, so the body says why instead of
             rendering the panel to anyone who types the path.
           */}
-          {tab === "connections" ? (accessSource === "trial" ? (
+          {tab === "connections" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>Source connections are part of Developer access.</h2>
-              <p>Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access.</p>
-              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+              <h2>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
+                : "Source connections are part of Developer access."}</h2>
+              <p>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
+                : accessSource === "trial"
+                ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
+                : "This account has no active compute access. Source connections require Developer access."}</p>
+              <div className="billing-actions">{accessSource === null
+                ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <ConnectionsPanel />) : null}
 
-          {tab === "developers" ? (accessSource === "trial" ? (
+          {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>API keys are part of Developer access.</h2>
-              <p>Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access.</p>
-              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+              <h2>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
+                : "API keys are part of Developer access."}</h2>
+              <p>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
+                : accessSource === "trial"
+                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
+                : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
+              <div className="billing-actions">{accessSource === null
+                ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}
 

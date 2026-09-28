@@ -576,6 +576,8 @@
   .one-path-workspace .compile-stage[data-tone="ready"] .compile-stage-status { border-left-color: var(--verified); }
   .one-path-workspace .compile-stage-canvas { display: block; width: 100%; height: clamp(260px, 30vw, 380px); }
   .one-path-workspace .compile-stage-canvas[hidden] { display: none; }
+  .one-path-workspace .compile-stage-film-caption { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px 0; border-top: 1px solid var(--hairline); color: var(--text-mid); font: 13px/1.5 var(--f-sans); }
+  .one-path-workspace .compile-stage-film-progress { flex: none; font-family: var(--f-mono); color: var(--text-lo); letter-spacing: .08em; }
   .one-path-workspace .compile-stage-summary { margin: 0; padding: 4px 20px 18px; font: 13px/1.6 var(--f-sans); color: var(--text-mid); }
   .one-path-workspace .workspace-attention-items button,
   .one-path-workspace .workspace-content button,

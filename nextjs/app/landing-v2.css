@@ -271,7 +271,8 @@
   margin: 26px auto 0;
   text-align: center;
 }
-.lv2-hero [data-compiler-specimen] { margin-top: 16px; }
+.lv2-scene[data-scene="2"] [data-compiler-specimen] { margin-top: 16px; }
+.lv2-scene[data-scene="2"] [data-compiler-specimen] + .lv2-scene-head { margin-top: clamp(48px, 5vw, 72px); }
 .lv2-actions {
   display: flex;
   flex-wrap: wrap;
@@ -316,10 +317,12 @@
 .lv2-film .compile-film-stage-disclosure[open] .compile-film-stages { margin-top: 12px; }
 .lv2-film .compile-film-stages,
 .lv2-film .compile-film-viewport,
-.lv2-film .compile-film-caption {
+.lv2-film .compile-film-caption,
+.lv2-film > .fine {
   width: min(100%, var(--lv2-film-w));
   margin-inline: auto;
 }
+.lv2-film > .fine { max-width: none; margin-top: 12px; }
 .lv2-film .compile-film-stages button { min-height: 44px; }
 .lv2-film .compile-film-viewport {
   min-height: 0;

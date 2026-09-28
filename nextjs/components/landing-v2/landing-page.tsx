@@ -119,10 +119,7 @@ export default function LandingPage({
         <LandingAnalytics variant={experiment.tracked} />
 
         {/*
-          01 Hero -- one centered statement, then the product itself on the public sample World.
-
-          The first visual is a source-linked specimen that opens on its Evidence stage.
-          The public sample inspector and film follow in Scene 02.
+          01 Hero -- one centered statement followed by the four-cut product film.
         */}
         <section
           id="s1"
@@ -151,32 +148,31 @@ export default function LandingPage({
               {korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats}{" "}
               <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
             </p>
-            <div className="lv2-scene-head lv2-how-head">
-              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
-              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
-            </div>
-            <CompilerSpecimen korean={korean} />
+            <HeroFilm korean={korean} />
           </div>
         </section>
 
         {/*
-          02 Public sample -- the Evidence Inspector over the committed World, then the
-          four-cut film as an optional deeper explanation.
+          02 The source-linked specimen, then the Evidence Inspector over the committed World.
         */}
         <section
           id="s2"
           data-scene="2"
           tabIndex={-1}
-          aria-labelledby="lv2-s2-title"
+          aria-labelledby="lv2-how-title"
           className="lv2-scene lv2-obsidian"
         >
           <div className="lv2-wrap">
+            <div className="lv2-scene-head lv2-how-head">
+              <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
+              <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
+            </div>
+            <CompilerSpecimen korean={korean} />
             <div className="lv2-scene-head">
               <p className="lv2-eyebrow lv2-meta">{sampleCopy.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-s2-title">{sampleCopy.title}</h2>
             </div>
             <HeroProof korean={korean} />
-            <HeroFilm korean={korean} />
           </div>
         </section>
 

@@ -107,6 +107,10 @@ test('the canvas paints received content and resizes when its container changes'
   const canvas = page.locator('.compile-stage-canvas');
   await expect(page.locator('.compile-stage')).toHaveAttribute('data-visual', 'structure');
   await expect(canvas).toBeVisible();
+  await expect(page.locator('.compile-stage-film-caption')).toContainText('Organize');
+  await expect(page.locator('.compile-stage-film-caption')).toContainText('03 / 04');
+  await expect(page.locator('.compile-stage-summary')).toContainText('1 observed page · 1 observed region');
+  expect(await canvas.evaluate(c => c.getBoundingClientRect().height)).toBeLessThan(300);
   const before = await canvas.evaluate(c => (c as HTMLCanvasElement).width);
   await page.locator('.workspace-compile-block').evaluate(element => { (element as HTMLElement).style.width = '80%'; });
   await expect.poll(() => canvas.evaluate(c => (c as HTMLCanvasElement).width)).toBeLessThan(before);
