@@ -71,7 +71,6 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
-
 ## 2026-09-21 — Original-source compiler specimen and mobile film inspection
 
 The rejected repeated skeleton was replaced with the committed Apple 2026 Q1 10-Q page render and an exact operating-expenses crop. Page moves from the full filing page to the source region; Structure, Evidence, Knowledge, and Intelligence retain that source anchor while presenting distinct cell, address, object, and grounded-answer compositions. The crop includes the complete right edge and `15,443` value. Manual stage selection now stops both progression and transition motion.
@@ -468,5 +467,17 @@ The live closed-admission path could still show a saved OCR-qualified source wit
 The local TypeScript and ESLint checks passed. Vitest passed 377 files / 5,317 tests and the script suite passed 53 tests before the Home refinement; its 46 focused assertions passed afterward. The optimized Next.js build passed. The affected source-board Chromium suite passed **56/56** at **1920, 1440, 1280, 1024, 768, 390, and 360px**, plus 1440px reduced motion. The closed Home-to-Sources flow and closed source queue each passed 8/8, including no horizontal overflow, no compile promise or selection/action, and a visible pilot link. Full-page captures are attached to the local Playwright report under ignored `nextjs/playwright-report/data/`. The 1440px and 390px Home and Sources captures were inspected directly: the state and pilot path are readable, and the compile affordance is absent. The screenshots use intercepted API fixtures and do not prove a real customer compile or GPU OCR run. A final short Home copy reduction followed these captures; exact-head CI and preview must verify it.
 
 Exact-head CI, deployed-preview review, and production smoke remain required before publication. Automated and agent review do not replace founder visual acceptance.
+
+**FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-28 — Landing film, button contrast, and workspace account state
+
+The homepage now places the four-chapter film directly after the centered opening proposition and actions, ahead of the compiler specimen. Files, Organize, Updates, and Use with AI are exposed as direct tabs; the extra film-cut disclosure is gone. The film note, frame, and chapter caption share the same horizontal container. The first film poster receives image priority, while the lower specimen image loads lazily. Existing illustrative film assets remain labelled as examples, not customer results.
+
+A CSS layer declaration emitted by the Korean Pricing module before the shared layer order caused base styles to override component styles across routes. The homepage's primary action was white text on a white button; at 390px the contact page used a 420px/0px grid that pushed its form far below the copy. The layer order now precedes the module and token rules, and the general button color reset excludes styled button classes. A production-build browser check observed readable CTA text, the 390px contact form beginning around y=636px, working developer example tabs, and no document-width overflow.
+
+The workspace compile stage now displays a chapter title and 01/04–04/04 position while its existing four-stage visualization runs on real upload, OCR, and World progress. It does not start a simulated compile on file selection. Account bootstrap no longer treats a trial-denial decision as an authentication failure: it returns an authenticated, unentitled workspace with a Pricing route and without file or paid access. A genuine service/configuration failure still fails closed. The auth callback also shows a safe error code if no session is returned. The reported new-account failure has no reference code yet; these changes address a reproducible entitlement/login coupling, not a confirmed diagnosis of that exact session.
+
+Local verification passed the production build, 377 Vitest files / 5,322 tests, 53 script tests, and the final brand/type-floor/TypeScript/ESLint check. Focused landing and visual Playwright checks passed 218 cases with 62 intentional skips across 1920, 1440, 1280, 1024, 768, 390, 360px and 1440px reduced motion. The auth/workspace fixture suite passed 30 cases at 1440 and 390px; 26 detail-integrity cases passed at those widths, including canvas content and fallback behavior. Full-page home and Korean contact captures at the seven widths, plus reduced-motion home, and geometry measurements are stored under ignored `nextjs/test-results/landing-film-20260928/`. The 1440px and 390px home and 390px contact captures were inspected directly. Exact-head CI and deployed preview remain to be checked. No live new-account login or real customer-data compile is established by the fixture checks. Customer-document intake and paid purchase remain closed under their existing production gates.
 
 **FOUNDER VISUAL REVIEW REQUIRED**

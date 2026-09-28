@@ -493,14 +493,14 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("opens on the live inspector, then the four-cut film and the deterministic specimen", () => {
+  it("opens on the four-cut film, then the specimen and live inspector", () => {
     const page = landingSource();
     /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
        film opens the landmark that explains how the World was compiled. The entry pages preload
        the hero's own raster because that is the image above the fold now. */
-    expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
+    expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<HeroFilm"));
+    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
     expect(page.indexOf("<CompilerSpecimen")).toBeLessThan(page.indexOf("<HeroProof"));
-    expect(page.indexOf("<HeroProof")).toBeLessThan(page.indexOf("<HeroFilm"));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
     expect(page).toContain("CompilerSpecimen");
@@ -1319,10 +1319,10 @@ describe("public copy", () => {
     const order = [
       'id="s1"',
       "<HeroActions",
+      "<HeroFilm",
       "<CompilerSpecimen",
       'id="s2"',
       "<HeroProof",
-      "<HeroFilm",
       "<ProofScene",
       "copy.recompile",
       "copy.trust",

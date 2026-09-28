@@ -69,7 +69,7 @@ describe("approved one-path experience", () => {
     heading is the sentence it illustrates. The order below is read as positions, so it is the
     assertion that had to move rather than a rule that had to be dropped.
   */
-  it("orders the landing as proof, explanation, proof scene, change, trust and action", () => {
+  it("orders the landing as film, explanation, proof scene, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
     expect(page).toContain("<HeroFilm");
@@ -78,10 +78,10 @@ describe("approved one-path experience", () => {
       'id="s1"',
       "<HeroStatement",
       "<HeroActions",
+      "<HeroFilm",
       "<CompilerSpecimen",
       'id="s2"',
       "<HeroProof",
-      "<HeroFilm",
       "<ProofScene",
       "<RecompileScene",
       "<TrustScene",
@@ -98,11 +98,9 @@ describe("approved one-path experience", () => {
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
-    /* `priorityPoster` went with the film when it moved below the fold: the hero's own page
-       raster is what the entry pages preload now, and two eager high-priority rasters where one
-       is above the fold is a slower first paint, not a faster one. */
+    /* The film is the first visual again, so its poster owns the eager image slot. */
     expect(film).toContain("preferVideo");
-    expect(film).not.toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
+    expect(film).toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");

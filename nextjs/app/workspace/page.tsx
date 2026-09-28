@@ -250,7 +250,7 @@ export default function WorkspacePage() {
   const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
-  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | null>(null);
+  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
@@ -3023,18 +3023,22 @@ export default function WorkspacePage() {
             and the palette; the URL has to agree with the rail, so the body says why instead of
             rendering the panel to anyone who types the path.
           */}
-          {tab === "connections" ? (accessSource === "trial" ? (
+          {tab === "connections" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
               <h2>Source connections are part of Developer access.</h2>
-              <p>Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access.</p>
+              <p>{accessSource === "trial"
+                ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
+                : "This account has no active compute access. Source connections require Developer access."}</p>
               <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
             </section>
           ) : <ConnectionsPanel />) : null}
 
-          {tab === "developers" ? (accessSource === "trial" ? (
+          {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
               <h2>API keys are part of Developer access.</h2>
-              <p>Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access.</p>
+              <p>{accessSource === "trial"
+                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
+                : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
               <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
             </section>
           ) : <DeveloperPanel />) : null}

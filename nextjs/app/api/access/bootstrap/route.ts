@@ -30,6 +30,22 @@ export async function POST(request: Request) {
   if (access.setCookie) headers["Set-Cookie"] = access.setCookie;
 
   if (!access.ok) {
+    // A rejected free-compute grant is not a rejected identity. Keep the authenticated user in
+    // their workspace so they can inspect the access state or purchase a plan, without issuing
+    // trial limits or opening the separately verified customer-data gate.
+    if (readAccessMode() === "self_service" && access.status !== 503 && access.code.startsWith("TRIAL_")) {
+      return NextResponse.json({
+        code: "ACCESS_READY_NO_ENTITLEMENT",
+        access: {
+          source: "unentitled",
+          accessPlan: null,
+          billingExempt: false,
+          expiresAt: null,
+          limits: null,
+          customerDataEnabled: false,
+        },
+      }, { headers });
+    }
     if (access.status === 429) headers["Retry-After"] = "86400";
     return NextResponse.json({ code: access.code }, { status: access.status, headers });
   }

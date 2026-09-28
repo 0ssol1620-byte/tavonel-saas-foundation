@@ -121,8 +121,8 @@ export default function LandingPage({
         {/*
           01 Hero -- one centered statement, then the product itself on the public sample World.
 
-          The first visual is a source-linked specimen that opens on its Evidence stage.
-          The public sample inspector and film follow in Scene 02.
+          The four film cuts are the first visual. The source-linked specimen follows the film,
+          and the public sample inspector remains in Scene 02.
         */}
         <section
           id="s1"
@@ -151,6 +151,7 @@ export default function LandingPage({
               {korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats}{" "}
               <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
             </p>
+            <HeroFilm korean={korean} />
             <div className="lv2-scene-head lv2-how-head">
               <p className="lv2-eyebrow lv2-meta">{specimenCopy.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
@@ -160,8 +161,7 @@ export default function LandingPage({
         </section>
 
         {/*
-          02 Public sample -- the Evidence Inspector over the committed World, then the
-          four-cut film as an optional deeper explanation.
+          02 Public sample -- the Evidence Inspector over the committed World.
         */}
         <section
           id="s2"
@@ -176,7 +176,6 @@ export default function LandingPage({
               <h2 className="lv2-h2" id="lv2-s2-title">{sampleCopy.title}</h2>
             </div>
             <HeroProof korean={korean} />
-            <HeroFilm korean={korean} />
           </div>
         </section>
 

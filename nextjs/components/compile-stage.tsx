@@ -352,6 +352,12 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       </div>
       {hasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
         style={!framed ? { height: idleHeight } : undefined} /> : null}
+      {hasVisual ? <div className="compile-stage-film-caption" aria-label="Observed compilation chapter">
+        <span>{PIPELINE_STAGES[reached].label}</span>
+        <span className="compile-stage-film-progress" aria-hidden="true" data-derived="1">
+          {String(reached + 1).padStart(2, "0")} / {String(PIPELINE_STAGES.length).padStart(2, "0")}
+        </span>
+      </div> : null}
       {hasVisual ? <p className="compile-stage-summary" data-sensitive="content">
         {rows.length} sources · {observedPages} observed pages · {observedRegions} observed regions
         {world && view.visual === "world" ? ` · ${world.objects.length} compiled objects · ${world.relations.length} recorded relations` : ""}

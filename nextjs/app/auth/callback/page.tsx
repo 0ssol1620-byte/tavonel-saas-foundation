@@ -35,6 +35,10 @@ export default function AuthCallbackPage() {
       const { data, error } = await client.auth.getSession();
       if (cancelled) return;
       if (error || !data.session) {
+        const providerCode = new URLSearchParams(window.location.search).get("error_code");
+        setFailureCode(providerCode && /^[a-z0-9_]{1,60}$/i.test(providerCode)
+          ? providerCode.toUpperCase()
+          : "AUTH_SESSION_MISSING");
         setPhase("session-failed");
         return;
       }

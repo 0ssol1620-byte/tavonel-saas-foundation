@@ -1,5 +1,26 @@
 import { test, expect } from "@playwright/test";
 
+test("filled navigation and hero actions keep readable labels", async ({ page }) => {
+  await page.goto("/");
+  for (const selector of ['header.nav a.btn', '[data-analytics="hero-primary"]']) {
+    const contrast = await page.locator(selector).first().evaluate(element => {
+      const style = getComputedStyle(element);
+      const channels = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+      const luminance = (value: string) => {
+        const [r, g, b] = channels(value).map(channel => {
+          const normalized = channel / 255;
+          return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const foreground = luminance(style.color);
+      const background = luminance(style.backgroundColor);
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    });
+    expect(contrast, `${selector} label contrast`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 /*
   Gap #1, 2026-09-22: the film explains how it compiles, from Scene 02.
 
@@ -16,15 +37,15 @@ for (const path of ["/", "/ko"]) {
     const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
     const filmWrap = await page.locator("#s2 .lv2-wrap").boundingBox();
     const mark = await page.locator("header .wordmark").boundingBox();
-    const film = await page.locator("#s2 .compile-film-viewport").boundingBox();
+    const film = await page.locator("#s1 .compile-film-viewport").boundingBox();
     expect(wrap && filmWrap && mark && film).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(filmWrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     const viewportWidth = page.viewportSize()!.width;
-    const cap = viewportWidth >= 1600 ? 1280 : viewportWidth >= 900 ? 960 : 1120;
-    expect(film!.width).toBeGreaterThanOrEqual(Math.min(cap, filmWrap!.width) - 2);
-    expect(film!.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);
-    expect(film!.x + film!.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + 1);
+    const cap = viewportWidth >= 1600 ? 1280 : 1120;
+    expect(film!.width).toBeGreaterThanOrEqual(Math.min(cap, wrap!.width) - 2);
+    expect(film!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
+    expect(film!.x + film!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
   });
 }
 
