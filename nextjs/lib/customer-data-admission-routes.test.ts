@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, session, gate, signer, enqueue } = vi.hoisted(() => ({
+const { authorize, session, gate, signer, enqueue, applyBatch } = vi.hoisted(() => ({
   authorize: vi.fn(),
   session: vi.fn(),
   gate: vi.fn(),
   signer: vi.fn(),
   enqueue: vi.fn(),
+  applyBatch: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -22,9 +23,14 @@ vi.mock("@/lib/job-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./job-store")>()),
   enqueueConnectorSync: enqueue,
 }));
+vi.mock("@/lib/developer-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./developer-store")>()),
+  applyFoundationConnectionBatch: applyBatch,
+}));
 
 import { POST as confirmUpload } from "../app/api/uploads/confirm/route";
 import { POST as startConnectorSync } from "../app/api/v1/oauth-connectors/connections/[id]/sync/route";
+import { POST as applyConnectionBatch } from "../app/api/v1/connections/[id]/sync/route";
 
 const WORKSPACE = "pilot-gate-test";
 const DOCUMENT = "11111111-1111-4111-8111-111111111111";
@@ -65,5 +71,16 @@ describe("customer-data approval before asynchronous intake", () => {
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
     expect(gate).toHaveBeenCalledWith(WORKSPACE);
     expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("refuses a manual connection batch before accepting customer-source metadata", async () => {
+    const response = await applyConnectionBatch(
+      request(`/api/v1/connections/${CONNECTION}/sync`, {}),
+      { params: Promise.resolve({ id: CONNECTION }) },
+    );
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(gate).toHaveBeenCalledWith(WORKSPACE);
+    expect(applyBatch).not.toHaveBeenCalled();
   });
 });

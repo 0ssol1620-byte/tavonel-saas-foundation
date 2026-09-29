@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { parseConnectionBatchInput } from "@/lib/developer-contracts";
 import { applyFoundationConnectionBatch } from "@/lib/developer-store";
 
@@ -14,6 +15,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "CONNECTION_ID_INVALID" }, { status: 400, headers: NO_STORE });
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
+  }
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > 1_100_000) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: NO_STORE });
   const text = await request.text();
