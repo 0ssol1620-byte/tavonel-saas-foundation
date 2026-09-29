@@ -3034,14 +3034,18 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : "Source connections are part of Developer access."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Source connections are part of Developer access."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
+                : customerDataAccess === "closed"
+                ? "Your account is ready, but source processing is closed. Request source access before connecting a provider."
                 : accessSource === "trial"
                 ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
                 : "This account has no active compute access. Source connections require Developer access."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : customerDataAccess === "closed"
+                ? <Link className="btn" href="/contact">Request source access</Link>
                 : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <ConnectionsPanel />) : null}

@@ -31,9 +31,9 @@ test("an authenticated account without compute access sees one consistent next s
   await page.goto("/workspace/connections", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Source access pending")).toBeVisible();
-  await expect(page.getByText("This account has no active compute access. Source connections require Developer access.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "View access options" })).toHaveAttribute("href", "/pricing");
-  await expect(page.getByText("Contact us to arrange a pilot.")).toHaveCount(0);
+  await expect(page.getByText("Your account is ready, but source processing is closed.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
+  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
 });
 
 test("an unentitled workspace home points to the public example and access request", async ({ page }) => {
