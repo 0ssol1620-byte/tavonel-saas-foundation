@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { exchangeOAuthCode, fetchOAuthProviderIdentity, parseOAuthConnectorProvider, readOAuthProviderRuntime, sha256Hex } from "@/lib/connector-oauth";
 import { deleteOAuthSecret, putOAuthSecret, readOAuthSecret, readOAuthSecretBrokerConfig } from "@/lib/connector-oauth-secrets";
 import { consumeOAuthAuthorization, createOAuthConnection } from "@/lib/connector-oauth-store";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,6 +35,9 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const authorization = consumed.authorization;
   let refreshTokenReference = "";
   try {
+    if (!await canAdmitCustomerSource(authorization.workspaceKey, "connector")) {
+      return workspaceRedirect(request, "failed", provider, "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE");
+    }
     const [verifier, clientSecret] = await Promise.all([
       readOAuthSecret(broker, authorization.pkceVerifierReference),
       readOAuthSecret(broker, runtime.clientSecretReference),

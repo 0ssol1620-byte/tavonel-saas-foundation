@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
+import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { buildOAuthAuthorizationUrl, createOAuthPkce, parseOAuthConnectorProvider, readOAuthProviderRuntime, sha256Hex } from "@/lib/connector-oauth";
 import { deleteOAuthSecret, putOAuthSecret, readOAuthSecretBrokerConfig } from "@/lib/connector-oauth-secrets";
 import { createOAuthAuthorization } from "@/lib/connector-oauth-store";
@@ -22,6 +23,9 @@ export async function POST(request: Request) {
   const provider = parseOAuthConnectorProvider(body.provider);
   const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
   if (!provider || !displayName || displayName.length > 100) return NextResponse.json({ code: "OAUTH_CONNECTOR_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "connector")) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
+  }
   const runtime = readOAuthProviderRuntime(provider);
   const broker = readOAuthSecretBrokerConfig();
   if (!runtime || !broker) return NextResponse.json({ code: "OAUTH_PROVIDER_NOT_CONFIGURED" }, { status: 503, headers: HEADERS });

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   // refuse payment before creating a durable checkout intent unless the same workspace receipt
   // that intake and compilation require is current and valid. Sandbox qualification remains
   // available without a customer-data receipt because it cannot charge a real card.
-  if (commercial.provider === "production" && !await canAdmitCustomerSource(membership.workspaceId)) {
+  if (commercial.provider === "production" && !await canAdmitCustomerSource(membership.workspaceId, "direct_upload")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
   }
   const customData = createCheckoutBinding(

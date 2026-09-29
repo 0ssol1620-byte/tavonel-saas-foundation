@@ -62,6 +62,9 @@ describe("durable scoped customer-data gate", () => {
     await expect(read()).resolves.toEqual({
       ok: true, scope, releaseReceiptSha256: release.receiptSha256,
       grantReceiptSha256: grant.grantReceiptSha256,
+      authorization: { allowed: true, schemaVersion: release.schemaVersion,
+        tenantId: grant.tenantId, workspaceId: grant.workspaceId,
+        receiptSha256: grant.grantReceiptSha256, evaluatedAt, release, grant },
     });
     const releasePath = decodeURIComponent(request.mock.calls[0][1] as string);
     const grantPath = decodeURIComponent(request.mock.calls[1][1] as string);

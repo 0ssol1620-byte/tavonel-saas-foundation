@@ -105,7 +105,9 @@ select is_empty($$
      and c.relkind in ('r', 'p')
      and has_column_privilege('service_role', c.oid, a.attnum, p.privilege_type)
      and not has_table_privilege('service_role', c.oid, p.privilege_type)
-$$, 'service_role holds no column privilege its table row does not already carry');
+     and not (c.relname = 'foundation_intake_admissions' and p.privilege_type = 'SELECT'
+       and a.attname in ('workspace_key', 'document_id', 'confirmed_at'))
+$$, 'service_role column-only privileges are limited to the three source-origin fields');
 
 -- The default privilege is the reason R-2 existed at all: it re-grants ALL to service_role on
 -- every table created after it. 0053 revokes it, so the next migration's table arrives with

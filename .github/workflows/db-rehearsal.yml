@@ -192,7 +192,8 @@ jobs:
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
           for file in supabase/migrations/005[2345]_*.sql supabase/migrations/20260911*_*.sql \
-                      supabase/migrations/20260921110000_*.sql supabase/migrations/20260921120000_*.sql; do
+                      supabase/migrations/20260921110000_*.sql supabase/migrations/20260921120000_*.sql \
+                      supabase/migrations/20260929152100_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done

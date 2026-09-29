@@ -1,6 +1,7 @@
+import type { CustomerDataScope } from "../../shared/scopedCustomerDataGate";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { readCompiledWorldValidationChecks, regionsOrNone } from "../../shared/compiledWorldValidation";
-import { gateAdmitsCustomerData, type CustomerDataGateDecision } from "../../shared/customerDataGate";
+import { authorizationAdmitsCustomerData, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import {
   GENERIC_MIXED_CORPUS_BLUEPRINT,
   advertisedOntologyRelations,
@@ -204,7 +205,8 @@ export function buildProductCoreV2Request(
   now = new Date(),
   requestId = `core-${randomUUID()}`,
   previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null,
-  customerDataGate?: CustomerDataGateDecision,
+  customerDataGate?: CustomerDataAuthorization,
+  expectedSourceScope?: CustomerDataScope,
 ): ProductCoreV2CompileRequest {
   const binding = documentBinding(workspaceId, documents);
   const collectionId = productCoreV2CollectionId(workspaceId, documents);
@@ -240,7 +242,7 @@ export function buildProductCoreV2Request(
       maxCostCredits: 10,
       // Never more than this process will wait; see lib/execution-budget.ts.
       maxLatencyMs: CORE_MAX_LATENCY_MS,
-      privacyPolicy: gateAdmitsCustomerData(customerDataGate, workspaceId, workspaceId)
+      privacyPolicy: authorizationAdmitsCustomerData(customerDataGate, workspaceId, workspaceId, now, expectedSourceScope)
         ? "approved_customer_data"
         : "foundation_synthetic_only",
     },
@@ -631,9 +633,10 @@ export async function dispatchProductCoreV2(
   documents: CollectionOcrInput[],
   now = new Date(),
   previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null,
-  customerDataGate?: CustomerDataGateDecision,
+  customerDataGate?: CustomerDataAuthorization,
+  expectedSourceScope?: CustomerDataScope,
 ): Promise<{ ok: true; result: ProductCoreV2CompileResponse } | { ok: false; code: string }> {
-  if (customerDataGate && !gateAdmitsCustomerData(customerDataGate, workspaceId, workspaceId)) {
+  if (customerDataGate && !authorizationAdmitsCustomerData(customerDataGate, workspaceId, workspaceId, now, expectedSourceScope)) {
     return { ok: false, code: "CUSTOMER_DATA_GATE_DECISION_INVALID" };
   }
   const envelope = buildProductCoreV2Request(
@@ -643,6 +646,7 @@ export async function dispatchProductCoreV2(
     undefined,
     previousActiveWorld,
     customerDataGate,
+    expectedSourceScope,
   );
   const body = JSON.stringify(envelope);
   const inputSha256 = `sha256:${sha256(body)}`;

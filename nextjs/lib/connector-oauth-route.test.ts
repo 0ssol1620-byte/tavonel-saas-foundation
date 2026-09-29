@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const { gate } = vi.hoisted(() => ({ gate: vi.fn() }));
+vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: gate }));
 
 vi.mock("@/lib/developer-auth", () => ({
   requireFoundationSession: vi.fn(async () => ({
@@ -26,6 +28,7 @@ const environmentKeys = [
 ] as const;
 
 beforeEach(() => {
+  gate.mockReset().mockResolvedValue(true);
   // Vercel Production has real OAuth/Supabase configuration. Tests start empty and opt in
   // to the exact managed configuration required by each case.
   for (const key of environmentKeys) vi.stubEnv(key, "");
@@ -45,6 +48,15 @@ function request() {
 }
 
 describe("OAuth authorization route", () => {
+  it("refuses direct-upload-only workspaces before creating provider credentials", async () => {
+    gate.mockResolvedValue(false);
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const response = await authorizeOAuthConnector(request());
+    expect(response.status).toBe(403);
+    expect(gate).toHaveBeenCalledWith("pilot-1234567890abcdef", "connector");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("returns no provider URL when managed configuration is incomplete", async () => {
     const response = await authorizeOAuthConnector(request());
     expect(response.status).toBe(503);

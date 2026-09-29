@@ -15,7 +15,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "CONNECTION_ID_INVALID" }, { status: 400, headers: NO_STORE });
-  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "connector")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
   }
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
