@@ -45,11 +45,16 @@ async function runOneDeletion(request: Request) {
       signer, candidate.workspaceKey, candidate.objectKey),
   });
 
+  // A recorded object-lock refusal is expected: the database fences that finished attempt and
+  // defers the object for 24 hours (20260930011000); nothing was purged. Any other failure, or an unrecorded one, stays 503.
+  const deferred = !deletions.ok && deletions.code === "SOURCE_DELETE_OBJECT_LOCKED" &&
+    deletions.failureRecorded === true && closure.ok;
   return NextResponse.json(
     deletions.ok
       ? { code: closure.ok ? "OK" : closure.code, processed: deletions.receipts.length, derived }
-      : { code: deletions.code, processed: deletions.receipts.length, failureRecorded: deletions.failureRecorded, derived },
-    { status: deletions.ok && closure.ok ? 200 : 503, headers: HEADERS },
+      : { code: deletions.code, processed: deletions.receipts.length, failureRecorded: deletions.failureRecorded, derived,
+          ...(deferred ? { deferred: true } : {}) },
+    { status: (deletions.ok && closure.ok) || deferred ? 200 : 503, headers: HEADERS },
   );
 }
 

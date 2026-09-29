@@ -35,7 +35,7 @@ export type DeleteImmutableObject = (candidate: DeletionCandidate) => Promise<
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const ID = /^sha256:[a-f0-9]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-// R2 HEAD and DELETE each have an 8-second timeout. Leave room for both operations,
+// R2 HEAD, DELETE and verification HEAD each have an 8-second timeout. Leave room for all three,
 // scheduling jitter, and the final database receipt transaction.
 const MIN_LEASE_REMAINING_MS = 30_000;
 
@@ -101,6 +101,11 @@ export async function runSourceDeletionSweep(input: {
       ? await input.deleteObject(candidate)
       : { ok: true as const, alreadyAbsent: true };
     if (!removed.ok) return fail(removed.code);
+    // A provider acknowledgement is not proof that a locked object actually disappeared.
+    // R2 is strongly consistent; only an independently observed absence can earn a receipt.
+    const verified = await input.inspectObject(candidate);
+    if (!verified.ok) return fail(verified.code);
+    if (verified.exists) return fail("SOURCE_DELETE_NOT_CONFIRMED");
     const finalized = await input.store.finalize({ ...candidate, objectAlreadyAbsent: removed.alreadyAbsent });
     if (!finalized.ok) return fail(finalized.code);
     if (!ID.test(finalized.receipt.receiptId) ||

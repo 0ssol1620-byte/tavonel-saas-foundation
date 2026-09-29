@@ -6,6 +6,7 @@ import {
 import {
   hashFoundationSourceInventoryObject,
   listFoundationSourceInventory,
+  MAX_WORLD_OBJECTS,
   sourceInventoryListingsEqual,
   type SourceInventoryHashedObject,
 } from "./source-deletion-inventory-r2";
@@ -71,7 +72,11 @@ async function attestCandidate(
   hash: typeof hashFoundationSourceInventoryObject,
   attest: typeof recordSourceDeletionInventoryAttestation,
 ): Promise<SourceDeletionInventoryRun> {
-  const before = await listed(signer, candidate.workspaceKey, candidate.documentIds);
+  // An oversized World set is refused, never narrowed: there is no wildcard over a collection.
+  if (candidate.worldObjectKeys.length > MAX_WORLD_OBJECTS) {
+    return { ok: false, code: "SOURCE_INVENTORY_WORLD_LIMIT", processed: 0 };
+  }
+  const before = await listed(signer, candidate.workspaceKey, candidate.documentIds, candidate.worldObjectKeys);
   if (!before.ok) return { ok: false, code: before.code, processed: 0 };
 
   const objects: SourceInventoryHashedObject[] = [];
@@ -83,7 +88,7 @@ async function attestCandidate(
 
   // A CDR/OCR writer racing the scan changes either the key set or a listed byte length.
   // Refuse instead of sealing a prefix that was only complete at the start of the request.
-  const after = await listed(signer, candidate.workspaceKey, candidate.documentIds);
+  const after = await listed(signer, candidate.workspaceKey, candidate.documentIds, candidate.worldObjectKeys);
   if (!after.ok) return { ok: false, code: after.code, processed: 0 };
   if (!sourceInventoryListingsEqual(before.objects, after.objects)) {
     return { ok: false, code: "SOURCE_INVENTORY_CHANGED_DURING_SCAN", processed: 0 };
@@ -97,7 +102,9 @@ async function attestCandidate(
     return { ok: false, code: "SOURCE_INVENTORY_EMPTY_LISTING", processed: 0 };
   }
 
-  const recorded = await attest(candidate.deletionId, objects);
+  // The full World key set goes along: a key missing from `objects` was listed absent and is
+  // recorded as absent -- only a purge receipt ever says an object was removed.
+  const recorded = await attest(candidate.deletionId, objects, candidate.worldObjectKeys);
   if (!recorded.ok) return { ok: false, code: recorded.code, processed: 0 };
   if (recorded.attestation.artifactCount !== objects.length) {
     return { ok: false, code: "SOURCE_INVENTORY_ATTESTATION_COUNT_MISMATCH", processed: 0 };

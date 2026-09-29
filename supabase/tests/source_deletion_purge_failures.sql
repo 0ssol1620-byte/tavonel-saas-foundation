@@ -1,11 +1,13 @@
 -- Gate 11 (migration 20260927103000): a failed purge attempt leaves append-only evidence bound to
 -- the object and the claim that attempted it, the customer's status shows it until the object's
--- receipt exists, and recording it never purges, skips or releases anything.
+-- receipt exists, and recording it never purges anything. Since 20260930011000 an explicit
+-- SOURCE_DELETE_OBJECT_LOCKED refusal also ends the attempt: its claim is fenced and the object
+-- is retried a day later under a new claim.
 --
 -- The auth.users insert bootstraps the self-service workspace pilot-d4d4d4d4d4d44d4d
 -- (20260920121000); with no operator hold its legal-hold state is 'inactive'.
 begin;
-select plan(19);
+select plan(22);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -78,9 +80,12 @@ select is((select o->>'lastPurgeFailureCode' from status_before), 'SOURCE_DELETE
 select is((select (o->>'purgeFailureCount')::integer from status_before), 2, 'and how many attempts failed');
 select ok((select o->>'receiptId' is null and o->>'purgedAt' is null from status_before),
   'recording a failure never marks the object purged');
-select is((select purge_claim_id from public.source_deletion_objects
+-- 20260930011000: the explicit lock refusal fences the finished attempt and defers the object a day.
+select ok((select purge_claim_id is null and purge_claim_expires_at is null and delete_started_at is null
+    and purge_not_before >= now() + interval '24 hours'
+  from public.source_deletion_objects
   where deletion_id = (select c->>'deletionId' from claimed) and object_key = (select c->>'objectKey' from claimed)),
-  (select (c->>'claimId')::uuid from claimed), 'nor releases or replaces the claim');
+  'the lock refusal clears the claim and started state and defers the object');
 
 -- ---------------------------------------------------------------------------
 -- Table shape and append-only
@@ -97,9 +102,23 @@ select throws_ok($$delete from public.source_deletion_worker_failures$$,
 -- ---------------------------------------------------------------------------
 -- A later success: the receipt supersedes the failures in the status, the history stays
 -- ---------------------------------------------------------------------------
-select is(public.finalize_source_deletion_object((select c->>'deletionId' from claimed), (select c->>'objectKey' from claimed),
-  (select c->>'objectSha256' from claimed), false, (select (c->>'claimId')::uuid from claimed))->>'status', 'recorded',
-  'the same claim can still finalize after a recorded failure');
+select throws_ok($$select public.finalize_source_deletion_object((select c->>'deletionId' from claimed),
+  (select c->>'objectKey' from claimed), (select c->>'objectSha256' from claimed), false, (select (c->>'claimId')::uuid from claimed))$$,
+  'P0001', 'SOURCE_DELETION_LEASE_INVALID', 'the lock-refused claim can no longer finalize');
+select is((select count(*)::integer from public.claim_source_deletion_sweep(1)), 0, 'nor is the object reclaimed before it is due');
+
+-- The day passes: the object is reclaimed under a new claim, which begins and finalizes.
+update public.source_deletion_objects set purge_not_before = clock_timestamp() - interval '1 second'
+ where deletion_id = (select c->>'deletionId' from claimed) and object_key = (select c->>'objectKey' from claimed);
+create temp table reclaimed as select c from public.claim_source_deletion_sweep(1) c;
+select ok((select c->>'objectKey' = (select c->>'objectKey' from claimed)
+    and c->>'claimId' <> (select c->>'claimId' from claimed) from reclaimed),
+  'once due the object is reclaimed under a new claim');
+create temp table rebegun as select public.begin_source_deletion_object((select c->>'deletionId' from reclaimed),
+  (select c->>'objectKey' from reclaimed), (select c->>'objectSha256' from reclaimed), (select (c->>'claimId')::uuid from reclaimed)) as r;
+select is(public.finalize_source_deletion_object((select c->>'deletionId' from reclaimed), (select c->>'objectKey' from reclaimed),
+  (select c->>'objectSha256' from reclaimed), false, (select (c->>'claimId')::uuid from reclaimed))->>'status', 'recorded',
+  'the new claim finalizes after the recorded failures');
 select ok((select o->>'lastPurgeFailureCode' is null and (o->>'purgeFailureCount')::integer = 0 and o->>'receiptId' is not null
   from (select public.customer_source_deletion_status('pilot-d4d4d4d4d4d44d4d', '0f000000-0000-4000-8000-00000000000a')->'objects'->0 as o) s),
   'a purged object shows its receipt, not stale failures');

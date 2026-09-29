@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runSourceDeletionSweep, type DeletionCandidate, type DeletionSweepStore } from "./source-deletion-sweeper";
 
 const sha = (char: string) => `sha256:${char.repeat(64)}`;
@@ -20,6 +20,10 @@ function store(rows: DeletionCandidate[]) {
 }
 
 const inspectObject = vi.fn(async () => ({ ok: true as const, exists: true }));
+beforeEach(() => {
+  inspectObject.mockReset().mockResolvedValue({ ok: true, exists: false })
+    .mockResolvedValueOnce({ ok: true, exists: true });
+});
 
 describe("source deletion sweeper", () => {
   it.each(["unknown", "active"] as const)("fails closed when legal hold is %s", async legalHoldState => {
@@ -85,6 +89,7 @@ describe("source deletion sweeper", () => {
   });
 
   it("keeps the original code when the evidence write itself fails or throws", async () => {
+    inspectObject.mockReset().mockResolvedValue({ ok: true, exists: true });
     for (const outcome of [
       async () => ({ ok: false as const, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" }),
       async () => { throw new Error("network"); },
@@ -139,9 +144,29 @@ describe("source deletion sweeper", () => {
     const state = store([candidate("a", "one")]);
     const order: string[] = [];
     state.beginDelete.mockImplementation(async () => { order.push("begin"); return { ok: true }; });
-    const inspect = vi.fn(async () => { order.push("head"); return { ok: true as const, exists: true }; });
+    const inspect = vi.fn(async () => { order.push("head"); return { ok: true as const, exists: order.length === 1 }; });
     const remove = vi.fn(async () => { order.push("delete"); return { ok: true as const, alreadyAbsent: false }; });
     await runSourceDeletionSweep({ store: state.value, inspectObject: inspect, deleteObject: remove });
-    expect(order).toEqual(["head", "begin", "delete"]);
+    expect(order).toEqual(["head", "begin", "delete", "head"]);
+  });
+
+  it("refuses to finalize when DELETE succeeds but a fresh HEAD still finds the object", async () => {
+    const state = store([candidate("a", "one")]);
+    const inspect = vi.fn(async () => ({ ok: true as const, exists: true }));
+    const remove = vi.fn(async () => ({ ok: true as const, alreadyAbsent: false }));
+    await expect(runSourceDeletionSweep({ store: state.value, inspectObject: inspect, deleteObject: remove }))
+      .resolves.toEqual({ ok: false, code: "SOURCE_DELETE_NOT_CONFIRMED", receipts: [], failureRecorded: true });
+    expect(inspect).toHaveBeenCalledTimes(2);
+    expect(state.finalize).not.toHaveBeenCalled();
+  });
+
+  it("does not issue a receipt when post-delete verification is unavailable", async () => {
+    const state = store([candidate("a", "one")]);
+    const inspect = vi.fn().mockResolvedValueOnce({ ok: true, exists: true })
+      .mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_HEAD_FAILED" });
+    await expect(runSourceDeletionSweep({ store: state.value, inspectObject: inspect,
+      deleteObject: async () => ({ ok: true, alreadyAbsent: false }) }))
+      .resolves.toEqual({ ok: false, code: "SOURCE_DELETE_HEAD_FAILED", receipts: [], failureRecorded: true });
+    expect(state.finalize).not.toHaveBeenCalled();
   });
 });

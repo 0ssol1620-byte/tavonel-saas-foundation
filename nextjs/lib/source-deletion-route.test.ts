@@ -100,13 +100,31 @@ describe("source deletion cron route", () => {
     closeSourceDeletionDerived.mockResolvedValueOnce({ ok: true, status: "recorded" });
     runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: true });
     const locked = await POST(request("POST", SECRET));
-    expect(locked.status).toBe(503);
-    expect(await locked.json()).toEqual({ code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: true, derived: "recorded" });
+    expect(locked.status).toBe(200);
+    expect(await locked.json()).toEqual({
+      code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: true, derived: "recorded", deferred: true,
+    });
 
     closeSourceDeletionDerived.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_DERIVED_FAILED" });
     const failed = await POST(request("POST", SECRET));
     expect(failed.status).toBe(503);
     expect(await failed.json()).toEqual({ code: "SOURCE_DELETION_DERIVED_FAILED", processed: 0, derived: "SOURCE_DELETION_DERIVED_FAILED" });
+  });
+
+  it("defers a recorded object lock only when the derived closure also succeeded", async () => {
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", SECRET);
+    closeSourceDeletionDerived.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_DERIVED_FAILED" });
+    runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: true });
+    const lockedClosureFailed = await POST(request("POST", SECRET));
+    expect(lockedClosureFailed.status).toBe(503);
+    expect(await lockedClosureFailed.json()).toEqual({
+      code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: true, derived: "SOURCE_DELETION_DERIVED_FAILED",
+    });
+
+    runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_FAILED", receipts: [], failureRecorded: true });
+    const otherRecorded = await POST(request("POST", SECRET));
+    expect(otherRecorded.status).toBe(503);
+    expect(await otherRecorded.json()).toEqual({ code: "SOURCE_DELETE_FAILED", processed: 0, failureRecorded: true, derived: "idle" });
   });
 
   it("returns sanitized success and retryable failure responses", async () => {

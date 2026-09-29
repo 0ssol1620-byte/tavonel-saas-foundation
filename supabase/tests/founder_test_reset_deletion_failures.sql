@@ -90,8 +90,14 @@ create temp table begun as select public.begin_source_deletion_object((select c-
   (select c->>'objectKey' from claimed), (select c->>'objectSha256' from claimed), (select (c->>'claimId')::uuid from claimed)) as r;
 create temp table purge_failure as select public.record_source_deletion_purge_failure((select c->>'deletionId' from claimed),
   (select c->>'objectKey' from claimed), (select (c->>'claimId')::uuid from claimed), 'SOURCE_DELETE_OBJECT_LOCKED') as r;
-create temp table purged as select public.finalize_source_deletion_object((select c->>'deletionId' from claimed),
-  (select c->>'objectKey' from claimed), (select c->>'objectSha256' from claimed), false, (select (c->>'claimId')::uuid from claimed)) as r;
+-- The lock refusal fences that claim (20260930011000); once due, a new claim purges the object.
+update public.source_deletion_objects set purge_not_before = clock_timestamp() - interval '1 second'
+ where deletion_id = (select c->>'deletionId' from claimed) and object_key = (select c->>'objectKey' from claimed);
+create temp table reclaimed as select c from public.claim_source_deletion_sweep(1) c;
+create temp table rebegun as select public.begin_source_deletion_object((select c->>'deletionId' from reclaimed),
+  (select c->>'objectKey' from reclaimed), (select c->>'objectSha256' from reclaimed), (select (c->>'claimId')::uuid from reclaimed)) as r;
+create temp table purged as select public.finalize_source_deletion_object((select c->>'deletionId' from reclaimed),
+  (select c->>'objectKey' from reclaimed), (select c->>'objectSha256' from reclaimed), false, (select (c->>'claimId')::uuid from reclaimed)) as r;
 
 select is((select count(*)::integer from public.source_deletion_worker_failures
   where deletion_id = (select r->>'deletionId' from founder_request)), 2, 'fixture: two founder failures reference the tombstone and object');

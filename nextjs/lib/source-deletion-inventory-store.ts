@@ -1,3 +1,4 @@
+import { isCollectionCandidateKey } from "./immutable-keys";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import type { SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
 
@@ -12,6 +13,8 @@ export type SourceDeletionInventoryCandidate = {
   workspaceKey: string;
   sourceId: string;
   documentIds: string[];
+  /** Exact candidate-world.json keys of every World compiled from these documents (20260930010000). */
+  worldObjectKeys: string[];
 };
 
 export type SourceDeletionInventoryAttestation = {
@@ -29,13 +32,20 @@ function candidate(value: unknown): SourceDeletionInventoryCandidate | null {
     typeof row.sourceId !== "string" || !SOURCE_ID.test(row.sourceId) ||
     !Array.isArray(row.documentIds) || row.documentIds.length > 128 ||
     !row.documentIds.every((id) => typeof id === "string" && DOCUMENT.test(id)) ||
-    new Set(row.documentIds as string[]).size !== row.documentIds.length
+    new Set(row.documentIds as string[]).size !== row.documentIds.length ||
+    // At most 65 keys: one past the limit, so the worker refuses an oversized set and records it
+    // against the tombstone instead of this parse stalling the whole queue.
+    !Array.isArray(row.worldObjectKeys) || row.worldObjectKeys.length > 65 ||
+    !row.worldObjectKeys.every((key) =>
+      typeof key === "string" && isCollectionCandidateKey(row.workspaceKey as string, key)) ||
+    new Set(row.worldObjectKeys as string[]).size !== row.worldObjectKeys.length
   ) return null;
   return {
     deletionId: row.deletionId,
     workspaceKey: row.workspaceKey,
     sourceId: row.sourceId,
     documentIds: [...(row.documentIds as string[])].sort(),
+    worldObjectKeys: [...(row.worldObjectKeys as string[])].sort(),
   };
 }
 
@@ -102,10 +112,11 @@ export async function recordSourceDeletionInventoryFailure(deletionId: string, c
 export async function recordSourceDeletionInventoryAttestation(
   deletionId: string,
   objects: readonly SourceInventoryHashedObject[],
+  worldObjectKeys: readonly string[],
 ): Promise<
   { ok: true; attestation: SourceDeletionInventoryAttestation } | { ok: false; code: string }
 > {
-  if (!SHA256.test(deletionId) || objects.length > 512) {
+  if (!SHA256.test(deletionId) || objects.length > 512 || worldObjectKeys.length > 64) {
     return { ok: false, code: "SOURCE_INVENTORY_ATTESTATION_INVALID" };
   }
   const result = await rpc("attest_source_deletion_inventory", {
@@ -115,6 +126,8 @@ export async function recordSourceDeletionInventoryAttestation(
       sha256: object.sha256,
       sizeBytes: object.sizeBytes,
     })),
+    // The database re-derives this set and refuses any other; present keys are in `objects`.
+    p_world_object_keys: [...worldObjectKeys],
   });
   if (!result.ok) return result;
   const parsed = attestation(result.value);
