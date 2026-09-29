@@ -13,7 +13,7 @@ const commercial = {
 };
 
 describe("public deployment status v2", () => {
-  it("keeps purchase and self-service closed while customer processing is closed", () => {
+  it("allows an account while purchase and customer processing stay closed", () => {
     const status = buildPublicStatusV2({
       now: NOW,
       commercial,
@@ -26,7 +26,8 @@ describe("public deployment status v2", () => {
     expect(status.service.state).toBe("not_assessed");
     expect(status.availableActions.readPublicWorld.enabled).toBe(true);
     expect(status.availableActions.requestPilot.enabled).toBe(true);
-    expect(status.availableActions.createAccount.enabled).toBe(false);
+    expect(status.availableActions.createAccount.enabled).toBe(true);
+    expect(status.availableActions.createAccount.reason).toContain("requires separate approval");
     expect(status.availableActions.purchasePlan.enabled).toBe(false);
     expect(status.availableActions.compileCustomerDocuments.enabled).toBe(false);
     expect(status.availableActions.purchasePlan.reason).toContain("does not enable");
@@ -43,6 +44,14 @@ describe("public deployment status v2", () => {
     expect(status.availableActions.createAccount.enabled).toBe(true);
     expect(status.availableActions.purchasePlan.enabled).toBe(true);
     expect(status.availableActions.compileCustomerDocuments.enabled).toBe(true);
+  });
+
+  it("does not advertise account creation in a pilot-only deployment", () => {
+    const status = buildPublicStatusV2({
+      now: NOW, commercial, accessMode: "pilot", authReady: true, policy: activationPolicy,
+    });
+    expect(status.availableActions.signIn.enabled).toBe(true);
+    expect(status.availableActions.createAccount.enabled).toBe(false);
   });
 
   it("contains no operator configuration or secret-adjacent fields", () => {

@@ -33,8 +33,8 @@ export function buildPublicStatusV2(inputs: PublicStatusInputs): PublicStatusV2 
     && inputs.policy.cdr.enabled
     && inputs.policy.ocrGpu.enabled
     && inputs.policy.customerData.enabled;
-  const selfServiceReady = inputs.authReady && inputs.accessMode === "self_service" && customerPathReady;
-  const purchaseReady = inputs.commercial.liveChargesEnabled && selfServiceReady;
+  const selfServiceReady = inputs.authReady && inputs.accessMode === "self_service";
+  const purchaseReady = inputs.commercial.liveChargesEnabled && selfServiceReady && customerPathReady;
 
   return {
     schemaVersion: PUBLIC_STATUS_SCHEMA,
@@ -60,7 +60,11 @@ export function buildPublicStatusV2(inputs: PublicStatusInputs): PublicStatusV2 
       createAccount: {
         enabled: selfServiceReady,
         href: selfServiceReady ? "/login" : "/contact",
-        reason: selfServiceReady ? "Self-service account creation is open." : CLOSED_REASON,
+        reason: selfServiceReady
+          ? customerPathReady
+            ? "Self-service account creation is open."
+            : "Create an account to inspect the public World. Customer-file processing requires separate approval."
+          : CLOSED_REASON,
       },
       purchasePlan: {
         enabled: purchaseReady,
