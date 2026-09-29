@@ -98,7 +98,9 @@ export default defineConfig({
   webServer: usesExternalServer ? undefined : {
     // Exercise the production CSP. Next's development React Refresh runtime
     // requires eval, which the shipped policy intentionally forbids.
-    command: `pnpm build && pnpm start --hostname 127.0.0.1 --port ${testPort}`,
+    // CI runs check, tests, and the full build in its required nextjs job. The browser suites
+    // need a production bundle, not another copy of prebuild's full check and 5,000+ tests.
+    command: `pnpm exec next build && pnpm start --hostname 127.0.0.1 --port ${testPort}`,
     url: `${testBaseUrl}/workspace`,
     reuseExistingServer: false,
     timeout: Number(process.env.PLAYWRIGHT_WEB_SERVER_TIMEOUT ?? "300000"),
