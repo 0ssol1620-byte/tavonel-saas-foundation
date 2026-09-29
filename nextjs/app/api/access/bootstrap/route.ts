@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { foundationPilotAccess, getRequestUser, readAccessMode } from "@/lib/foundation-pilot";
 import { readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
+import { issueProcessingWorkspaceGrant } from "@/lib/processing-workspace-grant";
 import { ensureSelfServiceOrganization } from "@/lib/self-service-provisioning";
 import { authorizeFoundationSessionProduct, bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
 
@@ -15,6 +16,21 @@ const NO_ENTITLEMENT_TRIAL_CODES = new Set([
   "TRIAL_DEVICE_ALREADY_USED",
   "TRIAL_REVIEW_REQUIRED",
 ]);
+// Grant failures that mean "we could not check", not "this workspace is not qualified yet".
+const GRANT_UNAVAILABLE_CODES = new Set([
+  "WORKSPACE_GRANT_INPUT_INVALID",
+  "WORKSPACE_GRANT_STORE_NOT_CONFIGURED",
+  "WORKSPACE_GRANT_STORE_FAILED",
+  "PROCESSING_TERMS_UNAVAILABLE",
+  "SCOPED_RELEASE_INVALID",
+]);
+
+function sourcePendingReason(code: string) {
+  if (code === "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" || code === "SCOPED_TERMS_ACCEPTANCE_REQUIRED") {
+    return "terms_acceptance_required";
+  }
+  return code === "SCOPED_WORKSPACE_REFUSED" ? "workspace_refused" : "release_pending";
+}
 
 export async function POST(request: Request) {
   const user = await getRequestUser(request);
@@ -32,6 +48,24 @@ export async function POST(request: Request) {
     }
   }
 
+  // v2 only: renew this workspace's grant from what is already durable -- the owner's explicit
+  // acceptance of the served terms and the current release decision for this deployment. Nothing
+  // is accepted on the user's behalf; without an acceptance, release or with a refusal the gate
+  // read below stays closed and the response says why.
+  const scopedGate = process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2";
+  let grantCode: string | null = null;
+  if (scopedGate) {
+    const issued = await issueProcessingWorkspaceGrant({
+      workspaceKey: pilot.membership.workspaceId, scope: "direct_upload",
+    });
+    if (!issued.ok) {
+      if (readAccessMode() === "self_service" && GRANT_UNAVAILABLE_CODES.has(issued.code)) {
+        return NextResponse.json({ code: "SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
+      }
+      grantCode = issued.code;
+    }
+  }
+
   // A free evaluation must not begin counting down while this workspace cannot submit
   // a source. Existing owner/paid access remains visible, but a trial is only minted
   // after the same exact-workspace customer-data decision used by upload routes opens.
@@ -44,7 +78,8 @@ export async function POST(request: Request) {
       gate.code === "CUSTOMER_DATA_GATE_INPUT_INVALID" ||
       gate.code === "SCOPED_GATE_INPUT_INVALID" || gate.code === "SOURCE_GATE_VERSION_INVALID" ||
       gate.code === "SCOPED_GATE_STORE_NOT_CONFIGURED" || gate.code === "SCOPED_GATE_STORE_FAILED" ||
-      gate.code === "SCOPED_RELEASE_INVALID" || gate.code === "SCOPED_WORKSPACE_INVALID")) {
+      gate.code === "SCOPED_RELEASE_INVALID" || gate.code === "SCOPED_WORKSPACE_INVALID" ||
+      gate.code === "SCOPED_TERMS_UNAVAILABLE")) {
     return NextResponse.json({ code: "SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
   }
   if (readAccessMode() === "self_service" && !customerDataEnabled) {
@@ -54,6 +89,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       code: "ACCESS_READY_SOURCE_PENDING",
+      ...(scopedGate && !gate.ok ? { sourcePending: sourcePendingReason(grantCode ?? gate.code) } : {}),
       access: existing.ok && existing.access.source !== "trial"
         ? { ...existing.access, limits: null, customerDataEnabled: false }
         : {

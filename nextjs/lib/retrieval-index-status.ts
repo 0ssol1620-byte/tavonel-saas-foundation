@@ -1,5 +1,8 @@
 import { randomBytes } from "node:crypto";
 import type { CollectionCandidateArtifact } from "./collection-compiler";
+import type { ReviewableCollectionArtifact } from "./collection-download";
+import { collectionSourceDocumentIds } from "./collection-source-access";
+import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "./derived-data-admission";
 import { compileRetrievalArtifacts } from "./retrieval-compile";
 import type { RetrievalProfile } from "./retrieval-profile";
 import { buildProductionRetrievalProfile, selectProductionRetrievalRuntime } from "./retrieval-runtime-config";
@@ -168,6 +171,11 @@ export async function ensureRetrievalIndexForActiveWorld(
   const artifact = indexableArtifact(input.artifact);
   if (!artifact || artifact.manifestDigest !== input.worldManifestDigest) {
     return recordRefusal(input, profile, input.actorUserId, ARTIFACT_UNREADABLE);
+  }
+  // Compiling sends unit text to the embedder: new processing, so a revoked release or grant
+  // stops it. Not recorded as a run -- nothing was attempted, and the state is reported here.
+  if (!await admitsDerivedCustomerData(input.workspaceKey, collectionSourceDocumentIds(input.artifact as ReviewableCollectionArtifact) ?? [])) {
+    return { ...base, status: "failed", errorClass: DERIVED_DATA_REFUSED };
   }
 
   const runtime = selectProductionRetrievalRuntime(input.workspaceKey);

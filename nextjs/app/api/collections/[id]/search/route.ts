@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
+import { DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import {
   resolveConfiguredProductionRetrievalRuntime,
 } from "@/lib/retrieval-runtime-config";
@@ -147,7 +148,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             }
           : {}),
       },
-      { status: conflict ? 409 : result.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503, headers: NO_STORE },
+      { status: conflict ? 409 : result.code === "RETRIEVAL_QUESTION_INVALID" ? 400
+        : result.code === DERIVED_DATA_REFUSED ? 403 : 503, headers: NO_STORE },
     );
   }
 

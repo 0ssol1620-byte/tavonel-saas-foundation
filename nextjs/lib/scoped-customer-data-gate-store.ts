@@ -9,6 +9,7 @@ import {
 } from "../../shared/scopedCustomerDataGate";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import type { ScopedCustomerDataAuthorization } from "../../shared/customerDataAuthorization";
+import { readCurrentProcessingTermsAcceptance } from "./processing-workspace-grant";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const REVISION = /^[0-9a-f]{40}$/;
@@ -21,7 +22,8 @@ export type ScopedGateResult =
   | { ok: false; code: "SCOPED_GATE_INPUT_INVALID" | "SCOPED_GATE_STORE_NOT_CONFIGURED" |
       "SCOPED_GATE_STORE_FAILED" | "SCOPED_RELEASE_NOT_FOUND" | "SCOPED_RELEASE_REFUSED" |
       "SCOPED_RELEASE_INVALID" | "SCOPED_RELEASE_STALE" | "SCOPED_WORKSPACE_NOT_FOUND" |
-      "SCOPED_WORKSPACE_REFUSED" | "SCOPED_WORKSPACE_INVALID" };
+      "SCOPED_WORKSPACE_REFUSED" | "SCOPED_WORKSPACE_INVALID" | "SCOPED_TERMS_UNAVAILABLE" |
+      "SCOPED_TERMS_ACCEPTANCE_REQUIRED" };
 
 async function latestRow(path: string, env: Env): Promise<Record<string, unknown>[] | null | undefined> {
   const config = readSupabaseAdminConfig(env);
@@ -57,7 +59,12 @@ function parseEvidence(value: unknown, scope: CustomerDataScope): ReleaseEvidenc
 
 const iso = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
 
-/** Read both immutable ledgers. A later refusal or changed release invalidates an older grant. */
+/**
+ * Read both immutable ledgers. A later refusal or changed release invalidates an older grant, and so
+ * does losing the acceptance it was issued from: the grant's user and terms receipts must still equal
+ * the current owner's acceptance of the manifest this deployment serves. Tenant and workspace are
+ * the same Foundation workspace key.
+ */
 export async function readVerifiedScopedCustomerDataGate(
   tenantId: string,
   workspaceId: string,
@@ -65,11 +72,13 @@ export async function readVerifiedScopedCustomerDataGate(
   releaseRevision: string,
   now = new Date(),
   env: Env = process.env,
+  publicDir?: string,
 ): Promise<ScopedGateResult> {
-  if (!IDENTIFIER.test(tenantId) || !IDENTIFIER.test(workspaceId) ||
+  if (!IDENTIFIER.test(tenantId) || !IDENTIFIER.test(workspaceId) || tenantId !== workspaceId ||
     !["direct_upload", "connector"].includes(scope) || !REVISION.test(releaseRevision) ||
     !Number.isFinite(now.getTime())) return { ok: false, code: "SCOPED_GATE_INPUT_INVALID" };
-  if (!readSupabaseAdminConfig(env)) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
+  const config = readSupabaseAdminConfig(env);
+  if (!config) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
 
   const releaseQuery = new URLSearchParams({
     select: "schema_version,scope,release_revision,allowed,receipt_sha256,evidence,missing,evaluated_at,recorded_at",
@@ -137,6 +146,16 @@ export async function readVerifiedScopedCustomerDataGate(
   };
   if (!admitsWorkspace(release, grant, { tenantId, workspaceId, scope, releaseRevision }, now.toISOString())) {
     return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
+  }
+  const current = await readCurrentProcessingTermsAcceptance(config, workspaceId, scope, now.getTime(), publicDir);
+  if (!current.ok) {
+    return { ok: false, code: current.code === "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" ? "SCOPED_TERMS_ACCEPTANCE_REQUIRED"
+      : current.code === "PROCESSING_TERMS_UNAVAILABLE" ? "SCOPED_TERMS_UNAVAILABLE" : "SCOPED_GATE_STORE_FAILED" };
+  }
+  if (grant.userId.toLowerCase() !== current.userId || grant.termsVersion !== current.manifest.version ||
+    grant.termsReceiptSha256 !== current.termsReceiptSha256 ||
+    grant.processingTermsReceiptSha256 !== current.processingTermsReceiptSha256) {
+    return { ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" };
   }
   return { ok: true, scope, releaseReceiptSha256: release.receiptSha256!,
     grantReceiptSha256: grant.grantReceiptSha256,

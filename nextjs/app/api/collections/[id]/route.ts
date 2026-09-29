@@ -6,6 +6,7 @@ import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { collectionSourceDocumentIds } from "@/lib/collection-source-access";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import { listWorkspaceCompileJobs } from "@/lib/compile-job-store";
 import { listFoundationReviewDecisions } from "@/lib/review-store";
 import { buildWorldReadModel } from "@/lib/world-read-model";
@@ -47,6 +48,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
   });
+  // The signed download stays available for portability; this interactive view does not.
+  if (!await admitsDerivedCustomerData(auth.principal.workspaceKey, documentIds)) {
+    return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   /*
     The per-document breakdown, from the same derivation the workspace renders (audit U05).
 
