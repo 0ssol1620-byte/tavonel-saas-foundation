@@ -145,6 +145,9 @@ const nextConfig = {
   */
   htmlLimitedBots: /.*/,
   outputFileTracingRoot: packageRoot,
+  outputFileTracingIncludes: {
+    "/api/access/processing-terms": ["./public/policy/*2026-09-30*"],
+  },
   async headers() {
     return [
       {

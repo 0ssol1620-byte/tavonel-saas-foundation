@@ -460,6 +460,15 @@
         "DELETE"
       ],
       "credential": "bearer:supabase-jwt"
+    },
+    "app/api/access/processing-terms/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Records owner processing-terms acceptance only; grants nothing."
     }
   }
 }
