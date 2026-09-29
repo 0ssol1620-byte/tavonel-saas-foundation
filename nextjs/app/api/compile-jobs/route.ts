@@ -11,6 +11,7 @@ import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
+import { readCustomerSourceScope } from "@/lib/customer-source-scope";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
@@ -67,7 +68,13 @@ export async function POST(request: Request) {
   }
 
   // Do not enqueue work the compiler must later reject for a missing or revoked receipt.
-  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+  let sourceScope: "direct_upload" | "connector" = "direct_upload";
+  if (process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2") {
+    const source = await readCustomerSourceScope(auth.principal.workspaceKey, documentIds);
+    if (!source.ok) return NextResponse.json({ code: source.code }, { status: 503, headers: HEADERS });
+    sourceScope = source.scope;
+  }
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey, sourceScope)) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
   }
 

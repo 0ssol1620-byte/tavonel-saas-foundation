@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   const sourceSha256 = typeof body.sourceSha256 === "string" ? body.sourceSha256 : null;
 
   // Approval may be revoked after a short-lived capability was issued.
-  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "direct_upload")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers });
   }
 

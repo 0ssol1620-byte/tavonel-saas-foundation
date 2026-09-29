@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   }
   // A signed PUT URL admits bytes and reserves compute. Check before issuing either.
   const workspaceId = auth.principal.workspaceKey;
-  if (!await canAdmitCustomerSource(workspaceId)) {
+  if (!await canAdmitCustomerSource(workspaceId, "direct_upload")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
   }
 

@@ -69,7 +69,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     return { ok: false, nativeId: item.nativeId, code: "SOURCE_TOO_LARGE" };
   }
   // A queued sync can outlive its approval. Recheck before reading provider bytes.
-  if (!await canAdmitCustomerSource(context.workspaceKey)) {
+  if (!await canAdmitCustomerSource(context.workspaceKey, "connector")) {
     return { ok: false, nativeId: item.nativeId, code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" };
   }
   let identity: ConnectorSourceIdentity;

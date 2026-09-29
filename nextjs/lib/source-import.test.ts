@@ -55,6 +55,7 @@ describe("source import replay safety", () => {
       signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher },
     { nativeId: "file", name: "file.pdf", revision: "1", mimeType: "application/pdf", sizeBytes: 3, modifiedAt: null, kind: "file" });
     expect(result).toEqual({ ok: false, nativeId: "file", code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(canAdmitCustomerSource).toHaveBeenCalledWith("pilot-acme01", "connector");
     expect(fetcher).not.toHaveBeenCalled();
     expect(reserveFoundationIntake).not.toHaveBeenCalled();
   });

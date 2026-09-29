@@ -19,7 +19,7 @@ vi.mock("@/lib/self-service-trial", () => ({
   bootstrapFoundationSelfServiceTrial: bootstrap,
   authorizeFoundationSessionProduct: authorize,
 }));
-vi.mock("@/lib/customer-data-gate-store", () => ({ readVerifiedCustomerDataGateDecision: gate }));
+vi.mock("@/lib/customer-data-admission", () => ({ readCustomerSourceAuthorization: gate }));
 vi.mock("@/lib/self-service-provisioning", () => ({ ensureSelfServiceOrganization: provision }));
 
 import { POST } from "../app/api/access/bootstrap/route";
@@ -42,7 +42,7 @@ describe("workspace bootstrap source admission", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     await expect(response.json()).resolves.toMatchObject({ access: { customerDataEnabled: enabled } });
-    expect(gate).toHaveBeenCalledWith("pilot-11111111", "pilot-11111111");
+    expect(gate).toHaveBeenCalledWith("pilot-11111111", "direct_upload");
   });
 
   it("does not start a free evaluation while customer file processing is closed", async () => {
@@ -120,7 +120,7 @@ describe("workspace bootstrap source admission", () => {
       code: "ACCESS_READY_NO_ENTITLEMENT",
       access: { source: "unentitled", accessPlan: null, limits: null, customerDataEnabled: false },
     });
-    expect(gate).toHaveBeenCalledWith("pilot-11111111", "pilot-11111111");
+    expect(gate).toHaveBeenCalledWith("pilot-11111111", "direct_upload");
   });
 
   it("keeps configuration failures closed", async () => {

@@ -88,6 +88,7 @@ describe("cursor safety", () => {
   it("settles a revoked workspace before opening the connector", async () => {
     canAdmitCustomerSource.mockResolvedValue(false);
     expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
+    expect(canAdmitCustomerSource).toHaveBeenCalledWith(JOB.workspaceKey, "connector");
     expect(completeJobBatch).toHaveBeenCalledWith(JOB.workspaceKey, JOB.jobId, "worker-1", {
       outcome: "failed", errorCode: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE",
     });
