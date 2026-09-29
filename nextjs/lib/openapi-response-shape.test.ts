@@ -335,7 +335,7 @@ describe("documented response shapes", () => {
     expect(compile.status).toBe(403);
     await expect(compile.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
     expect(enqueue).not.toHaveBeenCalled();
-    expect(customerDataAdmission).toHaveBeenCalledWith(WORKSPACE);
+    expect(customerDataAdmission).toHaveBeenCalledWith(WORKSPACE, "direct_upload");
   });
 
   it("startCompileJob answers the 202 the spec describes, and refuses an empty documentIds", async () => {
