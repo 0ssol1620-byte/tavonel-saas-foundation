@@ -25,6 +25,10 @@ This record separates implemented paths from permission to accept a customer's f
 
 Until those conditions have evidence, keep the existing production customer-data and live-charge gates closed. This branch is a payment safety repair, not a launch approval.
 
+The 2026-09-29 [scoped launch-policy decision](SCOPED_CUSTOMER_DATA_LAUNCH_POLICY_2026-09-29.md)
+separates direct upload from connector qualification for future implementation. It does not alter
+the current 17-condition gate or authorize production customer-data processing.
+
 ## Recheck on 2026-09-29
 
 - Production Supabase project `tfcorhjkqcuisqhsjemz` still has zero rows in `customer_data_gate_receipts` (read-only SQL Editor count). The only row in `foundation_billing_accounts` says `active` and has a Paddle subscription ID, but it belongs to the workspace creator and was last updated on 2026-09-01. Paddle Live shows zero subscriptions and zero active subscribers, so this database projection is not evidence of a live subscription. Do not apply an automatic pause or refund to it without provider reconciliation.
