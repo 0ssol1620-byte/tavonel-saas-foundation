@@ -75,7 +75,7 @@ export function evaluateScopedRelease(input: {
     schemaVersion: SCOPED_CUSTOMER_DATA_GATE_SCHEMA,
     scope: input.scope,
     releaseRevision: input.releaseRevision,
-    evaluatedAt: input.now,
+    evaluatedAt: new Date(evaluated!).toISOString(),
     evidence: required.map((precondition) => {
       const row = input.evidence.find((entry) => entry.precondition === precondition)!;
       return { precondition, satisfied: row.satisfied, evidence: row.evidence, checkedAt: row.checkedAt };
@@ -95,6 +95,7 @@ export function evaluateScopedRelease(input: {
 export type WorkspaceGrant = {
   tenantId: string;
   workspaceId: string;
+  userId: string;
   scope: CustomerDataScope;
   releaseRevision: string;
   releaseReceiptSha256: string;
@@ -104,9 +105,32 @@ export type WorkspaceGrant = {
   grantedAt: string;
   expiresAt: string;
   revokedAt: string | null;
+  grantReceiptSha256: string;
 };
 
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
+const canonicalInstant = (value: string): string => {
+  const parsed = instant(value);
+  return parsed === null ? value : new Date(parsed).toISOString();
+};
+
+export function workspaceGrantSha256(grant: Omit<WorkspaceGrant, "grantReceiptSha256">): string {
+  const canonical = JSON.stringify({
+    schemaVersion: SCOPED_CUSTOMER_DATA_GATE_SCHEMA,
+    tenantId: grant.tenantId,
+    workspaceId: grant.workspaceId,
+    userId: grant.userId,
+    scope: grant.scope,
+    releaseRevision: grant.releaseRevision,
+    releaseReceiptSha256: grant.releaseReceiptSha256,
+    termsVersion: grant.termsVersion,
+    termsReceiptSha256: grant.termsReceiptSha256,
+    processingTermsReceiptSha256: grant.processingTermsReceiptSha256,
+    grantedAt: canonicalInstant(grant.grantedAt),
+    expiresAt: canonicalInstant(grant.expiresAt),
+  });
+  return `sha256:${createHash("sha256").update(canonical).digest("hex")}`;
+}
 
 /** A release cannot grant any account access on its own. */
 export function admitsWorkspace(
@@ -129,6 +153,7 @@ export function admitsWorkspace(
     grant.tenantId === subject.tenantId && grant.workspaceId === subject.workspaceId &&
     grant.scope === subject.scope && grant.releaseRevision === subject.releaseRevision &&
     grant.releaseReceiptSha256 === release.receiptSha256 && grant.revokedAt === null &&
+    grant.userId.length > 0 && grant.grantReceiptSha256 === workspaceGrantSha256(grant) &&
     grant.termsVersion.trim().length > 0 && DIGEST.test(grant.termsReceiptSha256) &&
     DIGEST.test(grant.processingTermsReceiptSha256);
 }
