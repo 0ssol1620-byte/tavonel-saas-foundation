@@ -13,6 +13,8 @@ test("closed workspace offers a public example without offering an upload", asyn
   await expect(page.getByText("Getting started")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Choose files" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Upload", exact: true })).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("workspace-admission-closed.png"), fullPage: true });
 });
 
@@ -32,6 +34,16 @@ test("an authenticated account without compute access sees one consistent next s
 
   await expect(page.getByText("Source access pending")).toBeVisible();
   await expect(page.getByText("Your account is ready, but source processing is closed.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
+  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
+});
+
+test("closed workspace does not sell AI connection access as an available plan", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+  await page.goto("/workspace/developers", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "AI connections are not available for this workspace yet." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
   await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { foundationPilotAccess, getRequestUser, readAccessMode } from "@/lib/foundation-pilot";
-import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
+import { readVerifiedCustomerDataGateDecision } from "@/lib/customer-data-gate-store";
 import { ensureSelfServiceOrganization } from "@/lib/self-service-provisioning";
 import { authorizeFoundationSessionProduct, bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
 
@@ -35,7 +35,15 @@ export async function POST(request: Request) {
   // A free evaluation must not begin counting down while this workspace cannot submit
   // a source. Existing owner/paid access remains visible, but a trial is only minted
   // after the same exact-workspace customer-data decision used by upload routes opens.
-  const customerDataEnabled = await canAdmitCustomerSource(pilot.membership.workspaceId);
+  const gate = await readVerifiedCustomerDataGateDecision(pilot.membership.workspaceId, pilot.membership.workspaceId);
+  const customerDataEnabled = gate.ok;
+  if (readAccessMode() === "self_service" && !gate.ok &&
+    (gate.code === "CUSTOMER_DATA_GATE_STORE_NOT_CONFIGURED" ||
+      gate.code === "CUSTOMER_DATA_GATE_STORE_FAILED" ||
+      gate.code === "CUSTOMER_DATA_GATE_RECEIPT_INVALID" ||
+      gate.code === "CUSTOMER_DATA_GATE_INPUT_INVALID")) {
+    return NextResponse.json({ code: "SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
+  }
   if (readAccessMode() === "self_service" && !customerDataEnabled) {
     const existing = await authorizeFoundationSessionProduct(pilot.membership.workspaceId, user.id, "observer");
     if (!existing.ok && existing.status >= 500) {

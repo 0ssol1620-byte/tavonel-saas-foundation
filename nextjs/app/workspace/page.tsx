@@ -2566,9 +2566,9 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
-                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? accessSource === "unentitled" ? "No compute access is active for this account. Review current access options before running Core." : "This workspace cannot run Core on your sources yet. Arrange a scoped pilot to continue." : "Source access could not be verified. Sign in again before running Core."}</p> : null}
+                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "Source processing is not active for this workspace. Request source access before running Core." : "Source access could not be verified. Refresh before running Core."}</p> : null}
                 <div className="billing-actions">
-                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? accessSource === "unentitled" ? <Link href="/pricing">View access options</Link> : <Link href="/contact">Arrange a pilot</Link> : null}
+                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <Link href="/contact">Request source access</Link> : null}
                 </div>
               </section>
             ) : null}
@@ -3054,14 +3054,18 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : "API keys are part of Developer access."}</h2>
+                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of Developer access."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
+                : customerDataAccess === "closed"
+                ? "Your account is ready, but source processing is closed. Request source access before setting up API keys or MCP."
                 : accessSource === "trial"
                 ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
                 : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : customerDataAccess === "closed"
+                ? <Link className="btn" href="/contact">Request source access</Link>
                 : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}
