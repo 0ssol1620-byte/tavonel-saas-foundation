@@ -147,7 +147,7 @@ jobs:
           cat "$RUNNER_TEMP/ocr-gpu-evidence/IMAGE_CANDIDATE.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload candidate identity
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: foundation-ocr-gpu-image-${{ github.sha }}
           path: ${{ runner.temp }}/ocr-gpu-evidence/IMAGE_CANDIDATE.md
