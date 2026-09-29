@@ -50,7 +50,10 @@ export function GET() {
       // Keep this compatibility response aligned with the action policy enforced by checkout.
       // Live Paddle credentials alone cannot make a closed customer workflow purchasable.
       liveCheckout: availableActions.purchasePlan.enabled,
-      selfService: availableActions.createAccount.enabled,
+      // This legacy field means a self-service document workflow. Account creation can be
+      // available separately through v2 without implying that files can be processed.
+      selfService: availableActions.createAccount.enabled &&
+        availableActions.compileCustomerDocuments.enabled,
       activationPolicy,
       auth,
       billing,

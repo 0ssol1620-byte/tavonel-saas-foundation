@@ -96,8 +96,10 @@ test("product page shows the product path before secondary product surfaces", as
   const statusResponse = await page.request.get("/api/status/v2");
   expect(statusResponse.ok()).toBe(true);
   const status = await statusResponse.json();
-  expect(typeof status.availableActions?.createAccount?.enabled).toBe("boolean");
-  const expectedCta = status.availableActions.createAccount.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
+  expect(typeof status.availableActions?.compileCustomerDocuments?.enabled).toBe("boolean");
+  expect(typeof status.availableActions?.purchasePlan?.enabled).toBe("boolean");
+  const expectedCta = status.availableActions.compileCustomerDocuments.enabled &&
+    status.availableActions.purchasePlan.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
   /*
     BQ-109 deleted `.product-flow`. /product printed the same four beats twice -- once as a

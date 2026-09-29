@@ -35,7 +35,7 @@ describe("status API compatibility", () => {
     expect(raw).not.toHaveProperty("coreV2");
   });
 
-  it("does not advertise checkout or signup when customer documents remain closed", async () => {
+  it("separates account creation from the legacy document-workflow flag", async () => {
     vi.stubEnv("COMMERCIAL_MODE", "live");
     vi.stubEnv("PADDLE_SANDBOX", "false");
     vi.stubEnv("TAVONEL_BILLING_LAUNCH_APPROVED", "true");
@@ -57,7 +57,8 @@ describe("status API compatibility", () => {
 
     expect(publicStatus).not.toBeNull();
     expect(legacy.liveCheckout).toBe(publicStatus?.availableActions.purchasePlan.enabled);
-    expect(legacy.selfService).toBe(publicStatus?.availableActions.createAccount.enabled);
+    expect(publicStatus?.availableActions.createAccount.enabled).toBe(true);
+    expect(publicStatus?.availableActions.compileCustomerDocuments.enabled).toBe(false);
     expect(legacy.liveCheckout).toBe(false);
     expect(legacy.selfService).toBe(false);
     expect(legacy.billing).toBe("live_launch_pending");
