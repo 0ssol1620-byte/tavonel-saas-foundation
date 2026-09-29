@@ -141,7 +141,9 @@ export async function readVerifiedCustomerDataGateDecision(
     select: "schema_version,tenant_id,workspace_id,allowed,satisfied_count,receipt_sha256,missing,evidence,evaluated_at,recorded_at",
     tenant_id: `eq.${tenantId}`,
     workspace_id: `eq.${workspaceId}`,
-    order: "evaluated_at.desc,recorded_at.desc",
+    // A later recorded refusal revokes an older approval even when its evidence was evaluated
+    // earlier. If two decisions share a recorded timestamp, prefer refusal and fail closed.
+    order: "recorded_at.desc,allowed.asc,evaluated_at.desc",
     limit: "1",
   });
   let response: Response;

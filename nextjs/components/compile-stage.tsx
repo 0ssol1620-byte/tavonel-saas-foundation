@@ -112,6 +112,12 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
   const hasVisual = view.visual !== "none";
   const framed = hasVisual && view.visual !== "sources" && drawable;
   const idleHeight = 132 + Math.min(Math.max(rows.length, 1), 8) * 22;
+  const observedTextBoxes = view.progressId
+    ? reading[view.progressId]?.pages.reduce((count, page) => count + page.boxes.filter((box) => box.text.trim()).length, 0) ?? 0
+    : 0;
+  const canvasHeight = !framed ? idleHeight : view.visual === "structure"
+    ? Math.min(380, Math.max(220, 160 + observedTextBoxes * 19))
+    : undefined;
 
   useEffect(() => {
     if (!hasVisual) return;
@@ -226,12 +232,20 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       progress.pages.forEach((page) => page.boxes.forEach((box) => { if (box.text) lines.push({ text: box.text, sure: box.confidence >= 0.75 }); }));
       context.font = sans(13);
       const packed: { text: string; sure: boolean }[] = [];
-      lines.forEach((line) => wrap(context, line.text, w - 38).forEach((part) => packed.push({ text: part, sure: line.sure })));
-      const maxRows = Math.max(6, Math.floor((h - 56) / 18));
-      packed.slice(Math.max(0, packed.length - maxRows)).forEach((line, i, tail) => {
-        const yy = y + h - 20 - (tail.length - 1 - i) * 18;
+      lines.forEach((line) => wrap(context, line.text, w - 64).forEach((part) => packed.push({ text: part, sure: line.sure })));
+      const rowH = 19;
+      const maxRows = Math.max(1, Math.floor((h - 80) / rowH));
+      context.fillStyle = colour["--text-lo"];
+      context.font = mono(10, 500);
+      context.fillText("OBSERVED TEXT · MOST RECENT", x + 16, y + 50);
+      packed.slice(Math.max(0, packed.length - maxRows)).forEach((line, i) => {
+        const yy = y + 74 + i * rowH;
+        context.fillStyle = colour["--text-lo"];
+        context.font = mono(11);
+        context.fillText(String(i + 1).padStart(2, "0"), x + 16, yy);
+        context.font = sans(13);
         context.fillStyle = line.sure ? colour["--text-mid"] : colour["--changed"];
-        context.fillText(line.text, x + 16, yy);
+        context.fillText(line.text, x + 48, yy);
       });
     };
 
@@ -348,12 +362,20 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       data-tone={view.tone} data-visual={view.visual} data-framed={framed ? "true" : "false"}>
       <div className="compile-stage-status" role="status">
         <strong>{view.title}</strong>
-        <p>{view.detail}</p>
+        <p>{(view.visual === "page" || view.visual === "structure") && view.tone === "active"
+          ? "Observed content from this run, updated as sources are read."
+          : view.detail}</p>
       </div>
       {hasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
-        style={!framed ? { height: idleHeight } : undefined} /> : null}
+        style={canvasHeight ? { height: canvasHeight } : undefined} /> : null}
+      {hasVisual ? <div className="compile-stage-film-caption" aria-label="Observed compilation chapter">
+        <span>{PIPELINE_STAGES[reached].label}</span>
+        <span className="compile-stage-film-progress" aria-hidden="true" data-derived="1">
+          {String(reached + 1).padStart(2, "0")} / {String(PIPELINE_STAGES.length).padStart(2, "0")}
+        </span>
+      </div> : null}
       {hasVisual ? <p className="compile-stage-summary" data-sensitive="content">
-        {rows.length} sources · {observedPages} observed pages · {observedRegions} observed regions
+        {rows.length} source{rows.length === 1 ? "" : "s"} · {observedPages} observed page{observedPages === 1 ? "" : "s"} · {observedRegions} observed region{observedRegions === 1 ? "" : "s"}
         {world && view.visual === "world" ? ` · ${world.objects.length} compiled objects · ${world.relations.length} recorded relations` : ""}
         {drawable ? "" : " The visual is unavailable in this browser; the run details remain available below."}
       </p> : null}

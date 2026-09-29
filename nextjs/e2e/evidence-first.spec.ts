@@ -10,7 +10,7 @@ import { expect, test } from "@playwright/test";
   screenshots of the live /explore route took its place; Landing V2 put the real thing in the hero
   -- a committed render of a real filing page with the region it was read from drawn on it. The
   hero is a centered statement over the four locked compile films now. The compiler specimen is
-  one scroll down, and proof follows in Scene 03: three prepared questions this public World answers, each with the passage the
+  in Scene 02, and proof follows in Scene 03: three prepared questions this public World answers, each with the passage the
   retriever scored, the page and box it was read from, and a link into the Evidence act.
 
   So the subject moves and the standard does not. The page may make no proof-shaped claim of its
@@ -41,17 +41,16 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await expect(page.locator('section#s3 a[href^="/explore?act=evidence&evidence="]').first())
     .toBeVisible();
   /*
-    2026-09-22, gap #1. The hero holds up the live Evidence Inspector on the public sample World;
-    the film and the interactive specimen are both in Scene 02, the landmark that explains how
-    the World was compiled. Nothing was deleted -- the assertion follows the film.
+    The film opens in Scene 01; the source-linked specimen and Evidence Inspector follow in
+    Scene 02. Nothing is a fabricated result, and each Explore link resolves to its source.
   */
   await expect(page.locator("section#s2 .lv2-hero-inspector")).toHaveCount(1);
   await expect(page.locator("section#s2 .lv2-hero-stats a")).toHaveCount(4);
   await expect(page.locator("section#s1 canvas")).toHaveCount(0);
-  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(0);
-  await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(1);
+  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(1);
+  await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(0);
   await expect(page.locator("section#s2 .lv2-film-note")).toHaveCount(0);
-  await expect(page.locator("section#s1 [data-compiler-specimen]")).toHaveCount(1);
+  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(1);
 });
 
 test("every /explore link on the landing opens a route that resolves", async ({ page, request }) => {
@@ -75,8 +74,7 @@ test("the hero and every scene below it fit the viewport at the active product-Q
 
   const hero = page.locator("section#s1");
   const title = page.locator("h1#lv2-hero-title");
-  /* The hero's visual since gap #1: the Evidence Inspector, not the film. */
-  const demo = page.locator("section#s1 [data-compiler-specimen]");
+  const demo = page.locator("section#s2 [data-compiler-specimen]");
   await expect(hero).toBeVisible();
   await expect(title).toBeVisible();
   await expect(demo).toBeVisible();
@@ -107,8 +105,9 @@ test("Korean visitors get the same story and the same route behind it", async ({
   await expect(page.locator('section#s3 a[href^="/explore?act=evidence&evidence="]').first())
     .toBeVisible();
   await expect(page.locator("section#s2 .lv2-hero-inspector")).toHaveCount(1);
-  await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(1);
-  await expect(page.locator("section#s1 [data-compiler-specimen]")).toHaveCount(1);
+  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(1);
+  await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(0);
+  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(1);
   await expect(page.getByRole("link", { name: "공개 Compiled World 열기" }).first()).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

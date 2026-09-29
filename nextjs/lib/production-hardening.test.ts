@@ -50,7 +50,7 @@ describe("2026-09-05 production hardening", () => {
     const workspace = read("app/workspace/page.tsx");
     const board = read("components/pipeline-board.tsx");
     expect(workspace).not.toContain('<ul className="document-meta">');
-    expect(workspace).toContain("selectableIds={compilableDocumentIds}");
+    expect(workspace).toContain("selectableIds={intakeOpen ? compilableDocumentIds : []}");
     expect(board).toContain('className="board-row-head"');
     expect(board).toContain('className="board-row-select"');
   });

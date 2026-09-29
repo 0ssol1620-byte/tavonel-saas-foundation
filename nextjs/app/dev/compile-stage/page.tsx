@@ -88,8 +88,10 @@ export default function CompileStageHarness() {
     "d-handbook": "Employee Handbook 2026.pdf",
   };
   return (
-    <main id="main" style={{ padding: 24, background: "#08090a", minHeight: "100vh" }}>
-      <CompileStage rows={rows} reading={reading} names={names} />
+    <main id="main" className="one-path-workspace" style={{ padding: 24, background: "#08090a", minHeight: "100vh" }}>
+      <div className="workspace-compile-block">
+        <CompileStage rows={rows} reading={reading} names={names} />
+      </div>
     </main>
   );
 }

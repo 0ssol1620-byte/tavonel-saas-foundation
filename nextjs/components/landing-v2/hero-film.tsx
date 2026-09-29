@@ -57,11 +57,8 @@ const HERO_CUT = {
 /**
  * The first stage's poster.
  *
- * It was the LCP resource of both entry pages while this film was the hero. Gap #1 (2026-09-22)
- * moved the film into Scene 02, so the poster is below the fold now: the entry pages preload the
- * hero's own page raster instead, and the player below no longer marks this one `priorityPoster`.
- * Two eager, high-priority rasters where only one is above the fold is a slower first paint on
- * the phone widths the founder checks, not a faster one.
+ * The film is once again the landing's first visual. Its poster has priority; the public sample
+ * inspector follows later with a lazy page raster.
  *
  * The constant stays exported because it is still the first frame the player paints and
  * `lib/one-path-contract.test.ts` holds its bytes.
@@ -79,7 +76,7 @@ function heroStages(korean: boolean): CompileStage[] {
 export default function HeroFilm({ korean = false }: { korean?: boolean }) {
   return (
     <div className="lv2-film">
-      <CompileStagePlayer stages={heroStages(korean)} preferVideo korean={korean} stageDisclosureLabel={korean ? "영상 단계 선택" : "Choose a film cut"} />
+      <CompileStagePlayer stages={heroStages(korean)} preferVideo priorityPoster korean={korean} />
       <p className="fine">{korean ? "영상은 제품 인터페이스를 설명하기 위한 예시입니다. 표시된 자료와 응답은 고객 결과가 아닙니다." : "Illustrative product walkthrough. The displayed documents and answers are examples, not customer results."}</p>
     </div>
   );

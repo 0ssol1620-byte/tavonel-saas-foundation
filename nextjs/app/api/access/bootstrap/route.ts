@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { foundationPilotAccess, getRequestUser, readAccessMode } from "@/lib/foundation-pilot";
-import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
+import { readVerifiedCustomerDataGateDecision } from "@/lib/customer-data-gate-store";
 import { ensureSelfServiceOrganization } from "@/lib/self-service-provisioning";
-import { bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
+import { authorizeFoundationSessionProduct, bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const NO_STORE = { "Cache-Control": "no-store" };
+const NO_ENTITLEMENT_TRIAL_CODES = new Set([
+  "TRIAL_DISABLED",
+  "TRIAL_NOT_AVAILABLE",
+  "TRIAL_NOT_ACTIVE",
+  "TRIAL_DEVICE_ALREADY_USED",
+  "TRIAL_REVIEW_REQUIRED",
+]);
 
 export async function POST(request: Request) {
   const user = await getRequestUser(request);
@@ -25,19 +32,62 @@ export async function POST(request: Request) {
     }
   }
 
+  // A free evaluation must not begin counting down while this workspace cannot submit
+  // a source. Existing owner/paid access remains visible, but a trial is only minted
+  // after the same exact-workspace customer-data decision used by upload routes opens.
+  const gate = await readVerifiedCustomerDataGateDecision(pilot.membership.workspaceId, pilot.membership.workspaceId);
+  const customerDataEnabled = gate.ok;
+  if (readAccessMode() === "self_service" && !gate.ok &&
+    (gate.code === "CUSTOMER_DATA_GATE_STORE_NOT_CONFIGURED" ||
+      gate.code === "CUSTOMER_DATA_GATE_STORE_FAILED" ||
+      gate.code === "CUSTOMER_DATA_GATE_RECEIPT_INVALID" ||
+      gate.code === "CUSTOMER_DATA_GATE_INPUT_INVALID")) {
+    return NextResponse.json({ code: "SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
+  }
+  if (readAccessMode() === "self_service" && !customerDataEnabled) {
+    const existing = await authorizeFoundationSessionProduct(pilot.membership.workspaceId, user.id, "observer");
+    if (!existing.ok && existing.status >= 500) {
+      return NextResponse.json({ code: existing.code }, { status: existing.status, headers: NO_STORE });
+    }
+    return NextResponse.json({
+      code: "ACCESS_READY_SOURCE_PENDING",
+      access: existing.ok && existing.access.source !== "trial"
+        ? { ...existing.access, limits: null, customerDataEnabled: false }
+        : {
+            source: "unentitled", accessPlan: null, billingExempt: false,
+            expiresAt: null, limits: null, customerDataEnabled: false,
+          },
+    }, { headers: NO_STORE });
+  }
+
   const access = await bootstrapFoundationSelfServiceTrial(request, user, pilot.membership.workspaceId);
   const headers: Record<string, string> = { ...NO_STORE };
   if (access.setCookie) headers["Set-Cookie"] = access.setCookie;
 
   if (!access.ok) {
+    // A rejected free-compute grant is not a rejected identity. Keep the authenticated user in
+    // their workspace so they can inspect the access state or purchase a plan, without issuing
+    // trial limits or opening the separately verified customer-data gate.
+    if (readAccessMode() === "self_service" && (access.status === 403 || access.status === 429)
+      && NO_ENTITLEMENT_TRIAL_CODES.has(access.code)) {
+      return NextResponse.json({
+        code: "ACCESS_READY_NO_ENTITLEMENT",
+        access: {
+          source: "unentitled",
+          accessPlan: null,
+          billingExempt: false,
+          expiresAt: null,
+          limits: null,
+          customerDataEnabled: false,
+        },
+      }, { headers });
+    }
     if (access.status === 429) headers["Retry-After"] = "86400";
     return NextResponse.json({ code: access.code }, { status: access.status, headers });
   }
 
   // The UI must learn the same per-workspace decision the upload routes enforce.
   // A store outage is closed, never advertised as upload-ready.
-  const customerDataEnabled = await canAdmitCustomerSource(pilot.membership.workspaceId);
-
   return NextResponse.json({
     code: "ACCESS_READY",
     access: {

@@ -3,16 +3,12 @@ import { expect, test } from "@playwright/test";
 const PHONE_PROJECTS = new Set(["360", "390"]);
 
 /*
-  Gap #1, 2026-09-22: the film moved from the hero into Scene 02, "How it compiles".
-
   The phone film contract -- starts magnified, keeps an
   explicit route back to the full frame, keeps all four cuts, stays keyboard-scrollable, and holds
   a poster under reduced motion until the visitor plays -- belongs to the film, not to the landmark
-  it sits in. The landing now places the four-cut selector in a native disclosure, so this test
-  opens it before exercising the tabs. The hero's own phone behaviour is asserted in `e2e/evidence-first.spec.ts` and
-  `e2e/landing-v2.spec.ts`.
+  it sits in. Scene 01 exposes the four tabs directly above the film.
 */
-const FILM_SCENE = "#s2 .compile-film-sequence";
+const FILM_SCENE = "#s1 .compile-film-sequence";
 
 test.describe("landing film mobile inspection", () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -61,7 +57,6 @@ test.describe("landing film mobile inspection", () => {
     const tabs = sequence.getByRole("tab");
 
     await expect(sequence).toHaveAttribute("data-narrow", "1");
-    await sequence.locator(".compile-film-stage-disclosure summary").click();
     await expect(tabs).toHaveCount(4);
     await tabs.nth(2).click();
     await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");

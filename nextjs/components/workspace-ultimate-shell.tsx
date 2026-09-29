@@ -57,8 +57,8 @@ const SURFACE_TITLES: Record<WorkspaceSurface, string> = {
 };
 
 type AccessSummary = {
-  source: "owner" | "paid" | "trial";
-  accessPlan: "observer_access" | "studio_access";
+  source: "owner" | "paid" | "trial" | "unentitled";
+  accessPlan: "observer_access" | "studio_access" | null;
   billingExempt: boolean;
   expiresAt: string | null;
   limits: { files: number; pages: number; worlds: number } | null;
@@ -129,7 +129,8 @@ export default function WorkspaceUltimateShell({
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, []);
-  const moreItems = MORE_ITEMS.filter((item) => access?.source !== "trial" || !["connections", "developer"].includes(item.surface));
+  const hasDeveloperAccess = access?.source === "owner" || access?.source === "paid";
+  const moreItems = MORE_ITEMS.filter((item) => hasDeveloperAccess || !["connections", "developer"].includes(item.surface));
 
   useEffect(() => {
     let current = true;
@@ -155,8 +156,8 @@ export default function WorkspaceUltimateShell({
   }, []);
 
   const navItems = useMemo(
-    () => NAV_ITEMS.filter((item) => access?.source !== "trial" || !["connections", "developer"].includes(item.surface)),
-    [access?.source],
+    () => NAV_ITEMS.filter((item) => hasDeveloperAccess || !["connections", "developer"].includes(item.surface)),
+    [hasDeveloperAccess],
   );
 
   useEffect(() => {
@@ -211,7 +212,7 @@ export default function WorkspaceUltimateShell({
     { group: "Go to", label: "Use with AI", hint: "G A", surface: "ask" as const },
     { group: "Go to", label: "Activity", hint: "C", surface: "activity" as const },
     { group: "Go to", label: "Settings", hint: "", surface: "settings" as const },
-    ...(access?.source === "trial" ? [] : [
+    ...(!hasDeveloperAccess ? [] : [
       { group: "Build", label: "Connections", hint: "", surface: "connections" as const },
       { group: "Build", label: "Developer tools", hint: "", surface: "developer" as const },
     ]),
@@ -305,7 +306,15 @@ export default function WorkspaceUltimateShell({
           <div className={styles.headerAction}>{headerAction}</div>
         </header>
 
-        {access?.source === "trial" ? (
+        {access?.source === "unentitled" ? (
+          <div className={styles.accessStrip} role="status">
+            <div><strong>Workspace ready</strong><span>{access.customerDataEnabled ? "No active plan" : "Source access pending"}</span></div>
+            <p>{access.customerDataEnabled
+              ? "No evaluation or paid compute access is active."
+              : "Your files cannot be processed here yet. Explore a complete public example below."}</p>
+            <Link href={access.customerDataEnabled ? "/pricing" : "/explore"}>{access.customerDataEnabled ? "View access options" : "Explore example"}</Link>
+          </div>
+        ) : access?.source === "trial" ? (
           <div className={styles.accessStrip} role="status">
             <div><strong>Free evaluation</strong><span>{trialDays} day{trialDays === 1 ? "" : "s"} remaining</span></div>
             <p>{access.limits ? `${access.limits.files} files · ${access.limits.pages} pages · ${access.limits.worlds} World` : "Bounded evaluation access"}</p>

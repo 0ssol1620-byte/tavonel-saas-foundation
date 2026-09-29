@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Logomark from "@/components/logomark";
 import WorldExplorer from "@/components/world-explorer";
-import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
+import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import { failureSentence } from "@/lib/workspace-failure-copy";
@@ -250,12 +250,14 @@ export default function WorkspacePage() {
   const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
-  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | null>(null);
+  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
-    ? "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
-    : "Source access could not be verified. Sign in again before choosing files.";
+    ? "Source processing is not active for this workspace. Request source access before choosing files."
+    : customerDataAccess === "checking"
+      ? "Checking source access before choosing files."
+      : "Source access could not be verified. Refresh before choosing files.";
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
@@ -336,6 +338,9 @@ export default function WorkspacePage() {
   const [documentInventoryState, setDocumentInventoryState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [workspaceStartupReady, setWorkspaceStartupReady] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (!intakeOpen) setSelectedDocumentIds([]);
+  }, [intakeOpen]);
   /**
    * D9 -- the tab keeps counting after you look away.
    *
@@ -1295,6 +1300,7 @@ export default function WorkspacePage() {
   };
 
   const recompileWithCore = async () => {
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     const documentIds = collectionResult?.sourceDocuments.map((document) => document.documentId) ?? [];
     const recompileVerdict = judgeCompileSet(documentIds.length);
     if (!recompileVerdict.ok) {
@@ -2011,6 +2017,7 @@ export default function WorkspacePage() {
     the first paint claim an empty workspace and then collapse (§13.4).
   */
   const workspaceStateInput: WorkspaceStateInput = {
+    customerDataAccess,
     inventoryState: documentInventoryState,
     documentCount,
     readyDocumentCount,
@@ -2135,24 +2142,16 @@ export default function WorkspacePage() {
       onRefresh={() => void loadDocuments()}
       onSignOut={() => void signOut()}
       headerAction={
-        activationPolicy.customerIntake.enabled && intakeOpen ? (
-          <>
-            <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
-            <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
-            {proofMode ? (
-              <div className="proof-actions">
-                <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Single proof"}</button>
-                <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "3-document proof"}</button>
-              </div>
-            ) : (
-              <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Processing…" : "Upload"}</button>
-            )}
-          </>
-        ) : (
-          <button type="button" disabled title={intakeClosedCopy}><UploadCloud size={16} /> Upload <LockKeyhole size={14} /></button>
-        )
+        proofMode && intakeOpen ? (
+          <div className="proof-actions">
+            <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Single proof"}</button>
+            <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "3-document proof"}</button>
+          </div>
+        ) : null
       }
     >
+          <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
+          <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           {notice ? (
             <p className="notice static" role="status">
               <strong>Activity.</strong> {notice}
@@ -2310,21 +2309,31 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               ) : !intakeOpen ? (
-                <div className="workspace-intake-copy workspace-intake-loading" role="status" aria-live="polite">
+                <div className="workspace-intake-copy workspace-intake-closed" role="status" aria-live="polite">
+                  <p className="eyebrow">A complete example is ready</p>
                   {workspaceState.mode === "new" && surface === "home"
-                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "Bring your knowledge to TAVONEL"}</h1>
-                    : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "Source intake"}</h2>}
+                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See how a source becomes usable knowledge"}</h1>
+                    : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p>{customerDataAccess === "checking"
                     ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
-                      ? "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
-                      : "Source access could not be verified. Sign in again before choosing files."}</p>
+                      ? accessSource === "unentitled"
+                        ? "Your account is ready. File processing is not active for this workspace yet. Start with a finished public example."
+                        : "Your workspace is ready. To process your own files, arrange source access with us."
+                      : "Source access could not be verified. Refresh before choosing files."}</p>
                   {customerDataAccess === "closed" ? (
-                    <div className="workspace-intake-gated-actions">
-                      <Link className="btn" href="/contact">Arrange a pilot</Link>
-                      <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
+                    <div className="workspace-example-path" aria-label="Example knowledge path">
+                      <span><b>01</b> Files</span><span><b>02</b> Read</span>
+                      <span><b>03</b> Organize</span><span><b>04</b> Use with AI</span>
                     </div>
                   ) : null}
+                  {customerDataAccess === "closed" ? (
+                    <div className="workspace-intake-gated-actions">
+                      <Link className="btn" href="/explore">Explore a compiled World</Link>
+                      <Link className="btn ghost" href="/contact">Request source access</Link>
+                    </div>
+                  ) : null}
+                  {customerDataAccess === "closed" ? <small>Public example. Your files stay on your device until source access is enabled.</small> : null}
                 </div>
               ) : (
               <div className="workspace-intake-copy">
@@ -2511,7 +2520,9 @@ export default function WorkspacePage() {
               rows={pipelineRows}
               reading={reading}
               names={names}
-              selectableIds={compilableDocumentIds}
+              customerDataAccess={customerDataAccess}
+              noComputeAccess={accessSource === "unentitled"}
+              selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
                 ? current.filter((id) => id !== documentId)
@@ -2519,7 +2530,8 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
             />
           </div>
-          <div className="workspace-grid">
+          {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
+            {intakeOpen ? (
             <section id="workspace-sources" className="card document-card">
               <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
               {documents && documents.length > 0 ? (
@@ -2543,6 +2555,7 @@ export default function WorkspacePage() {
                 </div>
               )}
             </section>
+            ) : null}
             {/*
               A candidate that exists but was never run through Core is the one case Home cannot
               act on, so the control stays here beside the sources it would read.
@@ -2551,12 +2564,13 @@ export default function WorkspacePage() {
               <section className="card">
                 <h2>This candidate has not been run through Core.</h2>
                 <p>{collectionResult.validation.counts.documents} documents · {collectionResult.validation.counts.entities} entities · {collectionResult.validation.counts.claims} claims · {collectionResult.validation.counts.relations} relations</p>
+                {!intakeOpen ? <p>{customerDataAccess === "checking" ? "Checking source access before this candidate can run through Core." : customerDataAccess === "closed" ? "Source processing is not active for this workspace. Request source access before running Core." : "Source access could not be verified. Refresh before running Core."}</p> : null}
                 <div className="billing-actions">
-                  <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button>
+                  {intakeOpen ? <button disabled={busy} onClick={() => void recompileWithCore()}>{busy ? "Running Core..." : "Recompile with separate Core"}</button> : customerDataAccess === "closed" ? <Link href="/contact">Request source access</Link> : null}
                 </div>
               </section>
             ) : null}
-          </div>
+          </div> : null}
           </> : null}
           </>
           ) : null}
@@ -3014,19 +3028,43 @@ export default function WorkspacePage() {
             and the palette; the URL has to agree with the rail, so the body says why instead of
             rendering the panel to anyone who types the path.
           */}
-          {tab === "connections" ? (accessSource === "trial" ? (
+          {tab === "connections" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>Source connections are part of Developer access.</h2>
-              <p>Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access.</p>
-              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+              <h2>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Source connections are part of Developer access."}</h2>
+              <p>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
+                : customerDataAccess === "closed"
+                ? "Your account is ready, but source processing is closed. Request source access before connecting a provider."
+                : accessSource === "trial"
+                ? "Free evaluation works with files you upload directly. Connect Google Drive, Dropbox, OneDrive or your own storage once the workspace is on Developer access."
+                : "This account has no active compute access. Source connections require Developer access."}</p>
+              <div className="billing-actions">{accessSource === null
+                ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : customerDataAccess === "closed"
+                ? <Link className="btn" href="/contact">Request source access</Link>
+                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <ConnectionsPanel />) : null}
 
-          {tab === "developers" ? (accessSource === "trial" ? (
+          {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
-              <h2>API keys are part of Developer access.</h2>
-              <p>Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access.</p>
-              <div className="billing-actions"><Link className="btn" href="/pricing">See Developer access</Link></div>
+              <h2>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
+                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of Developer access."}</h2>
+              <p>{accessSource === null
+                ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
+                : customerDataAccess === "closed"
+                ? "Your account is ready, but source processing is closed. Request source access before setting up API keys or MCP."
+                : accessSource === "trial"
+                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
+                : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
+              <div className="billing-actions">{accessSource === null
+                ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
+                : customerDataAccess === "closed"
+                ? <Link className="btn" href="/contact">Request source access</Link>
+                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}
 

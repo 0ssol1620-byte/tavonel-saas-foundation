@@ -75,6 +75,8 @@ describe("workspace compile floor and ceiling", () => {
     // The chapter names are the shared vocabulary, not a fifth set of labels.
     expect(compileStage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
     expect(compileStage).toContain("PIPELINE_STAGES.forEach((stage, i)");
+    expect(compileStage).toContain('className="compile-stage-film-caption"');
+    expect(compileStage).toContain("String(PIPELINE_STAGES.length).padStart(2, \"0\")");
     expect(compileStage).not.toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
   });
 

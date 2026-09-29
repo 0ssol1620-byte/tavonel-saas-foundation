@@ -12,10 +12,12 @@ select ok((select relrowsecurity from pg_class where oid = 'public.foundation_bi
 select ok((select relrowsecurity from pg_class where oid = 'public.foundation_credit_ledger'::regclass), 'credit ledger has RLS');
 select ok(not has_table_privilege('anon', 'public.foundation_billing_accounts', 'select'), 'anonymous clients cannot read billing');
 select ok(not has_table_privilege('authenticated', 'public.foundation_billing_accounts', 'select'), 'authenticated clients cannot read billing directly');
--- v5 is the only service-role entry point after checkout binding consumption was added. The
--- SECURITY DEFINER owner can delegate internally, while clients cannot bypass v5 through v4.
-select ok(not has_function_privilege('authenticated', 'public.apply_foundation_billing_event_v5(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text,text,timestamptz,text,boolean,boolean)', 'execute'), 'authenticated clients cannot execute billing projection');
-select ok(has_function_privilege('service_role', 'public.apply_foundation_billing_event_v5(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text,text,timestamptz,text,boolean,boolean)', 'execute'), 'service role can execute the binding-aware billing projection');
+-- v6 is the only service-role entry point after checkout intents were added (20260927120000);
+-- v5 re-read the live checkout gate and is closed. The SECURITY DEFINER owner can delegate
+-- internally, while clients cannot bypass v6 through v5 or v4.
+select ok(not has_function_privilege('authenticated', 'public.apply_foundation_billing_event_v6(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,text,text,timestamptz,text,text,integer)', 'execute'), 'authenticated clients cannot execute billing projection');
+select ok(has_function_privilege('service_role', 'public.apply_foundation_billing_event_v6(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,text,text,timestamptz,text,text,integer)', 'execute')
+  and not has_function_privilege('service_role', 'public.apply_foundation_billing_event_v5(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text,text,timestamptz,text,boolean,boolean)', 'execute'), 'service role executes the intent-aware projection and not the gate-reading v5');
 select ok(not has_function_privilege('service_role', 'public.apply_foundation_billing_event_v4(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)', 'execute'), 'service role cannot bypass binding consumption through v4');
 select ok(not has_function_privilege('authenticated', 'public.apply_foundation_subscription_schedule(text,text,text,timestamptz)', 'execute'), 'authenticated clients cannot project cancellation schedules');
 select ok(has_function_privilege('service_role', 'public.apply_foundation_subscription_schedule(text,text,text,timestamptz)', 'execute'), 'service role can project cancellation schedules');
