@@ -105,6 +105,9 @@ The v2 scope-bound evaluator and negative unit cases are implemented in
 read-side verifier are present, but they are inactive: no production v2 rows, authenticated
 terms-acceptance writer, route enforcement, deployment attestation or production qualification
 exists yet. A code-generated `allowed` value is evidence to verify, never permission by itself.
+The additive schema was applied to production on 2026-09-29 as Supabase migration
+`20260929075048_scoped_customer_data_gate_receipts`. Both new ledgers and the v1 receipt table
+had zero rows after application; RLS and the restricted service-role grants were verified.
 The v1 reader remains the only production guard and continues to refuse every workspace without
 a current receipt.
 The Cloudflare R2 bucket settings were read on 2026-09-29: `immutable/` has an enabled 365-day
