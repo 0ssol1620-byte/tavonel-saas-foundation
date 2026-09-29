@@ -100,12 +100,17 @@ connector. Public copy must describe the exact scope actually active.
 
 ## Current state
 
-The v2 scope-bound evaluator and its negative unit cases are implemented as an inactive
-policy primitive in `shared/scopedCustomerDataGate.ts`. It is not a durable release decision:
-there is no v2 receipt store, deployment attestation, workspace grant persistence, route
-enforcement or production qualification yet. In particular, constructing an in-memory
-`allowed` decision is not permission to process customer files. The v1 reader is still the
-only production guard and continues to refuse every workspace without a current receipt.
+The v2 scope-bound evaluator and negative unit cases are implemented in
+`shared/scopedCustomerDataGate.ts`. The additive v2 release and workspace decision ledgers and
+read-side verifier are present, but they are inactive: no production v2 rows, authenticated
+terms-acceptance writer, route enforcement, deployment attestation or production qualification
+exists yet. A code-generated `allowed` value is evidence to verify, never permission by itself.
+The v1 reader remains the only production guard and continues to refuse every workspace without
+a current receipt.
+The Cloudflare R2 bucket settings were read on 2026-09-29: `immutable/` has an enabled 365-day
+Bucket Lock rule and `quarantine/` has an enabled 365-day lifecycle deletion rule. Neither
+supports a 30-day physical-purge claim. The guarded deletion PR #121 remains a draft until the
+retention contract and locked-object canary are resolved.
 This document does **not** authorize live customer upload, live charges or a claim that the
 conditions above passed. The current v1 gate and production flags remain the enforcement source
 until a separately reviewed implementation replaces them.
