@@ -77,7 +77,7 @@ describe("durable customer-data gate reader", () => {
     expect(decodeURIComponent(path)).toContain(`tenant_id=eq.${TENANT}`);
     expect(decodeURIComponent(path)).toContain(`workspace_id=eq.${WORKSPACE}`);
     expect(decodeURIComponent(path)).not.toContain("allowed=");
-    expect(decodeURIComponent(path)).toContain("order=evaluated_at.desc,recorded_at.desc");
+    expect(decodeURIComponent(path)).toContain("order=recorded_at.desc,allowed.asc,evaluated_at.desc");
     expect(decodeURIComponent(path)).toContain("limit=1");
   });
 
@@ -123,7 +123,7 @@ describe("durable customer-data gate reader", () => {
     });
   });
 
-  it("lets the newest refusal revoke every older approval", async () => {
+  it("selects a later recorded refusal ahead of an approval evaluated more recently", async () => {
     adminConfig.mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "s".repeat(48) });
     adminRequest.mockResolvedValue(Response.json([row({
       allowed: false,
@@ -131,6 +131,8 @@ describe("durable customer-data gate reader", () => {
       receipt_sha256: null,
       missing: [customerDataPreconditions[0]],
       evidence: [],
+      evaluated_at: "2026-09-19T23:59:59.000Z",
+      recorded_at: "2026-09-20T00:00:02.000Z",
     })]));
 
     await expect(readVerifiedCustomerDataGateDecision(TENANT, WORKSPACE, NOW)).resolves.toEqual({
