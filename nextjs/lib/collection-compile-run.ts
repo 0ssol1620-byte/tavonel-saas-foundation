@@ -1,5 +1,5 @@
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
-import type { CustomerDataGateDecision } from "../../shared/customerDataGate";
+import type { CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
 import {
   compileReceiptAuditDetails,
@@ -18,7 +18,8 @@ import {
   revisionCompileEnabled,
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
-import { readVerifiedCustomerDataGateDecision } from "./customer-data-gate-store";
+import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from "./customer-data-admission";
+import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
 import { checkCurrentSourceVersions, collectionCandidateKey, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { getWorkspaceCollectionCandidate, getWorkspaceOcrJson, listImmutableWorkspaceObjects, putWorkspaceCollectionCandidate } from "./r2-objects";
@@ -72,6 +73,15 @@ export function isCompileWaitingOnReading(code: string) {
   return code === "OCR_NOT_READY" || code === "SOURCE_VERSION_CHANGED";
 }
 
+async function readCompileAuthorization(workspaceId: string, documentIds: readonly string[]): Promise<SourceAuthorizationResult & { scope?: "direct_upload" | "connector" }> {
+  if (process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2") {
+    const source = await readCustomerSourceScope(workspaceId, documentIds);
+    if (!source.ok) return source;
+    return { ...await readCustomerSourceAuthorization(workspaceId, source.scope), scope: source.scope };
+  }
+  return readCustomerSourceAuthorization(workspaceId, "direct_upload");
+}
+
 export async function runCollectionCompile(
   workspaceId: string,
   documentIds: readonly string[],
@@ -94,9 +104,9 @@ export async function runCollectionCompile(
   if (!readCompileReceiptSigner()) {
     return { ok: false, status: 503, code: "COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED", payload: {} };
   }
-  const gate = await readVerifiedCustomerDataGateDecision(workspaceId, workspaceId);
+  const gate = await readCompileAuthorization(workspaceId, documentIds);
   if (!gate.ok) return { ok: false, status: 503, code: gate.code, payload: {} };
-  let customerDataGate: Extract<CustomerDataGateDecision, { allowed: true }> = gate.decision;
+  let customerDataGate: Extract<CustomerDataAuthorization, { allowed: true }> = gate.decision;
 
   const listed = await listImmutableWorkspaceObjects(signer, workspaceId);
   if (!listed.ok) return { ok: false, status: 503, code: listed.code, payload: {} };
@@ -240,7 +250,7 @@ export async function runCollectionCompile(
   let artifact: CollectionCandidateArtifact;
   let coreExecution: CollectionCompileSuccess["coreExecution"];
   if (coreV2) {
-    const currentGate = await readVerifiedCustomerDataGateDecision(workspaceId, workspaceId);
+    const currentGate = await readCompileAuthorization(workspaceId, documentIds);
     if (!currentGate.ok) {
       return { ok: false, status: 503, code: currentGate.code, payload: {} };
     }
@@ -252,6 +262,7 @@ export async function runCollectionCompile(
       new Date(),
       previousActiveWorld,
       customerDataGate,
+      currentGate.scope,
     );
     if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
     if (compiled.result.status === "rejected") {
@@ -289,6 +300,9 @@ export async function runCollectionCompile(
 
   const postDispatchVersionFailure = await revalidate();
   if (postDispatchVersionFailure) return postDispatchVersionFailure;
+  // A revoked or expired approval cannot publish the result of a job already in flight.
+  const persistenceGate = await readCompileAuthorization(workspaceId, documentIds);
+  if (!persistenceGate.ok) return { ok: false, status: 503, code: persistenceGate.code, payload: {} };
 
   const key = collectionCandidateKey(workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
   if (!key) return { ok: false, status: 500, code: "COLLECTION_KEY_INVALID", payload: {} };

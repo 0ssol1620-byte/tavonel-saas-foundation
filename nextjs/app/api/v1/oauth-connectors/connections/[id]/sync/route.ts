@@ -61,7 +61,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const parsed = parseBody(read.value);
   if (!parsed) return NextResponse.json({ code: "OAUTH_SYNC_INPUT_INVALID" }, { status: 400, headers: HEADERS });
 
-  if (!await canAdmitCustomerSource(auth.principal.workspaceKey)) {
+  if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "connector")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
   }
 

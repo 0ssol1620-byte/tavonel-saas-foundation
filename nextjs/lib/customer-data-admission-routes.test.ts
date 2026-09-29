@@ -58,7 +58,7 @@ describe("customer-data approval before asynchronous intake", () => {
     const response = await confirmUpload(request("/api/uploads/confirm", { documentId: DOCUMENT }));
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
-    expect(gate).toHaveBeenCalledWith(WORKSPACE);
+    expect(gate).toHaveBeenCalledWith(WORKSPACE, "direct_upload");
     expect(signer).not.toHaveBeenCalled();
   });
 
@@ -69,7 +69,7 @@ describe("customer-data approval before asynchronous intake", () => {
     );
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
-    expect(gate).toHaveBeenCalledWith(WORKSPACE);
+    expect(gate).toHaveBeenCalledWith(WORKSPACE, "connector");
     expect(enqueue).not.toHaveBeenCalled();
   });
 
@@ -80,7 +80,7 @@ describe("customer-data approval before asynchronous intake", () => {
     );
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
-    expect(gate).toHaveBeenCalledWith(WORKSPACE);
+    expect(gate).toHaveBeenCalledWith(WORKSPACE, "connector");
     expect(applyBatch).not.toHaveBeenCalled();
   });
 });

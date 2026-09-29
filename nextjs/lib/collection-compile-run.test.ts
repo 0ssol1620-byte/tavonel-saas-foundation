@@ -21,6 +21,8 @@ const put = vi.fn();
 const dispatched = vi.fn();
 const sourceAccess = vi.fn();
 const customerDataGate = vi.fn();
+const sourceScope = vi.fn();
+vi.mock("./customer-source-scope", () => ({ readCustomerSourceScope: (...args: unknown[]) => sourceScope(...args) }));
 
 vi.mock("./r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "acct", bucket: "tavonel-foundation", accessKeyId: "key", secretAccessKey: "secret" }),
@@ -61,8 +63,8 @@ vi.mock("./core-runtime-v2", async (importOriginal) => ({
 vi.mock("./connector-source-access", () => ({
   checkConnectorSourceAccess: (workspaceId: string, documentIds: string[]) => sourceAccess(workspaceId, documentIds),
 }));
-vi.mock("./customer-data-gate-store", () => ({
-  readVerifiedCustomerDataGateDecision: (...args: unknown[]) => customerDataGate(...args),
+vi.mock("./customer-data-admission", () => ({
+  readCustomerSourceAuthorization: (...args: unknown[]) => customerDataGate(...args),
 }));
 const audited = vi.fn();
 vi.mock("./enterprise-store", () => ({
@@ -147,6 +149,24 @@ function readyWorkspace() {
 }
 
 describe("customer-data approval before source access", () => {
+  it("requires connector scope for a collection with a durable connector origin", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    customerDataGate.mockResolvedValue({ ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" });
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    expect(run).toMatchObject({ ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" });
+    expect(customerDataGate).toHaveBeenCalledWith(WS, "connector");
+    expect(listed).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unprovable origin before reading any source content", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+    expect(customerDataGate).not.toHaveBeenCalled();
+    expect(listed).not.toHaveBeenCalled();
+  });
   it("fails closed with the durable gate code before reading customer objects", async () => {
     customerDataGate.mockResolvedValue({ ok: false, code: "CUSTOMER_DATA_GATE_RECEIPT_NOT_FOUND" });
 
@@ -243,6 +263,16 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(JSON.stringify(event.details)).not.toMatch(/"(content|text|secret|password|token|credential|private[_-]?key)"\s*:|pump/i);
     expect(audited.mock.invocationCallOrder[0]).toBeLessThan(put.mock.invocationCallOrder[0]!);
     expect(put.mock.calls[0]?.[3]).toMatchObject({ signedReceipt: receipt });
+  });
+
+  it("does not publish an in-flight result after approval is revoked", async () => {
+    compilableSource();
+    customerDataGate.mockResolvedValueOnce(APPROVED_GATE).mockResolvedValueOnce(APPROVED_GATE)
+      .mockResolvedValueOnce({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    expect(dispatched).toHaveBeenCalledOnce();
+    expect(audited).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
   });
 
   it("persists nothing when the audit row cannot be written", async () => {

@@ -57,7 +57,7 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     const response = await POST(request());
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
-    expect(gate).toHaveBeenCalledWith("pilot-11111111");
+    expect(gate).toHaveBeenCalledWith("pilot-11111111", "direct_upload");
     expect(binding).not.toHaveBeenCalled();
     expect(intent).not.toHaveBeenCalled();
   });

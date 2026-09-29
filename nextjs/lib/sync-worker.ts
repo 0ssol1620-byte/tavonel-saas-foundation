@@ -106,7 +106,7 @@ export async function runSourceImportBatch(
 
   // A queued job can be claimed after its workspace approval was revoked. Settle it before
   // refreshing credentials, listing source metadata, or moving any provider bytes.
-  if (!await canAdmitCustomerSource(job.workspaceKey)) {
+  if (!await canAdmitCustomerSource(job.workspaceKey, "connector")) {
     await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
       outcome: "failed",
       errorCode: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE",

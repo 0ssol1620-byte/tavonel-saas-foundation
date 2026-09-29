@@ -8,6 +8,7 @@ import {
   type WorkspaceGrant,
 } from "../../shared/scopedCustomerDataGate";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import type { ScopedCustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const REVISION = /^[0-9a-f]{40}$/;
@@ -15,7 +16,8 @@ const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 type Env = Readonly<Record<string, string | undefined>>;
 export type ScopedGateResult =
-  | { ok: true; scope: CustomerDataScope; releaseReceiptSha256: string; grantReceiptSha256: string }
+  | { ok: true; scope: CustomerDataScope; releaseReceiptSha256: string; grantReceiptSha256: string;
+      authorization: ScopedCustomerDataAuthorization }
   | { ok: false; code: "SCOPED_GATE_INPUT_INVALID" | "SCOPED_GATE_STORE_NOT_CONFIGURED" |
       "SCOPED_GATE_STORE_FAILED" | "SCOPED_RELEASE_NOT_FOUND" | "SCOPED_RELEASE_REFUSED" |
       "SCOPED_RELEASE_INVALID" | "SCOPED_RELEASE_STALE" | "SCOPED_WORKSPACE_NOT_FOUND" |
@@ -137,5 +139,10 @@ export async function readVerifiedScopedCustomerDataGate(
     return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
   }
   return { ok: true, scope, releaseReceiptSha256: release.receiptSha256!,
-    grantReceiptSha256: grant.grantReceiptSha256 };
+    grantReceiptSha256: grant.grantReceiptSha256,
+    authorization: {
+      allowed: true, schemaVersion: SCOPED_CUSTOMER_DATA_GATE_SCHEMA,
+      tenantId, workspaceId, receiptSha256: grant.grantReceiptSha256,
+      evaluatedAt: release.evaluatedAt, release, grant,
+    } };
 }

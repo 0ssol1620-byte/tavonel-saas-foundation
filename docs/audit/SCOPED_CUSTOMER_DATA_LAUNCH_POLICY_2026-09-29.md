@@ -102,9 +102,17 @@ connector. Public copy must describe the exact scope actually active.
 
 The v2 scope-bound evaluator and negative unit cases are implemented in
 `shared/scopedCustomerDataGate.ts`. The additive v2 release and workspace decision ledgers and
-read-side verifier are present, but they are inactive: no production v2 rows, authenticated
-terms-acceptance writer, route enforcement, deployment attestation or production qualification
-exists yet. A code-generated `allowed` value is evidence to verify, never permission by itself.
+read-side verifier are present. The 2026-09-30 candidate wires the ledgers into bootstrap,
+intake, OAuth authorization/callback, connector imports and compile execution behind
+`TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`, bound to `VERCEL_GIT_COMMIT_SHA`. A refused v2
+decision never falls back to v1. Compilation classifies durable source bindings, rejects
+unknown origins and rechecks approval before dispatch and result persistence. Source-origin
+reads require only three admission-table columns, not full-table access.
+
+This is staged code, not activation. No production v2 rows, authenticated terms-acceptance
+writer, deployment attestation or production qualification exists yet. Serving previously
+derived data under v2 still needs its release/workspace checks. A code-generated `allowed`
+value is evidence to verify, never permission by itself.
 The additive schema was applied to production on 2026-09-29 as Supabase migration
 `20260929075048_scoped_customer_data_gate_receipts`. Both new ledgers and the v1 receipt table
 had zero rows after application; RLS and the restricted service-role grants were verified.
@@ -117,3 +125,18 @@ retention contract and locked-object canary are resolved.
 This document does **not** authorize live customer upload, live charges or a claim that the
 conditions above passed. The current v1 gate and production flags remain the enforcement source
 until a separately reviewed implementation replaces them.
+
+### Deployment lifecycle for the staged v2 guard
+
+Every v2 release decision and workspace grant is bound to the exact deployed Git SHA.
+Before activating v2 on a new deployment, qualification must produce the new release
+receipt and renew grants only for workspaces whose recorded terms acceptance remains valid.
+A deployment or rollback without those matching receipts deliberately refuses new processing;
+it must not silently reuse an old revision or mark test evidence as production evidence.
+Keep export/deletion accessible during this transition. Billing activation and subscription
+reconciliation remain separate launch work; this patch does not enable charging.
+
+The source-origin reader is an explicit, narrow exception to migration 0053's historical
+zero-read policy for intake admissions: service_role can SELECT workspace_key, document_id,
+and confirmed_at only. No object key, user identity, byte count, or full-table SELECT is added.
+The grant matrix and exhaustive column-negative assertions track this exception.
