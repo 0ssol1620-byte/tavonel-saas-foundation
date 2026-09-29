@@ -39,7 +39,8 @@ create function pg_temp.digest() returns text language sql as $$
   select candidate_manifest_digest from public.foundation_compile_jobs where job_id = 'cjob-' || repeat('c', 32);
 $$;
 
-select has_trigger('public', 'foundation_compile_jobs', 'foundation_compile_jobs_candidate_digest_immutable',
+select ok(exists (select 1 from pg_trigger where tgrelid = 'public.foundation_compile_jobs'::regclass
+    and tgname = 'foundation_compile_jobs_candidate_digest_immutable' and tgenabled = 'O'),
   'the guard sits on the table, so it covers every write path');
 
 -- ---------------------------------------------------------------------------

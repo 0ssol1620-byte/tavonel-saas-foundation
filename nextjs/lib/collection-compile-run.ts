@@ -7,6 +7,7 @@ import {
   signCompileReceipt,
   type SignedCompileReceipt,
 } from "./compile-receipt-signing";
+import { CANONICAL_DOCUMENT_ID, mayPublish, registerCollectionArtifact } from "./compile-artifact-provenance";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import {
@@ -86,6 +87,11 @@ export async function runCollectionCompile(
   workspaceId: string,
   documentIds: readonly string[],
 ): Promise<CollectionCompileRun> {
+  // A candidate is registered under its document ids before it is stored, and source deletion
+  // can only name a UUID. An id it could never name is refused here, before anything is paid for.
+  if (documentIds.length === 0 || !documentIds.every((id) => CANONICAL_DOCUMENT_ID.test(id))) {
+    return { ok: false, status: 400, code: "DOCUMENT_SET_UNQUALIFIED", payload: {} };
+  }
   const signer = readR2SignerEnv();
   if (!signer) return { ok: false, status: 503, code: "SIGNER_NOT_CONFIGURED", payload: {} };
 
@@ -341,7 +347,25 @@ export async function runCollectionCompile(
   });
   if (!audited.ok) return { ok: false, status: 503, code: audited.code, payload: {} };
 
+  /*
+    Provenance before bytes (20260930013000): the registry names these documents for this key
+    before the object can exist, so a later deletion of any of them finds and purges it. The
+    registration is also a bounded write lease -- the PUT starts only inside it, never after.
+  */
+  const registered = await registerCollectionArtifact({
+    workspaceKey: workspaceId,
+    collectionId: artifact.collectionId,
+    manifestDigest: artifact.manifestDigest,
+    documentIds,
+  });
+  if (!registered.ok) {
+    return { ok: false, status: registered.refused ? 409 : 503, code: registered.code, payload: {} };
+  }
+
   const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
+  if (!mayPublish(registered)) {
+    return { ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {} };
+  }
   const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
   if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };
 
