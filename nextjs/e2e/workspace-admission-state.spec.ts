@@ -41,7 +41,7 @@ test("an authenticated account without compute access sees one consistent next s
 test("closed workspace does not sell AI connection access as an available plan", async ({ page }) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
-  await page.goto("/workspace/developers", { waitUntil: "domcontentloaded" });
+  await page.goto("/workspace/developer", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "AI connections are not available for this workspace yet." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
