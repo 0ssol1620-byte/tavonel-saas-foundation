@@ -100,7 +100,12 @@ connector. Public copy must describe the exact scope actually active.
 
 ## Current state
 
-No v2 decision, deployment attestation, workspace grant or production qualification exists yet.
+The v2 scope-bound evaluator and its negative unit cases are implemented as an inactive
+policy primitive in `shared/scopedCustomerDataGate.ts`. It is not a durable release decision:
+there is no v2 receipt store, deployment attestation, workspace grant persistence, route
+enforcement or production qualification yet. In particular, constructing an in-memory
+`allowed` decision is not permission to process customer files. The v1 reader is still the
+only production guard and continues to refuse every workspace without a current receipt.
 This document does **not** authorize live customer upload, live charges or a claim that the
 conditions above passed. The current v1 gate and production flags remain the enforcement source
 until a separately reviewed implementation replaces them.
