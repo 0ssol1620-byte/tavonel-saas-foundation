@@ -308,9 +308,11 @@ export default function WorkspaceUltimateShell({
 
         {access?.source === "unentitled" ? (
           <div className={styles.accessStrip} role="status">
-            <div><strong>Account ready</strong><span>No active plan</span></div>
-            <p>No evaluation or paid compute access is active. Customer file processing remains closed.</p>
-            <Link href="/pricing">View access options</Link>
+            <div><strong>Workspace ready</strong><span>{access.customerDataEnabled ? "No active plan" : "Source access pending"}</span></div>
+            <p>{access.customerDataEnabled
+              ? "No evaluation or paid compute access is active."
+              : "Your files cannot be processed here yet. Explore a complete public example below."}</p>
+            <Link href={access.customerDataEnabled ? "/pricing" : "/explore"}>{access.customerDataEnabled ? "View access options" : "Explore example"}</Link>
           </div>
         ) : access?.source === "trial" ? (
           <div className={styles.accessStrip} role="status">

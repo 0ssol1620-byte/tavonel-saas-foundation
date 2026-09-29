@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Logomark from "@/components/logomark";
 import WorldExplorer from "@/components/world-explorer";
-import { FileText, LockKeyhole, ShieldCheck, UploadCloud } from "lucide-react";
+import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import { failureSentence } from "@/lib/workspace-failure-copy";
@@ -2144,24 +2144,16 @@ export default function WorkspacePage() {
       onRefresh={() => void loadDocuments()}
       onSignOut={() => void signOut()}
       headerAction={
-        activationPolicy.customerIntake.enabled && intakeOpen ? (
-          <>
-            <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
-            <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
-            {proofMode ? (
-              <div className="proof-actions">
-                <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Single proof"}</button>
-                <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "3-document proof"}</button>
-              </div>
-            ) : (
-              <button disabled={busy} onClick={() => fileRef.current?.click()}><UploadCloud size={16} /> {busy ? "Processing…" : "Upload"}</button>
-            )}
-          </>
-        ) : (
-          <button type="button" disabled title={intakeClosedCopy}><UploadCloud size={16} /> Upload <LockKeyhole size={14} /></button>
-        )
+        proofMode && intakeOpen ? (
+          <div className="proof-actions">
+            <button disabled={busy} onClick={() => void uploadPublicProof()}><UploadCloud size={16} /> {busy ? "Running proof…" : "Single proof"}</button>
+            <button disabled={busy} onClick={() => void uploadPublicCollectionProof()}><UploadCloud size={16} /> {busy ? "Compiling…" : "3-document proof"}</button>
+          </div>
+        ) : null
       }
     >
+          <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
+          <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           {notice ? (
             <p className="notice static" role="status">
               <strong>Activity.</strong> {notice}
@@ -2319,25 +2311,31 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               ) : !intakeOpen ? (
-                <div className="workspace-intake-copy workspace-intake-loading" role="status" aria-live="polite">
+                <div className="workspace-intake-copy workspace-intake-closed" role="status" aria-live="polite">
+                  <p className="eyebrow">A complete example is ready</p>
                   {workspaceState.mode === "new" && surface === "home"
-                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "Bring your knowledge to TAVONEL"}</h1>
-                    : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "Source intake"}</h2>}
+                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See how a source becomes usable knowledge"}</h1>
+                    : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p>{customerDataAccess === "checking"
                     ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
                       ? accessSource === "unentitled"
-                        ? "Your workspace is available, but no compute access is active. Review current access options before processing files."
-                        : "Your existing work remains available. To compile your own files, arrange a scoped pilot with us first."
+                        ? "Your account is ready. File processing is not active for this workspace yet. Start with a finished public example."
+                        : "Your workspace is ready. To process your own files, arrange source access with us."
                       : "Source access could not be verified. Sign in again before choosing files."}</p>
                   {customerDataAccess === "closed" ? (
-                    <div className="workspace-intake-gated-actions">
-                      {accessSource === "unentitled"
-                        ? <Link className="btn" href="/pricing">View access options</Link>
-                        : <Link className="btn" href="/contact">Arrange a pilot</Link>}
-                      <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
+                    <div className="workspace-example-path" aria-label="Example knowledge path">
+                      <span><b>01</b> Files</span><span><b>02</b> Read</span>
+                      <span><b>03</b> Organize</span><span><b>04</b> Use with AI</span>
                     </div>
                   ) : null}
+                  {customerDataAccess === "closed" ? (
+                    <div className="workspace-intake-gated-actions">
+                      <Link className="btn" href="/explore">Explore a compiled World</Link>
+                      <Link className="btn ghost" href="/contact">Request source access</Link>
+                    </div>
+                  ) : null}
+                  {customerDataAccess === "closed" ? <small>Public example. Your files stay on your device until source access is enabled.</small> : null}
                 </div>
               ) : (
               <div className="workspace-intake-copy">

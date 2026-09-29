@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getUser, pilotAccess, accessMode, bootstrap, gate, provision } = vi.hoisted(() => ({
+const { getUser, pilotAccess, accessMode, bootstrap, authorize, gate, provision } = vi.hoisted(() => ({
   getUser: vi.fn(),
   pilotAccess: vi.fn(),
   accessMode: vi.fn(),
   bootstrap: vi.fn(),
+  authorize: vi.fn(),
   gate: vi.fn(),
   provision: vi.fn(),
 }));
@@ -14,7 +15,10 @@ vi.mock("@/lib/foundation-pilot", () => ({
   foundationPilotAccess: pilotAccess,
   readAccessMode: accessMode,
 }));
-vi.mock("@/lib/self-service-trial", () => ({ bootstrapFoundationSelfServiceTrial: bootstrap }));
+vi.mock("@/lib/self-service-trial", () => ({
+  bootstrapFoundationSelfServiceTrial: bootstrap,
+  authorizeFoundationSessionProduct: authorize,
+}));
 vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: gate }));
 vi.mock("@/lib/self-service-provisioning", () => ({ ensureSelfServiceOrganization: provision }));
 
@@ -27,7 +31,9 @@ describe("workspace bootstrap source admission", () => {
     pilotAccess.mockReturnValue({ membership: { workspaceId: "pilot-11111111" } });
     accessMode.mockReturnValue("pilot");
     provision.mockResolvedValue({ ok: true });
+    gate.mockResolvedValue(true);
     bootstrap.mockResolvedValue({ ok: true, access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null }, limits: null });
+    authorize.mockResolvedValue({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
   });
 
   it.each([false, true])("reports the verified workspace decision %s without exposing receipt details", async (enabled) => {
@@ -37,6 +43,41 @@ describe("workspace bootstrap source admission", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     await expect(response.json()).resolves.toMatchObject({ access: { customerDataEnabled: enabled } });
     expect(gate).toHaveBeenCalledWith("pilot-11111111");
+  });
+
+  it("does not start a free evaluation while customer file processing is closed", async () => {
+    accessMode.mockReturnValue("self_service");
+    gate.mockResolvedValue(false);
+    const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "ACCESS_READY_SOURCE_PENDING",
+      access: { source: "unentitled", limits: null, expiresAt: null, customerDataEnabled: false },
+    });
+    expect(bootstrap).not.toHaveBeenCalled();
+    expect(authorize).toHaveBeenCalledWith("pilot-11111111", "11111111-1111-4111-8111-111111111111", "observer");
+  });
+
+  it("keeps owner access visible without starting a trial while intake is closed", async () => {
+    accessMode.mockReturnValue("self_service");
+    gate.mockResolvedValue(false);
+    authorize.mockResolvedValue({ ok: true, access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null } });
+    const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      access: { source: "owner", accessPlan: "studio_access", customerDataEnabled: false },
+    });
+    expect(bootstrap).not.toHaveBeenCalled();
+  });
+
+  it("starts the evaluation when exact-workspace source access opens", async () => {
+    accessMode.mockReturnValue("self_service");
+    gate.mockResolvedValue(true);
+    bootstrap.mockResolvedValue({ ok: true, access: { source: "trial", accessPlan: "observer_access", billingExempt: true, expiresAt: "2026-10-06T00:00:00Z" }, limits: { files: 3, pages: 50, worlds: 1 } });
+    const response = await POST(new Request("https://tavonel.test/api/access/bootstrap", { method: "POST" }));
+    expect(response.status).toBe(200);
+    expect(bootstrap).toHaveBeenCalledOnce();
+    await expect(response.json()).resolves.toMatchObject({ access: { source: "trial", customerDataEnabled: true } });
   });
 
   it("does not inspect a workspace gate before authentication", async () => {
@@ -60,7 +101,7 @@ describe("workspace bootstrap source admission", () => {
       code: "ACCESS_READY_NO_ENTITLEMENT",
       access: { source: "unentitled", accessPlan: null, limits: null, customerDataEnabled: false },
     });
-    expect(gate).not.toHaveBeenCalled();
+    expect(gate).toHaveBeenCalledWith("pilot-11111111");
   });
 
   it("keeps configuration failures closed", async () => {
