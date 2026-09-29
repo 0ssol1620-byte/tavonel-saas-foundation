@@ -1,7 +1,7 @@
--- Reproduce the Auth role's permission shape and force deferred owner checks before rollback.
--- The local test connection cannot SET ROLE supabase_auth_admin, so temporarily give
--- authenticated INSERT on auth.users inside this transaction. It still has no direct
--- access to the private workspace tables. All temporary grants roll back with the fixture.
+-- Reproduce the Auth role's commit-time permission shape before rollback.
+-- The local test connection cannot SET ROLE supabase_auth_admin, and it cannot grant
+-- INSERT on Supabase-owned auth.users. Seed as postgres, then force the queued
+-- deferred checks under authenticated, which likewise cannot read private tables.
 begin;
 select plan(6);
 
@@ -14,9 +14,6 @@ select ok((select prosecdef from pg_proc where oid = 'public.assert_foundation_w
 select ok((select prosecdef from pg_proc where oid = 'public.assert_new_foundation_workspace_has_owner()'::regprocedure),
   'workspace owner invariant runs with its restricted owner privileges');
 
-grant usage on schema auth to authenticated;
-grant insert on auth.users to authenticated;
-set local role authenticated;
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -27,6 +24,7 @@ insert into auth.users (
   '$2a$10$fixture', now(), '{"provider":"email","providers":["email"]}',
   '{}', now(), now()
 );
+set local role authenticated;
 set constraints all immediate;
 reset role;
 
