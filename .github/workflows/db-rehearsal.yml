@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
       # release change what this receipt means without a commit saying so.
