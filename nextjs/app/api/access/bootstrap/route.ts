@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { foundationPilotAccess, getRequestUser, readAccessMode } from "@/lib/foundation-pilot";
-import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
+import { readVerifiedCustomerDataGateDecision } from "@/lib/customer-data-gate-store";
 import { ensureSelfServiceOrganization } from "@/lib/self-service-provisioning";
-import { bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
+import { authorizeFoundationSessionProduct, bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +30,34 @@ export async function POST(request: Request) {
     if (!provisioned.ok) {
       return NextResponse.json({ code: provisioned.code }, { status: 503, headers: NO_STORE });
     }
+  }
+
+  // A free evaluation must not begin counting down while this workspace cannot submit
+  // a source. Existing owner/paid access remains visible, but a trial is only minted
+  // after the same exact-workspace customer-data decision used by upload routes opens.
+  const gate = await readVerifiedCustomerDataGateDecision(pilot.membership.workspaceId, pilot.membership.workspaceId);
+  const customerDataEnabled = gate.ok;
+  if (readAccessMode() === "self_service" && !gate.ok &&
+    (gate.code === "CUSTOMER_DATA_GATE_STORE_NOT_CONFIGURED" ||
+      gate.code === "CUSTOMER_DATA_GATE_STORE_FAILED" ||
+      gate.code === "CUSTOMER_DATA_GATE_RECEIPT_INVALID" ||
+      gate.code === "CUSTOMER_DATA_GATE_INPUT_INVALID")) {
+    return NextResponse.json({ code: "SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
+  }
+  if (readAccessMode() === "self_service" && !customerDataEnabled) {
+    const existing = await authorizeFoundationSessionProduct(pilot.membership.workspaceId, user.id, "observer");
+    if (!existing.ok && existing.status >= 500) {
+      return NextResponse.json({ code: existing.code }, { status: existing.status, headers: NO_STORE });
+    }
+    return NextResponse.json({
+      code: "ACCESS_READY_SOURCE_PENDING",
+      access: existing.ok && existing.access.source !== "trial"
+        ? { ...existing.access, limits: null, customerDataEnabled: false }
+        : {
+            source: "unentitled", accessPlan: null, billingExempt: false,
+            expiresAt: null, limits: null, customerDataEnabled: false,
+          },
+    }, { headers: NO_STORE });
   }
 
   const access = await bootstrapFoundationSelfServiceTrial(request, user, pilot.membership.workspaceId);
@@ -60,8 +88,6 @@ export async function POST(request: Request) {
 
   // The UI must learn the same per-workspace decision the upload routes enforce.
   // A store outage is closed, never advertised as upload-ready.
-  const customerDataEnabled = await canAdmitCustomerSource(pilot.membership.workspaceId);
-
   return NextResponse.json({
     code: "ACCESS_READY",
     access: {

@@ -1,18 +1,23 @@
 import { expect, test } from "@playwright/test";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
-test("closed workspace shows the pilot path without offering an upload", async ({ page }, testInfo) => {
+test("closed workspace offers a public example without offering an upload", async ({ page }, testInfo) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { customerDataEnabled: false });
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: "Bring your knowledge to TAVONEL" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Arrange a pilot" })).toHaveAttribute("href", "/contact");
+  await expect(page.getByRole("heading", { name: "See how a source becomes usable knowledge" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
   await expect(page.getByRole("link", { name: "Explore a compiled World" })).toHaveAttribute("href", "/explore");
+  await expect(page.locator(".workspace-example-path span")).toHaveCount(4);
   await expect(page.getByText("Getting started")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Choose files" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Upload/ }).first()).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Upload", exact: true })).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("workspace-admission-closed.png"), fullPage: true });
+  await page.keyboard.press("u");
+  await expect(page.getByText("Source processing is not active for this workspace. Request source access before choosing files.")).toBeVisible();
 });
 
 test("approved workspace retains its source controls", async ({ page }) => {
@@ -29,20 +34,30 @@ test("an authenticated account without compute access sees one consistent next s
   await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
   await page.goto("/workspace/connections", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("No active plan")).toBeVisible();
-  await expect(page.getByText("This account has no active compute access. Source connections require Developer access.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "View access options" })).toHaveAttribute("href", "/pricing");
-  await expect(page.getByText("Contact us to arrange a pilot.")).toHaveCount(0);
+  await expect(page.getByText("Source access pending")).toBeVisible();
+  await expect(page.getByText("Your account is ready, but source processing is closed.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
+  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
 });
 
-test("an unentitled workspace home points to access options instead of a pilot", async ({ page }) => {
+test("closed workspace does not sell AI connection access as an available plan", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
+  await page.goto("/workspace/developer", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "AI connections are not available for this workspace yet." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
+  await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
+});
+
+test("an unentitled workspace home points to the public example and access request", async ({ page }) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("Your workspace is available, but no compute access is active.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("link", { name: "View access options" }).first()).toHaveAttribute("href", "/pricing");
-  await expect(page.getByRole("link", { name: "Arrange a pilot" })).toHaveCount(0);
+  await expect(page.getByText("Your account is ready. File processing is not active", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Explore a compiled World" })).toHaveAttribute("href", "/explore");
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
 });
 
 test("an unavailable access check does not describe a paid account as unentitled", async ({ page }) => {
