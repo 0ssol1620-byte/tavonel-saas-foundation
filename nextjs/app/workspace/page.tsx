@@ -254,12 +254,10 @@ export default function WorkspacePage() {
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
-    ? accessSource === "unentitled"
-      ? "No compute access is active for this account. Review the current access options in Pricing."
-      : "This workspace is not yet set up to process your files. Contact us to arrange a pilot."
+    ? "Source processing is not active for this workspace. Request source access before choosing files."
     : customerDataAccess === "checking"
       ? "Checking source access before choosing files."
-      : "Source access could not be verified. Sign in again before choosing files.";
+      : "Source access could not be verified. Refresh before choosing files.";
   const { start: buy } = useCheckout(setNotice);
   // Read from the URL on mount so a linked or reloaded workspace opens on the same view.
   const [tab, setTab] = useState<WorkspaceTab>("overview");
@@ -2322,7 +2320,7 @@ export default function WorkspacePage() {
                       ? accessSource === "unentitled"
                         ? "Your account is ready. File processing is not active for this workspace yet. Start with a finished public example."
                         : "Your workspace is ready. To process your own files, arrange source access with us."
-                      : "Source access could not be verified. Sign in again before choosing files."}</p>
+                      : "Source access could not be verified. Refresh before choosing files."}</p>
                   {customerDataAccess === "closed" ? (
                     <div className="workspace-example-path" aria-label="Example knowledge path">
                       <span><b>01</b> Files</span><span><b>02</b> Read</span>

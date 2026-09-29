@@ -16,6 +16,8 @@ test("closed workspace offers a public example without offering an upload", asyn
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("workspace-admission-closed.png"), fullPage: true });
+  await page.keyboard.press("u");
+  await expect(page.getByText("Source processing is not active for this workspace. Request source access before choosing files.")).toBeVisible();
 });
 
 test("approved workspace retains its source controls", async ({ page }) => {
