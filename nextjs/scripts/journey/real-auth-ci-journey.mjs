@@ -8,7 +8,7 @@ import https from "node:https";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { authGatewayService, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
+import { authGatewayService, currentSourceObjects, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
 import { withLocalStorage } from "./local-storage-journey.mjs";
 import { stopOwnedChild } from "./stop-owned-child.mjs";
 
@@ -24,7 +24,7 @@ const root = mkdtempSync(path.join(tmpdir(), "tavonel-real-auth-"));
 const owner = "a1111111-1111-4111-8111-111111111111", workspace = "pilot-a111111111114111";
 const origin = "https://127.0.0.1:54443", host = "00000000000000000000000000000000.r2.cloudflarestorage.com";
 const email = "real-auth-owner@journey.invalid", password = randomBytes(32).toString("base64url");
-const report = { kind: "genuine-local-gotrue-next-browser", success: false, assertions: [], goTrueExecuted: false,
+const report = { kind: "genuine-local-gotrue-next-browser", success: false, assertions: [], goTrueExecuted: false, hydratedReviewPublishVerified: false,
   generatedAt:new Date().toISOString(),harnessSha256:createHash("sha256").update(readFileSync(import.meta.filename)).digest("hex"),
   googleOAuthVerified: false, productionAuthCookieUsed: false, productionSourceAdmissionVerified: false,
   foundationCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: nextRoot, encoding: "utf8" }).trim() };
@@ -45,6 +45,8 @@ const fixtures = ["initial", "updated"].map(name => {
 });
 const hash = body => createHash("sha256").update(body).digest("hex");
 const hmac = (key, body) => createHmac("sha256", key).update(body).digest();
+// The promote route admits a candidate only when its bound source versions are current in storage.
+const currentSources = currentSourceObjects(fixtures[1], workspace);
 let userCreated = false;
 try {
   const authContainers=execFileSync("docker",["ps","--format","{{.Names}}\t{{.Image}}"],{env,encoding:"utf8",timeout:10_000}).trim().split("\n")
@@ -57,10 +59,10 @@ try {
   check("provider honors fixed fixture UUID", created.body.id, owner); userCreated = true;
   check("actual signup trigger provisions the fixture membership", sql(`select count(*) from public.foundation_workspace_members where workspace_key='${workspace}' and user_id='${owner}' and state='active'`), "1");
   sql(`insert into public.foundation_account_access_grants(user_id,grant_kind,billing_exempt,trial_exempt) values ('${owner}','owner',true,true)`);
+  // Review decisions reference the workspace billing account; this disposable row carries no provider customer or subscription.
+  sql(`insert into public.foundation_billing_accounts(workspace_key,user_id) values ('${workspace}','${owner}') on conflict (workspace_key) do nothing`);
   await withLocalStorage(process.env.TAVONEL_LOCAL_SEAWEED_EXE, async storage => {
-    for (let i=0; i<fixtures.length; i++) {
-      const artifact = fixtures[i], body = `${JSON.stringify(artifact)}\n`;
-      const key = `immutable/${workspace}/${workspace}/collections/${artifact.collectionId}/${artifact.manifestDigest.slice(7)}/candidate-world.json`;
+    async function putObject(key, body) {
       const uri = `/${storage.env.S3_BUCKET}/${key}`, date = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
       const headers = { host, "x-amz-content-sha256": hash(body), "x-amz-date": date }, names = Object.keys(headers).sort();
       const canonical = ["PUT",uri,"",names.map(name=>`${name}:${headers[name]}\n`).join(""),names.join(";"),hash(body)].join("\n");
@@ -69,15 +71,22 @@ try {
       const signature = createHmac("sha256",signing).update(`AWS4-HMAC-SHA256\n${date}\n${scope}\n${hash(canonical)}`).digest("hex");
       headers.authorization = `AWS4-HMAC-SHA256 Credential=${storage.env.AWS_ACCESS_KEY_ID}/${scope}, SignedHeaders=${names.join(";")}, Signature=${signature}`;
       const stored = await fetch(`${storage.endpoint}${uri}`,{method:"PUT",headers,body,signal:AbortSignal.timeout(8000)});
-      check("actual S3 stores unchanged Core-produced Auth UI fixture",stored.status,200); await stored.text();
+      await stored.text(); return stored.status;
+    }
+    for (const artifact of fixtures) {
+      const key = `immutable/${workspace}/${workspace}/collections/${artifact.collectionId}/${artifact.manifestDigest.slice(7)}/candidate-world.json`;
+      check("actual S3 stores unchanged Core-produced Auth UI fixture",await putObject(key,`${JSON.stringify(artifact)}\n`),200);
+      // Only the initial revision is prepared through SQL. The updated one stays a candidate for the hydrated UI to publish.
+      if (artifact !== fixtures[0]) continue;
       const activated = await api("/rest/v1/rpc/transition_foundation_world_atomic", {
         p_operation_id:randomUUID(),p_action:"activate",p_workspace_key:workspace,p_collection_id:artifact.collectionId,
         p_target_manifest_digest:artifact.manifestDigest,p_candidate_object_key:key,p_world_state_id:artifact.coreExecution.worldStateId,
-        p_core_output_sha256:artifact.coreExecution.receipt.outputSha256,p_expected_current_state:i===0?"empty":"active",
-        p_expected_current_revision:i,p_expected_current_manifest_digest:i===0?null:fixtures[0].manifestDigest,p_actor_user_id:owner,p_reason:"Synthetic real Auth CI fixture publication",
+        p_core_output_sha256:artifact.coreExecution.receipt.outputSha256,p_expected_current_state:"empty",
+        p_expected_current_revision:0,p_expected_current_manifest_digest:null,p_actor_user_id:owner,p_reason:"Synthetic real Auth CI fixture publication",
       });
-      check("actual SQL publication prepares retained and active Auth UI revisions",activated.status,200);
+      check("actual SQL publication prepares the initial active Auth UI revision",activated.status,200);
     }
+    for (const source of currentSources) check("actual S3 stores the hash-bound current source version",await putObject(source.key,source.body),200);
     execFileSync("openssl",["req","-x509","-newkey","rsa:2048","-nodes","-keyout",path.join(root,"key.pem"),"-out",path.join(root,"cert.pem"),"-days","1","-subj","/CN=localhost","-addext",`subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:${host}`],{env,stdio:"ignore",timeout:15_000});
     const gateway = https.createServer({key:readFileSync(path.join(root,"key.pem")),cert:readFileSync(path.join(root,"cert.pem"))},(request,response)=>{
       const service=authGatewayService(request.url,storage.env.S3_BUCKET);
@@ -140,6 +149,26 @@ try {
       }
       await inspect(0,url=>page.goto(url));await inspect(0,()=>page.reload());await inspect(1,url=>page.goto(url));await inspect(0,()=>page.goBack(),false);
       report.selectedRevisionUiVerified=true;
+      // Hydrated review and publication: the reviewed production-control driver clicks; Next, SQL and S3 decide.
+      report.stage="hydrated-review-publish";
+      const {acceptEvidenceThroughUi,activateCandidateThroughUi}=await import(pathToFileURL(path.join(nextRoot,"e2e/support/workspace-review-actions.ts")).href);
+      const [published,candidate]=fixtures;
+      const scope=`workspace_key='${workspace}' and collection_id='${candidate.collectionId}'`;
+      check("candidate is not active before the hydrated publication",sql(`select manifest_digest||'@'||revision from public.foundation_active_worlds where ${scope}`),`${published.manifestDigest}@1`);
+      await page.goto(`${origin}/workspace/review?collection=${candidate.collectionId}&manifest=${encodeURIComponent(candidate.manifestDigest)}`);
+      await expect(page.getByRole("button",{name:"Accept",exact:true})).toBeVisible({timeout:30_000});
+      const accepted=await acceptEvidenceThroughUi(page,candidate.collectionId,candidate.manifestDigest);
+      check("actual Next records the hydrated evidence acceptance",accepted.status(),201);
+      check("actual SQL retains the accept decision for the exact reviewed revision",
+        sql(`select count(*) from public.foundation_review_decisions where ${scope} and manifest_digest='${candidate.manifestDigest}' and action='accept' and actor_user_id='${owner}'`),"1");
+      const activated=await activateCandidateThroughUi(page,{collectionId:candidate.collectionId,manifestDigest:candidate.manifestDigest,
+        expectedCurrentManifest:published.manifestDigest,expectedCurrentRevision:1},"Reviewed the exact updated payment-terms revision.");
+      check("actual Next publishes the reviewed candidate through the hydrated control",activated.status(),200);
+      check("publication reply names the active World",(await activated.json()).code,"WORLD_ACTIVE");
+      check("actual SQL moves the active pointer to the reviewed revision",sql(`select manifest_digest||'@'||revision from public.foundation_active_worlds where ${scope}`),`${candidate.manifestDigest}@2`);
+      check("actual SQL retains the previous revision as superseded",sql(`select lifecycle_status from public.foundation_world_versions where ${scope} and manifest_digest='${published.manifestDigest}'`),"superseded");
+      await inspect(1,url=>page.goto(url));
+      report.hydratedReviewPublishVerified=true;
       const fresh=await login();check("fresh provider session for logout observation",fresh.status,200);session=fresh.body;
       const claims=JSON.parse(Buffer.from(session.access_token.split(".")[1],"base64url").toString());
       assert.ok(claims.exp-Date.now()/1000>30&&claims.exp-Date.now()/1000<120,"The local CI config must use the 60-second test JWT lifetime");

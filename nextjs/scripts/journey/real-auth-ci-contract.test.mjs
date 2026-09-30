@@ -1,6 +1,27 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
-import { authGatewayService, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
+import { authGatewayService, currentSourceObjects, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
+const fixture = name => JSON.parse(readFileSync(path.join(import.meta.dirname, "real-auth-fixtures", `${name}.json`), "utf8")).artifact;
+test("hydrated publication stores only hash-bound current sources of the updated fixture", () => {
+  const updated = fixture("updated"), workspace = "pilot-a111111111114111";
+  const objects = currentSourceObjects(updated, workspace);
+  assert.deepEqual(objects.map(item => item.key).sort(), updated.sourceDocuments.map(item => `immutable/${workspace}/${workspace}/${item.documentId}/${item.versionKey}/sanitized.pdf`).sort());
+  // The initial revision binds the 30-day policy, which is not the current source.
+  assert.throws(() => currentSourceObjects(fixture("initial"), workspace), /synthetic-policy bytes must hash/);
+  assert.throws(() => currentSourceObjects(updated, workspace, { "synthetic-policy": "altered", "synthetic-board": "altered" }));
+  assert.throws(() => currentSourceObjects({ sourceDocuments: [] }, workspace));
+});
+// The journey imports the reviewed TypeScript driver directly; fail here, before the optimized build, if this Node cannot.
+// The journey is hosted-only, so the requirement binds on GitHub Actions; elsewhere the skip names the runtime.
+test("the reviewed button driver loads in this Node runtime without a bundler", {
+  skip: process.env.GITHUB_ACTIONS !== "true" && !process.features.typescript && `journey is hosted-only; ${process.version} cannot strip TypeScript`,
+}, async () => {
+  const driver = await import(new URL("../../e2e/support/workspace-review-actions.ts", import.meta.url).href);
+  assert.equal(typeof driver.acceptEvidenceThroughUi, "function");
+  assert.equal(typeof driver.activateCandidateThroughUi, "function");
+});
 test("requires the actual GoTrue expiry rejection and refuses success or unrelated errors", () => {
   const expired = { status: 403, body: { error_code: "bad_jwt", msg: "invalid JWT: token has invalid claims: token is expired" } };
   validateExpiredProviderJwt(expired);

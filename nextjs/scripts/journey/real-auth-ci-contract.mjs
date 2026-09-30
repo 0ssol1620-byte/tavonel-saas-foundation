@@ -1,5 +1,21 @@
 /** Fail-closed configuration for the existing disposable GitHub runner Supabase stack. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+/** Source texts the updated fixture was compiled from (local-core.integration.test.ts); versionKey is sha256(text). */
+export const UPDATED_SOURCE_TEXTS = Object.freeze({
+  "synthetic-policy": "The synthetic company's payment terms are 45 days.",
+  "synthetic-board": "The synthetic board approved the payment policy.",
+});
+/** Current immutable source objects for a candidate, refusing any object whose bytes do not hash to its bound versionKey. */
+export function currentSourceObjects(artifact, workspace, texts = UPDATED_SOURCE_TEXTS) {
+  const bindings = artifact?.sourceDocuments ?? [];
+  assert.deepEqual(bindings.map(item => item.documentId).sort(), Object.keys(texts).sort(), "Every bound source needs its exact input text");
+  return bindings.map(({ documentId, versionKey }) => {
+    const body = texts[documentId];
+    assert.equal(versionKey, createHash("sha256").update(body).digest("hex"), `${documentId} bytes must hash to the bound versionKey`);
+    return { key: `immutable/${workspace}/${workspace}/${documentId}/${versionKey}/sanitized.pdf`, body };
+  });
+}
 /** GoTrue v2.196.0 parseJWTClaims returns Forbidden/bad_jwt for expired claims. */
 export function validateExpiredProviderJwt(response) {
   assert.equal(response.status, 403, "GoTrue rejects expired JWT claims as forbidden");
