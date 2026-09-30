@@ -123,7 +123,7 @@ Insert the row only if the output says `"allowed": true`:
 2. Deploy the exact SHA. Leave `TAVONEL_CUSTOMER_DATA_GATE_VERSION` and every public flag as they
    are until the operator deliberately switches to v2 for the qualification window.
 3. **Billing precondition. Do not open the window unless it holds.** Immediately before the window,
-   list subscriptions from the **live Paddle API** (not only the `foundation_billing_accounts`
+   list subscriptions from the **live Paddle API or authenticated live dashboard with all statuses and no search filter** (not only the `foundation_billing_accounts`
    projection). Confirm there are zero in `active`, `trialing`, `past_due` or `paused` for any
    workspace. Record the query time and the count. If any exist, stop: the window would expose
    them to the sweeper effects above. Never suspend or disable the gate-enforce reconciliation cron to
@@ -140,7 +140,7 @@ Insert the row only if the output says `"allowed": true`:
    `TAVONEL_CUSTOMER_DATA_GATE_VERSION` and the cohort back. In a separate decision, evaluate the
    12-fact production release for that SHA, citing the actual receipt. Only that production row
    admits other workspaces or billing. Note that the operator-workspace refusal is permanent for that
-   workspace and scope until a newer grant is issued. It also pauses that workspace's own
+   workspace and scope until a new, explicitly reassessed operator workspace decision lifts it; bootstrap does not automatically lift a refusal. It also pauses that workspace's own
    subscription immediately if one exists (step 3 requires none).
 
 Rollback: let the qualification expire (every qualification grant is dead within an hour) or record

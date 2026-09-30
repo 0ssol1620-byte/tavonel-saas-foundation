@@ -221,9 +221,9 @@ insert into public.customer_data_release_decisions (scope, release_revision, all
   evaluated_at, recorded_at, operator_actor, decision_reason)
 select 'direct_upload', repeat('a', 40), true, 'sha256:' || repeat('d', 64),
   (select jsonb_agg(jsonb_build_object('i', g)) from generate_series(1, 12) g),
-  now() - interval '1 day', clock_timestamp(), 'test-operator', 'production release';
+  now() - interval '1 day', now() - interval '1 day', 'test-operator', 'production release';
 select is((select stage from public.customer_data_release_decisions order by recorded_at desc limit 1),
-  'production', 'an unlabelled release row is production');
+  'production', 'a production insertion supersedes qualification despite a caller-supplied old timestamp');
 select throws_ok($$ select pg_temp.issue('pilot-qb2b2b200004000', 'c0b2b2b2-0000-4000-8000-00000000bb01',
   'sha256:' || repeat('d', 64), p_stage => 'qualification', p_ttl => interval '30 minutes') $$,
   'P0001', 'workspace_grant_input_invalid', 'a qualification-labelled digest does not pass for a production grant');

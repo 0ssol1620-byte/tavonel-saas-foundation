@@ -63,6 +63,9 @@ as $$
 begin
   perform pg_advisory_xact_lock(
     hashtextextended('customer_data_release_decisions:' || new.scope || ':' || new.release_revision, 0));
+  -- Decision order is acquisition order, not transaction start time or caller-supplied history.
+  -- Otherwise an older production transaction could commit after qualification yet sort before it.
+  new.recorded_at := clock_timestamp();
   if new.stage = 'qualification' then
     if current_setting('transaction_isolation') <> 'read committed' then
       raise exception 'qualification_requires_read_committed';
