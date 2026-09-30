@@ -175,6 +175,10 @@ describe("v2 workspace grant during bootstrap", () => {
     ["SCOPED_RELEASE_NOT_FOUND", "SCOPED_RELEASE_NOT_FOUND", "release_pending"],
     ["SCOPED_RELEASE_REFUSED", "SCOPED_RELEASE_REFUSED", "release_pending"],
     ["SCOPED_WORKSPACE_REFUSED", "SCOPED_WORKSPACE_REFUSED", "workspace_refused"],
+    // The grant reports cohort exclusion only after consent is on record, so "accepted, awaiting" holds.
+    // A misconfigured cohort closes processing but must not lock the owner out of their workspace.
+    ["PROCESSING_COHORT_EXCLUDED", "PROCESSING_COHORT_EXCLUDED", "release_pending"],
+    ["PROCESSING_COHORT_CONFIG_INVALID", "PROCESSING_COHORT_CONFIG_INVALID", "release_pending"],
   ])("reports %s as truthful pending access without a trial", async (grantCode, gateCode, reason) => {
     issueGrant.mockResolvedValue({ ok: false, code: grantCode });
     gate.mockResolvedValue({ ok: false, code: gateCode });
