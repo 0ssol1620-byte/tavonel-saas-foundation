@@ -1,5 +1,7 @@
 # Real Auth CI preparation and cumulative journey ledger
 
+Current Auth qualification: exact Foundation ca104ea passed actual disposable GoTrue + optimized Next + Chromium, 35 assertions, at 17:31 UTC. See [REAL_AUTH_ROUTING_AND_EXPIRY_2026-09-30.md](REAL_AUTH_ROUTING_AND_EXPIRY_2026-09-30.md). Earlier preparation/pending statements below are historical. Google OAuth, production source admission and full intake/review/publication remain unqualified; whole-requirement counts are unchanged.
+
 **Prepared, not hosted-executed.** This increment adds a manual-only qualification job to the already registered DB rehearsal workflow and a genuine GoTrue test harness. No GitHub workflow was dispatched, no branch was pushed and no GoTrue service was run on the user's desktop. Existing `.github/workflows/ci.yml`, DB rehearsal steps and permissions are unchanged; only an independent `real-auth-journey` job is appended, conditional on manual dispatch. Latest published Foundation `5af5baf9` was integrated at `7dfd9cb9b0652c2724399a4ae8c65837dc755571` before this increment; no frontend component changed.
 
 ## Existing CI can supply the missing runtime
@@ -42,7 +44,7 @@ These local checks **do not prove GoTrue startup, hosted image availability, the
 | Actual PostgREST JWT/RLS | `3534304d`, real JWT verification and HTTP-to-SQL lifecycle | Synthetic JWT issuer, no GoTrue |
 | Actual S3 protocol | `bdf4d75f`, six actual-service signer/immutability/digest tests | SeaweedFS, not production R2 |
 | Actual Next/browser downstream | `4bee0958`, **109 cumulative assertions**, real read/restore/lost-response replay/stale publication/membership refusal | Next development mode and explicit synthetic identity adapter; API actions rather than hydrated workspace selection |
-| Genuine GoTrue and optimized Next/UI | This prepared manual CI harness | **Not executed; all real Auth/UI outcomes remain pending hosted run** |
+| Genuine GoTrue and optimized Next/UI | Exact `ca104ea` hosted run 36750543772, 35 assertions | **Passed in disposable actual GoTrue/S3/SQL/production Next/Chromium; full intake/review/publication and OAuth remain open** |
 
 K04/K06 retain their local real-Core qualification. K07 retains actual browser restore/replay/CAS qualification. K09/K19/K21 retain actual JWT/RLS and Next membership-revocation qualification; provider-login/session semantics remain pending. K10 and UX11–UX16 stay partial. No item completion count or production readiness claim is increased.
 

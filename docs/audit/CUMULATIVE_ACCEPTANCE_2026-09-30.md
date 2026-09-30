@@ -1,5 +1,7 @@
 # Cumulative acceptance reconciliation
 
+Current Auth qualification: exact Foundation ca104ea passed actual disposable GoTrue + optimized Next + Chromium, 35 assertions, at 17:31 UTC. See [REAL_AUTH_ROUTING_AND_EXPIRY_2026-09-30.md](REAL_AUTH_ROUTING_AND_EXPIRY_2026-09-30.md). Earlier preparation/pending statements below are historical. Google OAuth, production source admission and full intake/review/publication remain unqualified; whole-requirement counts are unchanged.
+
 Foundation qualification pin: `5af5baf9dfc2a2db144f5e72f0f3a7af8f0af0ea`. Core documentation pin: `36f8f99bf298c4177bb9c7808920eda81d7c6632`; implementation `19e9d0a78c111b513f687cd48ac8f60edd8268e6`. This reconciles the historical checkpoint ledger; older statements about missing immutable-input verification, never-executed SQL, blocked builds and wholly mocked storage are superseded only within the explicit local scopes below. No production activation, merge or deployment has occurred.
 
 ## Acceptance totals

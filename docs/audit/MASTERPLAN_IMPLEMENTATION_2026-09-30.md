@@ -1,5 +1,7 @@
 # TAVONEL masterplan implementation status
 
+Current Auth qualification: exact Foundation ca104ea passed actual disposable GoTrue + optimized Next + Chromium, 35 assertions, at 17:31 UTC. See [REAL_AUTH_ROUTING_AND_EXPIRY_2026-09-30.md](REAL_AUTH_ROUTING_AND_EXPIRY_2026-09-30.md). Earlier preparation/pending statements below are historical. Google OAuth, production source admission and full intake/review/publication remain unqualified; whole-requirement counts are unchanged.
+
 Current cumulative acceptance is reconciled in [CUMULATIVE_ACCEPTANCE_2026-09-30.md](CUMULATIVE_ACCEPTANCE_2026-09-30.md), pinned to Foundation `5af5baf` and Core `36f8f99`. Sections below retain chronological checkpoint evidence; earlier unverified-boundary statements must be read with that current reconciliation. Global totals remain 2 complete / 36 partial / 11 unassessed / 6 external-dependent. No release gate is newly accepted.
 
 This is a local implementation checkpoint, not a release or a claim of full masterplan completion. Production flags, credentials, paid compute and customer data were not changed. Base Foundation: `7a7b4fed9e7d45ec596057f7f1cc5d0672465326`. Core productization reference: `f2fc5d856f7efb09221aede309e1e6f2e07671a9` on `codex/tavonel-p0p2-productization`.
