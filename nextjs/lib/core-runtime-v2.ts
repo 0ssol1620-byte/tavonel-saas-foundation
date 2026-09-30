@@ -11,6 +11,7 @@ import {
   type RevisionCompileSnapshot,
 } from "./collection-compiler";
 import { CORE_CLIENT_TIMEOUT_MS, CORE_MAX_LATENCY_MS } from "./execution-budget";
+import { canonicalJsonWireField } from "./canonical-json-wire";
 
 export const PRODUCT_CORE_REQUEST_SCHEMA = "tavonel.product_core.compile_request.v2" as const;
 export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_response.v2" as const;
@@ -728,12 +729,15 @@ export async function dispatchProductCoreV2(
       && (cause.name === "TimeoutError" || cause.name === "AbortError");
     return { ok: false, code: timedOut ? "CORE_V2_TIMEOUT" : "CORE_V2_UNAVAILABLE" };
   }
-  const json = await response.json().catch(() => null) as ProductCoreV2CompileResponse | { code?: unknown } | null;
+  const responseText = await response.text().catch(() => "");
+  let json: ProductCoreV2CompileResponse | { code?: unknown } | null;
+  try { json = JSON.parse(responseText); } catch { json = null; }
   if (!response.ok || !json) {
     const errorCode = (json as { code?: unknown } | null)?.code;
     return { ok: false, code: typeof errorCode === "string" ? errorCode : `CORE_V2_HTTP_${response.status}` };
   }
   const result = json as ProductCoreV2CompileResponse;
+  const canonicalCandidate = canonicalJsonWireField(responseText, "candidate");
   const lifecycleStatus = {
     completed: "candidate",
     review_required: "review_required",
@@ -756,7 +760,8 @@ export async function dispatchProductCoreV2(
     (result.status === "completed" && envelope.previousActiveWorld !== undefined && result.receipt.equivalence !== "passed") ||
     result.receipt.requestId !== envelope.requestId ||
     result.receipt.inputSha256 !== inputSha256 ||
-    result.receipt.outputSha256 !== `sha256:${sha256(canonicalize(result.candidate))}` ||
+    canonicalCandidate === null ||
+    result.receipt.outputSha256 !== `sha256:${sha256(canonicalCandidate)}` ||
     !SHA256.test(result.receipt.coreReleaseDigest) ||
     result.receipt.matchingPolicy !== "legacy" ||
     result.receipt.candidatePromotion !== false ||
