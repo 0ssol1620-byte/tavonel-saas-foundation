@@ -26,6 +26,7 @@ const manifest = {
 const scope = "direct_upload" as const;
 const revision = "a".repeat(40);
 const WORKSPACE = "pilot-1111111111114111";
+const OTHER = "pilot-2222222222224222";
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const evaluatedAt = "2026-09-29T00:00:00.000Z";
 const now = new Date("2026-09-30T00:00:00.000Z");
@@ -45,9 +46,10 @@ const acceptance = (overrides: Record<string, unknown> = {}) => ({
   terms: manifest.terms, processing: manifest.processing, acceptedAt: "2026-09-29T12:00:00.000Z",
   idempotentReplay: false, ...overrides,
 });
+type Rpc = (config: unknown, path: string, init: RequestInit) => Promise<Response>;
 /** Plays the RPC: echoes the submitted grant back, as a fresh insert or a stored replay. */
-function grantRpc(replay?: { grantedAt: string; expiresAt: string }) {
-  return (_config: unknown, _path: string, init: RequestInit) => {
+function grantRpc(replay?: { grantedAt: string; expiresAt: string }): Rpc {
+  return (_config, _path, init) => {
     const p = JSON.parse(String(init.body)) as Record<string, string>;
     const stored = {
       tenantId: p.p_workspace_key, workspaceId: p.p_workspace_key, userId: OWNER, scope,
@@ -62,10 +64,18 @@ function grantRpc(replay?: { grantedAt: string; expiresAt: string }) {
 }
 const rpcError = (message: string) => Promise.resolve(Response.json({ message }, { status: 400 }));
 
+const GRANT_RPC = "/rest/v1/rpc/issue_customer_data_workspace_grant";
+/** Durable facts the fake store answers with, routed by path rather than by call order. */
+let store: { latest: unknown; acceptance: unknown; release: unknown; rpc: Rpc };
+const paths = () => request.mock.calls.map((call) => String(call[1]));
+const wroteGrant = () => paths().includes(GRANT_RPC);
+const readRelease = () => paths().some((path) => path.startsWith("/rest/v1/customer_data_release_decisions"));
+
 let root: string;
 const issue = (at = now, env: Record<string, string | undefined> = { VERCEL_GIT_COMMIT_SHA: revision }) =>
   issueProcessingWorkspaceGrant({ workspaceKey: WORKSPACE, scope, now: at, env, publicDir: root });
-const rpcBody = () => JSON.parse(String(request.mock.calls[2][2].body)) as Record<string, string>;
+const rpcBody = () => JSON.parse(String(request.mock.calls.filter((call) => call[1] === GRANT_RPC).at(-1)![2].body)) as
+  Record<string, string>;
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -75,10 +85,16 @@ beforeEach(async () => {
   await writeFile(join(root, "policy/processing-terms-2026-09-30.json"), JSON.stringify(manifest));
   await writeFile(join(root, TERMS.slice(1)), "terms fixture");
   await writeFile(join(root, PROCESSING.slice(1)), "processing fixture");
-  request
-    .mockResolvedValueOnce(Response.json([releaseRow()]))
-    .mockResolvedValueOnce(Response.json(acceptance()))
-    .mockImplementationOnce(grantRpc());
+  store = { latest: [], acceptance: acceptance(), release: [releaseRow()], rpc: grantRpc() };
+  request.mockImplementation((c: unknown, path: string, init: RequestInit) => {
+    if (path.startsWith("/rest/v1/customer_data_workspace_decisions?")) return Promise.resolve(Response.json(store.latest));
+    if (path === "/rest/v1/rpc/current_foundation_processing_terms_acceptance") {
+      return Promise.resolve(Response.json(store.acceptance));
+    }
+    if (path.startsWith("/rest/v1/customer_data_release_decisions?")) return Promise.resolve(Response.json(store.release));
+    if (path === GRANT_RPC) return store.rpc(c, path, init);
+    throw new Error(`unexpected ${path}`);
+  });
 });
 afterEach(() => rm(root, { recursive: true, force: true }));
 
@@ -87,7 +103,7 @@ describe("processing workspace grant", () => {
     const result = await issue();
     expect(result).toMatchObject({ ok: true, idempotentReplay: false });
     if (!result.ok) throw new Error("unreachable");
-    expect(request.mock.calls[0][1]).toContain(`release_revision=eq.${revision}`);
+    expect(paths().find((path) => path.includes("customer_data_release_decisions"))).toContain(`release_revision=eq.${revision}`);
     const body = rpcBody();
     expect(body.p_workspace_key).toBe(WORKSPACE);
     expect(body.p_grant_receipt_sha256).toBe(workspaceGrantSha256(result.grant));
@@ -101,10 +117,7 @@ describe("processing workspace grant", () => {
   it("repeated issuance is an idempotent replay of the stored grant", async () => {
     const first = await issue();
     if (!first.ok) throw new Error("first grant failed");
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance()))
-      .mockImplementationOnce(grantRpc(first.grant));
+    store.rpc = grantRpc(first.grant);
     const later = new Date(now.getTime() + 60_000);
     const second = await issue(later);
     expect(second).toEqual({ ok: true, grant: first.grant, idempotentReplay: true });
@@ -135,62 +148,99 @@ describe("processing workspace grant", () => {
   });
 
   it("refuses cross-workspace acceptances and grants", async () => {
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance({ workspaceKey: "pilot-2222222222224222" })));
+    store.acceptance = acceptance({ workspaceKey: OTHER });
     await expect(issue()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(wroteGrant()).toBe(false);
 
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance()))
-      .mockImplementationOnce((c: unknown, p: string, init: RequestInit) => grantRpc()(c, p, {
-        ...init, body: JSON.stringify({ ...JSON.parse(String(init.body)), p_workspace_key: "pilot-2222222222224222" }),
-      }));
+    store.acceptance = acceptance();
+    store.rpc = (c, p, init) => grantRpc()(c, p, {
+      ...init, body: JSON.stringify({ ...JSON.parse(String(init.body)), p_workspace_key: OTHER }),
+    });
     await expect(issue()).resolves.toEqual({ ok: false, code: "WORKSPACE_GRANT_STORE_FAILED" });
   });
 
   it("closes when the published manifest changed or the owner no longer holds a current acceptance", async () => {
     await writeFile(join(root, TERMS.slice(1)), "edited terms");
     await expect(issue()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_UNAVAILABLE" });
-    expect(request).toHaveBeenCalledTimes(1); // the release read; no acceptance lookup, no grant write
+    expect(paths().some((path) => path.includes("processing_terms_acceptance"))).toBe(false);
+    expect(wroteGrant()).toBe(false);
     await writeFile(join(root, TERMS.slice(1)), "terms fixture");
 
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance({ terms: { path: TERMS, sha256: hash("old terms") } })));
+    store.acceptance = acceptance({ terms: { path: TERMS, sha256: hash("old terms") } });
     await expect(issue()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
 
     // current_foundation_processing_terms_acceptance answers null once the owner changes or is revoked.
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(null));
+    store.acceptance = null;
     await expect(issue()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
 
     // An owner change that races between the read and the locked RPC.
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance()))
-      .mockReturnValueOnce(rpcError("workspace_grant_acceptance_required"));
+    store.acceptance = acceptance();
+    store.rpc = () => rpcError("workspace_grant_acceptance_required");
     await expect(issue()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
   });
 
   it("never renews over a refused release or an explicit workspace refusal", async () => {
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow({ allowed: false, missing: ["x"] })]));
+    store.release = [releaseRow({ allowed: false, missing: ["x"] })];
     await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(wroteGrant()).toBe(false);
 
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance()))
-      .mockReturnValueOnce(rpcError("workspace_grant_release_changed"));
+    store.release = [releaseRow()];
+    store.rpc = () => rpcError("workspace_grant_release_changed");
     await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_CHANGED" });
 
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json(acceptance()))
-      .mockReturnValueOnce(rpcError("workspace_grant_refused"));
+    store.rpc = () => rpcError("workspace_grant_refused");
     await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+  });
+
+  // The onboarding bug: with neither a release nor an acceptance the owner was told "release pending",
+  // which the workspace renders as "terms accepted".
+  it("reports missing consent before a missing release, and an explicit refusal before both", async () => {
+    store.release = [];
+    store.acceptance = null;
+    await expect(issue()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+
+    store.acceptance = acceptance();
+    await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
+
+    store.acceptance = null;
+    store.latest = [{ allowed: false }];
+    request.mockClear();
+    await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    expect(wroteGrant()).toBe(false);
+
+    // A later grant supersedes an older refusal; only the latest decision counts.
+    store.latest = [{ allowed: true }];
+    store.acceptance = acceptance();
+    store.release = [releaseRow()];
+    await expect(issue()).resolves.toMatchObject({ ok: true });
+
+    store.latest = { message: "not a row list" };
+    await expect(issue()).resolves.toEqual({ ok: false, code: "WORKSPACE_GRANT_STORE_FAILED" });
+  });
+
+  it("issues only inside a configured rollout cohort, without hiding consent or refusal", async () => {
+    const env = (cohort: string) => ({ VERCEL_GIT_COMMIT_SHA: revision, TAVONEL_PROCESSING_WORKSPACE_COHORT: cohort });
+    await expect(issue(now, env(`${OTHER}, ${WORKSPACE}`))).resolves.toMatchObject({ ok: true });
+
+    request.mockClear();
+    await expect(issue(now, env(OTHER))).resolves.toEqual({ ok: false, code: "PROCESSING_COHORT_EXCLUDED" });
+    expect(wroteGrant()).toBe(false);
+    expect(readRelease()).toBe(false);
+
+    // Exact keys only: a prefix of the workspace key is a different workspace.
+    await expect(issue(now, env(WORKSPACE.slice(0, -1)))).resolves.toEqual({ ok: false, code: "PROCESSING_COHORT_EXCLUDED" });
+
+    for (const malformed of ["", " ", ",", `${WORKSPACE},`, "*", "pilot-*", `${WORKSPACE.slice(0, 10)}*`, `${WORKSPACE};${OTHER}`]) {
+      request.mockClear();
+      await expect(issue(now, env(malformed)), malformed).resolves.toEqual({ ok: false, code: "PROCESSING_COHORT_CONFIG_INVALID" });
+      expect(wroteGrant()).toBe(false);
+    }
+
+    // Outside the cohort the owner still learns the true consent state, and any refusal.
+    store.acceptance = null;
+    await expect(issue(now, env(OTHER))).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+    store.latest = [{ allowed: false }];
+    await expect(issue(now, env(OTHER))).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
   });
 
   it("caps expiry at release evaluation + 30 days and refuses an expired release", async () => {
@@ -198,8 +248,9 @@ describe("processing workspace grant", () => {
     const result = await issue(lateNow);
     expect(result).toMatchObject({ ok: true, grant: { expiresAt: "2026-10-29T00:00:00.000Z" } });
 
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow()]));
+    request.mockClear();
     await expect(issue(new Date("2026-10-29T00:00:00.001Z"))).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_STALE" });
+    expect(wroteGrant()).toBe(false);
   });
 
   it("fails closed on missing SHA, tampered, duplicate or future evidence", async () => {
@@ -213,10 +264,11 @@ describe("processing workspace grant", () => {
       releaseRow({ release_revision: "b".repeat(40) }),
     ];
     for (const row of cases) {
-      request.mockReset().mockResolvedValueOnce(Response.json([row]));
+      store.release = [row];
       await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
     }
-    request.mockReset().mockResolvedValueOnce(Response.json([]));
+    expect(wroteGrant()).toBe(false);
+    store.release = [];
     await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
     config.mockReturnValue(null);
     await expect(issue()).resolves.toEqual({ ok: false, code: "WORKSPACE_GRANT_STORE_NOT_CONFIGURED" });

@@ -140,3 +140,31 @@ The source-origin reader is an explicit, narrow exception to migration 0053's hi
 zero-read policy for intake admissions: service_role can SELECT workspace_key, document_id,
 and confirmed_at only. No object key, user identity, byte count, or full-table SELECT is added.
 The grant matrix and exhaustive column-negative assertions track this exception.
+
+### Bounded processing cohort (`TAVONEL_PROCESSING_WORKSPACE_COHORT`)
+
+Optional, separate from `ACCESS_MODE`: a comma-separated list of exact workspace keys
+(`pilot-` + 1–16 alphanumerics, at most 20). Unset adds nothing. Set, it is an extra refusal on
+grant issuance and on every processing authorization read (upload, confirm, compile, derived
+serving, connectors, billing reconciliation), including workspaces that already hold a grant.
+It never admits by itself: release evidence, terms acceptance, ACL and billing gates are
+unchanged, and a direct-upload grant is not a connector grant. An empty or malformed value
+(`*`, `pilot-*`, prefixes, trailing comma) closes processing for everyone. Sign-in, the
+workspace, and source export/deletion stay available to excluded workspaces.
+
+Operator steps:
+
+1. During synthetic qualification set
+   `TAVONEL_PROCESSING_WORKSPACE_COHORT=pilot-969dc192daa24119` in the production Vercel
+   environment and redeploy; confirm a second workspace's bootstrap reports source pending.
+2. Keep it set until one real account has completed the full journey on the qualified SHA
+   (upload → CDR/scan → OCR → compile → signed export → AI use → deletion) with receipts.
+3. Only then remove the variable (unset, not empty) and redeploy. Do not widen it with patterns.
+
+The cohort does not qualify anything. Mechanism tests are not evidence that
+`compile_receipts_signed_and_audited` holds for production, and none of the release
+preconditions may be recorded as `satisfied: true` to open the pilot. Open policy problem: that
+precondition asks for an audited production compile, but a production compile of customer data
+needs an allowed release first. Breaking that cycle needs an explicitly reviewed
+staged-qualification rule (for example, an operator-owned synthetic corpus admitted under a
+distinct, labelled release decision), not synthesized evidence.

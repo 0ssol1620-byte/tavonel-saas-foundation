@@ -1,5 +1,6 @@
 import { readVerifiedCustomerDataGateDecision } from "./customer-data-gate-store";
 import { readVerifiedScopedCustomerDataGate } from "./scoped-customer-data-gate-store";
+import { processingCohortRefusal } from "./processing-workspace-grant";
 import type { CustomerDataScope } from "../../shared/scopedCustomerDataGate";
 import type { CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 
@@ -17,6 +18,9 @@ export async function readCustomerSourceAuthorization(
   scope: CustomerDataScope,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<SourceAuthorizationResult> {
+  // A rollout cohort only narrows: it refuses existing grants too, and never stands in for one.
+  const cohort = processingCohortRefusal(workspaceKey, env);
+  if (cohort) return { ok: false, code: cohort };
   const version = env.TAVONEL_CUSTOMER_DATA_GATE_VERSION;
   if (version === "v2") {
     const revision = env.VERCEL_GIT_COMMIT_SHA;

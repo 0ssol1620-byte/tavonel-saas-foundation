@@ -17,8 +17,9 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   Issues or renews the v2 workspace grant the scoped customer-data gate reads. The only inputs
   are durable ones: the latest release decision for the exact deployed SHA and scope (recomputed
   like the gate reader does), the published terms manifest (re-hashed from disk) and the current
-  owner's persisted acceptance of it. It never records release evidence or an acceptance, flips
-  TAVONEL_CUSTOMER_DATA_GATE_VERSION, starts a trial or charges.
+  owner's persisted acceptance of it, narrowed by the optional operator rollout cohort. It never
+  records release evidence or an acceptance, flips TAVONEL_CUSTOMER_DATA_GATE_VERSION, starts a
+  trial or charges.
 
   issue_customer_data_workspace_grant() rechecks all of it under locks and refuses to write over
   the workspace's latest explicit refusal. The caller must already have authorized the session for
@@ -36,7 +37,8 @@ export type WorkspaceGrantFailureCode =
   | "WORKSPACE_GRANT_INPUT_INVALID" | "WORKSPACE_GRANT_STORE_NOT_CONFIGURED" | "WORKSPACE_GRANT_STORE_FAILED"
   | "PROCESSING_TERMS_UNAVAILABLE" | "PROCESSING_TERMS_ACCEPTANCE_REQUIRED"
   | "SCOPED_RELEASE_NOT_FOUND" | "SCOPED_RELEASE_REFUSED" | "SCOPED_RELEASE_INVALID"
-  | "SCOPED_RELEASE_STALE" | "SCOPED_RELEASE_CHANGED" | "SCOPED_WORKSPACE_REFUSED";
+  | "SCOPED_RELEASE_STALE" | "SCOPED_RELEASE_CHANGED" | "SCOPED_WORKSPACE_REFUSED"
+  | "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID";
 export type WorkspaceGrantResult =
   | { ok: true; grant: WorkspaceGrant; idempotentReplay: boolean }
   | { ok: false; code: WorkspaceGrantFailureCode };
@@ -55,6 +57,21 @@ export function processingTermsReceiptSha256(kind: "terms" | "processing", accep
   return sha256(["tavonel.processing_terms_receipt.v1", kind, acceptance.acceptanceId.toLowerCase(),
     acceptance.workspaceKey, acceptance.userId.toLowerCase(), String(acceptance.authorizationRevision),
     acceptance.scope, acceptance.termsVersion, acceptance.document.path, acceptance.document.sha256].join("|"));
+}
+
+/**
+ * TAVONEL_PROCESSING_WORKSPACE_COHORT: optional comma-separated list of exact workspace keys for a
+ * bounded rollout. Unset adds no restriction. Set, it is an extra AND on every grant and every
+ * processing authorization read, per scope -- it never admits anything by itself. An empty or
+ * malformed value (wildcards and prefixes included) admits nobody.
+ */
+export function processingCohortRefusal(workspaceKey: string, env: Env = process.env):
+  "PROCESSING_COHORT_EXCLUDED" | "PROCESSING_COHORT_CONFIG_INVALID" | null {
+  const raw = env.TAVONEL_PROCESSING_WORKSPACE_COHORT;
+  if (raw === undefined) return null;
+  const ids = raw.split(",").map((id) => id.trim());
+  if (ids.length > 20 || !ids.every((id) => WORKSPACE.test(id))) return "PROCESSING_COHORT_CONFIG_INVALID";
+  return ids.includes(workspaceKey) ? null : "PROCESSING_COHORT_EXCLUDED";
 }
 
 async function call(config: Config, path: string, init?: RequestInit) {
@@ -165,6 +182,26 @@ export async function issueProcessingWorkspaceGrant(input: {
     !REVISION.test(revision) || !Number.isFinite(now)) return fail("WORKSPACE_GRANT_INPUT_INVALID");
   const config = readSupabaseAdminConfig(env);
   if (!config) return fail("WORKSPACE_GRANT_STORE_NOT_CONFIGURED");
+
+  // The first failure is what the owner is told, so check in the order the facts hold: an explicit
+  // refusal outranks everything, then the owner's own consent, and only then rollout and release.
+  // Otherwise a workspace with neither terms nor a release would read as "terms accepted".
+  const latestQuery = new URLSearchParams({
+    select: "allowed", tenant_id: `eq.${workspaceKey}`, workspace_id: `eq.${workspaceKey}`, scope: `eq.${scope}`,
+    order: "recorded_at.desc,allowed.asc", limit: "1",
+  });
+  const latestResponse = await call(config, `/rest/v1/customer_data_workspace_decisions?${latestQuery}`);
+  const latest = latestResponse?.ok ? await latestResponse.json().catch(() => null) as unknown : null;
+  if (!Array.isArray(latest)) return fail("WORKSPACE_GRANT_STORE_FAILED");
+  if (isRecord(latest[0]) && latest[0].allowed === false) return fail("SCOPED_WORKSPACE_REFUSED");
+
+  const current = await readCurrentProcessingTermsAcceptance(config, workspaceKey, scope, now, input.publicDir);
+  if (!current.ok) return current;
+  const { manifest } = current;
+
+  const cohort = processingCohortRefusal(workspaceKey, env);
+  if (cohort) return fail(cohort);
+
   const releaseQuery = new URLSearchParams({
     select: "schema_version,scope,release_revision,allowed,receipt_sha256,evidence,missing,evaluated_at,recorded_at",
     scope: `eq.${scope}`, release_revision: `eq.${revision}`,
@@ -175,10 +212,6 @@ export async function issueProcessingWorkspaceGrant(input: {
   const verified = verifyRelease(await releaseResponse.json().catch(() => null), scope, revision, now);
   if (!verified.ok) return verified;
   const { release } = verified;
-
-  const current = await readCurrentProcessingTermsAcceptance(config, workspaceKey, scope, now, input.publicDir);
-  if (!current.ok) return current;
-  const { manifest } = current;
 
   const expires = Math.min(now + MAX_AGE_MS, Date.parse(release.evaluatedAt) + MAX_AGE_MS);
   const unsigned: Omit<WorkspaceGrant, "grantReceiptSha256"> = {
