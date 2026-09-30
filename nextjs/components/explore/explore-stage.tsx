@@ -154,58 +154,36 @@ export default function ExploreStage({ model, layout, change, answers, technical
     [enter, model.nodes],
   );
 
-  /*
-    What the URL asked for, read once after mount.
-
-    It sits below `openRegion` because a region link resolves through the same opener a click
-    does -- the region's owning object gets selected, the evidence id is set, and the act change
-    is counted once. A hand-rolled second path here would be the place the two drift apart.
-
-    `?evidence=<regionId>` wins over `?act=` when both are present: naming a region is the more
-    specific request, and it is always an Evidence-act request. An id the shipped World does not
-    hold resolves to `null` and the page falls through to the act (or to entry), so a stale link
-    still lands somewhere real rather than on an empty source sheet.
-  */
-  useEffect(() => {
+  // Reading a URL must not call the click openers: their pushState would discard the browser's
+  // forward entries when an evidence page is re-mounted after Back. Use the same restoration
+  // for initial links and popstate; only an explicit user action creates a history entry.
+  const restoreFromUrl = useCallback(() => {
     const query = new URLSearchParams(window.location.search);
     const region = evidenceIdFromQuery(query.get("evidence") ?? undefined, model.evidence);
     const requested = region ? "evidence" : actFromQuery(query.get("act") ?? undefined);
-    trackFunnel("explore_entered", { act: requested });
     if (region) {
-      openRegion(region);
-      return;
+      const owner = model.nodes.find(node => node.kind === "Claim" && node.evidenceRefs.includes(region)) ??
+        model.nodes.find(node => node.evidenceRefs.includes(region));
+      if (owner) setSelectedId(owner.id);
+      setEvidenceId(region);
     }
-    if (requested !== "entry") {
-      enter(requested);
-      return;
-    }
-    /*
-      The world settles behind the hero rather than after it (§17).
-
-      Arriving from the landing's last frame, the reader should be looking at the same world
-      through the entry copy, not at a black panel that turns into one when they click. So the
-      composition settles on mount and ENTER WORLD only lifts the scrim -- which is also why
-      entering costs nothing: there is no animation left to wait for.
-    */
-    const frame = window.requestAnimationFrame(() => setSettled(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, [enter, model.evidence, openRegion]);
+    setAct(requested);
+    setSettled(true);
+    return { requested, region };
+  }, [model.evidence, model.nodes]);
 
   useEffect(() => {
-    const restore = () => {
-      const query = new URLSearchParams(window.location.search);
-      const region = evidenceIdFromQuery(query.get("evidence") ?? undefined, model.evidence);
-      if (region) {
-        const owner = model.nodes.find(node => node.evidenceRefs.includes(region));
-        if (owner) setSelectedId(owner.id);
-        setEvidenceId(region);
-      }
-      setAct(region ? "evidence" : actFromQuery(query.get("act") ?? undefined));
-      setSettled(true);
-    };
+    const { requested, region } = restoreFromUrl();
+    trackFunnel("explore_entered", { act: requested });
+    if (region) trackFunnel("explore_evidence_opened", { from: "region" });
+    if (requested === "change_compare") trackFunnel("explore_change_opened");
+  }, [restoreFromUrl]);
+
+  useEffect(() => {
+    const restore = () => { restoreFromUrl(); };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [model.evidence, model.nodes]);
+  }, [restoreFromUrl]);
 
   useEffect(() => {
     /*

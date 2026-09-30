@@ -1,86 +1,46 @@
 import { expect, test } from "@playwright/test";
 
 const PHONE_PROJECTS = new Set(["360", "390"]);
+// The masterplan replaces autoplay hero film with the actual committed source page.
+// Keep mobile fit, keyboard reachability, and reduced-motion parity as real browser contracts.
+test.beforeEach(async ({ page }, info) => {
+  test.skip(!PHONE_PROJECTS.has(info.project.name), "phone acceptance contract");
+  await page.goto("/");
+});
 
-/*
-  The phone film contract -- starts magnified, keeps an
-  explicit route back to the full frame, keeps all four cuts, stays keyboard-scrollable, and holds
-  a poster under reduced motion until the visitor plays -- belongs to the film, not to the landmark
-  it sits in. Scene 01 exposes the four tabs directly above the film.
-*/
-const FILM_SCENE = "#s1 .compile-film-sequence";
+test("fits the original source page and preserves its route to the inspector", async ({ page }) => {
+  const source = page.locator("#s1 .paper-source");
+  const image = source.locator("img");
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  const bounds = await image.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  const aspect = await image.evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight);
+  expect(Math.abs(bounds!.width / bounds!.height - aspect)).toBeLessThan(0.01);
+  await expect(source.locator("blockquote")).not.toBeEmpty();
+  await source.getByRole("link", { name: "Inspect this evidence" }).click();
+  await expect(page.locator("[data-source-sheet]")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+});
 
-test.describe("landing film mobile inspection", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    test.skip(!PHONE_PROJECTS.has(testInfo.project.name), "the focused film is a phone layout");
-    await page.goto("/");
-  });
+test("keeps the evidence action touchable and keyboard operable", async ({ page }) => {
+  const link = page.locator("#s1 .paper-source").getByRole("link", { name: "Inspect this evidence" });
+  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await link.focus();
+  await expect(link).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/act=evidence&evidence=/);
+  await expect(page.locator("[data-source-sheet]")).toBeVisible();
+});
 
-  test("starts magnified and keeps an explicit route back to the full frame", async ({ page }) => {
-    const sequence = page.locator(FILM_SCENE);
-    const viewport = sequence.locator(".compile-film-viewport");
-    const media = viewport.locator(".compile-film-video, .compile-film-still").first();
-    const fit = page.getByRole("button", { name: "Fit full frame" });
-
-    await expect(sequence).toHaveAttribute("data-narrow", "1");
-    await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
-    await expect(fit).toBeVisible();
-    await expect(fit).toHaveAttribute("aria-controls", await viewport.getAttribute("id") ?? "");
-
-    const focused = await Promise.all([viewport.boundingBox(), media.boundingBox()]);
-    expect(focused[0]).not.toBeNull();
-    expect(focused[1]).not.toBeNull();
-    expect(focused[1]!.width).toBeGreaterThanOrEqual(1119);
-    expect(focused[1]!.width / focused[0]!.width).toBeGreaterThan(2.8);
-    const scroll = await viewport.evaluate(node => ({
-      clientHeight: node.clientHeight,
-      scrollHeight: node.scrollHeight,
-      scrollWidth: node.scrollWidth,
-    }));
-    expect(scroll.scrollWidth).toBeGreaterThanOrEqual(1119);
-    expect(scroll.scrollHeight).toBeGreaterThan(scroll.clientHeight);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-
-    await fit.click();
-    await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
-    await expect(page.getByRole("button", { name: "Focus details" })).toBeVisible();
-
-    const fitted = await Promise.all([viewport.boundingBox(), media.boundingBox()]);
-    // The viewport's one-pixel border sits outside the media content box on both sides.
-    expect(Math.abs(fitted[1]!.width - fitted[0]!.width)).toBeLessThanOrEqual(2);
-    expect(Math.abs(fitted[1]!.height - fitted[0]!.height)).toBeLessThanOrEqual(2);
-  });
-
-  test("preserves all four film tabs and keeps the focused viewport keyboard-scrollable", async ({ page }) => {
-    const sequence = page.locator(FILM_SCENE);
-    const viewport = sequence.locator(".compile-film-viewport");
-    const tabs = sequence.getByRole("tab");
-
-    await expect(sequence).toHaveAttribute("data-narrow", "1");
-    await expect(tabs).toHaveCount(4);
-    await tabs.nth(2).click();
-    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
-    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/compile-cut-3.mp4");
-
-    await viewport.focus();
-    await page.keyboard.press("ArrowRight");
-    await expect.poll(() => viewport.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
-
-    await tabs.nth(1).click();
-    await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
-    await expect.poll(() => viewport.evaluate(node => node.scrollLeft)).toBeGreaterThan(200);
-  });
-
-  test("keeps reduced motion on the focused poster until the visitor explicitly plays", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
-    const sequence = page.locator(FILM_SCENE);
-
-    await expect(sequence).toHaveAttribute("data-narrow", "1");
-    await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
-    await expect(sequence.locator(".compile-film-still")).toBeVisible();
-    await expect(sequence.locator(".compile-film-video")).toHaveCount(0);
-    await expect(sequence.getByRole("button", { name: "Play the compilation film" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Fit full frame" })).toBeVisible();
-  });
+test("reduced motion retains the exact source and its evidence action", async ({ page }) => {
+  const source = page.locator("#s1 .paper-source");
+  const src = await source.locator("img").getAttribute("src");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(source.locator("img")).toHaveAttribute("src", src!);
+  await expect(source.locator("blockquote")).not.toBeEmpty();
+  await expect(page.locator("#s1 video")).toHaveCount(0);
+  await expect(source.getByRole("link", { name: "Inspect this evidence" })).toBeVisible();
 });

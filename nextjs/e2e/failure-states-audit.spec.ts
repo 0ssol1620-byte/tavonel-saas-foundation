@@ -159,24 +159,20 @@ test("a compile that fails on the server names the failure and where to look", a
   await expect(hero.getByRole("button", { name: "Open activity" })).toBeEnabled();
 });
 
-test("the Explore stage has no free-text search, so it has no empty result to strand anyone in", async ({ page }) => {
+test("the prepared-question filter has an honest empty state and a usable reset", async ({ page }) => {
   await page.goto("/explore");
-  const dismiss = page.getByRole("button", { name: "No thanks", exact: true });
-  if (await dismiss.isVisible()) await dismiss.click();
-  await page.getByRole("button", { name: "ENTER WORLD", exact: true }).click();
-  await page.locator("button[aria-expanded]").filter({ hasText: /ask/i }).first().click();
-
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  // Three questions the sample can answer, and no box that accepts a fourth. If a text field
-  // ever appears here, it needs an empty-result state and this assertion is the reminder.
-  await expect(dialog.locator("input, textarea")).toHaveCount(0);
-  const questions = dialog.getByRole("group", { name: "Questions this sample answers" }).getByRole("button");
+  await expect(page.getByText("Free-form AI queries are not running", { exact: false })).toBeVisible();
+  await page.getByLabel("Find a sample question").fill("a question outside this prepared sample");
+  await expect(page.getByText("No sample question matches.", { exact: false })).toBeVisible();
+  const questions = page.getByRole("group", { name: "Sample questions" }).locator("button[aria-pressed]");
+  await expect(questions).toHaveCount(0);
+  await page.getByRole("button", { name: "Show all questions" }).click();
+  await expect(page.getByLabel("Find a sample question")).toHaveValue("");
   expect(await questions.count()).toBeGreaterThan(0);
-  // Every offered question returns an answer with at least one source region.
+  // Every offered answer retains a route to evidence; filtering cannot invent an AI answer.
   for (let index = 0; index < await questions.count(); index += 1) {
     await questions.nth(index).click();
-    await expect(dialog.locator("blockquote")).not.toBeEmpty();
-    await expect(dialog).toContainText(/SOURCE REGION/);
+    await expect(page.getByLabel("Selected sample answer")).not.toBeEmpty();
+    await expect(page.getByLabel("Selected sample answer").getByRole("link")).toHaveCount(1);
   }
 });

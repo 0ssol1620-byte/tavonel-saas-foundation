@@ -22,6 +22,7 @@
 .paper-product .lv2-cta { background: #2447b3; color: #fff; border: 1px solid #2447b3; border-radius: 6px; min-height: 46px; }
 .paper-product .lv2-text-link { color: #2447b3; font-size: 14px; min-height: 44px; }
 .paper-hero-note { color: #53606a; font-size: 13px; margin: 14px 0 0; }
+.paper-hero-note a, .paper-purchase-boundary a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
 .paper-source { min-width: 0; background: #fff; border: 1px solid #d8ddd9; border-radius: 10px; overflow: hidden; }
 .paper-source > header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 16px 20px; border-bottom: 1px solid #d8ddd9; font-size: 13px; }
 .paper-source > header span:last-child { color: #226849; }
