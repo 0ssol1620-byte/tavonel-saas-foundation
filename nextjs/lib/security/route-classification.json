@@ -206,10 +206,11 @@
     "app/api/internal/deletions/retention/route.ts": {
       "type": "A-bearer",
       "methods": [
+        "GET",
         "POST"
       ],
       "credential": "bearer:shared-secret",
-      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. dry_run lists candidates and writes nothing. execute with one workspaceKey (the canary) must echo the dry run's candidatesSha256; execute without one is refused unless FOUNDATION_RETENTION_FLEET_ARMED is exactly \"true\". Records at most 25 retention_expired tombstones, one transaction each, skipping any workspace whose legal hold is not readably inactive; deletes no bytes. POST only and not in vercel.json, so no cron can reach it."
+      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. POST dry_run lists candidates and writes nothing. POST execute with one workspaceKey (the canary) must echo the dry run's candidatesSha256; fleet execute is refused unless FOUNDATION_RETENTION_FLEET_ARMED is exactly \"true\". GET is the scheduled fleet run: refused unless that same variable is exactly \"true\" (checked before any database read), replies with counts and the batch digest only. Records at most 25 retention_expired tombstones per request, one transaction each, skipping any workspace whose legal hold is not readably inactive; deletes no bytes."
     },
     "app/api/internal/deletions/run/route.ts": {
       "type": "A-bearer",
