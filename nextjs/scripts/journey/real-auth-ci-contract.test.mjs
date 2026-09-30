@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
+import { authGatewayService, validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
 const env = { CI: "true", GITHUB_ACTIONS: "true" };
 const status = { API_URL: "http://127.0.0.1:54321", DB_URL: "postgresql://postgres:synthetic@127.0.0.1:54322/postgres", ANON_KEY: "synthetic".repeat(8), SERVICE_ROLE_KEY: "synthetic".repeat(8) };
+
+test("Next callback is never captured by the versioned GoTrue API route", () => {
+  for (const target of ["/auth/callback", "/auth/callback?error_code=access_denied", "/auth/callback?code=synthetic", "/auth/v10/token", "/auth/v1", "/workspace", "/api/access/bootstrap", "/_next/static/runtime.js"]) {
+    assert.equal(authGatewayService(target,"fixture-bucket"),"next",target);
+  }
+  for (const target of ["/auth/v1/token?grant_type=password", "/auth/v1/token?grant_type=refresh_token", "/auth/v1/user", "/auth/v1/logout?scope=global", "/auth/v1/admin/users", "/rest/v1/rpc/transition_foundation_world_atomic"]) {
+    assert.equal(authGatewayService(target,"fixture-bucket"),"supabase",target);
+  }
+  assert.equal(authGatewayService("/fixture-bucket/immutable/candidate-world.json","fixture-bucket"),"s3");
+  assert.equal(authGatewayService("/fixture-bucket?list-type=2","fixture-bucket"),"s3");
+  assert.equal(authGatewayService("/fixture-bucket-other/object","fixture-bucket"),"next");
+});
 test("accepts only the disposable CI default local API/database pair", () => { assert.equal(validateDisposableAuthStack(status, env).api, status.API_URL); });
 test("refuses ordinary workstation and non-GitHub CI execution", () => {
   assert.throws(() => validateDisposableAuthStack(status, {}));

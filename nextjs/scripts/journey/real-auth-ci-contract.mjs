@@ -1,5 +1,12 @@
 /** Fail-closed configuration for the existing disposable GitHub runner Supabase stack. */
 import assert from "node:assert/strict";
+/** Next owns /auth/callback; only the versioned provider API belongs to GoTrue. */
+export function authGatewayService(requestTarget, bucket) {
+  const pathname = requestTarget.split("?")[0];
+  if (pathname === `/${bucket}` || pathname.startsWith(`/${bucket}/`)) return "s3";
+  if (pathname.startsWith("/auth/v1/") || pathname.startsWith("/rest/v1/")) return "supabase";
+  return "next";
+}
 export function validateDisposableAuthStack(status, env) {
   assert.equal(env.CI, "true", "Real Auth qualification is restricted to disposable CI");
   assert.equal(env.GITHUB_ACTIONS, "true", "Use the existing disposable GitHub runner workflow");

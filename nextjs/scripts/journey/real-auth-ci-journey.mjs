@@ -8,7 +8,7 @@ import https from "node:https";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
+import { authGatewayService, validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
 import { withLocalStorage } from "./local-storage-journey.mjs";
 import { stopOwnedChild } from "./stop-owned-child.mjs";
 
@@ -80,8 +80,9 @@ try {
     }
     execFileSync("openssl",["req","-x509","-newkey","rsa:2048","-nodes","-keyout",path.join(root,"key.pem"),"-out",path.join(root,"cert.pem"),"-days","1","-subj","/CN=localhost","-addext",`subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:${host}`],{env,stdio:"ignore",timeout:15_000});
     const gateway = https.createServer({key:readFileSync(path.join(root,"key.pem")),cert:readFileSync(path.join(root,"cert.pem"))},(request,response)=>{
-      const isS3=request.url.startsWith(`/${storage.env.S3_BUCKET}`);
-      const target=new URL(isS3?storage.endpoint:request.url.startsWith("/auth/")||request.url.startsWith("/rest/")?stack.api:"http://127.0.0.1:3100");
+      const service=authGatewayService(request.url,storage.env.S3_BUCKET);
+      const isS3=service==="s3";
+      const target=new URL(isS3?storage.endpoint:service==="supabase"?stack.api:"http://127.0.0.1:3100");
       const upstream=http.request({hostname:target.hostname,port:target.port,path:request.url,method:request.method,headers:isS3?{...request.headers,host}:request.headers},result=>{response.writeHead(result.statusCode,result.headers);result.pipe(response);});
       upstream.on("error",()=>{response.writeHead(502);response.end("Owned local upstream unavailable");}); request.pipe(upstream);
     });
