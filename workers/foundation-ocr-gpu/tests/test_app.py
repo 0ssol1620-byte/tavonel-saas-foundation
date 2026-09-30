@@ -266,6 +266,7 @@ def test_numeric_mixed_line_keeps_the_hangul_the_general_reader_dropped() -> Non
         ("顧客文書の処理検証：契約書と設計資料を整理します。", "고객문서의처리"),  # Japanese (kana)
         ("Quarterly revenue grew 12% in 2026", "Quarterly revenue grew 12% in 2026"),
         ("Total 125,000", "Tota 가나"),  # Korean reading loses the digits and is not more confident
+        ("Total 125,000", "Total 가나125,000"),  # Preserved digits do not justify spurious Hangul
     ],
 )
 def test_general_reading_is_kept_for_non_korean_lines(general_text: str, korean_text: str) -> None:
@@ -273,6 +274,13 @@ def test_general_reading_is_kept_for_non_korean_lines(general_text: str, korean_
     general = [raster_line(general_text, 1.0, 0)]
     merged = worker.merge_korean_lines(general, [raster_line(korean_text, 0.9, 0)])
     assert [line["text"] for line in merged] == [general_text]
+
+
+def test_comparable_confidence_chinese_is_not_replaced_by_hangul() -> None:
+    worker = importlib.import_module("app")
+    general = [raster_line("客户文件处理验证：整理合同和设计资料。", 0.85, 0)]
+    korean = [raster_line("고객문서처리", 0.9, 0)]
+    assert worker.merge_korean_lines(general, korean) == general
 
 
 def test_raster_pages_always_get_the_korean_pass_without_the_angle_classifier(monkeypatch: pytest.MonkeyPatch) -> None:

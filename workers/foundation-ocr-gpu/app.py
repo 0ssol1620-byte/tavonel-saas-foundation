@@ -249,13 +249,17 @@ def _prefer_korean(general: RasterLine, korean: RasterLine) -> bool:
     # Real Japanese or Chinese lines stay with the general reader. A Hangul line misread by it
     # yields fewer Han characters than the Hangul it lost, or reads with lower confidence.
     if general_counts["kana"] or (
-        general_counts["han"] >= korean_counts["hangul"] and general["confidence"] >= 0.9
+        general_counts["han"] >= korean_counts["hangul"]
+        and general["confidence"] + 0.05 >= korean["confidence"]
     ):
         return False
     # The general reader drops Hangul silently from mixed lines ("금액 125,000원" -> "125,000"),
     # so a Korean reading that keeps its Latin letters and digits carries strictly more text.
     general_alnum = general_counts["latin"] + general_counts["digits"]
     korean_alnum = korean_counts["latin"] + korean_counts["digits"]
+    # Retaining digits alone is insufficient evidence for adding Hangul to a clear Latin line.
+    if not general_counts["han"] and general["confidence"] > korean["confidence"] + 0.02:
+        return False
     return korean_alnum >= 0.8 * general_alnum or korean["confidence"] >= general["confidence"] + 0.05
 
 

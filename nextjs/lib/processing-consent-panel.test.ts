@@ -27,7 +27,7 @@ describe("processing consent panel", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const html = renderToStaticMarkup(createElement(ProcessingConsentPanel, { getToken: async () => "t", onAccepted() {} }));
-    expect(html).toMatch(/<button type="button" class="btn ghost" aria-expanded="false"[^>]*>Review processing terms<\/button>/);
+    expect(html).toMatch(/<button type="button" class="btn" aria-expanded="false"[^>]*>Review processing terms<\/button>/);
     expect(html).not.toContain('type="checkbox"');
     expect(html).not.toContain("/contact");
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe("createTermsAcceptor", () => {
 describe("workspace integration", () => {
   const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
   it("replaces the closed Home intake's contact CTA with the terms review and keeps the public example", () => {
-    expect(page).toMatch(/<ProcessingConsentPanel getToken=\{getAuthToken\} onAccepted=\{refreshAccess\}>\s*<Link className="btn" href="\/explore">Explore a compiled World<\/Link>/);
+    expect(page).toMatch(/<ProcessingConsentPanel getToken=\{getAuthToken\} onAccepted=\{refreshAccess\}>\s*<Link className="btn ghost" href="\/explore">Explore a compiled World<\/Link>/);
     expect(page).not.toContain('<Link className="btn ghost" href="/contact">Request source access</Link>');
     expect(page).not.toContain("arrange source access with us");
     expect(page).toContain('sourcePending === "terms_acceptance_required" || sourcePending === "legacy"');
