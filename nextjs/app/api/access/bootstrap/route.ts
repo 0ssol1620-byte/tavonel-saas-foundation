@@ -57,9 +57,15 @@ export async function POST(request: Request) {
   if (scopedGate) {
     // The owner's own authenticated bootstrap is the only caller allowed a qualification grant; the
     // issuer still requires the recorded workspace, the deployed SHA and the owner's acceptance.
-    const issued = await issueProcessingWorkspaceGrant({
-      workspaceKey: pilot.membership.workspaceId, scope: "direct_upload", allowQualification: true,
-    });
+    // Connector scope is renewed alongside and independently: the issuer grants nothing without the
+    // current owner's durable acceptance for scope `connector` (it never records one), and any
+    // connector outcome -- absent terms, refusal, outage -- leaves direct-upload onboarding unchanged.
+    const workspaceKey = pilot.membership.workspaceId;
+    const [issued] = await Promise.all([
+      issueProcessingWorkspaceGrant({ workspaceKey, scope: "direct_upload", allowQualification: true }),
+      issueProcessingWorkspaceGrant({ workspaceKey, scope: "connector", allowQualification: true })
+        .catch(() => undefined),
+    ]);
     if (!issued.ok) {
       if (readAccessMode() === "self_service" && GRANT_UNAVAILABLE_CODES.has(issued.code)) {
         return NextResponse.json({ code: "SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  admitsWorkspace, evaluateQualificationRelease, evaluateScopedRelease, QUALIFICATION_PENDING, requiredReleaseEvidence,
+  admitsWorkspace, evaluateQualificationRelease, evaluateScopedRelease, QUALIFICATION_PENDING, QUALIFICATION_PENDING_BY_SCOPE, requiredReleaseEvidence,
   workspaceGrantSha256, type ReleaseStage,
 } from "../../shared/scopedCustomerDataGate";
 
@@ -370,5 +370,62 @@ describe("qualification-stage grant", () => {
 
     store.rpc = () => rpcError("workspace_grant_qualification_refused");
     await expect(issueQ()).resolves.toEqual({ ok: false, code: "SCOPED_QUALIFICATION_REFUSED" });
+  });
+});
+
+describe("connector qualification grant", () => {
+  const connector = "connector" as const;
+  const qExpires = "2026-09-30T00:30:00.000Z";
+  const qEvaluated = "2026-09-29T23:40:00.000Z";
+  const pending: readonly string[] = QUALIFICATION_PENDING_BY_SCOPE.connector;
+  const fourteen = requiredReleaseEvidence(connector).filter((precondition) => !pending.includes(precondition))
+    .map((precondition) => ({ precondition, satisfied: true, evidence: `test:${precondition}`, checkedAt: qEvaluated }));
+  const qualification = evaluateQualificationRelease({ scope: connector, releaseRevision: revision,
+    workspaceId: WORKSPACE, expiresAt: qExpires, evidence: fourteen, now: qEvaluated });
+  const connectorRow = {
+    schema_version: qualification.schemaVersion, stage: "qualification", scope: connector, release_revision: revision,
+    allowed: true, receipt_sha256: qualification.receiptSha256, evidence: fourteen, missing: qualification.missing,
+    evaluated_at: qEvaluated, recorded_at: "2026-09-29T23:40:01.000Z",
+    qualification_workspace_key: WORKSPACE, qualification_expires_at: qExpires,
+  };
+  /** The RPC echo for a connector grant: the stored scope is the submitted scope. */
+  const connectorRpc: Rpc = (_config, _path, init) => {
+    const p = JSON.parse(String(init.body)) as Record<string, string>;
+    return Promise.resolve(Response.json({
+      tenantId: p.p_workspace_key, workspaceId: p.p_workspace_key, userId: OWNER, scope: p.p_scope,
+      stage: "qualification", releaseRevision: p.p_release_revision, releaseReceiptSha256: p.p_release_receipt_sha256,
+      termsVersion: p.p_terms_version, termsReceiptSha256: p.p_terms_receipt_sha256,
+      processingTermsReceiptSha256: p.p_processing_terms_receipt_sha256, grantedAt: p.p_granted_at,
+      expiresAt: p.p_expires_at, grantReceiptSha256: p.p_grant_receipt_sha256, idempotentReplay: false,
+    }));
+  };
+  const issueC = (allowQualification = true) => issueProcessingWorkspaceGrant({ workspaceKey: WORKSPACE,
+    scope: connector, now, env: { VERCEL_GIT_COMMIT_SHA: revision }, publicDir: root, allowQualification });
+
+  beforeEach(() => {
+    store.release = [connectorRow];
+    store.acceptance = acceptance({ scope: connector });
+    store.rpc = connectorRpc;
+  });
+
+  it("issues an hour-bounded connector qualification grant from the owner's connector-scope acceptance", async () => {
+    const result = await issueC();
+    expect(result).toMatchObject({ ok: true, grant: { scope: connector, stage: "qualification", expiresAt: qExpires } });
+    if (!result.ok) throw new Error("unreachable");
+    expect(rpcBody()).toMatchObject({ p_scope: connector, p_grant_receipt_sha256: workspaceGrantSha256(result.grant) });
+    expect(JSON.parse(String(request.mock.calls.find((c) =>
+      c[1] === "/rest/v1/rpc/current_foundation_processing_terms_acceptance")![2].body))).toMatchObject({ p_scope: connector });
+    expect(admitsWorkspace(qualification, result.grant,
+      { tenantId: WORKSPACE, workspaceId: WORKSPACE, scope: connector, releaseRevision: revision }, now.toISOString())).toBe(true);
+  });
+
+  it("refuses without a connector-scope acceptance, without opt-in, and for a direct-upload-shaped row", async () => {
+    store.acceptance = acceptance();
+    await expect(issueC()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+    store.acceptance = acceptance({ scope: connector });
+    await expect(issueC(false)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_QUALIFICATION_ONLY" });
+    store.release = [{ ...connectorRow, missing: [QUALIFICATION_PENDING] }];
+    await expect(issueC()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    expect(wroteGrant()).toBe(false);
   });
 });

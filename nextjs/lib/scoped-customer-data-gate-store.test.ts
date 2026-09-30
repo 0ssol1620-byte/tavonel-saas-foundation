@@ -4,10 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  evaluateQualificationRelease, evaluateScopedRelease, QUALIFICATION_PENDING, requiredReleaseEvidence,
+  evaluateQualificationRelease, evaluateScopedRelease, QUALIFICATION_PENDING, QUALIFICATION_PENDING_BY_SCOPE,
+  requiredReleaseEvidence,
   workspaceGrantSha256,
   type WorkspaceGrant,
 } from "../../shared/scopedCustomerDataGate";
+import { authorizationAdmitsCustomerData, authorizationStage } from "../../shared/customerDataAuthorization";
 
 const config = vi.fn();
 const request = vi.fn();
@@ -274,5 +276,62 @@ describe("qualification stage at the gate reader", () => {
     // A refusal row for another workspace or scope is not this workspace's refusal.
     serve({ release: [], grant: [grantRow({ allowed: false, scope: "connector" })] });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
+  });
+});
+
+describe("connector qualification at the gate reader", () => {
+  const connector = "connector" as const;
+  const qExpires = "2026-09-29T01:30:00.000Z";
+  const qEvaluated = "2026-09-29T00:40:00.000Z";
+  const pending: readonly string[] = QUALIFICATION_PENDING_BY_SCOPE.connector;
+  const fourteen = requiredReleaseEvidence(connector).filter((precondition) => !pending.includes(precondition))
+    .map((precondition) => ({ precondition, satisfied: true, evidence: `test:${precondition}`, checkedAt: qEvaluated }));
+  const qualification = evaluateQualificationRelease({ scope: connector, releaseRevision: revision,
+    workspaceId: WORKSPACE, expiresAt: qExpires, evidence: fourteen, now: qEvaluated });
+  const cRow = {
+    schema_version: qualification.schemaVersion, stage: "qualification", scope: connector, release_revision: revision,
+    allowed: true, receipt_sha256: qualification.receiptSha256, evidence: fourteen, missing: qualification.missing,
+    evaluated_at: qEvaluated, recorded_at: "2026-09-29T00:40:01.000Z",
+    qualification_workspace_key: WORKSPACE, qualification_expires_at: qExpires,
+  };
+  const connectorReceipt = (kind: "terms" | "processing") => processingTermsReceiptSha256(kind, {
+    acceptanceId: acceptance().acceptanceId, workspaceKey: WORKSPACE, userId: OWNER, authorizationRevision: 3,
+    scope: connector, termsVersion: manifest.version, document: kind === "terms" ? manifest.terms : manifest.processing,
+  });
+  const cUnsigned: Omit<WorkspaceGrant, "grantReceiptSha256"> = {
+    ...unsignedGrant, scope: connector, stage: "qualification", releaseReceiptSha256: qualification.receiptSha256!,
+    termsReceiptSha256: connectorReceipt("terms"), processingTermsReceiptSha256: connectorReceipt("processing"),
+    grantedAt: "2026-09-29T00:45:00.000Z", expiresAt: qExpires,
+  };
+  const cGrant: WorkspaceGrant = { ...cUnsigned, grantReceiptSha256: workspaceGrantSha256(cUnsigned) };
+  const cGrantRow = grantRow({
+    schema_version: qualification.schemaVersion, stage: "qualification", scope: connector,
+    release_receipt_sha256: cGrant.releaseReceiptSha256, terms_receipt_sha256: cGrant.termsReceiptSha256,
+    processing_terms_receipt_sha256: cGrant.processingTermsReceiptSha256, grant_receipt_sha256: cGrant.grantReceiptSha256,
+    granted_at: cGrant.grantedAt, expires_at: cGrant.expiresAt, recorded_at: "2026-09-29T00:45:01.000Z",
+  });
+  const readConnector = () => readVerifiedScopedCustomerDataGate(WORKSPACE, WORKSPACE, connector, revision, now,
+    process.env, root);
+
+  it("admits the operator workspace for connector work only, typed as non-billable qualification", async () => {
+    serve({ release: [cRow], grant: [cGrantRow], acceptanceBody: acceptance({ scope: connector }) });
+    const result = await readConnector();
+    expect(result).toMatchObject({ ok: true, scope: connector, stage: "qualification" });
+    if (!result.ok) throw new Error("unreachable");
+    expect(JSON.parse(String(call(ACCEPTANCE)![2].body))).toMatchObject({ p_scope: connector });
+    expect(authorizationStage(result.authorization)).toBe("qualification");
+    expect(authorizationAdmitsCustomerData(result.authorization, WORKSPACE, WORKSPACE, now, connector)).toBe(true);
+    expect(authorizationAdmitsCustomerData(result.authorization, WORKSPACE, WORKSPACE, now, "direct_upload")).toBe(false);
+  });
+
+  it("closes when the owner's connector acceptance is gone, the row is direct-shaped, or the grant is production", async () => {
+    serve({ release: [cRow], grant: [cGrantRow], acceptanceBody: null });
+    await expect(readConnector()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
+    serve({ release: [{ ...cRow, missing: [QUALIFICATION_PENDING] }], grant: [cGrantRow],
+      acceptanceBody: acceptance({ scope: connector }) });
+    await expect(readConnector()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    serve({ release: [cRow], grant: [{ ...cGrantRow, stage: "production", schema_version: release.schemaVersion }],
+      acceptanceBody: acceptance({ scope: connector }) });
+    await expect(readConnector()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
   });
 });
