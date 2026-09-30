@@ -124,6 +124,9 @@ describe.sequential("real Foundation to local Python Core boundary", () => {
     const incomplete = structuredClone(first);
     delete incomplete.candidate.validation.immutableInputsOnly;
     expect(projectProductCoreV2Candidate(incomplete, firstInputs, true)).toBeNull();
+    const failed = structuredClone(first);
+    failed.candidate.validation.immutableInputsOnly = false;
+    expect(projectProductCoreV2Candidate(failed, firstInputs, true)).toBeNull();
     for (const file of first.candidate.package.files) {
       expect(`sha256:${createHash("sha256").update(file.content).digest("hex")}`).toBe(file.sha256);
     }

@@ -1,5 +1,9 @@
 # Actual Core → PostgreSQL synthetic journey — 2026-09-30
 
+## Integration-owner revalidation
+
+The integration owner applied only the new journey delta as `bf77f5505e5f437ae95655171e7a0c5b5debe376`, preserving the previously integrated receipt change. The joined harness was rerun against Core `39f4eff2a8cd6e3eba5611f60566b61883688b0e`: 103 migrations and 48 SQL assertions passed, with actual Core initial/update/restore receipt bindings. The five HTTP tests passed within that run. An additional negative assertion refuses an explicitly failed immutable-input verdict as well as a missing one. Foundation's 88 focused receipt/parser/compile tests, TypeScript and harness ESLint passed. Core's 95 Product Core tests, Ruff and strict mypy (11 source files) passed. Local evidence is `task/desktop-core-sql-current.log` and `task/core-new-contract-tests.log`; no complete authenticated journey or distributed-storage acceptance is inferred.
+
 ## Scope and integration base
 
 The isolated Foundation clone remains `C:\Users\yspow\Documents\Codex\2026-09-30\task-2\customer-journey`, branch `codex/customer-journey-local`. Before implementation, fetched integration checkpoint `2ed47797` and merged it locally as `5af5314c2f8f8ba2ea3dc3f99707bbbb5936109e`, retaining the earlier receipt fix. No integration-owned worktree was changed. The new deliverable changes only the local integration harness and this report; there is no public UI or Core engine edit.
