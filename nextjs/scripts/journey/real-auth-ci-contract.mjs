@@ -1,5 +1,11 @@
 /** Fail-closed configuration for the existing disposable GitHub runner Supabase stack. */
 import assert from "node:assert/strict";
+/** GoTrue v2.196.0 parseJWTClaims returns Forbidden/bad_jwt for expired claims. */
+export function validateExpiredProviderJwt(response) {
+  assert.equal(response.status, 403, "GoTrue rejects expired JWT claims as forbidden");
+  assert.equal(response.body?.error_code, "bad_jwt", "Require provider JWT validation failure");
+  assert.match(response.body?.msg ?? "", /token is expired/i, "Require actual expiry, not another refusal");
+}
 /** Next owns /auth/callback; only the versioned provider API belongs to GoTrue. */
 export function authGatewayService(requestTarget, bucket) {
   const pathname = requestTarget.split("?")[0];

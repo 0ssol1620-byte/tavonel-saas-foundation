@@ -8,7 +8,7 @@ import https from "node:https";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { authGatewayService, validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
+import { authGatewayService, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
 import { withLocalStorage } from "./local-storage-journey.mjs";
 import { stopOwnedChild } from "./stop-owned-child.mjs";
 
@@ -152,7 +152,7 @@ try {
       assert.ok([200,401,403].includes(immediateNext));report.nextLogoutAccessTokenImmediatelyRefused=immediateNext!==200;
       // Supabase documents that already-issued JWTs may remain valid until expiry; record, never conceal, that boundary.
       while(Date.now()/1000<=claims.exp+2) await new Promise(resolve=>setTimeout(resolve,250));
-      const expired=await api("/auth/v1/user",null,session.access_token);check("naturally expired provider JWT is refused",expired.status,401);
+      const expired=await api("/auth/v1/user",null,session.access_token);validateExpiredProviderJwt(expired);check("naturally expired provider JWT is refused with actual expiry error",true,true);
       const downstream=await page.evaluate(async ({token,collection})=>{const r=await fetch(`/api/collections/${collection}/world`,{headers:{authorization:`Bearer ${token}`}});return r.status;},{token:session.access_token,collection:fixtures[0].collectionId});
       check("actual Next refuses naturally expired provider JWT",downstream,401);
       await context.clearCookies();await context.addCookies([{name:"tvnl_device",value:"expired-fixture-risk-cookie",url:origin,expires:Math.floor(Date.now()/1000)-60,httpOnly:true,secure:true}]);

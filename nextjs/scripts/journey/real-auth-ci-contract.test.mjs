@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authGatewayService, validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
+import { authGatewayService, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
+test("requires the actual GoTrue expiry rejection and refuses success or unrelated errors", () => {
+  const expired = { status: 403, body: { error_code: "bad_jwt", msg: "invalid JWT: token has invalid claims: token is expired" } };
+  validateExpiredProviderJwt(expired);
+  for (const invalid of [{ ...expired, status: 200 }, { ...expired, status: 500 }, { ...expired, body: { error_code: "session_not_found", msg: "Session missing" } }, { ...expired, body: { error_code: "bad_jwt", msg: "Invalid signature" } }]) assert.throws(() => validateExpiredProviderJwt(invalid));
+});
 const env = { CI: "true", GITHUB_ACTIONS: "true" };
 const status = { API_URL: "http://127.0.0.1:54321", DB_URL: "postgresql://postgres:synthetic@127.0.0.1:54322/postgres", ANON_KEY: "synthetic".repeat(8), SERVICE_ROLE_KEY: "synthetic".repeat(8) };
 
