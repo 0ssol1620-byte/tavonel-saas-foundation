@@ -63,8 +63,8 @@ nextjs/scripts/journey/*.mjs text eol=lf
 nextjs/scripts/qa/*.mjs text eol=lf
 
 # Every node script under scripts/ opens with a hashbang, and lib/journey-acceptance.test.ts
-# fails on a CRLF one: a Linux shell resolves the interpreter as `node
-`, and the module
+# fails on a CRLF one: a Linux shell resolves the interpreter with a trailing carriage return,
+# and the module
 # transform applied to an imported .mjs stops on the stray carriage return. The individual pins
 # above predate this line and are kept; this one covers the class, including the three scripts a
 # fresh Windows checkout was still getting CRLF hashbangs on.

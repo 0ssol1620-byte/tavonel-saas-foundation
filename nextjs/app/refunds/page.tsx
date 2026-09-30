@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import PolicyLayout from "@/components/policy-layout";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import {
@@ -67,7 +68,10 @@ export default function RefundsPage() {
         <h2>If paid plans open</h2>
         <p>
           Cancellation and refund terms will be published here, and presented at checkout, before
-          any payment method can be entered.
+          any payment method can be entered. The <Link href="/terms">self-service terms</Link>{" "}
+          already set one rule for that day: while processing is unavailable for your workspace,
+          renewal of its paid subscription is paused rather than charged, and it resumes only
+          after you confirm. A pause does not by itself refund a completed payment.
         </p>
       </PolicyLayout>
     );
@@ -150,6 +154,14 @@ export default function RefundsPage() {
         You may cancel a recurring plan at any time through the billing portal or support.
         Cancellation stops future renewals and normally preserves paid access until the current
         billing period ends. It does not automatically refund a completed renewal.
+      </p>
+
+      <h2>When processing is unavailable</h2>
+      <p>
+        If processing is unavailable for your workspace, renewal of its paid subscription is
+        paused rather than charged. It resumes only after you confirm the resumption, because
+        Paddle may charge immediately when a subscription resumes. A pause does not by itself
+        refund a completed payment; the refund rule and your statutory rights above still apply.
       </p>
 
       <h2>Billing errors</h2>

@@ -5,6 +5,7 @@ import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-ind
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { TrustDisclosures } from "@/components/trust-disclosures";
 import TrustProvisions from "@/components/trust-provisions";
+import processingTerms from "@/public/policy/processing-terms-2026-09-30.json";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/trust" },
@@ -14,16 +15,24 @@ export const metadata: Metadata = {
     "Public policies, processors, legal terms, and security contacts for evaluating how TAVONEL handles documents.",
 };
 
-const DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md";
-const DPA_LABEL =
-  "Draft v2 (2026-09-23) — under review; not a signed agreement";
+/*
+  The processing addendum a workspace owner accepts with the self-service terms is the document
+  this page links. The 2026-09-23 draft DPA is still served at its address, so where it is linked
+  it carries the label that says what it is now: archived, and replaced for a workspace that
+  accepts the 2026-09-30 version.
+*/
+const ADDENDUM_URL = processingTerms.processing.path;
+const ADDENDUM_LABEL = `Version ${processingTerms.version}, accepted by a workspace owner together with the self-service terms`;
+const ARCHIVED_DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md";
+const ARCHIVED_DPA_LABEL =
+  "Archived draft v2 (2026-09-23) — replaced by the 2026-09-30 processing addendum for a workspace that accepts it, and kept as the template for negotiating a separately executed Enterprise agreement; not a signed agreement";
 
 const DESTINATIONS: Array<[string, string, Route]> = [
   ["Security", "The customer-facing safeguards for document intake, workspace access, evidence, activation, retention, and deletion.", "/security" as Route],
   ["Privacy notice", "What is collected, why it is processed, where it is stored, which processing happens outside Korea, and how to ask for access, export or deletion.", "/privacy" as Route],
   ["Subprocessors", "Every third-party service permitted to process account, document, billing or inquiry data, with the purpose and the data class for each one.", "/subprocessors" as Route],
   ["Service status", "Public availability and incident notices for the service.", "/status" as Route],
-  ["Terms", "The agreement itself.", "/terms" as Route],
+  ["Terms", "The self-service terms a workspace owner accepts, and the service operator.", "/terms" as Route],
   ["Security contact", "security@tavonel.com for a vulnerability, privacy@tavonel.com for a data request, and the inquiry form for a security review.", "/contact" as Route],
 ];
 
@@ -70,7 +79,8 @@ export default function TrustCenterPage() {
                 Start with the maintained public policies, processor record, legal terms, and
                 reporting contacts below. Deployment-specific architecture, control evidence,
                 assurance scope, and questionnaire responses are provided through a qualified
-                review. The published data processing agreement remains clearly labelled as a draft.
+                review. The self-service terms and processing addendum are published as versioned documents,
+                identified by the same hash an acceptance receipt records.
               </p>
               {/*
                 B04. Five hubs -- this one, Evidence, Benchmarks, Reproducibility, Research --
@@ -128,19 +138,21 @@ export default function TrustCenterPage() {
                   <p>The machine-readable disclosure record: reporting address, policy and preferred languages, at the well-known path.</p>
                 </a>
                 {/*
-                  A plain anchor, not a `Link`: the DPA is a served file rather than a route, so
-                  typed routing does not apply and a client-side navigation would be wrong.
+                  A plain anchor, not a `Link`: the addendum is a served file rather than a route,
+                  so typed routing does not apply and a client-side navigation would be wrong.
 
-                  The label travels with the link everywhere it appears, which is the whole
-                  discipline of publishing an unsigned document: a reader who sees the URL without
-                  the label has been handed a contract, and a reader who sees both has been handed
-                  a draft. `lib/trust-page-answers.test.ts` fails if the two are ever separated.
+                  The label travels with the link, so a reader knows which version this is and how
+                  it becomes binding; the archived draft keeps its own label the same way.
+                  `lib/trust-page-answers.test.ts` fails if either pair is separated.
                 */}
-                <a className="tile trust-link" key="dpa" href={DPA_URL}>
-                  <h3>Data processing agreement</h3>
-                  <p>{DPA_LABEL}. It states the breach-notification and sub-processor change commitments, the verified-request deletion right, and the qualifications that apply to legal retention duties and provider backups. The clauses still open say so in place.</p>
+                <a className="tile trust-link" key="processing-addendum" href={ADDENDUM_URL}>
+                  <h3>Processing addendum</h3>
+                  <p>{ADDENDUM_LABEL}. It states the breach-notification and sub-processor change commitments, the verified-request deletion right, the configured deletion periods, and the qualifications that apply to legal retention duties and provider backups.</p>
                 </a>
               </div>
+              <p className="fine">
+                <a href={ARCHIVED_DPA_URL}>Earlier data processing agreement</a>: {ARCHIVED_DPA_LABEL}.
+              </p>
 
               <TrustDisclosures />
 

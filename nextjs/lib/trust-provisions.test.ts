@@ -76,7 +76,26 @@ describe("the Provided / Roadmap / Not provided table", () => {
     }
   });
 
-  it("states the assurance report as absent, in the draft agreement's words", () => {
+  /*
+    2026-09-30. The current processing agreement is the addendum an owner accepts. The 2026-09-23
+    draft is cited only under a label that says it is an archived template, and the one row about
+    a signed DPA says none exists until both parties execute one.
+  */
+  it("cites the accepted addendum as current and the old draft only as an archived template", () => {
+    const addendum = TRUST_PROVISIONS.find((row) => row.id === "processing_addendum");
+    expect(addendum?.state).toBe("provided");
+    expect(addendum?.source.href).toBe("/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md");
+    for (const row of TRUST_PROVISIONS.filter((candidate) => candidate.source.href.includes("TAVONEL_DPA_v2"))) {
+      expect(row.source.label, `${row.id} cites the old draft without saying it is archived`).toContain("archived");
+    }
+    const signed = TRUST_PROVISIONS.find((row) => row.id === "dpa")!;
+    expect(signed.line).toContain("No signed bilateral agreement exists until both parties execute one");
+    expect(provisionsModule).not.toContain("the draft agreement");
+    const deletion = TRUST_PROVISIONS.find((row) => row.id === "deletion")!;
+    expect(deletion.line).toContain("not a guaranteed completion deadline");
+  });
+
+  it("states the assurance report as absent", () => {
     const assurance = TRUST_PROVISIONS.find((row) => row.id === "third_party_assurance");
     expect(assurance?.state).toBe("not_provided");
     /*

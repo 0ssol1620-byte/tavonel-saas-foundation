@@ -1,0 +1,48 @@
+# Production pipeline qualification — 2026-09-30
+
+Status: public one-line fixture passes after GPU compatibility repair; broader
+document and website-to-export qualification remains outstanding.
+
+The operator used the founder's standing test authorization and the public W3C
+dummy PDF served by `/api/proof-pdf`. No customer document was used in this probe.
+Input: 13,264 bytes, SHA-256
+`3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4`.
+
+The real quarantine queue produced a clean CDR receipt and a 7,515-byte sanitized
+PDF at 00:02:49 UTC. Its SHA-256 was
+`f4c89c26a669e290786df19dddb3147a6827887c6d6e9ca7a941024f76d2ce42`.
+The OCR result was stored at 00:05:20 UTC and the reserved operator computation
+was subsequently `settled` in the production database. This was a direct storage
+qualification probe, not a website upload or a customer compilation test.
+
+The OCR JSON reports `status: ok`, one page, but only one region containing
+`yme` at confidence 0.55334. An HTTP success and this status do not establish
+content fidelity. Source-versus-sanitized rendering and the OCR runtime are being
+investigated. Do not use this result as a successful OCR quality, compilation,
+signed-export, or AI-consumer receipt.
+
+Raw receipts and the public fixture are retained outside the repository in
+`D:/CodexProjects/tavonel-private-audit/scoped-admission-20260930/`.
+Customer processing and live charging have not been activated by this probe.
+
+## GPU compatibility repair and repeat
+
+The original worker used an RTX PRO 6000 Blackwell MIG device. The same deployed
+image and local reproduction read the fixture correctly on a compatible GPU.
+The operator removed `BLACKWELL_96` from endpoint `cohlugjzf0dk9i`, preserved the
+other GPU pools and image, and cycled the idle worker. The configured worker cap
+was restored to one, with zero minimum workers and a 120-second idle timeout.
+
+Endpoint version 17 ran the repeated quarantine/CDR/OCR request on an NVIDIA
+GeForce RTX 4090 in `EUR-NO-1`. The result was exactly `Dummy PDF file`, one page,
+one region, confidence 0.99922, and the compute reservation settled. The new
+sanitized PDF hash is
+`ffeeeb7700659d489772d8934671820cd2ad3d54274cab10ad9bd3e8c71b390c`.
+Its bytes differ from the prior sanitization, so this is the same original-input
+and deployed-image comparison, not a byte-identical sanitized-input comparison.
+
+The observed repair supports a GPU/runtime compatibility diagnosis. It does
+not establish general multilingual OCR accuracy, customer document compilation,
+or signed-export acceptance. The active image digest remains
+`1392dac4e3d743f720deaa4721594a06fef6f0e8d7a6dac5e81b66324dfe6406`;
+its source/build provenance is under review before a replacement is deployed.

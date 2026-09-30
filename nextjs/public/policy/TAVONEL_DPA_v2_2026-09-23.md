@@ -2,6 +2,14 @@
 
 **Draft v2 (2026-09-23) — under review; not a signed agreement.**
 
+**Archived — enterprise negotiation template.** For a workspace whose owner accepts the 2026-09-30
+self-service terms, the processing addendum published at
+/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md replaces this draft, and this draft forms no
+second agreement beside it. It is kept as the starting template for negotiating a separately
+executed data processing agreement for an Enterprise engagement. No signed bilateral agreement
+exists on these terms unless both parties execute one. Its statements about the running service
+describe 2026-09-23; where they differ from the current published pages, the pages are correct.
+
 This text is published so that a security or procurement reviewer can read the terms before
 asking for them. It has not been reviewed by a lawyer, it is not executed, and it binds nobody
 until it is signed. Clauses that are not drafted say so, in place, rather than being left out.

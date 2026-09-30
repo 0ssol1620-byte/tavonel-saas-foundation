@@ -2,6 +2,11 @@
 
 **Draft v1 (2026-09-11) — under review; not a signed agreement.**
 
+**Archived — superseded.** Draft v2 (2026-09-23), itself archived as the enterprise negotiation
+template, replaced this draft. For a workspace whose owner accepts the 2026-09-30 self-service
+terms, the processing addendum published at /policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md
+applies, and this draft forms no agreement.
+
 This text is published so that a security or procurement reviewer can read the terms before
 asking for them. It has not been reviewed by a lawyer, it is not executed, and it binds nobody
 until it is signed. Clauses that are not drafted say so, in place, rather than being left out.

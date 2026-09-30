@@ -23,7 +23,10 @@ describe("public trust contract", () => {
   });
 
   it("keeps required legal and processor records public", () => {
-    expect(getPublicTrustDisclosure("dpa").line).toContain("draft, not a signed agreement");
+    // The current agreement is the accepted addendum; the old draft is named only as archived.
+    expect(getPublicTrustDisclosure("dpa").href).toBe("/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md");
+    expect(getPublicTrustDisclosure("dpa").line).toContain("a workspace owner accepts with the self-service terms");
+    expect(getPublicTrustDisclosure("dpa").line).toContain("archived 2026-09-23 draft");
     expect(getPublicTrustDisclosure("privacy").line).toContain("storage and transfer locations");
     expect(getPublicTrustDisclosure("subprocessors").line).toContain("third parties permitted to process customer data");
   });
