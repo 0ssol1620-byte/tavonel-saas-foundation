@@ -15,6 +15,7 @@ test("automation branch previews skip unless the commit opts in", () => {
   for (const ref of ["codex/masterplan-checkpoint-2026-09-30", "dependabot/npm_and_yarn/x"]) {
     assert.equal(decide({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: ref }, app).build, false);
     assert.equal(decide({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: ref, VERCEL_GIT_COMMIT_MESSAGE: "fix: y [preview]" }, app).build, true);
+    assert.equal(decide({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: ref, VERCEL_GIT_COMMIT_MESSAGE: "fix: y\n\nBody explains the [preview] token." }, app).build, false);
   }
 });
 

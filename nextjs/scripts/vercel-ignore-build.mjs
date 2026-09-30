@@ -7,7 +7,8 @@ import { pathToFileURL } from "node:url";
  * Every push to an automation branch used to start a full Turbo-machine preview build (prebuild
  * repeats typecheck, lint and the whole unit suite that GitHub CI already runs). Production
  * always builds. Automation branches (codex/*, dependabot/*) build only on explicit opt-in with
- * "[preview]" in the commit message. Other preview branches skip only documentation-only commits.
+ * "[preview]" in the commit subject line; a body that merely mentions the token does not opt in.
+ * Other preview branches skip only documentation-only commits.
  * Any uncertainty (missing metadata, unreadable diff) builds, so this can only remove builds that
  * are known to be redundant. Revert by deleting ignoreCommand from vercel.json.
  */
@@ -16,7 +17,7 @@ const DOCS_ONLY_PATH = /^docs\/|\.md$/i;
 
 export function decide(env, changedFiles) {
   if (env.VERCEL_ENV === "production") return { build: true, reason: "production" };
-  if (/\[preview\]/i.test(env.VERCEL_GIT_COMMIT_MESSAGE ?? "")) return { build: true, reason: "explicit [preview] opt-in" };
+  if (/\[preview\]/i.test((env.VERCEL_GIT_COMMIT_MESSAGE ?? "").split("\n", 1)[0])) return { build: true, reason: "explicit [preview] opt-in" };
   const ref = env.VERCEL_GIT_COMMIT_REF ?? "";
   if (AUTOMATION_BRANCH.test(ref)) return { build: false, reason: `automation branch ${ref} without [preview]` };
   if (Array.isArray(changedFiles) && changedFiles.length > 0 && changedFiles.every(file => DOCS_ONLY_PATH.test(file))) {
