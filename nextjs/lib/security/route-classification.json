@@ -469,6 +469,15 @@
       ],
       "credential": "bearer:supabase-jwt",
       "note": "Records owner processing-terms acceptance only; grants nothing."
+    },
+    "app/api/internal/billing/gate-enforce/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:shared-secret",
+      "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, closed when unset. Cross-tenant scheduled enforcement verifies provider identity and signed workspace binding before pausing a subscription whose processing admission is unavailable."
     }
   }
 }

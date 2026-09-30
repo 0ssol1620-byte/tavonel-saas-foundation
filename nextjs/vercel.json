@@ -28,6 +28,10 @@
     {
       "path": "/api/internal/deletions/run",
       "schedule": "8,23,38,53 * * * *"
+    },
+    {
+      "path": "/api/internal/billing/gate-enforce",
+      "schedule": "11,26,41,56 * * * *"
     }
   ],
   "headers": [
