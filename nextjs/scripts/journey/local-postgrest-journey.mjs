@@ -5,6 +5,7 @@ import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
+import { qualifyNextBrowser } from "./local-next-browser-journey.mjs";
 
 export async function qualifyPostgrest({ executable, root, env, port, sql, check, owner, outsider, admin, workspace, artifacts }) {
   const binarySha256 = createHash("sha256").update(readFileSync(executable)).digest("hex");
@@ -147,8 +148,13 @@ log-level = "error"
     check("two HTTP publication requests have exactly one winner", racers.filter(result => result.status === 200).length, 1);
     check("concurrent HTTP loser is a named CAS refusal", racers.filter(result => result.status !== 200).map(result => result.body.message), ["world_transition_compare_and_swap_conflict"]);
     check("concurrent HTTP publication advances one SQL revision", (await request(activeResource, serviceToken)).body[0].revision, revision+2);
+    let nextBrowser;
+    if (process.env.TAVONEL_LOCAL_NEXT_BROWSER === "1") {
+      assert.ok(artifacts, "Next qualification requires real Core artifacts");
+      nextBrowser = await qualifyNextBrowser({ root, env, base, token, owner, admin, workspace, artifacts, serviceToken, sql, check, rpc });
+    }
     return { version, binarySha256, jwtVerifiedByActualService: true, syntheticIssuerOnly: true,
-      realCoreArtifacts: Boolean(artifacts), goTrueSessionServiceVerified: false, storageServiceVerified: false };
+      realCoreArtifacts: Boolean(artifacts), goTrueSessionServiceVerified: false, storageServiceVerified: Boolean(nextBrowser), nextBrowser };
   } finally {
     if (child.exitCode === null) child.kill();
     await closed;

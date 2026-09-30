@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import net from "node:net";
 import path from "node:path";
 
-const executable = process.env.TAVONEL_LOCAL_SEAWEED_EXE;
+export async function withLocalStorage(executable, visit) {
 assert.ok(executable, "Set TAVONEL_LOCAL_SEAWEED_EXE to the qualified official SeaweedFS 4.48 Windows binary");
 const binarySha256 = createHash("sha256").update(readFileSync(executable)).digest("hex");
 assert.equal(binarySha256, "394a0154424f3d96f7969c044b77ee4cfb649299f8b42ecc7b703971872ce61d");
@@ -50,6 +50,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   assert.ok(ready, `Authenticated local S3 did not start: ${diagnostics}`);
+  if (visit) return await visit({ endpoint: `http://127.0.0.1:${s3}`, env, root, binarySha256 });
   const nextRoot = path.resolve(import.meta.dirname, "../..");
   const vitest = path.join(nextRoot, "node_modules/vitest/vitest.mjs");
   const output = execFileSync(process.execPath, [vitest, "run", "scripts/journey/local-storage.integration.test.ts", "--config", "scripts/journey/vitest.local.config.ts"], {
@@ -68,4 +69,9 @@ try {
     await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Owned SeaweedFS did not stop")), 10_000); })]);
   } finally { clearTimeout(timer); }
   rmSync(root, { recursive: true, force: true });
+}
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  await withLocalStorage(process.env.TAVONEL_LOCAL_SEAWEED_EXE);
 }
