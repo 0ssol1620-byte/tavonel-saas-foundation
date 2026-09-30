@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyCandidatePatch } from "@/lib/collection-patch";
+import { mayPublish, registerCollectionArtifact } from "@/lib/compile-artifact-provenance";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { recordServerFunnel } from "@/lib/funnel-events";
@@ -130,6 +131,16 @@ export async function POST(request: Request) {
       applied.artifact.manifestDigest.replace("sha256:", ""),
     );
     if (!key) return refuse("COLLECTION_KEY_INVALID", 500);
+    // The derived candidate carries the reviewed one's documents; it is registered under them
+    // before it exists, so deleting any of them also purges it (20260930013000).
+    const registered = await registerCollectionArtifact({
+      workspaceKey: auth.principal.workspaceKey,
+      collectionId,
+      manifestDigest: applied.artifact.manifestDigest,
+      documentIds: applied.artifact.sourceDocuments.map((document) => document.documentId),
+    });
+    if (!registered.ok) return refuse(registered.code, registered.refused ? 409 : 503);
+    if (!mayPublish(registered)) return refuse("COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", 503);
     const written = await putWorkspaceCollectionCandidate(signer, auth.principal.workspaceKey, key, applied.artifact);
     if (!written.ok) return refuse(written.code, 503);
     patch = {

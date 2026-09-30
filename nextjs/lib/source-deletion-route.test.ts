@@ -7,9 +7,10 @@ const createSourceDeletionSweepStore = vi.fn(() => ({ kind: "deletion-store" }))
 const readR2SignerEnv = vi.fn<(...args: any[]) => any>();
 const inspectFoundationSourceObject = vi.fn<(...args: any[]) => any>();
 const deleteFoundationSourceObject = vi.fn<(...args: any[]) => any>();
+const closeSourceDeletionDerived = vi.fn<(...args: any[]) => any>();
 
 vi.mock("@/lib/source-deletion-sweeper", () => ({ runSourceDeletionSweep }));
-vi.mock("@/lib/source-deletion-store", () => ({ createSourceDeletionSweepStore }));
+vi.mock("@/lib/source-deletion-store", () => ({ createSourceDeletionSweepStore, closeSourceDeletionDerived }));
 vi.mock("@/lib/r2-synthetic-canary", async importOriginal => {
   const original = await importOriginal<typeof import("./r2-synthetic-canary")>();
   return { ...original, readR2SignerEnv, inspectFoundationSourceObject, deleteFoundationSourceObject };
@@ -35,6 +36,7 @@ beforeEach(() => {
   inspectFoundationSourceObject.mockResolvedValue({ ok: true, exists: true });
   deleteFoundationSourceObject.mockResolvedValue({ ok: true, alreadyAbsent: false });
   runSourceDeletionSweep.mockResolvedValue({ ok: true, receipts: [] });
+  closeSourceDeletionDerived.mockResolvedValue({ ok: true, status: "idle" });
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -51,6 +53,7 @@ describe("source deletion cron route", () => {
       await POST(request("POST", "x".repeat(48))),
     ]) expect(response.status).toBe(401);
     expect(runSourceDeletionSweep).not.toHaveBeenCalled();
+    expect(closeSourceDeletionDerived).not.toHaveBeenCalled();
   });
 
   it("accepts manual worker POST and Vercel Cron GET credentials", async () => {
@@ -84,23 +87,64 @@ describe("source deletion cron route", () => {
     readR2SignerEnv.mockReturnValue(invalidSigner);
     const response = await POST(request("POST", SECRET));
     expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ code: "SOURCE_DELETE_NOT_CONFIGURED", processed: 0 });
+    expect(await response.json()).toEqual({ code: "SOURCE_DELETE_NOT_CONFIGURED", processed: 0, derived: "idle" });
     expect(runSourceDeletionSweep).not.toHaveBeenCalled();
     expect(deleteFoundationSourceObject).not.toHaveBeenCalled();
+    // The derived closure is database-only and does not wait for R2.
+    expect(closeSourceDeletionDerived).toHaveBeenCalledOnce();
     },
   );
+
+  it("closes derived rows even when an object purge fails, and reports a failed closure", async () => {
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", SECRET);
+    closeSourceDeletionDerived.mockResolvedValueOnce({ ok: true, status: "recorded" });
+    runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: true });
+    const locked = await POST(request("POST", SECRET));
+    expect(locked.status).toBe(200);
+    expect(await locked.json()).toEqual({
+      code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: true, derived: "recorded", deferred: true,
+    });
+
+    closeSourceDeletionDerived.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_DERIVED_FAILED" });
+    const failed = await POST(request("POST", SECRET));
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ code: "SOURCE_DELETION_DERIVED_FAILED", processed: 0, derived: "SOURCE_DELETION_DERIVED_FAILED" });
+  });
+
+  it("defers a recorded object lock only when the derived closure also succeeded", async () => {
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", SECRET);
+    closeSourceDeletionDerived.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_DERIVED_FAILED" });
+    runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: true });
+    const lockedClosureFailed = await POST(request("POST", SECRET));
+    expect(lockedClosureFailed.status).toBe(503);
+    expect(await lockedClosureFailed.json()).toEqual({
+      code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: true, derived: "SOURCE_DELETION_DERIVED_FAILED",
+    });
+
+    runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_FAILED", receipts: [], failureRecorded: true });
+    const otherRecorded = await POST(request("POST", SECRET));
+    expect(otherRecorded.status).toBe(503);
+    expect(await otherRecorded.json()).toEqual({ code: "SOURCE_DELETE_FAILED", processed: 0, failureRecorded: true, derived: "idle" });
+  });
 
   it("returns sanitized success and retryable failure responses", async () => {
     vi.stubEnv("FOUNDATION_WORKER_SECRET", SECRET);
     runSourceDeletionSweep.mockResolvedValueOnce({ ok: true, receipts: [{ receiptId: "private", status: "recorded" }] });
     const success = await POST(request("POST", SECRET));
     expect(success.status).toBe(200);
-    expect(await success.json()).toEqual({ code: "OK", processed: 1 });
+    expect(await success.json()).toEqual({ code: "OK", processed: 1, derived: "idle" });
 
     runSourceDeletionSweep.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETE_FAILED", receipts: [] });
     const failure = await POST(request("POST", SECRET));
     expect(failure.status).toBe(503);
-    expect(await failure.json()).toEqual({ code: "SOURCE_DELETE_FAILED", processed: 0 });
+    expect(await failure.json()).toEqual({ code: "SOURCE_DELETE_FAILED", processed: 0, derived: "idle" });
+
+    runSourceDeletionSweep.mockResolvedValueOnce({
+      ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", receipts: [], failureRecorded: false,
+    });
+    const unrecorded = await POST(request("POST", SECRET));
+    expect(unrecorded.status).toBe(503);
+    expect(await unrecorded.json()).toEqual({ code: "SOURCE_DELETE_OBJECT_LOCKED", processed: 0, failureRecorded: false, derived: "idle" });
   });
 
   it("keeps credentials external and schedules inventory before physical purge", () => {

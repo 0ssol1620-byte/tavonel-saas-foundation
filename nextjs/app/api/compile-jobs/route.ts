@@ -9,6 +9,7 @@ import {
 } from "@/lib/compile-job-store";
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readCustomerSourceScope } from "@/lib/customer-source-scope";
 import { readBoundedJson } from "@/lib/enterprise-http";
@@ -75,6 +76,15 @@ export async function POST(request: Request) {
   }
   if (!await canAdmitCustomerSource(auth.principal.workspaceKey, sourceScope)) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
+  }
+
+  // A deleted or suspended source would be refused by the worker anyway, but a queued job for it
+  // also holds its deletion inventory open ("not quiescent") until the job is terminal.
+  const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+  if (!sourceAccess.ok) {
+    return NextResponse.json({ code: sourceAccess.code }, {
+      status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: HEADERS,
+    });
   }
 
   // The evaluation includes one Compiled World. A retry of the exact same document set must

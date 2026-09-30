@@ -6,7 +6,7 @@ import {
   inspectFoundationSourceObject,
   readR2SignerEnv,
 } from "@/lib/r2-synthetic-canary";
-import { createSourceDeletionSweepStore } from "@/lib/source-deletion-store";
+import { closeSourceDeletionDerived, createSourceDeletionSweepStore } from "@/lib/source-deletion-store";
 import { runSourceDeletionSweep } from "@/lib/source-deletion-sweeper";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +27,13 @@ async function runOneDeletion(request: Request) {
     return NextResponse.json({ code: "DELETION_WORKER_NOT_AUTHORIZED" }, { status: 401, headers: HEADERS });
   }
 
+  // Database-only and independent of R2, so an object under a storage lock never blocks it.
+  const closure = await closeSourceDeletionDerived();
+  const derived = closure.ok ? closure.status : closure.code;
+
   const signer = readR2SignerEnv();
   if (!signer || signer.bucket !== FOUNDATION_R2_BUCKET) {
-    return NextResponse.json({ code: "SOURCE_DELETE_NOT_CONFIGURED", processed: 0 },
+    return NextResponse.json({ code: "SOURCE_DELETE_NOT_CONFIGURED", processed: 0, derived },
       { status: 503, headers: HEADERS });
   }
   const deletions = await runSourceDeletionSweep({
@@ -41,9 +45,16 @@ async function runOneDeletion(request: Request) {
       signer, candidate.workspaceKey, candidate.objectKey),
   });
 
+  // A recorded object-lock refusal is expected: the database fences that finished attempt and
+  // defers the object for 24 hours (20260930011000); nothing was purged. Any other failure, or an unrecorded one, stays 503.
+  const deferred = !deletions.ok && deletions.code === "SOURCE_DELETE_OBJECT_LOCKED" &&
+    deletions.failureRecorded === true && closure.ok;
   return NextResponse.json(
-    { code: deletions.ok ? "OK" : deletions.code, processed: deletions.receipts.length },
-    { status: deletions.ok ? 200 : 503, headers: HEADERS },
+    deletions.ok
+      ? { code: closure.ok ? "OK" : closure.code, processed: deletions.receipts.length, derived }
+      : { code: deletions.code, processed: deletions.receipts.length, failureRecorded: deletions.failureRecorded, derived,
+          ...(deferred ? { deferred: true } : {}) },
+    { status: (deletions.ok && closure.ok) || deferred ? 200 : 503, headers: HEADERS },
   );
 }
 

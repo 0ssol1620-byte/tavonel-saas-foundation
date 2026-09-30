@@ -1,5 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
-import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN, immutableWorkspacePrefix } from "./immutable-keys";
+import {
+  DOCUMENT_ID_PATTERN,
+  WORKSPACE_ID_PATTERN,
+  immutableWorkspacePrefix,
+  isCollectionCandidateKey,
+} from "./immutable-keys";
 import {
   FOUNDATION_R2_BUCKET,
   assertFoundationDeletionKey,
@@ -17,6 +22,7 @@ export type SourceInventoryHashedObject = SourceInventoryObject & {
 
 const MAX_DOCUMENTS = 128;
 const MAX_OBJECTS = 512;
+export const MAX_WORLD_OBJECTS = 64;
 const MAX_OBJECT_BYTES = 64 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
 
@@ -92,67 +98,86 @@ function documentPrefixes(workspaceKey: string, documentId: string) {
   ];
 }
 
-function validScope(workspaceKey: string, documentIds: readonly string[]) {
+function validScope(workspaceKey: string, documentIds: readonly string[], worldObjectKeys: readonly string[]) {
   return WORKSPACE_ID_PATTERN.test(workspaceKey)
     && documentIds.length <= MAX_DOCUMENTS
     && documentIds.every((id) => DOCUMENT_ID_PATTERN.test(id))
-    && new Set(documentIds).size === documentIds.length;
+    && new Set(documentIds).size === documentIds.length
+    && worldObjectKeys.every((key) => isCollectionCandidateKey(workspaceKey, key))
+    && new Set(worldObjectKeys).size === worldObjectKeys.length;
 }
 
+/**
+ * Every object under the documents' own prefixes, plus each named World candidate key exactly.
+ *
+ * A World key is listed with itself as the prefix and max-keys 1: the first key at or after a
+ * prefix is the prefix itself when it exists, so one page answers "present, with this size" or
+ * "absent" and nothing else under the collection is ever read or returned.
+ */
 export async function listFoundationSourceInventory(
   env: R2SignerEnv,
   workspaceKey: string,
   documentIds: readonly string[],
+  worldObjectKeys: readonly string[] = [],
   fetcher: typeof fetch = fetch,
 ): Promise<{ ok: true; objects: SourceInventoryObject[] } | { ok: false; code: string }> {
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
-  if (!validScope(workspaceKey, documentIds)) return { ok: false, code: "SOURCE_INVENTORY_SCOPE_INVALID" };
+  if (worldObjectKeys.length > MAX_WORLD_OBJECTS) return { ok: false, code: "SOURCE_INVENTORY_WORLD_LIMIT" };
+  if (!validScope(workspaceKey, documentIds, worldObjectKeys)) {
+    return { ok: false, code: "SOURCE_INVENTORY_SCOPE_INVALID" };
+  }
 
   const byKey = new Map<string, number>();
   let totalBytes = 0;
-  for (const documentId of [...documentIds].sort()) {
-    for (const prefix of documentPrefixes(workspaceKey, documentId)) {
-      let continuation: string | null = null;
-      do {
-        const query: Record<string, string> = { "list-type": "2", "max-keys": "1000", prefix };
-        if (continuation) query["continuation-token"] = continuation;
-        const canonicalQuery = Object.keys(query).sort()
-          .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`).join("&");
-        const response = await signedRequest(
-          env, "GET", `/${env.bucket}`, canonicalQuery, new Date(), 15_000, fetcher,
-        );
-        if (!response?.ok) return { ok: false, code: "SOURCE_INVENTORY_LIST_FAILED" };
-        const xml = await response.text();
-        for (const match of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/gi)) {
-          const block = match[1] ?? "";
-          const key = decodeXml(/<Key>([\s\S]*?)<\/Key>/i.exec(block)?.[1] ?? "");
-          const rawSize = /<Size>(\d+)<\/Size>/i.exec(block)?.[1] ?? "";
-          if (!key || !/^\d+$/.test(rawSize)) return { ok: false, code: "SOURCE_INVENTORY_LIST_INVALID" };
-          const sizeBytes = Number(rawSize);
-          if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0 || sizeBytes > MAX_OBJECT_BYTES) {
-            return { ok: false, code: "SOURCE_INVENTORY_OBJECT_TOO_LARGE" };
-          }
-          if (!key.startsWith(prefix) || assertFoundationDeletionKey(env.bucket, workspaceKey, key)) {
-            return { ok: false, code: "SOURCE_INVENTORY_OBJECT_OUT_OF_SCOPE" };
-          }
-          const prior = byKey.get(key);
-          if (prior !== undefined && prior !== sizeBytes) {
-            return { ok: false, code: "SOURCE_INVENTORY_LIST_CHANGED" };
-          }
-          if (prior === undefined) {
-            byKey.set(key, sizeBytes);
-            totalBytes += sizeBytes;
-            if (byKey.size > MAX_OBJECTS) return { ok: false, code: "SOURCE_INVENTORY_OBJECT_LIMIT" };
-            if (totalBytes > MAX_TOTAL_BYTES) return { ok: false, code: "SOURCE_INVENTORY_TOTAL_TOO_LARGE" };
-          }
+  const scans = [
+    ...[...documentIds].sort().flatMap((documentId) =>
+      documentPrefixes(workspaceKey, documentId).map((prefix) => ({ prefix, exact: false }))),
+    ...[...worldObjectKeys].sort().map((prefix) => ({ prefix, exact: true })),
+  ];
+  for (const { prefix, exact } of scans) {
+    let continuation: string | null = null;
+    do {
+      const query: Record<string, string> = { "list-type": "2", "max-keys": exact ? "1" : "1000", prefix };
+      if (continuation) query["continuation-token"] = continuation;
+      const canonicalQuery = Object.keys(query).sort()
+        .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`).join("&");
+      const response = await signedRequest(
+        env, "GET", `/${env.bucket}`, canonicalQuery, new Date(), 15_000, fetcher,
+      );
+      if (!response?.ok) return { ok: false, code: "SOURCE_INVENTORY_LIST_FAILED" };
+      const xml = await response.text();
+      for (const match of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/gi)) {
+        const block = match[1] ?? "";
+        const key = decodeXml(/<Key>([\s\S]*?)<\/Key>/i.exec(block)?.[1] ?? "");
+        const rawSize = /<Size>(\d+)<\/Size>/i.exec(block)?.[1] ?? "";
+        if (!key || !/^\d+$/.test(rawSize)) return { ok: false, code: "SOURCE_INVENTORY_LIST_INVALID" };
+        // A longer key that merely starts with the World key belongs to no one named here.
+        if (exact && key !== prefix) continue;
+        const sizeBytes = Number(rawSize);
+        if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0 || sizeBytes > MAX_OBJECT_BYTES) {
+          return { ok: false, code: "SOURCE_INVENTORY_OBJECT_TOO_LARGE" };
         }
-        const truncated = /<IsTruncated>true<\/IsTruncated>/i.test(xml);
-        continuation = truncated
-          ? decodeXml(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/i.exec(xml)?.[1] ?? "")
-          : null;
-        if (truncated && !continuation) return { ok: false, code: "SOURCE_INVENTORY_CURSOR_MISSING" };
-      } while (continuation);
-    }
+        if (!key.startsWith(prefix) || assertFoundationDeletionKey(env.bucket, workspaceKey, key)) {
+          return { ok: false, code: "SOURCE_INVENTORY_OBJECT_OUT_OF_SCOPE" };
+        }
+        const prior = byKey.get(key);
+        if (prior !== undefined && prior !== sizeBytes) {
+          return { ok: false, code: "SOURCE_INVENTORY_LIST_CHANGED" };
+        }
+        if (prior === undefined) {
+          byKey.set(key, sizeBytes);
+          totalBytes += sizeBytes;
+          if (byKey.size > MAX_OBJECTS) return { ok: false, code: "SOURCE_INVENTORY_OBJECT_LIMIT" };
+          if (totalBytes > MAX_TOTAL_BYTES) return { ok: false, code: "SOURCE_INVENTORY_TOTAL_TOO_LARGE" };
+        }
+      }
+      // An exact World key never pages: its one page already answered present or absent.
+      const truncated = !exact && /<IsTruncated>true<\/IsTruncated>/i.test(xml);
+      continuation = truncated
+        ? decodeXml(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/i.exec(xml)?.[1] ?? "")
+        : null;
+      if (truncated && !continuation) return { ok: false, code: "SOURCE_INVENTORY_CURSOR_MISSING" };
+    } while (continuation);
   }
   return {
     ok: true,

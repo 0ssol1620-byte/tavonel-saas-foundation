@@ -168,7 +168,10 @@ export async function deleteFoundationSourceObject(
   if (removed.status !== 200 && removed.status !== 204) {
     const body = await removed.text().catch(() => "");
     const providerCode = /<Code>([A-Za-z0-9]+)<\/Code>/.exec(body)?.[1];
-    return { ok: false, code: "SOURCE_DELETE_FAILED", status: removed.status, providerCode };
+    // A bucket object-lock rule (production `immutable/`, 365 days) is a durable refusal, not an
+    // outage: name it so the purge-failure record and the customer's receipt can say so.
+    const code = providerCode === "ObjectLockedByBucketPolicy" ? "SOURCE_DELETE_OBJECT_LOCKED" : "SOURCE_DELETE_FAILED";
+    return { ok: false, code, status: removed.status, providerCode };
   }
   return { ok: true, alreadyAbsent: false };
 }

@@ -36,6 +36,19 @@ select is(
   'a job that has not compiled anything records no digest, rather than a placeholder'
 );
 
+-- 23514 is a CHECK violation, and it is the SQLSTATE rather than a message because the
+-- constraint name is not part of any contract. throws_ok runs the statement in a subtransaction,
+-- so a malformed first digest leaves the job unchanged. Once a valid digest exists, the
+-- immutability trigger refuses replacement before the CHECK (covered in compile_digest_immutability.sql).
+select throws_ok(
+  $$select public.advance_foundation_compile_job(
+      'cjob-' || repeat('1', 32), 'pilot-digest01', 'building_world', 1,
+      null, null, null, null, 'not-a-digest')$$,
+  '23514',
+  null,
+  'a digest that is not a sha256 is refused by the column, not stored for a reader to trip over'
+);
+
 select is(
   (select changed from public.advance_foundation_compile_job(
      'cjob-' || repeat('1', 32), 'pilot-digest01', 'building_world', 1,
@@ -49,18 +62,6 @@ select is(
     where job_id = 'cjob-' || repeat('1', 32)),
   'sha256:' || repeat('b', 64),
   'the digest the worker passed is the digest the row holds'
-);
-
--- 23514 is a CHECK violation, and it is the SQLSTATE rather than a message because the
--- constraint name is not part of any contract. throws_ok runs the statement in a subtransaction,
--- so the refusal leaves the digest above untouched -- which the last assertion then re-reads.
-select throws_ok(
-  $$select public.advance_foundation_compile_job(
-      'cjob-' || repeat('1', 32), 'pilot-digest01', 'building_world', 1,
-      null, null, null, null, 'not-a-digest')$$,
-  '23514',
-  null,
-  'a digest that is not a sha256 is refused by the column, not stored for a reader to trip over'
 );
 
 -- Deploy order, asserted rather than assumed (integration stage-B repair, 2026-09-11).

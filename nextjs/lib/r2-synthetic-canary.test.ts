@@ -81,6 +81,18 @@ describe("r2 synthetic canary guards", () => {
     });
   });
 
+  it("names a bucket object-lock refusal instead of reporting a generic failure", async () => {
+    const workspace = "pilot-969dc192daa24119";
+    const key = `immutable/${workspace}/${workspace}/doc-1/source`;
+    const env = { accountId: "account", bucket: FOUNDATION_R2_BUCKET,
+      accessKeyId: "access", secretAccessKey: "secret" };
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response("<Error><Code>ObjectLockedByBucketPolicy</Code></Error>", { status: 409 })));
+    await expect(deleteFoundationSourceObject(env, workspace, key)).resolves.toEqual({
+      ok: false, code: "SOURCE_DELETE_OBJECT_LOCKED", status: 409, providerCode: "ObjectLockedByBucketPolicy",
+    });
+  });
+
   it("does not issue DELETE when HEAD is ambiguous", async () => {
     const workspace = "pilot-969dc192daa24119";
     const key = `quarantine/${workspace}/doc-1/source`;
