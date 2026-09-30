@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { qualifyPostgrest } from "./local-postgrest-journey.mjs";
 
 const bin = process.env.TAVONEL_LOCAL_POSTGRES_BIN;
 if (!bin || !existsSync(path.join(bin, process.platform === "win32" ? "initdb.exe" : "initdb"))) {
@@ -23,6 +24,7 @@ env.PGPASSWORD = password;
 env.PGCONNECT_TIMEOUT = "5";
 const report = { kind: "real-disposable-postgres-journey", foundationCommit,
   harnessSha256: createHash("sha256").update(readFileSync(import.meta.filename)).digest("hex"),
+  postgrestHarnessSha256: createHash("sha256").update(readFileSync(path.join(import.meta.dirname, "local-postgrest-journey.mjs"))).digest("hex"),
   assertions: [], vectorSemanticsVerified: false, authServiceVerified: false, storageServiceVerified: false };
 let started = false;
 let connection;
@@ -185,6 +187,7 @@ try {
   check("serving overlay still denies connector sources without verified viewer binding", sql(asService(`select public.connector_documents_blocked(${quote(workspace)},array[${quote(documentId)}])`)), "t");
   denied("browser cannot probe provider ACL", `set role authenticated; select public.source_version_acl_admits(${quote(workspace)},${quote(sourceVersion)},'google_drive',${quote(viewer)}::jsonb)`, /permission denied for function source_version_acl_admits/);
   denied("foreign workspace cannot write source ACL snapshot", `insert into public.source_acl_snapshots(source_version_id,workspace_key,provider_id,principals,snapshot_sha256,captured_at) values(${quote(sourceVersion)},${quote(otherWorkspace)},'google_drive','[]',${quote(digest("d"))},now())`, /SOURCE_ACL_SNAPSHOT_UNBOUND/);
+  let realCoreArtifacts;
   const coreDirectory = process.env.TAVONEL_LOCAL_CORE_DIR, python = process.env.TAVONEL_LOCAL_CORE_PYTHON;
   if (coreDirectory || python) {
     assert.ok(coreDirectory && python, "Both explicit isolated Core paths are required");
@@ -199,6 +202,7 @@ try {
       assert.equal(fixture.syntheticOnly, true); assert.equal(fixture.workspace, workspace);
       return fixture.artifact;
     });
+    realCoreArtifacts = artifacts;
     function realTransition(artifact, revision, current, action = "activate") {
       const digest = artifact.manifestDigest;
       const args = [randomUUID(), action, workspace, artifact.collectionId, digest,
@@ -217,6 +221,11 @@ try {
     sql(asService(realTransition(artifacts[0], 2, artifacts[1].manifestDigest, "rollback")));
     check("real Core historical artifact restores through real SQL", realPointer(), { revision: 3, digest: artifacts[0].manifestDigest });
     report.coreToSqlBoundaryVerified = true;
+  }
+  if (process.env.TAVONEL_LOCAL_POSTGREST_EXE) {
+    report.postgrest = await qualifyPostgrest({ executable: process.env.TAVONEL_LOCAL_POSTGREST_EXE,
+      root, env, port, sql, check, owner, outsider, admin, workspace, artifacts: realCoreArtifacts });
+    report.jwtDataApiVerified = true;
   }
   report.success = true;
 } finally {
