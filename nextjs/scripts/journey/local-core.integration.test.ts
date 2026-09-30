@@ -1,6 +1,6 @@
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -9,9 +9,17 @@ import {
   type ProductCoreV2CompileResponse,
 } from "../../lib/core-runtime-v2";
 import type { CollectionOcrInput } from "../../lib/collection-compiler";
+import { validatePromotableCollectionArtifact } from "../../lib/collection-download";
+import { buildWorldReadModel } from "../../lib/world-read-model";
+import { answerGroundedQuestion } from "../../lib/grounded-ask";
 
 const hmac = "synthetic-local-core-test-secret-never-a-deployment-key";
-const workspace = "pilot-realcore";
+const workspace = process.env.TAVONEL_LOCAL_CORE_TEST_WORKSPACE ?? "pilot-realcore";
+if (!/^pilot-[A-Za-z0-9]{1,16}$/.test(workspace)) throw new Error("Invalid synthetic Core workspace");
+function exportSyntheticArtifact(name: string, artifact: unknown) {
+  const directory = process.env.TAVONEL_LOCAL_CORE_ARTIFACT_OUT;
+  if (directory) writeFileSync(path.join(directory, `${name}.json`), JSON.stringify({ syntheticOnly: true, workspace, artifact }));
+}
 let processHandle: ChildProcess | undefined;
 let baseUrl = "";
 let temporary = "";
@@ -88,7 +96,7 @@ beforeAll(async () => {
   if (!coreDirectory || !python || !existsSync(path.join(coreDirectory, "packages/product-core/src")) || !existsSync(python)) {
     throw new Error("Set TAVONEL_LOCAL_CORE_DIR to an isolated Core clone and TAVONEL_LOCAL_CORE_PYTHON to a Python executable with FastAPI/httpx. No live fallback is allowed.");
   }
-  const coreCommit = execFileSync("git", ["-C", coreDirectory, "rev-parse", "HEAD"], { encoding: "utf8", windowsHide: true }).trim();
+  const coreCommit = execFileSync("git", ["--git-dir", path.join(coreDirectory, ".git"), "rev-parse", "HEAD"], { encoding: "utf8", windowsHide: true }).trim();
   releaseDigest = `sha256:${createHash("sha256").update(coreCommit).digest("hex")}`;
   temporary = mkdtempSync(path.join(tmpdir(), "tavonel-real-core-journey-"));
   await start();
@@ -96,16 +104,26 @@ beforeAll(async () => {
 afterAll(async () => { await stop(); if (temporary) rmSync(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
 
 describe.sequential("real Foundation to local Python Core boundary", () => {
-  it("compiles signed HTTP input into real source-bound evidence and refuses the incomplete Core validation contract", async () => {
+  it("compiles signed HTTP input into promotable evidence with the computed Core validation contract", async () => {
     first = await compile(firstInputs);
     expect(first.status).toBe("completed");
     expect(first.receipt.coreReleaseDigest).toBe(releaseDigest);
     expect(first.receipt.equivalence).toBe("not_run");
     expect(first.candidate.units.length).toBeGreaterThan(0);
     expect(first.candidate.package.files.find(file => file.path === "rag/chunks.jsonl")?.content).toContain("30 days");
-    // This actual Core revision omits immutableInputsOnly. Never invent its verdict.
-    expect(first.candidate.validation.immutableInputsOnly).toBeUndefined();
-    expect(projectProductCoreV2Candidate(first, firstInputs, true)).toBeNull();
+    expect(first.candidate.validation.immutableInputsOnly).toBe(true);
+    const projected = projectProductCoreV2Candidate(first, firstInputs, true)!;
+    expect(projected).not.toBeNull();
+    const artifact = { ...projected, coreExecution: { status: first.status, runtime: first.runtime,
+      worldStateId: first.candidate.worldStateId, receipt: first.receipt } };
+    expect(validatePromotableCollectionArtifact(artifact, artifact.collectionId)).not.toBeNull();
+    expect(buildWorldReadModel(artifact, artifact.collectionId)!.evidence.length).toBeGreaterThan(0);
+    expect(answerGroundedQuestion(artifact, "What are the payment terms?")!.answer).toContain("30 days");
+    exportSyntheticArtifact("initial", artifact);
+    // Removing the actual authority's check must still refuse publication.
+    const incomplete = structuredClone(first);
+    delete incomplete.candidate.validation.immutableInputsOnly;
+    expect(projectProductCoreV2Candidate(incomplete, firstInputs, true)).toBeNull();
     for (const file of first.candidate.package.files) {
       expect(`sha256:${createHash("sha256").update(file.content).digest("hex")}`).toBe(file.sha256);
     }
@@ -118,7 +136,7 @@ describe.sequential("real Foundation to local Python Core boundary", () => {
     expect(replay.receipt.requestId).not.toBe(first.receipt.requestId);
   });
   it("runs a real incremental parent and full-rebuild equivalence check across two revisions", async () => {
-    // Direct Core contract qualification; production publication remains refused above.
+    // Use the real prior units, never reconstruct a previous world from grouped chunks.
     const parent = { worldStateId: first.candidate.worldStateId, manifestDigest: first.candidate.manifestDigest,
       units: first.candidate.units as Array<Record<string, unknown>>, artifactHashes: first.candidate.artifactHashes };
     const second = await compile(secondInputs, parent);
@@ -128,7 +146,14 @@ describe.sequential("real Foundation to local Python Core boundary", () => {
     expect(second.candidate.canonicalKnowledgeModel.collectionId).toBe(first.candidate.canonicalKnowledgeModel.collectionId);
     expect(second.candidate.manifestDigest).not.toBe(first.candidate.manifestDigest);
     expect(second.candidate.package.files.find(file => file.path === "rag/chunks.jsonl")?.content).toContain("45 days");
-    expect(projectProductCoreV2Candidate(second, secondInputs, true)).toBeNull();
+    expect(second.candidate.validation.immutableInputsOnly).toBe(true);
+    const projected = projectProductCoreV2Candidate(second, secondInputs, true)!;
+    expect(projected).not.toBeNull();
+    const artifact = { ...projected, coreExecution: { status: second.status, runtime: second.runtime,
+      worldStateId: second.candidate.worldStateId, receipt: second.receipt } };
+    expect(validatePromotableCollectionArtifact(artifact, artifact.collectionId)).not.toBeNull();
+    expect(answerGroundedQuestion(artifact, "What are the payment terms?")!.answer).toContain("45 days");
+    exportSyntheticArtifact("updated", artifact);
   });
   it("refuses an unauthenticated HTTP caller and a mismatched HMAC", async () => {
     const anonymous = await fetch(`${baseUrl}/v2/compile`, { method: "POST", body: "{}" });
