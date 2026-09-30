@@ -153,3 +153,9 @@ Current engineering lane: Product QA functional classification, real mobile touc
 - Exact-head Lighthouse at359005b passed all existing budgets in CI. The incremental UI head requires its own CI confirmation; local NO_NAVSTART was not counted as a successful measurement or product budget failure.
 
 No new database source was changed in this follow-up. No customer data, new credentials, paid compute, production activation, merge or deployment was used. Next authorized engineering remains stable revision lineage/historical mapping and a synthetic cross-revision vertical consumer path; broader concurrency, ACL/revocation/restore/cost and large-corpus/format qualification remain explicit unfinished requirements.
+
+## Public evaluation acceptance follow-up
+
+The Korean evaluation form region previously exposed an English-only accessible name. It now derives its accessible name from the visible localized heading through aria-labelledby. Public evaluation-only changes do not touch authenticated backend/Core lanes.
+
+Focused actual Chromium acceptance passed12cases at1440/390/360 for English and Korean: document language, exact canonical/OG/hreflang destinations, localized named region,3required fields/no file input,503refusal preserving the message and explicit retry. Contact requests were intercepted locally with synthetic values; no inquiry was sent externally. Relevant copy/locale/metadata/consent/truth unit contracts passed123tests in6files. TypeScript and ESLint passed; the optimized local test build compiled153pages. Actual Korean360px evaluation capture inspected. Broader live availability combinations and customer/production qualification remain unfinished;55item acceptance counts are unchanged.

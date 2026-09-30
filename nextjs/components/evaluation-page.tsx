@@ -26,8 +26,8 @@ export default function EvaluationPage({ korean = false }: { korean?: boolean })
           <p className="fine">{korean ? "문의를 보내도 자료 처리, 외부 연결, 결제가 시작되지 않습니다." : "An inquiry does not start processing, enable a connection, or create a payment commitment."}</p>
           <p><Link href="/sources">{korean ? "자료 지원 범위 (영문)" : "Source limits"}</Link> · <Link href={korean ? "/ko/pricing" : "/pricing"}>{korean ? "가격과 이용 조건" : "Pricing conditions"}</Link> · <Link href="/trust">{korean ? "데이터 처리 범위 (영문)" : "Data boundaries"}</Link></p>
         </aside>
-        <section className="evaluation-form" aria-label="Request a document evaluation">
-          <h2>{korean ? "무엇을 검증하고 싶으신가요?" : "Tell us what you want to verify"}</h2>
+        <section className="evaluation-form" aria-labelledby="evaluation-request-title">
+          <h2 id="evaluation-request-title">{korean ? "무엇을 검증하고 싶으신가요?" : "Tell us what you want to verify"}</h2>
           <p>{korean ? "필수 항목은 세 개입니다. 간단하게 적어주세요. 자세한 자료 정보는 선택 사항이며, 비공개 문서나 인증 정보는 넣지 마세요." : "Three required fields. Keep the first message short; document details are optional. Please do not include private documents or credentials."}</p>
           <ContactForm locale={korean ? "ko" : "en"} />
         </section>
