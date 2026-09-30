@@ -10,7 +10,10 @@ import path from "node:path";
 export async function withLocalStorage(executable, visit) {
 assert.ok(executable, "Set TAVONEL_LOCAL_SEAWEED_EXE to the qualified official SeaweedFS 4.48 Windows binary");
 const binarySha256 = createHash("sha256").update(readFileSync(executable)).digest("hex");
-assert.equal(binarySha256, "394a0154424f3d96f7969c044b77ee4cfb649299f8b42ecc7b703971872ce61d");
+assert.ok(["win32", "linux"].includes(process.platform), "Only separately qualified Windows/Linux runtimes are supported");
+assert.equal(binarySha256, process.platform === "win32"
+  ? "394a0154424f3d96f7969c044b77ee4cfb649299f8b42ecc7b703971872ce61d"
+  : "8c07a1ccc4ec058cd90989ac0533c30436832e41c63de2b26f37253d9f744c4d");
 const root = mkdtempSync(path.join(tmpdir(), "tavonel-s3-journey-"));
 const allowed = new Set(["PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"]);
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => allowed.has(key.toUpperCase())));
@@ -29,6 +32,7 @@ for (let i = 0; i < 9; i++) {
 await Promise.all(reservations.map(server => new Promise(resolve => server.close(resolve))));
 const [master, masterGrpc, volume, volumeGrpc, filer, filerGrpc, s3, s3Grpc, volumePublic] = ports;
 const args = ["mini", `-dir=${root}`, "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master.telemetry=false",
+  `-filer.localSocket=${path.join(root, "filer.sock")}`,
   "-admin.ui=false", "-webdav=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-volume.max=1", "-master.volumeSizeLimitMB=16",
   `-master.port=${master}`, `-master.port.grpc=${masterGrpc}`, `-volume.port=${volume}`, `-volume.port.grpc=${volumeGrpc}`,
   `-volume.port.public=${volumePublic}`, `-filer.port=${filer}`, `-filer.port.grpc=${filerGrpc}`, `-s3.port=${s3}`, `-s3.port.grpc=${s3Grpc}`,
