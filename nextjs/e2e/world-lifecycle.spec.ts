@@ -264,6 +264,96 @@ async function withCompiledWorld(page: Page) {
 
 const NARROW_STAGE_MAX = 820;
 
+for (const action of ["activation", "rollback"] as const) {
+  test(`${action} lost response preserves input and reports an uncertain outcome`, async ({ page }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await installSession(page);
+    await mockWorkspace(page);
+    let requests = 0;
+    const endpoint = action === "activation" ? "promote" : "world/rollback";
+    await page.route(`**/api/collections/${collectionId}/${endpoint}`, async route => {
+      requests++;
+      await route.abort("connectionfailed");
+    });
+    await page.goto(`/workspace/review?collection=${collectionId}`);
+    const reason = page.getByLabel(action === "activation" ? "Human review record" : "Rollback reason");
+    await reason.fill("Synthetic review of retained source evidence.");
+    const button = page.getByRole("button", { name: action === "activation" ? "Activate reviewed candidate" : "Rollback to this version" });
+    page.once("dialog", dialog => dialog.accept());
+    await button.click();
+    await expect(page.getByText(`The ${action} response could not be confirmed.`, { exact: false })).toBeVisible();
+    await expect(page.getByText("the active pointer may have changed.", { exact: false })).toBeVisible();
+    await expect(reason).toHaveValue("Synthetic review of retained source evidence.");
+    await expect(button).toBeEnabled();
+    expect(requests).toBe(1);
+    expect(errors).toEqual([]);
+    await testInfo.attach(`uncertain-${action}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  });
+}
+
+test("a lost correction response retains the proposed edit and never announces a recorded decision", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await withCompiledWorld(page);
+  let requests = 0;
+  await page.route("**/api/v1/reviews", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    requests++;
+    if (requests === 1) return route.abort("connectionfailed");
+    await route.fulfill({ json: { resultingManifestDigest: `sha256:${"d".repeat(64)}` } });
+  });
+  await page.route(`**/api/collections/${collectionId}?manifest=**`, route => route.abort("connectionfailed"));
+  await page.goto(`/workspace/review?collection=${collectionId}`);
+  await page.getByRole("button", { name: "Correct", exact: true }).click();
+  await page.getByLabel("What should it say?").fill("Corrected synthetic source label");
+  await page.getByLabel("What needs to change?").fill("The synthetic source supports this corrected label.");
+  const submit = page.getByRole("button", { name: "Correct and compile a new candidate" });
+  await submit.click();
+  await expect(page.getByText("The review response could not be confirmed.", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("What should it say?")).toHaveValue("Corrected synthetic source label");
+  await expect(page.getByLabel("What needs to change?")).toHaveValue("The synthetic source supports this corrected label.");
+  await expect(submit).toBeEnabled();
+  expect(requests).toBe(1);
+  // The decision can be recorded while the subsequent candidate read fails.
+  // Keep the proposed edit available rather than clearing it before that read.
+  await submit.click();
+  await expect.poll(() => requests).toBe(2);
+  await expect(submit).toBeEnabled();
+  await expect(page.getByLabel("What should it say?")).toHaveValue("Corrected synthetic source label");
+  await expect(page.getByLabel("What needs to change?")).toHaveValue("The synthetic source supports this corrected label.");
+  expect(errors).toEqual([]);
+  await testInfo.attach("uncertain-correction", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("Ask connection failure retains the question and allows an explicit grounded retry", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  let requests = 0;
+  await page.route(`**/api/collections/${collectionId}/ask`, async route => {
+    requests++;
+    if (requests === 1) return route.abort("connectionfailed");
+    await route.fallback();
+  });
+  await page.goto(`/workspace/ask?collection=${collectionId}`);
+  await page.getByLabel("Question").fill("What changed in quarterly revenue?");
+  const submit = page.getByRole("button", { name: "Ask the active World" });
+  await submit.click();
+  await expect(page.getByText("The answer response could not be read.", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("Question")).toHaveValue("What changed in quarterly revenue?");
+  await expect(page.getByText("Grounded answer", { exact: true })).toHaveCount(0);
+  await expect(submit).toBeEnabled();
+  expect(requests).toBe(1);
+  await submit.click();
+  await expect(page.getByText("Grounded answer", { exact: true })).toBeVisible();
+  expect(requests).toBe(2);
+  expect(errors).toEqual([]);
+});
+
 test("a first candidate does not claim consumers are reading a previous active World", async ({ page }, testInfo) => {
   await installSession(page);
   await mockWorkspace(page);

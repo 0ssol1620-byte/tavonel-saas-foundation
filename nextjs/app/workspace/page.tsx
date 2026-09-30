@@ -1834,10 +1834,12 @@ export default function WorkspacePage() {
           : `Review decision could not be recorded. ${failureSentence(body.code, response.status)}`);
         return;
       }
-      setEvidenceReviewAction(null);
-      setEvidenceReviewReason("");
-      setPatchObjectId(null);
-      setPatchAfter("");
+      const clearReviewInput = () => {
+        setEvidenceReviewAction(null);
+        setEvidenceReviewReason("");
+        setPatchObjectId(null);
+        setPatchAfter("");
+      };
       if (body.resultingManifestDigest) {
         /*
           A correction produced a new candidate, so move to it.
@@ -1851,10 +1853,14 @@ export default function WorkspacePage() {
         url.searchParams.set("collection", collectionResult.collectionId);
         url.searchParams.set("manifest", body.resultingManifestDigest);
         window.history.replaceState(null, "", url);
+        clearReviewInput();
         setNotice(`Corrected. A new candidate was compiled at ${body.resultingManifestDigest.slice(0, 19)}… and the change was recorded against the evidence it was reviewed under. The previous candidate is unchanged.`);
         return;
       }
+      clearReviewInput();
       setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Change requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
+    } catch {
+      setNotice("The review response could not be confirmed. Your input is kept. Check the review record before submitting again; the server may have recorded the decision.");
     } finally {
       setEvidenceReviewBusy(false);
     }
@@ -1901,6 +1907,8 @@ export default function WorkspacePage() {
       trackFunnel("workspace_world_activated");
       setReviewReason("");
       setNotice("Human review recorded. This revision is now the active World.");
+    } catch {
+      setNotice("The activation response could not be confirmed. Your review reason is kept. Reload the World state before trying again; the active pointer may have changed.");
     } finally {
       setWorldBusy(false);
     }
@@ -1936,6 +1944,8 @@ export default function WorkspacePage() {
       await loadWorldState(collectionResult.collectionId, token);
       setRollbackReason("");
       setNotice(`Rollback recorded. ${targetManifestDigest} is active again; all immutable versions and the audit event remain retained.`);
+    } catch {
+      setNotice("The rollback response could not be confirmed. Your reason is kept. Reload the World state before trying again; the active pointer may have changed.");
     } finally {
       setWorldBusy(false);
     }
@@ -1967,6 +1977,8 @@ export default function WorkspacePage() {
       setNotice(json.status === "grounded"
         ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
         : "The active world abstained because no region-bound evidence matched the question.");
+    } catch {
+      setNotice("The answer response could not be read. Your question is kept. No answer is shown; retry when the connection is available.");
     } finally {
       setAskBusy(false);
     }
