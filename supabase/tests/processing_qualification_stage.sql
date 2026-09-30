@@ -1,7 +1,7 @@
 -- Qualification stage (20260930070000): the ledgers and the grant writer enforce scope, workspace,
 -- the one-hour bound and refusal precedence themselves; production rows and digests are unchanged.
 begin;
-select plan(32);
+select plan(35);
 
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -209,7 +209,14 @@ select throws_ok($$ select pg_temp.issue('pilot-qa1a1a100004000', 'c0a1a1a1-0000
   'sha256:' || repeat('c', 64)) $$, 'P0001', 'workspace_grant_refused',
   'a fresh qualification never writes over the workspace''s explicit refusal');
 
--- 26-30: a production release issues exactly as before, with the v2 schema and digest.
+-- PostgreSQL CHECK accepts NULL, so both qualification bounds must be explicitly required.
+select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('b', 64), p_ws => null) $$,
+  '23514', null, 'a qualification cannot omit its workspace');
+select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('b', 64), p_ttl => null) $$,
+  '23514', null, 'a qualification cannot omit its expiry');
+
+-- 28-35: a production release issues exactly as before, with the v2 schema and digest, and no
+-- qualification can be recorded over it.
 insert into public.customer_data_release_decisions (scope, release_revision, allowed, receipt_sha256, evidence,
   evaluated_at, recorded_at, operator_actor, decision_reason)
 select 'direct_upload', repeat('a', 40), true, 'sha256:' || repeat('d', 64),
@@ -231,10 +238,15 @@ select ok(not has_function_privilege('authenticated',
   'public.issue_customer_data_workspace_grant(text, text, text, text, uuid, text, text, text, text, text, text, text, timestamptz, timestamptz, text)',
   'EXECUTE'), 'the replaced writer is still service-role only');
 
--- PostgreSQL CHECK accepts NULL, so both qualification bounds must be explicitly required.
-select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('b', 64), p_ws => null) $$,
-  '23514', null, 'a qualification cannot omit its workspace');
-select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('b', 64), p_ttl => null) $$,
-  '23514', null, 'a qualification cannot omit its expiry');
+-- Review F1: a qualification after an allowed production release would close every other workspace.
+select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('9', 64)) $$,
+  'P0001', 'qualification_after_release', 'no qualification can supersede an allowed production release');
+select is((select stage from public.customer_data_release_decisions
+    where scope = 'direct_upload' and release_revision = repeat('a', 40)
+    order by recorded_at desc, allowed asc limit 1),
+  'production', 'the allowed production release stays the latest decision');
+select ok(exists (select 1 from pg_locks where locktype = 'advisory' and pid = pg_backend_pid() and granted),
+  'release inserts hold the (scope, revision) advisory lock until commit, serializing concurrent writers');
+
 select * from finish();
 rollback;

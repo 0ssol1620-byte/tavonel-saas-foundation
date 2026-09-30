@@ -64,6 +64,20 @@ export async function readVerifiedScopedCustomerDataGate(
   const config = readSupabaseAdminConfig(env);
   if (!config) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
 
+  const workspaceQuery = new URLSearchParams({
+    select: "schema_version,stage,tenant_id,workspace_id,scope,release_revision,allowed,user_id,release_receipt_sha256,terms_version,terms_receipt_sha256,processing_terms_receipt_sha256,grant_receipt_sha256,granted_at,expires_at,recorded_at",
+    tenant_id: `eq.${tenantId}`, workspace_id: `eq.${workspaceId}`, scope: `eq.${scope}`,
+    order: "recorded_at.desc,allowed.asc", limit: "1",
+  });
+  const workspaceRows = await latestRow(`/rest/v1/customer_data_workspace_decisions?${workspaceQuery}`, env);
+  if (workspaceRows === null) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
+  if (workspaceRows === undefined) return { ok: false, code: "SCOPED_GATE_STORE_FAILED" };
+  // An explicit workspace refusal is definitive and outranks every release state, as in the issuer:
+  // billing must read it as a refusal even while the release is missing or qualifies another workspace.
+  const latest = workspaceRows.length === 1 ? workspaceRows[0] : null;
+  if (latest?.allowed === false && latest.tenant_id === tenantId && latest.workspace_id === workspaceId &&
+    latest.scope === scope) return { ok: false, code: "SCOPED_WORKSPACE_REFUSED" };
+
   const releaseQuery = new URLSearchParams({
     select: RELEASE_COLUMNS, scope: `eq.${scope}`, release_revision: `eq.${releaseRevision}`,
     order: "recorded_at.desc,allowed.asc,evaluated_at.desc", limit: "1",
@@ -77,14 +91,6 @@ export async function readVerifiedScopedCustomerDataGate(
   if (!verified.ok) return verified;
   const { release } = verified;
 
-  const workspaceQuery = new URLSearchParams({
-    select: "schema_version,stage,tenant_id,workspace_id,scope,release_revision,allowed,user_id,release_receipt_sha256,terms_version,terms_receipt_sha256,processing_terms_receipt_sha256,grant_receipt_sha256,granted_at,expires_at,recorded_at",
-    tenant_id: `eq.${tenantId}`, workspace_id: `eq.${workspaceId}`, scope: `eq.${scope}`,
-    order: "recorded_at.desc,allowed.asc", limit: "1",
-  });
-  const workspaceRows = await latestRow(`/rest/v1/customer_data_workspace_decisions?${workspaceQuery}`, env);
-  if (workspaceRows === null) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
-  if (workspaceRows === undefined) return { ok: false, code: "SCOPED_GATE_STORE_FAILED" };
   if (workspaceRows.length === 0) return { ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" };
   if (workspaceRows.length !== 1) return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
   const grantRow = workspaceRows[0];

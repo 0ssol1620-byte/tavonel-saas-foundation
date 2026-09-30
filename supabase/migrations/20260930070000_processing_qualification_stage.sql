@@ -14,8 +14,9 @@
 -- Additive and compatible: existing rows default to stage `production` with their v2 schema, and
 -- production grant digests are byte-identical to before. The latest release row remains the
 -- decision, so a production refusal recorded after a qualification ends it; no path falls back
--- from a refusal into qualification. Nothing here records evidence, activates the v2 gate or
--- enables billing.
+-- from a refusal into qualification. Once an allowed production release exists for a scope and
+-- revision, no qualification row can be recorded for it (trigger below), so a qualification can never
+-- supersede a release. Nothing here records evidence, activates the v2 gate or enables billing.
 begin;
 
 alter table public.customer_data_release_decisions
@@ -46,6 +47,41 @@ alter table public.customer_data_release_decisions
         and not evidence @> '[{"precondition": "compile_receipts_signed_and_audited"}]'::jsonb)
     ))
   );
+
+-- A qualification recorded after an allowed production release would become the latest row and
+-- close every other workspace, their grants, checkout and (through the billing sweeper) their
+-- subscriptions. Refuse it. Every insert for a (scope, revision) takes the same transaction advisory
+-- lock, so a production approval and a qualification in concurrent transactions are serialized: the
+-- later one waits for the earlier to commit, and its check then reads the committed row. That read
+-- needs a fresh statement snapshot, so qualification inserts are refused outside READ COMMITTED.
+-- A production refusal does not block a later qualification; only an allowed release does.
+create or replace function public.guard_customer_data_release_stage()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  perform pg_advisory_xact_lock(
+    hashtextextended('customer_data_release_decisions:' || new.scope || ':' || new.release_revision, 0));
+  if new.stage = 'qualification' then
+    if current_setting('transaction_isolation') <> 'read committed' then
+      raise exception 'qualification_requires_read_committed';
+    end if;
+    if exists (
+      select 1 from public.customer_data_release_decisions
+       where scope = new.scope and release_revision = new.release_revision
+         and stage = 'production' and allowed
+    ) then
+      raise exception 'qualification_after_release';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+create trigger customer_data_release_decisions_stage_guard
+  before insert on public.customer_data_release_decisions
+  for each row execute function public.guard_customer_data_release_stage();
+revoke all on function public.guard_customer_data_release_stage() from public, anon, authenticated, service_role;
 
 alter table public.customer_data_workspace_decisions
   add column stage text not null default 'production' check (stage in ('production', 'qualification'));
@@ -152,8 +188,6 @@ begin
     raise exception 'workspace_grant_input_invalid';
   end if;
 
-  -- ponytail: table-wide lock serializes every grant and direct decision insert; per-workspace
-  -- serialization needs direct inserts to go through an RPC first.
   lock table public.customer_data_workspace_decisions in share row exclusive mode;
   v_now := clock_timestamp();
   if p_granted_at > v_now + interval '1 minute' or p_granted_at < v_now - interval '5 minutes' then

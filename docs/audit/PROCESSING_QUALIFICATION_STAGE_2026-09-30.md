@@ -49,20 +49,44 @@ workspace.
 
 The latest release row for `(scope, revision)` is the decision. A production or qualification
 refusal recorded later ends the qualification; no code path falls back from a refusal into
-qualification. A workspace's latest explicit refusal is never overwritten. An unknown or
-malformed stage, a schema that does not match its stage, an extra evidence key, a stale or
+qualification. The reverse is blocked in the database: once an **allowed production** release exists
+for a `(scope, revision)`, the `guard_customer_data_release_stage` trigger refuses any qualification
+row for it (`qualification_after_release`). Every release insert takes a transaction advisory lock
+for its `(scope, revision)`, so a concurrent production approval and qualification are serialized,
+and qualification inserts are refused outside READ COMMITTED (`qualification_requires_read_committed`)
+so the post-lock check reads the committed row. A production *refusal* does not block a later
+qualification.
+
+A workspace's latest explicit refusal is never overwritten, and the gate reader reports it
+(`SCOPED_WORKSPACE_REFUSED`) before any release state, as the grant issuer already did. An unknown
+or malformed stage, a schema that does not match its stage, an extra evidence key, a stale or
 expired record, the wrong workspace or the wrong SHA denies. Stage mismatches between release and
 grant deny. The grant writer takes the stage from the latest release under its table lock and
 enforces workspace, scope and the one-hour bound in the database, not only in the application.
 
 ## Billing
 
-`authorizationStage()` returns `qualification` for any v2 authorization that is not consistently
-`production`. Live checkout returns `PROCESSING_QUALIFICATION_NOT_BILLABLE` before creating a
-checkout intent. The billing gate sweeper reads a qualification authorization as
-`SCOPED_RELEASE_QUALIFICATION_ONLY`, which follows the same (non-refusal, "lapsed") rule as
-"no release yet", so subscriptions are treated exactly as they were before qualification existed.
-Grant renewal from the sweeper never requests a qualification grant.
+A qualification grant is never billable. `authorizationStage()` returns `qualification` for any
+v2 authorization that is not consistently `production`. Live checkout returns
+`PROCESSING_QUALIFICATION_NOT_BILLABLE` before creating a checkout intent. Sweeper grant renewal
+never requests a qualification grant.
+
+The window still has billing effects. They come from the deployment-wide switches it needs, not
+from the qualification row. Production runs `COMMERCIAL_MODE=live` and the gate-enforce cron at
+minutes 11/26/41/56 (`nextjs/vercel.json`). The sweeper pauses each Paddle subscription whose
+workspace the `direct_upload` gate does not admit (`nextjs/lib/billing-gate-enforcement.ts`):
+
+| Code the sweeper reads during the window | Class | Effect on a subscription |
+| --- | --- | --- |
+| `SCOPED_RELEASE_REFUSED`, `SCOPED_WORKSPACE_REFUSED` | refused | paused at the next run, whatever the billing date; "refused" notice |
+| `PROCESSING_COHORT_EXCLUDED` (every workspace outside the cohort; checked before the v2 reader, so it also masks their explicit refusals), `SCOPED_RELEASE_QUALIFICATION_OTHER_WORKSPACE`, `SCOPED_RELEASE_QUALIFICATION_ONLY` (the qualification workspace itself), `SCOPED_RELEASE_NOT_FOUND` | lapsed | paused within 48 h of the next charge, or at once with refund review if the subscription is < 48 h old; otherwise deferred |
+
+Today's v1 gate has zero receipts, so the same subscriptions already read as lapsed
+(`CUSTOMER_DATA_GATE_RECEIPT_NOT_FOUND`). The window does not add a lapsed pause. It does add two
+risks: a **release** refusal while v2 is on turns every workspace into "refused" (immediate pause);
+and a stray qualification over an approved release, which the trigger above now prevents. The
+runbook therefore requires zero live subscriptions before the window and ends the window without a
+release refusal.
 
 ## Compile propagation
 
@@ -98,17 +122,31 @@ Insert the row only if the output says `"allowed": true`:
    New code on the old schema fails its `stage` select (`STORE_FAILED`, fail closed).
 2. Deploy the exact SHA. Leave `TAVONEL_CUSTOMER_DATA_GATE_VERSION` and every public flag as they
    are until the operator deliberately switches to v2 for the qualification window.
-3. Verify the 11 facts for that SHA and record the qualification row as above (≤ 1 hour). Set
+3. **Billing precondition. Do not open the window unless it holds.** Immediately before the window,
+   list subscriptions from the **live Paddle API** (not only the `foundation_billing_accounts`
+   projection). Confirm there are zero in `active`, `trialing`, `past_due` or `paused` for any
+   workspace. Record the query time and the count. If any exist, stop: the window would expose
+   them to the sweeper effects above. Never suspend or disable the gate-enforce reconciliation cron to
+   work around this. Its pause intents, notices and provider reconciliation must keep running.
+4. Verify the 11 facts for that SHA and record the qualification row as above (≤ 1 hour). There must
+   be no allowed production release for that SHA; the database refuses the row otherwise. Set
    `TAVONEL_PROCESSING_WORKSPACE_COHORT` to the same single workspace.
-4. As the workspace's current owner: sign in, accept the published terms if not already accepted,
+5. As the workspace's current owner: sign in, accept the published terms if not already accepted,
    call bootstrap, then upload → scan/CDR → OCR → compile → signed export → deletion. Record the
    compile receipt digest and audit event id.
-5. Record a refusal (or let the qualification expire). Then, in a separate decision, evaluate the
+6. End the window by **expiry**, or by a **workspace** refusal on the operator workspace only.
+   **Never record a release-wide refusal while v2 is on**: every workspace would read as refused and
+   every live subscription would be paused at the next sweeper run. Then switch
+   `TAVONEL_CUSTOMER_DATA_GATE_VERSION` and the cohort back. In a separate decision, evaluate the
    12-fact production release for that SHA, citing the actual receipt. Only that production row
-   admits other workspaces or billing.
+   admits other workspaces or billing. Note that the operator-workspace refusal is permanent for that
+   workspace and scope until a newer grant is issued. It also pauses that workspace's own
+   subscription immediately if one exists (step 3 requires none).
 
-Rollback: record a refusal row (release and/or workspace), or deploy the previous SHA. Every
-qualification grant is dead within an hour regardless.
+Rollback: let the qualification expire (every qualification grant is dead within an hour) or record
+a refusal for the operator workspace only. Then restore the previous gate version, cohort and SHA.
+A release-wide refusal is a billing action, not a qualification rollback. Use it only with v2 off, or
+after re-checking step 3.
 
 ## Remaining limitations
 
@@ -118,7 +156,11 @@ qualification grant is dead within an hour regardless.
   for the operator workspace when it has no owner/paid access). It is an entitlement, not a
   charge. Sandbox checkout is unchanged and never reads the gate.
 * The `qualification_workspace_key` is enforced against the grant; the Vercel cohort variable is
-  an additional, separate operator control.
+  an additional, separate operator control. The cohort check runs before the v2 reader, so under a
+  cohort an excluded workspace's explicit refusal reads as `PROCESSING_COHORT_EXCLUDED` (lapsed);
+  step 3's zero-subscription precondition covers that.
+* The database does not bind a directly inserted qualification *grant* to its release's workspace
+  or expiry. The RPC and every reader do, and direct inserts stay available for operator refusals.
 * Local verification ran real pgTAP 1.3.3 on a real PostgreSQL 17.2 against a subset of the
   migration chain with minimal Supabase role/`auth.users` prerequisites. The full chain runs only in
   CI `db-rehearsal`.

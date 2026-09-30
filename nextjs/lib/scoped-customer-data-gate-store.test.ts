@@ -81,10 +81,23 @@ function grantRow(overrides: Record<string, unknown> = {}) {
 let root: string;
 const read = (at = now, tenant = WORKSPACE) =>
   readVerifiedScopedCustomerDataGate(tenant, WORKSPACE, scope, revision, at, process.env, root);
-const withAcceptance = (body: unknown) => request.mockReset()
-  .mockResolvedValueOnce(Response.json([releaseRow()]))
-  .mockResolvedValueOnce(Response.json([grantRow()]))
-  .mockResolvedValueOnce(Response.json(body));
+const RELEASES = "/rest/v1/customer_data_release_decisions?";
+const DECISIONS = "/rest/v1/customer_data_workspace_decisions?";
+const ACCEPTANCE = "/rest/v1/rpc/current_foundation_processing_terms_acceptance";
+/** Answers by path, not call order, so the tests do not depend on which ledger the reader reads first. */
+const serve = ({ release = [releaseRow()], grant = [grantRow()], acceptanceBody = acceptance() as unknown,
+  acceptanceStatus = 200 }: { release?: unknown; grant?: unknown; acceptanceBody?: unknown; acceptanceStatus?: number } = {}) =>
+  request.mockReset().mockImplementation((_config: unknown, path: string) => {
+    if (path.startsWith(RELEASES)) return Promise.resolve(Response.json(release));
+    if (path.startsWith(DECISIONS)) return Promise.resolve(Response.json(grant));
+    if (path === ACCEPTANCE) {
+      return Promise.resolve(acceptanceStatus === 200 ? Response.json(acceptanceBody)
+        : new Response("unavailable", { status: acceptanceStatus }));
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+const call = (prefix: string) => request.mock.calls.find((c) => String(c[1]).startsWith(prefix));
+const withAcceptance = (acceptanceBody: unknown) => serve({ acceptanceBody });
 const publish = async (terms = "terms fixture", served = manifest) => {
   await writeFile(join(root, "policy/processing-terms-2026-09-30.json"), JSON.stringify(served));
   await writeFile(join(root, TERMS.slice(1)), terms);
@@ -110,16 +123,15 @@ describe("durable scoped customer-data gate", () => {
         tenantId: grant.tenantId, workspaceId: grant.workspaceId,
         receiptSha256: grant.grantReceiptSha256, evaluatedAt, release, grant },
     });
-    const releasePath = decodeURIComponent(request.mock.calls[0][1] as string);
-    const grantPath = decodeURIComponent(request.mock.calls[1][1] as string);
+    const releasePath = decodeURIComponent(call(RELEASES)![1] as string);
+    const grantPath = decodeURIComponent(call(DECISIONS)![1] as string);
     expect(releasePath).toContain(`scope=eq.${scope}`);
     expect(releasePath).toContain(`release_revision=eq.${revision}`);
     expect(releasePath).toContain("order=recorded_at.desc,allowed.asc,evaluated_at.desc");
     expect(grantPath).toContain(`tenant_id=eq.${WORKSPACE}`);
     expect(grantPath).toContain(`workspace_id=eq.${WORKSPACE}`);
     expect(grantPath).toContain("order=recorded_at.desc,allowed.asc");
-    expect(request.mock.calls[2][1]).toBe("/rest/v1/rpc/current_foundation_processing_terms_acceptance");
-    expect(JSON.parse(String(request.mock.calls[2][2].body))).toEqual({
+    expect(JSON.parse(String(call(ACCEPTANCE)![2].body))).toEqual({
       p_workspace_key: WORKSPACE, p_scope: scope, p_terms_version: manifest.version,
       p_terms_sha256: manifest.terms.sha256, p_processing_sha256: manifest.processing.sha256,
     });
@@ -131,29 +143,25 @@ describe("durable scoped customer-data gate", () => {
   });
 
   it("treats latest release and workspace refusals as revocations", async () => {
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow({ allowed: false })]));
+    serve({ release: [releaseRow({ allowed: false })] });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
-    expect(request).toHaveBeenCalledTimes(1);
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json([grantRow({ allowed: false })]));
+    expect(call(ACCEPTANCE)).toBeUndefined();
+    serve({ grant: [grantRow({ allowed: false })] });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
   });
 
   it("refuses altered digests, scopes, stale release and expired grants", async () => {
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow({ receipt_sha256: `sha256:${"0".repeat(64)}` })]));
+    serve({ release: [releaseRow({ receipt_sha256: `sha256:${"0".repeat(64)}` })] });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json([grantRow({ terms_version: "changed" })]));
+    serve({ grant: [grantRow({ terms_version: "changed" })] });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json([grantRow({ scope: "connector" })]));
+    serve({ grant: [grantRow({ scope: "connector" })] });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow()]));
+    serve();
     await expect(read(new Date("2026-10-30T00:00:00.001Z"))).resolves.toEqual({
       ok: false, code: "SCOPED_RELEASE_STALE",
     });
-    request.mockReset().mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json([grantRow()]));
+    serve();
     await expect(read(new Date("2026-10-01T00:00:00.000Z"))).resolves.toEqual({
       ok: false, code: "SCOPED_WORKSPACE_INVALID",
     });
@@ -179,7 +187,7 @@ describe("durable scoped customer-data gate", () => {
     await publish("terms v2", next);
     withAcceptance(acceptance({ acceptanceId: "66666666-6666-4666-8666-666666666666", terms: next.terms }));
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
-    expect(JSON.parse(String(request.mock.calls[2][2].body))).toMatchObject({ p_terms_sha256: next.terms.sha256 });
+    expect(JSON.parse(String(call(ACCEPTANCE)![2].body))).toMatchObject({ p_terms_sha256: next.terms.sha256 });
 
     await publish("edited without a manifest update");
     withAcceptance(acceptance());
@@ -187,10 +195,7 @@ describe("durable scoped customer-data gate", () => {
   });
 
   it("closes on an acceptance store outage", async () => {
-    request.mockReset()
-      .mockResolvedValueOnce(Response.json([releaseRow()]))
-      .mockResolvedValueOnce(Response.json([grantRow()]))
-      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+    serve({ acceptanceStatus: 503 });
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_GATE_STORE_FAILED" });
   });
 });
@@ -219,10 +224,7 @@ describe("qualification stage at the gate reader", () => {
     release_receipt_sha256: qGrant.releaseReceiptSha256, grant_receipt_sha256: qGrant.grantReceiptSha256,
     granted_at: qGrant.grantedAt, expires_at: qGrant.expiresAt, recorded_at: "2026-09-29T00:45:01.000Z", ...overrides,
   });
-  const answer = (release: unknown, grantRows: unknown) => request.mockReset()
-    .mockResolvedValueOnce(Response.json([release]))
-    .mockResolvedValueOnce(Response.json(grantRows))
-    .mockResolvedValueOnce(Response.json(acceptance()));
+  const answer = (release: unknown, grantRows: unknown) => serve({ release: [release], grant: grantRows });
 
   it("admits the recorded workspace with a typed qualification stage", async () => {
     answer(qRow, [qGrantRow()]);
@@ -230,7 +232,7 @@ describe("qualification stage at the gate reader", () => {
     expect(result).toMatchObject({ ok: true, stage: "qualification",
       authorization: { stage: "qualification", release: { stage: "qualification", missing: [QUALIFICATION_PENDING] },
         grant: { stage: "qualification" } } });
-    expect(decodeURIComponent(request.mock.calls[0][1] as string)).toContain("qualification_workspace_key");
+    expect(decodeURIComponent(call(RELEASES)![1] as string)).toContain("qualification_workspace_key");
   });
 
   it("denies a stage mismatch, a forged stage, expiry and a workspace the qualification does not name", async () => {
@@ -246,5 +248,31 @@ describe("qualification stage at the gate reader", () => {
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
     answer(releaseRow(), [qGrantRow()]);
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
+  });
+
+  // Review F4: the reader must report an explicit workspace refusal as such whatever the release says,
+  // because billing pauses a refused workspace now but defers a lapsed one.
+  it("reports an explicit workspace refusal before a missing release or another workspace's qualification", async () => {
+    const refused = [grantRow({ allowed: false, stage: "production", user_id: null })];
+    const otherQualification = { ...qRow, qualification_workspace_key: "pilot-2222222222224222" };
+    serve({ release: [], grant: refused });
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    serve({ release: [otherQualification], grant: refused });
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    serve({ release: [qRow], grant: refused });
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    expect(call(ACCEPTANCE)).toBeUndefined();
+
+    // Without a refusal the release state is still what is reported.
+    serve({ release: [], grant: [] });
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
+    const other = evaluateQualificationRelease({ releaseRevision: revision, workspaceId: "pilot-2222222222224222",
+      expiresAt: qExpires, evidence: eleven, now: qEvaluated });
+    serve({ release: [{ ...qRow, qualification_workspace_key: "pilot-2222222222224222",
+      receipt_sha256: other.receiptSha256 }], grant: [] });
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_QUALIFICATION_OTHER_WORKSPACE" });
+    // A refusal row for another workspace or scope is not this workspace's refusal.
+    serve({ release: [], grant: [grantRow({ allowed: false, scope: "connector" })] });
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
   });
 });
