@@ -433,6 +433,7 @@ export default function WorkspacePage() {
     { documentIds: string[]; blocked: CompileBlocker[]; settledAt: string | null } | null
   >(null);
   const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated: boolean }>({ decisions: [], truncated: false });
+  const [reviewLedgerEpoch, setReviewLedgerEpoch] = useState(0);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
     const manifest = collectionResult?.manifestDigest;
@@ -477,7 +478,7 @@ export default function WorkspacePage() {
         : { decisions: [], truncated: false });
     })();
     return () => controller.abort();
-  }, [collectionResult?.collectionId, collectionResult?.manifestDigest]);
+  }, [collectionResult?.collectionId, collectionResult?.manifestDigest, reviewLedgerEpoch]);
   const [downloading, setDownloading] = useState(false);
   // A setup guide or downloaded package is not proof of a working external AI connection.
   // Keep the success state false until an authenticated consumer receipt can establish it.
@@ -1855,10 +1856,15 @@ export default function WorkspacePage() {
     const evidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
       ?? worldReadModel?.evidence[0];
     if (!collectionResult || !evidence || reason.trim().length < 8) return;
+    if (worldReadModel?.world.id !== collectionResult.collectionId || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest) {
+      setNotice("Read this exact revision and its source-bound evidence before recording a decision."); return;
+    }
+    const selectionSequence = candidateLoadSequence.current;
     setEvidenceReviewBusy(true);
     try {
       const token = await getAuthToken();
       if (!token) { setNotice("Sign in before recording a review decision."); return; }
+      if (selectionSequence !== candidateLoadSequence.current) return;
       const response = await fetch("/api/v1/reviews", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -1876,6 +1882,10 @@ export default function WorkspacePage() {
         setNotice(body.code === "PATCH_BEFORE_MISMATCH"
           ? "That value has already been corrected by someone else. Reload the World and look again."
           : `Review decision could not be recorded. ${failureSentence(body.code, response.status)}`);
+        return;
+      }
+      if (selectionSequence !== candidateLoadSequence.current) {
+        setNotice("The decision was recorded for the previously selected revision. Your current selection is retained; return to that revision to inspect the record.");
         return;
       }
       const clearReviewInput = () => {
@@ -1902,6 +1912,7 @@ export default function WorkspacePage() {
         setNotice(`Corrected. A new candidate was compiled at ${body.resultingManifestDigest.slice(0, 19)}… and the change was recorded against the evidence it was reviewed under. The previous candidate is unchanged.`);
         return;
       }
+      setReviewLedgerEpoch(epoch => epoch + 1);
       clearReviewInput();
       setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Change requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
     } catch {

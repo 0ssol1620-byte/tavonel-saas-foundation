@@ -4,6 +4,8 @@ const playwrightModule = await import(playwrightPackage);
 const { expect, test } =
   "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
+import { acceptEvidenceThroughUi, activateCandidateThroughUi } from "./support/workspace-review-actions";
+
 type Page = {
   addInitScript: (
     fn: (...args: never[]) => unknown,
@@ -819,6 +821,54 @@ test("refuses a model returned for a different selected revision", async ({ page
   await expect(page.getByText("Compiled candidate loaded.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Correct", exact: true })).toHaveCount(0);
   await expect(page.getByText("Total net sales increased.", { exact: true })).toHaveCount(0);
+});
+
+test("a hydrated acceptance refreshes the exact revision ledger before publishing", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page);
+  let recorded = false;
+  await page.route("**/api/v1/reviews**", route => {
+    if (route.request().method() === "POST") {
+      recorded = true;
+      return route.fulfill({ status: 201, json: { code: "RECORDED", recordedAt: "2026-09-30T00:00:00Z" } });
+    }
+    return route.fulfill({ json: { code: "OK", decisions: recorded ? [{ evidenceId: worldModel.evidence[0].id, manifestDigest: candidateManifest, recordedAt: "2026-09-30T00:00:00Z" }] : [], truncated: false } });
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
+  expect((await acceptEvidenceThroughUi(page, collectionId, candidateManifest)).status()).toBe(201);
+  await expect(page.getByText("First review decision", { exact: false }).first()).toBeVisible();
+  await page.route(`**/api/collections/${collectionId}/promote`, route => route.fulfill({ status: 409, json: { code: "ACTIVE_WORLD_CONFLICT" } }));
+  expect((await activateCandidateThroughUi(page, { collectionId, manifestDigest: candidateManifest, expectedCurrentManifest: activeManifest, expectedCurrentRevision: 2 }, "Reviewed this exact source revision.")).status()).toBe(409);
+  await expect(page.getByText("Activation failed.", { exact: false })).toBeVisible();
+  await testInfo.attach("hydrated-review-ledger", { body: await page.screenshot({ path: testInfo.outputPath("hydrated-review-ledger.png"), fullPage: true }), contentType: "image/png" });
+});
+
+test("a late correction reply cannot replace a revision selected through Back", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page);
+  const corrected = `sha256:${"c".repeat(64)}`;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  let submitted!: () => void;
+  const posted = new Promise<void>(resolve => { submitted = resolve; });
+  await page.route("**/api/v1/reviews", async route => {
+    submitted(); await pending;
+    await route.fulfill({ status: 201, json: { code: "RECORDED", resultingManifestDigest: corrected } });
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(activeManifest)}`);
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  await page.evaluate(url => { history.pushState(null, "", url); dispatchEvent(new PopStateEvent("popstate")); }, `/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByLabel("Human review record")).toBeVisible();
+  await page.getByRole("button", { name: "Correct", exact: true }).click();
+  await page.getByLabel("What should it say?").fill("A reviewed correction");
+  await page.getByLabel("What needs to change?").fill("Correct the exact evidence-bound label.");
+  await page.getByRole("button", { name: "Correct and compile a new candidate" }).click();
+  await posted;
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(activeManifest)));
+  release();
+  await expect(page.getByText("previously selected revision", { exact: false })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(activeManifest)));
+  await testInfo.attach("retained-history-selection", { body: await page.screenshot({ path: testInfo.outputPath("retained-history-selection.png"), fullPage: true }), contentType: "image/png" });
 });
 
 
