@@ -30,6 +30,8 @@ alter table public.customer_data_release_decisions
       and qualification_workspace_key is null and qualification_expires_at is null)
     or (stage = 'qualification' and schema_version = 'tavonel.customer_data_gate.v2.qualification'
       and scope = 'direct_upload'
+      and qualification_workspace_key is not null
+      and qualification_expires_at is not null
       and qualification_workspace_key ~ '^pilot-[A-Za-z0-9]{1,16}$'
       and qualification_expires_at > evaluated_at
       and qualification_expires_at <= evaluated_at + interval '1 hour'

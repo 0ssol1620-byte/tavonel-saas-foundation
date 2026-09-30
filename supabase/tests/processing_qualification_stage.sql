@@ -1,7 +1,7 @@
--- Qualification stage (20260930050000): the ledgers and the grant writer enforce scope, workspace,
+-- Qualification stage (20260930070000): the ledgers and the grant writer enforce scope, workspace,
 -- the one-hour bound and refusal precedence themselves; production rows and digests are unchanged.
 begin;
-select plan(30);
+select plan(32);
 
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -231,5 +231,10 @@ select ok(not has_function_privilege('authenticated',
   'public.issue_customer_data_workspace_grant(text, text, text, text, uuid, text, text, text, text, text, text, text, timestamptz, timestamptz, text)',
   'EXECUTE'), 'the replaced writer is still service-role only');
 
+-- PostgreSQL CHECK accepts NULL, so both qualification bounds must be explicitly required.
+select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('b', 64), p_ws => null) $$,
+  '23514', null, 'a qualification cannot omit its workspace');
+select throws_ok($$ select pg_temp.qualify('sha256:' || repeat('b', 64), p_ttl => null) $$,
+  '23514', null, 'a qualification cannot omit its expiry');
 select * from finish();
 rollback;
