@@ -46,7 +46,7 @@ async function expectFocusUnobscured(page: Page) {
     if (!el) return "no focus";
     const r = el.getBoundingClientRect();
     const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return top === el || el.contains(top) ? "ok" : `covered by ${top?.tagName}.${(top as HTMLElement | null)?.className}`;
+    return top === el || el.contains(top) ? "ok" : `covered by ${top?.tagName ?? "nothing (off-screen)"}.${(top as HTMLElement | null)?.className ?? ""}`;
   });
   expect(hit).toBe("ok");
 }
@@ -70,10 +70,12 @@ test("a paused-processing notice states the pause and the pending refund review 
   await expect(notices).toContainText("may charge your payment method");
   await expect(notices).toContainText("does not reopen file processing");
   expect(portal.posts).toBe(0);
-  await page.screenshot({ path: testInfo.outputPath("billing-notice-resume-confirm.png"), fullPage: true });
+  // Focus check before any full-page capture: that capture temporarily resizes the viewport, and a
+  // focus() issued against the enlarged viewport does not scroll the control back into the real one.
   await notices.getByRole("button", { name: "Continue to billing portal" }).focus();
   await expectFocusUnobscured(page);
   await page.screenshot({ path: testInfo.outputPath("viewport-billing-notice-resume-confirm.png") });
+  await page.screenshot({ path: testInfo.outputPath("billing-notice-resume-confirm.png"), fullPage: true });
 
   await notices.getByRole("button", { name: "Keep paused" }).click();
   await expect(notices.getByRole("button", { name: "Continue to billing portal" })).toHaveCount(0);
@@ -83,6 +85,21 @@ test("a paused-processing notice states the pause and the pending refund review 
   await notices.getByRole("button", { name: "Continue to billing portal" }).click();
   await expect(page).toHaveURL("https://portal.fixture.invalid/session");
   expect(portal.posts).toBe(1);
+});
+
+test("a control the owner tabs to from behind the fixed mobile rail is scrolled clear of it", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1440) >= 1024, "The rail is a fixed bottom bar only below 1024px.");
+  const { card } = await openBilling(page, { notices: [notice()] });
+  await card.getByRole("button", { name: "Resume subscription…" }).click();
+  const target = card.getByRole("button", { name: "Continue to billing portal" });
+  // Park the control just inside the viewport but behind the rail -- "visible" to a naive
+  // scroll-if-needed, which is exactly the case that left it covered without scroll-margin.
+  await target.evaluate((el) => {
+    const rail = document.querySelector("aside")!.getBoundingClientRect();
+    window.scrollBy({ top: el.getBoundingClientRect().top - rail.top - 8, behavior: "instant" });
+  });
+  await target.focus();
+  await expectFocusUnobscured(page);
 });
 
 test("a lapsed notice without a refund review says nothing about refunds", async ({ page }) => {

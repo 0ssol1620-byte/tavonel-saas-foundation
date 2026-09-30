@@ -57,7 +57,7 @@ async function expectFocusUnobscured(page: Page) {
     if (!el) return "no focus";
     const r = el.getBoundingClientRect();
     const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return top === el || el.contains(top) ? "ok" : `covered by ${top?.tagName}.${(top as HTMLElement | null)?.className}`;
+    return top === el || el.contains(top) ? "ok" : `covered by ${top?.tagName ?? "nothing (off-screen)"}.${(top as HTMLElement | null)?.className ?? ""}`;
   });
   expect(hit).toBe("ok");
 }
@@ -90,9 +90,10 @@ test("the owner reviews and accepts the terms by keyboard, once, and the file dr
   await page.keyboard.press("Space");
   await expect(agree).toBeChecked();
   await expect(submit).toBeEnabled();
-  await page.screenshot({ path: testInfo.outputPath("consent-review-checked.png"), fullPage: true });
+  // Focus check before the full-page capture, which temporarily resizes the viewport.
   await expectFocusUnobscured(page);
   await page.screenshot({ path: testInfo.outputPath("viewport-consent-review-checked.png") });
+  await page.screenshot({ path: testInfo.outputPath("consent-review-checked.png"), fullPage: true });
 
   // Two submits from the same render: the second must join the first, not post again.
   await submit.evaluate(button => { const form = (button as HTMLButtonElement).form!; form.requestSubmit(); form.requestSubmit(); });

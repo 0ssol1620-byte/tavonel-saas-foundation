@@ -71,6 +71,34 @@ Automated evidence confirms rendering, interaction, accessibility, responsive be
 
 **FOUNDER VISUAL REVIEW REQUIRED**
 
+### 2026-09-30 final consent and CI follow-up
+
+The initial consent state now leads with "Start with your documents" and the
+terms-review action, with the public example secondary. The redundant example
+steps are hidden in that state. All 32 consent cases passed at 1920, 1440, 1280,
+1024, 768, 390, 360 and reduced motion. The parent inspected the 1440 and 390
+captures; no overflow was present. Evidence is preserved outside the checkout in
+`D:/CodexProjects/tavonel-private-audit/scoped-admission-20260930/consent-final-matrix/`.
+
+The full CI product matrix at `908baab` found a separate mobile billing focus
+failure: the confirmation button was covered by the fixed navigation rail at
+390 pixels (and intermittently at 360). This is not accepted as the earlier
+full-page screenshot artifact. Its trace and screenshots are retained in
+`ci-product-qa-908baab/` under the private audit directory, and require a fix and
+repeat before merge. The run had 947 passing cases, one failure, one flaky case
+and 238 conditionally skipped cases. Chromium, Firefox and WebKit jobs passed.
+
+The follow-up diagnosis reproduced a real keyboard-focus defect: a control already
+inside the viewport could remain beneath the 64px fixed rail. A scoped bottom
+scroll margin now includes the rail, safe-area inset and 16px clearance. A new
+regression deliberately parks the control behind the rail before focusing it.
+Full-page capture happens after the strict occlusion assertion; no retry, polling
+or sleep was added to that assertion. The smooth-scroll hypothesis was not supported
+by the diagnostic and was rejected. Mobile tests passed 90/90 with retries disabled;
+all widths plus reduced motion passed 67 cases, with five desktop-only skips of
+the mobile-rail regression. Captures are retained in
+`D:/CodexProjects/tavonel-qa-evidence/billing-focus-fix-20260930/`.
+
 
 
 

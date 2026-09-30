@@ -38,4 +38,14 @@
   .actions :global(.btn) { min-height: 44px; }
 
   .actions button:disabled { cursor: not-allowed; opacity: .55; }
+
+  /*
+    Below 1024px the workspace rail is a fixed bottom bar (workspace-ultimate.module.css: 64px plus
+    the safe-area inset). A control reached by keyboard is scrolled to the nearest edge, which put
+    it under that bar; the margin makes focus scrolling stop above it.
+    Keep this clearance aligned with the shell's mobile rail height.
+  */
+  @media (max-width: 1023px) {
+    .panel :is(a, button, input) { scroll-margin-bottom: calc(64px + env(safe-area-inset-bottom) + 16px); }
+  }
 }

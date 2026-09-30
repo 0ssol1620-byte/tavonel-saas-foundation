@@ -1,7 +1,7 @@
 # Production pipeline qualification — 2026-09-30
 
-Status: public one-line fixture passes after GPU compatibility repair; broader
-document and website-to-export qualification remains outstanding.
+Status: public English and operator-authored Korean/English fixtures now pass
+production OCR. Customer website-to-export qualification remains outstanding.
 
 The operator used the founder's standing test authorization and the public W3C
 dummy PDF served by `/api/proof-pdf`. No customer document was used in this probe.
@@ -60,3 +60,31 @@ This is a failed multilingual qualification. The recovered runtime invokes its
 Korean reader only under a text heuristic, which does not cover this sparse mixed
 page. Its decision and merge behavior require correction and a production repeat.
 The English canary success must not be generalized to Korean customer material.
+
+## Corrected multilingual runtime: production repeat
+
+The corrected runtime was built from `908baab57057376fc6ea7aaa8e2384915bda9790`
+by GitHub Actions run `36652489742`. Its immutable image is
+`ghcr.io/0ssol1620-byte/tavonel-foundation-ocr-gpu@sha256:0e916aa661ad7d54215de85f1f1b63349756ee2c9f58db663f3181dc8b704101`.
+The workflow passed 34 worker tests and container provider/non-root checks.
+Both readers must pass CUDA recognition self-tests before the worker becomes ready.
+
+Removing the `BLACKWELL_96` pool alone was insufficient: RunPod's live GPU catalog
+places the Blackwell 24 GB MIG SKU in `AMPERE_24`. The endpoint is now restricted
+to `ADA_24`, whose current catalog contains RTX 4090, with minimum zero and maximum
+one worker. Version 19 ran the new image on RTX 4090 in `US-TX-3`.
+
+The same original four-line multilingual fixture was newly uploaded through the
+operator's reserved quarantine/CDR/OCR path. The sanitized PDF hash was
+`39fc84ce0cc939dcd22e157c2943a5f633059e086bc58f91f3bdff347f15d44e`.
+OCR returned all four lines, including both Korean sentences, date `2026-0930`,
+amount `125,000원`, and quantity `37개`. It matches the authored text when whitespace
+is removed; spacing itself is not exact. This closes the specific sparse mixed-page
+regression, not a general accuracy benchmark.
+
+The follow-up production database read requested Supabase reauthentication, so
+compute settlement for this repeat has not been independently confirmed.
+The raw OCR and qualification JSON are retained in the private audit directory as
+`multilingual-fixed-ocr.json` and `multilingual-fixed-qualification.json`.
+This was a synthetic storage-pipeline probe, not an authenticated customer website
+upload, compilation, signed export, AI-consumer test or live payment.
