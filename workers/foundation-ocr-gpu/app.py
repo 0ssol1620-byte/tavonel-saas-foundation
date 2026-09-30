@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import hmac
 import json
+import hmac
 import os
 import re
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Lock, Thread
 from time import monotonic
+from collections.abc import Iterator
+from contextlib import asynccontextmanager
 from typing import Final, TypedDict
 
 import pypdfium2 as pdfium
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 APP_NAME: Final = "tavonel-foundation-ocr-gpu"
 LISTEN_PORT: Final = 8001
@@ -26,7 +27,22 @@ REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0
-_rapidocr = None
+OCR_ENGINE_RELEASE: Final = "rapidocr-3.9.2-ko-pass-nocls-v3-selftest"
+OCR_MODEL_SHA256: Final = {
+    "general-det": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
+    "general-rec": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+    "korean-rec": "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b",
+}
+SELF_TEST_LINES: Final = ("TAVONEL OCR SELF TEST", "Quality gate 0123456789")
+SELF_TEST_MIN_CONFIDENCE: Final = 0.9
+# The shared angle classifier flips upright Hangul lines 180 degrees (a whole line came back as
+# "이" at 0.41 and was dropped). Rendered PDF lines are upright, so the Korean pass skips it.
+KOREAN_PASS_OPTIONS: Final = {"use_cls": False}
+_general_rapidocr = None
+_korean_rapidocr = None
+_engine_lock = Lock()
+# pending -> passed | failed. Only "passed" lets raster OCR run or /ping report ready.
+_self_test: dict[str, str | None] = {"state": "pending", "detail": None}
 
 
 class OcrRegion(TypedDict):
@@ -41,6 +57,12 @@ class OcrRegion(TypedDict):
     authority: str
 
 
+class RasterLine(TypedDict):
+    polygon: list[list[float]]
+    text: str
+    confidence: float
+
+
 def cuda_available() -> bool:
     try:
         import onnxruntime as ort
@@ -49,25 +71,222 @@ def cuda_available() -> bool:
         return False
 
 
-def rapidocr_engine():
-    global _rapidocr
-    if _rapidocr is None:
-        from rapidocr_onnxruntime import RapidOCR
+def require_cuda_sessions(label: str, engine) -> None:
+    # A silent CPU fallback is a different, unqualified runtime. Never accept it.
+    for name, stage in (("detection", "text_det"), ("classification", "text_cls"), ("recognition", "text_rec")):
+        providers = getattr(engine, stage).session.session.get_providers()
+        if not providers or providers[0] != "CUDAExecutionProvider":
+            raise RuntimeError(f"RapidOCR {label} {name} session did not select CUDAExecutionProvider")
 
-        # The packaged RapidOCR defaults all three ONNX sessions to CPU, even
-        # when this worker has a CUDA device. Never accept that silent fallback.
-        engine = RapidOCR(det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True)
-        sessions = {
-            "detection": engine.text_det.infer.session,
-            "classification": engine.text_cls.infer.session,
-            "recognition": engine.text_rec.session.session,
-        }
-        for name, session in sessions.items():
-            providers = session.get_providers()
-            if not providers or providers[0] != "CUDAExecutionProvider":
-                raise RuntimeError(f"RapidOCR {name} session did not select CUDAExecutionProvider")
-        _rapidocr = engine
-    return _rapidocr
+
+def self_test_pdf() -> bytes:
+    """A one-page PDF of known text, drawn with a PDFium built-in font so it needs no font files."""
+    operators = "".join(
+        f"BT /F1 28 Tf 72 {720 - 60 * index} Td ({line}) Tj ET\n" for index, line in enumerate(SELF_TEST_LINES)
+    ).encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R"
+        b" /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(operators) + operators + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    body = b"%PDF-1.4\n"
+    offsets = []
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(body))
+        body += b"%d 0 obj\n" % number + obj + b"\nendobj\n"
+    xref = len(body)
+    body += b"xref\n0 6\n0000000000 65535 f \n" + b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    return body + b"trailer << /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % xref
+
+
+def self_test_image():
+    # Rendered exactly like a customer page, so the check covers the same pixels-to-text path.
+    document = pdfium.PdfDocument(self_test_pdf())
+    try:
+        page = document[0]
+        try:
+            bitmap = page.render(scale=RENDER_SCALE)
+            try:
+                return bitmap.to_pil()
+            finally:
+                bitmap.close()
+        finally:
+            page.close()
+    finally:
+        document.close()
+
+
+def self_test_failure(label: str, lines: list[RasterLine]) -> str | None:
+    """Why a known page was misread, or None. `status: ok` must never carry text like this."""
+    read = {" ".join(line["text"].split()): line["confidence"] for line in lines}
+    for expected in SELF_TEST_LINES:
+        if expected not in read:
+            return f"{label} engine read {sorted(read)!r} instead of {expected!r}"
+        if read[expected] < SELF_TEST_MIN_CONFIDENCE:
+            return f"{label} engine read {expected!r} at confidence {read[expected]:.3f}"
+    return None
+
+
+def rapidocr_engines():
+    """Both engines, once they have loaded on CUDA and read a known page correctly.
+
+    A GPU runtime can load every session on CUDA and still compute wrong text; that is how a
+    one-line page came back as "yme" with status ok. So the engines are not used for any request
+    until the recognition self-test passes, and a failed self-test is final for this worker.
+    Callers hold `_engine_lock`.
+    """
+    global _general_rapidocr, _korean_rapidocr
+    if _self_test["state"] == "failed":
+        raise HTTPException(503, "OCR recognition self-test did not pass")
+    if _general_rapidocr is None or _korean_rapidocr is None:
+        try:
+            from rapidocr import LangRec, ModelType, OCRVersion, RapidOCR
+
+            shared = {"EngineConfig.onnxruntime.use_cuda": True}
+            engines = {
+                "general": RapidOCR(params=shared),
+                "korean": RapidOCR(
+                    params={
+                        **shared,
+                        "Rec.lang_type": LangRec.KOREAN,
+                        "Rec.model_type": ModelType.MOBILE,
+                        "Rec.ocr_version": OCRVersion.PPOCRV5,
+                    }
+                ),
+            }
+            image = self_test_image()
+            for label, engine in engines.items():
+                require_cuda_sessions(label, engine)
+                options = KOREAN_PASS_OPTIONS if label == "korean" else {}
+                failure = self_test_failure(label, rapidocr_lines(engine, image, **options))
+                if failure:
+                    raise RuntimeError(failure)
+        except Exception as exc:
+            _self_test.update(state="failed", detail=str(exc)[:500])
+            raise HTTPException(503, "OCR recognition self-test did not pass") from exc
+        _general_rapidocr, _korean_rapidocr = engines["general"], engines["korean"]
+        _self_test.update(state="passed", detail=None)
+    return _general_rapidocr, _korean_rapidocr
+
+
+def warm_engines() -> None:
+    """Loads and self-tests the engines at startup, so readiness means a qualified reader."""
+    with _engine_lock:
+        try:
+            rapidocr_engines()
+        except HTTPException:
+            pass  # recorded in _self_test; /ping reports it
+
+
+def ping_status() -> int:
+    # RunPod load balancer convention: 200 ready, 204 still initializing, anything else unhealthy.
+    return {"passed": 200, "pending": 204}.get(_self_test["state"], 503)
+
+
+def rapidocr_lines(engine, image, **options) -> list[RasterLine]:
+    result = engine(image, **options)
+    boxes = getattr(result, "boxes", None)
+    texts = getattr(result, "txts", None)
+    scores = getattr(result, "scores", None)
+    if boxes is None or texts is None or scores is None:
+        return []
+    rows: list[RasterLine] = []
+    for polygon, text, score in zip(boxes, texts, scores, strict=True):
+        if not isinstance(text, str) or not text.strip():
+            continue
+        points = [[float(point[0]), float(point[1])] for point in polygon if len(point) >= 2]
+        if len(points) < 3:
+            continue
+        rows.append(
+            {
+                "polygon": points,
+                "text": text.strip(),
+                "confidence": max(0.0, min(1.0, float(score))),
+            }
+        )
+    return rows
+
+
+def _script_counts(value: str) -> dict[str, int]:
+    return {
+        "hangul": len(re.findall(r"[가-힣]", value)),
+        "han": len(re.findall(r"[\u4e00-\u9fff]", value)),
+        "kana": len(re.findall(r"[\u3040-\u30ff]", value)),
+        "latin": len(re.findall(r"[A-Za-z]", value)),
+        "digits": len(re.findall(r"\d", value)),
+    }
+
+
+def _bounds(line: RasterLine) -> tuple[float, float, float, float]:
+    xs = [point[0] for point in line["polygon"]]
+    ys = [point[1] for point in line["polygon"]]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _intersection_over_union(left: RasterLine, right: RasterLine) -> float:
+    left_x1, left_y1, left_x2, left_y2 = _bounds(left)
+    right_x1, right_y1, right_x2, right_y2 = _bounds(right)
+    width = max(0.0, min(left_x2, right_x2) - max(left_x1, right_x1))
+    height = max(0.0, min(left_y2, right_y2) - max(left_y1, right_y1))
+    intersection = width * height
+    if intersection <= 0:
+        return 0.0
+    left_area = max(0.0, left_x2 - left_x1) * max(0.0, left_y2 - left_y1)
+    right_area = max(0.0, right_x2 - right_x1) * max(0.0, right_y2 - right_y1)
+    return intersection / max(intersection, left_area + right_area - intersection)
+
+
+def _prefer_korean(general: RasterLine, korean: RasterLine) -> bool:
+    korean_counts = _script_counts(korean["text"])
+    if korean_counts["hangul"] < 2 or korean["confidence"] < 0.55:
+        return False
+    general_counts = _script_counts(general["text"])
+    if general_counts["hangul"] >= korean_counts["hangul"]:
+        return False
+    # Real Japanese or Chinese lines stay with the general reader. A Hangul line misread by it
+    # yields fewer Han characters than the Hangul it lost, or reads with lower confidence.
+    if general_counts["kana"] or (
+        general_counts["han"] >= korean_counts["hangul"] and general["confidence"] >= 0.9
+    ):
+        return False
+    # The general reader drops Hangul silently from mixed lines ("금액 125,000원" -> "125,000"),
+    # so a Korean reading that keeps its Latin letters and digits carries strictly more text.
+    general_alnum = general_counts["latin"] + general_counts["digits"]
+    korean_alnum = korean_counts["latin"] + korean_counts["digits"]
+    return korean_alnum >= 0.8 * general_alnum or korean["confidence"] >= general["confidence"] + 0.05
+
+
+def merge_korean_lines(general: list[RasterLine], korean: list[RasterLine]) -> list[RasterLine]:
+    """Replace only geometry-matched lines with materially better Hangul recognition."""
+
+    matched_korean: set[int] = set()
+    merged: list[RasterLine] = []
+    for general_line in general:
+        candidates = sorted(
+            (
+                (_intersection_over_union(general_line, korean_line), index, korean_line)
+                for index, korean_line in enumerate(korean)
+                if index not in matched_korean
+            ),
+            reverse=True,
+            key=lambda item: item[0],
+        )
+        if candidates and candidates[0][0] >= 0.45:
+            _, index, korean_line = candidates[0]
+            matched_korean.add(index)
+            if _prefer_korean(general_line, korean_line):
+                merged.append(korean_line)
+                continue
+        merged.append(general_line)
+
+    for index, korean_line in enumerate(korean):
+        counts = _script_counts(korean_line["text"])
+        if index not in matched_korean and counts["hangul"] >= 2 and korean_line["confidence"] >= 0.65:
+            merged.append(korean_line)
+    return sorted(merged, key=lambda line: (_bounds(line)[1], _bounds(line)[0]))
 
 
 def normalized_bbox(
@@ -94,7 +313,6 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
     nothing about what this function returns: the caller still receives the complete region list,
     and a caller that passes no observer behaves exactly as before.
     """
-    engine = rapidocr_engine()
     regions: list[OcrRegion] = []
     order = 0
     for index in range(len(document)):
@@ -105,18 +323,23 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
                 image = bitmap.to_pil()
             finally:
                 bitmap.close()
-            result, _elapsed = engine(image)
+            with _engine_lock:
+                general_engine, korean_engine = rapidocr_engines()
+                # The Korean pass always runs. The general recognizer drops Hangul lines without a
+                # trace (empty text) and turns mixed lines into Han/Latin noise, so its output can
+                # never prove a page has no Korean. Cost: one extra det+rec per raster page.
+                lines = merge_korean_lines(
+                    rapidocr_lines(general_engine, image),
+                    rapidocr_lines(korean_engine, image, **KOREAN_PASS_OPTIONS),
+                )
         finally:
             page.close()
-        if not result:
+        if not lines:
             continue
         width, height = image.size
-        for line_index, row in enumerate(result):
-            if not isinstance(row, (list, tuple)) or len(row) < 2 or not isinstance(row[1], str):
-                continue
-            text = row[1].strip()
-            polygon = row[0] if isinstance(row[0], (list, tuple)) else []
-            points = [point for point in polygon if isinstance(point, (list, tuple)) and len(point) >= 2]
+        for line_index, line in enumerate(lines):
+            text = line["text"]
+            points = line["polygon"]
             if not text or not points:
                 continue
             xs = [float(point[0]) for point in points]
@@ -124,7 +347,6 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
             bbox = normalized_bbox(min(xs), min(ys), max(xs), max(ys), width, height)
             if bbox is None:
                 continue
-            confidence = float(row[2]) if len(row) >= 3 and isinstance(row[2], (int, float)) else 0.0
             regions.append({
                 "regionId": f"ocr-p{index + 1:04d}-l{line_index + 1:05d}",
                 "pageIndex0": index,
@@ -133,7 +355,7 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
                 "blockType": "paragraph",
                 "text": text,
                 "bbox1000": bbox,
-                "confidence": max(0.0, min(1.0, confidence)),
+                "confidence": line["confidence"],
                 "authority": "informal",
             })
             order += 1
@@ -314,8 +536,10 @@ class SidecarHealthHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        body = b'{"status":"ok","port":8001,"ssh":false}'
-        self.send_response(200)
+        # /ping is the readiness probe and carries the self-test verdict; /health is liveness only.
+        status = ping_status() if path == "/ping" else 200
+        body = b"" if status == 204 else b'{"status":"ok","port":8001,"ssh":false}' if status == 200 else b'{"status":"unqualified"}'
+        self.send_response(status)
         self.send_header("content-type", "application/json")
         self.send_header("cache-control", "no-store")
         self.send_header("content-length", str(len(body)))
@@ -337,7 +561,14 @@ def start_health_sidecar() -> None:
 
 start_health_sidecar()
 
-app = FastAPI(title=APP_NAME, docs_url=None, redoc_url=None, openapi_url=None)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # In the background so /ping can answer 204 while the models load and read the known page.
+    Thread(target=warm_engines, name="ocr-self-test", daemon=True).start()
+    yield
+
+
+app = FastAPI(title=APP_NAME, docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
 
 @app.exception_handler(HTTPException)
@@ -352,18 +583,30 @@ async def http_exception_no_store(_: Request, exc: HTTPException) -> JSONRespons
 def healthz() -> JSONResponse:
     return JSONResponse(
         content={
-            "status": "ok", "port": LISTEN_PORT, "ssh": False,
-            "gpu": cuda_available(), "engine": "rapidocr",
-            # Availability alone says nothing about the actual model sessions.
-            "cudaSessionsSelected": _rapidocr is not None,
+            "status": "ok",
+            "port": LISTEN_PORT,
+            "ssh": False,
+            "gpu": cuda_available(),
+            "engine": "rapidocr",
+            "engineRelease": OCR_ENGINE_RELEASE,
+            "modelSha256": OCR_MODEL_SHA256,
+            "adaptiveKorean": True,
+            # Availability alone says nothing about the actual model sessions or their output.
+            "cudaSessionsSelected": _self_test["state"] == "passed",
+            "recognitionSelfTest": dict(_self_test),
         },
         headers={"cache-control": "no-store"},
     )
 
 
 
-@app.get("/ping")
-def ping() -> JSONResponse:
+@app.get("/ping", response_model=None)
+def ping() -> JSONResponse | Response:
+    status = ping_status()
+    if status == 204:
+        return Response(status_code=204, headers={"cache-control": "no-store"})
+    if status != 200:
+        return JSONResponse(status_code=status, content={"status": "unqualified"}, headers={"cache-control": "no-store"})
     return healthz()
 
 NDJSON_MEDIA_TYPE: Final = "application/x-ndjson"

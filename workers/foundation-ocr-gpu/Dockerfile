@@ -27,6 +27,9 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt ./
 RUN python3 -m pip install --no-cache-dir --ignore-installed -r requirements.txt
+# Models are fetched and digest-checked at build time; workers never download model code.
+COPY materialize_models.py ./
+RUN python3 materialize_models.py && rm materialize_models.py
 COPY app.py ./
 RUN chown -R ocr:ocr /app /home/ocr
 USER ocr
