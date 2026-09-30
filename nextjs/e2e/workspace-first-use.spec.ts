@@ -110,7 +110,7 @@ async function installReviewRequiredCollection(page: import("@playwright/test").
   await page.route(`**/api/collections/${collectionId}/world`, route => route.fulfill({
     json: { code: "WORLD_NOT_ACTIVE" },
   }));
-  await page.route(`**/api/v1/world/${collectionId}`, route => route.fulfill({ json: { model: null } }));
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: { model: null } }));
 }
 
 test.describe("workspace first use — desktop", () => {

@@ -69,12 +69,13 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
   // someone almost always wants and the one a rollback would actually perform.
   useEffect(() => {
     const candidates = versions.filter((entry) => entry.manifestDigest !== current);
-    setLeftDigest((previous) => previous ?? candidates[0]?.manifestDigest ?? null);
+    setLeftDigest((previous) => candidates.some((entry) => entry.manifestDigest === previous) ? previous : candidates[0]?.manifestDigest ?? null);
   }, [versions, current]);
 
   useEffect(() => {
     if (!model || !leftDigest) { setOther(null); return; }
     let cancelled = false;
+    setOther(null);
     setState("loading");
     void (async () => {
       const token = await authToken();
@@ -85,16 +86,17 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
       );
       const body = await response.json().catch(() => ({})) as { model?: WorldReadModel };
       if (cancelled) return;
-      if (!response.ok || !body.model) { setState("unavailable"); setOther(null); return; }
+      if (!response.ok || !body.model || body.model.world.id !== model.world.id || body.model.world.manifestDigest !== leftDigest) { setState("unavailable"); setOther(null); return; }
       setOther(body.model);
       setState("idle");
-    })();
+    })().catch(() => { if (!cancelled) { setOther(null); setState("unavailable"); } });
     return () => { cancelled = true; };
   }, [model, leftDigest]);
 
   useEffect(() => {
     if (!model) { setDecisions(null); return; }
     let cancelled = false;
+    setDecisions(null);
     void (async () => {
       const token = await authToken();
       if (!token) return;
@@ -104,7 +106,7 @@ export default function WorldVersionDiffPanel({ model, onRollback, rollbackBusy 
       });
       const body = await response.json().catch(() => ({})) as { decisions?: ReviewDecision[] };
       if (!cancelled && response.ok) setDecisions(body.decisions ?? []);
-    })();
+    })().catch(() => { if (!cancelled) setDecisions([]); });
     return () => { cancelled = true; };
   }, [model]);
 

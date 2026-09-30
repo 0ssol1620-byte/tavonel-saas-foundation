@@ -386,11 +386,13 @@ export default function WorkspacePage() {
   }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
+  const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
-    if (!collectionId) {
-      setWorldReadModel(null);
+    const manifest = collectionResult?.manifestDigest;
+    setWorldReadModel(null);
+    if (!collectionId || !manifest) {
       return;
     }
     const controller = new AbortController();
@@ -399,7 +401,7 @@ export default function WorkspacePage() {
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
       if (!token) return null;
-      const response = await fetch(`/api/v1/world/${encodeURIComponent(collectionId)}`, {
+      const response = await fetch(`/api/v1/world/${encodeURIComponent(collectionId)}?manifest=${encodeURIComponent(manifest)}`, {
         cache: "no-store",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
@@ -407,12 +409,14 @@ export default function WorkspacePage() {
       });
       return response.ok ? await response.json() as { model?: WorldReadModel } : null;
     })()
-      .then((body) => setWorldReadModel(body?.model ?? null))
+      .then((body) => {
+        if (!controller.signal.aborted) setWorldReadModel(body?.model?.world.id === collectionId && body.model.world.manifestDigest === manifest ? body.model : null);
+      })
       .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
+        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
       });
     return () => controller.abort();
-  }, [collectionResult?.collectionId]);
+  }, [collectionResult?.collectionId, collectionResult?.manifestDigest]);
   /*
     The two server facts the review queue needs and the candidate artifact does not carry.
 
@@ -428,11 +432,13 @@ export default function WorkspacePage() {
   const [compileRecord, setCompileRecord] = useState<
     { documentIds: string[]; blocked: CompileBlocker[]; settledAt: string | null } | null
   >(null);
-  const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string }>; truncated: boolean }>({ decisions: [], truncated: false });
+  const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated: boolean }>({ decisions: [], truncated: false });
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
-    if (!collectionId) {
-      setCompileRecord(null);
+    const manifest = collectionResult?.manifestDigest;
+    setCompileRecord(null);
+    setReviewDecisions({ decisions: [], truncated: false });
+    if (!collectionId || !manifest) {
       setReviewDecisions({ decisions: [], truncated: false });
       return;
     }
@@ -450,7 +456,7 @@ export default function WorkspacePage() {
             : null),
         fetch(`/api/v1/reviews?collectionId=${encodeURIComponent(collectionId)}`, { cache: "no-store", headers, signal: controller.signal })
           .then((response) => response.ok
-            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string }>; truncated?: boolean }>
+            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated?: boolean }>
             : null),
       ]);
       if (controller.signal.aborted) return;
@@ -467,11 +473,11 @@ export default function WorkspacePage() {
         first, instead of showing them as measured.
       */
       setReviewDecisions(reviews.status === "fulfilled"
-        ? { decisions: reviews.value?.decisions ?? [], truncated: reviews.value?.truncated === true }
+        ? { decisions: (reviews.value?.decisions ?? []).filter((decision) => decision.manifestDigest === manifest), truncated: reviews.value?.truncated === true }
         : { decisions: [], truncated: false });
     })();
     return () => controller.abort();
-  }, [collectionResult?.collectionId]);
+  }, [collectionResult?.collectionId, collectionResult?.manifestDigest]);
   const [downloading, setDownloading] = useState(false);
   // A setup guide or downloaded package is not proof of a working external AI connection.
   // Keep the success state false until an authenticated consumer receipt can establish it.
@@ -580,7 +586,7 @@ export default function WorkspacePage() {
     setAskEvidenceId(null);
   };
 
-  const loadWorldState = async (collectionId: string, token?: string): Promise<ActiveWorld | null | undefined> => {
+  const loadWorldState = async (collectionId: string, token?: string, selectionSequence?: number): Promise<ActiveWorld | null | undefined> => {
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
     const accessToken = token ?? await getAuthToken();
     if (!accessToken) return;
@@ -588,6 +594,7 @@ export default function WorkspacePage() {
       headers: { authorization: `Bearer ${accessToken}` },
     });
     const json = await response.json() as { code?: string; activeWorld?: ActiveWorld; versions?: WorldVersion[] };
+    if (selectionSequence !== undefined && selectionSequence !== candidateLoadSequence.current) return;
     if (response.status === 404 && json.code === "ACTIVE_WORLD_NOT_FOUND") {
       clearWorldState();
       return null;
@@ -657,7 +664,8 @@ export default function WorkspacePage() {
   };
 
   const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string) => {
-    if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
+    const sequence = ++candidateLoadSequence.current;
+    if (!/^collection-[a-f0-9]{32}$/.test(collectionId) || (manifestDigest && !/^sha256:[a-f0-9]{64}$/.test(manifestDigest))) return;
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
     const token = data.session?.access_token;
@@ -675,6 +683,7 @@ export default function WorkspacePage() {
         package?: { roots?: unknown; files?: Array<{ path?: unknown }> };
       };
     };
+    if (sequence !== candidateLoadSequence.current) return;
     const artifact = json.artifact;
     const paths = artifact?.package?.files?.map((file) => file.path).filter((path): path is string => typeof path === "string") ?? [];
     if (
@@ -682,6 +691,7 @@ export default function WorkspacePage() {
       !artifact ||
       artifact.schemaVersion !== "tavonel.collection_candidate.v1" ||
       artifact.collectionId !== collectionId ||
+      (manifestDigest !== undefined && artifact.manifestDigest !== manifestDigest) ||
       artifact.candidatePromotion !== false ||
       json.candidatePromotion !== false ||
       !(
@@ -697,7 +707,8 @@ export default function WorkspacePage() {
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
-    const loadedActiveWorld = await loadWorldState(collectionId, token);
+    const loadedActiveWorld = await loadWorldState(collectionId, token, sequence);
+    if (sequence !== candidateLoadSequence.current) return;
     if (loadedActiveWorld === undefined) return artifact.lifecycle;
     const verifiedPackage = "Its required package entries and state were checked.";
     setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
@@ -713,6 +724,28 @@ export default function WorkspacePage() {
     */
     return artifact.lifecycle;
   };
+
+  // Browser history selects artifact identity as well as the visible surface.
+  useEffect(() => {
+    const restoreRevision = () => {
+      const params = new URLSearchParams(window.location.search);
+      const collection = params.get("collection");
+      setCollectionResult(null); setWorldReadModel(null);
+      if (collection) void loadCollectionCandidate(collection, params.get("manifest") ?? undefined)
+        .catch(() => setNotice("The selected revision could not be read. Reload to recheck access; no revision was changed."));
+      else { ++candidateLoadSequence.current; setCollectionResult(null); setWorldReadModel(null); }
+    };
+    window.addEventListener("popstate", restoreRevision);
+    return () => window.removeEventListener("popstate", restoreRevision);
+    // Reads current URL; the loader only uses auth and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!collectionResult?.manifestDigest) return;
+    setReviewReason(""); setRollbackReason(""); setReviewEvidenceId(null);
+    setEvidenceReviewAction(null); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter("");
+  }, [collectionResult]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1638,6 +1671,10 @@ export default function WorkspacePage() {
     const url = new URL(window.location.href);
     url.pathname = next === "home" ? "/workspace" : `/workspace/${next}`;
     url.searchParams.delete("tab");
+    if (collectionResult) {
+      url.searchParams.set("collection", collectionResult.collectionId);
+      url.searchParams.set("manifest", collectionResult.manifestDigest);
+    }
     window.history.pushState(null, "", url.toString());
     /*
       Every surface now starts with its own content under the state hero, so a change of
@@ -1646,7 +1683,7 @@ export default function WorkspacePage() {
       exist, so Changes and Activity silently did nothing.
     */
     window.scrollTo({ top: 0 });
-  }, []);
+  }, [collectionResult]);
 
   const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
 
@@ -1848,11 +1885,12 @@ export default function WorkspacePage() {
           is immutable artifact truth, and a patch writes a second artifact rather than
           replacing the first.
         */
-        await loadCollectionCandidate(collectionResult.collectionId, body.resultingManifestDigest);
+        const loaded = await loadCollectionCandidate(collectionResult.collectionId, body.resultingManifestDigest);
+        if (!loaded) { setNotice("The correction was recorded, but its resulting revision could not be verified. Reload before reviewing it; your input is kept."); return; }
         const url = new URL(window.location.href);
         url.searchParams.set("collection", collectionResult.collectionId);
         url.searchParams.set("manifest", body.resultingManifestDigest);
-        window.history.replaceState(null, "", url);
+        window.history.pushState(null, "", url);
         clearReviewInput();
         setNotice(`Corrected. A new candidate was compiled at ${body.resultingManifestDigest.slice(0, 19)}… and the change was recorded against the evidence it was reviewed under. The previous candidate is unchanged.`);
         return;
@@ -1868,6 +1906,9 @@ export default function WorkspacePage() {
 
   const promoteCandidate = async () => {
     if (!collectionResult || reviewReason.trim().length < 8) return;
+    if (!worldReadModel || worldReadModel.world.id !== collectionResult.collectionId || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest || worldReadModel.evidence.length === 0) {
+      setNotice("Read this exact revision and its source-bound evidence before activation. Reload to recheck access."); return;
+    }
     if (
       collectionResult.lifecycle !== "candidate" ||
       collectionResult.validation.status !== "passed" ||
@@ -2895,7 +2936,7 @@ export default function WorkspacePage() {
                       <div className="world-actions">
                         <small>{reviewReason.trim().length}/500 · minimum 8 characters</small>
                         <button
-                          disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
+                          disabled={worldBusy || !worldReadModel?.evidence.length || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
                           onClick={() => void promoteCandidate()}
                         >
                           {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision…" : "Activate reviewed candidate"}
