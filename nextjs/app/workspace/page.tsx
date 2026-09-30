@@ -707,6 +707,12 @@ export default function WorkspacePage() {
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
+    // Resolve a latest-candidate link once, then make reload/history immutable.
+    const selectedUrl = new URL(window.location.href);
+    if (selectedUrl.searchParams.get("collection") === collectionId && !selectedUrl.searchParams.has("manifest")) {
+      selectedUrl.searchParams.set("manifest", artifact.manifestDigest);
+      window.history.replaceState(null, "", selectedUrl);
+    }
     const loadedActiveWorld = await loadWorldState(collectionId, token, sequence);
     if (sequence !== candidateLoadSequence.current) return;
     if (loadedActiveWorld === undefined) return artifact.lifecycle;
@@ -771,9 +777,10 @@ export default function WorkspacePage() {
       setSession("signed-in");
       const documentLoad = loadDocuments();
       void loadBilling();
-      const collectionId = params.get("collection");
+      const selectedParams = new URLSearchParams(window.location.search);
+      const collectionId = selectedParams.get("collection");
       const collectionLoad = collectionId
-        ? loadCollectionCandidate(collectionId, params.get("manifest") ?? undefined)
+        ? loadCollectionCandidate(collectionId, selectedParams.get("manifest") ?? undefined)
         : Promise.resolve();
       void Promise.allSettled([documentLoad, collectionLoad]).then(() => setWorkspaceStartupReady(true));
 

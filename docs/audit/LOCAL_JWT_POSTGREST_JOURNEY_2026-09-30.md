@@ -1,5 +1,9 @@
 # Actual JWT / PostgREST / Core / SQL boundary — 2026-09-30
 
+## Integration-owner revalidation
+
+Applied only this new delta as `1fca3e42ece8206fc4e3464b55574966ce55a532`, retaining the earlier selected-revision frontend and receipt integrations. Reran the joined variant against isolated Core `36f8f99bf298c4177bb9c7808920eda81d7c6632` (documentation-only successor to implementation `19e9d0a`), the checksum-qualified official PostgREST binary and a fresh disposable PostgreSQL cluster. All 103 migrations and 81 SQL/JWT/HTTP assertions passed; real Core HTTP tests executed within the run and actual initial/update/restore artifacts were used. Harness ESLint passed. Evidence: `task/desktop-current-jwt-sql.log` and `task/desktop-current-jwt-lint.log`. Services and temporary configuration/cluster/journal were cleaned by the harness. This does not qualify GoTrue, Next cookies, storage, OCR or a complete customer browser journey.
+
 ## Deliverable and frozen inputs
 
 The isolated Foundation clone remains `C:\Users\yspow\Documents\Codex\2026-09-30\task-2\customer-journey`, branch `codex/customer-journey-local`. Fetched integration checkpoint **`7f1c0c78`**, merging it locally as `0c189e86`. The only merge conflict was the earlier Core harness imported by integration; retained the already verified computed-validation/artifact-export version from `b345c01b`. No integration-owned worktree was edited. This deliverable adds an actual PostgREST service harness and extends the existing disposable SQL runner; it changes no production schema, auth policy, public UI or Core implementation.

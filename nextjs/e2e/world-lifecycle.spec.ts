@@ -882,3 +882,16 @@ test("late revision reads cannot overwrite a newer history selection", async ({ 
   const body = await page.locator("body").innerText();
   expect(body).not.toContain("Immutable collection verification failed");
 });
+
+
+test("an unversioned entry pins its first verified candidate across reload", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page);
+  await page.goto(`/workspace/review?collection=${collectionId}`);
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  // The preferred candidate advances, but this tab's inspected revision does not.
+  await mockWorkspace(page, false, `sha256:${"c".repeat(64)}`);
+  await page.reload();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+});
