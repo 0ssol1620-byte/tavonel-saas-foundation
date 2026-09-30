@@ -52,14 +52,17 @@ async function installConsentRoutes(page: Page, sourcePending: Pending, options:
 
 /** The focused control must be the topmost element at its own centre -- not under sticky chrome. */
 async function expectFocusUnobscured(page: Page) {
-  const hit = await page.evaluate(() => {
+  // Linux Chromium animates the scroll that focus() starts (html has `scroll-behavior: smooth`):
+  // the 6ecb651 CI trace shows scrollTop unchanged when a single read ran and the page moving
+  // ~40ms later, and --enable-smooth-scrolling reproduces it (movement from ~80ms, settled by
+  // ~230ms). So the same strict hit test is polled, bounded, until that scroll lands.
+  await expect.poll(() => page.evaluate(() => {
     const el = document.activeElement as HTMLElement | null;
     if (!el) return "no focus";
     const r = el.getBoundingClientRect();
     const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return top === el || el.contains(top) ? "ok" : `covered by ${top?.tagName ?? "nothing (off-screen)"}.${(top as HTMLElement | null)?.className ?? ""}`;
-  });
-  expect(hit).toBe("ok");
+  }), { timeout: 2_000 }).toBe("ok");
 }
 
 test("the owner reviews and accepts the terms by keyboard, once, and the file drop opens after bootstrap", async ({ page }, testInfo) => {

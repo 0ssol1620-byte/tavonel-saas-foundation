@@ -590,3 +590,11 @@ Runs:
 The 33 final captures (full-page, plus `viewport-*` after keyboard focus and at page end) are outside the repository in `D:/CodexProjects/tavonel-qa-evidence/consent-billing-20260930-fix/`. `nextjs/test-results/` is wiped on every Playwright run.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+### Linux CI focus-scroll follow-up (2026-09-30)
+
+At `6ecb651`, Linux CI still failed the mobile billing focus checks (947 passed, 3 failed, 1 flaky, 240 skipped). The earlier Windows result did not establish cross-platform completion. The trace shows the assertion reading the original scroll position 5 ms after focus; smooth scrolling starts afterwards. Enabling Chromium smooth scrolling on Windows reproduced the same four 360/390 failures.
+
+The two focus helpers now poll the unchanged strict `elementFromPoint` assertion for at most two seconds, allowing the native focus scroll to settle. Motion remains enabled. With smooth scrolling and retries disabled: the repeated mobile run passed 90/90, and the seven widths plus reduced-motion run passed 67 with 5 desktop-only skips. Removing the product scroll-margin fix still fails the assertion at both mobile widths. This negative control checks that polling does not conceal actual rail occlusion. Default Chromium also passed 67 with 5 skips; TypeScript passed.
+
+Linux CI on this new commit remains required before merge. The evidence and trace analysis are in the private launch audit `claude-billing-focus-linux-fix.json`. These are fixture tests, not authenticated customer or payment evidence.
