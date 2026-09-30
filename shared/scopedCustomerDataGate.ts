@@ -10,10 +10,19 @@ export const SCOPED_CUSTOMER_DATA_GATE_SCHEMA = "tavonel.customer_data_gate.v2" 
  * precondition as still pending, and admits exactly one recorded workspace for at most an hour.
  * Its own schema version keeps every production digest, row and reader from mistaking it for a
  * release. See docs/audit/PROCESSING_QUALIFICATION_STAGE_2026-09-30.md.
+ *
+ * A connector qualification follows the same rules for the one operator workspace and an
+ * operator-owned synthetic sample. Its pending set is exactly the three facts that only an imported,
+ * bound and compiled connector source can show; the other 14 connector facts are required.
  */
 export const QUALIFICATION_GATE_SCHEMA = "tavonel.customer_data_gate.v2.qualification" as const;
 export const QUALIFICATION_PENDING = "compile_receipts_signed_and_audited" as const;
 export const QUALIFICATION_MAX_MS = 60 * 60 * 1000;
+/** Pending preconditions per scope, in customerDataPreconditions order (the SQL CHECK pins the same arrays). */
+export const QUALIFICATION_PENDING_BY_SCOPE = {
+  direct_upload: [QUALIFICATION_PENDING],
+  connector: [QUALIFICATION_PENDING, "deletion_tombstone_propagation_verified", "per_source_acl_preserved"],
+} as const satisfies Record<string, readonly CustomerDataPrecondition[]>;
 export type ReleaseStage = "production" | "qualification";
 export const stageSchema = (stage: ReleaseStage) =>
   stage === "qualification" ? QUALIFICATION_GATE_SCHEMA : SCOPED_CUSTOMER_DATA_GATE_SCHEMA;
@@ -123,41 +132,45 @@ export function evaluateScopedRelease(input: {
 }
 
 /**
- * The 11 direct-upload facts other than the one a qualification compile exists to produce, under
- * the release's own freshness rules. Evidence claiming that fact is extra and refuses. `allowed`
- * means "the bounded qualification may run", never "the release passed": `missing` always names
- * the pending precondition.
+ * The scope's facts other than its pending ones (11 for direct upload, 14 for connectors), under
+ * the release's own freshness rules. Evidence claiming a pending fact is extra and refuses.
+ * `allowed` means "the bounded qualification may run", never "the release passed": `missing`
+ * always names the pending preconditions. An omitted scope is direct upload, whose digest is
+ * unchanged.
  */
 export function evaluateQualificationRelease(input: {
+  scope?: CustomerDataScope;
   releaseRevision: string;
   workspaceId: string;
   expiresAt: string;
   evidence: readonly ReleaseEvidence[];
   now: string;
 }): ScopedReleaseDecision {
-  const required = requiredReleaseEvidence("direct_upload").filter((condition) => condition !== QUALIFICATION_PENDING);
+  const scope = input.scope ?? "direct_upload";
+  const pending: readonly CustomerDataPrecondition[] = QUALIFICATION_PENDING_BY_SCOPE[scope] ?? [];
+  const required = requiredReleaseEvidence(scope).filter((condition) => !pending.includes(condition));
   const evaluated = instant(input.now);
   const expires = instant(input.expiresAt);
-  const validSubject = REVISION.test(input.releaseRevision) && WORKSPACE.test(input.workspaceId) &&
+  const validSubject = pending.length > 0 && REVISION.test(input.releaseRevision) && WORKSPACE.test(input.workspaceId) &&
     evaluated !== null && expires !== null && expires > evaluated && expires - evaluated <= QUALIFICATION_MAX_MS;
   const { missing, exact, canonical } = checkEvidence(required, input.evidence, evaluated);
   const allowed = validSubject && exact && missing.length === 0;
   return {
     schemaVersion: QUALIFICATION_GATE_SCHEMA,
     stage: "qualification",
-    scope: "direct_upload",
+    scope,
     releaseRevision: input.releaseRevision,
     allowed,
-    missing: [...(validSubject && exact ? missing : required), QUALIFICATION_PENDING],
+    missing: [...(validSubject && exact ? missing : required), ...pending],
     receiptSha256: allowed ? digest({
       schemaVersion: QUALIFICATION_GATE_SCHEMA,
       stage: "qualification",
-      scope: "direct_upload",
+      scope,
       releaseRevision: input.releaseRevision,
       workspaceId: input.workspaceId,
       evaluatedAt: new Date(evaluated!).toISOString(),
       expiresAt: new Date(expires!).toISOString(),
-      pending: [QUALIFICATION_PENDING],
+      pending: [...pending],
       evidence: canonical(),
     }) : null,
     evaluatedAt: input.now,
@@ -216,11 +229,12 @@ export function verifyStoredRelease(
     release = evaluateScopedRelease({ scope: subject.scope, releaseRevision: subject.releaseRevision, evidence,
       now: row.evaluated_at });
   } else {
-    if (subject.scope !== "direct_upload" || row.missing.length !== 1 || row.missing[0] !== QUALIFICATION_PENDING ||
+    const pending: readonly string[] | undefined = QUALIFICATION_PENDING_BY_SCOPE[subject.scope];
+    if (!pending || row.missing.length !== pending.length || row.missing.some((item, index) => item !== pending[index]) ||
       typeof row.qualification_workspace_key !== "string" || !isoText(row.qualification_expires_at)) {
       return fail("SCOPED_RELEASE_INVALID");
     }
-    release = evaluateQualificationRelease({ releaseRevision: subject.releaseRevision,
+    release = evaluateQualificationRelease({ scope: subject.scope, releaseRevision: subject.releaseRevision,
       workspaceId: row.qualification_workspace_key, expiresAt: row.qualification_expires_at, evidence,
       now: row.evaluated_at });
   }
@@ -292,13 +306,13 @@ export function admitsWorkspace(
   const evaluated = instant(release.evaluatedAt);
   const qualification = release.qualification;
   const qualificationEnds = qualification && instant(qualification.expiresAt);
-  // A qualification release admits only its recorded workspace, direct upload, and a grant that ends
+  // A qualification release admits only its recorded workspace, its own scope, and a grant that ends
   // within the hour and no later than the qualification itself.
   const stageHolds = grant !== null && release.stage === grant.stage &&
     release.schemaVersion === stageSchema(release.stage) &&
     (release.stage === "production" ? qualification === null
       : release.stage === "qualification" && qualification !== null && qualificationEnds !== null &&
-        timestamp !== null && granted !== null && expires !== null && subject.scope === "direct_upload" &&
+        timestamp !== null && granted !== null && expires !== null && subject.scope === release.scope &&
         subject.tenantId === subject.workspaceId && qualification.workspaceId === subject.workspaceId &&
         timestamp < qualificationEnds && expires <= qualificationEnds && expires - granted <= QUALIFICATION_MAX_MS);
   return timestamp !== null && grant !== null && granted !== null && expires !== null &&

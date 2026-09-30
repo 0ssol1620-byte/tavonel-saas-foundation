@@ -240,4 +240,82 @@ describe("v2 workspace grant during bootstrap", () => {
     expect((await post()).status).toBe(503);
     expect(issueGrant).not.toHaveBeenCalled();
   });
+
+  describe("connector-scope grant renewal", () => {
+    const WS = "pilot-11111111";
+    const byScope = (connector: unknown, direct: unknown = { ok: true, grant: {}, idempotentReplay: false }) =>
+      issueGrant.mockImplementation(async ({ scope }: { scope: string }) => {
+        const outcome = scope === "connector" ? connector : direct;
+        if (outcome instanceof Error) throw outcome;
+        return outcome;
+      });
+    const baseline = async () => {
+      byScope({ ok: true, grant: {}, idempotentReplay: false });
+      const response = await post();
+      return { status: response.status, body: await response.json() };
+    };
+
+    it("renews the connector grant separately, as the owner's own qualification-capable caller", async () => {
+      byScope({ ok: true, grant: { scope: "connector", stage: "qualification" }, idempotentReplay: false });
+      expect((await post()).status).toBe(200);
+      expect(issueGrant).toHaveBeenCalledTimes(2);
+      expect(issueGrant).toHaveBeenCalledWith({ workspaceKey: WS, scope: "direct_upload", allowQualification: true });
+      expect(issueGrant).toHaveBeenCalledWith({ workspaceKey: WS, scope: "connector", allowQualification: true });
+      // Onboarding still reads, and reports, only the direct-upload decision.
+      expect(gate).toHaveBeenCalledOnce();
+      expect(gate).toHaveBeenCalledWith(WS, "direct_upload");
+    });
+
+    it.each([
+      ["absent connector acceptance", { ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" }],
+      ["connector workspace refusal", { ok: false, code: "SCOPED_WORKSPACE_REFUSED" }],
+      ["connector release refusal", { ok: false, code: "SCOPED_RELEASE_REFUSED" }],
+      ["another workspace's connector qualification", { ok: false, code: "SCOPED_RELEASE_QUALIFICATION_OTHER_WORKSPACE" }],
+      ["connector grant store outage", { ok: false, code: "WORKSPACE_GRANT_STORE_FAILED" }],
+      ["unreadable served terms", { ok: false, code: "PROCESSING_TERMS_UNAVAILABLE" }],
+      ["a thrown connector issuance", new Error("network")],
+    ])("leaves valid direct-upload onboarding and its trial unchanged on %s", async (_label, connector) => {
+      const expected = await baseline();
+      vi.clearAllMocks();
+      byScope(connector);
+      const response = await post();
+      expect({ status: response.status, body: await response.json() }).toEqual(expected);
+      expect(expected).toMatchObject({ status: 200, body: { code: "ACCESS_READY", access: { customerDataEnabled: true } } });
+      expect(bootstrap).toHaveBeenCalledOnce();
+    });
+
+    it("keeps a direct-upload outage an outage even when the connector grant succeeds", async () => {
+      byScope({ ok: true, grant: {}, idempotentReplay: false }, { ok: false, code: "WORKSPACE_GRANT_STORE_FAILED" });
+      const response = await post();
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code: "SOURCE_ACCESS_UNAVAILABLE" });
+      expect(bootstrap).not.toHaveBeenCalled();
+    });
+
+    it("never lets a connector grant stand in for direct-upload pending state", async () => {
+      byScope({ ok: true, grant: { scope: "connector", stage: "qualification" }, idempotentReplay: false },
+        { ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+      gate.mockResolvedValue({ ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" });
+      const response = await post();
+      await expect(response.json()).resolves.toMatchObject({ code: "ACCESS_READY_SOURCE_PENDING",
+        sourcePending: "terms_acceptance_required", access: { customerDataEnabled: false } });
+      expect(bootstrap).not.toHaveBeenCalled();
+    });
+
+    it("issues no connector grant on v1 or before authentication and provisioning", async () => {
+      vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v1");
+      await post();
+      expect(issueGrant).not.toHaveBeenCalled();
+      vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+      getUser.mockResolvedValue(null);
+      expect((await post()).status).toBe(401);
+      getUser.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111" });
+      pilotAccess.mockReturnValue(null);
+      expect((await post()).status).toBe(403);
+      pilotAccess.mockReturnValue({ membership: { workspaceId: WS } });
+      provision.mockResolvedValue({ ok: false, code: "SELF_SERVICE_PROVISIONING_FAILED" });
+      expect((await post()).status).toBe(503);
+      expect(issueGrant).not.toHaveBeenCalled();
+    });
+  });
 });

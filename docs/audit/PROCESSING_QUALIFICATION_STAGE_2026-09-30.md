@@ -148,6 +148,70 @@ a refusal for the operator workspace only. Then restore the previous gate versio
 A release-wide refusal is a billing action, not a qualification rollback. Use it only with v2 off, or
 after re-checking step 3.
 
+## Connector qualification (migration `20260930080000`)
+
+Status: implemented in the shared gate, the grant writer/reader and an additive migration on
+branch `codex/connector-processing-qualification-20260930`. It is **not applied, not deployed and not
+a connector release or claim**. The parent approved it for one operator workspace and an
+operator-owned synthetic sample only.
+
+A connector release needs all 17 preconditions. Three can only be observed from a connector source
+that has been imported, bound and compiled. A connector qualification row names exactly those three
+as `missing`, in precondition order: `compile_receipts_signed_and_audited`,
+`deletion_tombstone_propagation_verified`, `per_source_acl_preserved`. It carries the other 14 as
+satisfied evidence under the same validation, and claiming any of the three refuses it. Everything
+else is the direct-upload qualification unchanged:
+- its own schema version;
+- one recorded `pilot-*` workspace;
+- expiry of at most one hour, with each grant no longer than the qualification;
+- the exact deployed SHA;
+- a `delegated-operator:` actor;
+- non-billable on every path;
+- no qualification after an allowed connector release (the 070000 trigger keys on scope and
+  revision).
+
+The latest decision for scope `connector` is independent of `direct_upload`. A connector
+qualification never admits direct upload, and the reverse also holds.
+
+The grant needs the workspace owner's current terms acceptance **for scope `connector`**. A
+direct-upload acceptance does not count. Membership, role, authorization revision, ACL, intake
+binding, quota and hold checks are unchanged. `evaluateQualificationRelease` takes
+`scope: "connector"`. An omitted scope is direct upload, whose digest is unchanged.
+
+Digests: the production `direct_upload` and `connector` release digests and the direct-upload
+qualification digest are pinned to their `f646681` values in
+`server/foundation/scopedCustomerDataGate.test.ts`. So are the production and qualification grant
+digests.
+
+Forward and backward are both fail-closed:
+- Before `20260930080000` the database rejects any connector qualification row (`23514`), so none
+  can exist.
+- Code at `f646681` reads a connector qualification row as `SCOPED_RELEASE_INVALID`.
+- The 070000 grant writer refuses a connector qualification grant
+  (`workspace_grant_qualification_refused`).
+
+Grant caller: the existing authenticated `POST /api/access/bootstrap` renews the connector grant
+alongside the direct-upload grant, as `issueProcessingWorkspaceGrant({ scope: "connector",
+allowQualification: true })`. It runs only after sign-in, pilot membership and self-service
+provisioning, and only when `TAVONEL_CUSTOMER_DATA_GATE_VERSION=v2`. The issuer grants nothing
+without the current owner's durable acceptance for scope `connector`, and it never records one.
+The connector outcome is not part of the response. An absent acceptance, a refusal, another
+workspace's qualification, a store outage or a thrown issuance leaves the direct-upload response,
+its pending reason and the trial exactly as they would be without it. The route reads and reports
+only the `direct_upload` gate. There is no new endpoint.
+
+Preconditions not met by this change. Do not open a connector window until each holds:
+1. **Fixture-folder selection does not exist on this branch.** `listGoogleDriveLifecyclePage`
+   lists every non-trashed file the account can see, or one shared drive when a `driveId` is given.
+   It does not restrict the list to a folder. The operator test must select only the fixture
+   folder, never an account-wide import. That selector belongs to the connector sync/import code
+   owned by another agent.
+2. Connection setup (OAuth authorize/callback) is still gated on the connector processing gate. The
+   setup separation is handled separately.
+3. The 14 facts must be verified against the deployed SHA; this change verifies none of them. The
+   billing precondition in the Rollout sequence (zero live subscriptions, cron never suspended) applies
+   unchanged.
+
 ## Remaining limitations
 
 * The 11 facts must be verified against the deployed SHA before step 3. This change verifies
