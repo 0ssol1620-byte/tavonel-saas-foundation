@@ -120,7 +120,7 @@ export async function qualifyNextBrowser({ root, env, base, token, owner, admin,
         return { status: response.status, cache: response.headers.get("cache-control"), body: await response.json() };
       }, { resource, bearer, body });
       const worldPath = `/api/collections/${artifacts[0].collectionId}/world`;
-      await context.addCookies([{ name: "tvnl_device", value: "synthetic-risk-cookie-is-not-authentication", url: origin, httpOnly: true, secure: true, sameSite: "Lax" }]);
+      await context.addCookies([{ name: "tvnl_device", value: "synthetic-device-cookie-without-authentication", url: origin, httpOnly: true, secure: true, sameSite: "Lax" }]);
       check("actual browser unauthenticated Next request is refused", (await request(worldPath)).status, 401);
       check("actual browser invalid synthetic JWT is refused", (await request(worldPath, token(owner,"authenticated",{},"invalid-local-key"))).status,401);
       check("actual browser expired synthetic JWT is refused", (await request(worldPath, token(owner,"authenticated",{exp:Math.floor(Date.now()/1000)-120}))).status,401);
