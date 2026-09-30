@@ -9,6 +9,7 @@ import "./globals.css";
 import "./one-path.css";
 import "./chrome-v2.css";
 import "./landing-v2.css";
+import "./paper-product.css";
 
 /**
  * The three faces, landing V2 blueprint §6 / lane D3.

@@ -1,3 +1,4 @@
+import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX } from "./global-collection-compile";
 import { isCompileWaitingOnReading, runCollectionCompile } from "./collection-compile-run";
 import {
   advanceCompileJob,
@@ -180,6 +181,9 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
   */
   if (isRestingCompileState(job.state)) return rest("resting", job.state, job.documentsReady, job.blocked);
 
+  if (job.compilationMode === "global_collection" && !globalCollectionCompileEnabled()) {
+    return rest("skipped", job.state, job.documentsReady, job.blocked);
+  }
   const signer = readR2SignerEnv();
   if (!signer) return rest("skipped", job.state, job.documentsReady, job.blocked);
 
@@ -268,7 +272,9 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     return rest("skipped", job.state, classified.ready.length, classified.blocked);
   }
 
-  const run = await runCollectionCompile(job.workspaceKey, classified.ready);
+  const run = job.compilationMode === "global_collection"
+    ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`)
+    : await runCollectionCompile(job.workspaceKey, classified.ready);
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
       /*

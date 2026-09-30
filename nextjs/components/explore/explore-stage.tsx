@@ -28,9 +28,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import Logomark from "@/components/logomark";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
-import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
-import { sourcePageQualifier } from "@/lib/source-page-rasters";
+
+
 import WorldAct from "./world-act";
+import EvidenceWorkbench from "./evidence-workbench";
 import EvidenceAct from "./evidence-act";
 import ChangeAct from "./change-act";
 import AskOverlay from "./ask-overlay";
@@ -80,8 +81,6 @@ type Props = {
 export default function ExploreStage({ model, layout, change, answers, technical, capturedOn }: Props) {
   const reduced = useReducedMotion();
   const narrow = useNarrowStage();
-  const entryProof = useMemo(() => chooseExploreEntryProof(model.evidence, answers), [model.evidence, answers]);
-  const proofPreview = entryProof ? excerptPreview(entryProof.excerpt) : null;
 
   const opening = useMemo(() => {
     const claim = model.focus.find((id) => model.nodes.find((node) => node.id === id)?.kind === "Claim");
@@ -109,6 +108,11 @@ export default function ExploreStage({ model, layout, change, answers, technical
     // Every act change goes through here -- the rail, the entry CTA, the deep link and the
     // openers -- so the change act is counted once rather than once per way in.
     if (next === "change_compare") trackFunnel("explore_change_opened");
+    const url = new URL(window.location.href);
+    if (next === "entry") url.searchParams.delete("act");
+    else url.searchParams.set("act", next);
+    url.searchParams.delete("evidence");
+    if (url.href !== window.location.href) window.history.pushState(null, "", url);
     setAct(next);
     setSettled(true);
   }, []);
@@ -143,6 +147,9 @@ export default function ExploreStage({ model, layout, change, answers, technical
       setEvidenceId(regionId);
       trackFunnel("explore_evidence_opened", { from: "region" });
       enter("evidence");
+      const url = new URL(window.location.href);
+      url.searchParams.set("evidence", regionId);
+      window.history.replaceState(null, "", url);
     },
     [enter, model.nodes],
   );
@@ -183,6 +190,22 @@ export default function ExploreStage({ model, layout, change, answers, technical
     const frame = window.requestAnimationFrame(() => setSettled(true));
     return () => window.cancelAnimationFrame(frame);
   }, [enter, model.evidence, openRegion]);
+
+  useEffect(() => {
+    const restore = () => {
+      const query = new URLSearchParams(window.location.search);
+      const region = evidenceIdFromQuery(query.get("evidence") ?? undefined, model.evidence);
+      if (region) {
+        const owner = model.nodes.find(node => node.evidenceRefs.includes(region));
+        if (owner) setSelectedId(owner.id);
+        setEvidenceId(region);
+      }
+      setAct(region ? "evidence" : actFromQuery(query.get("act") ?? undefined));
+      setSettled(true);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [model.evidence, model.nodes]);
 
   useEffect(() => {
     /*
@@ -304,7 +327,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
   };
 
   return (
-    <main id="main" className={styles.page}>
+    <main id="main" className={`${styles.page} paper-product`}>
       <header className={styles.header}>
         {/*
           chrome-01. One wordmark everywhere. The header, the footer and the share card set
@@ -364,6 +387,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
         {act === "entry" ? null : (
           <div className={styles.railRow}>
             <nav className={styles.rail} aria-label="Acts">
+              <button type="button" onClick={() => enter("entry")}>Content &amp; evidence</button>
               {EXPLORE_ACTS.map((entry) => (
                 <button
                   key={entry.act}
@@ -381,8 +405,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
           </div>
         )}
 
-        <div className={styles.acts} inert={act === "entry"}>
-          {scene === "world" ? (
+        <div className={styles.acts} hidden={act === "entry"}>
+          {scene === "world" && act !== "entry" ? (
             <WorldAct
               model={model}
               layout={layout}
@@ -423,80 +447,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
           ) : null}
         </div>
 
-        {act === "entry" ? (
-          <div className={styles.entry}>
-            <div className={styles.entryLayout}>
-              <div className={styles.entryCopy}>
-                <p className={styles.entryEyebrow}>Explore · no login required</p>
-                <h1>{EXPLORE_COPY.hero}</h1>
-                <p className={styles.entrySub}>{EXPLORE_COPY.sub}</p>
-                <button type="button" className={`btn ${styles.entryCta}`} onClick={() => enter("world")}>
-                  {EXPLORE_COPY.enter}
-                </button>
-                <div className={styles.entryPaths} aria-label="Other ways to explore">
-                  <button type="button" onClick={() => enter("change_compare")}>Compare filings</button>
-                  <button type="button" onClick={openAsk}>Try sample questions</button>
-                </div>
-              </div>
-              {entryProof && proofPreview ? (
-                <aside className={styles.entryProof} aria-label="Excerpt from the sample source" data-entry-proof="source-bound">
-                  <div className={styles.proofHeading}>
-                    <span>From the source</span>
-                  </div>
-                  <p className={styles.proofFiling}>
-                    {entryProof.form ?? "Public filing"}
-                    {entryProof.filingDate ? <span>Filed {entryProof.filingDate}</span> : null}
-                  </p>
-                  {/* BQ-072: the excerpt stops on a word boundary and says so with an ellipsis. */}
-                  <blockquote>{proofPreview.text}{proofPreview.truncated ? "…" : ""}</blockquote>
-                  <div className={styles.proofFoot}>
-                    <span>Page {entryProof.page} · {sourcePageQualifier(entryProof.representationKind)}</span>
-                    <button type="button" onClick={() => openRegion(entryProof.id)}>Open this source page</button>
-                  </div>
-                </aside>
-              ) : null}
-            </div>
-            {/*
-              WG-034 asks for three facts before anything else on this page: when the sources were
-              captured, how much material is in scope, and that this is a sample you read rather
-              than a compile you are watching. The first two are read off the fixture -- the
-              acquisition manifest's own timestamp and the documents actually compiled -- so
-              neither can drift from what the page is built from.
-            */}
-            <p className={styles.entryScope}>
-              Read-only sample · sources captured {capturedOn} · {technical.documents.length} public
-              filings · Follow the evidence back to its source
-            </p>
-            {/*
-              Audit E04 and G06, at the sample rather than two pages away, rewritten by BA-037.
-
-              Six scoping clauses in 11px type sat directly under the page's central promise --
-              one issuer, in English, cleanly scanned, one permission level, not a mixed internal
-              corpus, not a degraded scan -- and half of them were the page auditing itself in
-              front of a buyer. Both facts survive, in two sentences at a readable size, because
-              both are still load-bearing: the corpus is public so the result is re-derivable, and
-              what the read recovers is published in full rather than summarised here. The
-              capability manifest is the one document that carries the whole of the second half,
-              which is why one link can replace four clauses without losing anything.
-
-              The representativeness limit keeps one sentence rather than none. The audit's
-              replacement dropped it entirely, and nothing else on the site states it: /sources
-              publishes what the *read* recovers and /reproducibility publishes what the manifest
-              establishes, and neither says that this particular corpus is one clean English
-              issuer. A limitation is moved to where it belongs or compressed, never deleted -- so
-              the four clauses become one sentence that leads with what the corpus shows.
-            */}
-            <p className={styles.entryNote}>
-              This World is compiled from Apple’s public SEC filings, so you can re-derive every
-              result: the same inputs are downloadable as a{" "}
-              <Link href="/reproducibility">reproducibility manifest</Link>. One issuer’s clean,
-              English-language filings at a single permission level show the mechanism; they are
-              not a claim about a mixed internal corpus or a degraded scan. What this read
-              recovers, and what it does not, is published in full in the{" "}
-              <Link href="/sources">capability manifest</Link>.
-            </p>
-          </div>
-        ) : null}
+        {act === "entry" ? <EvidenceWorkbench model={model} answers={answers} technical={technical} capturedOn={capturedOn} onOpenRegion={openRegion} onRelations={() => enter("world")} onChanges={() => enter("change_compare")} /> : null}
 
         {act === "ask" ? (
           <AskOverlay

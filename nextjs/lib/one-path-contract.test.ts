@@ -67,16 +67,17 @@ describe("approved one-path experience", () => {
     CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
     this contract keeps the buyer's first-visit sequence explicit.
   */
-  it("orders the landing as film, explanation, proof scene, change, trust and action", () => {
+  it("orders the landing as source evidence, explanation, proof, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    expect(page).toContain("<HeroFilm");
+    expect(page).toContain("<HeroSourceCard");
+    expect(page).not.toContain("<HeroFilm");
     expect(page).toContain("<CompilerSpecimen");
     const order = [
       'id="s1"',
-      "<HeroStatement",
+      'id="lv2-hero-title"',
       "<HeroActions",
-      "<HeroFilm",
+      "<HeroSourceCard",
       'id="s2"',
       "<CompilerSpecimen",
       "<HeroProof",
@@ -188,7 +189,8 @@ describe("approved one-path experience", () => {
     */
     const composition = text("components/landing-v2/landing-page.tsx");
     expect(composition, "the pricing link remains in the Korean journey")
-      .toContain('pricingHref={korean ? "/ko/pricing" : "/pricing"}');
+      .toContain('href={korean ? "/ko/pricing" : "/pricing"}');
+    expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref');
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');

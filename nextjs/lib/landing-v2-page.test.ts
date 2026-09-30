@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -22,7 +23,6 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
-import { BRAND_LINE } from "./site-navigation";
 
 /*
   THE COMPOSITION GUARD (contract D9, D13).
@@ -91,8 +91,8 @@ function elements(html: string, tag: string): string[] {
 const attr = (open: string, name: string): string | undefined =>
   open.match(new RegExp(`\\s${name}="([^"]*)"`, "i"))?.[1];
 
-/** D9's ground alternation, read off the page rather than off the composition's own table. */
-const GROUND = ["obsidian", "obsidian", "paper", "obsidian", "obsidian", "obsidian"];
+/** The 2026-09-30 approved masterplan supersedes historical scene ground names. */
+const PAPER_CSS = readFileSync(new URL("../app/paper-product.css", import.meta.url), "utf8");
 
 describe("landing v2 -- the composition", () => {
   it.each(LOCALES)(
@@ -111,20 +111,18 @@ describe("landing v2 -- the composition", () => {
   );
 
   it.each(LOCALES)(
-    "%s reserves paper for actual proof and source evidence",
+    "%s applies the approved paper/ink work surface while retaining named landmarks",
     locale => {
-      const main = mainOf(render(locale));
-      const grounds = elements(main, "section").map(open =>
-        /\blv2-obsidian\b/.test(attr(open, "class") ?? "")
-          ? "obsidian"
-          : "paper"
-      );
-      expect(grounds).toEqual(GROUND);
+      expect(render(locale)).toContain('class="page lv2 paper-product"');
+      expect(PAPER_CSS).toContain("--ground: #f7f5ef");
+      expect(PAPER_CSS).toContain("--text-hi: #171c20");
+      expect(PAPER_CSS).toContain(".paper-product .paper-hero-grid");
+      expect(PAPER_CSS).toContain("prefers-reduced-motion:reduce");
     }
   );
 
   it.each(LOCALES)(
-    "%s has one h1, and it is the founder-owned headline",
+    "%s has one h1, matching the approved source-first masterplan",
     locale => {
       const html = render(locale);
       const main = mainOf(html);
@@ -142,8 +140,8 @@ describe("landing v2 -- the composition", () => {
       const bare = (value: string) => value.replace(/\s+/g, "");
       const expected =
         locale === "ko"
-          ? LANDING_V2_COPY.ko.hero.headline
-          : BRAND_LINE.headline;
+          ? "문서에서 찾은 지식, 원문에서 확인하세요"
+          : "Knowledge from your documents. Evidence you can inspect.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
     }
   );
@@ -262,7 +260,9 @@ describe("landing v2 -- the composition", () => {
       expect(main).toContain(locale === "ko" ? ">원문</button>" : ">Page</button>");
       expect(main).toContain(locale === "ko" ? ">활용</button>" : ">Intelligence</button>");
       expect(main).toContain(locale === "ko" ? "TIF 또는 GIF" : "TIF or GIF");
-      expect(main).not.toContain('fetchpriority="high"');
+      const heroImage = elements(main, "img").find(open => attr(open, "fetchpriority") === "high");
+      expect(heroImage, "the committed above-fold source page owns the image priority").toBeTruthy();
+      expect(attr(heroImage!, "loading")).toBe("eager");
     }
   );
 
@@ -279,7 +279,7 @@ describe("landing v2 -- the composition", () => {
     "%s declares every image's box, alt and loading posture",
     locale => {
       const main = mainOf(render(locale));
-      const hero = main.slice(0, main.indexOf('<section id="proof"'));
+      const hero = main.slice(0, main.indexOf('<section id="s2"'));
       const images = elements(main, "img");
       expect(images.length).toBeGreaterThan(0);
       for (const open of images) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const DISTRIBUTION_VERSION = "2026.9.20.1";
+const DISTRIBUTION_VERSION = "2026.9.30.1";
 const API_VERSION = "1";
 const SEARCH_LIMIT_MAX = 25;
 const PAGE_LIMIT_MAX = 50;

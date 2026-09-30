@@ -31,7 +31,7 @@ describe("developer distribution", () => {
     const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
     const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
     const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
-    expect(channel.version).toBe("2026.9.20.1");
+    expect(channel.version).toBe("2026.9.30.1");
     expect(channel.apiVersion).toBe(1);
     expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
     expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
@@ -169,7 +169,9 @@ describe("developer distribution", () => {
     expect(source).not.toContain('add_argument("--api-key"');
     expect(source).toContain("/api/v1/uploads/capability");
     expect(source).toContain("/sync");
-    expect(source.indexOf("result = client.post(")).toBeLessThan(source.indexOf("write_state(args.state"));
+    const commit = source.slice(source.indexOf("def commit_pending("), source.indexOf("@contextmanager"));
+    expect(commit.indexOf("result = client.post(")).toBeLessThan(commit.indexOf("write_state(args.state"));
+    expect(source).toContain("write_journal(pending_path, pending)");
     expect(source).toContain("os.replace(temp_name, path)");
     expect(source).toContain('parsed.hostname in {"localhost", "127.0.0.1", "::1"}');
   });

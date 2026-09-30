@@ -1,3 +1,6 @@
+import { CORPUS_MAX_DOCUMENTS } from "./compile-limits";
+import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX, GLOBAL_COLLECTION_MAX_BYTES, GLOBAL_COLLECTION_MAX_REGIONS, judgeGlobalCollectionInput } from "./global-collection-compile";
+import { CORE_MAX_LATENCY_MS } from "./execution-budget";
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { authorizationStage, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import type { ReleaseStage } from "../../shared/scopedCustomerDataGate";
@@ -14,6 +17,7 @@ import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import {
   dispatchProductCoreV2,
   productCoreV2CollectionId,
+  legacyProductCoreV2CollectionId,
   projectProductCoreV2Candidate,
   readProductCoreV2Env,
   readRevisionCompileSnapshot,
@@ -89,11 +93,23 @@ async function readCompileAuthorization(workspaceId: string, documentIds: readon
 export async function runCollectionCompile(
   workspaceId: string,
   documentIds: readonly string[],
+  logicalCollectionKey?: string,
 ): Promise<CollectionCompileRun> {
+  const startedAt = Date.now();
+  const globalCollection = logicalCollectionKey?.startsWith(GLOBAL_COLLECTION_KEY_PREFIX) === true;
+  if (globalCollection && documentIds.length > CORPUS_MAX_DOCUMENTS) {
+    return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+  }
+  if (globalCollection && !globalCollectionCompileEnabled()) {
+    return { ok: false, status: 503, code: "GLOBAL_COLLECTION_COMPILE_DISABLED", payload: {} };
+  }
   // A candidate is registered under its document ids before it is stored, and source deletion
   // can only name a UUID. An id it could never name is refused here, before anything is paid for.
-  if (documentIds.length === 0 || !documentIds.every((id) => CANONICAL_DOCUMENT_ID.test(id))) {
+  if (documentIds.length === 0 || new Set(documentIds).size !== documentIds.length || !documentIds.every((id) => CANONICAL_DOCUMENT_ID.test(id))) {
     return { ok: false, status: 400, code: "DOCUMENT_SET_UNQUALIFIED", payload: {} };
+  }
+  if (logicalCollectionKey !== undefined && (!logicalCollectionKey.trim() || logicalCollectionKey.length > 256)) {
+    return { ok: false, status: 400, code: "COLLECTION_IDENTITY_INVALID", payload: {} };
   }
   const signer = readR2SignerEnv();
   if (!signer) return { ok: false, status: 503, code: "SIGNER_NOT_CONFIGURED", payload: {} };
@@ -132,7 +148,22 @@ export async function runCollectionCompile(
     return { ok: false, status: 409, code: "OCR_NOT_READY", payload: {}, retryAfterSeconds: 5 };
   }
 
-  const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
+  const fetched: Awaited<ReturnType<typeof getWorkspaceOcrJson>>[] = [];
+  let fetchedBytes = 0;
+  let fetchedRegions = 0;
+  const fanout = globalCollection ? 1 : 4;
+  // Global reads consume the remaining byte budget sequentially; legacy reads use fan-out 4.
+  for (let offset = 0; offset < selected.length; offset += fanout) {
+    const batch = await Promise.all(selected.slice(offset, offset + fanout).map((item) => globalCollection
+      ? getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!, new Date(), GLOBAL_COLLECTION_MAX_BYTES - fetchedBytes)
+      : getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
+    fetched.push(...batch);
+    if (globalCollection) {
+      fetchedBytes += batch.reduce((sum, result) => sum + (result.ok ? (result.byteLength ?? Buffer.byteLength(JSON.stringify(result.json), "utf8")) : 0), 0);
+      fetchedRegions += batch.reduce((sum, result) => sum + (result.ok && result.json && typeof result.json === "object" && Array.isArray((result.json as { regions?: unknown }).regions) ? ((result.json as { regions: unknown[] }).regions.length) : 0), 0);
+      if (fetchedBytes > GLOBAL_COLLECTION_MAX_BYTES || fetchedRegions > GLOBAL_COLLECTION_MAX_REGIONS || batch.some((result) => !result.ok && result.code === "JSON_TOO_LARGE")) return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+    }
+  }
   // An OCR result that could not be read at all is a binding failure, not a missing-region one.
   const bodies = fetched.map((result) => (result.ok ? result.json : null));
   if (bodies.some((body) => body === null || typeof body !== "object")) {
@@ -181,6 +212,9 @@ export async function runCollectionCompile(
   }
 
   const verifiedInputs = inputs.filter((item) => item !== null);
+  if (globalCollection && !judgeGlobalCollectionInput(verifiedInputs)) {
+    return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+  }
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
   const revalidate = async (): Promise<CollectionCompileRun | null> => {
@@ -227,19 +261,29 @@ export async function runCollectionCompile(
     (same defect, with a receipt attached), and it is off unless an operator turns it on --
     nothing here verifies that the deployed Core accepts `incremental_recompile`.
 
-    The lookup is exact: the collection id is a hash of the document/version binding, so this
-    finds a prior World only for a re-compile of an identical binding. That is enough to
-    exercise the equivalence path and not enough for the economic claim; the missing piece is a
-    collection identity that survives a source revision, written up in the lane report.
+    The lookup is exact and revision-independent: the logical selection identity excludes
+    versionKey. A source revision therefore finds the actual active parent, while unrelated
+    collections are never joined by content similarity. Historical version-key identities
+    require an explicit migration mapping; this path does not guess their lineage.
   */
   let previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null;
   if (coreV2 && revisionCompileEnabled()) {
     const active = await getFoundationActiveWorld(
       workspaceId,
-      productCoreV2CollectionId(workspaceId, verifiedInputs),
+      productCoreV2CollectionId(workspaceId, verifiedInputs, logicalCollectionKey),
     );
     if (!active.ok && active.code !== "ACTIVE_WORLD_NOT_FOUND") {
       return { ok: false, status: 503, code: active.code, payload: {} };
+    }
+    if (!active.ok && logicalCollectionKey === undefined) {
+      // An exact old binding is evidence of a legacy collection, not permission to migrate
+      // its history. Refuse instead of silently presenting the same work as a new collection.
+      const legacy = await getFoundationActiveWorld(workspaceId, legacyProductCoreV2CollectionId(workspaceId, verifiedInputs));
+      if (legacy.ok) return {
+        ok: false, status: 409, code: "COLLECTION_IDENTITY_MIGRATION_REQUIRED",
+        payload: { legacyCollectionId: legacy.world.collectionId },
+      };
+      if (legacy.code !== "ACTIVE_WORLD_NOT_FOUND") return { ok: false, status: 503, code: legacy.code, payload: {} };
     }
     if (active.ok) {
       const stored = await getWorkspaceCollectionCandidate(signer, workspaceId, active.world.candidateObjectKey);
@@ -264,6 +308,8 @@ export async function runCollectionCompile(
       return { ok: false, status: 503, code: currentGate.code, payload: {} };
     }
     customerDataGate = currentGate.decision;
+    const remainingMs = globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS;
+    if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
     const compiled = await dispatchProductCoreV2(
       coreV2,
       workspaceId,
@@ -272,8 +318,13 @@ export async function runCollectionCompile(
       previousActiveWorld,
       customerDataGate,
       currentGate.scope,
+      logicalCollectionKey,
+      remainingMs,
     );
     if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
+    if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
+      return { ok: false, status: 502, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH", payload: {} };
+    }
     if (compiled.result.status === "rejected") {
       return {
         ok: false,

@@ -12,7 +12,7 @@ export const CONSENT_KEY = "tavonel.analytics-consent.v1";
 */
 export const PUBLIC_MARKETING_PATHS = new Set([
   "/", "/api", "/arena", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise",
-  "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy",
+  "/evaluation", "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy",
   "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
   "/refunds", "/research", "/research/notes", "/resources", "/security", "/sources", "/status",
   "/subprocessors", "/terms", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence",
@@ -28,7 +28,7 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   // because this set is what gates where consented analytics loads. Consent is unchanged: the
   // path being listed is what makes a consented page view possible, never what makes it exempt.
   "/ko",
-  "/ko/contact", "/ko/pricing",
+  "/ko/contact", "/ko/evaluation", "/ko/pricing",
   /*
     The two pages the 2026-09-11 campaign published, found at integration by the guard in
     `lib/seo-surface.test.ts` rather than by a reader: `/solutions` is the new hub (all five

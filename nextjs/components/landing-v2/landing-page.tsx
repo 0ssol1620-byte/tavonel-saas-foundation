@@ -1,12 +1,13 @@
+import Link from "next/link";
 import {
   PublicSiteFooter,
   PublicSiteHeader,
 } from "@/components/public-site-chrome";
 import CompilerSpecimen from "./compiler-specimen";
-import HeroFilm from "./hero-film";
+import HeroSourceCard from "./hero-source-card";
 import HeroActions from "./hero-actions";
 import HeroProof from "./hero-proof";
-import HeroStatement from "./hero-statement";
+
 import LandingAnalytics from "./landing-analytics";
 import ProofScene from "./scenes/proof";
 import RecompileScene from "./scenes/recompile";
@@ -106,7 +107,7 @@ export default function LandingPage({
     : { eyebrow: "Public sample", title: "Inspect the result and its source." };
 
   return (
-    <div className="page lv2" lang={korean ? "ko" : undefined}>
+    <div className="page lv2 paper-product" lang={korean ? "ko" : undefined}>
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
@@ -128,27 +129,17 @@ export default function LandingPage({
           aria-labelledby="lv2-hero-title"
           className="lv2-scene lv2-obsidian lv2-hero"
         >
-          <div className="lv2-wrap">
-            <HeroStatement
-              copy={copy.hero}
-              titleId="lv2-hero-title"
-              /* D3 allows the serif on one phrase of the H1; Instrument Serif has no Hangul. */
-              accent={korean ? undefined : "Knowledge you can verify"}
-              headlineVariant={experiment.headlineVariant}
-            />
-            <HeroActions
-              exploreLabel={heroActions.exploreLabel}
-              exploreHref={heroActions.exploreHref}
-              pricingLabel={korean ? "요금 보기" : "View pricing"}
-              pricingHref={korean ? "/ko/pricing" : "/pricing"}
-              scene="1"
-              ctaOrderVariant={experiment.ctaOrderVariant}
-            />
-            <p className="lv2-hero-intake lv2-meta">
-              {korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats}{" "}
-              <span className="lv2-hero-intake-tail">· {copy.hero.microProofConnected}</span>
-            </p>
-            <HeroFilm korean={korean} />
+          <div className="lv2-wrap paper-hero-grid">
+            <div className="paper-hero-copy">
+              <p className="paper-availability"><span aria-hidden="true">●</span> {korean ? "공개 샘플 이용 가능 · 내 문서는 상담 후 평가" : "Public sample available · Your documents by agreement"}</p>
+              <p className="paper-label">{korean ? "근거를 가진 AI 지식" : "Knowledge with a source"}</p>
+              <h1 id="lv2-hero-title">{korean ? <>문서에서 찾은 지식,<br />원문에서 확인하세요</> : <>Knowledge from your documents.<br /><span>Evidence you can inspect.</span></>}</h1>
+              <p className="paper-hero-description">{korean ? "흩어진 내용을 근거와 함께 살펴보고, 어떤 문서와 버전에서 나왔는지 확인하세요. 사용할 AI에 연결하는 경로도 함께 제공합니다." : "Explore what your documents say, trace it to the original passage, and understand which version your AI is using."}</p>
+              <HeroActions exploreLabel={korean ? "공개 샘플 열기" : "Open the public sample"} exploreHref={heroActions.exploreHref} pricingLabel={access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : startActions.accessLabel} pricingHref={access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref} scene="1" />
+              <p className="paper-hero-note">{korean ? "로그인 없이 실제 공개 자료의 결과와 근거를 확인하세요." : "No sign-up. Real public documents, readable evidence."}</p>
+              <p className="paper-hero-note">{korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats} · <Link href={korean ? "/ko/pricing" : "/pricing"}>{korean ? "가격과 이용 조건" : "Pricing and conditions"}</Link></p>
+            </div>
+            <HeroSourceCard korean={korean} />
           </div>
         </section>
 

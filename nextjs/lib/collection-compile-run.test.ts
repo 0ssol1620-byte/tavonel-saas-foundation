@@ -688,12 +688,45 @@ describe("a re-compile of a collection that already has an active World", () => 
     vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
     readableSource();
     promotedOnce();
-    priorCandidate.mockResolvedValue({ ok: true, json: { revisionCompile: SNAPSHOT } });
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-unused-by-this-assertion", revisionCompile: SNAPSHOT } });
 
     await runCollectionCompile(WS, [DOCUMENT]);
 
     expect(dispatched.mock.calls[0]?.[4]).toEqual(SNAPSHOT);
     vi.unstubAllEnvs();
+  });
+
+  it("looks up the same active collection after a source revision", async () => {
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    readableSource();
+    promotedOnce();
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-unused-by-this-assertion", revisionCompile: SNAPSHOT } });
+    await runCollectionCompile(WS, [DOCUMENT]);
+    const firstLookup = activeWorld.mock.calls[0];
+    const newer = "e".repeat(64);
+    listed.mockResolvedValue({ ok: true, objects: [
+      { key: `${PREFIX.replace(VERSION, newer)}/sanitized.pdf`, size: 1024 },
+      { key: `${PREFIX.replace(VERSION, newer)}/ocr.json`, size: 512 },
+    ] });
+    const updated = ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]);
+    fetched.mockResolvedValue({ ok: true, json: { ...updated, inputSha256: `sha256:${newer}`, sourceImmutableKey: `${PREFIX.replace(VERSION, newer)}/sanitized.pdf` } });
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    expect(run.ok).toBe(true);
+    expect(activeWorld.mock.calls[1]).toEqual(firstLookup);
+    expect(dispatched.mock.calls[1]?.[4]).toEqual(SNAPSHOT);
+  });
+
+  it("refuses a parent snapshot stored under another collection", async () => {
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    readableSource();
+    promotedOnce();
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-wrong", revisionCompile: SNAPSHOT } });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, code: "REVISION_COMPILE_PRIOR_WORLD_UNREADABLE" });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 
   it("compiles from scratch when this binding has no active World", async () => {
@@ -706,6 +739,15 @@ describe("a re-compile of a collection that already has an active World", () => 
     expect(priorCandidate).not.toHaveBeenCalled();
     expect(dispatched.mock.calls[0]?.[4] ?? null).toBeNull();
     vi.unstubAllEnvs();
+  });
+
+  it("requires explicit migration for an exact legacy active binding", async () => {
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    readableSource();
+    activeWorld.mockResolvedValueOnce({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" })
+      .mockResolvedValueOnce({ ok: true, world: { collectionId: "collection-legacy" } });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, status: 409, code: "COLLECTION_IDENTITY_MIGRATION_REQUIRED" });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 
   it("refuses instead of compiling from scratch when the prior World cannot be described", async () => {
@@ -748,7 +790,7 @@ describe("a re-compile of a collection that already has an active World", () => 
     vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
     readableSource();
     promotedOnce();
-    priorCandidate.mockResolvedValue({ ok: true, json: { revisionCompile: SNAPSHOT } });
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-unused-by-this-assertion", revisionCompile: SNAPSHOT } });
     // What a Core built before the incremental contract answers: a named refusal, not a World.
     dispatched.mockResolvedValue({ ok: false, code: "CORE_REQUEST_INVALID" });
 
@@ -761,5 +803,51 @@ describe("a re-compile of a collection that already has an active World", () => 
     }
     expect(put).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
+  });
+});
+
+describe("private global compile admission and release binding", () => {
+  const key = `global-corpus/corpus-${"a".repeat(32)}`;
+  function qualifySource(releaseDigest: string) {
+    vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_COMPILE", "1");
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256", `sha256:${"a".repeat(64)}`);
+    readyWorkspace();
+    activeWorld.mockResolvedValue({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" });
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2", candidate: { worldStateId: "world-global", reviewReasons: [] },
+      receipt: { requestId: "request-global", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: releaseDigest, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+  it("refuses a global call before source reads when qualification is closed", async () => {
+    expect(await runCollectionCompile(WS, [DOCUMENT], key)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_COMPILE_DISABLED" });
+    expect(fetched).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+  it("refuses output from an unqualified Core release before persistence", async () => {
+    qualifySource(`sha256:${"b".repeat(64)}`);
+    expect(await runCollectionCompile(WS, [DOCUMENT], key)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH" });
+    expect(put).not.toHaveBeenCalled();
+  });
+  it("preserves all existing signed-receipt gates on a qualified global compile", async () => {
+    qualifySource(`sha256:${"a".repeat(64)}`);
+    expect((await runCollectionCompile(WS, [DOCUMENT], key)).ok).toBe(true);
+    expect(dispatched.mock.calls[0][7]).toBe(key);
+    expect(dispatched.mock.calls[0][8]).toBeGreaterThanOrEqual(1000);
+    expect(dispatched.mock.calls[0][8]).toBeLessThanOrEqual(52000);
+    expect(audited).toHaveBeenCalledOnce();
+    expect(registered).toHaveBeenCalledOnce();
+  });
+  it("bounds aggregate OCR bytes before dispatch", async () => {
+    qualifySource(`sha256:${"a".repeat(64)}`);
+    fetched.mockResolvedValue({ ok: true, json: { text: "x".repeat(4 * 1024 * 1024 + 1) } });
+    expect(await runCollectionCompile(WS, [DOCUMENT], key)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT" });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 });

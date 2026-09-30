@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { CORPUS_ID_PATTERN, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
 import { corpusIdFor } from "./corpus-id";
+import { globalCollectionCompileEnabled } from "./global-collection-compile";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 
 /*
@@ -86,6 +87,7 @@ export type CompileJob = {
   workspaceKey: string;
   documentIds: string[];
   state: CompileState;
+  compilationMode?: "document_batch" | "global_collection";
   collectionId: string | null;
   errorCode: string | null;
   blocked: CompileBlocker[];
@@ -294,6 +296,7 @@ function toJob(row: CompileJobRow): CompileJob | null {
     workspaceKey: row.workspace_key,
     documentIds: Array.isArray(row.document_ids) ? row.document_ids : [],
     state: row.state,
+    compilationMode: (row as CompileJobRow & { compilation_mode?: string }).compilation_mode === "global_collection" ? "global_collection" : "document_batch",
     collectionId: row.collection_id,
     errorCode: row.error_code,
     blocked: parseBlocked(row.blocked),
@@ -360,11 +363,13 @@ export async function enqueueCompileJob(input: {
   documentIds: readonly string[];
   /* Present when this job is one part of a corpus compile. */
   corpus?: { corpusId: string; batchIndex: number; batchCount: number };
+  globalCollection?: boolean;
 }): Promise<CompileJobResult<{ jobId: string; state: CompileState; created: boolean }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
   if (!UUID.test(input.createdByUserId)) return fail("COMPILE_JOB_SCOPE_INVALID");
   const documentIds = [...new Set(input.documentIds)];
-  if (documentIds.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (documentIds.length === 0 || documentIds.length > CORPUS_MAX_DOCUMENTS) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (input.globalCollection && (!globalCollectionCompileEnabled() || !input.corpus || input.corpus.batchIndex !== 0 || input.corpus.batchCount !== 1)) return fail("COMPILE_JOB_SCOPE_INVALID");
   // See CANONICAL_DOCUMENT_ID: an id the deletion guard cannot match is worse than a rejected
   // compile, so it is rejected here, where every caller converges, rather than at the route.
   if (documentIds.some((id) => !CANONICAL_DOCUMENT_ID.test(id))) return fail("COMPILE_JOB_SCOPE_INVALID");
@@ -380,7 +385,7 @@ export async function enqueueCompileJob(input: {
   if (!capacity.ok) return capacity;
   if (!capacity.value.allowed) return fail("COMPILE_JOB_WORKSPACE_LIMIT_REACHED");
 
-  const result = await rpc("enqueue_foundation_compile_job", {
+  const result = await rpc(input.globalCollection ? "enqueue_foundation_global_collection_job" : "enqueue_foundation_compile_job", {
     p_job_id: newCompileJobId(),
     p_workspace_key: input.workspaceKey,
     p_created_by_user_id: input.createdByUserId,
@@ -778,9 +783,19 @@ export async function enqueueCorpusCompile(input: {
   incompleteReason: CompileJobFailure | null;
 }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
-  const batches: CorpusBatch[] = planCorpusBatches(input.documentIds);
+  const globalCollection = globalCollectionCompileEnabled();
+  const ordered = [...new Set(input.documentIds)].sort();
+  if (ordered.length > CORPUS_MAX_DOCUMENTS) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const batches: CorpusBatch[] = globalCollection
+    ? [{ index: 0, count: 1, documentIds: ordered }]
+    : planCorpusBatches(input.documentIds);
   if (batches.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
-  const corpusId = corpusIdFor(input.workspaceKey, input.documentIds);
+  if (ordered.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const baseCorpusId = corpusIdFor(input.workspaceKey, input.documentIds);
+  // A new namespace prevents adopting a legacy batch slot as a whole-collection job.
+  const corpusId = globalCollection
+    ? `corpus-${createHash("sha256").update(`global-collection/1\n${baseCorpusId}`).digest("hex").slice(0, 32)}`
+    : baseCorpusId;
 
   const parts: Array<{ jobId: string; batchIndex: number; state: CompileState; created: boolean }> = [];
   for (const batch of batches) {
@@ -789,6 +804,7 @@ export async function enqueueCorpusCompile(input: {
       createdByUserId: input.createdByUserId,
       documentIds: batch.documentIds,
       corpus: { corpusId, batchIndex: batch.index, batchCount: batch.count },
+      ...(globalCollection ? { globalCollection: true } : {}),
     });
     if (!enqueued.ok) {
       if (parts.length === 0) return enqueued;
