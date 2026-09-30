@@ -16,6 +16,29 @@ function candidate(value: unknown): DeletionCandidate | null {
   return row as DeletionCandidate;
 }
 
+export type DerivedClosureResult =
+  | { ok: true; status: "idle" | "recorded" | "held" | "raced" }
+  | { ok: false; code: string };
+
+/**
+ * One database transaction: erases the retrieval rows one deleted document provably owns and
+ * records its `derived_purged` receipt (20260927104000). No object storage is involved, so a
+ * locked or failing R2 object never holds it back.
+ */
+export async function closeSourceDeletionDerived(): Promise<DerivedClosureResult> {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false, code: "SOURCE_DELETION_STORE_UNAVAILABLE" };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/close_source_deletion_derived", {
+      method: "POST", body: "{}", signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return { ok: false, code: "SOURCE_DELETION_DERIVED_FAILED" };
+    const status = ((await response.json()) as { status?: unknown } | null)?.status;
+    return status === "idle" || status === "recorded" || status === "held" || status === "raced"
+      ? { ok: true, status } : { ok: false, code: "SOURCE_DELETION_DERIVED_INVALID" };
+  } catch { return { ok: false, code: "SOURCE_DELETION_DERIVED_FAILED" }; }
+}
+
 export function createSourceDeletionSweepStore(): DeletionSweepStore {
   return {
     async claim(limit) {
@@ -87,6 +110,22 @@ export function createSourceDeletionSweepStore(): DeletionSweepStore {
         }
         return { ok: true, receipt: { receiptId, status } };
       } catch { return { ok: false, code: "SOURCE_DELETION_FINALIZE_FAILED" }; }
+    },
+    async recordFailure(input) {
+      const config = readSupabaseAdminConfig();
+      if (!config) return { ok: false, code: "SOURCE_DELETION_STORE_UNAVAILABLE" };
+      try {
+        const response = await supabaseAdminRequest(config, "/rest/v1/rpc/record_source_deletion_purge_failure", {
+          method: "POST",
+          body: JSON.stringify({
+            p_deletion_id: input.deletionId,
+            p_object_key: input.objectKey,
+            p_claim_id: input.claimId,
+            p_code: input.code,
+          }),
+        });
+        return response.ok ? { ok: true } : { ok: false, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" };
+      } catch { return { ok: false, code: "SOURCE_DELETION_FAILURE_RECORD_FAILED" }; }
     },
   };
 }

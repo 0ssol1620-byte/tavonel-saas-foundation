@@ -1,8 +1,10 @@
+import { isCollectionCandidateKey } from "./immutable-keys";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import type { SourceInventoryHashedObject } from "./source-deletion-inventory-r2";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
-const SOURCE_ID = /^src-[a-f0-9]{64}$/;
+// Connector sources are `src-<sha256 hex>`; upload tombstones (20260927102000) use the document uuid.
+const SOURCE_ID = /^(src-[a-f0-9]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const WORKSPACE = /^[A-Za-z0-9_-]{1,80}$/;
 const DOCUMENT = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -11,6 +13,8 @@ export type SourceDeletionInventoryCandidate = {
   workspaceKey: string;
   sourceId: string;
   documentIds: string[];
+  /** Exact candidate-world.json keys of every World compiled from these documents (20260930010000). */
+  worldObjectKeys: string[];
 };
 
 export type SourceDeletionInventoryAttestation = {
@@ -28,13 +32,20 @@ function candidate(value: unknown): SourceDeletionInventoryCandidate | null {
     typeof row.sourceId !== "string" || !SOURCE_ID.test(row.sourceId) ||
     !Array.isArray(row.documentIds) || row.documentIds.length > 128 ||
     !row.documentIds.every((id) => typeof id === "string" && DOCUMENT.test(id)) ||
-    new Set(row.documentIds as string[]).size !== row.documentIds.length
+    new Set(row.documentIds as string[]).size !== row.documentIds.length ||
+    // At most 65 keys: one past the limit, so the worker refuses an oversized set and records it
+    // against the tombstone instead of this parse stalling the whole queue.
+    !Array.isArray(row.worldObjectKeys) || row.worldObjectKeys.length > 65 ||
+    !row.worldObjectKeys.every((key) =>
+      typeof key === "string" && isCollectionCandidateKey(row.workspaceKey as string, key)) ||
+    new Set(row.worldObjectKeys as string[]).size !== row.worldObjectKeys.length
   ) return null;
   return {
     deletionId: row.deletionId,
     workspaceKey: row.workspaceKey,
     sourceId: row.sourceId,
     documentIds: [...(row.documentIds as string[])].sort(),
+    worldObjectKeys: [...(row.worldObjectKeys as string[])].sort(),
   };
 }
 
@@ -85,13 +96,27 @@ export async function readSourceDeletionInventoryCandidate(): Promise<
     : { ok: false, code: "SOURCE_INVENTORY_CANDIDATE_INVALID" };
 }
 
+/** Append-only; moves this tombstone behind every other candidate until they have been tried. */
+export async function recordSourceDeletionInventoryFailure(deletionId: string, code: string): Promise<
+  { ok: true } | { ok: false; code: string }
+> {
+  if (!SHA256.test(deletionId) || !/^[A-Z0-9_]{1,80}$/.test(code)) {
+    return { ok: false, code: "SOURCE_INVENTORY_FAILURE_INVALID" };
+  }
+  const result = await rpc("record_source_deletion_worker_failure", {
+    p_deletion_id: deletionId, p_stage: "inventory", p_code: code,
+  });
+  return result.ok ? { ok: true } : result;
+}
+
 export async function recordSourceDeletionInventoryAttestation(
   deletionId: string,
   objects: readonly SourceInventoryHashedObject[],
+  worldObjectKeys: readonly string[],
 ): Promise<
   { ok: true; attestation: SourceDeletionInventoryAttestation } | { ok: false; code: string }
 > {
-  if (!SHA256.test(deletionId) || objects.length > 512) {
+  if (!SHA256.test(deletionId) || objects.length > 512 || worldObjectKeys.length > 64) {
     return { ok: false, code: "SOURCE_INVENTORY_ATTESTATION_INVALID" };
   }
   const result = await rpc("attest_source_deletion_inventory", {
@@ -101,6 +126,8 @@ export async function recordSourceDeletionInventoryAttestation(
       sha256: object.sha256,
       sizeBytes: object.sizeBytes,
     })),
+    // The database re-derives this set and refuses any other; present keys are in `objects`.
+    p_world_object_keys: [...worldObjectKeys],
   });
   if (!result.ok) return result;
   const parsed = attestation(result.value);

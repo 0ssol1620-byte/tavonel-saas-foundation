@@ -347,6 +347,7 @@ describe("documented response shapes", () => {
 
     grantKey({ accessSource: "subscription" });
     customerDataAdmission.mockResolvedValue(true);
+    sourceAccess.mockResolvedValue({ ok: true });
     enqueue.mockResolvedValue({ ok: true, value: { jobId: "job-shape-1", state: "draft" } });
 
     const response = await startCompile(apiRequest("/api/compile-jobs", { documentIds: [DOCUMENT] }));

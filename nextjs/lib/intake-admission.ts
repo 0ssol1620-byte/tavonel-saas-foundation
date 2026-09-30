@@ -58,6 +58,7 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
     if (message.includes("foundation_trial_file_limit_exceeded")) return { ok: false as const, code: "TRIAL_FILE_LIMIT_EXCEEDED" };
     if (message.includes("foundation_trial_not_active")) return { ok: false as const, code: "TRIAL_NOT_ACTIVE" };
     if (message.includes("foundation_intake_idempotency_conflict")) return { ok: false as const, code: "INTAKE_IDEMPOTENCY_CONFLICT" };
+    if (message.includes("foundation_intake_source_deleted")) return { ok: false as const, code: "SOURCE_DELETED" };
     return { ok: false as const, code: "INTAKE_ADMISSION_FAILED" };
   }
   const result = await response.json().catch(() => null) as Record<string, unknown> | null;

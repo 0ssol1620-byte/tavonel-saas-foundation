@@ -167,6 +167,7 @@ select is(
     'deletionId', (select deletion_id from public.source_deletion_tombstones where workspace_key = 'pilot-del1'),
     'workspaceKey', 'pilot-del1',
     'sourceId', 'src-' || repeat('a', 64),
+    'worldObjectKeys', '[]'::jsonb,
     'documentIds', jsonb_build_array(
       '0d000000-0000-4000-8000-000000000001', '0d000000-0000-4000-8000-000000000002')
   ),

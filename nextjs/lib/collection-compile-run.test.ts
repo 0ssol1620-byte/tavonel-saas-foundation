@@ -70,6 +70,11 @@ const audited = vi.fn();
 vi.mock("./enterprise-store", () => ({
   appendServiceAuditEvent: (...args: unknown[]) => audited(...args),
 }));
+const registered = vi.fn();
+vi.mock("./compile-artifact-provenance", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./compile-artifact-provenance")>()),
+  registerCollectionArtifact: (...args: unknown[]) => registered(...args),
+}));
 
 const { runCollectionCompile } = await import("./collection-compile-run");
 const { verifyCompileReceipt } = await import("./compile-receipt-signing");
@@ -99,7 +104,7 @@ let signingEnv = receiptSigningEnv();
 
 const WS = "pilot";
 const VERSION = "a".repeat(64);
-const DOCUMENT = "doc-legacy-ocr";
+const DOCUMENT = "0c0c0c0c-0000-4000-8000-00000000000a";
 const PREFIX = `immutable/${WS}/${WS}/${DOCUMENT}/${VERSION}`;
 const APPROVED_GATE = {
   ok: true as const,
@@ -134,6 +139,7 @@ beforeEach(() => {
   sourceAccess.mockReset().mockResolvedValue({ ok: true });
   customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
   audited.mockReset().mockResolvedValue({ ok: true, eventId: "00000000-0000-4000-8000-000000000000" });
+  registered.mockReset().mockImplementation(async () => ({ ok: true, publishBy: Date.now() + 60_000 }));
   signingEnv = receiptSigningEnv();
   for (const [name, value] of Object.entries(signingEnv)) vi.stubEnv(name, value);
 });
@@ -283,6 +289,55 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
 
     expect(run).toEqual({ ok: false, status: 503, code: "ENTERPRISE_AUDIT_WRITE_FAILED", payload: {} });
     expect(put).not.toHaveBeenCalled();
+  });
+
+  it("registers the exact artifact provenance after the audit and before the PUT", async () => {
+    compilableSource();
+    expect((await runCollectionCompile(WS, [DOCUMENT])).ok).toBe(true);
+    expect(registered).toHaveBeenCalledWith({
+      workspaceKey: WS,
+      collectionId: `collection-${"0".repeat(32)}`,
+      manifestDigest: `sha256:${"a".repeat(64)}`,
+      documentIds: [DOCUMENT],
+    });
+    expect(audited.mock.invocationCallOrder[0]).toBeLessThan(registered.mock.invocationCallOrder[0]!);
+    expect(registered.mock.invocationCallOrder[0]).toBeLessThan(put.mock.invocationCallOrder[0]!);
+  });
+
+  it("stores nothing when the registry refuses a deleted source", async () => {
+    compilableSource();
+    registered.mockResolvedValue({ ok: false, code: "COLLECTION_ARTIFACT_SOURCE_DELETED", refused: true });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toEqual({
+      ok: false, status: 409, code: "COLLECTION_ARTIFACT_SOURCE_DELETED", payload: {},
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("stores nothing when the registry cannot be reached", async () => {
+    compilableSource();
+    registered.mockResolvedValue({ ok: false, code: "COLLECTION_ARTIFACT_PROVENANCE_FAILED", refused: false });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, status: 503 });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("does not start the PUT once the publication lease has run out", async () => {
+    compilableSource();
+    registered.mockResolvedValue({ ok: true, publishBy: Date.now() - 1 });
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toEqual({
+      ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {},
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("refuses a document id deletion could never name before touching anything", async () => {
+    compilableSource();
+    expect(await runCollectionCompile(WS, ["doc-legacy-ocr"])).toEqual({
+      ok: false, status: 400, code: "DOCUMENT_SET_UNQUALIFIED", payload: {},
+    });
+    expect(customerDataGate).not.toHaveBeenCalled();
+    expect(listed).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
   });
 
   it("refuses before the gate, R2 or the Core when no receipt signer is configured", async () => {

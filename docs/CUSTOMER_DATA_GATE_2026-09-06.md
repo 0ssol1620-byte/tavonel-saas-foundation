@@ -51,8 +51,8 @@ exists, with a named hole), or **MISSING** (no implementation in this repository
 | 7 | `archive_bomb_limits_enforced` | EXISTS | `nextjs/lib/archive-expand.ts`: `MAX_FILES` 128, `MAX_EXPANDED_BYTES` 500 MiB, decompression ratio ceiling 100, plus traversal, encryption and nested-archive refusals. Tested in `nextjs/lib/archive-expand.test.ts`. |
 | 8 | `compile_receipts_signed_and_audited` | MISSING | Ed25519 signing exists but only for the trust export (`nextjs/lib/export-signing.ts`, `app/api/export/trust/route.ts`). `CompileReceipt` is not signed, and no compile path writes an audit event: neither `nextjs/lib/compile-job-store.ts` nor `nextjs/lib/collection-compile-run.ts` references either audit table. |
 | 9 | `deletion_tombstone_propagation_verified` | MISSING | `nextjs/lib/connector-oauth-adapters.ts:80` lists Google Drive with `q=trashed = false`, so a trashed file leaves the listing with **no** downstream signal, while the Dropbox and Microsoft Graph adapters emit `kind: "deleted"` (`:114`, `:154`). No tombstone table, no propagation test. Blueprint §15.2 names this as a stale-knowledge failure. **RESOLVED B-7: not an acceptable production limitation — connector qualification is `BLOCKED` until tombstone, delete, permission-change and move/rename semantics are implemented and verified; no connector is `VERIFIED` before then (P2).** |
-| 10 | `retention_controls_configured` | PARTIAL | `enterprise_governance_policies` stores `retention_days`, `deleted_object_grace_days` and `audit_retention_days` (`0014:88-90`), applied through `apply_enterprise_governance_policy` and read by `nextjs/lib/enterprise-store.ts:122`. **Configuration only — no sweeper, no job, nothing deletes on schedule.** A retention sweeper that deletes wrongly is itself a stop-the-line event, so it needs a canary, not a checkbox. |
-| 11 | `data_export_and_delete_available` | MISSING | `/api/export/trust` exports a signed trust record and `/api/enterprise/audit/export` exports audit events. Neither exports customer sources. The only `DELETE` handlers in `nextjs/app/api/**` are for connections and developer API keys; customer-initiated source deletion is an "on request" process, not a self-service route. |
+| 10 | `retention_controls_configured` | PARTIAL | `enterprise_governance_policies` stores `retention_days`, `deleted_object_grace_days` and `audit_retention_days` (`0014:88-90`), applied through `apply_enterprise_governance_policy` and read by `nextjs/lib/enterprise-store.ts:122`. **Configuration only — no sweeper, no job, nothing deletes on schedule.** A retention sweeper that deletes wrongly is itself a stop-the-line event, so it needs a canary, not a checkbox. **Updated 2026-09-27 (§10): a guarded worker exists but is not scheduled or proven live.** |
+| 11 | `data_export_and_delete_available` | MISSING | `/api/export/trust` exports a signed trust record and `/api/enterprise/audit/export` exports audit events. Neither exports customer sources. The only `DELETE` handlers in `nextjs/app/api/**` are for connections and developer API keys; customer-initiated source deletion is an "on request" process, not a self-service route. **Updated 2026-09-27 (§10): PARTIAL — source inventory and deletion paths exist, but physical erasure of derived artifacts and live proof do not.** |
 | 12 | `audit_log_active` | PARTIAL | Two tables exist. `foundation_developer_audit_events` (`0012`) is written by `nextjs/lib/developer-store.ts:77` and `nextjs/lib/connector-oauth-store.ts:50`. `enterprise_audit_events` (`0014`) is written by `record_enterprise_audit_event` and read by `nextjs/lib/enterprise-store.ts:142`. Neither records a document read, a compile, or (before this lane) a gate decision. |
 | 13 | `least_privilege_connector_scopes_verified` | PARTIAL | Scopes are declared in code and published rather than discovered at the consent screen: `nextjs/lib/connector-oauth.ts:42,48,54`, exported as `OAUTH_CONNECTOR_SCOPES`. Google is `drive.readonly`. **Microsoft asks for `Files.Read.All` and `Sites.Read.All`, which is tenant-wide read**, not least privilege for one workspace. |
 | 14 | `per_provider_isolation_verified` | MISSING | Per-connection secret envelopes exist, but nothing tests that one provider's credential or content cannot reach another provider's code path. |
@@ -387,3 +387,151 @@ Not changed: `activationPolicy.customerData` stays `false`; no flag, secret, sco
 touched. The founder test reset deletes snapshots by `source_versions` membership, not by the new
 `workspace_key`; a snapshot whose version is only in `connector_document_bindings` survives a reset
 as an orphan that can admit nothing (the admission query starts from the binding).
+
+---
+
+## 10. Rows 10 and 11, 2026-09-27 — guarded source deletion prototype
+
+Migration `20260927102000_customer_source_deletion.sql` extends the existing connector tombstone,
+inventory attestation, and object-purge chain to uploaded sources. It adds customer-requested and
+retention-expired reasons, requires owner/admin membership and workspace-bound admission, rechecks
+legal hold under the deletion lock, and blocks re-upload with the same document ID after a tombstone.
+An operator-only legal-hold table permits a self-service workspace without an enterprise governance
+policy to distinguish a known inactive hold from an unknown state. Unknown or active holds still deny.
+
+`/api/documents/[id]/lifecycle` exposes a workspace-scoped export inventory, an audited dry run,
+and an execute request that must repeat the inventory digest. It returns an evolving deletion
+receipt. A `source_objects_purged` receipt covers only the document's own attested R2 objects and
+explicitly says derived artifacts remain. The route signs
+the receipt with the export key when configured and reports an absent signer explicitly. The
+attestation worker records per-item failures so one blocked tombstone does not silently complete
+or halt the entire queue. Serving, compile, collection, retrieval-index, and Ask paths are denied
+for a tombstoned source; deleted documents are omitted from the document list.
+
+The retention worker is POST-only. A single-workspace execute requires the digest from dry run;
+fleet execution additionally requires `FOUNDATION_RETENTION_FLEET_ARMED=true`. There is no cron
+entry or production arm. Focused local Vitest checks passed 241 tests across seven files, and the
+Next.js type/lint check passed. The migration and 53-assertion pgTAP file still need a successful
+PostgreSQL rehearsal and a real synthetic canary through the complete deletion chain.
+
+**Rows 10 and 11 remain PARTIAL.** Derived collection artifacts, retrieval units, and cached
+answers are denied at serving but are not physically erased. A previously issued progress URL
+can remain valid for its 120-second lifetime. Connector deletion in self-service workspaces still
+lacks a grace-period source. Purge-stage failures lack a dedicated append-only failure record.
+No production R2 deletion receipt exists. The 2026-09-27 local check passed 5,324 Vitest cases,
+the type/lint check, and the Next.js production build after preserving ACL admission in the
+later deletion migration; CI database rehearsal and a real canary remain outstanding.
+An Opus 5.5 code review then identified three defects: enterprise assignment changes could bypass
+the effective hold, the signed receipt overstated deletion scope, and rehearsal replay could restore
+old connector-only inventory functions. The follow-up adds a hold-transition trigger, makes the
+receipt say `source_objects_purged` with its limited scope, and removes superseded files from the
+replay pass. The follow-up still needs CI PostgreSQL rehearsal and a synthetic R2 canary.
+The second independent read found a workspace-key UPDATE route around the hold trigger; the key
+is now immutable. It also found that replaying old migration 0053 would erase later service-role
+grants, so that file is excluded from the replay pass. The signed receipt schema is v2.
+The last review found two bounded issues: the lifecycle inventory route could expose connector
+metadata without ACL admission, and retention execution could select a different document after
+the reviewed candidate set changed. The route now checks source access before exposing a live
+inventory, and the retention worker calls an exact candidate RPC carrying its workspace, document,
+creation time, retention policy and grace period. A changed candidate fails closed.
+The production R2 bucket's `immutable/` prefix remains under a 365-day object lock. The founder
+test reset on 2026-09-23 hit `ObjectLockedByBucketPolicy`; it completed only after a temporary
+scoped change, and the broad lock was restored (`docs/evidence/production/TAVONEL_FOUNDER_TEST_RESET_2026-09-23.md`).
+The live Cloudflare bucket settings were read again at 2026-09-27 16:12 KST; the
+`Immutable 365 day lock` rule on `immutable/` was still enabled.
+Therefore the code's 30-day default grace is a scheduling value, not a verified 30-day physical
+purge. Storage lock, retention promises, and legal holds must be reconciled before activation.
+These gaps must be closed or explicitly bounded before
+customer-data activation; this code does not change `activationPolicy.customerData`.
+
+### 10.1 Purge-stage failure evidence, 2026-09-27 (local verification)
+
+Migration `20260927103000_source_deletion_purge_failures.sql` closes the "purge-stage failures lack
+a dedicated append-only failure record" gap locally. `source_deletion_worker_failures` now accepts
+stage `purge`, bound by foreign key to one attested object. `record_source_deletion_purge_failure`
+writes it only for the claim that made the attempt, under the same per-object lock as begin and
+finalize. It never marks an object purged, releases a claim or writes a receipt. The deletion worker
+(`/api/internal/deletions/run`, already on the Vercel cron) records every failure after a claim.
+This covers HEAD, begin, DELETE, finalize and an invalid receipt. It returns `failureRecorded` so a
+lost evidence write is visible. Legal-hold and short-lease refusals happen before any object I/O.
+They are not recorded as purge failures.
+
+R2's `ObjectLockedByBucketPolicy` refusal now maps to `SOURCE_DELETE_OBJECT_LOCKED` instead of
+the generic `SOURCE_DELETE_FAILED`. The customer status reports each unpurged object's failure count
+and last failure. The signed receipt is now schema v3 and has a new state,
+`purge_blocked_by_storage_lock`, with `objectsRetainedUnderStorageLock`. An object that the bucket
+lock refuses is therefore reported as retained, never as purging or purged.
+
+Product decision taken, safest truthful path: no lock rule was changed, no retention claim was
+shortened, and a locked object is never skipped or marked done. The worker retries it on each claim
+rotation and records each refusal, until the lock lapses or an operator acts. Customer-facing copy
+must not promise a 30-day physical purge for anything stored under `immutable/`. The
+receipt now states the retention explicitly instead.
+
+Checks: 73 focused Vitest tests, TypeScript, and ESLint passed locally. The pgTAP file
+`supabase/tests/source_deletion_purge_failures.sql` has 19 assertions. The SQL migration and
+fixture still require CI database rehearsal before this is relied on.
+
+**Still open for rows 10 and 11:**
+
+- physical erasure of derived artifacts (collections, retrieval units, cached answers);
+- a grace-period source for self-service connector deletion;
+- reconciling the 365-day `immutable/` lock with the 30-day grace, which needs a legal/product
+  decision on the promised retention;
+- CI PostgreSQL rehearsal of 20260927102000 and 20260927103000;
+- a real synthetic R2 canary through tombstone → attest → purge, including one locked object.
+
+### 10.2 Derived-artifact closure, 2026-09-27 (local code only, not executed)
+
+Migration `20260927104000_source_deletion_derived_closure.sql` adds `close_source_deletion_derived()`.
+The deletion worker (`/api/internal/deletions/run`) calls it once per run before the R2 sweep, so a
+locked object does not hold it back. One call closes one deletion in one transaction. It erases only
+what ownership can be proven for:
+
+- `foundation_retrieval_units` of type `section`, `claim` or `entity` that name the document, and
+  their embeddings (cascade). `nextjs/lib/retrieval-units.ts` builds each of these from exactly one
+  chunk of exactly one document, so no other document's content is removed. A shared entity keeps
+  its units in the other documents.
+- expired rows of the workspace's Ask/export replay cache (`foundation_operation_leases`). A cached
+  response names no document, so ownership is bounded by time instead. A response completes within
+  the 75-second lease and expires 10 minutes later (0055), and `eligible_at` is at least 15 minutes
+  after the tombstone. Every response that could hold the document is therefore expired, and
+  expired rows are never replayed.
+
+It keeps and counts, without erasing:
+
+- retrieval units of any other type that name the document (`retrievalUnitsRetainedUnproven`).
+  None is produced today;
+- Compiled World candidates in R2, `foundation_world_*` rows, compile runs and every receipt. A World
+  can combine several documents and is provenance for each, and its R2 object is under the 365-day
+  `immutable/` lock. `indexedWorldVersionsRetained` counts only Worlds whose retrieval index named
+  the document. The receipt labels this `retrieval_index_only`; a World with no retrieval index
+  cannot be enumerated from the database, so zero is not a claim that no World remains.
+
+Preconditions, re-read under the deletion lock and the legal-hold lock: the tombstone is eligible,
+its inventory is attested, the hold is readable and inactive, and no retrieval compile is pending
+or running in the workspace. The result is one append-only `derived_purged` row in
+`source_deletion_receipts`, with its counts in `derived_summary`. The customer status returns it as
+`derived`, plus a live `retrievalUnitsRemaining` count. The signed receipt is now schema v4. Its
+scope is `document_r2_objects_and_exclusive_retrieval_rows` only after the derived closure ran;
+before that it is `document_r2_objects_only`. It carries `derivedClosure` when present, and
+`derivedArtifactsRetained` stays `true`.
+
+Checks: 78 focused Vitest tests, TypeScript and ESLint passed locally. The 20-assertion pgTAP
+fixture in `supabase/tests/source_deletion_derived_closure.sql` passed CI DB rehearsal twice;
+full CI for the latest receipt-wording update remains pending.
+
+**Still open after 10.2:**
+
+- Compiled World candidates that include a deleted document stay in R2 and in World history. Erasing
+  them needs a recompile-without-the-document plus a decision on the `immutable/` lock and on World
+  provenance. It is not done here.
+- A retrieval run stuck in `running` defers the closure for its whole workspace. The deferral is
+  visible (`derived: null`) but is not alerted.
+- `completed` retrieval runs keep their original `unit_count` after the erase.
+- Legacy `knowledge_graph_candidates` (0001) are keyed to legacy `documents`, not upload ids, and are
+  not covered.
+- The founder test reset does not delete `source_deletion_worker_failures`
+  (20260927102000/103000), so the tombstone delete would hit that table's foreign key. The reset
+  aborts, failing closed. This predates 10.2 and is not changed here.
+- A production synthetic canary through the closure, including one object refused by the R2 lock.

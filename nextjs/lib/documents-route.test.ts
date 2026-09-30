@@ -13,7 +13,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, reauthorize, signerEnv, listImmutable, reviewJson, listRejects, getReject, sourceAccess } = vi.hoisted(() => ({
+const { authorize, reauthorize, signerEnv, listImmutable, reviewJson, listRejects, getReject, sourceAccess, tombstoned } = vi.hoisted(() => ({
+  tombstoned: vi.fn(),
   authorize: vi.fn(),
   reauthorize: vi.fn(),
   signerEnv: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
   getFoundationQuarantineReject: getReject,
 }));
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/customer-source-lifecycle", () => ({ readTombstonedUploadDocumentIds: tombstoned }));
 
 import { GET } from "../app/api/documents/route";
 
@@ -86,6 +88,7 @@ beforeEach(() => {
   listRejects.mockReset().mockResolvedValue({ ok: true, documentIds: [refusedId], truncated: false });
   getReject.mockReset().mockResolvedValue({ ok: true, receipt });
   sourceAccess.mockReset().mockResolvedValue({ ok: true });
+  tombstoned.mockReset().mockResolvedValue({ ok: true, ids: new Set() });
 });
 
 describe("the documents listing", () => {
@@ -169,6 +172,23 @@ describe("the documents listing", () => {
     const body = await documents();
     expect(body.status).toBe(200);
     expect(body.documents.map((item) => item.documentId)).toEqual([readId]);
+  });
+
+  it("leaves a deleted upload out instead of denying the whole listing while its bytes await purge", async () => {
+    tombstoned.mockResolvedValue({ ok: true, ids: new Set([readId, refusedId]) });
+    const body = await documents();
+    expect(body.status).toBe(200);
+    expect(body.documents).toEqual([]);
+    expect(getReject).not.toHaveBeenCalled();
+    expect(sourceAccess.mock.calls.every(([, ids]) => ids.length === 0)).toBe(true);
+    expect(tombstoned).toHaveBeenCalledWith(workspaceKey);
+  });
+
+  it("fails closed when it cannot tell which uploads were deleted", async () => {
+    tombstoned.mockResolvedValue({ ok: false, code: "CUSTOMER_SOURCE_DELETE_STORE_FAILED" });
+    const body = await documents();
+    expect(body.status).toBe(503);
+    expect(sourceAccess).not.toHaveBeenCalled();
   });
 
   it("never reads a refusal for a workspace the caller did not authenticate as", async () => {

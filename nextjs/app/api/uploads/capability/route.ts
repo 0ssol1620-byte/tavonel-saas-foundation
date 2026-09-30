@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     const rateLimited = admission.code === "INTAKE_RATE_LIMITED" || admission.code === "INTAKE_DAILY_QUOTA_EXCEEDED";
     const trialLimited = admission.code === "TRIAL_FILE_LIMIT_EXCEEDED" || admission.code === "TRIAL_NOT_ACTIVE";
     const tooLarge = admission.code === "INTAKE_FILE_TOO_LARGE" || admission.code === "TRIAL_FILE_TOO_LARGE";
-    const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT";
+    const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT" || admission.code === "SOURCE_DELETED";
     return NextResponse.json(
       {
         // The admission RPC guards at the same ceiling this route does (migration 0051), so this

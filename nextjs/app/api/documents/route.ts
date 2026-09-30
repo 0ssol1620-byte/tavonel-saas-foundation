@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { readTombstonedUploadDocumentIds } from "@/lib/customer-source-lifecycle";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { ambiguousPipelineDocument, type PipelineDocument } from "@/lib/pipeline";
 import { validateOcrReviewReceipt } from "@/lib/processing-receipts";
@@ -75,9 +76,16 @@ export async function GET(request: Request) {
   if (!listed.ok) {
     return NextResponse.json({ code: listed.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  // A deleted upload keeps its bytes until the sweeper purges them, and the access check below
+  // denies the whole listing if any listed document is tombstoned. Leave deleted ones out instead.
+  const tombstoned = await readTombstonedUploadDocumentIds(workspaceId);
+  if (!tombstoned.ok) {
+    return NextResponse.json({ code: tombstoned.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
   const selected = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceId, listed.objects));
-  const documents = selected.documents;
-  const visibleDocumentIds = [...documents.map((item) => item.documentId), ...selected.ambiguousDocumentIds];
+  const documents = selected.documents.filter((item) => !tombstoned.ids.has(item.documentId.toLowerCase()));
+  const ambiguousDocumentIds = selected.ambiguousDocumentIds.filter((id) => !tombstoned.ids.has(id.toLowerCase()));
+  const visibleDocumentIds = [...documents.map((item) => item.documentId), ...ambiguousDocumentIds];
   const sourceAccess = await checkConnectorSourceAccess(workspaceId, visibleDocumentIds);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
@@ -91,7 +99,7 @@ export async function GET(request: Request) {
       immutableKey: item.sanitizedKey!,
       loaded: await getWorkspaceOcrReviewJson(signer, workspaceId, item.ocrReviewKey!),
     }))),
-    listRefusedDocuments(signer, workspaceId, new Set(visibleDocumentIds)),
+    listRefusedDocuments(signer, workspaceId, new Set([...visibleDocumentIds, ...tombstoned.ids])),
   ]);
   const reasonCodes = new Map(reviewReceipts.flatMap((item) => {
     if (!item.loaded.ok) return [];
@@ -121,7 +129,7 @@ export async function GET(request: Request) {
     {
       code: "OK",
       workspaceId,
-      documents: [...hydrated, ...selected.ambiguousDocumentIds.map(ambiguousPipelineDocument), ...refused],
+      documents: [...hydrated, ...ambiguousDocumentIds.map(ambiguousPipelineDocument), ...refused],
     },
     { headers: { "Cache-Control": "no-store" } },
   );
