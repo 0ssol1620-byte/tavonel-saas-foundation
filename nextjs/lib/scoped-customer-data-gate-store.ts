@@ -1,10 +1,11 @@
 import {
   admitsWorkspace,
-  evaluateScopedRelease,
-  requiredReleaseEvidence,
+  RELEASE_COLUMNS,
   SCOPED_CUSTOMER_DATA_GATE_SCHEMA,
+  stageSchema,
+  verifyStoredRelease,
   type CustomerDataScope,
-  type ReleaseEvidence,
+  type ReleaseStage,
   type WorkspaceGrant,
 } from "../../shared/scopedCustomerDataGate";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
@@ -13,15 +14,15 @@ import { readCurrentProcessingTermsAcceptance } from "./processing-workspace-gra
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const REVISION = /^[0-9a-f]{40}$/;
-const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 type Env = Readonly<Record<string, string | undefined>>;
 export type ScopedGateResult =
-  | { ok: true; scope: CustomerDataScope; releaseReceiptSha256: string; grantReceiptSha256: string;
-      authorization: ScopedCustomerDataAuthorization }
+  | { ok: true; scope: CustomerDataScope; stage: ReleaseStage; releaseReceiptSha256: string;
+      grantReceiptSha256: string; authorization: ScopedCustomerDataAuthorization }
   | { ok: false; code: "SCOPED_GATE_INPUT_INVALID" | "SCOPED_GATE_STORE_NOT_CONFIGURED" |
       "SCOPED_GATE_STORE_FAILED" | "SCOPED_RELEASE_NOT_FOUND" | "SCOPED_RELEASE_REFUSED" |
-      "SCOPED_RELEASE_INVALID" | "SCOPED_RELEASE_STALE" | "SCOPED_WORKSPACE_NOT_FOUND" |
+      "SCOPED_RELEASE_INVALID" | "SCOPED_RELEASE_STALE" | "SCOPED_RELEASE_QUALIFICATION_OTHER_WORKSPACE" |
+      "SCOPED_WORKSPACE_NOT_FOUND" |
       "SCOPED_WORKSPACE_REFUSED" | "SCOPED_WORKSPACE_INVALID" | "SCOPED_TERMS_UNAVAILABLE" |
       "SCOPED_TERMS_ACCEPTANCE_REQUIRED" };
 
@@ -38,23 +39,6 @@ async function latestRow(path: string, env: Env): Promise<Record<string, unknown
   const body = await response.json().catch(() => null) as unknown;
   if (!Array.isArray(body) || body.some((row) => !row || typeof row !== "object" || Array.isArray(row))) return undefined;
   return body as Record<string, unknown>[];
-}
-
-function parseEvidence(value: unknown, scope: CustomerDataScope): ReleaseEvidence[] | null {
-  const required = requiredReleaseEvidence(scope);
-  if (!Array.isArray(value) || value.length !== required.length) return null;
-  const rows: ReleaseEvidence[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-    const row = item as Record<string, unknown>;
-    if (typeof row.precondition !== "string" || !required.includes(row.precondition as ReleaseEvidence["precondition"]) ||
-      row.satisfied !== true || typeof row.evidence !== "string" || typeof row.checkedAt !== "string") return null;
-    rows.push({
-      precondition: row.precondition as ReleaseEvidence["precondition"],
-      satisfied: true, evidence: row.evidence, checkedAt: row.checkedAt,
-    });
-  }
-  return rows;
 }
 
 const iso = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
@@ -81,8 +65,7 @@ export async function readVerifiedScopedCustomerDataGate(
   if (!config) return { ok: false, code: "SCOPED_GATE_STORE_NOT_CONFIGURED" };
 
   const releaseQuery = new URLSearchParams({
-    select: "schema_version,scope,release_revision,allowed,receipt_sha256,evidence,missing,evaluated_at,recorded_at",
-    scope: `eq.${scope}`, release_revision: `eq.${releaseRevision}`,
+    select: RELEASE_COLUMNS, scope: `eq.${scope}`, release_revision: `eq.${releaseRevision}`,
     order: "recorded_at.desc,allowed.asc,evaluated_at.desc", limit: "1",
   });
   const releaseRows = await latestRow(`/rest/v1/customer_data_release_decisions?${releaseQuery}`, env);
@@ -90,27 +73,12 @@ export async function readVerifiedScopedCustomerDataGate(
   if (releaseRows === undefined) return { ok: false, code: "SCOPED_GATE_STORE_FAILED" };
   if (releaseRows.length === 0) return { ok: false, code: "SCOPED_RELEASE_NOT_FOUND" };
   if (releaseRows.length !== 1) return { ok: false, code: "SCOPED_RELEASE_INVALID" };
-  const row = releaseRows[0];
-  if (row.schema_version !== SCOPED_CUSTOMER_DATA_GATE_SCHEMA || row.scope !== scope ||
-    row.release_revision !== releaseRevision || !iso(row.evaluated_at) || !iso(row.recorded_at) ||
-    Date.parse(row.recorded_at) < Date.parse(row.evaluated_at) || Date.parse(row.recorded_at) > now.getTime()) {
-    return { ok: false, code: "SCOPED_RELEASE_INVALID" };
-  }
-  if (row.allowed === false) return { ok: false, code: "SCOPED_RELEASE_REFUSED" };
-  const evidence = parseEvidence(row.evidence, scope);
-  if (row.allowed !== true || !evidence || !Array.isArray(row.missing) || row.missing.length !== 0 ||
-    typeof row.receipt_sha256 !== "string") return { ok: false, code: "SCOPED_RELEASE_INVALID" };
-  const release = evaluateScopedRelease({ scope, releaseRevision, evidence, now: row.evaluated_at });
-  if (!release.allowed || release.receiptSha256 !== row.receipt_sha256) {
-    return { ok: false, code: "SCOPED_RELEASE_INVALID" };
-  }
-  if (now.getTime() < Date.parse(row.evaluated_at) ||
-    now.getTime() - Date.parse(row.evaluated_at) > MAX_AGE_MS) {
-    return { ok: false, code: "SCOPED_RELEASE_STALE" };
-  }
+  const verified = verifyStoredRelease(releaseRows[0], { scope, releaseRevision, workspaceId }, now.getTime());
+  if (!verified.ok) return verified;
+  const { release } = verified;
 
   const workspaceQuery = new URLSearchParams({
-    select: "schema_version,tenant_id,workspace_id,scope,release_revision,allowed,user_id,release_receipt_sha256,terms_version,terms_receipt_sha256,processing_terms_receipt_sha256,grant_receipt_sha256,granted_at,expires_at,recorded_at",
+    select: "schema_version,stage,tenant_id,workspace_id,scope,release_revision,allowed,user_id,release_receipt_sha256,terms_version,terms_receipt_sha256,processing_terms_receipt_sha256,grant_receipt_sha256,granted_at,expires_at,recorded_at",
     tenant_id: `eq.${tenantId}`, workspace_id: `eq.${workspaceId}`, scope: `eq.${scope}`,
     order: "recorded_at.desc,allowed.asc", limit: "1",
   });
@@ -120,8 +88,9 @@ export async function readVerifiedScopedCustomerDataGate(
   if (workspaceRows.length === 0) return { ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" };
   if (workspaceRows.length !== 1) return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
   const grantRow = workspaceRows[0];
-  if (grantRow.schema_version !== SCOPED_CUSTOMER_DATA_GATE_SCHEMA ||
-    grantRow.tenant_id !== tenantId || grantRow.workspace_id !== workspaceId || grantRow.scope !== scope ||
+  if ((grantRow.stage !== "production" && grantRow.stage !== "qualification") ||
+    grantRow.schema_version !== stageSchema(grantRow.stage) || grantRow.tenant_id !== tenantId ||
+    grantRow.workspace_id !== workspaceId || grantRow.scope !== scope ||
     !iso(grantRow.recorded_at) || Date.parse(grantRow.recorded_at) > now.getTime()) {
     return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
   }
@@ -132,7 +101,7 @@ export async function readVerifiedScopedCustomerDataGate(
     return { ok: false, code: "SCOPED_WORKSPACE_INVALID" };
   }
   const grant: WorkspaceGrant = {
-    tenantId, workspaceId, scope,
+    tenantId, workspaceId, scope, stage: grantRow.stage,
     userId: grantRow.user_id as string,
     releaseRevision: grantRow.release_revision as string,
     releaseReceiptSha256: grantRow.release_receipt_sha256 as string,
@@ -157,10 +126,10 @@ export async function readVerifiedScopedCustomerDataGate(
     grant.processingTermsReceiptSha256 !== current.processingTermsReceiptSha256) {
     return { ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" };
   }
-  return { ok: true, scope, releaseReceiptSha256: release.receiptSha256!,
+  return { ok: true, scope, stage: release.stage, releaseReceiptSha256: release.receiptSha256!,
     grantReceiptSha256: grant.grantReceiptSha256,
     authorization: {
-      allowed: true, schemaVersion: SCOPED_CUSTOMER_DATA_GATE_SCHEMA,
+      allowed: true, schemaVersion: SCOPED_CUSTOMER_DATA_GATE_SCHEMA, stage: release.stage,
       tenantId, workspaceId, receiptSha256: grant.grantReceiptSha256,
       evaluatedAt: release.evaluatedAt, release, grant,
     } };

@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { run, issueGrant } = vi.hoisted(() => ({ run: vi.fn(), issueGrant: vi.fn() }));
+const { run, issueGrant, readAuth } = vi.hoisted(() => ({ run: vi.fn(), issueGrant: vi.fn(), readAuth: vi.fn() }));
 vi.mock("@/lib/processing-workspace-grant", () => ({ issueProcessingWorkspaceGrant: issueGrant }));
 vi.mock("@/lib/billing-gate-enforcement", () => ({
   runBillingGateEnforcement: run,
   createSupabaseGateEnforcementStore: () => ({}),
 }));
-vi.mock("@/lib/customer-data-admission", () => ({ readCustomerSourceAuthorization: vi.fn() }));
+vi.mock("@/lib/customer-data-admission", async () => ({
+  readCustomerSourceAuthorization: readAuth,
+  authorizationStage: (await import("../../shared/customerDataAuthorization")).authorizationStage,
+}));
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   authorizeSyntheticCanary: (presented: string | null, secret: string) => presented === `Bearer ${secret}`,
 }));
@@ -69,5 +72,21 @@ describe("internal billing gate enforcement route", () => {
     vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v1");
     await call();
     expect(run.mock.calls[1][0].renewGrant).toBeUndefined();
+  });
+
+  it("reads a qualification grant as no billable authorization, leaving other outcomes untouched", async () => {
+    await call();
+    const { readGate } = run.mock.calls[0][0];
+    const scoped = (stage: string) => ({ ok: true, decision: { allowed: true,
+      schemaVersion: "tavonel.customer_data_gate.v2", stage, release: { stage }, grant: { stage } } });
+    readAuth.mockResolvedValue(scoped("qualification"));
+    await expect(readGate("pilot-abc")).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_QUALIFICATION_ONLY" });
+    readAuth.mockResolvedValue(scoped("production"));
+    await expect(readGate("pilot-abc")).resolves.toMatchObject({ ok: true });
+    readAuth.mockResolvedValue({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+    await expect(readGate("pilot-abc")).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+    // Renewal never asks for a qualification grant.
+    await run.mock.calls[0][0].renewGrant("pilot-abc");
+    expect(issueGrant.mock.calls[0][0]).not.toHaveProperty("allowQualification");
   });
 });

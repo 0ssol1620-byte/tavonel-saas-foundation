@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  evaluateScopedRelease, requiredReleaseEvidence, workspaceGrantSha256,
+  evaluateQualificationRelease, evaluateScopedRelease, QUALIFICATION_PENDING, requiredReleaseEvidence,
+  workspaceGrantSha256,
   type WorkspaceGrant,
 } from "../../shared/scopedCustomerDataGate";
 
@@ -49,7 +50,7 @@ const receipt = (kind: "terms" | "processing") => processingTermsReceiptSha256(k
 });
 const unsignedGrant: Omit<WorkspaceGrant, "grantReceiptSha256"> = {
   tenantId: WORKSPACE, workspaceId: WORKSPACE, userId: OWNER,
-  scope, releaseRevision: revision, releaseReceiptSha256: release.receiptSha256,
+  scope, stage: "production", releaseRevision: revision, releaseReceiptSha256: release.receiptSha256,
   termsVersion: manifest.version, termsReceiptSha256: receipt("terms"),
   processingTermsReceiptSha256: receipt("processing"),
   grantedAt: evaluatedAt, expiresAt: "2026-10-01T00:00:00.000Z", revokedAt: null,
@@ -58,14 +59,15 @@ const grant: WorkspaceGrant = { ...unsignedGrant, grantReceiptSha256: workspaceG
 
 function releaseRow(overrides: Record<string, unknown> = {}) {
   return {
-    schema_version: release.schemaVersion, scope, release_revision: revision, allowed: true,
+    schema_version: release.schemaVersion, stage: "production", scope, release_revision: revision, allowed: true,
+    qualification_workspace_key: null, qualification_expires_at: null,
     receipt_sha256: release.receiptSha256, evidence, missing: [], evaluated_at: evaluatedAt,
     recorded_at: "2026-09-29T00:00:01.000Z", ...overrides,
   };
 }
 function grantRow(overrides: Record<string, unknown> = {}) {
   return {
-    schema_version: release.schemaVersion, tenant_id: grant.tenantId, workspace_id: grant.workspaceId,
+    schema_version: release.schemaVersion, stage: "production", tenant_id: grant.tenantId, workspace_id: grant.workspaceId,
     scope, release_revision: revision, allowed: true, user_id: grant.userId,
     release_receipt_sha256: grant.releaseReceiptSha256, terms_version: grant.termsVersion,
     terms_receipt_sha256: grant.termsReceiptSha256,
@@ -102,9 +104,9 @@ afterEach(() => rm(root, { recursive: true, force: true }));
 describe("durable scoped customer-data gate", () => {
   it("requires exact release and workspace decisions and the grant's current acceptance", async () => {
     await expect(read()).resolves.toEqual({
-      ok: true, scope, releaseReceiptSha256: release.receiptSha256,
+      ok: true, scope, stage: "production", releaseReceiptSha256: release.receiptSha256,
       grantReceiptSha256: grant.grantReceiptSha256,
-      authorization: { allowed: true, schemaVersion: release.schemaVersion,
+      authorization: { allowed: true, schemaVersion: release.schemaVersion, stage: "production",
         tenantId: grant.tenantId, workspaceId: grant.workspaceId,
         receiptSha256: grant.grantReceiptSha256, evaluatedAt, release, grant },
     });
@@ -190,5 +192,59 @@ describe("durable scoped customer-data gate", () => {
       .mockResolvedValueOnce(Response.json([grantRow()]))
       .mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
     await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_GATE_STORE_FAILED" });
+  });
+});
+
+describe("qualification stage at the gate reader", () => {
+  const qExpires = "2026-09-29T01:30:00.000Z";
+  const qEvaluated = "2026-09-29T00:40:00.000Z";
+  const eleven = evidence.filter((row) => row.precondition !== QUALIFICATION_PENDING)
+    .map((row) => ({ ...row, checkedAt: qEvaluated }));
+  const qualification = evaluateQualificationRelease({
+    releaseRevision: revision, workspaceId: WORKSPACE, expiresAt: qExpires, evidence: eleven, now: qEvaluated,
+  });
+  const qRow = {
+    schema_version: qualification.schemaVersion, stage: "qualification", scope, release_revision: revision,
+    allowed: true, receipt_sha256: qualification.receiptSha256, evidence: eleven, missing: qualification.missing,
+    evaluated_at: qEvaluated, recorded_at: "2026-09-29T00:40:01.000Z",
+    qualification_workspace_key: WORKSPACE, qualification_expires_at: qExpires,
+  };
+  const qUnsigned: Omit<WorkspaceGrant, "grantReceiptSha256"> = {
+    ...unsignedGrant, stage: "qualification", releaseReceiptSha256: qualification.receiptSha256!,
+    grantedAt: "2026-09-29T00:45:00.000Z", expiresAt: qExpires,
+  };
+  const qGrant: WorkspaceGrant = { ...qUnsigned, grantReceiptSha256: workspaceGrantSha256(qUnsigned) };
+  const qGrantRow = (overrides: Record<string, unknown> = {}) => grantRow({
+    schema_version: qualification.schemaVersion, stage: "qualification",
+    release_receipt_sha256: qGrant.releaseReceiptSha256, grant_receipt_sha256: qGrant.grantReceiptSha256,
+    granted_at: qGrant.grantedAt, expires_at: qGrant.expiresAt, recorded_at: "2026-09-29T00:45:01.000Z", ...overrides,
+  });
+  const answer = (release: unknown, grantRows: unknown) => request.mockReset()
+    .mockResolvedValueOnce(Response.json([release]))
+    .mockResolvedValueOnce(Response.json(grantRows))
+    .mockResolvedValueOnce(Response.json(acceptance()));
+
+  it("admits the recorded workspace with a typed qualification stage", async () => {
+    answer(qRow, [qGrantRow()]);
+    const result = await read();
+    expect(result).toMatchObject({ ok: true, stage: "qualification",
+      authorization: { stage: "qualification", release: { stage: "qualification", missing: [QUALIFICATION_PENDING] },
+        grant: { stage: "qualification" } } });
+    expect(decodeURIComponent(request.mock.calls[0][1] as string)).toContain("qualification_workspace_key");
+  });
+
+  it("denies a stage mismatch, a forged stage, expiry and a workspace the qualification does not name", async () => {
+    answer(qRow, [grantRow()]);
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
+    answer(qRow, [qGrantRow({ stage: "production" })]);
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
+    answer(qRow, [qGrantRow({ stage: "beta" })]);
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
+    answer(qRow, [qGrantRow()]);
+    await expect(read(new Date(qExpires))).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_STALE" });
+    answer({ ...qRow, qualification_workspace_key: "pilot-2222222222224222" }, [qGrantRow()]);
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    answer(releaseRow(), [qGrantRow()]);
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_INVALID" });
   });
 });

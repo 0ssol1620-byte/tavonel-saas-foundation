@@ -1,5 +1,6 @@
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
-import type { CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
+import { authorizationStage, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
+import type { ReleaseStage } from "../../shared/scopedCustomerDataGate";
 import { type CollectionCandidateArtifact, validateCollectionOcrInput } from "./collection-compiler";
 import {
   compileReceiptAuditDetails,
@@ -63,6 +64,8 @@ export type CollectionCompileSuccess = {
   reviewReasons: readonly string[];
   lifecycle: CollectionCandidateArtifact["lifecycle"];
   signedReceipt: SignedCompileReceipt;
+  /** The stage of the grant that admitted the dispatch; `qualification` is not release evidence by itself. */
+  customerDataGateStage: ReleaseStage;
 };
 
 export type CollectionCompileRun =
@@ -343,7 +346,10 @@ export async function runCollectionCompile(
     targetType: "compile_receipt",
     targetId: signed.receipt.signature.signedPayloadSha256,
     outcome: "succeeded",
-    details: compileReceiptAuditDetails(signed.receipt, signed.payload),
+    // The signed payload binds the admitting grant's digest, whose schema already names its stage;
+    // the audit row states it plainly so a qualification compile is never read as a release compile.
+    details: { ...compileReceiptAuditDetails(signed.receipt, signed.payload),
+      customerDataGateStage: authorizationStage(customerDataGate) },
   });
   if (!audited.ok) return { ok: false, status: 503, code: audited.code, payload: {} };
 
@@ -389,6 +395,7 @@ export async function runCollectionCompile(
       reviewReasons: artifact.reviewReasons ?? [],
       lifecycle: artifact.lifecycle,
       signedReceipt: signed.receipt,
+      customerDataGateStage: authorizationStage(customerDataGate),
     },
   };
 }
