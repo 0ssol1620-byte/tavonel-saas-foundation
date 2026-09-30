@@ -13,6 +13,7 @@ import {
 } from "./compile-receipt-signing";
 import { CANONICAL_DOCUMENT_ID, mayPublish, registerCollectionArtifact } from "./compile-artifact-provenance";
 import { checkConnectorSourceAccess } from "./connector-source-access";
+import { readConnectorCompileIdentities } from "./connector-compile-identity";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import {
   dispatchProductCoreV2,
@@ -212,6 +213,11 @@ export async function runCollectionCompile(
   }
 
   const verifiedInputs = inputs.filter((item) => item !== null);
+  if (gate.scope === "connector") {
+    const bindings = await readConnectorCompileIdentities(workspaceId, documentIds);
+    if (!bindings.ok) return { ok: false, status: 409, code: bindings.code, payload: {} };
+    for (const input of verifiedInputs) input.logicalSourceId = bindings.identities.get(input.documentId)!;
+  }
   if (globalCollection && !judgeGlobalCollectionInput(verifiedInputs)) {
     return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
   }

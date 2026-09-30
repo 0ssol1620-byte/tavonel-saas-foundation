@@ -204,7 +204,7 @@ export function productCoreV2CollectionId(
     throw new Error("COLLECTION_IDENTITY_INVALID");
   }
   const identity = logicalCollectionKey === undefined
-    ? { kind: "selection", documentIds: [...new Set(documents.map((document) => document.documentId))].sort() }
+    ? { kind: "selection", documentIds: [...new Set(documents.map((document) => document.logicalSourceId ?? document.documentId))].sort() }
     : { kind: "logical", key: logicalCollectionKey };
   return `collection-${sha256(canonicalize({ schemaVersion: "tavonel.collection_identity.v1", workspaceId, identity })).slice(0, 32)}`;
 }
@@ -234,6 +234,10 @@ export function buildProductCoreV2Request(
   expectedSourceScope?: CustomerDataScope,
   logicalCollectionKey?: string,
 ): ProductCoreV2CompileRequest {
+  const nativeIds = documents.map(document => document.logicalSourceId ?? document.documentId);
+  if (nativeIds.some(id => !IDENTIFIER.test(id)) || new Set(nativeIds).size !== nativeIds.length) {
+    throw new Error("COLLECTION_SOURCE_IDENTITY_INVALID");
+  }
   const binding = productCoreV2RevisionId(workspaceId, documents, logicalCollectionKey);
   const collectionId = productCoreV2CollectionId(workspaceId, documents, logicalCollectionKey);
   return {
@@ -275,7 +279,7 @@ export function buildProductCoreV2Request(
     documents: [...documents]
       .sort((left, right) => left.documentId.localeCompare(right.documentId))
       .map((document) => ({
-        nativeId: document.documentId,
+        nativeId: document.logicalSourceId ?? document.documentId,
         connectorType: "foundation-r2" as const,
         immutableObjectKey: document.sourceImmutableKey,
         ocrObjectKey: document.ocrJsonKey,

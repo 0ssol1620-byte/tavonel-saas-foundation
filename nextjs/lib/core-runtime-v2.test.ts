@@ -62,6 +62,17 @@ function inputs(): CollectionOcrInput[] {
   });
 }
 
+it("keeps connector collection and Core native identity stable while immutable upload revisions change", () => {
+  const first = { ...inputs()[0], logicalSourceId: `src-${"a".repeat(64)}` };
+  const next = { ...first, documentId: "replacement-upload", versionKey: "b".repeat(64), inputSha256: sha("b"),
+    sourceImmutableKey: "immutable/new-upload/sanitized.pdf", sanitizedKey: "immutable/new-upload/sanitized.pdf", ocrJsonKey: "immutable/new-upload/ocr.json" };
+  expect(productCoreV2CollectionId("pilot-acme01", [first])).toBe(productCoreV2CollectionId("pilot-acme01", [next]));
+  expect(productCoreV2RevisionId("pilot-acme01", [first])).not.toBe(productCoreV2RevisionId("pilot-acme01", [next]));
+  expect(buildProductCoreV2Request("pilot-acme01", [next]).documents[0]).toMatchObject({ nativeId: first.logicalSourceId,
+    immutableObjectKey: next.sourceImmutableKey, sourceFilename: "replacement-upload.pdf" });
+  expect(() => buildProductCoreV2Request("pilot-acme01", [first,next])).toThrow("COLLECTION_SOURCE_IDENTITY_INVALID");
+});
+
 /** The validation record the Core sends and the projection now has to read rather than replace. */
 const CORE_CHECKS = {
   deterministicMaterialization: true,

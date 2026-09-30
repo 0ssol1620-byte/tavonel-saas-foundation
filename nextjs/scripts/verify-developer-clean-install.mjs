@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,6 +65,17 @@ try {
     "tavonel-cli.mjs", "tavonel-mcp.mjs", "tavonel-source-agent.py", "channel.json", "README.md",
     "tavonel-verify-export.mjs", "tavonel-verify-package.mjs", "tavonel-verify-roundtrip.py",
   ]) cpSync(join(source, name), join(install, name));
+  const channel = JSON.parse(readFileSync(join(install, "channel.json"), "utf8"));
+  if (channel.schemaVersion !== "tavonel.developer-distribution.v1" ||
+      typeof channel.version !== "string" || !/^\d{4}\.\d+\.\d+\.\d+$/.test(channel.version)) {
+    throw new Error("Invalid developer distribution channel");
+  }
+  for (const [asset, name] of Object.entries({cli:"tavonel-cli.mjs",mcp:"tavonel-mcp.mjs",
+    sourceAgent:"tavonel-source-agent.py",verifyExport:"tavonel-verify-export.mjs",
+    verifyPackage:"tavonel-verify-package.mjs",verifyRoundtrip:"tavonel-verify-roundtrip.py"})) {
+    const digest = `sha256:${createHash("sha256").update(readFileSync(join(install,name))).digest("hex")}`;
+    if (channel.assets?.[asset]?.sha256 !== digest) throw new Error(`Distribution integrity failed: ${asset}`);
+  }
   const cliVersion = run(process.execPath, ["tavonel-cli.mjs", "--version"]);
   const cliHelp = run(process.execPath, ["tavonel-cli.mjs", "help"]);
   const initialize = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "clean-harness", version: "1" } } });
@@ -75,8 +87,8 @@ try {
   const exportUsage = runExpecting(1, process.execPath, ["tavonel-verify-export.mjs"]);
   const packageUsage = runExpecting(2, process.execPath, ["tavonel-verify-package.mjs"]);
   const roundtripUsage = runExpecting(2, python, ["-I", "tavonel-verify-roundtrip.py"]);
-  if (!cliVersion.includes("2026.9.20.1") || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
-  if (mcp?.result?.serverInfo?.version !== "2026.9.20.1") throw new Error("MCP distribution contract failed");
+  if (cliVersion !== `tavonel-cli ${channel.version} (api v${channel.apiVersion})` || !cliHelp.includes("update-check")) throw new Error("CLI distribution contract failed");
+  if (mcp?.result?.serverInfo?.version !== channel.version) throw new Error("MCP distribution contract failed");
   if (!exportUsage.includes("--trusted-fingerprint")) throw new Error("the export verifier did not print its usage");
   if (!packageUsage.includes("--package")) throw new Error("the package validator did not print its usage");
   if (!roundtripUsage.includes("--package")) throw new Error("the round-trip checker did not print its usage");

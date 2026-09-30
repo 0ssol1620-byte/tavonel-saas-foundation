@@ -22,6 +22,8 @@ const dispatched = vi.fn();
 const sourceAccess = vi.fn();
 const customerDataGate = vi.fn();
 const sourceScope = vi.fn();
+const compileIdentities = vi.fn();
+vi.mock("./connector-compile-identity", () => ({ readConnectorCompileIdentities: (...args: unknown[]) => compileIdentities(...args) }));
 vi.mock("./customer-source-scope", () => ({ readCustomerSourceScope: (...args: unknown[]) => sourceScope(...args) }));
 
 vi.mock("./r2-synthetic-canary", () => ({
@@ -136,6 +138,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  compileIdentities.mockReset();
   sourceAccess.mockReset().mockResolvedValue({ ok: true });
   customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
   audited.mockReset().mockResolvedValue({ ok: true, eventId: "00000000-0000-4000-8000-000000000000" });
@@ -219,6 +222,25 @@ describe("customer-data approval before source access", () => {
 });
 
 describe("signed and audited compile receipts (gate preconditions 8 and 12)", () => {
+  it("refuses unresolved connector lineage before Core dispatch", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    compileIdentities.mockResolvedValue({ ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" });
+    compilableSource();
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" });
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("uses the durable logical connector ID for Core while retaining upload UUIDs for source authorization", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    const logical = `src-${"e".repeat(64)}`;
+    compileIdentities.mockResolvedValue({ ok: true, identities: new Map([[DOCUMENT, logical]]) });
+    compilableSource();
+    await runCollectionCompile(WS, [DOCUMENT]);
+    expect(dispatched.mock.calls[0][2][0]).toMatchObject({ documentId: DOCUMENT, logicalSourceId: logical });
+    expect(sourceAccess).toHaveBeenCalledWith(WS, [DOCUMENT]);
+  });
   function compilableSource() {
     readyWorkspace();
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{

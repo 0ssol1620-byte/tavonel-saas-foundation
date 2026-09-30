@@ -597,7 +597,9 @@ def state_lock(path: Path):
     with lock_path.open("a+b") as handle:
         os.chmod(lock_path, 0o600)
         handle.seek(0)
-        if not handle.read(1):
+        # Windows byte-range locks deny reads before the second writer can attempt its lock.
+        # Inspect size without touching the locked byte, then let the OS lock report contention.
+        if os.fstat(handle.fileno()).st_size == 0:
             handle.write(b"0")
             handle.flush()
         handle.seek(0)
