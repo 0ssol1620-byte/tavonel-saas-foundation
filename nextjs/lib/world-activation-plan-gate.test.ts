@@ -42,6 +42,7 @@ vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: apiRequest 
   the wiring a mocked limiter is otherwise free to lose.
 */
 vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: ceiling }));
+vi.mock("@/lib/world-rollback-source-access", () => ({ checkRollbackSourceAccess: async () => ({ ok: true }) }));
 vi.mock("@/lib/account-grants", () => ({ getFoundationAccountGrant: grant }));
 vi.mock("@/lib/billing-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./billing-store")>()),

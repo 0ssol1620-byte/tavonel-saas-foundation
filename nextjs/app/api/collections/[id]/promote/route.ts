@@ -16,6 +16,7 @@ import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { ensureRetrievalIndexForActiveWorld } from "@/lib/retrieval-index-status";
 import { promoteFoundationCandidate } from "@/lib/world-store";
+import { buildWorldReadModel } from "@/lib/world-read-model";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -189,6 +190,13 @@ export async function POST(
       { code: "WORLD_CANDIDATE_NOT_PROMOTABLE" },
       { status: 422, headers: NO_STORE }
     );
+  }
+
+  const model = buildWorldReadModel(loaded.json, id);
+  if (!model || model.evidence.length === 0) {
+    return NextResponse.json({ code: "WORLD_CANDIDATE_EVIDENCE_REQUIRED" }, {
+      status: 422, headers: NO_STORE,
+    });
   }
 
   /*

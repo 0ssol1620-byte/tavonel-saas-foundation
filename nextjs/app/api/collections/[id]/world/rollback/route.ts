@@ -4,6 +4,7 @@ import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { rollbackFoundationWorld } from "@/lib/world-store";
+import { checkRollbackSourceAccess } from "@/lib/world-rollback-source-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -105,6 +106,22 @@ export async function POST(
       }
     );
   }
+  const sourceAccess = await checkRollbackSourceAccess(membership.workspaceId, id, targetManifestDigest);
+  if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
+    status: sourceAccess.status, headers: NO_STORE,
+  });
+  // Storage and policy reads can outlive the session or its workspace role.
+  const currentUser = await getRequestUser(request);
+  const currentPilot = currentUser ? foundationPilotAccess(currentUser.id) : null;
+  if (!currentUser || currentUser.id !== user.id || !currentPilot ||
+      currentPilot.membership.workspaceId !== membership.workspaceId ||
+      (currentPilot.membership.role !== "owner" && currentPilot.membership.role !== "admin")) {
+    return NextResponse.json({ code: "AUTHORIZATION_CHANGED_RETRY" }, { status: 403, headers: NO_STORE });
+  }
+  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", currentPilot.membership.role);
+  if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
+    status: currentProductAccess.status, headers: NO_STORE,
+  });
   const rolledBack = await rollbackFoundationWorld({
     operationId,
     workspaceKey: membership.workspaceId,

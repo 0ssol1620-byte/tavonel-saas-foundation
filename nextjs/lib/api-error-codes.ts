@@ -326,6 +326,8 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "WORLD_STORE_WRITE_FAILED", status: 503, meaning: "The World store could not be written.", whatToDo: "Retry." },
       { code: "WORLD_VERSION_BINDING_INVALID", meaning: "A retained version could not be bound to its manifest.", whatToDo: "Report it with the collection id." },
       { code: "WORLD_CANDIDATE_NOT_PROMOTABLE", status: 422, meaning: "The candidate failed the checks activation requires.", whatToDo: "Read the validation report in the candidate; it names what failed." },
+      { code: "WORLD_CANDIDATE_EVIDENCE_REQUIRED", status: 422, meaning: "The candidate has no readable source-bound evidence, so publication or restoration was refused.", whatToDo: "Recompile from source regions and inspect the evidence before publishing." },
+      { code: "ROLLBACK_TARGET_ARTIFACT_INVALID", status: 422, meaning: "The retained rollback artifact does not match its collection, manifest or qualified runtime.", whatToDo: "Choose a valid retained version from World history; report a damaged artifact." },
       { code: "WORLD_CANDIDATE_SOURCE_BINDING_INVALID", status: 422, meaning: "A candidate object cites a source version the store cannot resolve.", whatToDo: "Recompile. A World with an unresolved link is not emitted." },
       { code: "WORLD_EQUIVALENCE_REFUSED", status: 409, meaning: "The activation would have replaced the active World with one the equivalence check does not accept as the same subject.", whatToDo: "Review the diff before promoting." },
       { code: "EVIDENCE_DANGLING", meaning: "An object cites evidence that is not in the package.", whatToDo: "Recompile. Fail-closed: the World is not emitted rather than emitted incomplete." },
@@ -561,6 +563,7 @@ export const API_ERROR_SCAN_ROOTS: readonly string[] = [
   "app/api/connections",
   "app/api/export",
   "lib/developer-auth.ts",
+  "lib/world-rollback-source-access.ts",
   "lib/developer-store.ts",
   "lib/activation-rate-limit.ts",
 ];
