@@ -6,6 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import net from "node:net";
 import path from "node:path";
+import { stopOwnedChild } from "./stop-owned-child.mjs";
 
 export async function withLocalStorage(executable, visit) {
 assert.ok(executable, "Set TAVONEL_LOCAL_SEAWEED_EXE to the qualified official SeaweedFS 4.48 Windows binary");
@@ -39,7 +40,6 @@ const args = ["mini", `-dir=${root}`, "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-m
   "-s3.externalUrl=https://00000000000000000000000000000000.r2.cloudflarestorage.com", `-bucket=${env.S3_BUCKET}`];
 let diagnostics = "";
 const child = spawn(executable, args, { cwd: root, env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
-const closed = new Promise(resolve => child.once("close", resolve));
 for (const stream of [child.stdout, child.stderr]) stream.on("data", part => { diagnostics = (diagnostics + part).slice(-6000); });
 child.on("error", error => { diagnostics += String(error); });
 try {
@@ -66,12 +66,12 @@ try {
     harnessSha256: createHash("sha256").update(readFileSync(import.meta.filename)).digest("hex"),
     foundationCommit: execFileSync("git", ["--git-dir", path.resolve(nextRoot, "../.git"), "rev-parse", "HEAD"], { cwd: nextRoot, encoding: "utf8", windowsHide: true }).trim(),
     cloudflareR2Verified: false, authLoginVerified: false, nextBrowserVerified: false }));
+} catch (error) {
+  // Record the original failure before cleanup can fail separately. Never log service credentials.
+  console.error("Local service qualification failed:", error.name);
+  throw error;
 } finally {
-  if (child.exitCode === null) child.kill();
-  let timer;
-  try {
-    await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Owned SeaweedFS did not stop")), 10_000); })]);
-  } finally { clearTimeout(timer); }
+  await stopOwnedChild(child);
   rmSync(root, { recursive: true, force: true });
 }
 }

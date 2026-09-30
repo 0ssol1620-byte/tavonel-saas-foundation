@@ -227,7 +227,7 @@ jobs:
           pnpm scan:secrets
           pnpm check
           pnpm test
-          node --test scripts/journey/real-auth-ci-contract.test.mjs
+          node --test scripts/journey/real-auth-ci-contract.test.mjs scripts/journey/stop-owned-child.test.mjs
       - name: Start genuine Auth in the disposable local Supabase stack
         run: |
           test ! -f supabase/config.toml

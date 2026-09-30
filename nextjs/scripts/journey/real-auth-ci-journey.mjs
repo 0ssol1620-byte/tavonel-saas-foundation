@@ -10,6 +10,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateDisposableAuthStack } from "./real-auth-ci-contract.mjs";
 import { withLocalStorage } from "./local-storage-journey.mjs";
+import { stopOwnedChild } from "./stop-owned-child.mjs";
 
 const statusFile = realpathSync(process.env.TAVONEL_AUTH_STACK_STATUS ?? "");
 const runnerTemp = realpathSync(process.env.RUNNER_TEMP ?? "");
@@ -85,7 +86,7 @@ try {
       upstream.on("error",()=>{response.writeHead(502);response.end("Owned local upstream unavailable");}); request.pipe(upstream);
     });
     await new Promise(resolve=>gateway.listen(54443,"127.0.0.1",resolve));
-    let child,browser;
+    let child,browser,page;
     try {
       const preload=path.join(root,"transport.cjs");
       writeFileSync(preload,`const os=require('node:os');const cpus=os.cpus;os.cpus=()=>cpus().slice(0,2);os.availableParallelism=()=>2;const f=globalThis.fetch;globalThis.fetch=(input,init)=>{if(typeof input==='string'){const u=new URL(input);if(u.hostname===${JSON.stringify(host)})return f(${JSON.stringify(origin)}+u.pathname+u.search,init);}return f(input,init);};`);
@@ -100,7 +101,8 @@ try {
       browser=await chromium.launch({headless:true});
       const context=await browser.newContext({ignoreHTTPSErrors:true});
       await context.route("**/*",route=>new URL(route.request().url()).hostname==="127.0.0.1"?route.continue():route.abort());
-      const page=await context.newPage();
+      page=await context.newPage();
+      report.stage="callback-without-session";
       await page.goto(`${origin}/auth/callback`); await expect(page.getByRole("heading",{name:"Sign-in did not complete."})).toBeVisible();
       check("actual callback without provider session fails visibly",true,true);
       const login=()=>page.evaluate(async ({email,password,anon})=>{const r=await fetch("/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:anon,"content-type":"application/json"},body:JSON.stringify({email,password})});return {status:r.status,body:await r.json()};},{email,password,anon:stack.anon});
@@ -158,13 +160,16 @@ try {
       await expect(page.getByRole("heading",{name:"Sign-in did not complete."})).toBeVisible();
       check("expired-cookie-only browser cannot establish an app session",true,true);
       report.browserVersion=browser.version();report.nextMode="production";
+    } catch (error) {
+      const redact = value => [password,stack.anon,stack.service,storage.env.AWS_SECRET_ACCESS_KEY].reduce((text,secret)=>text.replaceAll(secret,"[redacted]"),String(value)).replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,"[redacted JWT]");
+      report.failure={name:error.name,message:redact(error.message).slice(0,4000)};
+      if(page) report.failure.visibleHeadings=await page.getByRole("heading").allTextContents().then(items=>items.map(redact)).catch(()=>[]);
+      console.error("Real Auth primary failure:",JSON.stringify(report.failure));
+      throw error;
     } finally {
       try { if(browser)await browser.close(); } finally {
         try {
-          if(child&&child.exitCode===null) {
-            const closed=new Promise(resolve=>child.once("close",resolve));child.kill();
-            let timer;try { await Promise.race([closed,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Owned Next did not stop")),10_000);})]); } finally {clearTimeout(timer);}
-          }
+          if(child) await stopOwnedChild(child);
         } finally {gateway.closeAllConnections();await new Promise(resolve=>gateway.close(resolve));}
       }
     }
