@@ -7,7 +7,9 @@ test("closed workspace offers a public example without offering an upload", asyn
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "See how a source becomes usable knowledge" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
+  // A v1 bootstrap names no pending reason, so the self-service terms review stands in for the old contact link.
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Explore a compiled World" })).toHaveAttribute("href", "/explore");
   await expect(page.locator(".workspace-example-path span")).toHaveCount(4);
   await expect(page.getByText("Getting started")).toHaveCount(0);
@@ -17,7 +19,7 @@ test("closed workspace offers a public example without offering an upload", asyn
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("workspace-admission-closed.png"), fullPage: true });
   await page.keyboard.press("u");
-  await expect(page.getByText("Source processing is not active for this workspace. Request source access before choosing files.")).toBeVisible();
+  await expect(page.getByText("Source processing is not active for this workspace yet. Your files stay on your device.")).toBeVisible();
 });
 
 test("approved workspace retains its source controls", async ({ page }) => {
@@ -50,14 +52,15 @@ test("closed workspace does not sell AI connection access as an available plan",
   await expect(page.getByRole("link", { name: "See Developer access" })).toHaveCount(0);
 });
 
-test("an unentitled workspace home points to the public example and access request", async ({ page }) => {
+test("an unentitled workspace home points to the public example and the processing terms", async ({ page }) => {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page, { accessSource: "unentitled", customerDataEnabled: false });
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Your account is ready. File processing is not active", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Explore a compiled World" })).toHaveAttribute("href", "/explore");
-  await expect(page.getByRole("link", { name: "Request source access" })).toHaveAttribute("href", "/contact");
+  await expect(page.getByRole("button", { name: "Review processing terms" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request source access" })).toHaveCount(0);
 });
 
 test("an unavailable access check does not describe a paid account as unentitled", async ({ page }) => {

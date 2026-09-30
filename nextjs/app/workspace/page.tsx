@@ -35,9 +35,11 @@ import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
-import WorkspaceUltimateShell, { type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
+import ProcessingConsentPanel from "@/components/processing-consent-panel";
+import workspaceStateStyles from "./workspace-states.module.css";
 import {
   deriveAttentionItems,
   deriveOnboardingSteps,
@@ -175,6 +177,28 @@ type BillingAccount = {
   subscriptionCancelAt: string | null;
   updatedAt: string | null;
 };
+/*
+  Mirrors BillingNotice in lib/billing-gate-enforcement.ts, which is server-only. The server sends
+  codes; the sentences are this page's. `null` from the server means the notice store could not be
+  read -- never "there are no notices".
+*/
+type BillingNotice = {
+  id: string;
+  kind: "subscription_paused_processing_gate";
+  reason: "processing_authorization_refused" | "processing_authorization_lapsed";
+  refundReviewRequired: boolean;
+  createdAt: string;
+  acknowledgedAt: string | null;
+};
+
+function readBillingNotices(value: unknown): BillingNotice[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.filter((item): item is BillingNotice =>
+    typeof item === "object" && item !== null && typeof item.id === "string"
+    && item.kind === "subscription_paused_processing_gate"
+    && (item.reason === "processing_authorization_refused" || item.reason === "processing_authorization_lapsed")
+    && typeof item.createdAt === "string");
+}
 
 function bytesToHex(bytes: Uint8Array) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -252,9 +276,13 @@ export default function WorkspacePage() {
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
+  /** Why a closed workspace is closed, as the shell read it from the v2 bootstrap; "legacy" on v1. */
+  const [sourcePending, setSourcePending] = useState<SourcePendingReason | "legacy">("legacy");
+  const [accessRecheck, setAccessRecheck] = useState<"idle" | "checking" | "done">("idle");
+  const [accessEpoch, setAccessEpoch] = useState(0);
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
-    ? "Source processing is not active for this workspace. Request source access before choosing files."
+    ? "Source processing is not active for this workspace yet. Your files stay on your device."
     : customerDataAccess === "checking"
       ? "Checking source access before choosing files."
       : "Source access could not be verified. Refresh before choosing files.";
@@ -450,6 +478,9 @@ export default function WorkspacePage() {
   const aiConnectionTaken = false;
   const [billingAccount, setBillingAccount] = useState<BillingAccount | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  /** undefined until billing is read; null when the notice store was unavailable. */
+  const [billingNotices, setBillingNotices] = useState<BillingNotice[] | null | undefined>(undefined);
+  const [resumeConfirm, setResumeConfirm] = useState(false);
   /**
    * What this browser knows about files it is sending. The server list cannot see a document
    * until CDR has written an immutable PDF for it, so without this the first stretch of every
@@ -525,6 +556,22 @@ export default function WorkspacePage() {
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
     return data.session?.access_token ?? null;
   };
+
+  /*
+    The shell's /api/access/bootstrap read, including the v2 reason a closed workspace is closed:
+    whether the owner still has to accept the processing terms, has accepted and is waiting on
+    release, or was refused. v1 sends no reason; that is "legacy" and keeps the terms review on
+    offer. The page never reads bootstrap itself -- after an acceptance, or when the owner asks to
+    check again, it bumps accessEpoch and the shell reads once more.
+  */
+  const applyAccess = (source: typeof accessSource, enabled: boolean | null, reason: SourcePendingReason | null) => {
+    setAccessSource(source);
+    setCustomerDataAccess(enabled === null ? "unavailable" : enabled ? "open" : "closed");
+    setSourcePending(reason ?? "legacy");
+    setAccessRecheck((current) => current === "checking" ? "done" : current);
+  };
+  const refreshAccess = () => setAccessEpoch((epoch) => epoch + 1);
+  const recheckFileAccess = () => { setAccessRecheck("checking"); refreshAccess(); };
 
   const clearWorldState = () => {
     setActiveWorld(null);
@@ -604,8 +651,9 @@ export default function WorkspacePage() {
     if (!token) return;
     const response = await fetch("/api/billing/status", { headers: { authorization: `Bearer ${token}` } });
     if (!response.ok) return;
-    const json = await response.json() as { account?: BillingAccount };
+    const json = await response.json() as { account?: BillingAccount; notices?: unknown };
     if (json.account) setBillingAccount(json.account);
+    setBillingNotices(readBillingNotices(json.notices));
   };
 
   const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string) => {
@@ -2132,10 +2180,8 @@ export default function WorkspacePage() {
       stateDescription={stateDescription}
       stateFacts={workspaceFacts}
       stateHero={workspaceState.mode !== "new"}
-      onAccess={(source, enabled) => {
-        setAccessSource(source);
-        setCustomerDataAccess(enabled === null ? "unavailable" : enabled ? "open" : "closed");
-      }}
+      onAccess={applyAccess}
+      accessEpoch={accessEpoch}
       nextAction={nextAction}
       onNavigate={navigateSurface}
       onUpload={() => activationPolicy.customerIntake.enabled && intakeOpen ? fileRef.current?.click() : setNotice(intakeClosedCopy)}
@@ -2310,30 +2356,53 @@ export default function WorkspacePage() {
                 </div>
               ) : !intakeOpen ? (
                 <div className="workspace-intake-copy workspace-intake-closed" role="status" aria-live="polite">
-                  <p className="eyebrow">A complete example is ready</p>
+                  <p className="eyebrow">{sourcePending === "terms_acceptance_required" ? "Your workspace" : "A complete example is ready"}</p>
                   {workspaceState.mode === "new" && surface === "home"
-                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See how a source becomes usable knowledge"}</h1>
+                    ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : sourcePending === "terms_acceptance_required" ? "Start with your documents" : "See how a source becomes usable knowledge"}</h1>
                     : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p>{customerDataAccess === "checking"
                     ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
                     : customerDataAccess === "closed"
-                      ? accessSource === "unentitled"
-                        ? "Your account is ready. File processing is not active for this workspace yet. Start with a finished public example."
-                        : "Your workspace is ready. To process your own files, arrange source access with us."
+                      ? sourcePending === "terms_acceptance_required"
+                        ? "Your account is ready. To process your own files, review and accept the processing terms."
+                        : sourcePending === "release_pending"
+                          ? "Your processing terms are accepted. File access for this workspace is awaiting release; the file drop opens here once it is."
+                          : sourcePending === "workspace_refused"
+                            ? "File processing is not available for this workspace. Accepting terms does not change this."
+                            : accessSource === "unentitled"
+                              ? "Your account is ready. File processing is not active for this workspace yet. Start with a finished public example."
+                              : "Your workspace is ready. File processing is not active for this workspace yet."
                       : "Source access could not be verified. Refresh before choosing files."}</p>
-                  {customerDataAccess === "closed" ? (
+                  {customerDataAccess === "closed" && sourcePending !== "terms_acceptance_required" ? (
                     <div className="workspace-example-path" aria-label="Example knowledge path">
                       <span><b>01</b> Files</span><span><b>02</b> Read</span>
                       <span><b>03</b> Organize</span><span><b>04</b> Use with AI</span>
                     </div>
                   ) : null}
                   {customerDataAccess === "closed" ? (
-                    <div className="workspace-intake-gated-actions">
-                      <Link className="btn" href="/explore">Explore a compiled World</Link>
-                      <Link className="btn ghost" href="/contact">Request source access</Link>
-                    </div>
+                    sourcePending === "terms_acceptance_required" || sourcePending === "legacy" ? (
+                      <ProcessingConsentPanel getToken={getAuthToken} onAccepted={refreshAccess}>
+                        <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
+                      </ProcessingConsentPanel>
+                    ) : (
+                      <div className="workspace-intake-gated-actions">
+                        <Link className="btn" href="/explore">Explore a compiled World</Link>
+                        {sourcePending === "release_pending" ? (
+                          <button type="button" className="btn ghost" disabled={accessRecheck === "checking"} onClick={recheckFileAccess}>
+                            {accessRecheck === "checking" ? "Checking file access…" : "Check file access again"}
+                          </button>
+                        ) : sourcePending === "workspace_refused" ? (
+                          <Link className="btn ghost" href="/contact">Contact support</Link>
+                        ) : null}
+                      </div>
+                    )
                   ) : null}
-                  {customerDataAccess === "closed" ? <small>Public example. Your files stay on your device until source access is enabled.</small> : null}
+                  {customerDataAccess === "closed" && sourcePending === "release_pending" && accessRecheck === "done"
+                    ? <p className={workspaceStateStyles.recheck} role="status">Checked just now. File access is still awaiting release.</p>
+                    : null}
+                  {customerDataAccess === "closed"
+                    ? <small>{sourcePending === "workspace_refused" ? "Public example. Your files stay on your device." : "Public example. Your files stay on your device until source access is enabled."}</small>
+                    : null}
                 </div>
               ) : (
               <div className="workspace-intake-copy">
@@ -3016,6 +3085,49 @@ export default function WorkspacePage() {
               <p className="billing-hold" role="status">
                 Cancellation is scheduled. Access remains active through the current paid period.
               </p>
+            ) : null}
+            {/*
+              A pause the processing gate made. Stated as what happened and what is still open:
+              nothing here says a refund was issued, and resuming goes through the billing portal
+              only after the owner has read that it may charge.
+            */}
+            {billingNotices === null ? (
+              <p className="fine">Billing notices could not be read. This does not mean there are none; refresh billing to check again.</p>
+            ) : billingNotices?.length ? (
+              <section className={workspaceStateStyles.notices} aria-labelledby="billing-notices-title">
+                <h3 id="billing-notices-title">Billing notices</h3>
+                <ul>
+                  {billingNotices.map((notice) => (
+                    <li key={notice.id} className="billing-hold">
+                      <strong>Subscription paused on {formatTimestamp(notice.createdAt) ?? UNKNOWN}.</strong>{" "}
+                      {notice.reason === "processing_authorization_refused"
+                        ? "File processing was not authorized for this workspace, so its subscription was paused."
+                        : "File processing authorization for this workspace lapsed, so its subscription was paused."}
+                      {notice.refundReviewRequired
+                        ? " A refund review is required for this workspace. No refund has been issued automatically; the result of the review will be reported separately."
+                        : null}
+                    </li>
+                  ))}
+                </ul>
+                {resumeConfirm ? (
+                  <div className="billing-resume-confirm" role="group" aria-labelledby="billing-resume-title">
+                    <p id="billing-resume-title">
+                      Resuming the subscription may charge your payment method for the next billing period. It does not reopen file
+                      processing for this workspace by itself. You will confirm the resume in the billing portal.
+                    </p>
+                    <div className="billing-actions">
+                      <button type="button" disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
+                        {billingBusy ? "Opening..." : "Continue to billing portal"}
+                      </button>
+                      <button type="button" onClick={() => setResumeConfirm(false)}>Keep paused</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="billing-actions">
+                    <button type="button" disabled={!billingAccount?.paddleCustomerId} onClick={() => setResumeConfirm(true)}>Resume subscription…</button>
+                  </div>
+                )}
+              </section>
             ) : null}
             {billingAccount?.updatedAt ? <small>Last persisted billing change · {formatTimestamp(billingAccount.updatedAt)}</small> : null}
           </section>

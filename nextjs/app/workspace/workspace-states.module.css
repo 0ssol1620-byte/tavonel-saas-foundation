@@ -1,0 +1,10 @@
+@layer components {
+  /* Billing notices sit under the card's plan heading, so their heading must read one step below it. */
+  .notices { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+  .notices h3 { font-size: 15px; line-height: 1.3; letter-spacing: 0; }
+  .notices ul { display: grid; gap: 8px; margin: 0; padding-left: 18px; }
+  .notices li { line-height: 1.5; }
+
+  /* The answer to "Check file access again", kept visibly apart from the action row above it. */
+  .recheck { margin: 12px 0 0; color: var(--text-mid); font-size: 14px; }
+}

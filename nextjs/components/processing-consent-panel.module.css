@@ -1,0 +1,41 @@
+/* Sits inside the centred closed-intake block; the agreement itself reads left-aligned like a form. */
+@layer components {
+  .panel {
+    width: min(100%, 60ch);
+    margin: 20px auto 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--hairline-hi);
+    color: var(--text-mid);
+    font-size: 15px;
+    line-height: 1.55;
+    text-align: left;
+  }
+
+  .panel[hidden] { display: none; }
+
+  .panel p { margin: 0 0 12px; }
+
+  .panel a { color: var(--text-hi); text-decoration: underline; text-underline-offset: 3px; }
+
+  .form { display: grid; gap: 4px; }
+
+  .agree {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 44px;
+    padding: 10px 0;
+    color: var(--text-hi);
+    cursor: pointer;
+  }
+
+  .agree input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; accent-color: var(--verified); }
+
+  .error { color: var(--text-hi); font-weight: 550; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .actions :global(.btn) { min-height: 44px; }
+
+  .actions button:disabled { cursor: not-allowed; opacity: .55; }
+}

@@ -17,6 +17,7 @@ server-assigned versions differ intentionally.
 | compile_artifact_provenance | 20260930001619 |
 | processing_terms_acceptance | 20260930001717 |
 | processing_workspace_grant | 20260930001722 |
+| billing_gate_enforcement | 20260930003548 |
 
 Deletion migrations were qualified by the DB rehearsal on PR #121 at `a830d39`.
 Terms and grant migrations were qualified by the DB rehearsal on PR #137 at
@@ -24,3 +25,7 @@ Terms and grant migrations were qualified by the DB rehearsal on PR #137 at
 They do not constitute a customer-processing approval, a customer's terms
 acceptance, a successful purge, or an activation of live billing. No customer
 acceptance or release grant was inserted as part of these migrations.
+
+The billing migration was subsequently qualified by the complete DB rehearsal
+on PR #137 at `47146ca` and applied. It creates durable pause intent, reconciliation
+and customer-notice storage; applying it does not itself call Paddle or charge.

@@ -510,3 +510,55 @@ Local TypeScript, targeted ESLint, 13 bootstrap unit cases, and the optimized Ne
 The 1440, 390, and 360px CI captures of the closed workspace were inspected: the center card, two actions, four-step path, and mobile navigation have no visible collision or truncation. An independent read-only Claude Code CLI review using `--model opus` found that a gate-store outage looked like an ordinary pending source decision and that Core and Developers still sent closed workspaces toward Pricing. Those paths now distinguish temporary unavailability and use the source-access request consistently; 15 focused bootstrap tests, TypeScript, and targeted ESLint pass after the corrections. The installed Claude MCP Agent advertised no available agent types, so this review was not an MCP subagent run. Existing trials continue to age in the database while intake is closed; the production trial policy is temporarily disabled to prevent further premature grants, and the already-issued trial must be restored before usable access opens.
 
 **FOUNDER VISUAL REVIEW REQUIRED**
+
+## 2026-09-30 — Workspace processing-terms consent and billing notices (mocked states)
+
+**Every state in this entry is a labelled Playwright route fixture, not a live account.** `/api/access/bootstrap`, `/api/access/processing-terms`, `/api/billing/status` and `/api/billing/portal` were answered by fixtures in `nextjs/e2e/processing-consent.spec.ts` and `nextjs/e2e/billing-notices.spec.ts` on top of `e2e/fixtures/workspace-fixture.ts`. No Supabase, Paddle, published-terms file or customer document was touched. No refund, pause or resume decision was made.
+
+Closed-workspace Home now branches on the v2 bootstrap `sourcePending` reason:
+- `terms_acceptance_required` and v1 (no reason) offer "Review processing terms". The published offer is fetched only on request, and the agreement checkbox starts unticked. Submit stays disabled until the box is ticked. The POST names the exact version, both hashes and `direct_upload`.
+- `release_pending` says the terms are accepted and file access is awaiting release. It does not ask again and offers "Check file access again".
+- `workspace_refused` states that processing is not available and that accepting terms does not change this. It offers no agreement and makes no promise of enablement.
+
+A submit that gets no confirmed answer (network failure, 5xx or an unreadable reply) now says the outcome could not be confirmed and is safe to retry. "Nothing was recorded" appears only for an explicit 4xx refusal.
+
+The Usage & billing card now shows `subscription_paused_processing_gate` notices. Each shows the pause date and its reason. When `refundReviewRequired` is set, it says a refund review is required and that no refund has been issued automatically; otherwise it says nothing about refunds. `notices: null` (or no `notices` key) reads as "could not be read… does not mean there are none". Resume is a two-step disclosure. It first states that resuming may charge the payment method and does not reopen file processing by itself, and only then opens the existing billing portal. No new resume endpoint was added.
+
+Playwright production build (existing `webServer`), projects 1920, 1440, 1280, 1024, 768, 390, 360, reduced-motion and audit, with specs `processing-consent`, `billing-notices`, `workspace-admission-state`, `pipeline-board` and `billing-lifecycle`: **173 passed, 0 failed, 0 flaky**. An earlier run of the same matrix failed one `billing-lifecycle` case. The new "notices unavailable" line carried `role="status"` and collided with that spec's single-status locator; the line is static content, so the role was removed and the rerun passed.
+
+Sixty-four full-page captures (8 states × 7 widths + reduced motion) are stored in ignored `nextjs/test-results/consent-billing-20260930/`:
+- `consent-terms-required`, `consent-review-checked`, `consent-accepted-dropzone-open`, `consent-release-pending`, `consent-workspace-refused`
+- `billing-notice-paused`, `billing-notice-resume-confirm`, `billing-notices-unavailable`
+
+Inspected directly:
+- 1440: review-checked, billing paused, resume-confirm
+- 390: terms-required, review-checked, billing unavailable
+- 360: resume-confirm
+- 1920: release-pending
+- 768: refused
+
+Observations, not all resolved:
+- **Fixed; not re-captured at every width.** The first capture set showed the "Billing notices" h3 larger than the card's plan h2 because it inherited the global `h3` size. A new `app/workspace/billing-notices.module.css` (in `@layer components`) now sets it one step below the plan heading.
+- **Suspected capture artifact, not ruled out.** On the 360/390 captures taken after keyboard steps, the fixed mobile header and "Skip to content" link are drawn over mid-page content, and the fixed bottom nav covers the card's last line. The same widths captured before any interaction (`390-consent-terms-required`, `390-billing-notices-unavailable`) show no overlap. This is attributed to full-page capture of fixed chrome after focus scrolling, but a viewport-level check at 360/390 is still required.
+- **Mocked mismatch.** The billing captures show the shell's "OWNER · Full workspace access · not billed" strip beside a paused subscription. The fixture default access source is `owner`; this pairing is not a real account state.
+- **Out of scope.** The shell strip reads "Source access pending" in the `workspace_refused` state. That copy lives in `workspace-ultimate-shell.tsx`, which this change did not touch.
+- **Minor spacing.** The release-pending "Checked just now" line sits close under the action row.
+
+Not run: the full Vitest and Playwright suites, Lighthouse, a live preview, or a live account. Automated captures are not founder acceptance.
+
+### Follow-up: observations resolved (still mocked fixtures)
+
+- **Duplicate bootstrap and refused-shows-pending: fixed.** `workspace-ultimate-shell.tsx` now reads `sourcePending` from its single `/api/access/bootstrap` call and passes it to the page through `onAccess`. The page no longer fetches bootstrap itself. After an acceptance, or on "Check file access again", it bumps an `accessEpoch` prop and the shell reads once more. The fixture spec asserts exactly one bootstrap on load and a second after the recheck. The `workspace_refused` strip now reads "Source processing unavailable / Files cannot be processed in this workspace" instead of "Source access pending".
+- **Release-status spacing: fixed.** "Checked just now" has its own 12px top margin, set in `app/workspace/workspace-states.module.css` (`@layer components`; the billing-notice styles moved into this file).
+- **Mocked owner/paused mismatch: fixed.** The billing-notice fixture now uses a subscription (`paid`) access source. The spec asserts that "not billed" does not appear.
+- **360/390 overlap: capture artifact confirmed.** Real-viewport (non-full-page) captures were taken after the keyboard steps. The fixed header sits at the top of the viewport with nothing overlapping. A new `elementFromPoint` check confirms the focused control (the agreement checkbox, and "Continue to billing portal") is the topmost element at its own centre. Scrolled to the end, the card's last line sits above the fixed bottom navigation. All of this passed at 1440, 390 and 360. The overlap seen earlier appears only in full-page captures, which draw fixed chrome at the scroll position.
+- **Heading-size fix: captured.** `1440-billing-notice-paused.png` shows "Billing notices" one step below the plan heading.
+
+Runs:
+- `processing-consent`, `billing-notices`, `workspace-admission-state` and `pipeline-board` at 1440/390/360, plus `billing-lifecycle` in `audit`: **68 passed**.
+- After one spec-only addition (the end-of-page check), `processing-consent` and `billing-notices` at 1440/390/360: **24 passed**.
+- The full 173-case matrix was not repeated.
+
+The 33 final captures (full-page, plus `viewport-*` after keyboard focus and at page end) are outside the repository in `D:/CodexProjects/tavonel-qa-evidence/consent-billing-20260930-fix/`. `nextjs/test-results/` is wiped on every Playwright run.
+
+**FOUNDER VISUAL REVIEW REQUIRED**

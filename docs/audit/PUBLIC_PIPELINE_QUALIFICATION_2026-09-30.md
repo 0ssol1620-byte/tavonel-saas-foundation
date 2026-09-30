@@ -46,3 +46,17 @@ not establish general multilingual OCR accuracy, customer document compilation,
 or signed-export acceptance. The active image digest remains
 `1392dac4e3d743f720deaa4721594a06fef6f0e8d7a6dac5e81b66324dfe6406`;
 its source/build provenance is under review before a replacement is deployed.
+
+## Mixed Korean/English regression
+
+A second operator-authored, noncustomer PDF contains an English heading, two
+Korean sentences and a Korean line with a date, amount and quantity. Input hash:
+`bb14fc26aec18fe2b18a9d532539f370d6e3e292ee76dbd6819c8cfdd555cbae`.
+The source and sanitized PDF were rendered and visually checked: all four lines
+remain legible. Production OCR on the compatible GPU returns only the English
+heading and a corrupted numeric line, losing the Korean sentences.
+
+This is a failed multilingual qualification. The recovered runtime invokes its
+Korean reader only under a text heuristic, which does not cover this sparse mixed
+page. Its decision and merge behavior require correction and a production repeat.
+The English canary success must not be generalized to Korean customer material.
