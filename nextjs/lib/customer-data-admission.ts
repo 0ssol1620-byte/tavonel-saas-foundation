@@ -4,6 +4,8 @@ import { processingCohortRefusal } from "./processing-workspace-grant";
 import type { CustomerDataScope } from "../../shared/scopedCustomerDataGate";
 import type { CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 
+export { authorizationStage } from "../../shared/customerDataAuthorization";
+
 export type SourceAuthorizationResult =
   | { ok: true; decision: Extract<CustomerDataAuthorization, { allowed: true }> }
   | { ok: false; code: string };

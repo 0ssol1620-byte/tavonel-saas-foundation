@@ -20,9 +20,9 @@ function authorized(request: Request): boolean {
 }
 
 /**
- * Retention deletion, deliberately not a cron. POST only (Vercel cron sends GET, so adding this
- * path to vercel.json does nothing until the preconditions in docs/CUSTOMER_DATA_GATE_2026-09-06.md
- * §7 are met and someone changes this file on purpose).
+ * Retention deletion. The operator drives it with POST; a Vercel cron may drive it with GET (below).
+ * Neither tombstones anything until FOUNDATION_RETENTION_FLEET_ARMED is exactly "true" or a reviewed
+ * single-workspace canary is confirmed (docs/CUSTOMER_DATA_GATE_2026-09-06.md §7).
  *
  * - `dry_run` (optionally one `workspaceKey`): lists what would be tombstoned, writes nothing.
  * - `execute` + `workspaceKey`: the canary. Must echo the dry run's `candidatesSha256`, so what is
@@ -57,4 +57,27 @@ export async function POST(request: Request) {
   const result = await runRetentionTombstones(preview.candidates);
   return reply({ ...result, mode: "execute", workspaceKey },
     result.ok ? 200 : result.code === "RETENTION_CANDIDATES_CHANGED" ? 409 : 503);
+}
+
+/**
+ * Scheduled fleet retention (Vercel cron sends GET). Same secret, same arm switch and same exact,
+ * hold-rechecking tombstone RPC as a fleet POST execute, at most 25 candidates per run. Nothing to
+ * confirm: an armed fleet was already reviewed through the canary. The reply is counts and the batch
+ * digest only, never a workspace or document identifier, because cron responses land in logs.
+ * A failed candidate stops the batch and is reported with how many were recorded before it; the
+ * next run re-selects, and a tombstoned source is never selected again.
+ */
+export async function GET(request: Request) {
+  if (!authorized(request)) return reply({ code: "RETENTION_WORKER_NOT_AUTHORIZED" }, 401);
+  if (process.env.FOUNDATION_RETENTION_FLEET_ARMED !== "true") return reply({ code: "RETENTION_FLEET_NOT_ARMED" }, 409);
+  const preview = await previewRetentionCandidates(null, LIMIT);
+  if (!preview.ok) return reply({ code: preview.code }, 503);
+  const summary = { mode: "scheduled", candidates: preview.candidates.length,
+    candidatesSha256: preview.candidatesSha256, batchLimit: LIMIT };
+  if (preview.candidates.length === 0) return reply({ ok: true, code: "OK", ...summary, recorded: 0 });
+  const result = await runRetentionTombstones(preview.candidates);
+  if (result.ok) return reply({ ok: true, code: "OK", ...summary, recorded: result.recorded });
+  return reply({ ok: false, code: result.code, ...summary, recorded: result.recorded,
+    notAttempted: preview.candidates.length - result.recorded - 1 },
+  result.code === "RETENTION_CANDIDATES_CHANGED" ? 409 : 503);
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { foundationPilotAccess, getRequestUser, readAccessMode } from "@/lib/foundation-pilot";
-import { readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
+import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
 import { issueProcessingWorkspaceGrant } from "@/lib/processing-workspace-grant";
 import { ensureSelfServiceOrganization } from "@/lib/self-service-provisioning";
 import { authorizeFoundationSessionProduct, bootstrapFoundationSelfServiceTrial } from "@/lib/self-service-trial";
@@ -55,8 +55,10 @@ export async function POST(request: Request) {
   const scopedGate = process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2";
   let grantCode: string | null = null;
   if (scopedGate) {
+    // The owner's own authenticated bootstrap is the only caller allowed a qualification grant; the
+    // issuer still requires the recorded workspace, the deployed SHA and the owner's acceptance.
     const issued = await issueProcessingWorkspaceGrant({
-      workspaceKey: pilot.membership.workspaceId, scope: "direct_upload",
+      workspaceKey: pilot.membership.workspaceId, scope: "direct_upload", allowQualification: true,
     });
     if (!issued.ok) {
       if (readAccessMode() === "self_service" && GRANT_UNAVAILABLE_CODES.has(issued.code)) {
@@ -71,6 +73,8 @@ export async function POST(request: Request) {
   // after the same exact-workspace customer-data decision used by upload routes opens.
   const gate = await readCustomerSourceAuthorization(pilot.membership.workspaceId, "direct_upload");
   const customerDataEnabled = gate.ok;
+  // Typed so the UI and billing can tell a bounded qualification from a release; never billable.
+  const processingStage = gate.ok ? authorizationStage(gate.decision) : null;
   if (readAccessMode() === "self_service" && !gate.ok &&
     (gate.code === "CUSTOMER_DATA_GATE_STORE_NOT_CONFIGURED" ||
       gate.code === "CUSTOMER_DATA_GATE_STORE_FAILED" ||
@@ -136,6 +140,7 @@ export async function POST(request: Request) {
       expiresAt: access.access.expiresAt,
       limits: access.limits ?? null,
       customerDataEnabled,
+      processingStage,
     },
   }, { headers });
 }

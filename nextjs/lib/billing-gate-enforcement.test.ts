@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCheckoutBinding } from "./billing-binding";
 import {
+  decideGatePause,
   runBillingGateEnforcement,
   type GateEnforcementCandidate,
   type GateEnforcementDeps,
@@ -293,5 +294,23 @@ describe("billing gate enforcement", () => {
     await expect(runBillingGateEnforcement(d)).resolves.toEqual({ ok: true, counts: { held: 1 } });
     await expect(runBillingGateEnforcement({ ...d, deadline: Date.now() - 1 })).resolves.toEqual({ ok: true, counts: {} });
     expect(d.readGate).not.toHaveBeenCalled();
+  });
+});
+
+// Review F4: what billing does with each code the scoped reader can return during a qualification window.
+describe("billing classification of scoped gate codes", () => {
+  const far = subscription();
+  it("pauses an explicitly refused workspace now, whatever the release state", () => {
+    expect(decideGatePause("SCOPED_WORKSPACE_REFUSED", far, NOW))
+      .toEqual({ pause: true, reason: "processing_authorization_refused", refundReview: false });
+    expect(decideGatePause("SCOPED_RELEASE_REFUSED", far, NOW))
+      .toEqual({ pause: true, reason: "processing_authorization_refused", refundReview: false });
+  });
+
+  it.each(["SCOPED_RELEASE_QUALIFICATION_OTHER_WORKSPACE", "SCOPED_RELEASE_QUALIFICATION_ONLY",
+    "SCOPED_RELEASE_NOT_FOUND", "PROCESSING_COHORT_EXCLUDED"])("treats %s as lapsed: deferred until near billing", (code) => {
+    expect(decideGatePause(code, far, NOW)).toEqual({ pause: false, outcome: "deferred_until_near_billing" });
+    const near = subscription({ nextBilledAt: new Date(NOW.getTime() + 2 * HOUR).toISOString() });
+    expect(decideGatePause(code, near, NOW)).toEqual({ pause: true, reason: "processing_authorization_lapsed", refundReview: false });
   });
 });

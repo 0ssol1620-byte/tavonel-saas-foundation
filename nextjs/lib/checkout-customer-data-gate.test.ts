@@ -23,7 +23,15 @@ vi.mock("@/lib/billing-catalog", async (original) => ({
 }));
 vi.mock("@/lib/billing-store", () => ({ issueFoundationCheckoutIntent: intent }));
 vi.mock("@/lib/commercial-state", () => ({ readCommercialState: commercial }));
-vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: gate }));
+vi.mock("@/lib/customer-data-admission", async () => ({
+  readCustomerSourceAuthorization: gate,
+  authorizationStage: (await import("../../shared/customerDataAuthorization")).authorizationStage,
+}));
+const refused = { ok: false, code: "SCOPED_RELEASE_NOT_FOUND" };
+const approved = (stage?: "production" | "qualification") => ({ ok: true, decision: stage
+  ? { allowed: true, schemaVersion: "tavonel.customer_data_gate.v2", stage,
+      release: { stage }, grant: { stage } }
+  : { allowed: true, schemaVersion: "tavonel.customer_data_gate.v1" } });
 vi.mock("@/lib/foundation-pilot", () => ({
   getRequestUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", email: "buyer@example.test" }),
   foundationPilotAccess: () => ({ membership: { workspaceId: "pilot-11111111" } }),
@@ -53,7 +61,7 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
   });
 
   it("refuses to create a live payment intent when this workspace cannot compile", async () => {
-    gate.mockResolvedValue(false);
+    gate.mockResolvedValue(refused);
     const response = await POST(request());
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" });
@@ -63,7 +71,7 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
   });
 
   it("creates the checkout intent after an exact-workspace approval", async () => {
-    gate.mockResolvedValue(true);
+    gate.mockResolvedValue(approved());
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(intent).toHaveBeenCalledOnce();
@@ -71,11 +79,24 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
 
   it("keeps the existing sandbox billing qualification independent of customer-data approval", async () => {
     commercial.mockReturnValue({ provider: "sandbox", checkoutEnabled: true, liveChargesEnabled: false });
-    gate.mockResolvedValue(false);
+    gate.mockResolvedValue(refused);
     const response = await POST(request());
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ environment: "sandbox" });
     expect(gate).not.toHaveBeenCalled();
+    expect(intent).toHaveBeenCalledOnce();
+  });
+
+  it("never opens a live checkout for a qualification-stage grant", async () => {
+    gate.mockResolvedValue(approved("qualification"));
+    const response = await POST(request());
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ code: "PROCESSING_QUALIFICATION_NOT_BILLABLE" });
+    expect(binding).not.toHaveBeenCalled();
+    expect(intent).not.toHaveBeenCalled();
+
+    gate.mockResolvedValue(approved("production"));
+    expect((await POST(request())).status).toBe(200);
     expect(intent).toHaveBeenCalledOnce();
   });
 });

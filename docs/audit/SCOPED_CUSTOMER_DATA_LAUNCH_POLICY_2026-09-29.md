@@ -168,3 +168,6 @@ precondition asks for an audited production compile, but a production compile of
 needs an allowed release first. Breaking that cycle needs an explicitly reviewed
 staged-qualification rule (for example, an operator-owned synthetic corpus admitted under a
 distinct, labelled release decision), not synthesized evidence.
+That rule is now implemented as a separate, hour-bounded, single-workspace `qualification` stage
+(11 facts + the audited compile pending), not a release: see
+[`PROCESSING_QUALIFICATION_STAGE_2026-09-30.md`](PROCESSING_QUALIFICATION_STAGE_2026-09-30.md).

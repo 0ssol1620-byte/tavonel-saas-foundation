@@ -5,7 +5,7 @@ import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfi
 import { issueFoundationCheckoutIntent } from "@/lib/billing-store";
 import { readCommercialState } from "@/lib/commercial-state";
 import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "@/lib/checkout-policy";
-import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
+import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { readPublicStatusV2 } from "@/lib/public-status";
 
@@ -65,8 +65,15 @@ export async function POST(request: Request) {
   // refuse payment before creating a durable checkout intent unless the same workspace receipt
   // that intake and compilation require is current and valid. Sandbox qualification remains
   // available without a customer-data receipt because it cannot charge a real card.
-  if (commercial.provider === "production" && !await canAdmitCustomerSource(membership.workspaceId, "direct_upload")) {
-    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
+  // A qualification grant admits the operator's own processing check, never a purchase.
+  if (commercial.provider === "production") {
+    const gate = await readCustomerSourceAuthorization(membership.workspaceId, "direct_upload");
+    if (!gate.ok) {
+      return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
+    }
+    if (authorizationStage(gate.decision) !== "production") {
+      return NextResponse.json({ code: "PROCESSING_QUALIFICATION_NOT_BILLABLE" }, { status: 403, headers: NO_STORE });
+    }
   }
   const customData = createCheckoutBinding(
     { userId: user.id, workspaceId: membership.workspaceId, offerCode: body.offerCode },

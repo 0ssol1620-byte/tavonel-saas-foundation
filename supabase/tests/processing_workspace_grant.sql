@@ -50,6 +50,7 @@ declare
   g public.customer_data_workspace_decisions;
 begin
   select * into a from public.foundation_processing_terms_acceptances where acceptance_id = p_acceptance;
+  g.schema_version := 'tavonel.customer_data_gate.v2';
   g.tenant_id := p_ws; g.workspace_id := p_ws; g.scope := 'direct_upload'; g.release_revision := repeat('a', 40);
   g.user_id := a.user_id; g.release_receipt_sha256 := p_release; g.terms_version := '2026-09-30';
   g.terms_receipt_sha256 := public.processing_terms_receipt_sha256('terms', a);
@@ -66,6 +67,7 @@ $$;
 create function pg_temp.pinned_grant_sha256() returns text language plpgsql as $$
 declare g public.customer_data_workspace_decisions;
 begin
+  g.schema_version := 'tavonel.customer_data_gate.v2';
   g.tenant_id := 'pilot-c0a1a1a100004000'; g.workspace_id := g.tenant_id;
   g.user_id := 'c0a1a1a1-0000-4000-8000-000000000001'; g.scope := 'direct_upload';
   g.release_revision := repeat('a', 40); g.release_receipt_sha256 := 'sha256:' || repeat('d', 64);

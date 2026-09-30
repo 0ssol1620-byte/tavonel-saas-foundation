@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  admitsWorkspace, evaluateScopedRelease, requiredReleaseEvidence, workspaceGrantSha256,
+  admitsWorkspace, evaluateQualificationRelease, evaluateScopedRelease, QUALIFICATION_PENDING, requiredReleaseEvidence,
+  workspaceGrantSha256, type ReleaseStage,
 } from "../../shared/scopedCustomerDataGate";
 
 const config = vi.fn();
@@ -36,7 +37,8 @@ const evidence = requiredReleaseEvidence(scope).map((precondition) => ({
 const release = evaluateScopedRelease({ scope, releaseRevision: revision, evidence, now: evaluatedAt });
 
 const releaseRow = (overrides: Record<string, unknown> = {}) => ({
-  schema_version: release.schemaVersion, scope, release_revision: revision, allowed: true,
+  schema_version: release.schemaVersion, stage: "production", scope, release_revision: revision, allowed: true,
+  qualification_workspace_key: null, qualification_expires_at: null,
   receipt_sha256: release.receiptSha256, evidence, missing: [], evaluated_at: evaluatedAt,
   recorded_at: "2026-09-29T00:00:01.000Z", ...overrides,
 });
@@ -48,11 +50,11 @@ const acceptance = (overrides: Record<string, unknown> = {}) => ({
 });
 type Rpc = (config: unknown, path: string, init: RequestInit) => Promise<Response>;
 /** Plays the RPC: echoes the submitted grant back, as a fresh insert or a stored replay. */
-function grantRpc(replay?: { grantedAt: string; expiresAt: string }): Rpc {
+function grantRpc(replay?: { grantedAt: string; expiresAt: string }, rpcStage: ReleaseStage = "production"): Rpc {
   return (_config, _path, init) => {
     const p = JSON.parse(String(init.body)) as Record<string, string>;
     const stored = {
-      tenantId: p.p_workspace_key, workspaceId: p.p_workspace_key, userId: OWNER, scope,
+      tenantId: p.p_workspace_key, workspaceId: p.p_workspace_key, userId: OWNER, scope, stage: rpcStage,
       releaseRevision: p.p_release_revision, releaseReceiptSha256: p.p_release_receipt_sha256,
       termsVersion: p.p_terms_version, termsReceiptSha256: p.p_terms_receipt_sha256,
       processingTermsReceiptSha256: p.p_processing_terms_receipt_sha256,
@@ -135,7 +137,7 @@ describe("processing workspace grant", () => {
       document: { path: TERMS, sha256: `sha256:${"a".repeat(64)}` } }))
       .toBe("sha256:aa98c2784eca086344961c2f34f00fc88c9765aadd84c42fee86340d773da81b");
     expect(workspaceGrantSha256({ tenantId: "pilot-c0a1a1a100004000", workspaceId: "pilot-c0a1a1a100004000",
-      userId: "c0a1a1a1-0000-4000-8000-000000000001", scope, releaseRevision: revision,
+      userId: "c0a1a1a1-0000-4000-8000-000000000001", scope, stage: "production", releaseRevision: revision,
       releaseReceiptSha256: `sha256:${"d".repeat(64)}`, termsVersion: "2026-09-30",
       termsReceiptSha256: `sha256:${"1".repeat(64)}`, processingTermsReceiptSha256: `sha256:${"2".repeat(64)}`,
       grantedAt: "2026-09-30T00:00:00.123Z", expiresAt: "2026-10-29T00:00:00.000Z", revokedAt: null }))
@@ -272,5 +274,101 @@ describe("processing workspace grant", () => {
     await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_NOT_FOUND" });
     config.mockReturnValue(null);
     await expect(issue()).resolves.toEqual({ ok: false, code: "WORKSPACE_GRANT_STORE_NOT_CONFIGURED" });
+  });
+});
+
+describe("qualification-stage grant", () => {
+  const qExpires = "2026-09-30T00:30:00.000Z";
+  const qEvaluated = "2026-09-29T23:40:00.000Z";
+  const eleven = evidence.filter((row) => row.precondition !== QUALIFICATION_PENDING)
+    .map((row) => ({ ...row, checkedAt: qEvaluated }));
+  const qualification = evaluateQualificationRelease({
+    releaseRevision: revision, workspaceId: WORKSPACE, expiresAt: qExpires, evidence: eleven, now: qEvaluated,
+  });
+  const qualificationRow = (overrides: Record<string, unknown> = {}) => ({
+    schema_version: qualification.schemaVersion, stage: "qualification", scope, release_revision: revision,
+    allowed: true, receipt_sha256: qualification.receiptSha256, evidence: eleven, missing: qualification.missing,
+    evaluated_at: qEvaluated, recorded_at: "2026-09-29T23:40:01.000Z",
+    qualification_workspace_key: WORKSPACE, qualification_expires_at: qExpires, ...overrides,
+  });
+  const issueQ = (at = now, workspaceKey = WORKSPACE, env: Record<string, string | undefined> = { VERCEL_GIT_COMMIT_SHA: revision }) =>
+    issueProcessingWorkspaceGrant({ workspaceKey, scope, now: at, env, publicDir: root, allowQualification: true });
+
+  beforeEach(() => {
+    store.release = [qualificationRow()];
+    store.rpc = grantRpc(undefined, "qualification");
+  });
+
+  it("hashes a qualification grant like production except for its schema version", () => {
+    const pinned = { tenantId: "pilot-c0a1a1a100004000", workspaceId: "pilot-c0a1a1a100004000",
+      userId: "c0a1a1a1-0000-4000-8000-000000000001", scope, releaseRevision: revision,
+      releaseReceiptSha256: `sha256:${"d".repeat(64)}`, termsVersion: "2026-09-30",
+      termsReceiptSha256: `sha256:${"1".repeat(64)}`, processingTermsReceiptSha256: `sha256:${"2".repeat(64)}`,
+      grantedAt: "2026-09-30T00:00:00.123Z", expiresAt: "2026-09-30T01:00:00.000Z", revokedAt: null };
+    // Pinned for supabase/tests/processing_qualification_stage.sql.
+    expect(workspaceGrantSha256({ ...pinned, stage: "qualification" }))
+      .toBe("sha256:e9b93be98f017dae135364ec48620a6ba063651c0c6ef054f3dbc6651794a7d3");
+  });
+
+  it("issues an hour-bounded qualification grant only to the owner's authenticated bootstrap", async () => {
+    const result = await issueQ();
+    expect(result).toMatchObject({ ok: true, grant: { stage: "qualification", expiresAt: qExpires,
+      releaseReceiptSha256: qualification.receiptSha256 } });
+    if (!result.ok) throw new Error("unreachable");
+    expect(rpcBody().p_grant_receipt_sha256).toBe(workspaceGrantSha256(result.grant));
+    expect(admitsWorkspace(qualification, result.grant,
+      { tenantId: WORKSPACE, workspaceId: WORKSPACE, scope, releaseRevision: revision }, now.toISOString())).toBe(true);
+
+    // Billing renewal (no opt-in) never takes one.
+    request.mockClear();
+    await expect(issue()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_QUALIFICATION_ONLY" });
+    expect(wroteGrant()).toBe(false);
+  });
+
+  it("ends the grant with the qualification, and refuses one recorded in the future", async () => {
+    const early = new Date("2026-09-29T23:45:00.000Z");
+    const long = evaluateQualificationRelease({ releaseRevision: revision, workspaceId: WORKSPACE,
+      expiresAt: "2026-09-30T00:40:00.000Z", evidence: eleven, now: qEvaluated });
+    store.release = [qualificationRow({ receipt_sha256: long.receiptSha256, qualification_expires_at: "2026-09-30T00:40:00.000Z" })];
+    await expect(issueQ(early)).resolves.toMatchObject({ ok: true, grant: { expiresAt: "2026-09-30T00:40:00.000Z" } });
+    await expect(issueQ(new Date("2026-09-29T23:39:59.000Z"))).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+  });
+
+  it("denies another workspace, an expired qualification and the wrong deployed SHA", async () => {
+    store.acceptance = acceptance({ workspaceKey: OTHER });
+    await expect(issueQ(now, OTHER)).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_QUALIFICATION_OTHER_WORKSPACE" });
+    store.acceptance = acceptance();
+    await expect(issueQ(new Date(qExpires))).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_STALE" });
+    await expect(issueQ(now, WORKSPACE, { VERCEL_GIT_COMMIT_SHA: "b".repeat(40) }))
+      .resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_INVALID" });
+    expect(wroteGrant()).toBe(false);
+  });
+
+  it("never falls back to qualification after a later refusal, and never without the owner's terms", async () => {
+    store.release = [releaseRow({ allowed: false, missing: ["compile_receipts_signed_and_audited"],
+      receipt_sha256: null, evidence: [] })];
+    await expect(issueQ()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+    store.release = [qualificationRow({ allowed: false })];
+    await expect(issueQ()).resolves.toEqual({ ok: false, code: "SCOPED_RELEASE_REFUSED" });
+    store.release = [qualificationRow()];
+    store.latest = [{ allowed: false }];
+    await expect(issueQ()).resolves.toEqual({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    store.latest = [];
+    store.acceptance = null;
+    await expect(issueQ()).resolves.toEqual({ ok: false, code: "PROCESSING_TERMS_ACCEPTANCE_REQUIRED" });
+    expect(wroteGrant()).toBe(false);
+  });
+
+  it("refuses scope escalation, a production-shaped echo and the database's own qualification refusal", async () => {
+    await expect(issueProcessingWorkspaceGrant({ workspaceKey: WORKSPACE, scope: "connector", now,
+      env: { VERCEL_GIT_COMMIT_SHA: revision }, publicDir: root, allowQualification: true }))
+      .resolves.toMatchObject({ ok: false });
+    expect(wroteGrant()).toBe(false);
+
+    store.rpc = grantRpc(undefined, "production");
+    await expect(issueQ()).resolves.toEqual({ ok: false, code: "WORKSPACE_GRANT_STORE_FAILED" });
+
+    store.rpc = () => rpcError("workspace_grant_qualification_refused");
+    await expect(issueQ()).resolves.toEqual({ ok: false, code: "SCOPED_QUALIFICATION_REFUSED" });
   });
 });

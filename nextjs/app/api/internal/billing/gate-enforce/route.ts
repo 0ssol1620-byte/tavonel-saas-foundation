@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseGateEnforcementStore, runBillingGateEnforcement } from "@/lib/billing-gate-enforcement";
 import { readCommercialState } from "@/lib/commercial-state";
-import { readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
+import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
 import { getPaddleSubscription, pausePaddleSubscriptionImmediately, readPaddleApiConfig } from "@/lib/paddle-api";
 import { issueProcessingWorkspaceGrant } from "@/lib/processing-workspace-grant";
 import { authorizeSyntheticCanary } from "@/lib/r2-synthetic-canary";
@@ -42,7 +42,13 @@ async function enforce(request: Request) {
     renewGrant: process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2"
       ? workspaceKey => issueProcessingWorkspaceGrant({ workspaceKey, scope: "direct_upload" })
       : undefined,
-    readGate: workspaceKey => readCustomerSourceAuthorization(workspaceKey, "direct_upload"),
+    // A qualification grant is not a billable authorization: it reads as "no release yet", exactly
+    // as the same workspace read before qualification existed, so existing pause rules are unchanged.
+    readGate: async workspaceKey => {
+      const gate = await readCustomerSourceAuthorization(workspaceKey, "direct_upload");
+      return !gate.ok || authorizationStage(gate.decision) === "production"
+        ? gate : { ok: false as const, code: "SCOPED_RELEASE_QUALIFICATION_ONLY" };
+    },
     getSubscription: id => getPaddleSubscription(id),
     pauseSubscription: id => pausePaddleSubscriptionImmediately(id),
     expectedEnvironment: commercial.provider,

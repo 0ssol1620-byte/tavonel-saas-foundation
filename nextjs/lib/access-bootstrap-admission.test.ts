@@ -20,7 +20,10 @@ vi.mock("@/lib/self-service-trial", () => ({
   bootstrapFoundationSelfServiceTrial: bootstrap,
   authorizeFoundationSessionProduct: authorize,
 }));
-vi.mock("@/lib/customer-data-admission", () => ({ readCustomerSourceAuthorization: gate }));
+vi.mock("@/lib/customer-data-admission", async () => ({
+  readCustomerSourceAuthorization: gate,
+  authorizationStage: (await import("../../shared/customerDataAuthorization")).authorizationStage,
+}));
 vi.mock("@/lib/self-service-provisioning", () => ({ ensureSelfServiceOrganization: provision }));
 vi.mock("@/lib/processing-workspace-grant", () => ({ issueProcessingWorkspaceGrant: issueGrant }));
 
@@ -165,9 +168,20 @@ describe("v2 workspace grant during bootstrap", () => {
     const response = await post();
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ code: "ACCESS_READY", access: { source: "trial", customerDataEnabled: true } });
-    expect(issueGrant).toHaveBeenCalledWith({ workspaceKey: "pilot-11111111", scope: "direct_upload" });
+    expect(issueGrant).toHaveBeenCalledWith({ workspaceKey: "pilot-11111111", scope: "direct_upload", allowQualification: true });
     const order = [provision, issueGrant, gate, bootstrap].map((fn) => fn.mock.invocationCallOrder[0]);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("types a qualification-stage admission so the UI and billing can tell it from a release", async () => {
+    gate.mockResolvedValue({ ok: true, decision: { allowed: true, schemaVersion: "tavonel.customer_data_gate.v2",
+      stage: "qualification", release: { stage: "qualification" }, grant: { stage: "qualification" } } });
+    const response = await post();
+    await expect(response.json()).resolves.toMatchObject({ code: "ACCESS_READY",
+      access: { customerDataEnabled: true, processingStage: "qualification" } });
+    gate.mockResolvedValue({ ok: true, decision: { allowed: true, schemaVersion: "tavonel.customer_data_gate.v2",
+      stage: "production", release: { stage: "production" }, grant: { stage: "production" } } });
+    await expect((await post()).json()).resolves.toMatchObject({ access: { processingStage: "production" } });
   });
 
   it.each([

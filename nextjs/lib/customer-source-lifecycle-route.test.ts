@@ -26,7 +26,7 @@ vi.mock("@/lib/supabase-admin", () => ({
 }));
 
 const { GET, POST } = await import("../app/api/documents/[id]/lifecycle/route");
-const { POST: retention } = await import("../app/api/internal/deletions/retention/route");
+const { POST: retention, GET: scheduledRetention } = await import("../app/api/internal/deletions/retention/route");
 
 const DOC = "0d000000-0000-4000-8000-000000000001";
 const sha = (c: string) => `sha256:${c.repeat(64)}`;
@@ -293,5 +293,124 @@ describe("retention worker preconditions", () => {
     rpc.mockImplementation((name) => name === "retention_expired_source_candidates"
       ? { status: 200, body: [{ ...expired[0], workspace_key: "pilot-other9" }] } : defaultRpc(name));
     expect((await run({ mode: "dry_run", workspaceKey: "pilot-acme01" })).status).toBe(503);
+  });
+});
+
+describe("scheduled fleet retention (cron GET)", () => {
+  const SECRET = "s".repeat(40);
+  const DOC2 = "0d000000-0000-4000-8000-000000000002";
+  const row = (document_id: string, workspace_key = "pilot-acme01") => ({ workspace_key, document_id,
+    created_at: "2025-08-01T00:00:00Z", expires_at: "2025-08-01T00:10:00Z", retention_days: 365,
+    deleted_object_grace_days: 30 });
+  // A small database: selection skips tombstoned rows, the exact RPC refuses a row whose legal hold
+  // became active after selection, and one document can be made to fail once.
+  let expired: ReturnType<typeof row>[] = [];
+  let tombstoned: Set<string>;
+  let holdAfterSelection = false;
+  let failOnce: string | null = null;
+  const cron = (auth = `Bearer ${SECRET}`) => scheduledRetention(new Request(
+    "https://tavonel.com/api/internal/deletions/retention", { method: "GET", headers: { authorization: auth } }));
+
+  beforeEach(() => {
+    process.env.FOUNDATION_WORKER_SECRET = SECRET;
+    process.env.FOUNDATION_RETENTION_FLEET_ARMED = "true";
+    expired = [row(DOC), row(DOC2, "pilot-other9")];
+    tombstoned = new Set();
+    holdAfterSelection = false;
+    failOnce = null;
+    rpc.mockImplementation((name, body) => {
+      if (name === "retention_expired_source_candidates") {
+        return { status: 200, body: expired.filter(r => !tombstoned.has(r.document_id)) };
+      }
+      if (name === "request_retention_expired_source_deletion_exact") {
+        if (holdAfterSelection) return { status: 200, body: { status: "changed" } };
+        if (failOnce === body.p_document_id) {
+          failOnce = null;
+          return { status: 500, body: { message: "transient" } };
+        }
+        tombstoned.add(body.p_document_id);
+        return { status: 200, body: { status: "recorded" } };
+      }
+      return defaultRpc(name);
+    });
+  });
+
+  it("refuses without the worker secret and reads nothing", async () => {
+    expect((await cron("Bearer wrong")).status).toBe(401);
+    expect((await cron("")).status).toBe(401);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("does nothing, not even a read, unless armed with exactly \"true\"", async () => {
+    for (const value of [undefined, "", "TRUE", "1", " true"]) {
+      if (value === undefined) delete process.env.FOUNDATION_RETENTION_FLEET_ARMED;
+      else process.env.FOUNDATION_RETENTION_FLEET_ARMED = value;
+      const response = await cron();
+      expect(response.status).toBe(409);
+      expect((await response.json()).code).toBe("RETENTION_FLEET_NOT_ARMED");
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reports an empty batch without writing", async () => {
+    expired = [];
+    const response = await cron();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, code: "OK", mode: "scheduled", candidates: 0, recorded: 0 });
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([]);
+  });
+
+  it("tombstones the fleet batch through the exact RPC, bounded to 25, and replies without identifiers", async () => {
+    const response = await cron();
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(JSON.parse(text)).toMatchObject({ ok: true, candidates: 2, recorded: 2, batchLimit: 25,
+      candidatesSha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/) });
+    for (const identifier of [DOC, DOC2, "pilot-acme01", "pilot-other9"]) expect(text).not.toContain(identifier);
+    expect(rpcCalls("retention_expired_source_candidates")).toEqual([{ p_workspace_key: null, p_limit: 25 }]);
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([
+      { p_workspace_key: "pilot-acme01", p_document_id: DOC, p_expected_created_at: "2025-08-01T00:00:00Z",
+        p_expected_retention_days: 365, p_expected_grace_days: 30 },
+      { p_workspace_key: "pilot-other9", p_document_id: DOC2, p_expected_created_at: "2025-08-01T00:00:00Z",
+        p_expected_retention_days: 365, p_expected_grace_days: 30 },
+    ]);
+  });
+
+  it("is idempotent: a repeated run records nothing new", async () => {
+    await cron();
+    const again = await cron();
+    expect(await again.json()).toMatchObject({ ok: true, candidates: 0, recorded: 0 });
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toHaveLength(2);
+  });
+
+  it("stops, and says so, when a legal hold lands after selection", async () => {
+    holdAfterSelection = true;
+    const response = await cron();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ ok: false, code: "RETENTION_CANDIDATES_CHANGED",
+      candidates: 2, recorded: 0, notAttempted: 1 });
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toHaveLength(1);
+    expect(tombstoned.size).toBe(0);
+  });
+
+  it("reports a partial failure honestly and the next run finishes only what is left", async () => {
+    failOnce = DOC2;
+    const response = await cron();
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false, candidates: 2, recorded: 1, notAttempted: 0 });
+    expect(body.code).not.toBe("OK");
+    expect([...tombstoned]).toEqual([DOC]);
+
+    const retry = await cron();
+    expect(await retry.json()).toMatchObject({ ok: true, candidates: 1, recorded: 1 });
+    expect([...tombstoned].sort()).toEqual([DOC, DOC2]);
+  });
+
+  it("fails closed when candidate selection is unreadable", async () => {
+    rpc.mockImplementation((name) => name === "retention_expired_source_candidates"
+      ? { status: 500, body: { message: "down" } } : defaultRpc(name));
+    expect((await cron()).status).toBe(503);
+    expect(rpcCalls("request_retention_expired_source_deletion_exact")).toEqual([]);
   });
 });

@@ -271,6 +271,47 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(put.mock.calls[0]?.[3]).toMatchObject({ signedReceipt: receipt });
   });
 
+  it("carries a qualification grant from admission through dispatch into the signed, audited receipt", async () => {
+    const { evaluateQualificationRelease, requiredReleaseEvidence, workspaceGrantSha256, QUALIFICATION_PENDING } =
+      await import("../../shared/scopedCustomerDataGate");
+    const at = new Date().toISOString();
+    const release = evaluateQualificationRelease({ releaseRevision: "a".repeat(40), workspaceId: "pilot-qual01",
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(), now: at,
+      evidence: requiredReleaseEvidence("direct_upload").filter((p) => p !== QUALIFICATION_PENDING)
+        .map((precondition) => ({ precondition, satisfied: true, evidence: "test-only", checkedAt: at })) });
+    const unsigned = { tenantId: WS, workspaceId: WS, userId: "user-a", scope: "direct_upload" as const,
+      stage: "qualification" as const, releaseRevision: release.releaseRevision, releaseReceiptSha256: release.receiptSha256!,
+      termsVersion: "t", termsReceiptSha256: `sha256:${"1".repeat(64)}`,
+      processingTermsReceiptSha256: `sha256:${"2".repeat(64)}`, grantedAt: at, expiresAt: release.qualification!.expiresAt,
+      revokedAt: null };
+    const grant = { ...unsigned, grantReceiptSha256: workspaceGrantSha256(unsigned) };
+    const decision = { allowed: true as const, schemaVersion: "tavonel.customer_data_gate.v2" as const,
+      stage: "qualification" as const, tenantId: WS, workspaceId: WS, receiptSha256: grant.grantReceiptSha256,
+      evaluatedAt: at, release, grant };
+    customerDataGate.mockResolvedValue({ ok: true, decision });
+    compilableSource();
+
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(dispatched.mock.calls[0]).toContain(decision);
+    expect(run.payload.customerDataGateStage).toBe("qualification");
+    const verified = verifyCompileReceipt(run.payload.signedReceipt, { tenantId: WS, workspaceId: WS },
+      readExportTrustStoreEnv(signingEnv)!);
+    expect(verified).toMatchObject({ ok: true, payload: { customerDataGateReceiptSha256: grant.grantReceiptSha256 } });
+    expect((audited.mock.calls[0]![0] as { details: Record<string, unknown> }).details).toMatchObject({
+      customerDataGateStage: "qualification", customerDataGateReceiptSha256: grant.grantReceiptSha256 });
+  });
+
+  it("labels a v1-receipt compile as production", async () => {
+    compilableSource();
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    expect(run.ok && run.payload.customerDataGateStage).toBe("production");
+    expect((audited.mock.calls[0]![0] as { details: Record<string, unknown> }).details.customerDataGateStage)
+      .toBe("production");
+  });
+
   it("does not publish an in-flight result after approval is revoked", async () => {
     compilableSource();
     customerDataGate.mockResolvedValueOnce(APPROVED_GATE).mockResolvedValueOnce(APPROVED_GATE)
