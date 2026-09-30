@@ -1,0 +1,20 @@
+@layer components {
+  /* Billing notices sit under the card's plan heading, so their heading must read one step below it. */
+  .notices { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+  .notices h3 { font-size: 15px; line-height: 1.3; letter-spacing: 0; }
+  .notices ul { display: grid; gap: 8px; margin: 0; padding-left: 18px; }
+  .notices li { line-height: 1.5; }
+
+  /* The answer to "Check file access again", kept visibly apart from the action row above it. */
+  .recheck { margin: 12px 0 0; color: var(--text-mid); font-size: 14px; }
+
+  /*
+    Below 1024px the workspace rail is a fixed bottom bar (workspace-ultimate.module.css: 64px plus
+    the safe-area inset). A control reached by keyboard is scrolled to the nearest edge, which put
+    it under that bar; the margin makes focus scrolling stop above it.
+    Keep this clearance aligned with the shell's mobile rail height.
+  */
+  @media (max-width: 1023px) {
+    .notices :is(a, button) { scroll-margin-bottom: calc(64px + env(safe-area-inset-bottom) + 16px); }
+  }
+}

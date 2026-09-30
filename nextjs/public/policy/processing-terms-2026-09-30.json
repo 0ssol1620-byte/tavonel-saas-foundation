@@ -1,0 +1,11 @@
+{
+  "version": "2026-09-30",
+  "terms": {
+    "sha256": "sha256:de4c156109056fd8ac16c7ff674e94304fe05a409477371ffc547c05c173f7d6",
+    "path": "/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md"
+  },
+  "processing": {
+    "sha256": "sha256:086d6680cf9999a1c86141348e36abfbd18d5000e610ba854cd53e6efd59eab5",
+    "path": "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md"
+  }
+}

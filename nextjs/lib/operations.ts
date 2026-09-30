@@ -18,7 +18,7 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   the terms began to apply and does not move when wording changes; this is the day the wording
   last changed, and it is the date of the commit that changed it.
 */
-export const LEGAL_LAST_UPDATED = "2026-09-27";
+export const LEGAL_LAST_UPDATED = "2026-09-30";
 
 /*
   SD-07. One draft label, on every legal document, until counsel signs it off.
@@ -34,9 +34,15 @@ export const LEGAL_LAST_UPDATED = "2026-09-27";
   and the process vocabulary stays in the log. It is one constant so the four documents cannot
   end up carrying three different disclaimers, and so that removing it after a legal review is
   one edit in one place.
+
+  2026-09-30. /terms no longer carries this label: it renders the versioned, hashed self-service
+  terms an owner accepts, and those change by new version, not in place. The label stays on the
+  notices and policy pages that are still maintained in place (/privacy, /refunds,
+  /subprocessors), and it now says which document is the agreement so a reader of one of those
+  pages is not left with "Draft v1" beside a 2026-09-30 contract.
 */
 export const LEGAL_DRAFT_NOTICE =
-  "Draft v1 — under review. This text is published so you can read the terms before asking for them. It has not yet been reviewed by a lawyer, and it is revised in place when that review returns; the last-updated date above is the day it last changed.";
+  "The last-updated date identifies this notice. Your workspace agreement is the versioned self-service terms and processing addendum linked from the Terms page.";
 
 export function readPublicOperations() {
   const commercial = readCommercialState();

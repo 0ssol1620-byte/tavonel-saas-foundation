@@ -52,8 +52,8 @@ export const PUBLIC_TRUST_DISCLOSURES = [
     id: "dpa",
     subject: "Data processing agreement",
     status: "published",
-    line: "A draft v2 data processing agreement is published for review and is clearly labelled as a draft, not a signed agreement.",
-    href: "/policy/TAVONEL_DPA_v2_2026-09-23.md",
+    line: "The 2026-09-30 processing addendum is the data processing agreement a workspace owner accepts with the self-service terms. An Enterprise engagement can negotiate a separately executed agreement from the archived 2026-09-23 draft.",
+    href: "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md",
   },
   {
     id: "responsible_disclosure",

@@ -24,7 +24,7 @@ env:
 
 jobs:
   candidate:
-    if: github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main' && github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -55,6 +55,9 @@ jobs:
           load: true
           push: false
           tags: foundation-ocr-gpu:candidate
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           provenance: false
       - name: Check image provider and runtime user
         run: |
@@ -62,7 +65,9 @@ jobs:
           docker run --rm --entrypoint sh foundation-ocr-gpu:candidate -c 'test "$(id -u)" = 10001 && ! dpkg -l | grep -qi openssh'
 
   publish:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # A manual branch build publishes only its unique commit/run tag and digest.
+    # It never updates a mutable tag or changes a production endpoint.
+    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/main' && github.event_name != 'pull_request')
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -109,6 +114,9 @@ jobs:
           load: true
           push: false
           tags: ${{ env.IMAGE }}:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           provenance: false
 
       - name: Check image provider and runtime user

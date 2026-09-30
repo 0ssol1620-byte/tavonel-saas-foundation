@@ -8,6 +8,7 @@ import {
   type CollectionSourceBinding,
 } from "./collection-source-access";
 import { checkConnectorSourceAccess } from "./connector-source-access";
+import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "./derived-data-admission";
 import {
   EMPTY_WORLD_FRESHNESS,
   getFoundationActiveWorld,
@@ -770,6 +771,7 @@ export async function loadWorldReadModel(
   const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
   if (!sourceAccess.ok) return { ok: false, code: sourceAccess.code,
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503 };
+  if (!await admitsDerivedCustomerData(workspaceKey, documentIds)) return { ok: false, code: DERIVED_DATA_REFUSED, status: 403 };
   /*
     The candidate digest is handed to the freshness read rather than rediscovered there: this
     function has already loaded the preferred candidate, and the database cannot see a

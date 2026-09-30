@@ -135,16 +135,28 @@ describe("/trust indexes the six published surfaces", () => {
     the page attributing a delegated decision to the founder, so that ban stays exactly as it was,
     and the provenance has to remain findable in the source.
   */
-  it("links the DPA with its draft label in the same tile", () => {
-    expect(page).toContain('const DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md"');
-    expect(page).toContain("Draft v2 (2026-09-23)");
-    expect(page).toContain("under review");
+  /*
+    2026-09-30. The tile links the processing addendum an owner accepts, and the 2026-09-23 draft
+    is kept reachable only under a label saying it is archived, replaced, and the Enterprise
+    negotiation template. The shared disclosure list's DPA row points at the addendum too, so the
+    page renders the whole list and no row offers the draft as the current agreement.
+  */
+  it("links the accepted processing addendum, and labels the old draft archived", () => {
+    expect(page).toContain("const ADDENDUM_URL = processingTerms.processing.path");
+    expect(page).toContain('const ARCHIVED_DPA_URL = "/policy/TAVONEL_DPA_v2_2026-09-23.md"');
+    expect(page).toContain("Archived draft v2 (2026-09-23) — replaced by the 2026-09-30 processing addendum");
     expect(page).toContain("not a signed agreement");
+    expect(page).not.toContain("const DPA_URL");
+    expect(page).toContain("template for negotiating a separately executed Enterprise agreement");
+    expect(publicTrustContract).toContain('href: "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md"');
+    expect(publicTrustContract).not.toContain("TAVONEL_DPA_v2");
     expect(page, "no copy here may present a delegated decision as the founder's own").not.toMatch(
       /founder decided|decided by the founder/,
     );
-    const tile = page.slice(page.indexOf("href={DPA_URL}"));
-    expect(tile.slice(0, 600), "the label has to travel with the link").toContain("{DPA_LABEL}");
+    const tile = page.slice(page.indexOf("href={ADDENDUM_URL}"));
+    expect(tile.slice(0, 600), "the label has to travel with the link").toContain("{ADDENDUM_LABEL}");
+    const archived = page.slice(page.indexOf("href={ARCHIVED_DPA_URL}"));
+    expect(archived.slice(0, 200), "the archived label travels with its link").toContain("{ARCHIVED_DPA_LABEL}");
     // Block comments and whole-line `//` comments both. Not a blanket "//" strip: a URL in the
     // copy carries one, and eating the rest of that line would hide real text from the ban below.
     const copy = withoutComments(page)
@@ -244,9 +256,9 @@ describe("/trust indexes the six published surfaces", () => {
         .toContain(settled);
     }
     expect(
-      read("app/terms/page.tsx"),
-      "the cap in the DPA and the cap on /terms are one number, not two",
-    ).toContain("fees you paid to TAVONEL in the twelve months");
+      read("public/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md"),
+      "the cap in the archived DPA and the cap in the terms are one period, not two",
+    ).toContain("limited to the fees paid for it in the preceding twelve months");
     expect(document, "the party block may not deny what the live operator disclosure publishes")
       .not.toContain("is not published in the pilot deployment");
     expect(document, "and the document may not publish our project plan as a checklist")
@@ -620,12 +632,22 @@ describe("CA S04 the privacy notice states deletion mechanics and no invented nu
     }
   });
 
+  /*
+    2026-09-30. Two configured periods are published: the 28-day storage lock and the 30-day
+    purge eligibility. Both are the addendum's numbers, read from the served addendum here, and
+    the page has to call them configuration rather than a deadline.
+  */
   it("invents no retention period in days", () => {
     const copy = withoutComments(page);
+    const addendum = read("public/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md");
+    expect(addendum).toContain("recovery protection of 28 days from object creation");
+    expect(addendum).toContain("eligible for physical purge 30 days after the verified request");
+    expect(addendum).toContain("These are configured periods, not a guaranteed completion deadline");
+    expect(copy).toContain("are configured periods, not a guaranteed completion deadline");
     const numbers = copy.match(/\b\d+\s*(?:calendar )?(?:days?|weeks?|months?|years?)\b/gi) ?? [];
     // 180 days is the analytics cookie lifetime, set in code. Every other day count on this page
     // would be an unsupported retention or deletion period.
-    const invented = numbers.filter((match) => !/180 days/.test(match));
+    const invented = numbers.filter((match) => !/^(?:180|28|30) days$/.test(match));
     expect(
       invented,
       `a retention period in days has to come from a measured run: ${invented.join(", ")}`,

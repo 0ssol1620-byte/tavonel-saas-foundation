@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, isOcrJsonKey, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { getWorkspaceOcrJson, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
@@ -56,6 +57,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
   });
+  // OCR output is derived content; the original source route stays open on refusal.
+  if (!await admitsDerivedCustomerData(membership.workspaceId, [id])) {
+    return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   const currentUser = await getRequestUser(request);
   if (!currentUser || currentUser.id !== user.id) {
     return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: { "Cache-Control": "no-store" } });

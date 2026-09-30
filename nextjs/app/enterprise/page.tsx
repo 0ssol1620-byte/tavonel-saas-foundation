@@ -125,8 +125,14 @@ export default function EnterprisePage() {
                 Review the maintained public record in the <Link href={"/trust" as Route}>Trust Center</Link> and{" "}
                 <Link href={"/security" as Route}>Security</Link>. Deployment-specific architecture,
                 control evidence and questionnaire responses are provided during a qualified review.
-                The <a href="/policy/TAVONEL_DPA_v2_2026-09-23.md">data processing agreement</a> is
-                available as a draft for review and is not presented as a signed agreement.
+                A self-service workspace is covered by the{" "}
+                <a href="/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md">processing addendum</a> its
+                owner accepts with the <Link href={"/terms" as Route}>self-service terms</Link>. An
+                Enterprise engagement can negotiate a separately executed data processing agreement
+                during scoping, starting from the{" "}
+                <a href="/policy/TAVONEL_DPA_v2_2026-09-23.md">archived 2026-09-23 template</a>, which
+                is a draft for review and not a signed agreement; once executed, it prevails within
+                its scope.
               </p>
 
               <h2>What an engagement costs</h2>

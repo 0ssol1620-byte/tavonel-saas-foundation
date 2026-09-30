@@ -17,6 +17,7 @@ import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
 import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import {
   attemptedRetrievalModelRoles,
   attemptedRetrievalModelRolesOnFailure,
@@ -286,6 +287,9 @@ export async function POST(
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
     });
+    if (!await admitsDerivedCustomerData(workspaceKey, documentIds)) {
+      return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: NO_STORE });
+    }
     answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active);
     if (answered.status === 200) {
       const authorizedNow = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
@@ -319,6 +323,11 @@ export async function POST(
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
     });
+    // A cached answer is derived content too: a release or grant revoked since it was
+    // computed refuses it.
+    if (!await admitsDerivedCustomerData(workspaceKey, documentIds)) {
+      return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: NO_STORE });
+    }
     const authorizedAtRelease = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
     if (!authorizedAtRelease.ok) return NextResponse.json({ code: authorizedAtRelease.code }, {
       status: authorizedAtRelease.status, headers: NO_STORE,

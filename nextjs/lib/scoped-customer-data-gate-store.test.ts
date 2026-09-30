@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   evaluateScopedRelease, requiredReleaseEvidence, workspaceGrantSha256,
   type WorkspaceGrant,
@@ -11,7 +15,18 @@ vi.mock("./supabase-admin", () => ({
   supabaseAdminRequest: (...args: unknown[]) => request(...args),
 }));
 const { readVerifiedScopedCustomerDataGate } = await import("./scoped-customer-data-gate-store");
+const { processingTermsReceiptSha256 } = await import("./processing-workspace-grant");
 
+const TERMS = "/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md";
+const PROCESSING = "/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md";
+const hash = (text: string) => `sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`;
+const manifest = {
+  version: "2026-09-30",
+  terms: { path: TERMS, sha256: hash("terms fixture") },
+  processing: { path: PROCESSING, sha256: hash("processing fixture") },
+};
+const WORKSPACE = "pilot-1111111111114111";
+const OWNER = "11111111-1111-4111-8111-111111111111";
 const scope = "direct_upload" as const;
 const revision = "a".repeat(40);
 const evaluatedAt = "2026-09-29T00:00:00.000Z";
@@ -21,11 +36,22 @@ const evidence = requiredReleaseEvidence(scope).map((precondition) => ({
 }));
 const release = evaluateScopedRelease({ scope, releaseRevision: revision, evidence, now: evaluatedAt });
 if (!release.allowed || !release.receiptSha256) throw new Error("invalid release fixture");
+
+const acceptance = (overrides: Record<string, unknown> = {}) => ({
+  acceptanceId: "22222222-2222-4222-8222-222222222222", workspaceKey: WORKSPACE, userId: OWNER,
+  actorRole: "owner", authorizationRevision: 3, scope, termsVersion: manifest.version,
+  terms: manifest.terms, processing: manifest.processing, acceptedAt: "2026-09-28T12:00:00.000Z",
+  idempotentReplay: false, ...overrides,
+});
+const receipt = (kind: "terms" | "processing") => processingTermsReceiptSha256(kind, {
+  acceptanceId: acceptance().acceptanceId, workspaceKey: WORKSPACE, userId: OWNER, authorizationRevision: 3,
+  scope, termsVersion: manifest.version, document: kind === "terms" ? manifest.terms : manifest.processing,
+});
 const unsignedGrant: Omit<WorkspaceGrant, "grantReceiptSha256"> = {
-  tenantId: "tenant-a", workspaceId: "workspace-a", userId: "11111111-1111-4111-8111-111111111111",
+  tenantId: WORKSPACE, workspaceId: WORKSPACE, userId: OWNER,
   scope, releaseRevision: revision, releaseReceiptSha256: release.receiptSha256,
-  termsVersion: "live-2026-09-29", termsReceiptSha256: `sha256:${"1".repeat(64)}`,
-  processingTermsReceiptSha256: `sha256:${"2".repeat(64)}`,
+  termsVersion: manifest.version, termsReceiptSha256: receipt("terms"),
+  processingTermsReceiptSha256: receipt("processing"),
   grantedAt: evaluatedAt, expiresAt: "2026-10-01T00:00:00.000Z", revokedAt: null,
 };
 const grant: WorkspaceGrant = { ...unsignedGrant, grantReceiptSha256: workspaceGrantSha256(unsignedGrant) };
@@ -49,16 +75,32 @@ function grantRow(overrides: Record<string, unknown> = {}) {
     recorded_at: "2026-09-29T00:00:02.000Z", ...overrides,
   };
 }
-const read = (at = now) => readVerifiedScopedCustomerDataGate("tenant-a", "workspace-a", scope, revision, at);
 
-beforeEach(() => {
+let root: string;
+const read = (at = now, tenant = WORKSPACE) =>
+  readVerifiedScopedCustomerDataGate(tenant, WORKSPACE, scope, revision, at, process.env, root);
+const withAcceptance = (body: unknown) => request.mockReset()
+  .mockResolvedValueOnce(Response.json([releaseRow()]))
+  .mockResolvedValueOnce(Response.json([grantRow()]))
+  .mockResolvedValueOnce(Response.json(body));
+const publish = async (terms = "terms fixture", served = manifest) => {
+  await writeFile(join(root, "policy/processing-terms-2026-09-30.json"), JSON.stringify(served));
+  await writeFile(join(root, TERMS.slice(1)), terms);
+  await writeFile(join(root, PROCESSING.slice(1)), "processing fixture");
+};
+
+beforeEach(async () => {
   vi.clearAllMocks();
   config.mockReturnValue({ url: "https://example.supabase.co", serviceRoleKey: "s".repeat(48) });
-  request.mockResolvedValueOnce(Response.json([releaseRow()])).mockResolvedValueOnce(Response.json([grantRow()]));
+  root = await mkdtemp(join(tmpdir(), "gate-"));
+  await mkdir(join(root, "policy"));
+  await publish();
+  withAcceptance(acceptance());
 });
+afterEach(() => rm(root, { recursive: true, force: true }));
 
 describe("durable scoped customer-data gate", () => {
-  it("requires both exact release and workspace decisions", async () => {
+  it("requires exact release and workspace decisions and the grant's current acceptance", async () => {
     await expect(read()).resolves.toEqual({
       ok: true, scope, releaseReceiptSha256: release.receiptSha256,
       grantReceiptSha256: grant.grantReceiptSha256,
@@ -71,9 +113,19 @@ describe("durable scoped customer-data gate", () => {
     expect(releasePath).toContain(`scope=eq.${scope}`);
     expect(releasePath).toContain(`release_revision=eq.${revision}`);
     expect(releasePath).toContain("order=recorded_at.desc,allowed.asc,evaluated_at.desc");
-    expect(grantPath).toContain("tenant_id=eq.tenant-a");
-    expect(grantPath).toContain("workspace_id=eq.workspace-a");
+    expect(grantPath).toContain(`tenant_id=eq.${WORKSPACE}`);
+    expect(grantPath).toContain(`workspace_id=eq.${WORKSPACE}`);
     expect(grantPath).toContain("order=recorded_at.desc,allowed.asc");
+    expect(request.mock.calls[2][1]).toBe("/rest/v1/rpc/current_foundation_processing_terms_acceptance");
+    expect(JSON.parse(String(request.mock.calls[2][2].body))).toEqual({
+      p_workspace_key: WORKSPACE, p_scope: scope, p_terms_version: manifest.version,
+      p_terms_sha256: manifest.terms.sha256, p_processing_sha256: manifest.processing.sha256,
+    });
+  });
+
+  it("does not let a tenant read another workspace's grant", async () => {
+    await expect(read(now, "pilot-2222222222224222")).resolves.toEqual({ ok: false, code: "SCOPED_GATE_INPUT_INVALID" });
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("treats latest release and workspace refusals as revocations", async () => {
@@ -103,5 +155,40 @@ describe("durable scoped customer-data gate", () => {
     await expect(read(new Date("2026-10-01T00:00:00.000Z"))).resolves.toEqual({
       ok: false, code: "SCOPED_WORKSPACE_INVALID",
     });
+  });
+
+  it("stops admitting an unexpired grant once its accepting owner is revoked, replaced or re-authorized", async () => {
+    // Revoked or demoted owner: the current-acceptance RPC no longer answers.
+    withAcceptance(null);
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
+    // A new owner accepted: their acceptance is current, but this grant was issued from someone else's.
+    withAcceptance(acceptance({ acceptanceId: "33333333-3333-4333-8333-333333333333",
+      userId: "44444444-4444-4444-8444-444444444444" }));
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
+    // The same owner re-accepted at a new membership revision: the old receipt no longer matches.
+    withAcceptance(acceptance({ acceptanceId: "55555555-5555-4555-8555-555555555555", authorizationRevision: 4 }));
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
+    withAcceptance(acceptance({ workspaceKey: "pilot-2222222222224222" }));
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
+  });
+
+  it("stops admitting a grant once the served terms change", async () => {
+    const next = { ...manifest, terms: { path: TERMS, sha256: hash("terms v2") } };
+    await publish("terms v2", next);
+    withAcceptance(acceptance({ acceptanceId: "66666666-6666-4666-8666-666666666666", terms: next.terms }));
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_ACCEPTANCE_REQUIRED" });
+    expect(JSON.parse(String(request.mock.calls[2][2].body))).toMatchObject({ p_terms_sha256: next.terms.sha256 });
+
+    await publish("edited without a manifest update");
+    withAcceptance(acceptance());
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_TERMS_UNAVAILABLE" });
+  });
+
+  it("closes on an acceptance store outage", async () => {
+    request.mockReset()
+      .mockResolvedValueOnce(Response.json([releaseRow()]))
+      .mockResolvedValueOnce(Response.json([grantRow()]))
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+    await expect(read()).resolves.toEqual({ ok: false, code: "SCOPED_GATE_STORE_FAILED" });
   });
 });

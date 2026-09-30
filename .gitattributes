@@ -63,7 +63,8 @@ nextjs/scripts/journey/*.mjs text eol=lf
 nextjs/scripts/qa/*.mjs text eol=lf
 
 # Every node script under scripts/ opens with a hashbang, and lib/journey-acceptance.test.ts
-# fails on a CRLF one: a Linux shell resolves the interpreter as `node`, and the module
+# fails on a CRLF one: a Linux shell resolves the interpreter with a trailing carriage return,
+# and the module
 # transform applied to an imported .mjs stops on the stray carriage return. The individual pins
 # above predate this line and are kept; this one covers the class, including the three scripts a
 # fresh Windows checkout was still getting CRLF hashbangs on.
@@ -102,3 +103,8 @@ nextjs/content/benchmarks/*.json text eol=lf
 # return in the script the test imports and blamed the import line. The glob covers every script,
 # so the deletion drills cannot pick the same defect back up.
 nextjs/scripts/**/*.mjs text eol=lf
+
+# Published processing agreements are hashed in the acceptance receipt.
+nextjs/public/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md text eol=lf
+nextjs/public/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md text eol=lf
+nextjs/public/policy/processing-terms-2026-09-30.json text eol=lf

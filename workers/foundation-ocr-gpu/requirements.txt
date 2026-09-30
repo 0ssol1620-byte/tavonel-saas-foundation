@@ -6,4 +6,4 @@ pypdfium2==4.30.0
 numpy==2.2.6
 pillow==11.3.0
 onnxruntime-gpu==1.20.2
-rapidocr-onnxruntime==1.4.4
+rapidocr==3.9.2

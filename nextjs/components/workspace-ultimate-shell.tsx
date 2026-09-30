@@ -64,6 +64,9 @@ type AccessSummary = {
   limits: { files: number; pages: number; worlds: number } | null;
   customerDataEnabled: boolean;
 };
+/** The v2 bootstrap's reason a closed workspace is closed; absent from v1, where it stays null. */
+export type SourcePendingReason = "terms_acceptance_required" | "release_pending" | "workspace_refused";
+const SOURCE_PENDING_REASONS: readonly string[] = ["terms_acceptance_required", "release_pending", "workspace_refused"];
 
 type Props = {
   surface: WorkspaceSurface;
@@ -85,7 +88,9 @@ type Props = {
   stateHero?: boolean;
   nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void };
   /** The access source from /api/access/bootstrap, so the page can gate surface bodies the same way the rail is gated. */
-  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null) => void;
+  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null, sourcePending: SourcePendingReason | null) => void;
+  /** Changing this re-runs the bootstrap read, e.g. after the owner records the processing terms. */
+  accessEpoch?: number;
   onNavigate: (surface: WorkspaceSurface) => void;
   onUpload: () => void;
   onRefresh: () => void;
@@ -110,13 +115,14 @@ function PaletteFocus({ panel }: { panel: RefObject<HTMLElement | null> }) {
 
 export default function WorkspaceUltimateShell({
   surface, children, headerAction, activeRevision, candidateReady, reviewCount, activityCount,
-  stateTitle, stateDescription, stateFacts, stateHero = true, nextAction, onAccess, onNavigate, onUpload, onRefresh, onSignOut,
+  stateTitle, stateDescription, stateFacts, stateHero = true, nextAction, onAccess, accessEpoch = 0, onNavigate, onUpload, onRefresh, onSignOut,
 }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   /* FINAL_WEB §41: hide filenames, page text, labels and answers while status stays visible. */
   const [privacyMode, setPrivacyMode] = useState(false);
   const [access, setAccess] = useState<AccessSummary | null>(null);
+  const [sourcePending, setSourcePending] = useState<SourcePendingReason | null>(null);
   const pendingGo = useRef(false);
   const paletteRef = useRef<HTMLElement>(null);
   const moreRef = useRef<HTMLDetailsElement>(null);
@@ -138,22 +144,27 @@ export default function WorkspaceUltimateShell({
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) { if (current) onAccess?.(null, null); return; }
+      if (!token) { if (current) onAccess?.(null, null, null); return; }
       const response = await fetch("/api/access/bootstrap", {
         method: "POST",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
       });
-      const body = await response.json().catch(() => null) as { access?: AccessSummary } | null;
+      const body = await response.json().catch(() => null) as { access?: AccessSummary; sourcePending?: unknown } | null;
       if (current && response.ok && body?.access) {
+        const reason = !body.access.customerDataEnabled && SOURCE_PENDING_REASONS.includes(body.sourcePending as string)
+          ? body.sourcePending as SourcePendingReason
+          : null;
         setAccess(body.access);
-        onAccess?.(body.access.source, body.access.customerDataEnabled === true);
-      } else if (current) onAccess?.(null, null);
-    })().catch(() => { if (current) onAccess?.(null, null); });
+        setSourcePending(reason);
+        onAccess?.(body.access.source, body.access.customerDataEnabled === true, reason);
+      } else if (current) onAccess?.(null, null, null);
+    })().catch(() => { if (current) onAccess?.(null, null, null); });
     return () => { current = false; };
-    // onAccess is a state setter from the page; bootstrap runs once per mount on purpose.
+    // onAccess is the page's handler; bootstrap runs once per mount and again only when the page
+    // bumps accessEpoch, never because a handler identity changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [accessEpoch]);
 
   const navItems = useMemo(
     () => NAV_ITEMS.filter((item) => hasDeveloperAccess || !["connections", "developer"].includes(item.surface)),
@@ -308,10 +319,12 @@ export default function WorkspaceUltimateShell({
 
         {access?.source === "unentitled" ? (
           <div className={styles.accessStrip} role="status">
-            <div><strong>Workspace ready</strong><span>{access.customerDataEnabled ? "No active plan" : "Source access pending"}</span></div>
+            <div><strong>Workspace ready</strong><span>{access.customerDataEnabled ? "No active plan" : sourcePending === "workspace_refused" ? "Source processing unavailable" : "Source access pending"}</span></div>
             <p>{access.customerDataEnabled
               ? "No evaluation or paid compute access is active."
-              : "Your files cannot be processed here yet. Explore a complete public example below."}</p>
+              : sourcePending === "workspace_refused"
+                ? "Files cannot be processed in this workspace. Explore a complete public example below."
+                : "Your files cannot be processed here yet. Explore a complete public example below."}</p>
             <Link href={access.customerDataEnabled ? "/pricing" : "/explore"}>{access.customerDataEnabled ? "View access options" : "Explore example"}</Link>
           </div>
         ) : access?.source === "trial" ? (
