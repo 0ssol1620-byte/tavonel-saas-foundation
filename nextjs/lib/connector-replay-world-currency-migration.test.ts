@@ -12,6 +12,15 @@ const body = (name: string) => {
 };
 
 describe("connector replay and World source-currency migration", () => {
+  it("is one transaction with exactly three function bodies (4f9a776 shipped a duplicated, unparseable file)", () => {
+    expect(migration.match(/^create or replace function public\./gm)).toHaveLength(3);
+    expect(migration.match(/ as \$\$\n/g)).toHaveLength(3);
+    expect(migration.match(/^\$\$;$/gm)).toHaveLength(3);
+    expect(migration.match(/^begin;$/gm)).toHaveLength(1);
+    expect(migration.match(/^commit;$/gm)).toHaveLength(1);
+    expect(migration.trimEnd().endsWith("commit;")).toBe(true);
+  });
+
   it("compares a replay with every stored field before any side effect", () => {
     const writer = body("record_connector_document_binding_after");
     const conflict = writer.indexOf("raise exception 'CONNECTOR_BINDING_CONFLICT'");
