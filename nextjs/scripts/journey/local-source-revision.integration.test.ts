@@ -234,6 +234,27 @@ describe.skipIf(!base)("continuous connector revisions through actual PostgREST 
     expect(await readConnectorCompileIdentities(workspaceKey, [a.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
   });
 
+  record("a replay that differs in stored bytes, length or type is refused before any tie resolution", async () => {
+    const native = "journey-tied-conflict-native";
+    const [a, b] = await Promise.all(["conflict-a", "conflict-b"].map(revision => fixtureIdentity(native, revision)));
+    const tie = [a.sourceVersionId, b.sourceVersionId].sort();
+    const row = { source_version_id: a.sourceVersionId, source_id: a.sourceId, workspace_key: workspaceKey, oauth_connection_id: connectionId, provider,
+      native_id: native, provider_revision: "conflict-a", document_id: a.documentId, content_sha256: `sha256:${FIXTURE_BYTE.repeat(64)}`, byte_length: 11, mime_type: "text/plain" };
+    const newest = async () => (await rpc("connector_source_newest_versions", { p_workspace_key: workspaceKey, p_source_id: a.sourceId })).json();
+    for (const change of [{ content_sha256: `sha256:${"0".repeat(64)}` }, { byte_length: 12 }, { mime_type: "application/pdf" }]) {
+      // The whole tie as the expected set: only the immutable fields differ from the stored binding.
+      const response = await rpc("record_connector_document_binding_after", { p_binding: { ...row, ...change }, p_expected_latest_source_version_ids: tie });
+      const observed = { status: response.status, body: await response.text() };
+      ids[`conflictObserved:${Object.keys(change)[0]}`] = JSON.stringify(observed).slice(0, 300);
+      expect(observed.status).not.toBe(200);
+      expect(observed.body).toContain("CONNECTOR_BINDING_CONFLICT");
+      expect(await newest()).toEqual(tie);
+    }
+    const exact = await rpc("record_connector_document_binding_after", { p_binding: row, p_expected_latest_source_version_ids: tie });
+    expect([exact.status, await exact.json()]).toEqual([200, "resolved"]);
+    expect(await newest()).toEqual([a.sourceVersionId]);
+  });
+
   record("revisions observed 1 microsecond apart inside one millisecond keep their database order", async () => {
     const [older, newer] = await Promise.all(["sub-a", "sub-b"].map(revision => fixtureIdentity(subNative, revision)));
     const rows = await supabaseAdminRequest(readSupabaseAdminConfig()!, `/rest/v1/connector_document_bindings?workspace_key=eq.${workspaceKey}&source_id=eq.${older.sourceId}&select=recorded_at`);

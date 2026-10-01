@@ -13,9 +13,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 export const SOURCE_REVISION_WORKSPACE = "pilot-c333333333334333";
-const EXPECTED_SERVICE_ASSERTIONS = 16;
+const EXPECTED_SERVICE_ASSERTIONS = 17;
 /** Native ids of the owner-level legacy fixtures; the integration test uses the same names. */
-export const LEGACY_FIXTURES = { tie: "journey-legacy-tie-native", tiedCurrent: "journey-tied-current-native", submillisecond: "journey-submillisecond-native" };
+export const LEGACY_FIXTURES = { tie: "journey-legacy-tie-native", tiedCurrent: "journey-tied-current-native", submillisecond: "journey-submillisecond-native", tiedConflict: "journey-tied-conflict-native" };
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
 
 export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, asService, check, actor, foreignWorkspace, root, env }) {
@@ -41,6 +41,7 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
     fixture(LEGACY_FIXTURES.tie, "legacy-b", "2026-09-01T00:00:00.123456Z"), fixture(LEGACY_FIXTURES.tie, "legacy-a", "2026-09-01T00:00:00.123456Z"),
     fixture(LEGACY_FIXTURES.tiedCurrent, "tied-b", "2026-09-01T00:00:01.123456Z"), fixture(LEGACY_FIXTURES.tiedCurrent, "tied-a", "2026-09-01T00:00:01.123456Z"),
     fixture(LEGACY_FIXTURES.submillisecond, "sub-b", "2026-09-01T00:00:02.000101Z"), fixture(LEGACY_FIXTURES.submillisecond, "sub-a", "2026-09-01T00:00:02.000100Z"),
+    fixture(LEGACY_FIXTURES.tiedConflict, "conflict-a", "2026-09-01T00:00:03.123456Z"), fixture(LEGACY_FIXTURES.tiedConflict, "conflict-b", "2026-09-01T00:00:03.123456Z"),
   ].join("\n"));
   const nextjs = path.resolve(import.meta.dirname, "../.."), output = path.join(root, "source-revision.json");
   try {
@@ -79,6 +80,8 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
     sql(`select (select count(*) from public.connector_document_bindings where ${tiedScope})||':'||count(*)||':'||
       max((select b.provider_revision from public.connector_document_bindings b where b.source_version_id=r.current_source_version_id))||':'||max(cardinality(r.tied_source_version_ids))
       from public.connector_binding_tie_resolutions r where ${tiedScope}`), "3:1:tied-a:2");
+  check("SQL keeps the tie with no resolution after conflicting replays, and exactly one after the exact replay",
+    sql(`select count(*) from public.connector_binding_tie_resolutions where workspace_key=${quote(workspace)} and source_id=${sourceOf(LEGACY_FIXTURES.tiedConflict)}`), "1");
   check("SQL holds the sub-millisecond fixture as two distinct instants inside one millisecond",
     sql(`select count(*)||':'||count(distinct recorded_at)||':'||count(distinct date_trunc('milliseconds',recorded_at)) from public.connector_document_bindings where workspace_key=${quote(workspace)} and source_id=${sourceOf(LEGACY_FIXTURES.submillisecond)}`), "2:2:1");
   check("SQL stores nothing from a direct API-role insert or an identity-mismatched write",
