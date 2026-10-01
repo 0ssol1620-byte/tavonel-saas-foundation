@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { recordConnectorDocumentBinding } from "../../lib/connector-binding-store";
+import { readConnectorLatestBinding, recordConnectorDocumentBinding } from "../../lib/connector-binding-store";
 import { readConnectorCompileIdentities } from "../../lib/connector-compile-identity";
 import { requestConnectorSourceDeletion } from "../../lib/connector-source-access";
 import { connectorSourceIdentity } from "../../lib/connector-source-identity";
@@ -29,11 +29,23 @@ const assertions: string[] = [];
 const ids: Record<string, string> = {};
 const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
-async function bind(revision: string, byte: string) {
+// Same order as an import: snapshot the latest binding, then record against that snapshot.
+async function bind(revision: string, byte: string, snapshot?: string | null) {
   const identity = await connectorSourceIdentity({ workspaceKey, connectionId, provider, nativeId, revision });
+  let expected = snapshot;
+  if (expected === undefined) {
+    const latest = await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId, revision });
+    if (!latest.ok) throw new Error(latest.code);
+    expected = latest.sourceVersionId;
+  }
   const result = await recordConnectorDocumentBinding({ workspaceKey, connectionId, provider, nativeId, revision,
-    contentSha256: `sha256:${byte.repeat(64)}`, byteLength: 11, mimeType: "text/plain" });
+    contentSha256: `sha256:${byte.repeat(64)}`, byteLength: 11, mimeType: "text/plain", expectedLatestSourceVersionId: expected });
   return { identity, result };
+}
+async function versionsFor(revisionPrefix: string) {
+  const response = await supabaseAdminRequest(readSupabaseAdminConfig()!, `/rest/v1/connector_document_bindings?workspace_key=eq.${workspaceKey}&source_id=eq.${ids.sourceId}&provider_revision=like.${revisionPrefix}*&select=provider_revision`);
+  expect(response.status).toBe(200);
+  return (await response.json() as Array<{ provider_revision: string }>).map(row => row.provider_revision);
 }
 function record(name: string, run: () => Promise<void>) {
   it(name, async () => { await run(); assertions.push(name); });
@@ -110,6 +122,32 @@ describe.skipIf(!base)("continuous connector revisions through actual PostgREST 
     const rewrite = await supabaseAdminRequest(config, `/rest/v1/connector_document_bindings?source_version_id=eq.${ids.r1Version}`, {
       method: "PATCH", body: JSON.stringify({ provider_revision: "revision-9" }) });
     expect(rewrite.ok).toBe(false);
+  });
+
+  record("a revision recorded against a stale latest snapshot is contested and writes nothing", async () => {
+    // The import's snapshot predates revision-3; another revision was bound while it downloaded.
+    const stale = await bind("stale-snapshot", "5", ids.r2Version);
+    expect(stale.result).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" });
+    expect(await versionsFor("stale-snapshot")).toEqual([]);
+    const current = await readConnectorCompileIdentities(workspaceKey, [ids.r3Document]);
+    expect(current.ok && current.identities.get(ids.r3Document)).toBe(ids.sourceId);
+  });
+
+  record("concurrent actual requests against one latest snapshot admit exactly one revision", async () => {
+    const racers = ["concurrent-a", "concurrent-b", "concurrent-c", "concurrent-d", "concurrent-e", "concurrent-f"];
+    const results = await Promise.all(racers.map((revision, index) => bind(revision, "abcdef"[index], ids.r3Version)));
+    const winners = results.filter(entry => entry.result.ok);
+    expect(winners).toHaveLength(1);
+    expect(results.filter(entry => !entry.result.ok).map(entry => entry.result))
+      .toEqual(Array(racers.length - 1).fill({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" }));
+    const stored = await versionsFor("concurrent-");
+    expect(stored).toHaveLength(1);
+    Object.assign(ids, { winnerDocument: winners[0].identity.documentId, winnerRevision: stored[0] });
+    expect(winners[0].identity.documentId).toBe((await connectorSourceIdentity({ workspaceKey, connectionId, provider, nativeId, revision: stored[0] })).documentId);
+    // The database-ordered winner is now latest; the previous latest is superseded.
+    const resolved = await readConnectorCompileIdentities(workspaceKey, [ids.winnerDocument]);
+    expect(resolved.ok && resolved.identities.get(ids.winnerDocument)).toBe(ids.sourceId);
+    expect(await readConnectorCompileIdentities(workspaceKey, [ids.r3Document])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
   });
 
   record("provider deletion tombstones the logical source and refuses a new revision", async () => {

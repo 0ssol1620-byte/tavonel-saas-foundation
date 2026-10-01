@@ -8,7 +8,7 @@ import path from "node:path";
 import { qualifyNextBrowser } from "./local-next-browser-journey.mjs";
 import { qualifySourceRevisions } from "./source-revision-journey.mjs";
 
-export async function qualifyPostgrest({ executable, root, env, port, sql, check, owner, outsider, admin, workspace, artifacts, sourceRevision }) {
+export async function qualifyPostgrest({ executable, root, env, port, sql, sqlAsync, check, owner, outsider, admin, workspace, artifacts, sourceRevision }) {
   const binarySha256 = createHash("sha256").update(readFileSync(executable)).digest("hex");
   if (process.platform === "win32") assert.equal(binarySha256,
     "c4155000dfb0befb59215b65d61a621bbaea1515f36a6e758fc504c7ca0dcbee",
@@ -150,7 +150,7 @@ log-level = "error"
     check("concurrent HTTP loser is a named CAS refusal", racers.filter(result => result.status !== 200).map(result => result.body.message), ["world_transition_compare_and_swap_conflict"]);
     check("concurrent HTTP publication advances one SQL revision", (await request(activeResource, serviceToken)).body[0].revision, revision+2);
     // Continuous connector revisions through this actual PostgREST; see source-revision-journey.mjs.
-    const revisionLineage = sourceRevision ? qualifySourceRevisions({ base, serviceKey: serviceToken, sql,
+    const revisionLineage = sourceRevision ? await qualifySourceRevisions({ base, serviceKey: serviceToken, sql, sqlAsync,
       asService: statement => `set role service_role; ${statement}`, check, actor: owner, foreignWorkspace: workspace, root, env }) : undefined;
     let nextBrowser;
     if (process.env.TAVONEL_LOCAL_NEXT_BROWSER === "1") {

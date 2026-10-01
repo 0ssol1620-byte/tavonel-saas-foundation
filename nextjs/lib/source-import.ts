@@ -9,7 +9,7 @@ import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r
 import { type R2SignerEnv } from "./r2-synthetic-canary";
 import { connectorSourceIdentity, type ConnectorSourceIdentity } from "./connector-source-identity";
 import { readBoundedSourceBody } from "./bounded-source-body";
-import { recordConnectorDocumentBinding } from "./connector-binding-store";
+import { readConnectorLatestBinding, recordConnectorDocumentBinding } from "./connector-binding-store";
 import { createHash } from "node:crypto";
 import { verifyDropboxSource } from "./dropbox-source-integrity";
 import { observeSourceVersion, verifySourceVersion, type SourceVersionObservation } from "./source-version-guard";
@@ -95,6 +95,12 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   }
   downloadHeaders.set("authorization", `Bearer ${context.accessToken}`);
 
+  // Snapshot the database's latest binding of this logical source before the first provider read.
+  // The binding is recorded only if that is still the latest, so a revision bound while this one
+  // downloads cannot be overtaken by it.
+  const latest = await readConnectorLatestBinding({ ...context, nativeId: item.nativeId, revision: item.revision });
+  if (!latest.ok) return { ok: false, nativeId: item.nativeId, code: latest.code };
+
   let observedVersion: SourceVersionObservation | null;
   try { observedVersion = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher); }
   catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
@@ -136,7 +142,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     workspaceKey: context.workspaceKey, connectionId: context.connectionId, provider: context.provider,
     nativeId: item.nativeId, revision: item.revision,
     contentSha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
-    byteLength: bytes.byteLength, mimeType: descriptor.mimeType,
+    byteLength: bytes.byteLength, mimeType: descriptor.mimeType, expectedLatestSourceVersionId: latest.sourceVersionId,
   });
   if (!binding.ok) return { ok: false, nativeId: item.nativeId, code: binding.code };
 

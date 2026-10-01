@@ -6,8 +6,9 @@ const reserveFoundationCompute = vi.fn<(...args: any[]) => Promise<any>>();
 const confirmFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const presignFoundationQuarantinePut = vi.fn<(...args: any[]) => any>();
 const recordConnectorDocumentBinding = vi.fn<(...args: any[]) => Promise<any>>();
+const readConnectorLatestBinding = vi.fn<(...args: any[]) => Promise<any>>();
 const canAdmitCustomerSource = vi.fn<(...args: any[]) => Promise<boolean>>();
-vi.mock("./connector-binding-store", () => ({ recordConnectorDocumentBinding }));
+vi.mock("./connector-binding-store", () => ({ readConnectorLatestBinding, recordConnectorDocumentBinding }));
 vi.mock("./customer-data-admission", () => ({ canAdmitCustomerSource }));
 
 vi.mock("./intake-admission", () => ({ confirmFoundationIntake, reserveFoundationIntake }));
@@ -32,6 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   canAdmitCustomerSource.mockResolvedValue(true);
   recordConnectorDocumentBinding.mockResolvedValue({ ok: true });
+  readConnectorLatestBinding.mockResolvedValue({ ok: true, sourceVersionId: null });
   reserveFoundationIntake.mockResolvedValue({
     ok: true,
     result: {
@@ -113,6 +115,30 @@ describe("source import replay safety", () => {
     expect(JSON.parse((downloadInit.headers as Headers).get("Dropbox-API-Arg")!)).toEqual({ path: "rev:a1c10ce0dd78" });
     expect(recordConnectorDocumentBinding).toHaveBeenCalledOnce();
     expect(recordConnectorDocumentBinding.mock.calls[0][0]).toMatchObject({ provider: "dropbox", nativeId: "id:file", revision: "a1c10ce0dd78" });
+  });
+  it("snapshots the latest binding before any provider read and records against it", async () => {
+    const order: string[] = [];
+    const latest = `sv-${"c".repeat(64)}`;
+    readConnectorLatestBinding.mockImplementation(async () => { order.push("snapshot"); return { ok: true, sourceVersionId: latest }; });
+    const provider = dropbox(["a1c10ce0dd78", "a1c10ce0dd78"]);
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => { order.push(String(input)); return provider(input); });
+    expect((await importDropbox(fetcher as unknown as ReturnType<typeof dropbox>)).ok).toBe(true);
+    expect(order[0]).toBe("snapshot");
+    expect(readConnectorLatestBinding.mock.calls[0][0]).toMatchObject({ provider: "dropbox", nativeId: "id:file", revision: "a1c10ce0dd78" });
+    expect(recordConnectorDocumentBinding.mock.calls[0][0]).toMatchObject({ expectedLatestSourceVersionId: latest });
+  });
+  it("reads no provider bytes when the latest binding cannot be read", async () => {
+    readConnectorLatestBinding.mockResolvedValue({ ok: false, code: "CONNECTOR_BINDING_READ_FAILED" });
+    const fetcher = dropbox([]);
+    expect(await importDropbox(fetcher)).toMatchObject({ ok: false, code: "CONNECTOR_BINDING_READ_FAILED" });
+    expect(fetcher).not.toHaveBeenCalled();
+    expectNothingBound();
+  });
+  it("admits nothing when another revision was bound after the snapshot", async () => {
+    recordConnectorDocumentBinding.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" });
+    expect(await importDropbox(dropbox(["a1c10ce0dd78", "a1c10ce0dd78"]))).toMatchObject({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" });
+    expect(reserveFoundationIntake).not.toHaveBeenCalled();
+    expect(reserveFoundationCompute).not.toHaveBeenCalled();
   });
   it("refuses a pinned download whose result names another revision", async () => {
     const result = await importDropbox(dropbox(["a1c10ce0dd78", "a1c10ce0dd78"], "newer"));

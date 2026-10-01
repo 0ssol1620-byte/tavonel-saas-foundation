@@ -39,6 +39,18 @@ async function api(resource, body, bearer = stack.service, method = body ? "POST
 function sql(statement) {
   return execFileSync("psql", [stack.db, "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", statement], { env, encoding: "utf8", timeout: 10_000 }).trim();
 }
+// A second, concurrent session on the same disposable database (used for lock qualification).
+function sqlAsync(statement) {
+  return new Promise(resolve => {
+    const child = spawn("psql", [stack.db, "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", statement], { env, windowsHide: true });
+    let stdout = "", stderr = "";
+    const timer = setTimeout(() => child.kill(), 30_000);
+    child.stdout.on("data", part => { stdout += part; });
+    child.stderr.on("data", part => { stderr += part; });
+    child.once("error", error => { clearTimeout(timer); resolve({ code: -1, stdout, stderr: String(error) }); });
+    child.once("close", code => { clearTimeout(timer); resolve({ code, stdout: stdout.trim(), stderr }); });
+  });
+}
 const fixtures = ["initial", "updated"].map(name => {
   const raw = readFileSync(path.join(import.meta.dirname, "real-auth-fixtures", `${name}.json`));
   const fixture = JSON.parse(raw); assert.equal(fixture.syntheticOnly, true); assert.equal(fixture.workspace, workspace);
@@ -223,7 +235,7 @@ try {
   });
   // Continuous connector revisions through this stack's actual gateway/PostgREST/PostgreSQL. Synthetic governed workspace only.
   report.stage="source-revision-lineage";
-  const lineage=qualifySourceRevisions({base:`${stack.api}/rest/v1`,serviceKey:stack.service,sql,asService:statement=>`set role service_role; ${statement}`,
+  const lineage=await qualifySourceRevisions({base:`${stack.api}/rest/v1`,serviceKey:stack.service,sql,sqlAsync,asService:statement=>`set role service_role; ${statement}`,
     check,actor:owner,foreignWorkspace:workspace,root,env});
   report.sourceRevisionLineageVerified=lineage.actualServiceVerified;
   report.success=true;

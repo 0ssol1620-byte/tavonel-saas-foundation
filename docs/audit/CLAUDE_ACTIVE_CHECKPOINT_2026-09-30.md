@@ -239,6 +239,52 @@ Received by a new Claude session; the prior owned session exited. Scope: recover
 - No provider timestamps or rev ordering are used.
 - **Qualification.** Unit tests; migration via the DB rehearsal workflow; actual-service assertions added to the existing `local-source-revision.integration.test.ts` run by the hosted real-Auth job.
 
+### Liveness fix published
+
+- Commit `d00d2a26b8105c5eafeaada81ff1de7eeb468d82` (`ee38efd..d00d2a2`) carries the `SOURCE_REVISION_SUPERSEDED` skip. Remote SHA verified.
+- `ee38efd` exact-head CI was terminal **all success** (CI, Launch QA, CodeQL, DB rehearsal, malware-scan).
+- `d00d2a2` exact-head CI terminal **all success**: CI `36801530715`, Launch QA `36801530679`, CodeQL `36801530690`, DB rehearsal `36801530697`, malware-scan `36801530730`. Recorded before the CAS successor push.
+
+### CAS implementation (local, uncommitted; acceptance NOT claimed until the actual-service run passes)
+
+- **Migration** `supabase/migrations/20261001090000_connector_binding_latest_cas.sql` adds `record_connector_document_binding_current(p_binding jsonb, p_expected_latest_source_version_id text)`:
+  - `security definer`, `search_path=''`; service_role execute only.
+  - Takes a per-source transaction advisory lock.
+  - An already-recorded version returns `replay` and never moves latest.
+  - Reads latest by `recorded_at desc`. Equal top instants return `contested`, so ties are never broken by id.
+  - If latest differs from the snapshot, returns `contested` and writes nothing. Otherwise inserts with `recorded_at = clock_timestamp()` taken after the lock and returns `recorded`.
+  - Table immutability, tombstone and connection triggers are unchanged.
+- **`lib/connector-binding-store.ts`:**
+  - New `readConnectorLatestBinding`: database order; fails closed on unreadable, foreign or malformed rows.
+  - `recordConnectorDocumentBinding` requires `expectedLatestSourceVersionId` and writes through the RPC. `contested` → `CONNECTOR_SOURCE_REVISION_CONTESTED`. The tombstone pre-check and read-back conflict check are kept.
+- **`lib/source-import.ts`:** takes the snapshot **before** the first provider read and passes it to the record step. If the snapshot read fails, no provider request is made.
+- **Sync worker:** `CONNECTOR_SOURCE_REVISION_CONTESTED` stays a **retry**. The retry re-snapshots and re-reads provider currency; a superseded revision then becomes a skip.
+- **Unchanged:** malformed or unreadable metadata keeps retrying. No provider chronology is used; only database observation order is.
+- **Actual-service qualification wired (hosted real-Auth job, and the bare-PostgREST harness when available):**
+  - `local-source-revision.integration.test.ts`, now 10 service assertions:
+    - all binds go through snapshot → RPC;
+    - a stale snapshot is contested and writes nothing;
+    - **6 concurrent actual PostgREST requests against one snapshot admit exactly one**; the winner becomes the compile latest and the prior latest is superseded.
+  - `source-revision-journey.mjs` SQL checks:
+    - 4 retained bindings;
+    - 0 stale-snapshot rows and exactly 1 concurrent row;
+    - all observation instants distinct;
+    - overlay denies all 4 after tombstone.
+  - New **two-session PostgreSQL lock race:**
+    - a holder session records against an empty snapshot and keeps its transaction open (`pg_sleep(2)`);
+    - once its advisory lock is observed **granted** in `pg_locks`, a second session with the same snapshot runs;
+    - it must return `contested`, and only the holder's row exists.
+    - Without the lock, the second session could not see the uncommitted row and would also record.
+  - Callers now `await` the qualification and supply a second-session `psql` runner.
+- **Local results (Windows):**
+  - CAS unit suites: 5 files, 99 pass.
+  - Related suites: 60 files, 747 pass / 1 pre-existing `WinError 1314`.
+  - Integration test in skip mode: 10 skipped (no local service).
+  - Contract tests: 8 pass / 2 platform skips.
+  - `tsc`, ESLint (10 files), `pnpm check`, `scan:secrets`: clean.
+  - The SQL/RPC itself has **not** been executed locally (Windows `pg_ctl` start failure remains unproven; no sandbox retry).
+- **Residual:** the provider can still change between the post-download read and the CAS commit. The CAS prevents an older binding overtaking one recorded after the snapshot; it does not prove the provider's current revision at commit time. Google/Graph superseded-skip remains open.
+
 ## Side task: vendor compute cost check (2026-10-01, redacted)
 
 - A bounded, read-only check of the GPU vendor account was done after the qualification passed, using only the already-authorized connector.
