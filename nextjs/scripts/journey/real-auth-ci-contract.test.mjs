@@ -55,3 +55,35 @@ test("requires actual local stack keys and refuses path routing to another API",
   assert.throws(() => validateDisposableAuthStack({ ...status, SERVICE_ROLE_KEY: "" }, env));
   assert.throws(() => validateDisposableAuthStack({ ...status, API_URL: `${status.API_URL}/remote` }, env));
 });
+// Run 36868958092: the journey refreshed the browser's session from Node while the app's live client
+// (refreshing on every load: jwt_expiry 60s < auth-js margin 90s) still held it, then overwrote its
+// storage; the app discarded the rotation (AuthRefreshDiscardedError) and returned to /login. No
+// Node-side refresh may run while an app page holds the session it rotates.
+test("no external refresh rotates a session an active app page holds", () => {
+  const journey = readFileSync(path.join(import.meta.dirname, "real-auth-ci-journey.mjs"), "utf8");
+  const call = 'await api("/auth/v1/token?grant_type=refresh_token",';
+  const calls = [];
+  for (let at = journey.indexOf(call); at !== -1; at = journey.indexOf(call, at + 1)) calls.push(at);
+  assert.equal(calls.length, 2, "every external refresh is accounted for below");
+  const appNavigation = /page\.(goto|reload|goBack|goForward)\(/;
+  // 1. Rotation: only after the page left the app for a static same-origin document, using the token the
+  //    browser holds then; written back before any app page loads again.
+  const detachStatement = "await page.goto(`${origin}/llms.txt`);";
+  const detach = journey.lastIndexOf(detachStatement, calls[0]);
+  assert.ok(detach > 0 && journey.lastIndexOf('await page.waitForLoadState("networkidle");', detach) > 0);
+  const window = journey.slice(detach + detachStatement.length, calls[0]);
+  assert.doesNotMatch(window, appNavigation, "no app page between detach and rotation");
+  assert.match(window, /const held=await page\.evaluate\(key=>JSON\.parse\(localStorage\.getItem\(key\)/);
+  assert.match(window, /session=held;/);
+  const writeBack = journey.indexOf("localStorage.setItem(key,JSON.stringify(session))", calls[0]);
+  assert.ok(writeBack > calls[0]);
+  assert.doesNotMatch(journey.slice(calls[0], writeBack), appNavigation, "rotated tokens are stored before the app loads");
+  // 2. Revocation probe: a separate fresh session the browser never stored, already globally logged out.
+  const fresh = journey.lastIndexOf("const fresh=await login();", calls[1]);
+  const probe = journey.slice(fresh, calls[1]);
+  assert.ok(fresh > calls[0]);
+  assert.match(probe, /session=fresh\.body;/);
+  assert.match(probe, /\/auth\/v1\/logout\?scope=global/);
+  assert.doesNotMatch(probe, /localStorage\.setItem/);
+  assert.ok(readFileSync(path.join(import.meta.dirname, "../../public/llms.txt"), "utf8").length > 0, "the detach document is static");
+});

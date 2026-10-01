@@ -153,6 +153,16 @@ try {
       await page.unroute("**/api/access/bootstrap");
       await page.goto(`${origin}/auth/callback`);await page.waitForURL("**/workspace",{timeout:30_000});
       check("retry completes actual provider-session callback and bootstrap",true,true);
+      // The app's live client owns this browser session. With this stack's jwt_expiry of 60s, below
+      // auth-js's 90s EXPIRY_MARGIN_MS, it refreshes on every page load and 30s tick, so the journey's
+      // own copy goes stale. Rotating out-of-band while that client runs raced it (run 36868958092:
+      // AuthRefreshDiscardedError, then /login). Detach the app first -- a same-origin static document
+      // runs no client -- and rotate the refresh token the browser currently holds.
+      await page.waitForLoadState("networkidle");
+      await page.goto(`${origin}/llms.txt`);
+      const held=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)??"null"),storageKey);
+      check("browser holds an actual provider session before out-of-band rotation",typeof held?.refresh_token==="string"&&held.user?.id===owner,true);
+      session=held;
       const refresh=await api("/auth/v1/token?grant_type=refresh_token",{refresh_token:session.refresh_token},stack.anon);
       check("actual GoTrue refresh succeeds",refresh.status,200);
       check("actual GoTrue rotates refresh token",refresh.body.refresh_token!==session.refresh_token,true);session=refresh.body;
