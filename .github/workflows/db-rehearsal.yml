@@ -43,7 +43,7 @@ jobs:
 
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
       # release change what this receipt means without a commit saying so.
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
 
