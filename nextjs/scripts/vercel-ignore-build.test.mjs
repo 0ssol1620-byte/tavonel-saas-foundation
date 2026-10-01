@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { decide } from "./vercel-ignore-build.mjs";
+import { PROJECT_IGNORE_COMMAND, decide } from "./vercel-ignore-build.mjs";
 
 const app = ["nextjs/app/page.tsx"];
 
@@ -39,4 +39,31 @@ test("CLI exit codes follow Vercel's contract: 0 skips, 1 builds", () => {
   const run = env => spawnSync(process.execPath, [script], { env: { PATH: process.env.PATH, ...env }, encoding: "utf8" });
   assert.equal(run({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "codex/x" }).status, 0);
   assert.equal(run({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main" }).status, 1);
+});
+
+test("the prepared project-level command matches decide() and never skips more", t => {
+  assert.ok(PROJECT_IGNORE_COMMAND.length <= 256, "Vercel limits the Ignored Build Step command to 256 characters");
+  const probe = spawnSync("sh", ["-c", "exit 0"]);
+  if (probe.error) return t.skip("no POSIX sh on this host");
+  const run = env => spawnSync("sh", ["-c", PROJECT_IGNORE_COMMAND], { env: { PATH: process.env.PATH, ...env }, encoding: "utf8" }).status;
+  const cases = [
+    { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "codex/x" },
+    { VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "dependabot/github_actions/x" },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "dependabot/github_actions/supabase/setup-cli-3", VERCEL_GIT_COMMIT_MESSAGE: "Bump supabase/setup-cli from 1 to 3\n\nBody" },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "codex/x", VERCEL_GIT_COMMIT_MESSAGE: "fix: y [Preview]" },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "codex/x", VERCEL_GIT_COMMIT_MESSAGE: "fix: y\n\nBody explains the [preview] token." },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "codex/x" },
+    { VERCEL_GIT_COMMIT_REF: "codex/x" },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "main" },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "codexfoo/x" },
+    { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "feature/codex/x" },
+    { VERCEL_ENV: "preview" },
+  ];
+  for (const env of cases) {
+    assert.equal(run(env), decide(env, app).build ? 1 : 0, JSON.stringify(env));
+  }
+  // decide() skips docs-only commits on other branches; the project command builds them.
+  const docsOnly = { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "agent/launch-qa-overflow" };
+  assert.equal(decide(docsOnly, ["docs/a.md"]).build, false);
+  assert.equal(run(docsOnly), 1);
 });

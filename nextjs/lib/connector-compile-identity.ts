@@ -1,5 +1,6 @@
 import { connectorSourceIdentity } from "./connector-source-identity";
 import type { OAuthConnectorProvider } from "./connector-oauth";
+import { databaseInstantMicros } from "./database-instant";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 type SupabaseAdminConfig = NonNullable<ReturnType<typeof readSupabaseAdminConfig>>;
@@ -65,18 +66,17 @@ async function readLatestBoundRevision(config: SupabaseAdminConfig, workspaceKey
   const rows: unknown = await response.json();
   if (!Array.isArray(rows) || rows.length === 0) return { ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" };
   const [latest, previous] = rows as Record<string, unknown>[];
+  // Microsecond comparison: Date.parse would merge distinct instants within one millisecond.
+  const latestAt = databaseInstantMicros(latest?.recorded_at);
   if (!latest || latest.workspace_key !== workspaceKey || latest.source_id !== sourceId ||
-      typeof latest.source_version_id !== "string" || typeof latest.recorded_at !== "string" ||
-      !Number.isFinite(Date.parse(latest.recorded_at))) {
+      typeof latest.source_version_id !== "string" || latestAt === null) {
     return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
   }
   if (previous !== undefined) {
-    if (!previous || typeof previous.recorded_at !== "string" || !Number.isFinite(Date.parse(previous.recorded_at))) {
-      return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
-    }
-    const order = Date.parse(latest.recorded_at) - Date.parse(previous.recorded_at);
-    if (order < 0) return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
-    if (order === 0) return { ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" };
+    const previousAt = databaseInstantMicros(previous?.recorded_at);
+    if (!previous || previousAt === null) return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
+    if (latestAt < previousAt) return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
+    if (latestAt === previousAt) return { ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" };
   }
   return { ok: true, sourceVersionId: latest.source_version_id };
 }

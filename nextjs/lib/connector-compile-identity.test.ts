@@ -76,3 +76,19 @@ it("fails closed on missing mapping or unavailable store",async()=>{
   expect(await readConnectorCompileIdentities(scope.workspaceKey,[first.documentId])).toEqual({ok:false,code:"CONNECTOR_IDENTITY_UNRESOLVED"});
   expect(await readConnectorCompileIdentities(scope.workspaceKey,[first.documentId])).toEqual({ok:false,code:"CONNECTOR_IDENTITY_UNAVAILABLE"});
 });
+it("orders revisions observed within one millisecond by their microseconds",async()=>{
+  // Date.parse sees one instant here; PostgreSQL recorded two, 1 microsecond apart.
+  const older=await binding("1","2026-10-01T00:00:05.000100+00:00"),newer=await binding("2","2026-10-01T00:00:05.000101+00:00");
+  vi.stubGlobal("fetch",store([older.row,newer.row]));
+  const latest=await readConnectorCompileIdentities(scope.workspaceKey,[newer.documentId]);
+  expect(latest.ok && latest.identities.get(newer.documentId)).toBe(newer.sourceId);
+  expect(await readConnectorCompileIdentities(scope.workspaceKey,[older.documentId])).toEqual({ok:false,code:"CONNECTOR_SOURCE_REVISION_SUPERSEDED"});
+});
+it("treats one instant written with different offsets as a tie, and an unparseable instant as a conflict",async()=>{
+  const first=await binding("1","2026-10-01T00:00:05.5+00:00"),next=await binding("2","2026-10-01T00:00:05.500000+00:00");
+  vi.stubGlobal("fetch",store([first.row,next.row]));
+  expect(await readConnectorCompileIdentities(scope.workspaceKey,[next.documentId])).toEqual({ok:false,code:"CONNECTOR_SOURCE_REVISION_AMBIGUOUS"});
+  const broken=await binding("3","2026-10-01T00:00:09.1234567+00:00");
+  vi.stubGlobal("fetch",store([broken.row]));
+  expect(await readConnectorCompileIdentities(scope.workspaceKey,[broken.documentId])).toEqual({ok:false,code:"CONNECTOR_IDENTITY_CONFLICT"});
+});

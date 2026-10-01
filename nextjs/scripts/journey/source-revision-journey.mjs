@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 export const SOURCE_REVISION_WORKSPACE = "pilot-c333333333334333";
-const EXPECTED_SERVICE_ASSERTIONS = 10;
+const EXPECTED_SERVICE_ASSERTIONS = 11;
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
 
 export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, asService, check, actor, foreignWorkspace, root, env }) {
@@ -52,6 +52,12 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
     sql(`select count(*) from public.source_deletion_tombstones where ${scope} and source_id=${quote(ids.sourceId)}`), "1");
   check("serving overlay denies every historical and current revision after tombstone",
     sql(asService(`select public.connector_documents_blocked(${quote(workspace)},array[${[ids.r1Document, ids.r2Document, ids.r3Document, ids.winnerDocument].map(quote).join(",")}])`)), "t");
+  const legacy = `workspace_key=${quote(workspace)} and source_id=${quote(ids.legacySourceId)}`;
+  check("SQL keeps the legacy tie immutable, writes nothing for a partial snapshot, and puts the current revision strictly after it",
+    sql(`select count(*)||':'||count(distinct recorded_at)||':'||count(*) filter (where provider_revision='legacy-partial')||':'||
+      (select provider_revision from public.connector_document_bindings where ${legacy} order by recorded_at desc limit 1)||':'||
+      (select count(*) from public.connector_document_bindings where ${legacy} and recorded_at=(select min(recorded_at) from public.connector_document_bindings where ${legacy}))
+      from public.connector_document_bindings where ${legacy}`), "3:2:0:legacy-current:2");
   sql(`insert into public.source_acl_snapshots(source_version_id,workspace_key,provider_id,principals,snapshot_sha256,captured_at)
     values(${quote(ids.r1Version)},${quote(workspace)},'google_drive','[{"kind":"user","principalId":"owner@journey.invalid","permission":"read"}]'::jsonb,${quote(`sha256:${"9".repeat(64)}`)},now())`);
   const admits = (version, key = workspace) => sql(asService(`select public.source_version_acl_admits(${quote(key)},${quote(version)},'google_drive','[{"kind":"user","principalId":"owner@journey.invalid"}]'::jsonb)`));
@@ -75,7 +81,7 @@ async function qualifyBindingLock({ sql, sqlAsync, check, workspace, connection 
   const row = revision => ({ source_version_id: `sv-${createHash("sha256").update([source, revision].join("\n")).digest("hex")}`, source_id: source,
     workspace_key: workspace, oauth_connection_id: connection, provider: "google_drive", native_id: "journey-binding-lock-native",
     provider_revision: revision, document_id: randomUUID(), content_sha256: `sha256:${"7".repeat(64)}`, byte_length: 7, mime_type: "text/plain" });
-  const record = revision => `select public.record_connector_document_binding_current(${quote(JSON.stringify(row(revision)))}::jsonb, null)`;
+  const record = revision => `select public.record_connector_document_binding_after(${quote(JSON.stringify(row(revision)))}::jsonb, '{}'::text[])`;
   const holder = sqlAsync(`set application_name=${quote(holderName)}; set role service_role; begin; ${record("lock-holder")}; select pg_catalog.pg_sleep(2); commit;`);
   let granted = false;
   for (let attempt = 0; attempt < 100 && !granted; attempt++) {

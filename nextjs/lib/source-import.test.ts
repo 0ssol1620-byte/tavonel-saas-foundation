@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   canAdmitCustomerSource.mockResolvedValue(true);
   recordConnectorDocumentBinding.mockResolvedValue({ ok: true });
-  readConnectorLatestBinding.mockResolvedValue({ ok: true, sourceVersionId: null });
+  readConnectorLatestBinding.mockResolvedValue({ ok: true, sourceVersionIds: [] });
   reserveFoundationIntake.mockResolvedValue({
     ok: true,
     result: {
@@ -119,13 +119,13 @@ describe("source import replay safety", () => {
   it("snapshots the latest binding before any provider read and records against it", async () => {
     const order: string[] = [];
     const latest = `sv-${"c".repeat(64)}`;
-    readConnectorLatestBinding.mockImplementation(async () => { order.push("snapshot"); return { ok: true, sourceVersionId: latest }; });
+    readConnectorLatestBinding.mockImplementation(async () => { order.push("snapshot"); return { ok: true, sourceVersionIds: [latest] }; });
     const provider = dropbox(["a1c10ce0dd78", "a1c10ce0dd78"]);
     const fetcher = vi.fn(async (input: RequestInfo | URL) => { order.push(String(input)); return provider(input); });
     expect((await importDropbox(fetcher as unknown as ReturnType<typeof dropbox>)).ok).toBe(true);
     expect(order[0]).toBe("snapshot");
     expect(readConnectorLatestBinding.mock.calls[0][0]).toMatchObject({ provider: "dropbox", nativeId: "id:file", revision: "a1c10ce0dd78" });
-    expect(recordConnectorDocumentBinding.mock.calls[0][0]).toMatchObject({ expectedLatestSourceVersionId: latest });
+    expect(recordConnectorDocumentBinding.mock.calls[0][0]).toMatchObject({ expectedLatestSourceVersionIds: [latest] });
   });
   it("reads no provider bytes when the latest binding cannot be read", async () => {
     readConnectorLatestBinding.mockResolvedValue({ ok: false, code: "CONNECTOR_BINDING_READ_FAILED" });

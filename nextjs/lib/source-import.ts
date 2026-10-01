@@ -95,7 +95,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   }
   downloadHeaders.set("authorization", `Bearer ${context.accessToken}`);
 
-  // Snapshot the database's latest binding of this logical source before the first provider read.
+  // Snapshot the database's newest binding set of this logical source before the first provider read.
   // The binding is recorded only if that is still the latest, so a revision bound while this one
   // downloads cannot be overtaken by it.
   const latest = await readConnectorLatestBinding({ ...context, nativeId: item.nativeId, revision: item.revision });
@@ -142,7 +142,7 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     workspaceKey: context.workspaceKey, connectionId: context.connectionId, provider: context.provider,
     nativeId: item.nativeId, revision: item.revision,
     contentSha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
-    byteLength: bytes.byteLength, mimeType: descriptor.mimeType, expectedLatestSourceVersionId: latest.sourceVersionId,
+    byteLength: bytes.byteLength, mimeType: descriptor.mimeType, expectedLatestSourceVersionIds: latest.sourceVersionIds,
   });
   if (!binding.ok) return { ok: false, nativeId: item.nativeId, code: binding.code };
 

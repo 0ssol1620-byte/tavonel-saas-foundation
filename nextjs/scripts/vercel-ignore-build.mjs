@@ -13,6 +13,17 @@ import { pathToFileURL } from "node:url";
  * are known to be redundant. Revert by deleting ignoreCommand from vercel.json.
  */
 const AUTOMATION_BRANCH = /^(codex|dependabot)\//;
+
+/*
+ * Prepared, NOT applied: the project-level "Ignored Build Step" equivalent for branches whose
+ * vercel.json has no ignoreCommand (e.g. dependabot/* cut from main, which built a READY preview).
+ * vercel.json ignoreCommand overrides the project setting, so branches carrying this script keep
+ * it. Self-contained POSIX sh (no repository file), because main-derived branches lack this script
+ * and a missing file would exit non-zero, i.e. build. It mirrors decide()'s first three rules only;
+ * the docs-only rule is omitted, so it can only build more, never less. Revert: clear the setting.
+ */
+export const PROJECT_IGNORE_COMMAND =
+  `[ "$VERCEL_ENV" != production ] && printf %s "$VERCEL_GIT_COMMIT_REF" | grep -Eq '^(codex|dependabot)/' && ! printf '%s\\n' "$VERCEL_GIT_COMMIT_MESSAGE" | head -n 1 | grep -qi '\\[preview\\]'`;
 const DOCS_ONLY_PATH = /^docs\/|\.md$/i;
 
 export function decide(env, changedFiles) {

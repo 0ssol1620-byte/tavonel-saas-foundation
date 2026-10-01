@@ -1,45 +1,65 @@
 import { connectorSourceIdentity } from "./connector-source-identity";
+import { databaseInstantMicros } from "./database-instant";
 import type { OAuthConnectorProvider } from "./connector-oauth";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 type SourceInput = { workspaceKey: string; connectionId: string; provider: OAuthConnectorProvider; nativeId: string; revision: string };
 
+const VERSION_ID = /^sv-[a-f0-9]{64}$/;
+/** The RPC refuses larger snapshots; a tie this wide is not recovered automatically. */
+const MAX_NEWEST_SET = 16;
+
 /*
-  The latest binding of a logical source as the database ordered it, read before an import's first
-  provider read. The import later records only if this is still the latest (see
-  `record_connector_document_binding_current`), so an older revision cannot overtake a newer one
-  that was bound while its download ran. No provider timestamp or revision ordering is involved.
+  The newest bindings of a logical source as the database ordered them, read before an import's
+  first provider read: every binding at the newest observation instant (one for a unique latest,
+  none for an unbound source, several for a legacy equal-instant tie). The import later records
+  only if that whole set is still the newest (see `record_connector_document_binding_after`), so an
+  older revision cannot overtake one bound while its download ran, and a provider-verified current
+  revision supersedes a tie as a whole. No tied row is preferred and no provider timestamp or
+  revision ordering is involved. Instants compare at microsecond precision.
 */
-export async function readConnectorLatestBinding(input: SourceInput): Promise<{ ok: true; sourceVersionId: string | null } | { ok: false; code: string }> {
+export async function readConnectorLatestBinding(input: SourceInput): Promise<{ ok: true; sourceVersionIds: string[] } | { ok: false; code: string }> {
   let sourceId: string;
   try { sourceId = (await connectorSourceIdentity(input)).sourceId; }
   catch { return { ok: false, code: "SOURCE_IDENTITY_INVALID" }; }
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false, code: "CONNECTOR_BINDING_STORE_NOT_CONFIGURED" };
   try {
-    const read = await supabaseAdminRequest(config, `/rest/v1/connector_document_bindings?workspace_key=eq.${encodeURIComponent(input.workspaceKey)}&source_id=eq.${sourceId}&select=source_version_id,workspace_key,source_id&order=recorded_at.desc,source_version_id.desc&limit=1`);
+    const read = await supabaseAdminRequest(config, `/rest/v1/connector_document_bindings?workspace_key=eq.${encodeURIComponent(input.workspaceKey)}&source_id=eq.${sourceId}&select=source_version_id,workspace_key,source_id,recorded_at&order=recorded_at.desc,source_version_id.desc&limit=${MAX_NEWEST_SET + 1}`);
     if (!read.ok) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
     const rows: unknown = await read.json();
-    if (!Array.isArray(rows) || rows.length > 1) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-    if (rows.length === 0) return { ok: true, sourceVersionId: null };
-    const row = rows[0] as Record<string, unknown> | null;
-    if (!row || typeof row.source_version_id !== "string" || !/^sv-[a-f0-9]{64}$/.test(row.source_version_id)
-      || row.workspace_key !== input.workspaceKey || row.source_id !== sourceId) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-    return { ok: true, sourceVersionId: row.source_version_id };
+    if (!Array.isArray(rows) || rows.length > MAX_NEWEST_SET + 1) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
+    const newest: string[] = [];
+    let top: bigint | null = null, previous: bigint | null = null;
+    for (const entry of rows) {
+      const row = entry as Record<string, unknown> | null;
+      const at = databaseInstantMicros(row?.recorded_at);
+      if (!row || typeof row.source_version_id !== "string" || !VERSION_ID.test(row.source_version_id) || at === null
+        || row.workspace_key !== input.workspaceKey || row.source_id !== sourceId) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
+      // The database ordered these newest first; anything else is not a readable order.
+      if (previous !== null && at > previous) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
+      previous = at;
+      top ??= at;
+      if (at === top) newest.push(row.source_version_id);
+    }
+    if (newest.length > MAX_NEWEST_SET || new Set(newest).size !== newest.length) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
+    return { ok: true, sourceVersionIds: newest.sort() };
   } catch { return { ok: false, code: "CONNECTOR_BINDING_STORE_FAILED" }; }
 }
 
 export async function recordConnectorDocumentBinding(input: SourceInput & {
   contentSha256: string; byteLength: number; mimeType: string;
-  /** The `readConnectorLatestBinding` result taken before the import's first provider read. */
-  expectedLatestSourceVersionId: string | null;
+  /** The `readConnectorLatestBinding` set taken before the import's first provider read. */
+  expectedLatestSourceVersionIds: readonly string[];
 }): Promise<{ ok: true } | { ok: false; code: string }> {
   let identity: Awaited<ReturnType<typeof connectorSourceIdentity>>;
   try { identity = await connectorSourceIdentity(input); }
   catch { return { ok: false, code: "SOURCE_IDENTITY_INVALID" }; }
+  const expected = input.expectedLatestSourceVersionIds;
   if (!/^sha256:[a-f0-9]{64}$/.test(input.contentSha256) || !Number.isSafeInteger(input.byteLength) ||
       input.byteLength <= 0 || typeof input.mimeType !== "string" || input.mimeType.length < 3 || input.mimeType.length > 160 ||
-      (input.expectedLatestSourceVersionId !== null && !/^sv-[a-f0-9]{64}$/.test(input.expectedLatestSourceVersionId))) {
+      !Array.isArray(expected) || expected.length > MAX_NEWEST_SET || new Set(expected).size !== expected.length ||
+      expected.some(id => typeof id !== "string" || !VERSION_ID.test(id))) {
     return { ok: false, code: "CONNECTOR_BINDING_INVALID" };
   }
   const config = readSupabaseAdminConfig();
@@ -62,8 +82,8 @@ export async function recordConnectorDocumentBinding(input: SourceInput & {
     if (decision !== true) {
       return { ok: false, code: decision === false ? "SOURCE_TOMBSTONED" : "CONNECTOR_BINDING_GUARD_UNAVAILABLE" };
     }
-    const write = await supabaseAdminRequest(config, "/rest/v1/rpc/record_connector_document_binding_current", {
-      method: "POST", body: JSON.stringify({ p_binding: row, p_expected_latest_source_version_id: input.expectedLatestSourceVersionId }),
+    const write = await supabaseAdminRequest(config, "/rest/v1/rpc/record_connector_document_binding_after", {
+      method: "POST", body: JSON.stringify({ p_binding: row, p_expected_latest_source_version_ids: [...expected].sort() }),
     });
     if (!write.ok) return { ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" };
     const outcome: unknown = await write.json();
