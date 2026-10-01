@@ -241,6 +241,30 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(dispatched.mock.calls[0][2][0]).toMatchObject({ documentId: DOCUMENT, logicalSourceId: logical });
     expect(sourceAccess).toHaveBeenCalledWith(WS, [DOCUMENT]);
   });
+
+  it("refuses a superseded connector revision before Core dispatch", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    compileIdentities.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    compilableSource();
+    expect(await runCollectionCompile(WS, [DOCUMENT])).toEqual({ ok: false, status: 409, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED", payload: {} });
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("does not persist a candidate when a newer revision is bound while Core runs", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    const resolved = { ok: true, identities: new Map([[DOCUMENT, `src-${"e".repeat(64)}`]]) };
+    // Selection resolve, pre-dispatch revalidation, then the post-dispatch revalidation observes r2.
+    compileIdentities.mockResolvedValueOnce(resolved).mockResolvedValueOnce(resolved)
+      .mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    compilableSource();
+    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    expect(run).toMatchObject({ ok: false, status: 409, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(put).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
+  });
   function compilableSource() {
     readyWorkspace();
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{

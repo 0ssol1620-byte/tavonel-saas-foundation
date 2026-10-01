@@ -10,6 +10,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { authGatewayService, currentSourceObjects, validateDisposableAuthStack, validateExpiredProviderJwt } from "./real-auth-ci-contract.mjs";
 import { withLocalStorage } from "./local-storage-journey.mjs";
+import { qualifySourceRevisions } from "./source-revision-journey.mjs";
 import { stopOwnedChild } from "./stop-owned-child.mjs";
 
 const statusFile = realpathSync(process.env.TAVONEL_AUTH_STACK_STATUS ?? "");
@@ -24,7 +25,7 @@ const root = mkdtempSync(path.join(tmpdir(), "tavonel-real-auth-"));
 const owner = "a1111111-1111-4111-8111-111111111111", workspace = "pilot-a111111111114111";
 const origin = "https://127.0.0.1:54443", host = "00000000000000000000000000000000.r2.cloudflarestorage.com";
 const email = "real-auth-owner@journey.invalid", password = randomBytes(32).toString("base64url");
-const report = { kind: "genuine-local-gotrue-next-browser", success: false, assertions: [], goTrueExecuted: false, hydratedReviewPublishVerified: false,
+const report = { kind: "genuine-local-gotrue-next-browser", success: false, assertions: [], goTrueExecuted: false, hydratedReviewPublishVerified: false, sourceRevisionLineageVerified: false,
   generatedAt:new Date().toISOString(),harnessSha256:createHash("sha256").update(readFileSync(import.meta.filename)).digest("hex"),
   googleOAuthVerified: false, productionAuthCookieUsed: false, productionSourceAdmissionVerified: false,
   foundationCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: nextRoot, encoding: "utf8" }).trim() };
@@ -204,6 +205,11 @@ try {
       }
     }
   });
+  // Continuous connector revisions through this stack's actual gateway/PostgREST/PostgreSQL. Synthetic governed workspace only.
+  report.stage="source-revision-lineage";
+  const lineage=qualifySourceRevisions({base:`${stack.api}/rest/v1`,serviceKey:stack.service,sql,asService:statement=>`set role service_role; ${statement}`,
+    check,actor:owner,foreignWorkspace:workspace,root,env});
+  report.sourceRevisionLineageVerified=lineage.actualServiceVerified;
   report.success=true;
 } finally {
   if(userCreated) await api(`/auth/v1/admin/users/${owner}`,null,stack.service,"DELETE").catch(()=>{});

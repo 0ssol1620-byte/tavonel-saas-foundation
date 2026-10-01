@@ -233,6 +233,12 @@ export async function runCollectionCompile(
         payload: {},
       };
     }
+    // A newer revision of a selected logical source bound while this compile was in flight
+    // makes the result stale in the same way a changed byte version does.
+    if (gate.scope === "connector") {
+      const rebound = await readConnectorCompileIdentities(workspaceId, documentIds);
+      if (!rebound.ok) return { ok: false, status: 409, code: rebound.code, payload: {} };
+    }
     const relisted = await listImmutableWorkspaceObjects(signer, workspaceId);
     if (!relisted.ok) return { ok: false, status: 503, code: relisted.code, payload: {} };
     const checked = checkCurrentSourceVersions(workspaceId, relisted.objects, expectedVersions);

@@ -224,7 +224,8 @@ try {
   }
   if (process.env.TAVONEL_LOCAL_POSTGREST_EXE) {
     report.postgrest = await qualifyPostgrest({ executable: process.env.TAVONEL_LOCAL_POSTGREST_EXE,
-      root, env, port, sql, check, owner, outsider, admin, workspace, artifacts: realCoreArtifacts });
+      root, env, port, sql, check, owner, outsider, admin, workspace, artifacts: realCoreArtifacts, sourceRevision: true });
+    report.sourceRevisionLineageVerified = Boolean(report.postgrest.sourceRevision?.actualServiceVerified);
     report.jwtDataApiVerified = true;
     report.storageServiceVerified = report.postgrest.storageServiceVerified;
     report.nextBrowserVerified = Boolean(report.postgrest.nextBrowser?.actualNextHttpBrowserVerified);
