@@ -98,6 +98,10 @@ try {
     });
     await new Promise(resolve=>gateway.listen(54443,"127.0.0.1",resolve));
     let child,browser,page;
+    const redact = value => [password,stack.anon,stack.service,storage.env.AWS_SECRET_ACCESS_KEY].reduce((text,secret)=>text.replaceAll(secret,"[redacted]"),String(value)).replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,"[redacted JWT]");
+    // Diagnostics only: bounded server output and browser events, attached to the ledger on failure. They decide nothing.
+    const serverTail=[],browserEvents=[];
+    const keep=(list,line,limit)=>{list.push(redact(line).slice(0,500));if(list.length>limit)list.shift();};
     try {
       const preload=path.join(root,"transport.cjs");
       writeFileSync(preload,`const os=require('node:os');const cpus=os.cpus;os.cpus=()=>cpus().slice(0,2);os.availableParallelism=()=>2;const f=globalThis.fetch;globalThis.fetch=(input,init)=>{if(typeof input==='string'){const u=new URL(input);if(u.hostname===${JSON.stringify(host)})return f(${JSON.stringify(origin)}+u.pathname+u.search,init);}return f(input,init);};`);
@@ -106,13 +110,20 @@ try {
         R2_ACCOUNT_ID:host.split(".")[0],R2_BUCKET:storage.env.S3_BUCKET,R2_ACCESS_KEY_ID:storage.env.AWS_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY:storage.env.AWS_SECRET_ACCESS_KEY};
       // The workflow runs unchanged check/test gates first; build is still a real optimized Next build.
       execFileSync(process.execPath,[path.join(nextRoot,"node_modules/next/dist/bin/next"),"build"],{cwd:nextRoot,env:nextEnv,stdio:"inherit",timeout:480_000});
-      child=spawn(process.execPath,[path.join(nextRoot,"node_modules/next/dist/bin/next"),"start","--hostname","127.0.0.1","--port","3100"],{cwd:nextRoot,env:nextEnv,stdio:["ignore","ignore","ignore"]});
+      child=spawn(process.execPath,[path.join(nextRoot,"node_modules/next/dist/bin/next"),"start","--hostname","127.0.0.1","--port","3100"],{cwd:nextRoot,env:nextEnv,stdio:["ignore","pipe","pipe"]});
+      for(const [stream,label] of [[child.stdout,"out"],[child.stderr,"err"]]) {stream.setEncoding("utf8");stream.on("data",chunk=>{for(const line of chunk.split("\n"))if(line.trim())keep(serverTail,`${label}: ${line}`,200);});}
       for(let i=0;i<120;i++) { if(child.exitCode!==null) throw new Error("Owned production Next exited"); try { const r=await fetch("http://127.0.0.1:3100/api/status",{signal:AbortSignal.timeout(500)});await r.text();if(r.ok)break; } catch {} await new Promise(r=>setTimeout(r,250)); }
       const {chromium,expect}=await import(pathToFileURL(path.join(nextRoot,"node_modules/@playwright/test/index.mjs")).href);
       browser=await chromium.launch({headless:true});
       const context=await browser.newContext({ignoreHTTPSErrors:true});
       await context.route("**/*",route=>new URL(route.request().url()).hostname==="127.0.0.1"?route.continue():route.abort());
       page=await context.newPage();
+      const at=()=>new Date().toISOString().slice(11,23),where=url=>{try{return new URL(url).pathname;}catch{return "?";}};
+      page.on("console",message=>{if(["error","warning"].includes(message.type()))keep(browserEvents,`${at()} console.${message.type()}: ${message.text()}`,200);});
+      page.on("pageerror",error=>keep(browserEvents,`${at()} pageerror: ${error.message}`,200));
+      page.on("requestfailed",request=>keep(browserEvents,`${at()} requestfailed ${request.method()} ${where(request.url())}: ${request.failure()?.errorText??"?"}`,200));
+      page.on("framenavigated",frame=>{if(frame===page.mainFrame())keep(browserEvents,`${at()} navigated ${where(frame.url())}`,200);});
+      page.on("response",response=>{const p=where(response.url());if(/^\/(api\/(collections|v1\/world|access)|auth\/v1\/(token|user))/.test(p))keep(browserEvents,`${at()} ${response.request().method()} ${p} ${response.status()}`,200);});
       report.stage="callback-without-session";
       await page.goto(`${origin}/auth/callback`); await expect(page.getByRole("heading",{name:"Sign-in did not complete."})).toBeVisible();
       check("actual callback without provider session fails visibly",true,true);
@@ -148,6 +159,7 @@ try {
         await expect(studio.getByText(index===0?/45 days/:/30 days/)).toHaveCount(0);
         check("hydrated UI evidence belongs to selected revision",true,true);
       }
+      report.stage="selected-revision-ui";
       await inspect(0,url=>page.goto(url));await inspect(0,()=>page.reload());await inspect(1,url=>page.goto(url));await inspect(0,()=>page.goBack(),false);
       report.selectedRevisionUiVerified=true;
       // Hydrated review and publication: the reviewed production-control driver clicks; Next, SQL and S3 decide.
@@ -192,9 +204,13 @@ try {
       check("expired-cookie-only browser cannot establish an app session",true,true);
       report.browserVersion=browser.version();report.nextMode="production";
     } catch (error) {
-      const redact = value => [password,stack.anon,stack.service,storage.env.AWS_SECRET_ACCESS_KEY].reduce((text,secret)=>text.replaceAll(secret,"[redacted]"),String(value)).replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,"[redacted JWT]");
       report.failure={name:error.name,message:redact(error.message).slice(0,4000)};
-      if(page) report.failure.visibleHeadings=await page.getByRole("heading").allTextContents().then(items=>items.map(redact)).catch(()=>[]);
+      if(page) {
+        report.failure.visibleHeadings=await page.getByRole("heading").allTextContents().then(items=>items.map(redact)).catch(()=>[]);
+        report.failure.pagePath=(()=>{try{return new URL(page.url()).pathname;}catch{return "?";}})();
+        report.failure.liveRegions=await page.locator('[role="status"],[role="alert"],[aria-live]').allTextContents().then(items=>items.map(text=>redact(text.trim()).slice(0,500)).filter(Boolean)).catch(()=>[]);
+      }
+      report.failure.browserEvents=browserEvents.slice(-80);report.failure.serverTail=serverTail.slice(-80);
       console.error("Real Auth primary failure:",JSON.stringify(report.failure));
       throw error;
     } finally {
