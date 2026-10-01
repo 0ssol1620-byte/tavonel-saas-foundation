@@ -55,7 +55,7 @@ begin
   v_legacy := pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
     p_connection_id || pg_catalog.chr(31) || p_native_id || pg_catalog.chr(31) || p_revision, 'UTF8'), 'sha256'), 'hex');
   v_bytes := pg_catalog.substring(extensions.digest(pg_catalog.convert_to(
-    'tavonel-source-intake' || pg_catalog.chr(31) || p_workspace_key || pg_catalog.chr(31) || v_legacy, 'UTF8'), 'sha256') from 1 for 16);
+    'tavonel-source-intake' || pg_catalog.chr(31) || p_workspace_key || pg_catalog.chr(31) || v_legacy, 'UTF8'), 'sha256'), 1, 16);
   v_bytes := pg_catalog.set_byte(v_bytes, 6, (pg_catalog.get_byte(v_bytes, 6) & 15) | 80);
   v_bytes := pg_catalog.set_byte(v_bytes, 8, (pg_catalog.get_byte(v_bytes, 8) & 63) | 128);
   v_hex := pg_catalog.encode(v_bytes, 'hex');

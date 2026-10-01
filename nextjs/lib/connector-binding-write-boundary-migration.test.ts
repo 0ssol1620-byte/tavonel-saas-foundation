@@ -28,6 +28,9 @@ describe("connector binding write boundary migration", () => {
     expect(identity).toContain(`'tavonel-source-intake' || pg_catalog.chr(31) || p_workspace_key || pg_catalog.chr(31) || v_legacy`);
     expect(identity).toMatch(/& 15\) \| 80/);
     expect(identity).toMatch(/& 63\) \| 128/);
+    // Schema-qualified substring takes plain arguments; the SQL-standard FROM/FOR form is a syntax error.
+    expect(identity).not.toMatch(/pg_catalog\.substring\([^;]*\bfrom \d/);
+    expect(identity).toMatch(/\), 1, 16\);/);
     const writer = body("record_connector_document_binding_after");
     expect(writer.indexOf("CONNECTOR_BINDING_IDENTITY_MISMATCH")).toBeLessThan(writer.indexOf("pg_advisory_xact_lock"));
   });
