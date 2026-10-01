@@ -6,10 +6,18 @@ beforeEach(()=>{vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL","https://binding-test.supa
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 async function binding(revision="1",recordedAt=`2026-10-01T00:00:0${revision}.000000+00:00`) {const identity=await connectorSourceIdentity({...scope,revision});return {...identity,row:{workspace_key:scope.workspaceKey,oauth_connection_id:scope.connectionId,provider:scope.provider,native_id:scope.nativeId,provider_revision:revision,source_id:identity.sourceId,source_version_id:identity.sourceVersionId,document_id:identity.documentId,recorded_at:recordedAt}};}
 type Row=Awaited<ReturnType<typeof binding>>["row"];
-/** A PostgREST stand-in for the two reads: by document_id, and latest-first by source_id. */
+/** Microseconds of an ISO instant, for the stand-in only (the real comparison runs in SQL). */
+const micros=(at:string)=>{const m=/.(d{1,6})/.exec(at);return BigInt(Date.parse(at.replace(/.d+/,"")))*1000n+BigInt((m?.[1]??"").padEnd(6,"0"));};
+/** A PostgREST stand-in: rows by document_id, and connector_source_newest_versions over the RPC. */
 function store(rows:Row[],override?:(url:URL)=>Response|undefined){
-  return vi.fn(async(input:string|URL)=>{
+  return vi.fn(async(input:string|URL,init?:RequestInit)=>{
     const url=new URL(String(input));const forced=override?.(url);if(forced)return forced;
+    if(url.pathname.endsWith("/rpc/connector_source_newest_versions")){
+      const {p_workspace_key,p_source_id}=JSON.parse(String(init?.body));
+      const scoped=rows.filter(r=>r.workspace_key===p_workspace_key&&r.source_id===p_source_id);
+      const top=scoped.reduce<bigint|null>((max,r)=>max===null||micros(r.recorded_at)>max?micros(r.recorded_at):max,null);
+      return Response.json(scoped.filter(r=>micros(r.recorded_at)===top).map(r=>r.source_version_id).sort());
+    }
     const q=url.searchParams;const eq=(k:string)=>q.get(k)?.replace(/^eq\./,"");
     let hit=rows.filter(r=>r.workspace_key===eq("workspace_key")&&(!q.has("document_id")||r.document_id===eq("document_id"))&&(!q.has("source_id")||r.source_id===eq("source_id")));
     if(q.get("order")==="recorded_at.desc")hit=[...hit].sort((a,b)=>b.recorded_at.localeCompare(a.recorded_at));
@@ -57,15 +65,23 @@ it("does not treat a same-native revision in another workspace as a newer revisi
   expect(result.ok && result.identities.get(first.documentId)).toBe(first.sourceId);
 });
 it.each([
-  ["an unavailable latest read",()=>new Response(null,{status:503}),"CONNECTOR_IDENTITY_UNAVAILABLE"],
-  ["an empty latest read",()=>Response.json([]),"CONNECTOR_IDENTITY_UNRESOLVED"],
-  ["a latest row for another source",(row:Row)=>Response.json([{...row,source_id:`src-${"0".repeat(64)}`}]),"CONNECTOR_IDENTITY_CONFLICT"],
-  ["an unparseable observation time",(row:Row)=>Response.json([{...row,recorded_at:"not-a-time"}]),"CONNECTOR_IDENTITY_CONFLICT"],
-  ["a read that is not latest-first",(row:Row)=>Response.json([{...row,recorded_at:"2026-10-01T00:00:01Z"},{...row,source_version_id:`sv-${"1".repeat(64)}`,recorded_at:"2026-10-01T00:00:09Z"}]),"CONNECTOR_IDENTITY_CONFLICT"],
+  ["an unavailable newest read",()=>new Response(null,{status:503}),"CONNECTOR_IDENTITY_UNAVAILABLE"],
+  ["an empty newest set",()=>Response.json([]),"CONNECTOR_IDENTITY_UNRESOLVED"],
+  ["an unresolved newest tie",()=>Response.json([`sv-${"1".repeat(64)}`,`sv-${"2".repeat(64)}`]),"CONNECTOR_SOURCE_REVISION_AMBIGUOUS"],
+  ["a malformed version id",()=>Response.json(["sv-x"]),"CONNECTOR_IDENTITY_UNAVAILABLE"],
+  ["a duplicated version id",()=>Response.json([`sv-${"1".repeat(64)}`,`sv-${"1".repeat(64)}`]),"CONNECTOR_IDENTITY_UNAVAILABLE"],
+  ["an object body",()=>Response.json({}),"CONNECTOR_IDENTITY_UNAVAILABLE"],
 ] as const)("fails closed on %s",async(_label,respond,code)=>{
   const first=await binding();
-  vi.stubGlobal("fetch",store([first.row],url=>url.searchParams.has("source_id")?respond(first.row):undefined));
+  vi.stubGlobal("fetch",store([first.row],url=>url.pathname.endsWith("/rpc/connector_source_newest_versions")?respond():undefined));
   expect(await readConnectorCompileIdentities(scope.workspaceKey,[first.documentId])).toEqual({ok:false,code});
+});
+it("asks the database for the scoped newest set rather than ordering rows itself",async()=>{
+  const first=await binding();const fetcher=store([first.row]);vi.stubGlobal("fetch",fetcher);
+  expect((await readConnectorCompileIdentities(scope.workspaceKey,[first.documentId])).ok).toBe(true);
+  const call=fetcher.mock.calls.find(([input])=>String(input).includes("/rpc/connector_source_newest_versions"))!;
+  expect(JSON.parse(String(call[1]!.body))).toEqual({p_workspace_key:scope.workspaceKey,p_source_id:first.sourceId});
+  expect(fetcher.mock.calls.some(([input])=>String(input).includes("order=recorded_at"))).toBe(false);
 });
 it.each(["workspace_key","document_id","source_id","source_version_id","provider_revision"])("rejects a corrupt %s binding",async field=>{
   const first=await binding();vi.stubGlobal("fetch",vi.fn().mockResolvedValue(Response.json([{...first.row,[field]:"wrong"}])));
@@ -75,20 +91,4 @@ it("fails closed on missing mapping or unavailable store",async()=>{
   const first=await binding();vi.stubGlobal("fetch",vi.fn().mockResolvedValueOnce(Response.json([])).mockResolvedValueOnce(new Response(null,{status:503})));
   expect(await readConnectorCompileIdentities(scope.workspaceKey,[first.documentId])).toEqual({ok:false,code:"CONNECTOR_IDENTITY_UNRESOLVED"});
   expect(await readConnectorCompileIdentities(scope.workspaceKey,[first.documentId])).toEqual({ok:false,code:"CONNECTOR_IDENTITY_UNAVAILABLE"});
-});
-it("orders revisions observed within one millisecond by their microseconds",async()=>{
-  // Date.parse sees one instant here; PostgreSQL recorded two, 1 microsecond apart.
-  const older=await binding("1","2026-10-01T00:00:05.000100+00:00"),newer=await binding("2","2026-10-01T00:00:05.000101+00:00");
-  vi.stubGlobal("fetch",store([older.row,newer.row]));
-  const latest=await readConnectorCompileIdentities(scope.workspaceKey,[newer.documentId]);
-  expect(latest.ok && latest.identities.get(newer.documentId)).toBe(newer.sourceId);
-  expect(await readConnectorCompileIdentities(scope.workspaceKey,[older.documentId])).toEqual({ok:false,code:"CONNECTOR_SOURCE_REVISION_SUPERSEDED"});
-});
-it("treats one instant written with different offsets as a tie, and an unparseable instant as a conflict",async()=>{
-  const first=await binding("1","2026-10-01T00:00:05.5+00:00"),next=await binding("2","2026-10-01T00:00:05.500000+00:00");
-  vi.stubGlobal("fetch",store([first.row,next.row]));
-  expect(await readConnectorCompileIdentities(scope.workspaceKey,[next.documentId])).toEqual({ok:false,code:"CONNECTOR_SOURCE_REVISION_AMBIGUOUS"});
-  const broken=await binding("3","2026-10-01T00:00:09.1234567+00:00");
-  vi.stubGlobal("fetch",store([broken.row]));
-  expect(await readConnectorCompileIdentities(scope.workspaceKey,[broken.documentId])).toEqual({ok:false,code:"CONNECTOR_IDENTITY_CONFLICT"});
 });

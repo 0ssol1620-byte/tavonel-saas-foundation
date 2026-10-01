@@ -1,22 +1,19 @@
 import { connectorSourceIdentity } from "./connector-source-identity";
-import { databaseInstantMicros } from "./database-instant";
+import { readConnectorNewestVersions } from "./connector-newest-versions";
 import type { OAuthConnectorProvider } from "./connector-oauth";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 type SourceInput = { workspaceKey: string; connectionId: string; provider: OAuthConnectorProvider; nativeId: string; revision: string };
 
 const VERSION_ID = /^sv-[a-f0-9]{64}$/;
-/** The RPC refuses larger snapshots; a tie this wide is not recovered automatically. */
+/** The guarded writer accepts at most this many ids in a snapshot. */
 const MAX_NEWEST_SET = 16;
 
 /*
-  The newest bindings of a logical source as the database ordered them, read before an import's
-  first provider read: every binding at the newest observation instant (one for a unique latest,
-  none for an unbound source, several for a legacy equal-instant tie). The import later records
-  only if that whole set is still the newest (see `record_connector_document_binding_after`), so an
-  older revision cannot overtake one bound while its download ran, and a provider-verified current
-  revision supersedes a tie as a whole. No tied row is preferred and no provider timestamp or
-  revision ordering is involved. Instants compare at microsecond precision.
+  The effective newest bindings of a logical source (see `readConnectorNewestVersions`), read
+  before an import's first provider read. The import later records only if that whole set is still
+  the newest, so an older revision cannot overtake one bound while its download ran, and a
+  provider-verified current revision supersedes, or resolves, a legacy equal-instant tie as a whole.
 */
 export async function readConnectorLatestBinding(input: SourceInput): Promise<{ ok: true; sourceVersionIds: string[] } | { ok: false; code: string }> {
   let sourceId: string;
@@ -25,25 +22,10 @@ export async function readConnectorLatestBinding(input: SourceInput): Promise<{ 
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false, code: "CONNECTOR_BINDING_STORE_NOT_CONFIGURED" };
   try {
-    const read = await supabaseAdminRequest(config, `/rest/v1/connector_document_bindings?workspace_key=eq.${encodeURIComponent(input.workspaceKey)}&source_id=eq.${sourceId}&select=source_version_id,workspace_key,source_id,recorded_at&order=recorded_at.desc,source_version_id.desc&limit=${MAX_NEWEST_SET + 1}`);
-    if (!read.ok) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-    const rows: unknown = await read.json();
-    if (!Array.isArray(rows) || rows.length > MAX_NEWEST_SET + 1) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-    const newest: string[] = [];
-    let top: bigint | null = null, previous: bigint | null = null;
-    for (const entry of rows) {
-      const row = entry as Record<string, unknown> | null;
-      const at = databaseInstantMicros(row?.recorded_at);
-      if (!row || typeof row.source_version_id !== "string" || !VERSION_ID.test(row.source_version_id) || at === null
-        || row.workspace_key !== input.workspaceKey || row.source_id !== sourceId) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-      // The database ordered these newest first; anything else is not a readable order.
-      if (previous !== null && at > previous) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-      previous = at;
-      top ??= at;
-      if (at === top) newest.push(row.source_version_id);
-    }
-    if (newest.length > MAX_NEWEST_SET || new Set(newest).size !== newest.length) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
-    return { ok: true, sourceVersionIds: newest.sort() };
+    const newest = await readConnectorNewestVersions(config, input.workspaceKey, sourceId);
+    // The writer refuses larger snapshots, so a tie this wide is not recovered automatically.
+    if (!newest.ok || newest.sourceVersionIds.length > MAX_NEWEST_SET) return { ok: false, code: "CONNECTOR_BINDING_READ_FAILED" };
+    return { ok: true, sourceVersionIds: newest.sourceVersionIds };
   } catch { return { ok: false, code: "CONNECTOR_BINDING_STORE_FAILED" }; }
 }
 
@@ -90,7 +72,8 @@ export async function recordConnectorDocumentBinding(input: SourceInput & {
     // Another revision of this source was bound after this import's snapshot. Retrying re-reads the
     // latest binding and the provider's current revision; nothing was written.
     if (outcome === "contested") return { ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" };
-    if (outcome !== "recorded" && outcome !== "replay") return { ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" };
+    // "resolved": this already-bound revision was one of a legacy tie and the provider named it current.
+    if (outcome !== "recorded" && outcome !== "replay" && outcome !== "resolved") return { ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" };
     // Read the actual winner even when the RPC recorded a row. No timestamp is invented
     // on replay: recorded_at belongs to the database's first successful observation.
     const read = await supabaseAdminRequest(config, `/rest/v1/connector_document_bindings?source_version_id=eq.${identity.sourceVersionId}&workspace_key=eq.${input.workspaceKey}&limit=1`);

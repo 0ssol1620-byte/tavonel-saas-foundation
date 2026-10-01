@@ -68,43 +68,34 @@ it.each([{ byteLength: 0 }, { expectedLatestSourceVersionIds: ["sv-not-a-version
 });
 
 const v = (n: number) => `sv-${n.toString(16).padStart(64, "0")}`;
-async function newestRows(entries: Array<[string, string]>, overrides: Record<string, unknown> = {}) {
+it("reads the effective newest set of the logical source from the database", async () => {
   const { sourceId } = await connectorSourceIdentity(source);
-  return entries.map(([id, at]) => ({ source_version_id: id, workspace_key: source.workspaceKey, source_id: sourceId, recorded_at: at, ...overrides }));
-}
-it("reads the database-ordered unique latest binding of the logical source", async () => {
-  const { sourceId } = await connectorSourceIdentity(source);
-  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(await newestRows([[latest, "2026-10-01T10:00:00.000002+00:00"], [v(1), "2026-10-01T10:00:00.000001+00:00"]])));
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json([latest]));
   vi.stubGlobal("fetch", fetcher);
-  // One microsecond apart is a unique latest, although Date.parse sees one millisecond.
   expect(await readConnectorLatestBinding(source)).toEqual({ ok: true, sourceVersionIds: [latest] });
-  const url = String(fetcher.mock.calls[0][0]);
-  expect(url).toContain(`source_id=eq.${sourceId}`);
-  expect(url).toContain("order=recorded_at.desc");
-  expect(url).toContain("limit=17");
+  expect(String(fetcher.mock.calls[0][0])).toContain("/rest/v1/rpc/connector_source_newest_versions");
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ p_workspace_key: source.workspaceKey, p_source_id: sourceId });
 });
-it("reports the whole newest set of a legacy equal-instant tie without preferring one", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json(await newestRows([
-    [v(3), "2026-09-20T08:00:00.123456+00:00"], [v(9), "2026-09-20T17:00:00.123456+09:00"], [v(1), "2026-09-20T07:59:59+00:00"]]))));
+it("reports a whole unresolved tie, sorted, and an unbound source as empty", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json([v(9), v(3)])).mockResolvedValueOnce(Response.json([])));
   expect(await readConnectorLatestBinding(source)).toEqual({ ok: true, sourceVersionIds: [v(3), v(9)] });
-});
-it("reports no latest binding for a never-bound source", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json([])));
   expect(await readConnectorLatestBinding(source)).toEqual({ ok: true, sourceVersionIds: [] });
 });
 it.each([
-  ["an unavailable read", async () => new Response(null, { status: 503 })],
-  ["a foreign workspace row", async () => Response.json(await newestRows([[latest, "2026-10-01T10:00:00Z"]], { workspace_key: "pilot-other01" }))],
-  ["a foreign source row", async () => Response.json(await newestRows([[latest, "2026-10-01T10:00:00Z"]], { source_id: `src-${"0".repeat(64)}` }))],
-  ["a malformed version id", async () => Response.json(await newestRows([["sv-x", "2026-10-01T10:00:00Z"]]))],
-  ["an unparseable instant", async () => Response.json(await newestRows([[latest, "yesterday"]]))],
-  ["rows that are not newest first", async () => Response.json(await newestRows([[latest, "2026-10-01T10:00:00.000001Z"], [v(1), "2026-10-01T10:00:00.000002Z"]]))],
-  ["a duplicated version", async () => Response.json(await newestRows([[latest, "2026-10-01T10:00:00Z"], [latest, "2026-10-01T10:00:00Z"]]))],
-  ["a tie wider than the RPC accepts", async () => Response.json(await newestRows(Array.from({ length: 17 }, (_, i) => [v(i), "2026-10-01T10:00:00Z"] as [string, string])))],
-  ["an object body", async () => Response.json({})],
+  ["an unavailable read", () => new Response(null, { status: 503 })],
+  ["a malformed version id", () => Response.json(["sv-x"])],
+  ["a duplicated version", () => Response.json([latest, latest])],
+  ["a tie wider than the writer accepts", () => Response.json(Array.from({ length: 17 }, (_, i) => v(i)))],
+  ["an object body", () => Response.json({})],
 ])("fails closed on %s", async (_label, response) => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(await response()));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(response()));
   expect(await readConnectorLatestBinding(source)).toEqual({ ok: false, code: "CONNECTOR_BINDING_READ_FAILED" });
+});
+it("accepts a tie resolution as a verified write of the already-bound revision", async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(Response.json("resolved")).mockResolvedValueOnce(Response.json([await row()]));
+  vi.stubGlobal("fetch", fetcher);
+  expect(await recordConnectorDocumentBinding({ ...input, expectedLatestSourceVersionIds: [v(3), v(9)] })).toEqual({ ok: true });
+  expect(fetcher).toHaveBeenCalledTimes(3);
 });
 it("sends the snapshot set sorted, so the server compares sets rather than order", async () => {
   const fetcher = vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(Response.json("recorded")).mockResolvedValueOnce(Response.json([await row()]));

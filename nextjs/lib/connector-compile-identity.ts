@@ -1,6 +1,6 @@
 import { connectorSourceIdentity } from "./connector-source-identity";
 import type { OAuthConnectorProvider } from "./connector-oauth";
-import { databaseInstantMicros } from "./database-instant";
+import { readConnectorNewestVersions } from "./connector-newest-versions";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
 type SupabaseAdminConfig = NonNullable<ReturnType<typeof readSupabaseAdminConfig>>;
@@ -51,32 +51,18 @@ export async function readConnectorCompileIdentities(workspaceKey: string, docum
   A continuous source keeps every revision it ever bound, and each revision is its own immutable
   upload UUID. Resolving a selected UUID to its logical source is not enough on its own: a
   refresh that still names revision 1 after revision 2 was bound would compile, and publish,
-  content the provider has already replaced. "Latest" is `recorded_at`, the database's first
-  successful observation -- provider revision strings are not orderable across providers, and
-  this code does not invent an order for them. Two revisions observed at the same instant are
-  not a latest, so they are refused rather than tie-broken by id.
+  content the provider has already replaced. "Latest" is the database's own observation order
+  (`connector_source_newest_versions`, microsecond precision, plus immutable tie resolutions) --
+  provider revision strings are not orderable across providers, and this code does not invent an
+  order for them. An unresolved equal-instant tie is not a latest, so it is refused rather than
+  tie-broken by id.
 */
 async function readLatestBoundRevision(config: SupabaseAdminConfig, workspaceKey: string, sourceId: string): Promise<
   { ok: true; sourceVersionId: string } | { ok: false; code: string }
 > {
-  const response = await supabaseAdminRequest(config,
-    `/rest/v1/connector_document_bindings?workspace_key=eq.${encodeURIComponent(workspaceKey)}&source_id=eq.${encodeURIComponent(sourceId)}` +
-    "&select=source_version_id,source_id,workspace_key,recorded_at&order=recorded_at.desc&limit=2");
-  if (!response.ok) return { ok: false, code: "CONNECTOR_IDENTITY_UNAVAILABLE" };
-  const rows: unknown = await response.json();
-  if (!Array.isArray(rows) || rows.length === 0) return { ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" };
-  const [latest, previous] = rows as Record<string, unknown>[];
-  // Microsecond comparison: Date.parse would merge distinct instants within one millisecond.
-  const latestAt = databaseInstantMicros(latest?.recorded_at);
-  if (!latest || latest.workspace_key !== workspaceKey || latest.source_id !== sourceId ||
-      typeof latest.source_version_id !== "string" || latestAt === null) {
-    return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
-  }
-  if (previous !== undefined) {
-    const previousAt = databaseInstantMicros(previous?.recorded_at);
-    if (!previous || previousAt === null) return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
-    if (latestAt < previousAt) return { ok: false, code: "CONNECTOR_IDENTITY_CONFLICT" };
-    if (latestAt === previousAt) return { ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" };
-  }
-  return { ok: true, sourceVersionId: latest.source_version_id };
+  const newest = await readConnectorNewestVersions(config, workspaceKey, sourceId);
+  if (!newest.ok) return { ok: false, code: "CONNECTOR_IDENTITY_UNAVAILABLE" };
+  if (newest.sourceVersionIds.length === 0) return { ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" };
+  if (newest.sourceVersionIds.length > 1) return { ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" };
+  return { ok: true, sourceVersionId: newest.sourceVersionIds[0] };
 }

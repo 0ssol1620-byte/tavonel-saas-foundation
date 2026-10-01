@@ -150,38 +150,101 @@ describe.skipIf(!base)("continuous connector revisions through actual PostgREST 
     expect(await readConnectorCompileIdentities(workspaceKey, [ids.r3Document])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
   });
 
+  // Fixtures written by owner-level SQL in source-revision-journey.mjs (LEGACY_FIXTURES there).
+  const tieNative = "journey-legacy-tie-native", tiedNative = "journey-tied-current-native", subNative = "journey-submillisecond-native";
+  const fixtureIdentity = (native: string, revision: string) => connectorSourceIdentity({ workspaceKey, connectionId, provider, nativeId: native, revision });
+  // Fixture bytes: sha256:8…8, 11 bytes, text/plain (a replay must match them exactly).
+  const FIXTURE_BYTE = "8";
+  const rpc = (name: string, body: unknown) => supabaseAdminRequest(readSupabaseAdminConfig()!, `/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
+
+  record("the schema derives exactly the identities the application derives", async () => {
+    for (const [native, revision] of [[nativeId, "revision-1"], ["문서/é \"quoted\" \\ back", "rev 7/ü"], ["id:AbC_-123", "015f2c3a"]]) {
+      const expected = await fixtureIdentity(native, revision);
+      const response = await rpc("connector_binding_identity", { p_workspace_key: workspaceKey, p_connection_id: connectionId, p_provider: provider, p_native_id: native, p_revision: revision });
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      const row = Array.isArray(body) ? body[0] : body;
+      expect(row).toEqual({ source_id: expected.sourceId, source_version_id: expected.sourceVersionId, document_id: expected.documentId });
+    }
+  });
+
+  record("a direct service-role table insert is refused; only the guarded writer records", async () => {
+    const identity = await fixtureIdentity("journey-direct-native", "direct-bypass");
+    const direct = await supabaseAdminRequest(readSupabaseAdminConfig()!, "/rest/v1/connector_document_bindings", { method: "POST", headers: { prefer: "return=minimal" },
+      body: JSON.stringify({ source_version_id: identity.sourceVersionId, source_id: identity.sourceId, workspace_key: workspaceKey, oauth_connection_id: connectionId,
+        provider, native_id: "journey-direct-native", provider_revision: "direct-bypass", document_id: identity.documentId,
+        content_sha256: `sha256:${"9".repeat(64)}`, byte_length: 11, mime_type: "text/plain" }) });
+    expect(direct.ok).toBe(false);
+    expect(await direct.text()).toContain("CONNECTOR_BINDING_WRITE_PATH");
+    const recorded = await bind("direct-bypass-guarded", "9", undefined, "journey-direct-native");
+    expect(recorded.result).toEqual({ ok: true });
+  });
+
+  record("the guarded writer refuses a row whose identity does not derive from its fields", async () => {
+    const own = await fixtureIdentity("journey-mismatch-native", "identity-mismatch"), other = await fixtureIdentity("journey-mismatch-native", "other-revision");
+    const response = await rpc("record_connector_document_binding_after", { p_expected_latest_source_version_ids: [], p_binding: {
+      source_version_id: other.sourceVersionId, source_id: own.sourceId, workspace_key: workspaceKey, oauth_connection_id: connectionId, provider,
+      native_id: "journey-mismatch-native", provider_revision: "identity-mismatch", document_id: own.documentId,
+      content_sha256: `sha256:${"9".repeat(64)}`, byte_length: 11, mime_type: "text/plain" } });
+    expect(response.ok).toBe(false);
+    expect(await response.text()).toContain("CONNECTOR_BINDING_IDENTITY_MISMATCH");
+  });
+
   record("a legacy equal-instant tie is superseded as a whole by a current revision, never tie-broken", async () => {
-    // Before the compare-and-set, bindings were plain inserts whose recorded_at defaulted to now(),
-    // the transaction start: one multi-row insert gives two revisions of one source one instant.
-    // That legacy write path (direct table insert) is used here only to create the fixture.
-    const native = "journey-legacy-tie-native";
-    const tied = await Promise.all(["legacy-a", "legacy-b"].map(revision => connectorSourceIdentity({ workspaceKey, connectionId, provider, nativeId: native, revision })));
-    const config = readSupabaseAdminConfig()!;
-    const legacy = await supabaseAdminRequest(config, "/rest/v1/connector_document_bindings", { method: "POST", headers: { prefer: "return=minimal" },
-      body: JSON.stringify(tied.map((identity, index) => ({ source_version_id: identity.sourceVersionId, source_id: identity.sourceId, workspace_key: workspaceKey,
-        oauth_connection_id: connectionId, provider, native_id: native, provider_revision: ["legacy-a", "legacy-b"][index], document_id: identity.documentId,
-        content_sha256: `sha256:${"8".repeat(64)}`, byte_length: 11, mime_type: "text/plain" }))) });
-    expect(legacy.status).toBe(201);
-    Object.assign(ids, { legacySourceId: tied[0].sourceId, legacyA: tied[0].documentId, legacyB: tied[1].documentId });
+    const tied = await Promise.all(["legacy-a", "legacy-b"].map(revision => fixtureIdentity(tieNative, revision)));
+    Object.assign(ids, { legacySourceId: tied[0].sourceId });
     for (const identity of tied) {
       expect(await readConnectorCompileIdentities(workspaceKey, [identity.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" });
     }
-    const snapshot = await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: native, revision: "legacy-current" });
+    const snapshot = await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: tieNative, revision: "legacy-current" });
     expect(snapshot).toEqual({ ok: true, sourceVersionIds: tied.map(identity => identity.sourceVersionId).sort() });
     // A snapshot naming only one tied row is not the newest set: contested, nothing written.
-    expect((await bind("legacy-partial", "6", [tied[0].sourceVersionId], native)).result).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" });
-    const current = await bind("legacy-current", "7", snapshot.ok ? snapshot.sourceVersionIds : [], native);
+    expect((await bind("legacy-partial", "6", [tied[0].sourceVersionId], tieNative)).result).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" });
+    const current = await bind("legacy-current", "7", snapshot.ok ? snapshot.sourceVersionIds : [], tieNative);
     expect(current.result).toEqual({ ok: true });
-    ids.legacyCurrent = current.identity.documentId;
     const resolved = await readConnectorCompileIdentities(workspaceKey, [current.identity.documentId]);
     expect(resolved.ok && resolved.identities.get(current.identity.documentId)).toBe(tied[0].sourceId);
     for (const identity of tied) {
       expect(await readConnectorCompileIdentities(workspaceKey, [identity.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
     }
-    // Replaying a tied legacy revision never moves latest.
-    expect((await bind("legacy-a", "8", undefined, native)).result).toEqual({ ok: true });
-    expect(await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: native, revision: "legacy-a" }))
+    // Replaying a tied legacy revision after supersession never moves latest.
+    expect((await bind("legacy-a", FIXTURE_BYTE, undefined, tieNative)).result).toEqual({ ok: true });
+    expect(await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: tieNative, revision: "legacy-a" }))
       .toEqual({ ok: true, sourceVersionIds: [current.identity.sourceVersionId] });
+  });
+
+  record("a tie whose provider-current revision is one of its rows is resolved to that row, never by id", async () => {
+    const [a, b] = await Promise.all(["tied-a", "tied-b"].map(revision => fixtureIdentity(tiedNative, revision)));
+    expect(await readConnectorCompileIdentities(workspaceKey, [a.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" });
+    const snapshot = await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: tiedNative, revision: "tied-a" });
+    expect(snapshot).toEqual({ ok: true, sourceVersionIds: [a.sourceVersionId, b.sourceVersionId].sort() });
+    // A stale snapshot (one member only) does not resolve anything.
+    expect((await bind("tied-a", FIXTURE_BYTE, [a.sourceVersionId], tiedNative)).result).toEqual({ ok: true });
+    expect(await readConnectorCompileIdentities(workspaceKey, [a.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_AMBIGUOUS" });
+    // The provider names tied-a current and the snapshot is the whole tie: resolved.
+    expect((await bind("tied-a", FIXTURE_BYTE, snapshot.ok ? snapshot.sourceVersionIds : [], tiedNative)).result).toEqual({ ok: true });
+    const resolved = await readConnectorCompileIdentities(workspaceKey, [a.documentId]);
+    expect(resolved.ok && resolved.identities.get(a.documentId)).toBe(a.sourceId);
+    expect(await readConnectorCompileIdentities(workspaceKey, [b.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    // The other member replays without moving latest; a newer revision then supersedes as usual.
+    expect((await bind("tied-b", FIXTURE_BYTE, [a.sourceVersionId], tiedNative)).result).toEqual({ ok: true });
+    expect(await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: tiedNative, revision: "tied-b" })).toEqual({ ok: true, sourceVersionIds: [a.sourceVersionId] });
+    const newer = await bind("tied-c", "c", undefined, tiedNative);
+    expect(newer.result).toEqual({ ok: true });
+    expect(await readConnectorCompileIdentities(workspaceKey, [a.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+  });
+
+  record("revisions observed 1 microsecond apart inside one millisecond keep their database order", async () => {
+    const [older, newer] = await Promise.all(["sub-a", "sub-b"].map(revision => fixtureIdentity(subNative, revision)));
+    const rows = await supabaseAdminRequest(readSupabaseAdminConfig()!, `/rest/v1/connector_document_bindings?workspace_key=eq.${workspaceKey}&source_id=eq.${older.sourceId}&select=recorded_at`);
+    const instants = (await rows.json() as Array<{ recorded_at: string }>).map(row => row.recorded_at);
+    expect(instants).toHaveLength(2);
+    // JavaScript milliseconds cannot tell these apart; the database can.
+    expect(new Set(instants.map(at => Date.parse(at))).size).toBe(1);
+    const latest = await readConnectorCompileIdentities(workspaceKey, [newer.documentId]);
+    expect(latest.ok && latest.identities.get(newer.documentId)).toBe(newer.sourceId);
+    expect(await readConnectorCompileIdentities(workspaceKey, [older.documentId])).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    expect(await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: subNative, revision: "sub-c" })).toEqual({ ok: true, sourceVersionIds: [newer.sourceVersionId] });
   });
 
   record("provider deletion tombstones the logical source and refuses a new revision", async () => {

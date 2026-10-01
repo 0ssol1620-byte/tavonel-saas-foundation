@@ -8,12 +8,14 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
 export const SOURCE_REVISION_WORKSPACE = "pilot-c333333333334333";
-const EXPECTED_SERVICE_ASSERTIONS = 11;
+const EXPECTED_SERVICE_ASSERTIONS = 16;
+/** Native ids of the owner-level legacy fixtures; the integration test uses the same names. */
+export const LEGACY_FIXTURES = { tie: "journey-legacy-tie-native", tiedCurrent: "journey-tied-current-native", submillisecond: "journey-submillisecond-native" };
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
 
 export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, asService, check, actor, foreignWorkspace, root, env }) {
@@ -27,6 +29,19 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
     insert into public.foundation_oauth_connections(oauth_connection_id,workspace_key,provider,display_name,provider_account_id,
       granted_scopes,client_secret_reference,refresh_token_reference,created_by,updated_by) values
       (${quote(connection)},${quote(workspace)},'google_drive','Synthetic revisions','synthetic-revision-account',array['drive.readonly'],'vault://synthetic/client','vault://synthetic/refresh',${quote(actor)},${quote(actor)});`);
+  // Deterministic legacy fixtures, written by owner-level SQL exactly as pre-CAS writes stored them
+  // (explicit observation instants). Identities come from the schema's own derivation, which the
+  // integration test cross-checks against the application's. Insertion order deliberately differs
+  // from instant order. Instants: one equal-instant tie, a tie whose current revision is a member,
+  // and two revisions 1 microsecond apart inside one millisecond.
+  const fixture = (native, revision, at) => `insert into public.connector_document_bindings(source_version_id,source_id,workspace_key,oauth_connection_id,provider,native_id,provider_revision,document_id,content_sha256,byte_length,mime_type,recorded_at)
+    select i.source_version_id,i.source_id,${quote(workspace)},${quote(connection)},'google_drive',${quote(native)},${quote(revision)},i.document_id,${quote(`sha256:${"8".repeat(64)}`)},11,'text/plain',${quote(at)}::timestamptz
+      from public.connector_binding_identity(${quote(workspace)},${quote(connection)},'google_drive',${quote(native)},${quote(revision)}) i;`;
+  sql([
+    fixture(LEGACY_FIXTURES.tie, "legacy-b", "2026-09-01T00:00:00.123456Z"), fixture(LEGACY_FIXTURES.tie, "legacy-a", "2026-09-01T00:00:00.123456Z"),
+    fixture(LEGACY_FIXTURES.tiedCurrent, "tied-b", "2026-09-01T00:00:01.123456Z"), fixture(LEGACY_FIXTURES.tiedCurrent, "tied-a", "2026-09-01T00:00:01.123456Z"),
+    fixture(LEGACY_FIXTURES.submillisecond, "sub-b", "2026-09-01T00:00:02.000101Z"), fixture(LEGACY_FIXTURES.submillisecond, "sub-a", "2026-09-01T00:00:02.000100Z"),
+  ].join("\n"));
   const nextjs = path.resolve(import.meta.dirname, "../.."), output = path.join(root, "source-revision.json");
   try {
     // Unchanged product connector code; the test file states its transport-only substitution.
@@ -58,6 +73,16 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
       (select provider_revision from public.connector_document_bindings where ${legacy} order by recorded_at desc limit 1)||':'||
       (select count(*) from public.connector_document_bindings where ${legacy} and recorded_at=(select min(recorded_at) from public.connector_document_bindings where ${legacy}))
       from public.connector_document_bindings where ${legacy}`), "3:2:0:legacy-current:2");
+  const sourceOf = native => `(select source_id from public.connector_binding_identity(${quote(workspace)},${quote(connection)},'google_drive',${quote(native)},'any'))`;
+  const tiedScope = `workspace_key=${quote(workspace)} and source_id=${sourceOf(LEGACY_FIXTURES.tiedCurrent)}`;
+  check("SQL keeps the tied rows immutable and records exactly one resolution naming the provider-current member, then a newer revision",
+    sql(`select (select count(*) from public.connector_document_bindings where ${tiedScope})||':'||count(*)||':'||
+      max((select b.provider_revision from public.connector_document_bindings b where b.source_version_id=r.current_source_version_id))||':'||max(cardinality(r.tied_source_version_ids))
+      from public.connector_binding_tie_resolutions r where ${tiedScope}`), "3:1:tied-a:2");
+  check("SQL holds the sub-millisecond fixture as two distinct instants inside one millisecond",
+    sql(`select count(*)||':'||count(distinct recorded_at)||':'||count(distinct date_trunc('milliseconds',recorded_at)) from public.connector_document_bindings where workspace_key=${quote(workspace)} and source_id=${sourceOf(LEGACY_FIXTURES.submillisecond)}`), "2:2:1");
+  check("SQL stores nothing from a direct API-role insert or an identity-mismatched write",
+    sql(`select count(*) from public.connector_document_bindings where workspace_key=${quote(workspace)} and provider_revision in ('direct-bypass','identity-mismatch')`), "0");
   sql(`insert into public.source_acl_snapshots(source_version_id,workspace_key,provider_id,principals,snapshot_sha256,captured_at)
     values(${quote(ids.r1Version)},${quote(workspace)},'google_drive','[{"kind":"user","principalId":"owner@journey.invalid","permission":"read"}]'::jsonb,${quote(`sha256:${"9".repeat(64)}`)},now())`);
   const admits = (version, key = workspace) => sql(asService(`select public.source_version_acl_admits(${quote(key)},${quote(version)},'google_drive','[{"kind":"user","principalId":"owner@journey.invalid"}]'::jsonb)`));
@@ -77,11 +102,15 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
 */
 async function qualifyBindingLock({ sql, sqlAsync, check, workspace, connection }) {
   const holderName = `tavonel-binding-cas-${randomUUID().slice(0, 8)}`;
-  const source = `src-${createHash("sha256").update(["binding-lock", workspace, connection].join("\n")).digest("hex")}`;
-  const row = revision => ({ source_version_id: `sv-${createHash("sha256").update([source, revision].join("\n")).digest("hex")}`, source_id: source,
-    workspace_key: workspace, oauth_connection_id: connection, provider: "google_drive", native_id: "journey-binding-lock-native",
-    provider_revision: revision, document_id: randomUUID(), content_sha256: `sha256:${"7".repeat(64)}`, byte_length: 7, mime_type: "text/plain" });
-  const record = revision => `select public.record_connector_document_binding_after(${quote(JSON.stringify(row(revision)))}::jsonb, '{}'::text[])`;
+  const native = "journey-binding-lock-native";
+  // The guarded writer refuses rows whose identity does not derive from their own fields, so the
+  // row is built from the schema's derivation inside the same statement.
+  const identity = revision => `public.connector_binding_identity(${quote(workspace)},${quote(connection)},'google_drive',${quote(native)},${quote(revision)})`;
+  const source = `(select source_id from ${identity("any")})`;
+  const record = revision => `select public.record_connector_document_binding_after(jsonb_build_object('source_version_id',i.source_version_id,'source_id',i.source_id,
+    'workspace_key',${quote(workspace)},'oauth_connection_id',${quote(connection)},'provider','google_drive','native_id',${quote(native)},
+    'provider_revision',${quote(revision)},'document_id',i.document_id,'content_sha256',${quote(`sha256:${"7".repeat(64)}`)},'byte_length',7,'mime_type','text/plain'),
+    '{}'::text[]) from ${identity(revision)} i`;
   const holder = sqlAsync(`set application_name=${quote(holderName)}; set role service_role; begin; ${record("lock-holder")}; select pg_catalog.pg_sleep(2); commit;`);
   let granted = false;
   for (let attempt = 0; attempt < 100 && !granted; attempt++) {
@@ -94,5 +123,5 @@ async function qualifyBindingLock({ sql, sqlAsync, check, workspace, connection 
   check("holder session records against the empty latest snapshot", held.code === 0 && held.stdout.split("\n").includes("recorded"), true);
   check("second session with the same snapshot waits for the lock and is contested", [waiter.code, waiter.stdout], [0, "contested"]);
   check("SQL keeps exactly the holder's binding after the two-session race",
-    sql(`select string_agg(provider_revision, ',') from public.connector_document_bindings where workspace_key=${quote(workspace)} and source_id=${quote(source)}`), "lock-holder");
+    sql(`select string_agg(provider_revision, ',') from public.connector_document_bindings where workspace_key=${quote(workspace)} and source_id=${source}`), "lock-holder");
 }
