@@ -268,6 +268,40 @@ describe.skipIf(!base)("continuous connector revisions through actual PostgREST 
     expect(await readConnectorLatestBinding({ workspaceKey, connectionId, provider, nativeId: subNative, revision: "sub-c" })).toEqual({ ok: true, sourceVersionIds: [newer.sourceVersionId] });
   });
 
+  record("promotion source currency: superseded and unresolved revisions are refused, current and unbound pass", async () => {
+    const assertCurrent = async (documents: string[]) => {
+      const response = await rpc("assert_world_sources_current", { p_workspace_key: workspaceKey, p_document_ids: documents });
+      return { status: response.status, body: await response.text() };
+    };
+    // Unbound UUID uploads and non-UUID direct document ids carry no logical-source lineage.
+    expect(await assertCurrent([ids.winnerDocument, "00000000-0000-4000-8000-0000000000aa", "fp200-maintenance-manual-revB"])).toEqual({ status: 200, body: "1" });
+    for (const stale of [ids.r1Document, ids.r3Document]) {
+      const refused = await assertCurrent([stale]);
+      expect(refused.status).not.toBe(200);
+      expect(refused.body).toContain("world_source_revision_superseded");
+    }
+    // Two revisions of one source in one candidate: at most one can be newest.
+    expect((await assertCurrent([ids.winnerDocument, ids.r3Document])).body).toContain("world_source_revision_superseded");
+    const open = await fixtureIdentity("journey-unresolved-tie-native", "open-a");
+    expect((await assertCurrent([open.documentId])).body).toContain("world_source_revision_ambiguous");
+  });
+
+  record("the promotion transition refuses a superseded source before any World change, and is forward-only", async () => {
+    const collection = `collection-${"5".repeat(32)}`, digest = `sha256:${"6".repeat(64)}`;
+    ids.promotionCollection = collection;
+    const params = { p_operation_id: "55555555-5555-4555-8555-555555555555", p_action: "activate", p_workspace_key: workspaceKey,
+      p_collection_id: collection, p_target_manifest_digest: digest,
+      p_candidate_object_key: `immutable/${workspaceKey}/${workspaceKey}/collections/${collection}/${digest.slice(7)}/candidate-world.json`,
+      p_world_state_id: "ws_journey_promotion", p_core_output_sha256: `sha256:${"7".repeat(64)}`, p_expected_current_state: "empty",
+      p_expected_current_revision: 0, p_expected_current_manifest_digest: null, p_actor_user_id: "00000000-0000-4000-8000-0000000000bb",
+      p_reason: "Journey promotion currency check", p_source_document_ids: [ids.r1Document] };
+    const stale = await rpc("transition_foundation_world_atomic_current", params);
+    expect(stale.status).not.toBe(200);
+    expect(await stale.text()).toContain("world_source_revision_superseded");
+    const rollback = await rpc("transition_foundation_world_atomic_current", { ...params, p_action: "rollback" });
+    expect(await rollback.text()).toContain("world_transition_contract_invalid");
+  });
+
   record("provider deletion tombstones the logical source and refuses a new revision", async () => {
     const deleted = await requestConnectorSourceDeletion({ workspaceKey, connectionId, provider, nativeId, reason: "provider_deleted" });
     expect(deleted).toMatchObject({ ok: true, held: false });

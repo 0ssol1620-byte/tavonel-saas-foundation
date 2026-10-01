@@ -140,7 +140,17 @@ describe("World promotion source-version gate", () => {
     const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
     expect(response.status).toBe(200);
     expect(promote).toHaveBeenCalledOnce();
+    // The transition re-checks these under the source locks in its own transaction.
+    expect(promote.mock.calls[0][0].sourceDocumentIds).toEqual(artifact.sourceDocuments.map(item => item.documentId));
   });
+
+  it.each(["WORLD_SOURCE_REVISION_SUPERSEDED", "WORLD_SOURCE_REVISION_AMBIGUOUS"])(
+    "reports the transition's %s refusal as a conflict", async code => {
+      promote.mockResolvedValue({ ok: false, code });
+      const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ code });
+    });
 
   it("refuses a candidate after a newer source version arrives", async () => {
     const current = artifact.sourceDocuments[0]!;

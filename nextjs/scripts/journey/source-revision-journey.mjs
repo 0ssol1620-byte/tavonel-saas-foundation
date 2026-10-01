@@ -13,9 +13,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 export const SOURCE_REVISION_WORKSPACE = "pilot-c333333333334333";
-const EXPECTED_SERVICE_ASSERTIONS = 17;
+const EXPECTED_SERVICE_ASSERTIONS = 19;
 /** Native ids of the owner-level legacy fixtures; the integration test uses the same names. */
-export const LEGACY_FIXTURES = { tie: "journey-legacy-tie-native", tiedCurrent: "journey-tied-current-native", submillisecond: "journey-submillisecond-native", tiedConflict: "journey-tied-conflict-native" };
+export const LEGACY_FIXTURES = { tie: "journey-legacy-tie-native", tiedCurrent: "journey-tied-current-native", submillisecond: "journey-submillisecond-native", tiedConflict: "journey-tied-conflict-native", unresolvedTie: "journey-unresolved-tie-native" };
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
 
 export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, asService, check, actor, foreignWorkspace, root, env }) {
@@ -42,6 +42,7 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
     fixture(LEGACY_FIXTURES.tiedCurrent, "tied-b", "2026-09-01T00:00:01.123456Z"), fixture(LEGACY_FIXTURES.tiedCurrent, "tied-a", "2026-09-01T00:00:01.123456Z"),
     fixture(LEGACY_FIXTURES.submillisecond, "sub-b", "2026-09-01T00:00:02.000101Z"), fixture(LEGACY_FIXTURES.submillisecond, "sub-a", "2026-09-01T00:00:02.000100Z"),
     fixture(LEGACY_FIXTURES.tiedConflict, "conflict-a", "2026-09-01T00:00:03.123456Z"), fixture(LEGACY_FIXTURES.tiedConflict, "conflict-b", "2026-09-01T00:00:03.123456Z"),
+    fixture(LEGACY_FIXTURES.unresolvedTie, "open-a", "2026-09-01T00:00:04.123456Z"), fixture(LEGACY_FIXTURES.unresolvedTie, "open-b", "2026-09-01T00:00:04.123456Z"),
   ].join("\n"));
   const nextjs = path.resolve(import.meta.dirname, "../.."), output = path.join(root, "source-revision.json");
   try {
@@ -92,8 +93,50 @@ export async function qualifySourceRevisions({ base, serviceKey, sql, sqlAsync, 
   check("historical revision ACL stays bound to its own version", admits(ids.r1Version), "t");
   check("historical ACL does not leak to the current revision", admits(ids.r3Version), "f");
   check("historical ACL does not leak across workspaces", admits(ids.r1Version, foreignWorkspace), "f");
+  check("SQL creates no World version for a promotion refused by source currency",
+    sql(`select count(*) from public.foundation_world_versions where workspace_key=${quote(workspace)} and collection_id=${quote(result.ids.promotionCollection)}`), "0");
   await qualifyBindingLock({ sql, sqlAsync, check, workspace, connection });
+  await qualifyPromotionCurrencyLock({ sql, sqlAsync, check, workspace, connection });
   return { actualServiceVerified: true, serviceAssertions: result.assertions.length };
+}
+
+/*
+  Promotion currency holds until commit, not only at a precheck. The holder session runs the
+  promotion's source check for revision 1 and keeps its transaction open; the writer session then
+  records revision 2 against revision 1. Under the shared per-source lock the writer must wait
+  (observed as an ungranted advisory lock) until the promotion commits, and only then record. A
+  promotion check after that refuses revision 1. Synthetic source in the governed journey workspace.
+*/
+async function qualifyPromotionCurrencyLock({ sql, sqlAsync, check, workspace, connection }) {
+  const holderName = `tavonel-promote-hold-${randomUUID().slice(0, 8)}`, writerName = `tavonel-promote-bind-${randomUUID().slice(0, 8)}`;
+  const native = "journey-promotion-race-native";
+  const identity = revision => `public.connector_binding_identity(${quote(workspace)},${quote(connection)},'google_drive',${quote(native)},${quote(revision)})`;
+  const record = (revision, expected) => `select public.record_connector_document_binding_after(jsonb_build_object('source_version_id',i.source_version_id,'source_id',i.source_id,
+    'workspace_key',${quote(workspace)},'oauth_connection_id',${quote(connection)},'provider','google_drive','native_id',${quote(native)},
+    'provider_revision',${quote(revision)},'document_id',i.document_id,'content_sha256',${quote(`sha256:${"5".repeat(64)}`)},'byte_length',5,'mime_type','text/plain'),
+    ${expected}) from ${identity(revision)} i`;
+  const document = revision => `(select document_id::text from ${identity(revision)})`;
+  const assertCurrent = revision => `select public.assert_world_sources_current(${quote(workspace)},array[${document(revision)}])`;
+  check("promotion-race revision 1 records as the first binding", sql(`set role service_role; ${record("race-1", "'{}'::text[]")}`), "recorded");
+  const holder = sqlAsync(`set application_name=${quote(holderName)}; set role service_role; begin; ${assertCurrent("race-1")}; select pg_catalog.pg_sleep(3); commit;`);
+  let held = false;
+  for (let attempt = 0; attempt < 100 && !held; attempt++) {
+    held = sql(`select count(*) from pg_catalog.pg_locks l join pg_catalog.pg_stat_activity a on a.pid=l.pid where a.application_name=${quote(holderName)} and l.locktype='advisory' and l.granted`) !== "0";
+    if (!held) await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  check("promotion check holds the logical source's binding lock", held, true);
+  const writer = sqlAsync(`set application_name=${quote(writerName)}; set role service_role; ${record("race-2", `array[(select source_version_id from ${identity("race-1")})]`)}`);
+  let waiting = false;
+  for (let attempt = 0; attempt < 50 && !waiting; attempt++) {
+    waiting = sql(`select count(*) from pg_catalog.pg_locks l join pg_catalog.pg_stat_activity a on a.pid=l.pid where a.application_name=${quote(writerName)} and l.locktype='advisory' and not l.granted`) !== "0";
+    if (!waiting) await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  check("a newer revision's binding waits while the promotion's currency check is uncommitted", waiting, true);
+  const [promotion, binding] = await Promise.all([holder, writer]);
+  check("the promotion's currency check passed for revision 1 and committed", promotion.code === 0 && promotion.stdout.split("\n").includes("1"), true);
+  check("the newer revision recorded only after the promotion committed", [binding.code, binding.stdout], [0, "recorded"]);
+  const refused = await sqlAsync(`set role service_role; ${assertCurrent("race-1")}`);
+  check("a promotion check after the newer binding refuses revision 1", refused.code !== 0 && /world_source_revision_superseded/.test(refused.stderr ?? ""), true);
 }
 
 /*

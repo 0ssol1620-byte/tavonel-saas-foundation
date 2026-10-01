@@ -88,6 +88,8 @@ const promotion = {
   expectedCurrentManifest: null,
   expectedCurrentRevision: 0,
   reason: "Synthetic public sample reviewed for the B32 product path.",
+  // Shape only: the sample never calls the store mutation, and its inputs are not uploads.
+  sourceDocumentIds: ["00000000-0000-4000-8000-000000000032"],
 };
 if (!validatePromoteWorldMutation(promotion)) {
   throw new Error("signed_product_demo_activation_contract_invalid");

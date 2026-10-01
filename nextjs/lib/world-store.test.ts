@@ -13,6 +13,7 @@ const manifestDigest = `sha256:${"b".repeat(64)}`;
 const outputSha = `sha256:${"d".repeat(64)}`;
 const actorUserId = "44444444-4444-4444-4444-444444444444";
 const operationId = "11111111-1111-4111-8111-111111111111";
+const sourceDocumentIds = ["22222222-2222-4222-8222-222222222222"];
 const eventId = "22222222-2222-4222-8222-222222222222";
 const candidateObjectKey = `immutable/${workspaceKey}/${workspaceKey}/collections/${collectionId}/${"b".repeat(64)}/candidate-world.json`;
 
@@ -54,6 +55,7 @@ describe("Foundation world lifecycle store", () => {
       expectedCurrentManifest: null,
       expectedCurrentRevision: 0,
       reason: "Human review passed",
+      sourceDocumentIds,
     };
     expect(validatePromoteWorldMutation(mutation)).toBe(true);
     expect(
@@ -65,6 +67,38 @@ describe("Foundation world lifecycle store", () => {
         ),
       })
     ).toBe(false);
+    // A promotion that does not name its source documents cannot be currency-checked: refused.
+    for (const ids of [[], ["not/a document id"], undefined]) {
+      expect(validatePromoteWorldMutation({ ...mutation, sourceDocumentIds: ids as unknown as string[] })).toBe(false);
+    }
+  });
+
+  it("sends promotion through the source-currency transition and rollback through the unchanged one", async () => {
+    configure();
+    const fetchMock = vi.fn(async (url: string | URL | Request) =>
+      Response.json(String(url).includes("_current")
+        ? receipt("activate", manifestDigest, 1)
+        : receipt("rollback", manifestDigest, 2)));
+    vi.stubGlobal("fetch", fetchMock);
+    const base = { operationId, workspaceKey, collectionId, actorUserId, reason: "Human review passed" };
+    await promoteFoundationCandidate({ ...base, manifestDigest, candidateObjectKey, worldStateId: "ws_candidate_b",
+      coreOutputSha256: outputSha, expectedCurrentManifest: null, expectedCurrentRevision: 0, sourceDocumentIds });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/rpc\/transition_foundation_world_atomic_current$/);
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown[])[1] && ((fetchMock.mock.calls[0] as unknown[])[1] as RequestInit).body)).p_source_document_ids).toEqual(sourceDocumentIds);
+    await rollbackFoundationWorld({ ...base, targetManifestDigest: manifestDigest, expectedCurrentManifest: manifestDigest, expectedCurrentRevision: 1 });
+    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/rpc\/transition_foundation_world_atomic$/);
+    expect(JSON.parse(String(((fetchMock.mock.calls[1] as unknown[])[1] as RequestInit).body))).not.toHaveProperty("p_source_document_ids");
+  });
+
+  it.each([
+    ["world_source_revision_superseded", "WORLD_SOURCE_REVISION_SUPERSEDED"],
+    ["world_source_revision_ambiguous", "WORLD_SOURCE_REVISION_AMBIGUOUS"],
+  ])("maps the transition's %s refusal", async (message, code) => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ message }, { status: 400 })));
+    await expect(promoteFoundationCandidate({ operationId, workspaceKey, collectionId, manifestDigest, candidateObjectKey,
+      worldStateId: "ws_candidate_b", coreOutputSha256: outputSha, actorUserId, expectedCurrentManifest: null,
+      expectedCurrentRevision: 0, reason: "Human review passed", sourceDocumentIds })).resolves.toEqual({ ok: false, code });
   });
 
   it("sends promotion through the service-only RPC without exposing the service key", async () => {
@@ -103,6 +137,7 @@ describe("Foundation world lifecycle store", () => {
         expectedCurrentManifest: null,
         expectedCurrentRevision: 0,
         reason: "Human review passed",
+        sourceDocumentIds,
       })
     ).resolves.toEqual({
       ok: true,
@@ -186,6 +221,7 @@ describe("Foundation world lifecycle store", () => {
         expectedCurrentManifest: null,
         expectedCurrentRevision: 0,
         reason: "Human review passed",
+        sourceDocumentIds,
       })
     ).resolves.toEqual({ ok: false, code: "WORLD_STORE_WRITE_FAILED" });
   });

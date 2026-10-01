@@ -34,6 +34,10 @@ it("writes nothing more and names the refusal when another revision became lates
   expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code: "CONNECTOR_SOURCE_REVISION_CONTESTED" });
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
+it.each([["CONNECTOR_BINDING_CONFLICT"], ["CONNECTOR_BINDING_IDENTITY_MISMATCH"]])("names the writer's %s refusal", async code => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(Response.json({ code: "P0001", message: code }, { status: 400 })));
+  expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code });
+});
 it("fails closed on an unknown RPC outcome", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json(true)).mockResolvedValueOnce(Response.json("maybe")));
   expect(await recordConnectorDocumentBinding(input)).toEqual({ ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" });

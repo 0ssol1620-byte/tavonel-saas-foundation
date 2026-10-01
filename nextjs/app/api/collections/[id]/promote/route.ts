@@ -290,9 +290,12 @@ export async function POST(
     expectedCurrentManifest,
     expectedCurrentRevision,
     reason,
+    sourceDocumentIds: sourceDocuments.map((item) => item.documentId as string),
   });
   if (!promoted.ok) {
     const status =
+      promoted.code === "WORLD_SOURCE_REVISION_SUPERSEDED" ||
+      promoted.code === "WORLD_SOURCE_REVISION_AMBIGUOUS" ||
       promoted.code === "ACTIVE_WORLD_CONFLICT" ||
       promoted.code === "WORLD_TRANSITION_IDEMPOTENCY_CONFLICT" ||
       promoted.code === "WORLD_VERSION_BINDING_CONFLICT"

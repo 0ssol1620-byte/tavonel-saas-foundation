@@ -67,7 +67,13 @@ export async function recordConnectorDocumentBinding(input: SourceInput & {
     const write = await supabaseAdminRequest(config, "/rest/v1/rpc/record_connector_document_binding_after", {
       method: "POST", body: JSON.stringify({ p_binding: row, p_expected_latest_source_version_ids: [...expected].sort() }),
     });
-    if (!write.ok) return { ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" };
+    if (!write.ok) {
+      // The writer compares a replay with the stored binding before any side effect and names the refusal.
+      const refusal = await write.text().catch(() => "");
+      if (refusal.includes("CONNECTOR_BINDING_CONFLICT")) return { ok: false, code: "CONNECTOR_BINDING_CONFLICT" };
+      if (refusal.includes("CONNECTOR_BINDING_IDENTITY_MISMATCH")) return { ok: false, code: "CONNECTOR_BINDING_IDENTITY_MISMATCH" };
+      return { ok: false, code: "CONNECTOR_BINDING_WRITE_FAILED" };
+    }
     const outcome: unknown = await write.json();
     // Another revision of this source was bound after this import's snapshot. Retrying re-reads the
     // latest binding and the provider's current revision; nothing was written.
