@@ -152,6 +152,62 @@ Received by a new Claude session; the prior owned session exited. Scope: recover
   - All six exact-head runs for `ac1e0b2` are terminal success: **batch qualified on hosted CI**, within the stated coverage limits.
 - The prior `86c56f1` UI timeout remains **undiagnosed**; a successful retry is not a diagnosis.
 
+## Next bounded slice: Dropbox still-current revision check (2026-10-01, local, in progress)
+
+- Base: published `2cff277` (code qualified at `ac1e0b2`).
+- Scope, K02/K03 (connector revision currency):
+  - Dropbox `observeSourceVersion` currently returns `null`, so a stale or replayed listed `rev` can be bound after a newer one.
+  - Add a still-current check before binding, using Dropbox's official `files/get_metadata`. A rev differing from current is refused, both before and after the pinned download.
+- Keep unchanged:
+  - `rev:` download pinning, id/rev/content_hash integrity checks.
+  - ACL, tombstone and immutable-history invariants.
+  - No rev chronology is inferred or compared; only equality with the provider's current rev is checked.
+- Constraints:
+  - Synthetic responses and official contract only; no OAuth credentials and no production calls.
+  - Google monotonic/current selection is deferred to a separate assessment.
+- Untouched: Core (private), cost controls, the local-only vendor cost report.
+
+### Implementation (local, before publication)
+
+- Inspected guard/import code:
+  - `source-version-guard.ts` `observeSourceVersion` returned `null` for Dropbox.
+  - `source-import.ts` ran only `verifyDropboxSource` for Dropbox. That check pins the `rev:` download and verifies `dropbox-api-result` id/rev/size/content_hash. There was no before/after currency read.
+  - Listing (`listDropbox`) supplies `rev` and an `id:`; the download is `POST content.dropboxapi.com/2/files/download` with `{path:"rev:<rev>"}`.
+- `lib/source-version-guard.ts`, new `observeDropboxVersion`:
+  - Official `POST https://api.dropboxapi.com/2/files/get_metadata` with `{path:"id:…", include_deleted:false}`, through `safeFetch` (api origin, `/2/files/`, no redirects, 32 KiB, 8 s).
+  - Requires `.tag:"file"`, the same `id`, a well-formed `rev`, `is_downloadable` not false, an integer `size` and a 64-hex `content_hash`.
+  - The listed rev must **equal** the current rev, else `SOURCE_REVISION_MISMATCH`. Revs are never ordered.
+  - A 409 `path/not_found` gives `SOURCE_REVISION_MISMATCH`. Any other 409 or non-200 gives `SOURCE_VERSION_READ_FAILED`. Malformed rows give `SOURCE_REVISION_UNQUALIFIED`.
+  - A non-`id:` native id is refused before any request.
+  - Observation `algorithm:"dropbox"`: `verifySourceVersion` checks bytes with the existing Dropbox block-hash (`dropboxContentHash`).
+- `lib/source-import.ts`: Dropbox now runs the same pre-download observation and post-download re-observation plus `verifySourceVersion` as Google/Graph, **after** the unchanged `verifyDropboxSource`. Binding, intake and compute happen only after both pass.
+- Unchanged:
+  - `rev:` pinning and download egress policy.
+  - Deterministic identity.
+  - `recordConnectorDocumentBinding` immutability, ACL/tombstone checks, history.
+  - Google/Graph paths.
+  - No DB migration.
+- Tests (synthetic responses shaped to the documented contracts; mocks, not live Dropbox):
+  - `source-import.test.ts`:
+    - binds when current before and after, asserting request order metadata → pinned download → metadata, the metadata body and `rev:` pin;
+    - pinned result naming another rev is refused;
+    - stale listed rev refused before download (one request, no download);
+    - superseded during download refused;
+    - deleted before/during download refused;
+    - 503 and other path errors fail closed;
+    - none of the refusals binds, reserves intake or reserves compute.
+  - `source-version-guard.test.ts`: observation shape, hash binding to bytes, eight refusal shapes, non-`id:` refused with zero requests.
+  - `connector-provider-isolation.test.ts`: Dropbox metadata only to `api.dropboxapi.com/2/files/get_metadata` with the Dropbox token.
+- Local results (Windows 10, Node v22.14.0):
+  - Focused: 4 files, 50 pass.
+  - Related `lib/{connector,sync-worker,source,customer-source,google-drive,dropbox,collection,compile}*`: 59 files, 730 pass / 1 fail. The failure is the pre-existing `source-agent-runtime` Python `test_symlinks_not_collected` `WinError 1314`.
+  - `tsc --noEmit`, ESLint (5 files), `pnpm check`, `pnpm scan:secrets`: pass/clean.
+- Residuals:
+  - A race remains between the post-download read and the binding write (no provider-side lock exists).
+  - `recorded_at` is still commit order.
+  - Google monotonic/current selection, Graph eTag reconciliation and latest-revision replacement remain open.
+  - Live Dropbox not exercised.
+
 ## Side task: vendor compute cost check (2026-10-01, redacted)
 
 - A bounded, read-only check of the GPU vendor account was done after the qualification passed, using only the already-authorized connector.

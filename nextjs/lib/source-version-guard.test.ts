@@ -49,4 +49,34 @@ describe("source version observations around download", () => {
     await expect(observeSourceVersion("microsoft_graph", { ...item, revision: graph.eTag }, {}, "token", vi.fn().mockResolvedValue(Response.json(unsupported))))
       .rejects.toThrow("SOURCE_REVISION_UNQUALIFIED");
   });
+  const dropboxItem = { ...item, nativeId: "id:file", revision: "a1c10ce0dd78" };
+  const dropbox = { ".tag": "file", id: "id:file", rev: "a1c10ce0dd78", size: 3,
+    content_hash: "4f8b42c22dd3729b519ba6f68d2da7cc5b2d606d05daed5ad5128cc03e6c6358", is_downloadable: true };
+  it("reads the current Dropbox revision and binds its content hash to bytes", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json(dropbox));
+    const observed = await observeSourceVersion("dropbox", dropboxItem, {}, "token", fetcher);
+    expect(observed).toEqual({ id: "id:file", version: "a1c10ce0dd78", contentTag: null, mimeType: "", size: 3, hash: dropbox.content_hash, algorithm: "dropbox" });
+    expect(fetcher.mock.calls[0][0]).toBe("https://api.dropboxapi.com/2/files/get_metadata");
+    expect(verifySourceVersion(observed, observed, new TextEncoder().encode("abc"))).toBeNull();
+    expect(verifySourceVersion(observed, observed, new TextEncoder().encode("abd"))).toBe("SOURCE_CONTENT_HASH_MISMATCH");
+    expect(verifySourceVersion(observed, { ...observed!, version: "b2d20ce0dd79" }, new TextEncoder().encode("abc"))).toBe("SOURCE_REVISION_MISMATCH");
+  });
+  it.each([
+    ["a different current revision", { rev: "b2d20ce0dd79" }, "SOURCE_REVISION_MISMATCH"],
+    ["another file id", { id: "id:other" }, "SOURCE_REVISION_MISMATCH"],
+    ["a folder", { ".tag": "folder" }, "SOURCE_REVISION_MISMATCH"],
+    ["a non-downloadable file", { is_downloadable: false }, "SOURCE_REVISION_UNQUALIFIED"],
+    ["a missing content hash", { content_hash: undefined }, "SOURCE_REVISION_UNQUALIFIED"],
+    ["a malformed content hash", { content_hash: "abc" }, "SOURCE_REVISION_UNQUALIFIED"],
+    ["a malformed revision", { rev: "rev with spaces" }, "SOURCE_REVISION_UNQUALIFIED"],
+    ["a non-integer size", { size: "3" }, "SOURCE_REVISION_UNQUALIFIED"],
+  ] as const)("refuses Dropbox metadata naming %s", async (_label, change, code) => {
+    await expect(observeSourceVersion("dropbox", dropboxItem, {}, "token", vi.fn().mockResolvedValue(Response.json({ ...dropbox, ...change }))))
+      .rejects.toThrow(code);
+  });
+  it("refuses a Dropbox item without a stable id path before any request", async () => {
+    const fetcher = vi.fn();
+    await expect(observeSourceVersion("dropbox", { ...dropboxItem, nativeId: "/folder/file.pdf" }, {}, "token", fetcher)).rejects.toThrow("SOURCE_REVISION_UNQUALIFIED");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });

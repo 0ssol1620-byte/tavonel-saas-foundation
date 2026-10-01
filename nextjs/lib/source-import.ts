@@ -116,15 +116,16 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   if (!body.ok) return { ok: false, nativeId: item.nativeId, code: body.code };
   const bytes = body.bytes;
   if (context.provider === "dropbox") {
+    // The pinned `rev:` download proves these bytes are the listed revision...
     const rejected = verifyDropboxSource(source, bytes, item);
     if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
-  } else {
-    try {
-      const current = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher);
-      const rejected = verifySourceVersion(observedVersion, current, bytes);
-      if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
-    } catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
   }
+  // ...and the before/after current-version reads prove it was still current across the download.
+  try {
+    const current = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher);
+    const rejected = verifySourceVersion(observedVersion, current, bytes);
+    if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+  } catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
   // at-least-once retry re-imports rather than duplicates.

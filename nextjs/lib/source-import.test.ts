@@ -74,24 +74,72 @@ describe("source import replay safety", () => {
     expect(reserveFoundationIntake).not.toHaveBeenCalled();
     expect(reserveFoundationCompute).not.toHaveBeenCalled();
   });
-  it.each([false, true])("binds a Dropbox revision before intake (matching=%s)", async matching => {
-    const bytes = new TextEncoder().encode("abc");
-    const fetcher = vi.fn().mockResolvedValue(new Response(bytes, { headers: {
-      "Dropbox-API-Result": JSON.stringify({ id: "id:file", rev: matching ? "a1c10ce0dd78" : "newer", size: 3,
-        content_hash: "4f8b42c22dd3729b519ba6f68d2da7cc5b2d606d05daed5ad5128cc03e6c6358" }),
-    } }));
-    const result = await importSourceObject({ workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
-      connectionId: "22222222-2222-4222-8222-222222222222", provider: "dropbox", accessToken: "access", target: {},
-      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher },
-    { nativeId: "id:file", name: "file.pdf", revision: "a1c10ce0dd78", mimeType: "application/pdf", sizeBytes: 3, modifiedAt: null, kind: "file" });
-    expect(JSON.parse(fetcher.mock.calls[0][1].headers.get("Dropbox-API-Arg"))).toEqual({ path: "rev:a1c10ce0dd78" });
-    expect(result.ok).toBe(matching);
-    if (matching) expect(recordConnectorDocumentBinding).toHaveBeenCalledOnce();
-    else {
-      expect(result).toMatchObject({ code: "SOURCE_REVISION_MISMATCH" });
-      expect(recordConnectorDocumentBinding).not.toHaveBeenCalled();
-      expect(reserveFoundationIntake).not.toHaveBeenCalled();
-    }
+  // Synthetic responses shaped by Dropbox's documented `files/get_metadata` and `files/download` contracts.
+  const ABC_HASH = "4f8b42c22dd3729b519ba6f68d2da7cc5b2d606d05daed5ad5128cc03e6c6358";
+  const dropboxFile = (rev: string) => ({ ".tag": "file", id: "id:file", name: "file.pdf", rev, size: 3, content_hash: ABC_HASH, is_downloadable: true });
+  function dropbox(currentRevs: Array<string | Response>, downloadRev = "a1c10ce0dd78") {
+    const metadata = [...currentRevs];
+    return vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "https://api.dropboxapi.com/2/files/get_metadata") {
+        const next = metadata.shift();
+        if (next === undefined) throw new Error("unexpected metadata read");
+        return typeof next === "string" ? Response.json(dropboxFile(next)) : next;
+      }
+      if (url === "https://content.dropboxapi.com/2/files/download") return new Response(new TextEncoder().encode("abc"), { headers: {
+        "Dropbox-API-Result": JSON.stringify({ id: "id:file", rev: downloadRev, size: 3, content_hash: ABC_HASH }) } });
+      throw new Error(`unexpected request ${url}`);
+    });
+  }
+  const importDropbox = (fetcher: ReturnType<typeof dropbox>) => importSourceObject({ workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
+    connectionId: "22222222-2222-4222-8222-222222222222", provider: "dropbox", accessToken: "access", target: {},
+    signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher: fetcher as unknown as typeof fetch },
+  { nativeId: "id:file", name: "file.pdf", revision: "a1c10ce0dd78", mimeType: "application/pdf", sizeBytes: 3, modifiedAt: null, kind: "file" });
+  const expectNothingBound = () => {
+    expect(recordConnectorDocumentBinding).not.toHaveBeenCalled();
+    expect(reserveFoundationIntake).not.toHaveBeenCalled();
+    expect(reserveFoundationCompute).not.toHaveBeenCalled();
+  };
+
+  it("binds a Dropbox revision that is current before and after its pinned download", async () => {
+    const fetcher = dropbox(["a1c10ce0dd78", "a1c10ce0dd78"]);
+    const result = await importDropbox(fetcher);
+    expect(result.ok).toBe(true);
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual(["https://api.dropboxapi.com/2/files/get_metadata",
+      "https://content.dropboxapi.com/2/files/download", "https://api.dropboxapi.com/2/files/get_metadata"]);
+    const [, metadataInit] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(metadataInit.body))).toEqual({ path: "id:file", include_deleted: false });
+    const [, downloadInit] = fetcher.mock.calls[1] as unknown as [string, RequestInit];
+    expect(JSON.parse((downloadInit.headers as Headers).get("Dropbox-API-Arg")!)).toEqual({ path: "rev:a1c10ce0dd78" });
+    expect(recordConnectorDocumentBinding).toHaveBeenCalledOnce();
+    expect(recordConnectorDocumentBinding.mock.calls[0][0]).toMatchObject({ provider: "dropbox", nativeId: "id:file", revision: "a1c10ce0dd78" });
+  });
+  it("refuses a pinned download whose result names another revision", async () => {
+    const result = await importDropbox(dropbox(["a1c10ce0dd78", "a1c10ce0dd78"], "newer"));
+    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expectNothingBound();
+  });
+  it("refuses a stale listed Dropbox revision before downloading it", async () => {
+    const fetcher = dropbox(["b2d20ce0dd79"]);
+    const result = await importDropbox(fetcher);
+    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expectNothingBound();
+  });
+  it("refuses a Dropbox revision superseded during its download", async () => {
+    const result = await importDropbox(dropbox(["a1c10ce0dd78", "b2d20ce0dd79"]));
+    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expectNothingBound();
+  });
+  it.each([
+    ["deleted before download", [Response.json({ error_summary: "path/not_found/.", error: { ".tag": "path", path: { ".tag": "not_found" } } }, { status: 409 })], "SOURCE_REVISION_MISMATCH"],
+    ["deleted during download", ["a1c10ce0dd78", Response.json({ error_summary: "path/not_found/.", error: { ".tag": "path", path: { ".tag": "not_found" } } }, { status: 409 })], "SOURCE_REVISION_MISMATCH"],
+    ["unreadable metadata", [new Response("unavailable", { status: 503 })], "SOURCE_VERSION_READ_FAILED"],
+    ["other path error", [Response.json({ error_summary: "path/restricted_content/.", error: { ".tag": "path", path: { ".tag": "restricted_content" } } }, { status: 409 })], "SOURCE_VERSION_READ_FAILED"],
+  ] as const)("fails closed when the Dropbox file is %s", async (_label, responses, code) => {
+    const result = await importDropbox(dropbox([...responses]));
+    expect(result).toMatchObject({ ok: false, code });
+    expectNothingBound();
   });
   it("does not admit or upload a source whose stream fails", async () => {
     const fetcher = vi.fn(async () => new Response(new ReadableStream({
