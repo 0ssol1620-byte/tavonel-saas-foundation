@@ -39,6 +39,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      # Manual run 36803612422 failed on a fresh runner: right after the image pull, Docker could
+      # not bind 0.0.0.0:54322 ("address already in use"), before any SQL ran. The socket's owner
+      # was not recorded, so the cause is unproven. Hypothesis: 54320-54329 lie inside Linux's
+      # default ephemeral range (32768-60999), so an earlier outbound connection on this runner
+      # (checkout, the parallel layer pull) may be handed one as its source port. Mitigation:
+      # exclude them from automatic source-port allocation, on GitHub-hosted disposable runners
+      # only, appending to (never replacing) any existing reservation. Explicit binds (the local
+      # stack) still work. The CLI default ports stay, because real-auth-ci-contract.mjs accepts
+      # only them. Nothing is stopped or killed; `ss` records any holder before the bind.
+      - name: Keep the local stack ports out of this runner's ephemeral range
+        run: |
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          key=/proc/sys/net/ipv4/ip_local_reserved_ports
+          before="$(cat "$key")"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${before:+$before,}54320-54329"
+          after="$(cat "$key")"
+          echo "reserved before='$before' after='$after'"
+          covered() { echo "$after" | tr ',' '\n' | awk -F- -v p="$1" 'NF { hi = ($2 == "" ? $1 : $2); if (p >= $1 && p <= hi) f = 1 } END { exit !f }'; }
+          for port in $(seq 54320 54329) $(echo "$before" | tr ',-' '  '); do covered "$port"; done
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
+
       - uses: actions/checkout@v4
 
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
@@ -90,6 +111,8 @@ jobs:
             version="$(basename "$file" | sed -E 's/^([0-9]+)_.*/\1/')"
             if [ "$version" \> "$HISTORY_BOUNDARY" ]; then mv "$file" /tmp/deferred-migrations/; fi
           done
+          # Evidence only: any socket still holding a stack port is printed before the bind.
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
           supabase db start
           eval "$(supabase status --output env | grep '^DB_URL=')"
           psql "$DB_URL" -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" \
@@ -206,6 +229,19 @@ jobs:
     env:
       SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
     steps:
+      # Same hypothesis-driven ephemeral-port exclusion as db-rehearsal (see there);
+      # `supabase start` binds 54321-54329.
+      - name: Keep the local stack ports out of this runner's ephemeral range
+        run: |
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          key=/proc/sys/net/ipv4/ip_local_reserved_ports
+          before="$(cat "$key")"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${before:+$before,}54320-54329"
+          after="$(cat "$key")"
+          echo "reserved before='$before' after='$after'"
+          covered() { echo "$after" | tr ',' '\n' | awk -F- -v p="$1" 'NF { hi = ($2 == "" ? $1 : $2); if (p >= $1 && p <= hi) f = 1 } END { exit !f }'; }
+          for port in $(seq 54320 54329) $(echo "$before" | tr ',-' '  '); do covered "$port"; done
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
@@ -243,6 +279,7 @@ jobs:
           assert count == 1, 'Expected the pinned CLI default Auth lifetime field'
           config.write_text(updated)
           PY
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
           supabase start
           supabase status --output json > "$RUNNER_TEMP/tavonel-auth-status.json"
           chmod 600 "$RUNNER_TEMP/tavonel-auth-status.json"
