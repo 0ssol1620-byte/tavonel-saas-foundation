@@ -89,7 +89,7 @@ async function observeDropboxVersion(item: OAuthSourceItem, accessToken: string,
       const error = object(object(JSON.parse(response.text)).error);
       notFound = error[".tag"] === "path" && object(error.path)[".tag"] === "not_found";
     } catch { notFound = false; }
-    throw new Error(notFound ? "SOURCE_REVISION_MISMATCH" : "SOURCE_VERSION_READ_FAILED");
+    throw new Error(notFound ? "SOURCE_REVISION_SUPERSEDED" : "SOURCE_VERSION_READ_FAILED");
   }
   if (!response.ok || response.status !== 200) throw new Error("SOURCE_VERSION_READ_FAILED");
   let row: Record<string, unknown>;
@@ -99,7 +99,9 @@ async function observeDropboxVersion(item: OAuthSourceItem, accessToken: string,
     || !Number.isSafeInteger(row.size) || (row.size as number) < 0) throw refused();
   const hash = digest(row.content_hash, 64);
   if (!hash) throw refused();
-  if (row.rev !== item.revision) throw new Error("SOURCE_REVISION_MISMATCH");
+  // The provider names a different current revision of the same file: the listed one is superseded.
+  // Its change feed reports that newer revision (or the deletion) after this page's cursor.
+  if (row.rev !== item.revision) throw new Error("SOURCE_REVISION_SUPERSEDED");
   return { id: item.nativeId, version: row.rev, contentTag: null, mimeType: "", size: row.size as number, hash, algorithm: "dropbox" };
 }
 

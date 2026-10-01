@@ -62,7 +62,7 @@ describe("source version observations around download", () => {
     expect(verifySourceVersion(observed, { ...observed!, version: "b2d20ce0dd79" }, new TextEncoder().encode("abc"))).toBe("SOURCE_REVISION_MISMATCH");
   });
   it.each([
-    ["a different current revision", { rev: "b2d20ce0dd79" }, "SOURCE_REVISION_MISMATCH"],
+    ["a different current revision", { rev: "b2d20ce0dd79" }, "SOURCE_REVISION_SUPERSEDED"],
     ["another file id", { id: "id:other" }, "SOURCE_REVISION_MISMATCH"],
     ["a folder", { ".tag": "folder" }, "SOURCE_REVISION_MISMATCH"],
     ["a non-downloadable file", { is_downloadable: false }, "SOURCE_REVISION_UNQUALIFIED"],

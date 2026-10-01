@@ -122,18 +122,18 @@ describe("source import replay safety", () => {
   it("refuses a stale listed Dropbox revision before downloading it", async () => {
     const fetcher = dropbox(["b2d20ce0dd79"]);
     const result = await importDropbox(fetcher);
-    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_SUPERSEDED" });
     expect(fetcher).toHaveBeenCalledOnce();
     expectNothingBound();
   });
   it("refuses a Dropbox revision superseded during its download", async () => {
     const result = await importDropbox(dropbox(["a1c10ce0dd78", "b2d20ce0dd79"]));
-    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expect(result).toMatchObject({ ok: false, code: "SOURCE_REVISION_SUPERSEDED" });
     expectNothingBound();
   });
   it.each([
-    ["deleted before download", [Response.json({ error_summary: "path/not_found/.", error: { ".tag": "path", path: { ".tag": "not_found" } } }, { status: 409 })], "SOURCE_REVISION_MISMATCH"],
-    ["deleted during download", ["a1c10ce0dd78", Response.json({ error_summary: "path/not_found/.", error: { ".tag": "path", path: { ".tag": "not_found" } } }, { status: 409 })], "SOURCE_REVISION_MISMATCH"],
+    ["deleted before download", [Response.json({ error_summary: "path/not_found/.", error: { ".tag": "path", path: { ".tag": "not_found" } } }, { status: 409 })], "SOURCE_REVISION_SUPERSEDED"],
+    ["deleted during download", ["a1c10ce0dd78", Response.json({ error_summary: "path/not_found/.", error: { ".tag": "path", path: { ".tag": "not_found" } } }, { status: 409 })], "SOURCE_REVISION_SUPERSEDED"],
     ["unreadable metadata", [new Response("unavailable", { status: 503 })], "SOURCE_VERSION_READ_FAILED"],
     ["other path error", [Response.json({ error_summary: "path/restricted_content/.", error: { ".tag": "path", path: { ".tag": "restricted_content" } } }, { status: 409 })], "SOURCE_VERSION_READ_FAILED"],
   ] as const)("fails closed when the Dropbox file is %s", async (_label, responses, code) => {

@@ -208,6 +208,37 @@ Received by a new Claude session; the prior owned session exited. Scope: recover
   - Google monotonic/current selection, Graph eTag reconciliation and latest-revision replacement remain open.
   - Live Dropbox not exercised.
 
+### Published
+
+- Commit `ee38efd6db42badf46de25b3aea4450403fb3de1` fast-forwarded `2cff277..ee38efd` to PR #141. The remote SHA was verified.
+- Exact-head PR CI is being watched to terminal.
+- No manual real-Auth dispatch: that journey does not exercise Dropbox import.
+- `ee38efd` CI at last query: PR CI `36799683011` (Linux Vitest/check/build), CodeQL `36799682996`, DB rehearsal `36799683020` and malware-scan `36799682983` all success. Launch QA `36799683027` in progress.
+
+### Follow-up defect found in `ee38efd` (local fix, uncommitted)
+
+- **Defect: liveness.** Sync pages are stored snapshots per `(job, provider cursor)` (`connector-sync-page.ts`), and a retry reuses the stored page. `ee38efd` returns `SOURCE_REVISION_MISMATCH` for a Dropbox entry whose rev was superseded. That code is a retry outcome in `sync-worker.ts`, so a page containing a file edited after listing would be refused on every retry and the sync could never pass it.
+- **Fix.**
+  - Dropbox now returns a distinct `SOURCE_REVISION_SUPERSEDED` only when the provider affirmatively names a different current rev for the same `id:`, or answers `path/not_found`.
+  - `sync-worker.ts` adds that code to the permanent skips: the item is skipped and counted, and the cursor advances. Nothing is bound.
+  - The provider change feed reports the newer revision (or the deletion, which takes the existing tombstone path) after this page's cursor.
+- **Kept as retry:** foreign id or folder, pinned-download rev mismatch, content-hash mismatch, and unreadable metadata stay `SOURCE_REVISION_MISMATCH` / `SOURCE_CONTENT_HASH_MISMATCH` / `SOURCE_VERSION_READ_FAILED`.
+- **Google/Graph** are unchanged. They have the same stored-page liveness exposure for superseded revisions; it is recorded as open for the separate Google/Graph assessment.
+- **Tests:** sync-worker "superseded is skipped and the cursor advances" plus "unexplained mismatch still retries"; updated Dropbox import/guard expectations.
+- **Local results:** 4 files, 85 pass. `tsc` and ESLint pass.
+
+## Next bounded slice (planned, 2026-10-01): concurrent binding currency (K02/K03)
+
+- **Gap.** Provider currency checks around the download leave a window between the post-download read and the binding insert. If import A (rev1) passes its post-check, then rev2 appears and import B binds it, A's later insert gets a later `recorded_at`. rev1 then becomes "latest" for compile selection.
+- **Design.** Optimistic compare-and-set on the per-source latest binding, ordered only by the database:
+  - The import reads the source's latest binding id (`order=recorded_at.desc`) **before** its pre-download provider read.
+  - A new RPC inserts only if, under a per-source transaction advisory lock, the latest binding is still that id. Otherwise it returns `contested` and nothing is written.
+  - An already-recorded identical version is a replay and never moves latest.
+  - `recorded_at` is `clock_timestamp()` taken after the lock, so DB order equals lock order.
+  - The tombstone/connection triggers still apply.
+- No provider timestamps or rev ordering are used.
+- **Qualification.** Unit tests; migration via the DB rehearsal workflow; actual-service assertions added to the existing `local-source-revision.integration.test.ts` run by the hosted real-Auth job.
+
 ## Side task: vendor compute cost check (2026-10-01, redacted)
 
 - A bounded, read-only check of the GPU vendor account was done after the qualification passed, using only the already-authorized connector.
