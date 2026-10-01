@@ -120,3 +120,42 @@ Received by a new Claude session; the prior owned session exited. Scope: recover
 - Local validation (Windows, Node v22.14.0): `node --check` pass; contract + stop-owned-child tests 10 → 8 pass / 0 fail / 2 pre-existing platform skips; ESLint pass; `pnpm scan:secrets` clean. The diagnostics themselves only execute on hosted CI.
 - Pending (needs one-time approval): commit/push to PR #141 branch and one manual `db-rehearsal.yml` dispatch for that new head. Launch QA `36794616444` for `86c56f1` still being watched.
 - All exact-head runs for `86c56f1` now terminal: Launch QA `36794616444` **success**, CI `36794616259` success, PR DB rehearsal `36794618546` success, CodeQL success, malware-scan success; manual DB/Auth `36794635686` failure (above). Batch qualification for `86c56f1` is therefore **not achieved** solely because of the manual real-Auth step; acceptance totals unchanged (2 / 36 / 11 / 6).
+
+### Diagnostic head published (2026-10-01)
+
+- Commit `ac1e0b25f5e36650154141d2a958f80141b934c0` (only `real-auth-ci-journey.mjs` + this checkpoint) fast-forwarded `86c56f1..ac1e0b2` to `transport` `codex/masterplan-checkpoint-2026-09-30` (PR #141); `git ls-remote` confirms the exact SHA.
+- One manual `db-rehearsal.yml` dispatch on that head: run `36796633995` (queued 00:31:48Z). Lineage not claimed until its ledger shows `sourceRevisionLineageVerified=true`.
+- Parent independently verified the `86c56f1` ledger artifact `11133516994` (15 genuine Auth assertions, then the 30 s Next response timeout; `hydratedReviewPublishVerified=false`, `sourceRevisionLineageVerified=false`). `36794635686` is terminal failed. Run `36796633995` is the current qualification. Provider chronology and latest-revision replacement remain open gaps (see the provider-ordering assessment above), independent of this run's outcome.
+
+### Manual DB/Auth run `36796633995` result (head `ac1e0b2`, queried by this session)
+
+- Conclusion **success**: `db-rehearsal` (job `110161471000`) success, `Real local Auth journey` (job `110161471104`) success.
+- Redacted ledger, artifact `real-auth-journey-ac1e0b2…`. Count-only scan found 0 JWTs, 0 `sb_` keys, 0 `service_role`, 0 token fields; the single `password` hit is the assertion label.
+- Ledger fields:
+  - `success=true`, `foundationCommit=ac1e0b25f5e36650154141d2a958f80141b934c0`, `stage=source-revision-lineage`, `failure` absent.
+  - 62 assertions (46 distinct).
+  - `goTrueExecuted`, `selectedRevisionUiVerified`, `hydratedReviewPublishVerified` and **`sourceRevisionLineageVerified` all true**.
+  - `googleOAuthVerified`, `productionAuthCookieUsed` and `productionSourceAdmissionVerified` all false.
+  - `nextMode=production`, Chromium 151.0.7922.34, `supabase/gotrue:v2.196.0`, harness sha256 `ace074c1…1db9`.
+- Lineage criterion met on actual hosted Supabase PostgREST/PostgreSQL (disposable CI stack, synthetic governed workspace):
+  - "every actual-service source revision assertion ran";
+  - 8 actual-service assertions: r1 resolves; r2 supersedes before compile; current resolves to the same logical source; r1+r2 ambiguous; identical rebind does not restore latest; in-flight r3 refuses the post-dispatch recheck; historical bindings immutable and readable; provider deletion tombstones and refuses r4;
+  - 6 SQL checks: 3 bindings retained; 1 tombstone; overlay denies every revision; historical ACL version-bound, not leaking to current or across workspaces.
+- The `86c56f1` selected-revision timeout did **not** recur. Because this run succeeded, the new diagnostics captured nothing, so its cause stays **undiagnosed**: 2 of 4 hosted runs failed at the same first `inspect` call site, and the diagnostics will capture it if it recurs. No timeout was raised or masked, and no product change was made.
+- Not covered by this run: browser intake/upload/compile, Google OAuth, production cookie/admission, R2, CDR/OCR.
+- Still open: provider chronology (Dropbox current-rev check, Google monotonic version, Graph eTag), automatic latest-revision replacement on refresh (refresh refuses, it does not substitute), derived-cache revocation, and same-context API/MCP/CLI proof.
+- Acceptance totals are not changed by this session; K02/K03 remain partial.
+- Exact-head `ac1e0b2` CI at last query:
+  - PR CI `36796618407`, PR DB rehearsal `36796618375`, CodeQL `36796618391` and malware-scan `36796618378`: success.
+  - Manual DB/Auth `36796633995`: success.
+  - Launch QA `36796618352`: **success** (terminal).
+  - All six exact-head runs for `ac1e0b2` are terminal success: **batch qualified on hosted CI**, within the stated coverage limits.
+- The prior `86c56f1` UI timeout remains **undiagnosed**; a successful retry is not a diagnosis.
+
+## Side task: vendor compute cost check (2026-10-01, redacted)
+
+- A bounded, read-only check of the GPU vendor account was done after the qualification passed, using only the already-authorized connector.
+- No credentials were printed, and nothing was changed, stopped, deleted or funded.
+- Raw inventory, billing amounts and resource IDs are kept in a local untracked file only and are intentionally not recorded here.
+- Recent spend traced to a single burst on the GPU OCR serverless path. No ongoing charge was evidenced at read time. The callers of that path are unknown.
+- Candidates were noted locally but none was applied, and endpoint deletion is not authorized. A lower OCR worker maximum would only bound concurrency; it guarantees neither a proportional cost reduction nor unchanged behavior for callers. No saving or data-safety claim is made without caller/reference checks.
