@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
 import hmac
 import math
@@ -17,6 +18,7 @@ from time import monotonic
 from typing import Final, TypedDict
 
 import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
@@ -31,6 +33,8 @@ REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0
+# Native text boxes are mapped onto a square device this many units per side, then normalized.
+DEVICE_UNITS: Final = 100_000
 # Raster budgets, checked for every page that would be rasterized before any page is rendered.
 # Sizes are counted as the renderer allocates them: ceil(points * RENDER_SCALE) per side.
 MAX_RASTER_SIDE_PX: Final = 8192
@@ -451,8 +455,27 @@ def raster_page_regions(page, index: int, order: int) -> list[OcrRegion]:
     return regions
 
 
+def displayed_bounds(page, left: float, bottom: float, right: float, top: float) -> tuple[int, int, int, int] | None:
+    """A page-space rectangle as (left, top, right, bottom) on the displayed page, in DEVICE_UNITS.
+
+    Text rectangles are in PDF user space: they carry the MediaBox origin, ignore the CropBox and
+    are not rotated. PDFium's own page-to-device transform, the one the renderer uses, applies all
+    three, so native boxes land in the same frame as raster boxes and as the page a reader sees.
+    """
+    device_x, device_y = ctypes.c_int(), ctypes.c_int()
+    xs, ys = [], []
+    for x, y in ((left, bottom), (left, top), (right, bottom), (right, top)):
+        mapped = pdfium_c.FPDF_PageToDevice(
+            page.raw, 0, 0, DEVICE_UNITS, DEVICE_UNITS, 0, x, y, ctypes.byref(device_x), ctypes.byref(device_y)
+        )
+        if not mapped:
+            return None
+        xs.append(device_x.value)
+        ys.append(device_y.value)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
 def native_page_region(page, textpage, text: str, page_index: int, order: int) -> OcrRegion | None:
-    width, height = page.get_size()
     rectangle_count = textpage.count_rects()
     if rectangle_count < 1:
         return None
@@ -461,7 +484,8 @@ def native_page_region(page, textpage, text: str, page_index: int, order: int) -
     bottom = min(rectangle[1] for rectangle in rectangles)
     right = max(rectangle[2] for rectangle in rectangles)
     top = max(rectangle[3] for rectangle in rectangles)
-    bbox = normalized_bbox(left, height - top, right, height - bottom, width, height)
+    bounds = displayed_bounds(page, left, bottom, right, top)
+    bbox = None if bounds is None else normalized_bbox(*bounds, DEVICE_UNITS, DEVICE_UNITS)
     if bbox is None:
         return None
     return {

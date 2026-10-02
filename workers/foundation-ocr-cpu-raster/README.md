@@ -7,6 +7,9 @@ same pinned RapidOCR 3.9.2 models (three SHA256 digests) and the same signed req
 - `POST /v1/ocr`: HMAC-signed input digest, timestamp window and single-use request id; PDF only,
   18 MiB and 80 pages max. Pages with embedded text keep it; other pages are rasterized. Returns
   `tavonel.ocr_result.v2` with normalized `bbox1000` region geometry. All responses are `no-store`.
+- `bbox1000` frame: the displayed page, i.e. the CropBox rotated clockwise by `/Rotate`, origin at
+  the top left, for raster and native-text regions alike. Native text boxes are mapped there with
+  PDFium's own page-to-device transform; a mapping PDFium refuses yields no native region.
 - Raster bounds: before the first page is rendered, every page must have a finite, positive size,
   and every page without a text layer (the pages that would be rasterized) is sized as the renderer
   allocates it, `ceil(points * RENDER_SCALE)` per side at `RENDER_SCALE = 2`. Each side must be at
@@ -54,7 +57,19 @@ missing or has a different digest, or if loading changes the model directory (a 
   engines. It draws known text into pixels with Pillow and embeds that raster as the only content of
   a one-page PDF with no text layer, then confirms that PDFium finds no embedded text but renders
   visible ink. It then runs the real worker startup self-test and an authenticated `POST /v1/ocr`.
-  Its fixture check always runs.
+  Its fixture check always runs. It also places the same raster on pages with a nonzero-origin
+  MediaBox plus CropBox and with `/Rotate` 90, 180 and 270, and requires each known line's box to
+  contain the line's drawn ink box (from Pillow's `textbbox`, not from OCR) at IoU >= 0.5, and not to
+  match the other line.
+- `workers/foundation-ocr-cpu-raster/tests/test_cpu_raster_bbox_location.py`: location checks with
+  no OCR runtime. Native-text and filled-rectangle pages are drawn at known user-space coordinates on
+  upright, nonzero-origin MediaBox, CropBox, `/Rotate` 90/180/270 and combined pages; the expected
+  box comes from the PDF geometry rules in the test (and, for text, from the rendered ink too), and
+  the emitted box must overlap it at IoU >= 0.8 (native) or 0.9 (raster, via a stand-in reader that
+  reports the rendered ink). Boxes left in PDF user space are shown to fail the same check.
+
+CI: `.github/workflows/foundation-ocr-cpu-raster.yml` installs the pinned requirements on Linux,
+runs `materialize_models.py`, and fails if any test is skipped.
 
 The real qualification test calls `pytest.skip` with a specific reason, and never substitutes a fake
 result, when any of these prerequisites is missing: the pinned CPU runtime (an accelerator

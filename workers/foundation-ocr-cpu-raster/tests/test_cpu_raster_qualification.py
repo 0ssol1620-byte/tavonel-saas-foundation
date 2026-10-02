@@ -60,20 +60,61 @@ def serialize_pdf(objects: list[bytes]) -> bytes:
     return body + b"trailer << /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (size, xref)
 
 
-def image_only_pdf() -> bytes:
-    """One page whose only content is a grayscale raster of FIXTURE_LINES. No font, no text operators."""
+FIXTURE_FONT_SIZE = 56
+# Where each fixture line is drawn, in pixels of the upright displayed page.
+FIXTURE_ORIGINS = tuple((120, 220 + 140 * index) for index in range(len(FIXTURE_LINES)))
+# name -> (MediaBox, CropBox or None, /Rotate, image matrix). Each places the same upright raster so
+# that the displayed page (CropBox, rotated clockwise by /Rotate) is exactly that raster.
+PAGE_GEOMETRY = {
+    "upright": ((0, 0, 612, 792), None, 0, (612, 0, 0, 792, 0, 0)),
+    "nonzero-origin-cropbox": ((100, 50, 812, 942), (150, 100, 762, 892), 0, (612, 0, 0, 792, 150, 100)),
+    "rotate-90": ((0, 0, 792, 612), None, 90, (0, 612, -792, 0, 792, 0)),
+    "rotate-180": ((0, 0, 612, 792), None, 180, (-612, 0, 0, -792, 612, 792)),
+    "rotate-270": ((0, 0, 792, 612), None, 270, (0, -612, 792, 0, 0, 612)),
+}
+
+
+def fixture_raster_size() -> tuple[int, int]:
     width, height = (round(points * cpu.RENDER_SCALE) for points in PAGE_POINTS)
+    return width, height
+
+
+def drawn_line_bbox1000() -> dict[str, tuple[float, float, float, float]]:
+    """Each fixture line's ink box on the displayed page, from the drawing calls, not from OCR."""
+    width, height = fixture_raster_size()
+    draw = ImageDraw.Draw(Image.new("L", (width, height), 255))
+    font = ImageFont.load_default(size=FIXTURE_FONT_SIZE)
+    boxes = {}
+    for line, origin in zip(FIXTURE_LINES, FIXTURE_ORIGINS, strict=True):
+        left, top, right, bottom = draw.textbbox(origin, line, font=font)
+        boxes[line] = (1000 * left / width, 1000 * top / height, 1000 * right / width, 1000 * bottom / height)
+    return boxes
+
+
+def numbers(values) -> bytes:
+    return " ".join(str(value) for value in values).encode("ascii")
+
+
+def image_only_pdf(geometry: str = "upright") -> bytes:
+    """One page whose only content is a grayscale raster of FIXTURE_LINES. No font, no text operators."""
+    media_box, crop_box, rotate, matrix = PAGE_GEOMETRY[geometry]
+    width, height = fixture_raster_size()
     image = Image.new("L", (width, height), 255)
     draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default(size=56)
-    for index, line in enumerate(FIXTURE_LINES):
-        draw.text((120, 220 + 140 * index), line, fill=0, font=font)
+    font = ImageFont.load_default(size=FIXTURE_FONT_SIZE)
+    for line, origin in zip(FIXTURE_LINES, FIXTURE_ORIGINS, strict=True):
+        draw.text(origin, line, fill=0, font=font)
     pixels = zlib.compress(image.tobytes(), 9)
-    content = b"q %d 0 0 %d 0 0 cm /Im0 Do Q" % PAGE_POINTS
+    content = b"q %s cm /Im0 Do Q" % numbers(matrix)
+    page_geometry = b"/MediaBox [%s]" % numbers(media_box)
+    if crop_box:
+        page_geometry += b" /CropBox [%s]" % numbers(crop_box)
+    if rotate:
+        page_geometry += b" /Rotate %d" % rotate
     return serialize_pdf([
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] /Contents 4 0 R" % PAGE_POINTS
+        b"<< /Type /Page /Parent 2 0 R %s /Contents 4 0 R" % page_geometry
         + b" /Resources << /XObject << /Im0 5 0 R >> >> >>",
         b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
         b"<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceGray" % (width, height)
@@ -141,8 +182,67 @@ def require_qualification_runtime() -> None:
         )
 
 
-def test_synthetic_fixture_is_image_only_with_visible_ink() -> None:
-    assert_image_only_with_visible_ink(image_only_pdf())
+def iou(a, b) -> float:
+    width = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    height = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    overlap = width * height
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - overlap
+    return overlap / union if union > 0 else 0.0
+
+
+# A real detector pads its line boxes; 0.5 still separates a line from its neighbor (IoU 0).
+MIN_LINE_IOU = 0.5
+
+
+@pytest.mark.parametrize("geometry", PAGE_GEOMETRY)
+def test_synthetic_fixture_is_image_only_with_visible_ink(geometry: str) -> None:
+    payload = image_only_pdf(geometry)
+    assert_image_only_with_visible_ink(payload)
+    # Every geometry displays the same upright raster, so the drawn line boxes hold all its ink.
+    document = pdfium.PdfDocument(payload)
+    try:
+        page = document[0]
+        try:
+            image = cpu.render_page(page).convert("L")
+        finally:
+            page.close()
+    finally:
+        document.close()
+    assert image.size == fixture_raster_size()
+    left, top, right, bottom = image.point(lambda value: 255 if value < 128 else 0).getbbox()
+    ink = (1000 * left / image.width, 1000 * top / image.height, 1000 * right / image.width, 1000 * bottom / image.height)
+    drawn = drawn_line_bbox1000().values()
+    union = (min(b[0] for b in drawn), min(b[1] for b in drawn), max(b[2] for b in drawn), max(b[3] for b in drawn))
+    assert iou(ink, union) >= 0.95, (ink, union)
+
+
+@pytest.mark.parametrize("geometry", PAGE_GEOMETRY)
+def test_real_cpu_ocr_locates_each_known_line_on_the_displayed_page(
+    monkeypatch: pytest.MonkeyPatch, geometry: str
+) -> None:
+    require_qualification_runtime()
+    monkeypatch.setattr(cpu, "_self_test", {"state": "pending", "detail": None})
+    monkeypatch.setattr(cpu, "_general_rapidocr", None)
+    monkeypatch.setattr(cpu, "_korean_rapidocr", None)
+    cpu.warm_engines()
+    assert cpu._self_test == {"state": "passed", "detail": None}
+
+    _, page_count, regions = cpu.extract_text(image_only_pdf(geometry))
+
+    assert page_count == 1
+    drawn = drawn_line_bbox1000()
+    for line, box in drawn.items():
+        wanted = " ".join(line.split()).casefold()
+        matches = [region for region in regions if wanted in " ".join(region["text"].split()).casefold()]
+        assert len(matches) == 1, (geometry, line, regions)
+        x1, y1, x2, y2 = matches[0]["bbox1000"]
+        # The detector box holds the drawn ink (2/1000 for rounding), and is not much larger than it.
+        assert x1 <= box[0] + 2 and y1 <= box[1] + 2 and x2 >= box[2] - 2 and y2 >= box[3] - 2, (geometry, line)
+        assert iou(matches[0]["bbox1000"], box) >= MIN_LINE_IOU, (geometry, line, matches[0]["bbox1000"], box)
+        # Read at its own line, not at the other one.
+        for other, other_box in drawn.items():
+            if other != line:
+                assert iou(matches[0]["bbox1000"], other_box) < MIN_LINE_IOU, (geometry, line, other)
 
 
 def test_real_cpu_ocr_reads_a_synthetic_image_only_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
