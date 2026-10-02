@@ -25,7 +25,10 @@ type ReservationCode =
   | "MODEL_PROVIDER_RESERVATION_NOT_ACTIVE"
   | "MODEL_PROVIDER_RECONCILIATION_NOT_FOUND"
   | "MODEL_PROVIDER_RECONCILIATION_CONFLICT"
-  | "MODEL_PROVIDER_RESERVED_COST_EXCEEDED";
+  | "MODEL_PROVIDER_RESERVED_COST_EXCEEDED"
+  // Terminal replay of a queued reservation the sweep expired before admission. Also kept out of
+  // RESERVATION_CODES: only a fully validated `status: "expired"` receipt may produce it.
+  | "MODEL_PROVIDER_RESERVATION_EXPIRED";
 
 const RESERVATION_CODES = new Set<ReservationCode>([
   "MODEL_PROVIDER_RESERVATION_INVALID", "MODEL_PROVIDER_LEDGER_NOT_CONFIGURED",
@@ -106,8 +109,12 @@ export async function reserveModelProviderSpend(value: {
   }
   const status = receipt?.status;
   const queued = status === "queued";
+  // A queued request the sweep expired before admission replays as terminal: it was never
+  // admitted, so it carries no expiry, and it can only ever be a replay of an earlier request.
+  const expired = status === "expired";
   const expiresAt = typeof receipt?.expiresAt === "string" ? Date.parse(receipt.expiresAt) : NaN;
-  if (!receipt || (status !== "reserved" && !queued) || !UUID.test(String(receipt.reservationId ?? ""))
+  if (!receipt || (status !== "reserved" && !queued && !expired)
+    || !UUID.test(String(receipt.reservationId ?? ""))
     || receipt.tenantId !== value.tenantId || receipt.requestKey !== value.requestKey
     || receipt.requestDigest !== value.requestDigest || receipt.provider !== value.provider
     || receipt.model !== value.model || receipt.meter !== value.meter
@@ -115,9 +122,13 @@ export async function reserveModelProviderSpend(value: {
     || !Number.isSafeInteger(receipt.unitMicrousd) || Number(receipt.unitMicrousd) <= 0
     || receipt.reservedMicrousd !== value.reservedUnits * Number(receipt.unitMicrousd)
     || typeof receipt.priceVersion !== "string" || receipt.priceVersion.length < 2
-    || (queued ? receipt.expiresAt !== null : !Number.isFinite(expiresAt) || expiresAt <= Date.now()
-      || expiresAt > Date.now() + 901_000)) {
+    || (queued || expired ? receipt.expiresAt !== null : !Number.isFinite(expiresAt)
+      || expiresAt <= Date.now() || expiresAt > Date.now() + 901_000)
+    || (expired && receipt.idempotentReplay !== true)) {
     return { ok: false as const, code: "MODEL_PROVIDER_RESERVATION_RECEIPT_INVALID" as const };
+  }
+  if (expired) {
+    return { ok: false as const, code: "MODEL_PROVIDER_RESERVATION_EXPIRED" as const, receipt };
   }
   return { ok: true as const, dispatchAllowed: status === "reserved", receipt };
 }
