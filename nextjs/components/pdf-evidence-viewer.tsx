@@ -39,6 +39,9 @@ export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
     if (!canvas) return;
     canvas.width = 0;
     canvas.height = 0;
+    // The wiped canvas holds no finished render, so none may match again: without this, A -> B -> A
+    // (a scrollbar flapping the width) would revive A's "ready" over the blank canvas.
+    setRendered(null);
     if (width < 1 || !Number.isSafeInteger(page) || page < 1) return;
     let cancelled = false;
     let renderTask: { cancel: () => void } | null = null;

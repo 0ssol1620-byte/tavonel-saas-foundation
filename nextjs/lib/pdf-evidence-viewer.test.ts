@@ -279,6 +279,8 @@ function expectOnly(timeline: Observation[], outcome: Observation, superseded: O
 }
 
 const drain = () => new Promise(resolve => setTimeout(resolve, 0));
+// The viewer's ResizeObserver callback, so a test can change the measured width as the browser would.
+let resizeCallback: (() => void) | undefined;
 let unmountMounted: (() => void) | undefined;
 
 function mountViewer(initial: ViewerProps) {
@@ -323,6 +325,14 @@ function mountViewer(initial: ViewerProps) {
       else timeline.push(observe(tree, canvas));
       return timeline.at(-1);
     },
+    /** Changes the container width and fires the ResizeObserver, committing the new measurement. */
+    resize(width: number) {
+      const from = timeline.length;
+      container.clientWidth = width;
+      resizeCallback?.();
+      settle();
+      return from;
+    },
     unmount: () => instance.unmount(),
     updatesAfterUnmount: () => instance.updatesAfterUnmount,
   };
@@ -335,7 +345,11 @@ describe("PDF evidence viewer render interruption (deferred PDF.js fake, no DOM)
   beforeEach(() => {
     pdf.reset();
     vi.stubGlobal("window", { devicePixelRatio: 1 });
-    vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); disconnect = vi.fn(); });
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resizeCallback = callback; }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    });
   });
 
   afterEach(() => {
@@ -380,6 +394,23 @@ describe("PDF evidence viewer render interruption (deferred PDF.js fake, no DOM)
       expectOnly(view.timeline.slice(from), outcome, drawn(older));
     },
   );
+
+  // Scrollbar flapping: 400 -> 385 -> 400 before the 385 render (or a fresh 400 one) has finished.
+  it("returning to an earlier width never revives that width's finished render over the wiped canvas", async () => {
+    const view = mountViewer(older);
+    await rendering(1);
+    pdf.renders[0].finish();
+    expect(await view.flush()).toEqual(drawn(older));
+    view.resize(385);
+    expect(view.timeline.at(-1)).toEqual(waiting);
+    const from = view.resize(400);
+    // The canvas was wiped for 385; nothing may claim the 400 page is on screen until it is redrawn.
+    for (const seen of view.timeline.slice(from)) expect(seen).toEqual(waiting);
+    // The 385 request was superseded before it reached PDF.js; only the fresh 400 render remains.
+    await rendering(2);
+    pdf.renders[1].finish();
+    expect(await view.flush()).toEqual(drawn(older));
+  });
 
   it("unmounting while the document loads destroys the loading task and never renders", async () => {
     pdf.options.holdLoads = true;
