@@ -25,7 +25,7 @@ const root = mkdtempSync(path.join(tmpdir(), "tavonel-real-auth-"));
 const owner = "a1111111-1111-4111-8111-111111111111", workspace = "pilot-a111111111114111";
 const origin = "https://127.0.0.1:54443", host = "00000000000000000000000000000000.r2.cloudflarestorage.com";
 const email = "real-auth-owner@journey.invalid", password = randomBytes(32).toString("base64url");
-const report = { kind: "genuine-local-gotrue-next-browser", success: false, assertions: [], goTrueExecuted: false, hydratedReviewPublishVerified: false, sourceRevisionLineageVerified: false,
+const report = { kind: "genuine-local-gotrue-next-browser", success: false, assertions: [], goTrueExecuted: false, hydratedReviewPublishVerified: false, consumerTransportVerified: false, sourceRevisionLineageVerified: false,
   generatedAt:new Date().toISOString(),harnessSha256:createHash("sha256").update(readFileSync(import.meta.filename)).digest("hex"),
   googleOAuthVerified: false, productionAuthCookieUsed: false, productionSourceAdmissionVerified: false,
   foundationCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: nextRoot, encoding: "utf8" }).trim() };
@@ -61,6 +61,8 @@ const hmac = (key, body) => createHmac("sha256", key).update(body).digest();
 // The promote route admits a candidate only when its bound source versions are current in storage.
 const currentSources = currentSourceObjects(fixtures[1], workspace);
 let userCreated = false;
+// The consumer-proof API key secret: process memory and owned child environments only, never reported or written.
+let consumerSecret = "";
 try {
   const authContainers=execFileSync("docker",["ps","--format","{{.Names}}\t{{.Image}}"],{env,encoding:"utf8",timeout:10_000}).trim().split("\n")
     .map(line=>line.split("\t")).filter(([name,image])=>name.startsWith("supabase_auth_")&&/^(docker\.io\/)?supabase\/gotrue:/.test(image));
@@ -110,7 +112,7 @@ try {
     });
     await new Promise(resolve=>gateway.listen(54443,"127.0.0.1",resolve));
     let child,browser,page;
-    const redact = value => [password,stack.anon,stack.service,storage.env.AWS_SECRET_ACCESS_KEY].reduce((text,secret)=>text.replaceAll(secret,"[redacted]"),String(value)).replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,"[redacted JWT]");
+    const redact = value => [password,stack.anon,stack.service,storage.env.AWS_SECRET_ACCESS_KEY,consumerSecret].filter(Boolean).reduce((text,secret)=>text.replaceAll(secret,"[redacted]"),String(value)).replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,"[redacted JWT]").replace(/tvnl_live_[A-Za-z0-9_-]+/g,"[redacted API key]");
     // Diagnostics only: bounded server output and browser events, attached to the ledger on failure. They decide nothing.
     const serverTail=[],browserEvents=[];
     const keep=(list,line,limit)=>{list.push(redact(line).slice(0,500));if(list.length>limit)list.shift();};
@@ -204,6 +206,170 @@ try {
       check("actual SQL retains the previous revision as superseded",sql(`select lifecycle_status from public.foundation_world_versions where ${scope} and manifest_digest='${published.manifestDigest}'`),"superseded");
       await inspect(1,url=>page.goto(url));
       report.hydratedReviewPublishVerified=true;
+      // Consumer transport proof, strictly reads after the human-gated activation above. Actual local
+      // GoTrue session + production-mode Next + the shipped MCP stdio server and CLI, over synthetic
+      // source/compiler fixtures. Not production identity or data, retrieval quality, or Core qualification.
+      report.stage="consumer-transport-proof";
+      const consumer={kind:"actual-local-auth-application-consumer-transport",
+        basis:"actual local GoTrue Auth + production-mode Next application + direct HTTPS API, shipped MCP stdio JSON-RPC and shipped CLI child process over synthetic source/compiler fixtures",
+        productionIdentity:false,productionData:false,retrievalQualityMeasured:false,coreQualified:false,
+        readOnlyAfterHumanGatedActivation:true,promotionOrRollbackFromConsumers:false,
+        apiKeyIssuedBy:"POST /api/developer/keys with the GoTrue owner session under the existing explicit owner grant",
+        apiKeySecretPersisted:false,apiKeySecretReported:false};
+      report.consumerTransport=consumer;
+      check("consumer proof is labelled local Auth + application + transport over synthetic fixtures only",
+        [consumer.productionIdentity,consumer.productionData,consumer.retrievalQualityMeasured,consumer.coreQualified,consumer.readOnlyAfterHumanGatedActivation],[false,false,false,false,true]);
+      const consumerOrigin=new URL(origin);
+      check("consumer transports address only the exact loopback origin",[consumerOrigin.protocol,consumerOrigin.hostname,consumerOrigin.origin],["https:","127.0.0.1",origin]);
+      const consumerCa=readFileSync(path.join(root,"cert.pem"));
+      // Direct production-mode Next API through the owned gateway, trusting only the run's local certificate.
+      const appRequest=(resource,bearer,body)=>new Promise((resolve,reject)=>{
+        const url=new URL(resource,origin);
+        if(url.origin!==origin) return reject(new Error("Consumer request left the exact loopback origin"));
+        const payload=body===undefined?null:JSON.stringify(body);
+        const request=https.request(url,{method:payload?"POST":"GET",ca:consumerCa,timeout:60_000,headers:{authorization:`Bearer ${bearer}`,accept:"application/vnd.tavonel.v1+json",
+          ...(payload?{"content-type":"application/json","content-length":Buffer.byteLength(payload)}:{})}},response=>{
+          let text="";response.setEncoding("utf8");response.on("data",part=>{text+=part;});
+          response.on("end",()=>{let json=null;try{json=JSON.parse(text);}catch{}resolve({status:response.statusCode,body:json});});
+        });
+        request.on("timeout",()=>request.destroy(new Error("Loopback consumer request timed out")));request.on("error",reject);request.end(payload??undefined);
+      });
+      // Shipped consumer artifacts as owned child processes; the key travels only in their environment.
+      const runConsumer=async (script,args,input="",childEnv=consumerEnv)=>{
+        const owned=spawn(process.execPath,[script,...args],{cwd:root,env:childEnv,stdio:["pipe","pipe","pipe"],windowsHide:true});
+        let stdout="",stderr="",timer;
+        owned.stdout.setEncoding("utf8").on("data",part=>{stdout+=part;});owned.stderr.setEncoding("utf8").on("data",part=>{stderr+=part;});
+        const closed=new Promise((resolve,reject)=>{owned.once("error",reject);owned.once("close",(code,signal)=>resolve({code,signal}));});
+        owned.stdin.on("error",()=>{});owned.stdin.end(input);
+        try {
+          const exit=await Promise.race([closed,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),90_000);})]);
+          if(!exit){await stopOwnedChild(owned);throw new Error(`Owned consumer process timed out: ${path.basename(script)}`);}
+          return {...exit,stdout,stderr:redact(stderr).slice(0,2000)};
+        } finally {clearTimeout(timer);}
+      };
+      // Test-only egress guard, loaded only into the owned MCP/CLI children (never the Next server or browser):
+      // every fetch must target exactly the loopback origin, is rejected before native fetch otherwise, and
+      // cannot follow a redirect. The preload holds no secret; the native-call counter backs the preflight below.
+      const fetchGuard=path.join(root,"consumer-fetch-guard.cjs");
+      writeFileSync(fetchGuard,`'use strict';const allowed=${JSON.stringify(origin)};const nativeFetch=globalThis.fetch;
+if(typeof nativeFetch!=='function')throw new Error('consumer fetch guard: native fetch unavailable');
+const state={nativeCalls:0};Object.defineProperty(globalThis,Symbol.for('tavonel.consumerFetchGuard'),{value:state});
+const guarded=function fetch(input,init){let target;
+  try{target=new URL(typeof input==='string'||input instanceof URL?input:input&&typeof input.url==='string'?input.url:'');}
+  catch{return Promise.reject(new TypeError('consumer fetch guard: unparseable request URL'));}
+  if(target.origin!==allowed||target.username||target.password)return Promise.reject(new TypeError('consumer fetch guard: blocked non-loopback origin'));
+  state.nativeCalls++;return nativeFetch(input,{...init,redirect:'error'});};
+Object.defineProperty(globalThis,'fetch',{value:guarded,writable:false,configurable:false,enumerable:false});
+`);
+      const guardOptions=`--require ${JSON.stringify(fetchGuard)}`;
+      // Bounded preflight: an owned child without the key attempts a reserved .invalid host; the guard must
+      // reject it with zero native fetch calls, so no DNS lookup or connection is ever attempted.
+      const egressProbe=path.join(root,"consumer-egress-probe.cjs");
+      writeFileSync(egressProbe,`'use strict';const state=globalThis[Symbol.for('tavonel.consumerFetchGuard')];
+(async()=>{let blocked=false;
+  if(state&&state.nativeCalls===0&&Object.getOwnPropertyDescriptor(globalThis,'fetch')?.writable===false&&!('TAVONEL_API_KEY' in process.env)){
+    try{await fetch('https://consumer-egress-probe.invalid/api/v1/collections',{redirect:'follow',signal:AbortSignal.timeout(5000)});}
+    catch(error){blocked=error instanceof TypeError&&error.message==='consumer fetch guard: blocked non-loopback origin';}
+    blocked=blocked&&state.nativeCalls===0;}
+  process.stdout.write(JSON.stringify({blocked}));})();
+`);
+      const probeEnv={...env,NODE_OPTIONS:guardOptions,NODE_EXTRA_CA_CERTS:path.join(root,"cert.pem")};
+      check("egress preflight child environment carries no API key or base URL",Object.keys(probeEnv).some(key=>/^TAVONEL_/i.test(key)),false);
+      const egress=await runConsumer(egressProbe,[],"",probeEnv);
+      consumer.nonLoopbackFetchBlockedBeforeNetwork=egress.code===0&&egress.stdout.trim()==='{"blocked":true}';
+      check("owned consumer child rejects a non-loopback fetch before any native request",consumer.nonLoopbackFetchBlockedBeforeNetwork,true);
+      const scopes=["ask:read","collections:read","worlds:read"];
+      const question="What are the synthetic company's payment terms?";
+      const activePointer=()=>sql(`select manifest_digest||'@'||revision from public.foundation_active_worlds where ${scope}`);
+      const versionStates=()=>sql(`select string_agg(manifest_digest||'='||lifecycle_status,',' order by manifest_digest) from public.foundation_world_versions where ${scope}`);
+      const pointerBefore=activePointer(),versionsBefore=versionStates();
+      check("consumer proof starts from the human-activated revision",pointerBefore,`${candidate.manifestDigest}@2`);
+      const ownerLogin=await login();check("fresh actual GoTrue owner session for the consumer proof",ownerLogin.status,200);
+      const ownerToken=ownerLogin.body.access_token;
+      const whoami=await api("/auth/v1/user",null,ownerToken);
+      check("actual GoTrue resolves the consumer-proof session to the fixture owner",[whoami.status,whoami.body?.id,whoami.body?.email],[200,owner,email]);
+      const issued=await appRequest("/api/developer/keys",ownerToken,{name:"real-auth-ci-consumer-read",scopes,expiresInDays:1});
+      check("normal developer key route issues a key under the explicit owner grant",[issued.status,issued.body?.code],[201,"CREATED"]);
+      consumerSecret=typeof issued.body.token==="string"?issued.body.token:"";delete issued.body.token;
+      check("developer key route returns a scoped TAVONEL key",/^tvnl_live_[A-Za-z0-9_-]{12}_[A-Za-z0-9_-]{43}$/.test(consumerSecret),true);
+      const keyId=String(issued.body.key?.keyId??"");
+      check("issued key metadata names a key id and exactly the read-only scopes",[/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(keyId),[...(issued.body.key?.scopes??[])].sort()],[true,scopes]);
+      check("actual SQL binds the issued key to the GoTrue owner and synthetic workspace",
+        sql(`select workspace_key||'|'||created_by||'|'||array_to_string(array(select unnest(scopes) order by 1),',')||'|'||(revoked_at is null)||'|'||(expires_at is not null) from public.foundation_api_keys where key_id='${keyId}'`),
+        `${workspace}|${owner}|${scopes.join(",")}|true|true`);
+      check("exactly one developer key exists for the synthetic workspace",sql(`select count(*) from public.foundation_api_keys where workspace_key='${workspace}'`),"1");
+      check("actual SQL audits the key issuance by the GoTrue owner",sql(`select count(*) from public.foundation_developer_audit_events where workspace_key='${workspace}' and action='api_key_created' and target_id='${keyId}' and actor_user_id='${owner}'`),"1");
+      const listedKeys=await appRequest("/api/developer/keys",ownerToken);
+      check("owner session lists the issued key without its secret",[listedKeys.status,listedKeys.body?.keys?.some(key=>key.keyId===keyId),JSON.stringify(listedKeys.body).includes(consumerSecret)],[200,true,false]);
+      // Per-key, per-scope request counters written by the key-authenticated path itself.
+      const keyUse=()=>sql(`select coalesce(string_agg(scope||'='||total,',' order by scope),'') from (select scope,sum(request_count) total from public.foundation_api_rate_windows where key_id='${keyId}' and workspace_key='${workspace}' group by scope) used`);
+      const usedBy=count=>scopes.map(name=>`${name}=${count}`).join(",");
+      check("issued key is unused before consumer reads",keyUse(),"");
+      const worldsOf=body=>body?.collections;
+      const worldOf=body=>({world:body?.model?.world,evidence:body?.model?.evidence});
+      const answerOf=body=>({code:body?.code,retrievalPath:body?.retrievalPath,answerMode:body?.answerMode,activeWorld:body?.activeWorld,
+        status:body?.status,answer:body?.answer,reason:body?.reason,citations:body?.citations,receipt:body?.receipt});
+      const directReads=async (bearer,label)=>{
+        const listed=await appRequest("/api/v1/collections?limit=50",bearer);
+        const world=await appRequest(`/api/v1/world/${candidate.collectionId}`,bearer);
+        const asked=await appRequest(`/api/v1/collections/${candidate.collectionId}/ask`,bearer,{question});
+        check(`${label} reads list_worlds, get_world and ask_world through production Next`,[[listed.status,listed.body?.code],[world.status,world.body?.code],[asked.status,asked.body?.code]],
+          [[200,"COLLECTIONS_LISTED"],[200,"OK"],[200,"GROUNDED_ANSWER"]]);
+        return {worlds:worldsOf(listed.body),world:worldOf(world.body),answer:answerOf(asked.body)};
+      };
+      const ownerReads=await directReads(ownerToken,"GoTrue owner session");
+      check("owner-session reads do not consume the issued key",keyUse(),"");
+      check("active World list names exactly the human-activated revision",ownerReads.worlds?.map(({collectionId,manifestDigest,revision})=>({collectionId,manifestDigest,revision})),
+        [{collectionId:candidate.collectionId,manifestDigest:candidate.manifestDigest,revision:2}]);
+      check("World read model is the active activated revision",ownerReads.world.world,{id:candidate.collectionId,manifestDigest:candidate.manifestDigest,status:"active",revision:{state:"read",value:2}});
+      check("ask is bound to the active activated revision",[ownerReads.answer.activeWorld?.manifestDigest,ownerReads.answer.activeWorld?.revision],[candidate.manifestDigest,2]);
+      check("grounded answer cites region-bound evidence of the active revision only",[(ownerReads.answer.citations?.length??0)>0,/45 days/.test(ownerReads.answer.answer??""),/30 days/.test(ownerReads.answer.answer??""),
+        (ownerReads.answer.citations??[]).every(item=>typeof item.evidenceId==="string"&&typeof item.sourceVersionId==="string"&&item.pageNumber1>=1&&Array.isArray(item.bbox1000))],[true,true,false,true]);
+      const keyReads=await directReads(consumerSecret,"direct API key");
+      check("direct API key reads are attributed to exactly the issued key",keyUse(),usedBy(1));
+      const consumerEnv={...env,TAVONEL_BASE_URL:origin,TAVONEL_API_KEY:consumerSecret,NODE_EXTRA_CA_CERTS:path.join(root,"cert.pem"),NODE_OPTIONS:guardOptions};
+      check("shipped MCP/CLI children use the exact loopback origin, the generated local certificate and the egress guard",
+        [consumerEnv.TAVONEL_BASE_URL,consumerEnv.NODE_EXTRA_CA_CERTS,consumerEnv.NODE_OPTIONS],[origin,path.join(root,"cert.pem"),guardOptions]);
+      const frames=[
+        {jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-06-18",capabilities:{},clientInfo:{name:"tavonel-real-auth-ci",version:"1"}}},
+        {jsonrpc:"2.0",method:"notifications/initialized"},
+        {jsonrpc:"2.0",id:2,method:"tools/list",params:{}},
+        {jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"list_worlds",arguments:{limit:50}}},
+        {jsonrpc:"2.0",id:4,method:"tools/call",params:{name:"get_world",arguments:{collectionId:candidate.collectionId}}},
+        {jsonrpc:"2.0",id:5,method:"tools/call",params:{name:"ask_world",arguments:{collectionId:candidate.collectionId,question}}},
+      ];
+      const mcp=await runConsumer(path.join(nextRoot,"public/developer/tavonel-mcp.mjs"),[],`${frames.map(frame=>JSON.stringify(frame)).join("\n")}\n`);
+      if(mcp.code!==0) throw new Error(`Shipped MCP stdio server exited ${mcp.code}/${mcp.signal}: ${mcp.stderr}`);
+      const replies=new Map(mcp.stdout.trim().split("\n").filter(Boolean).map(line=>{const frame=JSON.parse(line);return [frame.id,frame];}));
+      check("actual MCP stdio handshake identifies the read-only server",replies.get(1)?.result?.serverInfo?.name,"tavonel-readonly");
+      const toolNames=(replies.get(2)?.result?.tools??[]).map(item=>item.name);
+      check("MCP exposes the exercised read tools and no promotion, rollback, upload or compile tool",
+        [["list_worlds","get_world","ask_world"].every(name=>toolNames.includes(name)),toolNames.some(name=>/promot|rollback|upload|compile/.test(name))],[true,false]);
+      const toolResult=id=>{const result=replies.get(id)?.result;
+        if(result?.isError!==false) throw new Error(`MCP tools/call ${id} failed: ${redact(result?.content?.[0]?.text??"no reply").slice(0,500)}`);
+        return JSON.parse(result.content[0].text);};
+      const mcpReads={worlds:worldsOf(toolResult(3)),world:worldOf(toolResult(4)),answer:answerOf(toolResult(5))};
+      check("MCP stdio reads are attributed to exactly the issued key",keyUse(),usedBy(2));
+      const cliJson=async args=>{
+        const run=await runConsumer(path.join(nextRoot,"public/developer/tavonel-cli.mjs"),args);
+        if(run.code!==0) throw new Error(`Shipped CLI ${args[0]} exited ${run.code}/${run.signal}: ${run.stderr}`);
+        return JSON.parse(run.stdout);
+      };
+      const cliReads={worlds:worldsOf(await cliJson(["list_worlds","--limit","50"])),world:worldOf(await cliJson(["get_world",candidate.collectionId])),
+        answer:answerOf(await cliJson(["ask_world",candidate.collectionId,question]))};
+      check("CLI process reads are attributed to exactly the issued key",keyUse(),usedBy(3));
+      for(const [label,reads] of [["direct API key",keyReads],["MCP stdio",mcpReads],["CLI process",cliReads]]) {
+        check(`${label} lists the same active Worlds as the GoTrue owner session`,reads.worlds,ownerReads.worlds);
+        check(`${label} reads the same active World model and evidence as the GoTrue owner session`,reads.world,ownerReads.world);
+        check(`${label} receives the same answer and citations as the GoTrue owner session`,reads.answer,ownerReads.answer);
+      }
+      check("consumer reads leave the human-activated pointer unchanged",activePointer(),pointerBefore);
+      check("consumer reads create, promote and roll back no World version",versionStates(),versionsBefore);
+      Object.assign(consumer,{transports:["direct-api-gotrue-session","direct-api-key","mcp-stdio-json-rpc","cli-child-process"],
+        principal:{goTrueUserIsFixtureOwner:true,keyBoundToFixtureOwner:true,keyBoundToFixtureWorkspace:true,apiKeyScopes:scopes,keyRequestsByScope:usedBy(3)},
+        activeManifestDigest:candidate.manifestDigest,activeRevision:2,askCode:ownerReads.answer.code,askRetrievalPath:ownerReads.answer.retrievalPath,
+        citationEvidenceIds:ownerReads.answer.citations.map(item=>item.evidenceId),mcpServerVersion:replies.get(1).result.serverInfo.version});
+      report.consumerTransportVerified=true;
       const fresh=await login();check("fresh provider session for logout observation",fresh.status,200);session=fresh.body;
       const claims=JSON.parse(Buffer.from(session.access_token.split(".")[1],"base64url").toString());
       assert.ok(claims.exp-Date.now()/1000>30&&claims.exp-Date.now()/1000<120,"The local CI config must use the 60-second test JWT lifetime");
@@ -251,6 +417,8 @@ try {
   report.success=true;
 } finally {
   if(userCreated) await api(`/auth/v1/admin/users/${owner}`,null,stack.service,"DELETE").catch(()=>{});
-  writeFileSync(output,JSON.stringify(report,null,2));
+  const serialized=JSON.stringify(report,null,2);
+  writeFileSync(output,(consumerSecret?serialized.replaceAll(consumerSecret,"[redacted]"):serialized).replace(/tvnl_live_[A-Za-z0-9_-]+/g,"[redacted API key]"));
+  consumerSecret="";
   assert.equal(path.dirname(root),path.resolve(tmpdir()));assert.ok(path.basename(root).startsWith("tavonel-real-auth-"));rmSync(root,{recursive:true,force:true});
 }
