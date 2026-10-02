@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -47,5 +48,48 @@ describe("db-rehearsal local stack port reservation", () => {
     expect(contract).toContain('"http://127.0.0.1:54321"');
     expect(contract).toContain('database.port, "54322"');
     expect(workflow).not.toMatch(/^\s*port\s*=/m);
+  });
+});
+
+describe("db-rehearsal model-provider spend proof", () => {
+  const body = job("db-rehearsal");
+  const replay = body.split("- name: Apply the repair migrations a second time and re-run the suite")[1] ?? "";
+  const raceStep = body.split("- name: Race model-provider settlement against another tenant's reserve")[1] ?? "";
+
+  it("replays the queued-expiry recovery migration before the second pgTAP pass", () => {
+    const loop = replay.slice(0, replay.indexOf("supabase test db"));
+    expect(loop).toContain("supabase/migrations/20261002110000_*.sql");
+  });
+
+  it("races only after every pgTAP pass, against a marker written into the fresh stack", () => {
+    expect(raceStep).not.toBe("");
+    expect(body.lastIndexOf("supabase test db")).toBeLessThan(body.indexOf("- name: Race model-provider settlement"));
+    const write = raceStep.indexOf("insert into tavonel_ci_fixture.disposable_marker values ('$marker');");
+    const run = raceStep.indexOf('MODEL_PROVIDER_SPEND_RACE_MARKER="$marker" node nextjs/scripts/db/model-provider-spend-race.mjs');
+    expect(raceStep.indexOf('marker="tavonel-disposable-$(cat /proc/sys/kernel/random/uuid)"')).toBeGreaterThan(-1);
+    expect(raceStep).toContain('psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "create schema tavonel_ci_fixture;"');
+    expect(write).toBeGreaterThan(-1);
+    expect(run).toBeGreaterThan(write);
+  });
+
+  it("pins the script to the runner's psql and to the CI marker", () => {
+    const script = readFileSync("scripts/db/model-provider-spend-race.mjs", "utf8");
+    expect(script).toContain("const executable = '/usr/bin/psql';");
+    expect(script).not.toMatch(/PSQL_BIN|Program Files/);
+    expect(script).toContain("from tavonel_ci_fixture.disposable_marker where value = ${quote(marker)}");
+  });
+
+  it.each([
+    ["no marker", undefined],
+    ["a malformed marker", "tavonel-disposable-not-a-uuid"],
+    ["a marker with SQL in it", "tavonel-disposable-00000000-0000-0000-0000-000000000000' or true --"],
+  ])("refuses to start with %s, before any database connection", (_label, marker) => {
+    const env: NodeJS.ProcessEnv = { ...process.env, MODEL_PROVIDER_SPEND_RACE_TEST: "1", PGPORT: "54322", PGPASSWORD: "postgres" };
+    delete env.MODEL_PROVIDER_SPEND_RACE_MARKER;
+    if (marker !== undefined) env.MODEL_PROVIDER_SPEND_RACE_MARKER = marker;
+    const result = spawnSync(process.execPath, ["scripts/db/model-provider-spend-race.mjs"], { env, encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("MODEL_PROVIDER_SPEND_RACE_MARKER from the CI fresh-stack step is required");
+    expect(result.stdout).not.toContain("PASS");
   });
 });

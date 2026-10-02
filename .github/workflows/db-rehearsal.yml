@@ -215,11 +215,30 @@ jobs:
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
           for file in supabase/migrations/005[245]_*.sql supabase/migrations/20260911*_*.sql \
-                      supabase/migrations/20260929152100_*.sql; do
+                      supabase/migrations/20260929152100_*.sql \
+                      supabase/migrations/20261002110000_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done
           supabase test db
+
+      # Last on purpose: the race commits synthetic budgets, reservations and append-only ledger
+      # rows it cannot remove, so it must follow every pgTAP pass. Loopback, port and password do
+      # not prove the target is disposable, so this step writes a fresh random marker into the
+      # stack `supabase status` names, and the script refuses to write unless its own connection
+      # finds that marker. psql is the runner's /usr/bin/psql, pinned inside the script.
+      - name: Race model-provider settlement against another tenant's reserve on the disposable database
+        env:
+          MODEL_PROVIDER_SPEND_RACE_TEST: "1"
+          PGPORT: "54322"
+          PGPASSWORD: postgres
+        run: |
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          marker="tavonel-disposable-$(cat /proc/sys/kernel/random/uuid)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "create schema tavonel_ci_fixture;" \
+            -c "create table tavonel_ci_fixture.disposable_marker (value text primary key);" \
+            -c "insert into tavonel_ci_fixture.disposable_marker values ('$marker');"
+          MODEL_PROVIDER_SPEND_RACE_MARKER="$marker" node nextjs/scripts/db/model-provider-spend-race.mjs
 
   real-auth-journey:
     name: Real local Auth journey
