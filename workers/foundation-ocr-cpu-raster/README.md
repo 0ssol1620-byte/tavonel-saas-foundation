@@ -9,7 +9,12 @@ same pinned RapidOCR 3.9.2 models (three SHA256 digests) and the same signed req
   `tavonel.ocr_result.v2` with normalized `bbox1000` region geometry. All responses are `no-store`.
 - `bbox1000` frame: the displayed page, i.e. the CropBox rotated clockwise by `/Rotate`, origin at
   the top left, for raster and native-text regions alike. Native text boxes are mapped there with
-  PDFium's own page-to-device transform; a mapping PDFium refuses yields no native region.
+  PDFium's own page-to-device transform, after clipping each text rectangle to the page bounding box
+  (MediaBox intersected with CropBox) that bounds the extracted text. Text outside it adds nothing to
+  the box. A mapping PDFium refuses, or a box off the displayed page, yields no native region
+  (never a clamped one), and the page is read from its pixels instead.
+- `materialize_models.py` downloads each model from its pinned RapidOCR 3.9.2 URL and checks its
+  SHA256 before any ONNX session opens it; the angle classifier is pinned as well.
 - Raster bounds: before the first page is rendered, every page must have a finite, positive size,
   and every page without a text layer (the pages that would be rasterized) is sized as the renderer
   allocates it, `ceil(points * RENDER_SCALE)` per side at `RENDER_SCALE = 2`. Each side must be at

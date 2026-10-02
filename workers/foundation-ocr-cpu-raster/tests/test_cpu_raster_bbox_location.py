@@ -214,6 +214,55 @@ def test_a_box_left_in_pdf_user_space_fails_the_location_check(name: str) -> Non
     assert iou(user_space, expected) < MIN_IOU
 
 
+def test_text_outside_the_cropbox_does_not_stretch_the_native_box() -> None:
+    # Independent-review repro: an 8 pt slug below the CropBox is not in the bounded text, so its
+    # rectangle must not pull the box to the page edge ([98, 355, 381, 1000] before the fix).
+    media_box, crop_box, rotate, (x, y) = GEOMETRY["cropbox"]
+    stream = b"BT /F1 %d Tf %d %d Td (%s) Tj ET BT /F1 8 Tf 100 100 Td (slug) Tj ET" % (
+        FONT_SIZE, x, y, TEXT.encode("ascii")
+    )
+    payload = page_pdf(stream, media_box, crop_box, rotate)
+    expected = expected_bbox1000((x, y - TEXT_DESCENT, x + TEXT_WIDTH, y + TEXT_ASCENT), media_box, crop_box, rotate)
+
+    text, _, [region] = cpu.extract_text(payload)
+
+    assert text == TEXT
+    assert region["regionId"] == "native-p0001"
+    assert iou(region["bbox1000"], expected) >= MIN_IOU, (region["bbox1000"], expected)
+
+
+def test_text_straddling_the_cropbox_is_boxed_by_its_visible_part() -> None:
+    media_box, crop_box = (0, 0, 612, 792), (50, 300, 562, 792)
+    # The line starts left of the CropBox; only its visible part is the region's location.
+    payload = page_pdf(b"BT /F1 %d Tf 0 600 Td (%s) Tj ET" % (FONT_SIZE, TEXT.encode("ascii")), media_box, crop_box, 0)
+
+    _, _, regions = cpu.extract_text(payload)
+
+    [region] = [region for region in regions if region["regionId"] == "native-p0001"]
+    visible = expected_bbox1000((50, 600 - TEXT_DESCENT, TEXT_WIDTH, 600 + TEXT_ASCENT), media_box, crop_box, 0)
+    assert iou(region["bbox1000"], visible) >= MIN_IOU, (region["bbox1000"], visible)
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [(-1, 10, 500, 600), (10, -1, 500, 600), (10, 10, cpu.DEVICE_UNITS + 1, 600), (10, 10, 500, cpu.DEVICE_UNITS + 1)],
+)
+def test_native_box_off_the_displayed_page_is_dropped_not_clamped(monkeypatch: pytest.MonkeyPatch, bounds) -> None:
+    payload, _ = text_case("upright")
+    monkeypatch.setattr(cpu, "displayed_bounds", lambda *_args: bounds)
+    document = pdfium.PdfDocument(payload)
+    try:
+        page = document[0]
+        textpage = page.get_textpage()
+        try:
+            assert cpu.native_page_region(page, textpage, TEXT, 0, 0) is None
+        finally:
+            textpage.close()
+            page.close()
+    finally:
+        document.close()
+
+
 def test_displayed_bounds_refuses_a_failed_pdfium_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
     # No silent fallback to user space: a mapping PDFium refuses yields no native region.
     payload, _ = text_case("upright")

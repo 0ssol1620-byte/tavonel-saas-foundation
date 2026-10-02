@@ -476,16 +476,28 @@ def displayed_bounds(page, left: float, bottom: float, right: float, top: float)
 
 
 def native_page_region(page, textpage, text: str, page_index: int, order: int) -> OcrRegion | None:
-    rectangle_count = textpage.count_rects()
-    if rectangle_count < 1:
+    # `text` is get_text_bounded() over the page bounding box (MediaBox intersected with CropBox), but count_rects()
+    # covers the whole page. Only the visible part of each rectangle describes that text, so each is
+    # clipped to the same box and rectangles wholly outside it (text nobody sees) are dropped.
+    box_left, box_bottom, box_right, box_top = page.get_bbox()
+    rectangles = []
+    for index in range(textpage.count_rects()):
+        rect_left, rect_bottom, rect_right, rect_top = textpage.get_rect(index)
+        clipped = (max(rect_left, box_left), max(rect_bottom, box_bottom), min(rect_right, box_right), min(rect_top, box_top))
+        if clipped[0] < clipped[2] and clipped[1] < clipped[3]:
+            rectangles.append(clipped)
+    if not rectangles:
         return None
-    rectangles = [textpage.get_rect(index) for index in range(rectangle_count)]
     left = min(rectangle[0] for rectangle in rectangles)
     bottom = min(rectangle[1] for rectangle in rectangles)
     right = max(rectangle[2] for rectangle in rectangles)
     top = max(rectangle[3] for rectangle in rectangles)
     bounds = displayed_bounds(page, left, bottom, right, top)
-    bbox = None if bounds is None else normalized_bbox(*bounds, DEVICE_UNITS, DEVICE_UNITS)
+    # Never clamp a native box onto the page: one that maps off the displayed page is not this
+    # text's location, so the page gets no native region (and is read from its pixels instead).
+    if bounds is None or min(bounds) < 0 or max(bounds) > DEVICE_UNITS:
+        return None
+    bbox = normalized_bbox(*bounds, DEVICE_UNITS, DEVICE_UNITS)
     if bbox is None:
         return None
     return {
