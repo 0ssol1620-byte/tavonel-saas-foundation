@@ -15,7 +15,10 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
   const [planIntent, setPlanIntent] = useState<PlanIntent>("");
   const [startedAt] = useState(() => Date.now());
   const submitRef = useRef<HTMLButtonElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const errorId = useId();
+  // 403/415: the request itself is refused, so no resend is offered at all.
+  const terminal = state === "error" && !failure.retry;
 
   useEffect(() => {
     const plan = new URLSearchParams(window.location.search).get("plan");
@@ -24,13 +27,15 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
 
   /*
     UX06. The button is disabled while sending, so a keyboard submit leaves focus on <body> by
-    the time a failure returns. Once it is enabled again, focus goes back to it: the retry is one
-    keypress away, and the error it is described by is read with it -- which, where a retry
-    cannot help (403, 415), says so and gives the address to write to instead.
+    the time a failure returns. Where a retry can help, focus goes back to the re-enabled button:
+    the retry is one keypress away, and the error it is described by is read with it. Where it
+    cannot (403, 415), Send stays disabled and focus goes to the status itself, which says so and
+    holds the one thing left to do -- the fixed address, next in tab order.
   */
   useEffect(() => {
-    if (state === "error") submitRef.current?.focus();
-  }, [state]);
+    if (state !== "error") return;
+    (failure.retry ? submitRef : errorRef).current?.focus();
+  }, [state, failure]);
 
   function fail(status?: number) {
     setFailure(contactErrorCopy(status));
@@ -39,6 +44,8 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // A disabled default button already blocks implicit (Enter) submission; this keeps it so.
+    if (terminal) return;
     setState("sending");
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -190,7 +197,7 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
           ref={submitRef}
           className="btn"
           type="submit"
-          disabled={state === "sending"}
+          disabled={state === "sending" || terminal}
           aria-describedby={state === "error" ? errorId : undefined}
         >
           {contactText(state === "sending" ? "Sending..." : "Send inquiry", locale)}
@@ -205,7 +212,7 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
       <div className="contact-status" aria-live="polite">
         {state === "sent" && <p data-state="sent">{contactText("Received. We will reply from an official TAVONEL address.", locale)}</p>}
         {state === "error" && (
-          <p data-state="error" id={errorId}>
+          <p data-state="error" id={errorId} ref={errorRef} tabIndex={-1}>
             {contactText(failure.message, locale)}
             {failure.fallback ? (
               <>

@@ -78,6 +78,11 @@ export type ContactErrorCopy = {
   message: string;
   /** The lead-in to the fallback address, or null where no address is offered. */
   fallback: string | null;
+  /**
+    Whether sending again can succeed. False is terminal: the form keeps Send disabled and moves
+    focus to the status, so the only action left on screen is the fixed address.
+  */
+  retry: boolean;
 };
 
 /**
@@ -100,21 +105,23 @@ export type ContactErrorCopy = {
   both things a visitor can trim.
 */
 export function contactErrorCopy(status?: number): ContactErrorCopy {
-  if (status === 400) return { message: "Check the required fields and their lengths, then send again.", fallback: null };
+  if (status === 400) return { message: "Check the required fields and their lengths, then send again.", fallback: null, retry: true };
   if (status === 403 || status === 415) {
     return {
       message: "Your inquiry cannot be sent from this page, so sending it again will not help. Your answers are still in the form.",
       fallback: "Email us instead at",
+      retry: false,
     };
   }
   if (status === 413) {
     return {
       message: "Your inquiry is larger than this form can send. Shorten the message or remove some optional answers, then send it again.",
       fallback: null,
+      retry: true,
     };
   }
-  if (status === 429) return { message: "Too many inquiries were sent. Please try again in 10 minutes.", fallback: null };
-  return { message: "We could not send your inquiry. Your answers are still in the form.", fallback: "Send it again, or email us at" };
+  if (status === 429) return { message: "Too many inquiries were sent. Please try again in 10 minutes.", fallback: null, retry: true };
+  return { message: "We could not send your inquiry. Your answers are still in the form.", fallback: "Send it again, or email us at", retry: true };
 }
 
 export function contactText(value: string, locale: ContactLocale): string {

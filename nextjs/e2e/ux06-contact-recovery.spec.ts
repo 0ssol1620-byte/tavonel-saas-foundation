@@ -63,6 +63,7 @@ test("a mocked 503 keeps answers and returns keyboard focus to the retry button"
   await expect(error).toContainText("Your answers are still in the form.");
   await expect(error).not.toContainText("SECRET-DB-DETAILS");
   await expect(error.getByRole("link")).toHaveAttribute("href", "mailto:hello@tavonel.com");
+  await expect(submit).toBeEnabled();
   await expect(submit).toBeFocused();
   await expect(submit).toHaveAttribute("aria-describedby", await error.getAttribute("id") ?? "");
   await expect(page.locator('input[name="name"]')).toHaveValue("Avery Chen");
@@ -91,6 +92,7 @@ test("a mocked network abort keeps answers and never exposes browser fetch text"
   await expect(error).toContainText("Your answers are still in the form.");
   await expect(error).not.toContainText("Failed to fetch");
   await expect(error.getByRole("link")).toHaveAttribute("href", "mailto:hello@tavonel.com");
+  await expect(submit).toBeEnabled();
   await expect(submit).toBeFocused();
   await expect(page.locator('input[name="name"]')).toHaveValue("Avery Chen");
   await expect(page.locator('input[name="email"]')).toHaveValue("avery@example.com");
@@ -101,7 +103,8 @@ test("a mocked network abort keeps answers and never exposes browser fetch text"
   Status-specific recovery in both locales, asserted as the exact text a visitor reads.
 
   403 (origin refused) and 415 (not a JSON request) refuse the request itself, so the copy says
-  a retry will not help and offers the bare address alone. 413 is the whole request body, so the
+  a retry will not help and offers the bare address alone -- and the form agrees: Send stays
+  disabled and focus moves to the status, with the address next in tab order. 413 is the whole request body, so the
   copy names both things a visitor can trim before sending again.
 */
 const FORMS = {
@@ -138,7 +141,7 @@ const REFUSALS = [
 
 for (const { status, serverError } of REFUSALS) {
   for (const locale of ["en", "ko"] as const) {
-    test(`a mocked ${status} at ${FORMS[locale].path} keeps answers and offers only the fixed address, not a retry`, async ({ page }, testInfo) => {
+    test(`a mocked ${status} at ${FORMS[locale].path} keeps answers, keeps Send disabled and focuses the fixed-address status`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== "390", "UX06 keyboard and recovery behavior is measured at 390px");
       const form = FORMS[locale];
       let requests = 0;
@@ -159,8 +162,12 @@ for (const { status, serverError } of REFUSALS) {
       // One link, to the bare address: no answer is carried into the mailto URI.
       await expect(error.getByRole("link")).toHaveCount(1);
       await expect(error.getByRole("link")).toHaveAttribute("href", "mailto:hello@tavonel.com");
-      await expect(submit).toBeFocused();
+      // Terminal: no resend is offered, and focus lands on the status rather than a dead button.
+      await expect(error).toBeFocused();
+      await expect(submit).toBeDisabled();
       await expect(submit).toHaveAttribute("aria-describedby", await error.getAttribute("id") ?? "");
+      await page.keyboard.press("Tab");
+      await expect(error.getByRole("link")).toBeFocused();
       await expectAnswersKept(page, form);
       expect(requests).toBe(1);
     });
@@ -186,6 +193,7 @@ for (const locale of ["en", "ko"] as const) {
     const error = page.locator('form [aria-live="polite"] [data-state="error"]');
     await expect(error).toHaveText(form.tooLarge);
     await expect(error.getByRole("link")).toHaveCount(0);
+    await expect(submit).toBeEnabled();
     await expect(submit).toBeFocused();
     await expect(submit).toHaveAttribute("aria-describedby", await error.getAttribute("id") ?? "");
     await expectAnswersKept(page, form);
