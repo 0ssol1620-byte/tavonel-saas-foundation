@@ -395,20 +395,45 @@ describe("PDF evidence viewer render interruption (deferred PDF.js fake, no DOM)
     },
   );
 
-  // Scrollbar flapping: 400 -> 385 -> 400 before the 385 render (or a fresh 400 one) has finished.
+  /*
+    Scrollbar flapping: 400 -> 385 -> 400 before the page is redrawn at 400.
+
+    Each request is driven through explicit deferreds, never through timing. Vitest 3.2's factory
+    mock tracks an in-flight `import("pdfjs-dist")` on the importer's shared callstack, so a second
+    import from the viewer that starts while the first is still resolving bypasses the mock and
+    loads the real PDF.js (CI: "Please use the legacy build", then a hang). So the 385 request is
+    held at `getDocument` -- its import settled -- before the width returns to 400.
+  */
   it("returning to an earlier width never revives that width's finished render over the wiped canvas", async () => {
+    const loaded = (count: number) => vi.waitFor(() => expect(pdf.loads).toHaveLength(count), { timeout: 2000 });
     const view = mountViewer(older);
-    await rendering(1);
-    pdf.renders[0].finish();
+    await loaded(1);
+    await vi.waitFor(() => expect(pdf.renders).toHaveLength(1), { timeout: 2000 });
+    const first = pdf.renders[0];
+    first.finish();
     expect(await view.flush()).toEqual(drawn(older));
+
+    pdf.options.holdLoads = true;
     view.resize(385);
     expect(view.timeline.at(-1)).toEqual(waiting);
+    await loaded(2); // the 385 request has imported PDF.js and is parked on its document
+
     const from = view.resize(400);
+    expect(pdf.loads[1].destroyed).toBe(true);
     // The canvas was wiped for 385; nothing may claim the 400 page is on screen until it is redrawn.
     for (const seen of view.timeline.slice(from)) expect(seen).toEqual(waiting);
-    // The 385 request was superseded before it reached PDF.js; only the fresh 400 render remains.
-    await rendering(2);
-    pdf.renders[1].finish();
+    expect(await view.flush()).toEqual(waiting);
+
+    await loaded(3);
+    const redraw = pdf.loads[2];
+    redraw.open();
+    let render: FakeRender | undefined;
+    await vi.waitFor(() => {
+      render = pdf.renders.find(candidate => candidate !== first);
+      expect(render).toBeDefined();
+    }, { timeout: 2000 });
+    expect(view.timeline.at(-1)).toEqual(waiting);
+    render!.finish();
     expect(await view.flush()).toEqual(drawn(older));
   });
 
