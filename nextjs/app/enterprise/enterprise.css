@@ -54,8 +54,8 @@
 .membership-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px 20px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--hairline); }
 .membership-identity { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .membership-identity code, .membership-email { min-width: 0; overflow-wrap: anywhere; color: var(--text-hi); font: 13px/1.4 var(--f-mono); }
-.membership-label, .membership-facts dt { flex-basis: 100%; color: var(--text-lo); font: 11px/1.4 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
-.membership-you { padding: 2px 6px; border: 1px solid var(--verified-dim); color: var(--verified); font: 11px/1.4 var(--f-mono); letter-spacing: .08em; }
+.membership-label, .membership-facts dt { flex-basis: 100%; color: var(--text-lo); font: 12px/1.4 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+.membership-you { padding: 2px 6px; border: 1px solid var(--verified-dim); color: var(--verified); font: 12px/1.4 var(--f-mono); letter-spacing: .08em; }
 .membership-facts { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0; }
 .membership-facts dd { margin: 2px 0 0; color: var(--text-hi); font: 13px/1.4 var(--f-mono); overflow-wrap: anywhere; }
 .membership-facts dd[data-state="active"], .membership-facts dd[data-status="pending"], .membership-facts dd[data-status="accepted"] { color: var(--verified); }
