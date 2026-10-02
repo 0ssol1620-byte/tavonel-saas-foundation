@@ -70,11 +70,11 @@ export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
   }, [page, data, width]);
 
   return (
-    <div ref={containerRef} className={styles.viewer} aria-label={label} data-state={state} data-sensitive="content">
-      <canvas ref={canvasRef} aria-hidden={state !== "ready"} />
+    <div ref={containerRef} className={styles.viewer} role="group" aria-label={label} data-state={state} data-sensitive="content">
+      <canvas ref={canvasRef} role="img" aria-label={`${label}, page ${page}, evidence bounding box ${bbox.join(", ")}`} aria-hidden={state !== "ready"} />
       {state === "ready" ? (
         <i
-          aria-label={`Evidence bounding box ${bbox.join(", ")}`}
+          aria-hidden="true"
           style={{
             "--bbox-left": `${bbox[0] / 10}%`,
             "--bbox-top": `${bbox[1] / 10}%`,
@@ -82,7 +82,7 @@ export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
             "--bbox-height": `${(bbox[3] - bbox[1]) / 10}%`,
           } as CSSProperties}
         />
-      ) : <span>{state === "loading" ? "Rendering source page…" : "Source page unavailable"}</span>}
+      ) : <span role="status">{state === "loading" ? "Rendering source page…" : "Source page unavailable"}</span>}
     </div>
   );
 }

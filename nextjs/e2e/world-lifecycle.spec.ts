@@ -808,6 +808,13 @@ test("pins correction, evidence, activation and browser history to the selected 
   await expect(page.getByText("Corrected revision evidence.", { exact: true }).first()).toBeVisible();
   expect(reads).toContain(candidateManifest); expect(reads).toContain(corrected);
   await expect(page.getByRole("complementary", { name: "World selection inspector" }).locator('[data-state="ready"] canvas')).toBeVisible();
+  const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+  const sourceLabel = await inspector.locator('[data-state="ready"] canvas').locator("xpath=..").getAttribute("aria-label");
+  expect(sourceLabel).toBeTruthy();
+  const evidenceViewer = inspector.getByRole("group", { name: sourceLabel!, exact: true });
+  await expect(evidenceViewer).toHaveAttribute("data-state", "ready");
+  await expect(evidenceViewer.getByRole("img", { name: /, page \d+, evidence bounding box [\d.]+, [\d.]+, [\d.]+, [\d.]+$/ })).toBeVisible();
+  await expect(evidenceViewer.locator("i")).toHaveAttribute("aria-hidden", "true");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await testInfo.attach("selected-revision", { body: await page.screenshot({ path: testInfo.outputPath("selected-revision.png"), fullPage: true }), contentType: "image/png" });
 });

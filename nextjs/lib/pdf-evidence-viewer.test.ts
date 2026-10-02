@@ -14,6 +14,13 @@ describe("actual PDF evidence viewer", () => {
     expect(viewer).toContain("renderTask?.cancel()");
   });
 
+  it("exposes a named group, polite status and named page image while hiding the decorative bbox overlay", () => {
+    expect(viewer).toContain('role="group" aria-label={label}');
+    expect(viewer).toContain('<span role="status">');
+    expect(viewer).toContain('role="img" aria-label={`${label}, page ${page}, evidence bounding box ${bbox.join(", ")}`}');
+    expect(viewer).toMatch(/<i\s+aria-hidden="true"/);
+  });
+
   it("replaces the browser PDF iframe in the persisted World evidence surface", () => {
     expect(studio).toContain("<PdfEvidenceViewer");
     expect(studio).not.toContain("<iframe");
