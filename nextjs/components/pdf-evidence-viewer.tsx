@@ -75,6 +75,7 @@ export default function PdfEvidenceViewer({ data, page, bbox, label }: Props) {
       {state === "ready" ? (
         <i
           aria-hidden="true"
+          data-evidence-bbox=""
           style={{
             "--bbox-left": `${bbox[0] / 10}%`,
             "--bbox-top": `${bbox[1] / 10}%`,

@@ -482,7 +482,7 @@ test("source preview reuses bytes across pages and clears the previous document 
     await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
     expect(reads).toBe(2);
     const canvasBox = await inspector.locator("canvas").boundingBox();
-    const evidenceBox = await inspector.locator('[aria-label^="Evidence bounding box"]').boundingBox();
+    const evidenceBox = await inspector.locator('[data-evidence-bbox]').boundingBox();
     expect(canvasBox).not.toBeNull();
     expect(evidenceBox).not.toBeNull();
     expect(Math.abs(evidenceBox!.y - (canvasBox!.y + canvasBox!.height * 0.2))).toBeLessThan(2);
