@@ -3,6 +3,7 @@ import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { parseConnectionBatchInput } from "@/lib/developer-contracts";
 import { applyFoundationConnectionBatch } from "@/lib/developer-store";
+import { applyConnectionInventoryRequest, isInventoryRequest, parseInventoryRequest } from "@/lib/connection-source-inventory";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,6 +28,21 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     body = JSON.parse(text);
   } catch {
     return NextResponse.json({ code: "INVALID_JSON" }, { status: 400, headers: NO_STORE });
+  }
+  // Scan sessions share this route with the cursor batch. The batch body never has `operation`,
+  // so a source agent that only sends batches is unaffected.
+  if (isInventoryRequest(body)) {
+    const parsed = parseInventoryRequest(body);
+    if (!parsed.ok) return NextResponse.json({ code: parsed.code }, { status: 400, headers: NO_STORE });
+    const inventory = await applyConnectionInventoryRequest(auth.principal.workspaceKey, id, {
+      userId: auth.principal.userId,
+      keyId: auth.principal.keyId,
+    }, parsed.request);
+    if (!inventory.ok) {
+      const { code, headEpoch } = inventory;
+      return NextResponse.json(headEpoch === undefined ? { code } : { code, headEpoch }, { status: inventory.status, headers: NO_STORE });
+    }
+    return NextResponse.json({ code: "OK", ...inventory.result }, { headers: NO_STORE });
   }
   const batch = await parseConnectionBatchInput(body, auth.principal.workspaceKey);
   if (!batch) return NextResponse.json({ code: "CONNECTION_BATCH_INVALID" }, { status: 400, headers: NO_STORE });
