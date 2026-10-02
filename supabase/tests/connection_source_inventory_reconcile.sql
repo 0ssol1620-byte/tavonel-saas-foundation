@@ -6,7 +6,7 @@
 -- nextjs/lib/connection-source-inventory.test.ts, which runs the same vectors through the
 -- TypeScript validator. Keep each block a single jsonb literal.
 begin;
-select plan(72);
+select plan(85);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -216,6 +216,37 @@ select throws_ok($$ select pg_temp.ifin('a0000000-0000-4000-8000-0000000d0008', 
 select is(pg_temp.item_states(), 'a:unobserved:r2:21,b:unobserved:r1:21,c:unobserved:r1:21', 'the refused finalize changed no item');
 
 -- ---------------------------------------------------------------------------
+-- 7b. Running totals, the per-scan byte cap and expiry of an abandoned scan
+-- ---------------------------------------------------------------------------
+select is(pg_temp.ib('a0000000-0000-4000-8000-0000000d0010', 40, 25, 2, 2)->>'status', 'begun', 'scan at epoch 40 opens');
+select is(pg_temp.ip('a0000000-0000-4000-8000-0000000d0010', 0, jsonb_build_array(pg_temp.item('x')))->>'status', 'staged', 'its first page is staged');
+select is((select staged_item_count || ':' || (staged_bytes = octet_length(jsonb_build_array(pg_temp.item('x'))::text))
+  from public.foundation_connection_inventory_scans where scan_id = 'a0000000-0000-4000-8000-0000000d0010'),
+  '1:true', 'staging keeps per-scan running item and byte totals');
+-- Fault injection: the scan is one byte short of its 64 MiB staging cap.
+update public.foundation_connection_inventory_scans set staged_bytes = 67108863 where scan_id = 'a0000000-0000-4000-8000-0000000d0010';
+select throws_ok($$ select pg_temp.ip('a0000000-0000-4000-8000-0000000d0010', 1, jsonb_build_array(pg_temp.item('y'))) $$,
+  'INVENTORY_LIMIT_EXCEEDED', 'a page past the per-scan byte cap is refused');
+select is((select staged_item_count || ':' || (select count(*) from public.foundation_connection_inventory_pages p where p.scan_id = s.scan_id)
+  from public.foundation_connection_inventory_scans s where s.scan_id = 'a0000000-0000-4000-8000-0000000d0010'),
+  '1:1', 'the refused page wrote nothing');
+-- Fault injection: the scan was begun seven hours ago and abandoned.
+update public.foundation_connection_inventory_scans
+   set begun_at = begun_at - interval '7 hours', expires_at = expires_at - interval '7 hours'
+ where scan_id = 'a0000000-0000-4000-8000-0000000d0010';
+select throws_ok($$ select pg_temp.ip('a0000000-0000-4000-8000-0000000d0010', 1, jsonb_build_array(pg_temp.item('y'))) $$,
+  'INVENTORY_SCAN_EXPIRED', 'an expired scan accepts no page');
+select throws_ok($$ select pg_temp.ifin('a0000000-0000-4000-8000-0000000d0010', true, 2, 2) $$,
+  'INVENTORY_SCAN_EXPIRED', 'an expired scan cannot finalize');
+select throws_ok($$ select pg_temp.ib('a0000000-0000-4000-8000-0000000d0010', 40, 25, 2, 2) $$,
+  'INVENTORY_SCAN_EXPIRED', 'a begin replay does not revive an expired scan');
+select is(pg_temp.ib('a0000000-0000-4000-8000-0000000d0011', 35, 25, 0, 1)->>'status', 'begun',
+  'an abandoned scan does not block a new one, even at a lower epoch');
+select is((select state || ':' || (select count(*) from public.foundation_connection_inventory_pages p where p.scan_id = s.scan_id)
+  from public.foundation_connection_inventory_scans s where s.scan_id = 'a0000000-0000-4000-8000-0000000d0010'),
+  'expired:0', 'the abandoned scan is closed as expired and its pages released');
+
+-- ---------------------------------------------------------------------------
 -- 8. Actor and tenant isolation, each reaching the check it names
 -- ---------------------------------------------------------------------------
 select is((public.begin_connection_inventory_scan('b0000000-0000-4000-8000-0000000d0001', 'pilot-invB', 'b0000000-0000-4000-8000-0000000000c1',
@@ -257,7 +288,7 @@ reset role;
 set local role authenticated;
 select throws_ok($$ select public.begin_connection_inventory_scan('b0000000-0000-4000-8000-0000000d0004', 'pilot-invB', 'b0000000-0000-4000-8000-0000000000c1',
   null, 'b0000000-0000-4000-8000-00000000b0e1', 3, 0, 1, 1) $$,
-  '42501', 'a browser session cannot call the RPC');
+  '42501', null, 'a browser session cannot call the RPC');
 reset role;
 select is((select state from public.foundation_connection_inventory_scans where scan_id = 'b0000000-0000-4000-8000-0000000d0001'),
   'superseded', 'the newer epoch on connection B superseded its earlier scan');
@@ -267,6 +298,18 @@ select ok((select tombstones = (select count(*) from public.source_deletion_tomb
              and access_grants = (select count(*) from public.foundation_account_access_grants)
            from inv_baseline),
   'no tombstone, binding, ACL snapshot or access grant was written by any scan');
+
+-- ---------------------------------------------------------------------------
+-- 10. The founder-reset write fence covers begin and stage (last: it seals workspace A)
+-- ---------------------------------------------------------------------------
+insert into public.founder_test_reset_ledger (target_email, user_id, workspace_key, state, db_manifest_digest, manifest_digest, db_counts, r2_keys, sealed_at)
+values ('0ssol1620@gmail.com', 'a0000000-0000-4000-8000-0000000000a1', 'pilot-invA', 'sealed', 'sha256:' || repeat('a', 64), 'sha256:' || repeat('b', 64), '{}', '[]', now());
+select throws_ok($$ select pg_temp.ip('a0000000-0000-4000-8000-0000000d0011', 0, '[]'::jsonb) $$,
+  'founder_test_reset_write_fenced', 'a sealed workspace accepts no staged page');
+select is((select count(*)::integer from public.foundation_connection_inventory_pages where scan_id = 'a0000000-0000-4000-8000-0000000d0011'),
+  0, 'the fenced stage wrote no page');
+select throws_ok($$ select pg_temp.ib('a0000000-0000-4000-8000-0000000d0012', 50, 25, 0, 1) $$,
+  'founder_test_reset_write_fenced', 'a sealed workspace accepts no new scan');
 
 select * from finish();
 rollback;

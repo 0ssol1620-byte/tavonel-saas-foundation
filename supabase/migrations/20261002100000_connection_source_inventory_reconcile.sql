@@ -29,6 +29,7 @@
 --   items per scan 0..100000, pages 1..400, items per page 0..500 (an empty scan is exactly one
 --   empty page), nativeId 1..1024 UTF-8 bytes, revision 1..512 bytes (no C0 control or DEL),
 --   sizeBytes 0..1099511627776, mimeType null or MIME_TYPE_PATTERN and <= 127 chars.
+--   Staged page text per scan <= 64 MiB; an open scan expires 6 hours after begin.
 --
 -- Privileges: RLS on with a restrictive deny policy for anon/authenticated, no table privilege for
 -- any client role or service_role. service_role gets EXECUTE on the three RPCs only.
@@ -102,20 +103,29 @@ create table public.foundation_connection_inventory_scans (
   expected_head_epoch bigint not null check (expected_head_epoch >= 0 and expected_head_epoch < scan_epoch),
   item_count integer not null check (item_count between 0 and 100000),
   page_count integer not null check (page_count between 1 and 400),
-  state text not null default 'open' check (state in ('open', 'finalized', 'superseded')),
+  state text not null default 'open' check (state in ('open', 'finalized', 'superseded', 'expired')),
   actor_user_id uuid references auth.users(id) on delete restrict,
   actor_key_id uuid references public.foundation_api_keys(key_id) on delete restrict,
   begun_at timestamptz not null default clock_timestamp(),
+  -- An abandoned open scan stops accepting pages and finalize here, and the next begin on the
+  -- connection closes it and releases its pages whatever its epoch.
+  expires_at timestamptz not null default clock_timestamp() + interval '6 hours',
+  -- Running totals, so staging a page costs the page and not every page before it. Updating this
+  -- row on every stage also puts staging behind the founder-reset write fence below.
+  staged_item_count integer not null default 0 check (staged_item_count between 0 and item_count),
+  staged_bytes bigint not null default 0 check (staged_bytes between 0 and 67108864),
   closed_at timestamptz,
   receipt jsonb check (receipt is null or jsonb_typeof(receipt) = 'object'),
   check ((actor_user_id is null) <> (actor_key_id is null)),
   check ((item_count = 0 and page_count = 1)
     or (item_count > 0 and page_count <= item_count and item_count <= page_count * 500)),
+  check (expires_at > begun_at),
   check ((state = 'open') = (closed_at is null)),
   check ((state = 'finalized') = (receipt is not null))
 );
--- ponytail: finalized/superseded scan rows (receipts only, pages are released) are kept; prune by
--- age when a connection's history measurably matters.
+-- ponytail: closed scan rows (receipts only, pages are released) are kept, and an abandoned open
+-- scan keeps its <= 64 MiB of pages until the next begin on its connection; add a sweeper when
+-- either measurably matters.
 create unique index foundation_connection_inventory_scans_one_open_idx
   on public.foundation_connection_inventory_scans (connection_id) where state = 'open';
 
@@ -145,9 +155,10 @@ create table public.foundation_connection_inventory_items (
   primary key (connection_id, native_id)
 );
 
--- The founder test reset's write fence (20260920133000). Every RPC writes a head or scan row in
--- the same transaction as its other writes, so fencing these two blocks begin and finalize for a
--- sealed workspace without a per-item trigger. The reset itself does not yet archive or delete
+-- The founder test reset's write fence (20260920133000). Every RPC that writes anything also writes a
+-- head or scan row in the same transaction (stage bumps the scan's running totals), so
+-- fencing these two blocks begin, stage and finalize for a sealed workspace without a per-item
+-- trigger. The reset itself does not yet archive or delete
 -- these tables; the restrict FKs above make a reset of a workspace with inventory rows fail
 -- loudly instead of dropping them unarchived.
 create trigger founder_reset_fence before insert or update or delete on public.foundation_connection_inventory_heads
@@ -239,6 +250,9 @@ begin
       or v_scan.item_count <> p_item_count or v_scan.page_count <> p_page_count then
       raise exception 'INVENTORY_SCAN_CONFLICT';
     end if;
+    if v_scan.state = 'expired' or (v_scan.state = 'open' and v_scan.expires_at <= clock_timestamp()) then
+      raise exception 'INVENTORY_SCAN_EXPIRED';
+    end if;
     if v_scan.state <> 'open' then
       raise exception 'INVENTORY_SCAN_NOT_OPEN';
     end if;
@@ -249,6 +263,10 @@ begin
   if v_head.head_epoch <> p_expected_head_epoch then
     raise exception 'INVENTORY_HEAD_STALE' using detail = v_head.head_epoch::text;
   end if;
+  -- An abandoned scan neither blocks a new one by its epoch nor keeps its pages.
+  update public.foundation_connection_inventory_scans
+     set state = 'expired', closed_at = clock_timestamp()
+   where connection_id = p_connection_id and state = 'open' and expires_at <= clock_timestamp();
   if exists (select 1 from public.foundation_connection_inventory_scans s
               where s.connection_id = p_connection_id and s.state = 'open' and s.scan_epoch >= p_scan_epoch) then
     raise exception 'INVENTORY_EPOCH_STALE';
@@ -256,7 +274,7 @@ begin
 
   delete from public.foundation_connection_inventory_pages p
     using public.foundation_connection_inventory_scans s
-   where s.scan_id = p.scan_id and s.connection_id = p_connection_id and s.state = 'open';
+   where s.scan_id = p.scan_id and s.connection_id = p_connection_id and s.state in ('open', 'expired');
   update public.foundation_connection_inventory_scans
      set state = 'superseded', closed_at = clock_timestamp()
    where connection_id = p_connection_id and state = 'open';
@@ -291,7 +309,7 @@ declare
   v_scan public.foundation_connection_inventory_scans%rowtype;
   v_existing jsonb;
   v_count integer;
-  v_staged bigint;
+  v_bytes integer;
 begin
   if p_scan_id is null or p_page_index is null or p_page_index not between 0 and 399
     or p_items is null or jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 500 then
@@ -303,6 +321,9 @@ begin
    for update;
   if not found then
     raise exception 'INVENTORY_SCAN_NOT_FOUND';
+  end if;
+  if v_scan.state = 'expired' or (v_scan.state = 'open' and v_scan.expires_at <= clock_timestamp()) then
+    raise exception 'INVENTORY_SCAN_EXPIRED';
   end if;
   if v_scan.state <> 'open' then
     raise exception 'INVENTORY_SCAN_NOT_OPEN';
@@ -326,12 +347,18 @@ begin
     raise exception 'INVENTORY_ITEM_INVALID';
   end if;
   v_count := jsonb_array_length(p_items);
-  select coalesce(sum(jsonb_array_length(items)), 0) into v_staged
-    from public.foundation_connection_inventory_pages where scan_id = p_scan_id;
-  if (v_scan.item_count = 0) <> (v_count = 0) or v_staged + v_count > v_scan.item_count then
+  v_bytes := octet_length(p_items::text);
+  if (v_scan.item_count = 0) <> (v_count = 0) or v_scan.staged_item_count + v_count > v_scan.item_count then
     raise exception 'INVENTORY_COUNT_MISMATCH';
   end if;
+  if v_scan.staged_bytes + v_bytes > 67108864 then
+    raise exception 'INVENTORY_LIMIT_EXCEEDED';
+  end if;
 
+  -- This update is what the founder-reset fence sees; it runs before the page is written.
+  update public.foundation_connection_inventory_scans
+     set staged_item_count = staged_item_count + v_count, staged_bytes = staged_bytes + v_bytes
+   where scan_id = p_scan_id;
   insert into public.foundation_connection_inventory_pages (scan_id, page_index, items)
     values (p_scan_id, p_page_index, p_items);
   return jsonb_build_object('status', 'staged', 'scanId', p_scan_id, 'pageIndex', p_page_index,
@@ -387,6 +414,9 @@ begin
   if not p_complete then
     raise exception 'INVENTORY_NOT_ATTESTED_COMPLETE';
   end if;
+  if v_scan.state = 'expired' or (v_scan.state = 'open' and v_scan.expires_at <= clock_timestamp()) then
+    raise exception 'INVENTORY_SCAN_EXPIRED';
+  end if;
   if v_scan.state <> 'open' then
     raise exception 'INVENTORY_SCAN_NOT_OPEN';
   end if;
@@ -395,11 +425,15 @@ begin
   end if;
 
   select count(*) into v_pages from public.foundation_connection_inventory_pages where scan_id = p_scan_id;
+  if v_pages <> v_scan.page_count or v_scan.staged_item_count <> v_scan.item_count then
+    raise exception 'INVENTORY_PAGES_INCOMPLETE';
+  end if;
+  -- One linear pass over the staged items, re-counting rather than trusting the running total.
   select count(*), count(distinct e.item->>'nativeId') into v_items, v_distinct
     from public.foundation_connection_inventory_pages p
     cross join lateral jsonb_array_elements(p.items) e(item)
    where p.scan_id = p_scan_id;
-  if v_pages <> v_scan.page_count or v_items <> v_scan.item_count then
+  if v_items <> v_scan.item_count then
     raise exception 'INVENTORY_PAGES_INCOMPLETE';
   end if;
   if v_distinct <> v_items then

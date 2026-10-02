@@ -14,10 +14,11 @@
 --
 -- The expected sets are the migrations' own statements, not a judgement about what the server
 -- ought to have: 0053's header names the source migration for every row. Fourteen tables expect
--- `{}` because no migration ever granted service_role anything on them.
+-- `{}` because no migration ever granted service_role anything on them; the four
+-- foundation_connection_inventory_* tables (20261002100000) also expect `{}`: RPC-only.
 
 begin;
-select plan(66);
+select plan(70);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -52,6 +53,10 @@ select table_privs_are('public', 'foundation_compile_jobs', 'service_role', arra
 select table_privs_are('public', 'foundation_compute_reservations', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_connection_batches', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_connections', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
+select table_privs_are('public', 'foundation_connection_inventory_heads', 'service_role', array[]::text[]);
+select table_privs_are('public', 'foundation_connection_inventory_items', 'service_role', array[]::text[]);
+select table_privs_are('public', 'foundation_connection_inventory_pages', 'service_role', array[]::text[]);
+select table_privs_are('public', 'foundation_connection_inventory_scans', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_credit_ledger', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_developer_audit_events', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_intake_admissions', 'service_role', array[]::text[]);

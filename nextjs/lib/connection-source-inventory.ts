@@ -38,7 +38,7 @@ export type InventoryRpcName = "begin_connection_inventory_scan" | "stage_connec
 export type InventoryRpc = (fn: InventoryRpcName, args: Record<string, unknown>) => Promise<{ status: number; payload: unknown } | null>;
 export type InventoryOutcome =
   | { ok: true; result: Record<string, unknown> }
-  | { ok: false; code: string; status: 400 | 403 | 409 | 423 | 503; headEpoch?: number };
+  | { ok: false; code: string; status: 400 | 403 | 409 | 413 | 423 | 503; headEpoch?: number };
 
 type Json = Record<string, unknown>;
 
@@ -50,23 +50,25 @@ const REQUEST_KEYS: Record<InventoryRequest["operation"], string[]> = {
   "inventory.page": ["items", "operation", "pageIndex", "scanId"],
   "inventory.finalize": ["complete", "itemCount", "operation", "pageCount", "scanId"],
 };
-const ERROR_STATUS: Record<string, 400 | 403 | 409 | 423> = {
-  INVENTORY_CONTRACT_INVALID: 400,
-  INVENTORY_ITEM_INVALID: 400,
-  INVENTORY_PAGE_INDEX_INVALID: 400,
-  INVENTORY_NOT_ATTESTED_COMPLETE: 400,
-  INVENTORY_ACTOR_INVALID: 403,
-  INVENTORY_HEAD_STALE: 409,
-  INVENTORY_EPOCH_STALE: 409,
-  INVENTORY_SCAN_CONFLICT: 409,
-  INVENTORY_SCAN_NOT_FOUND: 409,
-  INVENTORY_SCAN_NOT_OPEN: 409,
-  INVENTORY_PAGE_CONFLICT: 409,
-  INVENTORY_COUNT_MISMATCH: 409,
-  INVENTORY_PAGES_INCOMPLETE: 409,
-  INVENTORY_DUPLICATE_ITEM: 409,
-  INVENTORY_FINALIZE_CONFLICT: 409,
-  CONNECTION_NOT_SYNCABLE: 423,
+const ERROR_STATUS: Record<string, 400 | 403 | 409 | 413 | 423> = {
+  "INVENTORY_CONTRACT_INVALID": 400,
+  "INVENTORY_ITEM_INVALID": 400,
+  "INVENTORY_PAGE_INDEX_INVALID": 400,
+  "INVENTORY_NOT_ATTESTED_COMPLETE": 400,
+  "INVENTORY_ACTOR_INVALID": 403,
+  "INVENTORY_HEAD_STALE": 409,
+  "INVENTORY_EPOCH_STALE": 409,
+  "INVENTORY_SCAN_CONFLICT": 409,
+  "INVENTORY_SCAN_NOT_FOUND": 409,
+  "INVENTORY_SCAN_NOT_OPEN": 409,
+  "INVENTORY_SCAN_EXPIRED": 409,
+  "INVENTORY_PAGE_CONFLICT": 409,
+  "INVENTORY_COUNT_MISMATCH": 409,
+  "INVENTORY_PAGES_INCOMPLETE": 409,
+  "INVENTORY_DUPLICATE_ITEM": 409,
+  "INVENTORY_FINALIZE_CONFLICT": 409,
+  "INVENTORY_LIMIT_EXCEEDED": 413,
+  "CONNECTION_NOT_SYNCABLE": 423,
 };
 const UNAVAILABLE = { ok: false, code: "INVENTORY_UNAVAILABLE", status: 503 } as const;
 
