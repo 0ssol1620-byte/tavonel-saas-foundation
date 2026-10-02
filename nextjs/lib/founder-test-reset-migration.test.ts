@@ -244,8 +244,55 @@ describe("founder test reset keeps its archived-row DELETE allowance in every gu
     expect(fix.body.replace(`  ${ALLOWANCE}\n`, "")).toBe(boundary[0]);
     expect(fix.body).toContain("raise exception 'CONNECTOR_BINDING_WRITE_PATH'");
     const migration = read(fix.file);
-    expect(migration).toContain("returns trigger\nlanguage plpgsql set search_path = '' as $$");
-    expect(migration).not.toMatch(/security\s+definer|^\s*(grant|revoke|alter)\b/im);
-    expect(migration.match(/create or replace function/gi)).toHaveLength(1);
+    expect(migration).toContain("create or replace function public.guard_connector_document_binding() returns trigger\nlanguage plpgsql set search_path = '' as $$");
+    expect(migration).not.toMatch(/^\s*(grant|revoke|alter)\b/im);
+    // The guard stays invoker; only the three reset functions it also replaces are security definer.
+    expect(migration.match(/security definer set search_path = '' as \$\$/g)).toHaveLength(3);
+    expect(migration.match(/create or replace function/gi)).toHaveLength(4);
+  });
+
+  const FIX = "20261002140000_connector_binding_guard_reset_allowance.sql";
+  const TIE = "connector_binding_tie_resolutions";
+  const RESET = ["finalize_founder_test_reset", "founder_test_reset_table_counts", "founder_test_reset_rows_fingerprint"];
+  const deletedIn = (finalize: string) => [...finalize.matchAll(/delete\s+from\s+public\.([a-z0-9_]+)/gi)].map((m) => m[1]!);
+  const resetBody = (file: string, name: string) => {
+    const match = read(file).match(new RegExp(
+      `create\\s+or\\s+replace\\s+function\\s+public\\.${name}\\b[\\s\\S]*?\\bas\\s+\\$\\$([\\s\\S]*?)\\$\\$\\s*;`, "i"));
+    expect(match, `function body missing: ${name}`).not.toBeNull();
+    return match![1]!;
+  };
+
+  it("is the live definition of every reset function it replaces", () => {
+    for (const name of RESET) {
+      const file = files.filter((candidate) => new RegExp(`function\\s+public\\.${name}\\(`, "i").test(read(candidate))).at(-1);
+      expect(file, name).toBe(FIX);
+    }
+  });
+
+  it("counts, fingerprints and deletes exactly the tie resolutions on top of 20261002120000", () => {
+    const previous = "20261002120000_founder_test_reset_connection_inventory.sql";
+    const before = new Set(deletedIn(resetBody(previous, "finalize_founder_test_reset")));
+    const after = deletedIn(resetBody(FIX, "finalize_founder_test_reset"));
+    expect(before.size).toBe(41);
+    expect(new Set(after).size).toBe(42);
+    expect(after.filter((table) => !before.has(table))).toEqual([TIE]);
+    expect([...selectedTables(resetBody(FIX, "founder_test_reset_table_counts"), "count\\(\\*\\)")].sort())
+      .toEqual([...new Set(after)].sort());
+    expect([...selectedTables(resetBody(FIX, "founder_test_reset_rows_fingerprint"), "to_jsonb\\(x\\)::text")].sort())
+      .toEqual([...new Set(after)].sort());
+    for (const name of RESET) {
+      const kept = resetBody(FIX, name).split("\n").filter((line) => !line.includes(TIE) && !/^\s*-- 20261002140000/.test(line));
+      expect(kept.join("\n"), name).toBe(resetBody(previous, name));
+    }
+  });
+
+  it("deletes the tie resolutions inside the reset session, ahead of the bindings, behind the reset fence", () => {
+    const finalize = resetBody(FIX, "finalize_founder_test_reset");
+    const at = (table: string) => finalize.indexOf(`delete from public.${table} where workspace_key=p_workspace_key;`);
+    expect(at(TIE)).toBeGreaterThan(finalize.indexOf("set_config('tavonel.founder_reset_id'"));
+    expect(at(TIE)).toBeLessThan(at("connector_document_bindings"));
+    expect(read(FIX)).toContain(`create trigger founder_reset_fence before insert or update or delete on public.${TIE}\n`
+      + "  for each row execute function public.guard_founder_test_reset_workspace_write();");
+    expect(read(FIX)).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
   });
 });

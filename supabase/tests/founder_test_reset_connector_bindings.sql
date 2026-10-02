@@ -6,14 +6,17 @@
 --   - outside the sealed reset session a binding is still immutable (DELETE and UPDATE), a forged
 --     reset session without an archived row still deletes nothing, and a direct service_role INSERT
 --     is still refused by 20261001150000's write boundary while the guarded writer still records;
---   - another workspace's bindings are untouched by finalize, and not deletable from its session.
+--   - another workspace's bindings are untouched by finalize, and not deletable from its session;
+--   - connector_binding_tie_resolutions (same migration) is counted, fingerprinted (a resolution
+--     recorded after prepare is drift), fenced while sealed and deleted by finalize for the reset
+--     workspace only.
 --
 -- Everything runs inside this rolled-back transaction on the disposable rehearsal database. Each
 -- auth.users insert bootstraps a legacy workspace and a foundation workspace (0001, 20260920121000):
 --   pilot-f0f0f0f0f0f04f0f  the founder test identity (enterprise, grace 0, hold off) -- the subject
 --   pilot-e5e5e5e5e5e54e5e  an unrelated self-service workspace -- must be left alone
 begin;
-select plan(13);
+select plan(16);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -57,16 +60,28 @@ insert into public.connector_document_bindings (
    'google_drive', 'native-founder', 'rev-1', '0db00000-0000-4000-8000-0000000000f1',
    'sha256:' || repeat('1', 64), 11, 'text/plain');
 
--- Every binding row of one workspace, for an exact before/after comparison.
+-- One tie resolution per workspace. The table has no API-role access and no foreign key; owner SQL
+-- writes it directly, as the guarded writer does.
+insert into public.connector_binding_tie_resolutions (workspace_key, source_id, tied_source_version_ids, current_source_version_id)
+values
+  ('pilot-f0f0f0f0f0f04f0f', 'src-' || repeat('f', 64), array['sv-' || repeat('a', 64), 'sv-' || repeat('f', 64)], 'sv-' || repeat('f', 64)),
+  ('pilot-e5e5e5e5e5e54e5e', 'src-' || repeat('e', 64), array['sv-' || repeat('c', 64), 'sv-' || repeat('d', 64)], 'sv-' || repeat('d', 64));
+
+-- Every binding and tie-resolution row of one workspace, for an exact before/after comparison.
 create function pg_temp.binding_rows(p_workspace text) returns text language sql as $f$
-  select coalesce(string_agg(to_jsonb(b)::text, E'\n' order by b.source_version_id), '')
-    from public.connector_document_bindings b where b.workspace_key = p_workspace
+  select coalesce(string_agg(r, E'\n' order by r), '') from (
+    select 'b:' || to_jsonb(b)::text r from public.connector_document_bindings b where b.workspace_key = p_workspace
+    union all select 't:' || to_jsonb(t)::text from public.connector_binding_tie_resolutions t where t.workspace_key = p_workspace
+  ) q
 $f$;
-create function pg_temp.binding_count(p_workspace text) returns integer language sql as $f$
-  select count(*)::integer from public.connector_document_bindings where workspace_key = p_workspace
+create function pg_temp.binding_counts(p_workspace text) returns jsonb language sql as $f$
+  select jsonb_build_object(
+    'bindings', (select count(*) from public.connector_document_bindings where workspace_key = p_workspace),
+    'ties', (select count(*) from public.connector_binding_tie_resolutions where workspace_key = p_workspace))
 $f$;
 
-select is(pg_temp.binding_count('pilot-f0f0f0f0f0f04f0f'), 1, 'fixture: the founder workspace has one binding');
+select is(pg_temp.binding_counts('pilot-f0f0f0f0f0f04f0f'), '{"bindings":1,"ties":1}'::jsonb,
+  'fixture: the founder workspace has one binding and one tie resolution');
 
 -- The bystander binding goes through the supported writer, with the identity its fields derive.
 select is((select public.record_connector_document_binding_after(jsonb_build_object(
@@ -102,11 +117,25 @@ end $d$;$$, 'P0001', 'CONNECTOR_BINDING_WRITE_PATH', 'a direct service_role inse
 -- ---------------------------------------------------------------------------
 create temp table prepared as select public.prepare_founder_test_reset('0ssol1620@gmail.com',
   'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'pilot-f0f0f0f0f0f04f0f') as r;
-select is((select (r->'dbCounts'->>'connector_document_bindings')::integer from prepared), 1,
-  'the sealed manifest counts the founder binding');
+select is((select jsonb_build_object('bindings', r->'dbCounts'->'connector_document_bindings',
+    'ties', r->'dbCounts'->'connector_binding_tie_resolutions') from prepared),
+  '{"bindings":1,"ties":1}'::jsonb, 'the sealed manifest counts the founder binding and tie resolution');
+
+select throws_ok($$do $d$ begin
+  insert into public.connector_binding_tie_resolutions (workspace_key, source_id, tied_source_version_ids, current_source_version_id)
+  values ('pilot-f0f0f0f0f0f04f0f', 'src-' || repeat('1', 64), array['sv-' || repeat('1', 64), 'sv-' || repeat('2', 64)], 'sv-' || repeat('2', 64));
+  perform public.seal_founder_test_reset((select (r->>'resetId')::uuid from prepared), '0ssol1620@gmail.com',
+    'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'pilot-f0f0f0f0f0f04f0f', (select r->>'dbManifestDigest' from prepared),
+    'sha256:' || repeat('b', 64), '[]'::jsonb);
+end $d$;$$, 'P0001', 'founder_test_reset_database_drift', 'a tie resolution recorded after prepare is database drift');
+
 select is(public.seal_founder_test_reset((select (r->>'resetId')::uuid from prepared), '0ssol1620@gmail.com',
   'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'pilot-f0f0f0f0f0f04f0f', (select r->>'dbManifestDigest' from prepared),
   'sha256:' || repeat('b', 64), '[]'::jsonb)->>'status', 'sealed', 'the reset seals with a binding present');
+
+select throws_ok($$insert into public.connector_binding_tie_resolutions (workspace_key, source_id, tied_source_version_ids, current_source_version_id)
+  values ('pilot-f0f0f0f0f0f04f0f', 'src-' || repeat('1', 64), array['sv-' || repeat('1', 64), 'sv-' || repeat('2', 64)], 'sv-' || repeat('2', 64))$$,
+  'P0001', 'founder_test_reset_write_fenced', 'a sealed workspace records no tie resolution');
 
 -- The allowance needs the archived row, not just the session setting: before finalize archives it,
 -- naming the sealed reset deletes nothing.
@@ -121,13 +150,16 @@ end $d$;$$, 'P0001', 'CONNECTOR_BINDING_IMMUTABLE', 'a sealed reset session with
 select is(public.finalize_founder_test_reset((select (r->>'resetId')::uuid from prepared), '0ssol1620@gmail.com',
   'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'pilot-f0f0f0f0f0f04f0f', 'sha256:' || repeat('b', 64))->>'status',
   'db_finalized_pending_object_verify', 'finalize succeeds on a workspace with a connector binding');
-select is(pg_temp.binding_count('pilot-f0f0f0f0f0f04f0f'), 0, 'no binding of the founder workspace remains');
+select is(pg_temp.binding_counts('pilot-f0f0f0f0f0f04f0f'), '{"bindings":0,"ties":0}'::jsonb,
+  'no binding or tie resolution of the founder workspace remains');
 select is((select count(*)::integer from public.founder_test_reset_evidence_archive
   where reset_id = (select (r->>'resetId')::uuid from prepared) and source_table = 'connector_document_bindings'
     and source_row_key = 'sv-' || repeat('f', 64) and payload->>'workspace_key' = 'pilot-f0f0f0f0f0f04f0f'), 1,
   'the deleted binding is in the evidence archive');
 select is(pg_temp.binding_rows('pilot-e5e5e5e5e5e54e5e'), (select rows from bystander_before),
-  'every bystander binding is byte-identical after finalize');
+  'every bystander binding and tie resolution is byte-identical after finalize');
+select is(pg_temp.binding_counts('pilot-e5e5e5e5e5e54e5e'), '{"bindings":1,"ties":1}'::jsonb,
+  'and the bystander still has its binding and tie resolution');
 select throws_ok($$do $d$ begin
   perform set_config('tavonel.founder_reset_id', (select r->>'resetId' from prepared), true);
   delete from public.connector_document_bindings where workspace_key = 'pilot-e5e5e5e5e5e54e5e';
