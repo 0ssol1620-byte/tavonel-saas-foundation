@@ -2,11 +2,44 @@
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import net from "node:net";
 import path from "node:path";
 import { stopOwnedChild } from "./stop-owned-child.mjs";
+
+const DIAGNOSTIC_TAIL_BYTES = 6000;
+const DIAGNOSTIC_PRINT_LIMIT = 6144;
+
+// Failure-only service tail. Literal secrets go first; a truncated tail drops its first partial line
+// so a cut-off credential fragment cannot survive the literal match.
+function redactedDiagnostics(text, env) {
+  let out = text;
+  if (out.length >= DIAGNOSTIC_TAIL_BYTES) {
+    const newline = out.indexOf("\n");
+    out = newline === -1 ? "" : out.slice(newline + 1);
+  }
+  for (const secret of [env.AWS_ACCESS_KEY_ID, env.AWS_SECRET_ACCESS_KEY]) if (secret) out = out.split(secret).join("[redacted]");
+  return out
+    .replace(/(AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)["']?\s*[=:]\s*["']?)[^\s"',&]+/gi, "$1[redacted]")
+    .replace(/(authorization["']?\s*[=:]\s*)[^\r\n]+/gi, "$1[redacted]")
+    .replace(/((?:X-Amz-(?:Signature|Credential|Security-Token)|Signature|Credential)["']?\s*[=:]\s*["']?)[^\s"',&]+/gi, "$1[redacted]")
+    .replace(/((?:secret|password|passwd|token|api[_-]?key|access[_-]?key)[\w-]*["']?\s*[=:]\s*["']?)[^\s"',&]+/gi, "$1[redacted]")
+    .slice(-DIAGNOSTIC_PRINT_LIMIT);
+}
+
+/**
+ * Parent for this harness's disposable directories. SeaweedFS refuses volume assignment below 1% free space on its
+ * data directory, so TAVONEL_LOCAL_S3_TMPDIR (a non-secret path) may point at a roomier local disk. When set, it must
+ * already be an absolute local directory: no UNC/network path, no link, nothing is created. Otherwise the OS tmpdir.
+ */
+export function localS3TempRoot() {
+  const configured = process.env.TAVONEL_LOCAL_S3_TMPDIR;
+  if (configured === undefined) return tmpdir();
+  assert.ok(path.isAbsolute(configured) && !/^[\\/]{2}/.test(configured), "TAVONEL_LOCAL_S3_TMPDIR must be an absolute local path");
+  assert.ok(lstatSync(configured, { throwIfNoEntry: false })?.isDirectory(), "TAVONEL_LOCAL_S3_TMPDIR must be an existing directory");
+  return configured;
+}
 
 export async function withLocalStorage(executable, visit) {
 assert.ok(executable, "Set TAVONEL_LOCAL_SEAWEED_EXE to the qualified official SeaweedFS 4.48 Windows binary");
@@ -15,7 +48,7 @@ assert.ok(["win32", "linux"].includes(process.platform), "Only separately qualif
 assert.equal(binarySha256, process.platform === "win32"
   ? "394a0154424f3d96f7969c044b77ee4cfb649299f8b42ecc7b703971872ce61d"
   : "8c07a1ccc4ec058cd90989ac0533c30436832e41c63de2b26f37253d9f744c4d");
-const root = mkdtempSync(path.join(tmpdir(), "tavonel-s3-journey-"));
+const root = mkdtempSync(path.join(localS3TempRoot(), "tavonel-s3-journey-"));
 const allowed = new Set(["PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"]);
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => allowed.has(key.toUpperCase())));
 env.GOMAXPROCS = "2";
@@ -69,6 +102,7 @@ try {
 } catch (error) {
   // Record the original failure before cleanup can fail separately. Never log service credentials.
   console.error("Local service qualification failed:", error.name);
+  console.error(`SeaweedFS output tail (redacted):\n${redactedDiagnostics(diagnostics, env)}`);
   throw error;
 } finally {
   await stopOwnedChild(child);

@@ -8,11 +8,110 @@ import https from "node:https";
 import net from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { withLocalStorage } from "./local-storage-journey.mjs";
 
 const hash = body => createHash("sha256").update(body).digest("hex");
 const hmac = (key, body) => createHmac("sha256", key).update(body).digest();
-const storageHost = "00000000000000000000000000000000.r2.cloudflarestorage.com";
+export const storageHost = "00000000000000000000000000000000.r2.cloudflarestorage.com";
+
+/** The exact https://127.0.0.1[:port] origin, or a throw. Remote, localhost alias, HTTP, credential, path, query and hash forms are refused. */
+function exactLocalOrigin(origin) {
+  let parsed;
+  try { parsed = typeof origin === "string" ? new URL(origin) : undefined; } catch { parsed = undefined; }
+  // Comparing the input with its own serialization also refuses numeric aliases such as 127.1 and an empty "?" or "#".
+  if (!parsed || parsed.protocol !== "https:" || parsed.hostname !== "127.0.0.1" || parsed.username || parsed.password
+    || parsed.pathname !== "/" || parsed.search || parsed.hash || (origin !== parsed.origin && origin !== `${parsed.origin}/`)) {
+    throw new TypeError("Local storage transport requires an exact https://127.0.0.1 origin");
+  }
+  return parsed.origin;
+}
+
+// Fail closed: Chromium resolves only these names, so any hostname not rewritten by a route fails with
+// ERR_NAME_NOT_RESOLVED instead of reaching external DNS. Never add storageHost here.
+export const loopbackOnlyChromiumArgs = Object.freeze(["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1"]);
+
+/**
+ * Transport only. Requests to the exact local origin continue unchanged. HTTPS requests to exactly storageHost
+ * on the default port continue in Chromium with the URL rewritten to the local origin, path+query unchanged, so
+ * Chromium's own network stack uploads the body; the proxy restores the signed Host. Every other URL is aborted;
+ * onBlocked (optional) observes it. Playwright does not run routes for redirect hops, so this helper never sees a
+ * redirect; only a browser launched with guardedChromiumArgs keeps such a hop off other hosts and loopback ports.
+ */
+export function routeLocalStorageTransport(context, origin, onBlocked) {
+  const local = exactLocalOrigin(origin);
+  return context.route("**/*", route => {
+    const original = route.request().url();
+    const url = new URL(original);
+    if (url.origin === local) return route.continue();
+    if (url.protocol === "https:" && url.hostname === storageHost && url.port === "" && !url.username && !url.password) {
+      return route.continue({ url: `${local}${url.pathname}${url.search}` });
+    }
+    onBlocked?.(original);
+    return route.abort();
+  });
+}
+
+// CONNECT targets are only ever host:port; anything else is recorded as unparseable rather than echoed.
+const connectTarget = value => typeof value === "string" && /^[A-Za-z0-9.\-[\]:]{1,300}$/.test(value) ? value : "<unparseable>";
+
+/**
+ * Network boundary for redirect hops, which routes never see and which the resolver admits on every loopback port.
+ * An HTTP CONNECT proxy bound to 127.0.0.1 that tunnels only to the exact "127.0.0.1:port" / "localhost:port"
+ * targets given (always dialled as 127.0.0.1:port). Any other CONNECT target is refused with 403 before a socket is
+ * opened; ordinary proxy requests and upgrades are refused with 405. accepted/rejected are test observations: target
+ * host:port and method only, never a path, query or header.
+ */
+export async function startLoopbackConnectGuard(targets) {
+  const allowed = new Set();
+  for (const target of targets) {
+    const match = typeof target === "string" ? /^(?:127\.0\.0\.1|localhost):([1-9]\d{0,4})$/.exec(target) : null;
+    if (!match || Number(match[1]) > 65535) throw new TypeError("Connect guard admits only exact 127.0.0.1:port or localhost:port targets");
+    allowed.add(target);
+  }
+  if (allowed.size === 0) throw new TypeError("Connect guard requires at least one listener target");
+  const accepted = [];
+  const rejected = [];
+  const sockets = new Set();
+  const own = socket => { sockets.add(socket); socket.on("close", () => sockets.delete(socket)); socket.on("error", () => socket.destroy()); return socket; };
+  const refuse = (socket, status, observation) => {
+    rejected.push(observation);
+    socket.end(`HTTP/1.1 ${status}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n`);
+  };
+  const server = http.createServer((request, response) => {
+    rejected.push({ kind: "non-connect", method: request.method });
+    request.resume();
+    response.writeHead(405, { connection: "close", "content-length": "0" }); response.end();
+  });
+  server.on("connection", own);
+  server.on("upgrade", (request, socket) => { refuse(socket, "405 Method Not Allowed", { kind: "non-connect", method: request.method }); });
+  server.on("clientError", (_error, socket) => { socket.destroy(); });
+  server.on("connect", (request, client, head) => {
+    const target = connectTarget(request.url);
+    if (!allowed.has(target)) { refuse(client, "403 Forbidden", { kind: "connect", target }); return; }
+    accepted.push({ kind: "connect", target });
+    const upstream = own(net.connect(Number(target.slice(target.lastIndexOf(":") + 1)), "127.0.0.1"));
+    upstream.on("connect", () => {
+      client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+      if (head?.length) upstream.write(head);
+      upstream.pipe(client); client.pipe(upstream);
+    });
+    upstream.on("close", () => client.destroy());
+    client.on("close", () => upstream.destroy());
+  });
+  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+  const port = server.address().port;
+  return {
+    port, proxyServer: `http://127.0.0.1:${port}`, allowed: [...allowed], accepted, rejected,
+    async close() {
+      for (const socket of sockets) socket.destroy();
+      await new Promise(resolve => server.close(resolve));
+    },
+  };
+}
+
+// Every request, loopback included, goes through the guard: "<-loopback>" removes Chromium's implicit loopback bypass.
+export const guardedChromiumArgs = guard => Object.freeze([...loopbackOnlyChromiumArgs, `--proxy-server=${guard.proxyServer}`, "--proxy-bypass-list=<-loopback>"]);
+
+
 async function freePort() {
   const server = net.createServer();
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -22,6 +121,8 @@ async function freePort() {
 
 export async function qualifyNextBrowser({ root, env, base, token, owner, admin, workspace, artifacts, serviceToken, sql, check, rpc }) {
   assert.ok(process.env.TAVONEL_LOCAL_SEAWEED_EXE, "Next qualification requires the qualified local S3 executable");
+  // Loaded only by this explicit runner, so importing the transport helper never touches the storage harness.
+  const { withLocalStorage } = await import("./local-storage-journey.mjs");
   return withLocalStorage(process.env.TAVONEL_LOCAL_SEAWEED_EXE, async storage => {
     const nextRoot = path.resolve(import.meta.dirname, "../..");
     const nextPort = await freePort();
@@ -73,7 +174,7 @@ export async function qualifyNextBrowser({ root, env, base, token, owner, admin,
     const origin = `https://127.0.0.1:${proxy.address().port}`;
     const preload = path.join(root, "r2-loopback-transport.cjs");
     writeFileSync(preload, `const original=globalThis.fetch;globalThis.fetch=(input,init)=>{if(typeof input==='string'){const u=new URL(input);if(u.hostname===${JSON.stringify(storageHost)})return original(${JSON.stringify(origin)}+u.pathname+u.search,init);}return original(input,init);};`);
-    let child, browser;
+    let child, browser, guard;
     try {
     // Fixtures remain actual Core outputs; no fabricated package/receipt is admitted.
     for (const artifact of artifacts) {
@@ -110,9 +211,11 @@ export async function qualifyNextBrowser({ root, env, base, token, owner, admin,
       }
       assert.ok(ready, `Owned Next did not become ready: ${diagnostics}`);
       const { chromium } = await import(pathToFileURL(path.join(nextRoot, "node_modules/@playwright/test/index.mjs")).href);
-      browser = await chromium.launch({ headless: true });
+      // The browser reaches only the local listener port; redirect hops to any other target stop at the guard.
+      guard = await startLoopbackConnectGuard([new URL(origin).host]);
+      browser = await chromium.launch({ headless: true, args: [...guardedChromiumArgs(guard)] });
       const context = await browser.newContext({ ignoreHTTPSErrors: true });
-      await context.route("**/*", route => { const u=new URL(route.request().url()); return u.hostname==="127.0.0.1" ? route.continue() : route.abort(); });
+      await routeLocalStorageTransport(context, origin);
       const page = await context.newPage();
       await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded", timeout: 60_000 });
       const request = (resource, bearer, body) => page.evaluate(async ({ resource, bearer, body }) => {
@@ -183,7 +286,11 @@ export async function qualifyNextBrowser({ root, env, base, token, owner, admin,
             if(process.platform==="win32") execFileSync("taskkill",["/PID",String(child.pid),"/T","/F"],{windowsHide:true,stdio:"ignore"});
             else child.kill();
           }
-        } finally { proxy.closeAllConnections(); await new Promise(resolve=>proxy.close(resolve)); }
+        } finally {
+          try {
+            if(guard) await guard.close();
+          } finally { proxy.closeAllConnections(); await new Promise(resolve=>proxy.close(resolve)); }
+        }
       }
     }
   });
