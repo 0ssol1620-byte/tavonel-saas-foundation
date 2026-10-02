@@ -63,7 +63,7 @@ describe("db-rehearsal model-provider spend proof", () => {
 
   it("replays the K20 dispatch-start mark after the queued-expiry recovery", () => {
     const loop = replay.slice(0, replay.indexOf("supabase test db"));
-    expect(loop.indexOf("supabase/migrations/20261002120000_*.sql"))
+    expect(loop.indexOf("supabase/migrations/20261002130000_*.sql"))
       .toBeGreaterThan(loop.indexOf("supabase/migrations/20261002110000_*.sql"));
   });
 

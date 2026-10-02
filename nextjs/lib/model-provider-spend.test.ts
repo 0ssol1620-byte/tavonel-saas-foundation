@@ -415,7 +415,7 @@ describe("model-provider queued-expiry recovery migration contract", () => {
 
 describe("model-provider dispatch-start mark migration contract (K20)", () => {
   const read = (path: string) => readFileSync(resolve(import.meta.dirname, "../../supabase", path), "utf8");
-  const mark = read("migrations/20261002120000_model_provider_dispatch_start_mark.sql")
+  const mark = read("migrations/20261002130000_model_provider_dispatch_start_mark.sql")
     .replace(/\r\n/g, "\n");
   const pgtap = read("tests/model_provider_dispatch_start_mark.sql");
 

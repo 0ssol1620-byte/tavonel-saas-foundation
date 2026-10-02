@@ -1,5 +1,5 @@
 -- Rollback-only pgTAP coverage for the K20 durable dispatch-start mark
--- (20261002120000_model_provider_dispatch_start_mark.sql). A "hard process death" is modelled as
+-- (20261002130000_model_provider_dispatch_start_mark.sql). A "hard process death" is modelled as
 -- the worker simply never making its next RPC: what remains is exactly the committed rows, and
 -- the restarted worker and the sweep only ever see those. Every price, budget, tenant and request
 -- is synthetic and the whole run is rolled back. No provider is involved at all.

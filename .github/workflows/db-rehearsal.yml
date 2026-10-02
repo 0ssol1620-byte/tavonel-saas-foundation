@@ -217,7 +217,7 @@ jobs:
           for file in supabase/migrations/005[245]_*.sql supabase/migrations/20260911*_*.sql \
                       supabase/migrations/20260929152100_*.sql \
                       supabase/migrations/20261002110000_*.sql \
-                      supabase/migrations/20261002120000_*.sql; do
+                      supabase/migrations/20261002130000_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done

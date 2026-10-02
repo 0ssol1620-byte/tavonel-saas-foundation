@@ -11,7 +11,7 @@ import {
 
   The real spend client runs against an in-memory stand-in for the four ledger RPCs, reached
   through the real `fetch` boundary, so every receipt still passes the client's own validation.
-  The stand-in mirrors the SQL rules of 20261002120000_model_provider_dispatch_start_mark.sql;
+  The stand-in mirrors the SQL rules of 20261002130000_model_provider_dispatch_start_mark.sql;
   supabase/tests/model_provider_dispatch_start_mark.sql proves those rules on Postgres itself.
 
   A crash is modelled as the worker making no durable write after the crash point: from then on
