@@ -155,3 +155,58 @@ describe("founder test reset migration", () => {
     expect(sql).toContain("guard_founder_test_reset_oauth_reference_write");
   });
 });
+
+describe("founder test reset covers the connection source inventory (20261002120000)", () => {
+  const read = (name: string) => readFileSync(resolve(process.cwd(), `../supabase/migrations/${name}`), "utf8");
+  const previous = read("20260927105000_founder_test_reset_deletion_failures_and_operator_holds.sql");
+  const current = read("20261002120000_founder_test_reset_connection_inventory.sql");
+  const inventoryMigration = read("20261002100000_connection_source_inventory_reconcile.sql");
+  const INVENTORY = ["foundation_connection_inventory_heads", "foundation_connection_inventory_scans",
+    "foundation_connection_inventory_pages", "foundation_connection_inventory_items"];
+  const body = (source: string, name: string) => {
+    const match = source.match(new RegExp(
+      `create\\s+or\\s+replace\\s+function\\s+public\\.${name}\\b[\\s\\S]*?\\bas\\s+\\$\\$([\\s\\S]*?)\\$\\$\\s*;`, "i"));
+    expect(match, `function body missing: ${name}`).not.toBeNull();
+    return match![1]!;
+  };
+  const deletedIn = (finalize: string) => [...finalize.matchAll(/delete\s+from\s+public\.([a-z0-9_]+)/gi)].map((m) => m[1]!);
+
+  it("counts, fingerprints and deletes exactly the four inventory tables on top of 20260927105000", () => {
+    const before = new Set(deletedIn(body(previous, "finalize_founder_test_reset")));
+    const after = deletedIn(body(current, "finalize_founder_test_reset"));
+    expect(before.size).toBe(37);
+    expect(new Set(after).size).toBe(41);
+    expect(after.filter((table) => !before.has(table)).sort()).toEqual([...INVENTORY].sort());
+    expect([...selectedTables(body(current, "founder_test_reset_table_counts"), "count\\(\\*\\)")].sort())
+      .toEqual([...new Set(after)].sort());
+    expect([...selectedTables(body(current, "founder_test_reset_rows_fingerprint"), "to_jsonb\\(x\\)::text")].sort())
+      .toEqual([...new Set(after)].sort());
+  });
+
+  it("keeps every replaced body identical apart from the added inventory lines", () => {
+    for (const name of ["finalize_founder_test_reset", "founder_test_reset_table_counts", "founder_test_reset_rows_fingerprint"]) {
+      const kept = body(current, name).split("\n")
+        .filter((line) => !/foundation_connection_inventory_|^\s*-- 20261002120000|^\s*-- pages cascade/.test(line));
+      expect(kept.join("\n"), name).toBe(body(previous, name));
+    }
+  });
+
+  it("deletes the inventory ahead of the connection, head before scan, and archives none of it", () => {
+    const finalize = body(current, "finalize_founder_test_reset");
+    const at = (table: string) => finalize.indexOf(`delete from public.${table}`);
+    for (const table of INVENTORY) expect(at(table)).toBeLessThan(at("foundation_connections"));
+    expect(at("foundation_connection_inventory_heads")).toBeLessThan(at("foundation_connection_inventory_scans"));
+    expect(at("foundation_connection_inventory_pages")).toBeLessThan(at("foundation_connection_inventory_scans"));
+    expect(finalize.indexOf("set_config('tavonel.founder_reset_id'")).toBeLessThan(at("foundation_connection_inventory_items"));
+    expect(current).not.toMatch(/function\s+public\.archive_founder_test_reset_evidence/i);
+  });
+
+  it("relies on the inventory migration's fence and changes no grant or search_path", () => {
+    for (const table of ["foundation_connection_inventory_heads", "foundation_connection_inventory_scans"]) {
+      expect(inventoryMigration).toContain(`create trigger founder_reset_fence before insert or update or delete on public.${table}`);
+    }
+    expect(current).not.toMatch(/^\s*(grant|revoke)\b/im);
+    expect(current.match(/security definer set search_path = '' as \$\$/g)).toHaveLength(3);
+    expect(current.match(/create or replace function/gi)).toHaveLength(3);
+  });
+});
