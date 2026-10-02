@@ -8,6 +8,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
+import { getFoundationActiveWorld } from "@/lib/world-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,15 +25,26 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     A specific version, when one is named.
 
     Comparing two versions means reading two, and the diff a reviewer sees before rolling back
-    is the reason this parameter exists. Without it the endpoint could only ever answer with
-    whichever candidate happens to be preferred.
+    is the reason this parameter exists. Without it the endpoint answers with the active World,
+    and only with the preferred candidate when nothing has been activated yet.
   */
   const requested = new URL(request.url).searchParams.get("manifest");
   if (requested !== null && !/^sha256:[a-f0-9]{64}$/.test(requested)) {
     return NextResponse.json({ code: "MANIFEST_DIGEST_INVALID" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
   if (!binding.bound) {
-    const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, requested ?? undefined);
+    // The active World is the one list_worlds reports, so an unnamed read is that digest. Only a
+    // collection with no active World falls back to the preferred candidate; a pointer that cannot
+    // be read is an outage, never a reason to answer with some other candidate.
+    let selected = requested ?? undefined;
+    if (selected === undefined) {
+      const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
+      if (active.ok) selected = active.world.manifestDigest;
+      else if (active.code !== "ACTIVE_WORLD_NOT_FOUND") {
+        return NextResponse.json({ code: active.code }, { status: active.code === "WORLD_ID_INVALID" ? 400 : 503, headers: NO_STORE });
+      }
+    }
+    const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
     if (!loaded.ok) return NextResponse.json({ code: loaded.code }, { status: loaded.status, headers: NO_STORE });
     return NextResponse.json({ code: "OK", model: loaded.model }, { headers: NO_STORE });
   }

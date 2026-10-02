@@ -1421,9 +1421,9 @@ describe("consumer context: wired route handlers over owned synthetic fixtures",
       expect(response.headers.get("cache-control"), item.name).toBe("no-store");
       for (const name of Object.values(CONTEXT_HEADERS)) expect(response.headers.get(name), `${item.name} ${name}`).toBeNull();
     }
-    // The legacy World read is still the preferred candidate, the list is the whole workspace, and
-    // none of these four reads gained a late check it did not have.
-    expect(fx.readModel.mock.calls.map((call) => call[2])).toEqual([undefined, undefined]);
+    // The legacy World read is the active World's digest (the candidate fallback is covered below),
+    // the list is the whole workspace, and none of these four reads gained a late check it did not have.
+    expect(fx.readModel.mock.calls.map((call) => call[2])).toEqual([ALPHA_V7, ALPHA_V7]);
     expect(await (await route("world").call({})).json()).toEqual({ code: "OK", model: fixtureModel(ALPHA, ALPHA_V7) });
     expect((await (await route("collections").call({})).json()).collections.map((world: { collectionId: string }) => world.collectionId)).toEqual([ALPHA, GAMMA]);
     expect(fx.revalidate).not.toHaveBeenCalled();
@@ -1439,6 +1439,62 @@ describe("consumer context: wired route handlers over owned synthetic fixtures",
     expect(fx.revalidate).toHaveBeenCalledTimes(3);
     for (const response of [search, ask]) {
       for (const name of Object.values(CONTEXT_HEADERS)) expect(response.headers.get(name)).toBeNull();
+    }
+  });
+
+  /* The read model as loadWorldReadModel answers it: a named digest is that digest, no digest is the
+     preferred candidate by list order, which need not be the active World. */
+  const preferCandidate = (candidate: string) => fx.readModel.mockImplementation(
+    async (_workspaceKey: string, collectionId: string, manifestDigest?: string) => ({ ok: true, model: fixtureModel(collectionId, manifestDigest ?? candidate) }),
+  );
+
+  it("answers an unnamed legacy World and lens read with the active World the list reports, never the preferred candidate", async () => {
+    // As in the reported run: the pointer moved on activation, while list order still prefers a historical candidate.
+    preferCandidate(ALPHA_V6);
+    const listed = (await (await route("collections").call({})).json()).collections
+      .find((world: { collectionId: string }) => world.collectionId === ALPHA);
+    expect(listed.manifestDigest).toBe(ALPHA_V7);
+
+    vi.clearAllMocks();
+    const world = await route("world").call({});
+    expect(world.status).toBe(200);
+    expect((await world.json()).model.world.manifestDigest).toBe(listed.manifestDigest);
+    const lens = await route("lens").call({});
+    expect(lens.status).toBe(200);
+    expect((await lens.json()).world.manifestDigest).toBe(listed.manifestDigest);
+    // Each read looked up the pointer in the principal's workspace and loaded exactly its digest.
+    expect(fx.activeWorld.mock.calls).toEqual([[WORKSPACE, ALPHA], [WORKSPACE, ALPHA]]);
+    expect(fx.readModel.mock.calls).toEqual([[WORKSPACE, ALPHA, ALPHA_V7], [WORKSPACE, ALPHA, ALPHA_V7]]);
+
+    // A named version is still exactly that version, and spends no pointer read.
+    vi.clearAllMocks();
+    const named = await route("world").call({}, { query: `?manifest=${ALPHA_V6}` });
+    expect(named.status).toBe(200);
+    expect((await named.json()).model.world.manifestDigest).toBe(ALPHA_V6);
+    expect(fx.activeWorld).not.toHaveBeenCalled();
+    expect(fx.readModel.mock.calls).toEqual([[WORKSPACE, ALPHA, ALPHA_V6]]);
+  });
+
+  it("falls back to the preferred candidate only when no World is active, and refuses when the pointer cannot be read", async () => {
+    // Before any activation: candidate review still reads the preferred candidate.
+    preferCandidate(ALPHA_V8);
+    fx.activeWorld.mockImplementation(async () => ({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" }));
+    const world = await route("world").call({});
+    expect(world.status).toBe(200);
+    expect((await world.json()).model.world.manifestDigest).toBe(ALPHA_V8);
+    const lens = await route("lens").call({});
+    expect(lens.status).toBe(200);
+    expect((await lens.json()).world.manifestDigest).toBe(ALPHA_V8);
+    expect(fx.activeWorld.mock.calls).toEqual([[WORKSPACE, ALPHA], [WORKSPACE, ALPHA]]);
+    expect(fx.readModel.mock.calls).toEqual([[WORKSPACE, ALPHA, undefined], [WORKSPACE, ALPHA, undefined]]);
+
+    // A pointer read that fails is an outage, not "nothing is active": no candidate is read.
+    for (const code of ["WORLD_STORE_READ_FAILED", "ACTIVE_WORLD_BINDING_INVALID", "WORLD_STORE_NOT_CONFIGURED"]) {
+      vi.clearAllMocks();
+      fx.activeWorld.mockImplementation(async () => ({ ok: false, code }));
+      await expectRouteRefusal(await route("world").call({}), code, 503, `world ${code}`);
+      await expectRouteRefusal(await route("lens").call({}), code, 503, `lens ${code}`);
+      expect(fx.readModel, code).not.toHaveBeenCalled();
     }
   });
 

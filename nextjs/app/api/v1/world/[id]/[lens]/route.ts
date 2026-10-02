@@ -7,6 +7,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
+import { getFoundationActiveWorld } from "@/lib/world-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -74,12 +75,21 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 
   // Bound: resolved before the World is read, and the read is the resolved digest, never the
-  // preferred candidate. Legacy reads exactly as before.
+  // preferred candidate. Legacy reads the active World list_worlds reports, and the preferred
+  // candidate only when no World is active; a pointer that cannot be read is an outage, never a
+  // reason to answer with some other candidate.
   const snapshot = binding.bound ? await resolveBoundSnapshot(binding, auth.principal.workspaceKey) : null;
   if (snapshot && !snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
-  const loaded = snapshot
-    ? await loadWorldReadModel(auth.principal.workspaceKey, id, snapshot.resolved.snapshot.manifestDigest)
-    : await loadWorldReadModel(auth.principal.workspaceKey, id);
+  let selected: string | undefined;
+  if (snapshot) selected = snapshot.resolved.snapshot.manifestDigest;
+  else {
+    const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
+    if (active.ok) selected = active.world.manifestDigest;
+    else if (active.code !== "ACTIVE_WORLD_NOT_FOUND") {
+      return NextResponse.json({ code: active.code }, { status: active.code === "WORLD_ID_INVALID" ? 400 : 503, headers: NO_STORE });
+    }
+  }
+  const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
   if (!loaded.ok) return NextResponse.json({ code: loaded.code }, { status: loaded.status, headers: NO_STORE });
   const shared = {
     code: "OK",
