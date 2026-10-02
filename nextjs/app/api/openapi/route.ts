@@ -1097,16 +1097,16 @@ export function GET(request: Request) {
       "/connections/{id}/sync": {
         post: {
           operationId: "applyConnectionBatch",
-          summary: "Advance a connection cursor",
+          summary: "Advance a connection cursor or report a complete inventory scan",
           tags: ["Connections"],
           "x-tavonel-scope": "connections:sync",
           parameters: [{ $ref: "#/components/parameters/ConnectionId" }],
-          description: "Applies one batch of source events and advances the cursor. `previousCursorSha256` must match the committed cursor, so two collectors cannot both advance it; a mismatch is a 409 and nothing is applied. Replaying an identical `batchId` is idempotent — delivery is at-least-once and this is the consumer that makes it exactly-once.",
+          description: "Applies one batch of source events and advances the cursor. `previousCursorSha256` must match the committed cursor, so two collectors cannot both advance it; a mismatch is a 409 and nothing is applied. Replaying an identical `batchId` is idempotent — delivery is at-least-once and this is the consumer that makes it exactly-once.\n\nA body with an `operation` field is instead one step of a complete inventory scan: `inventory.begin` (compare-and-set on `expectedHeadEpoch`; `scanEpoch` must exceed every open scan's, and a newer one supersedes it), `inventory.page` (an identical page is an idempotent replay), `inventory.finalize` (requires `complete: true` and every declared page). An item missing from a finalized scan is marked unobserved — a deletion candidate, never a deletion — and `aclObservationSha256` is recorded as an observation that grants no access. An open scan expires six hours after begin.",
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/ConnectionBatch" },
+                schema: { oneOf: [{ $ref: "#/components/schemas/ConnectionBatch" }, { $ref: "#/components/schemas/ConnectionInventoryRequest" }] },
                 examples: {
                   default: {
                     value: {
@@ -1117,28 +1117,41 @@ export function GET(request: Request) {
                       events: [{ kind: "added", nativeId: "s3://contracts/2026/a.pdf", revision: "\"etag\"", contentSha256: "<64 hex>", sizeBytes: 184320, mimeType: "application/pdf", documentId: "00000000-0000-4000-8000-000000000001", sourceIdempotencyKey: "<64 hex>" }],
                     },
                   },
+                  inventoryBegin: {
+                    value: { operation: "inventory.begin", scanId: "00000000-0000-4000-8000-000000000002", scanEpoch: 1, expectedHeadEpoch: 0, itemCount: 1, pageCount: 1 },
+                  },
+                  inventoryPage: {
+                    value: { operation: "inventory.page", scanId: "00000000-0000-4000-8000-000000000002", pageIndex: 0, items: [{ nativeId: "contracts/2026/a.pdf", revision: "mtime:1790000000", contentSha256: "<64 hex>", sizeBytes: 184320, mimeType: "application/pdf", aclObservationSha256: null }] },
+                  },
+                  inventoryFinalize: {
+                    value: { operation: "inventory.finalize", scanId: "00000000-0000-4000-8000-000000000002", complete: true, itemCount: 1, pageCount: 1 },
+                  },
                 },
               },
             },
           },
           responses: {
             "200": ok(
-              "The cursor transition, applied or idempotently replayed. `status: replayed` means this exact batch had already been applied and nothing changed.",
+              "The cursor transition, applied or idempotently replayed. `status: replayed` means this exact batch had already been applied and nothing changed. An inventory step answers `status` begun, staged, finalized or replayed with its own fields (`scanId`, `scanEpoch`, `headEpoch`, `pageIndex`, `itemCount`, or the finalize `receipt`).",
               {
                 type: "object",
-                required: ["code", "status", "batchId"],
-                properties: { code: { const: "OK" }, status: { enum: ["applied", "replayed"] }, batchId: str, cursorSha256: nullableStr, eventCount: int },
+                required: ["code", "status"],
+                properties: { code: { const: "OK" }, status: { enum: ["applied", "replayed", "begun", "staged", "finalized"] }, batchId: str, cursorSha256: nullableStr, eventCount: int, scanId: str, scanEpoch: int, headEpoch: int, pageIndex: int, itemCount: int, receipt: { type: "object" } },
                 ...bestEffort,
               },
               { code: "OK", status: "applied", batchId: "00000000-0000-4000-8000-000000000000", cursorSha256: "sha256:<64 hex>", eventCount: 1 },
             ),
-            "400": err("CONNECTION_BATCH_INVALID", "CONNECTION_ID_INVALID", "SOURCE_IDENTITY_INVALID", "SOURCE_DIGEST_REQUIRED", "SOURCE_METADATA_INVALID", "INVALID_JSON"),
+            "400": err("CONNECTION_BATCH_INVALID", "CONNECTION_ID_INVALID", "SOURCE_IDENTITY_INVALID", "SOURCE_DIGEST_REQUIRED", "SOURCE_METADATA_INVALID", "INVALID_JSON",
+              "INVENTORY_CONTRACT_INVALID", "INVENTORY_ITEM_INVALID", "INVENTORY_PAGE_INDEX_INVALID", "INVENTORY_NOT_ATTESTED_COMPLETE"),
             "401": err("AUTH_REQUIRED"),
+            "403": err("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", "INVENTORY_ACTOR_INVALID"),
             "404": err("CONNECTION_NOT_FOUND"),
-            "409": err("CONNECTION_BATCH_CONFLICT", "CONNECTION_CURSOR_CONFLICT", "SOURCE_CURSOR_STALE", "SOURCE_DIGEST_CONFLICT", "SOURCE_DIGEST_MISMATCH", "SOURCE_VERSION_DIGEST_CONFLICT"),
-            "413": err("REQUEST_TOO_LARGE", "SOURCE_CURSOR_TOO_LARGE"),
+            "409": err("CONNECTION_BATCH_CONFLICT", "CONNECTION_CURSOR_CONFLICT", "SOURCE_CURSOR_STALE", "SOURCE_DIGEST_CONFLICT", "SOURCE_DIGEST_MISMATCH", "SOURCE_VERSION_DIGEST_CONFLICT",
+              "INVENTORY_HEAD_STALE", "INVENTORY_EPOCH_STALE", "INVENTORY_SCAN_CONFLICT", "INVENTORY_SCAN_NOT_FOUND", "INVENTORY_SCAN_NOT_OPEN", "INVENTORY_SCAN_EXPIRED",
+              "INVENTORY_PAGE_CONFLICT", "INVENTORY_COUNT_MISMATCH", "INVENTORY_PAGES_INCOMPLETE", "INVENTORY_DUPLICATE_ITEM", "INVENTORY_FINALIZE_CONFLICT"),
+            "413": err("REQUEST_TOO_LARGE", "SOURCE_CURSOR_TOO_LARGE", "INVENTORY_LIMIT_EXCEEDED"),
             "423": err("CONNECTION_NOT_SYNCABLE", "SOURCE_LIFECYCLE_REVIEW_REQUIRED"),
-            "503": err("CONNECTION_BATCH_FAILED"),
+            "503": err("CONNECTION_BATCH_FAILED", "INVENTORY_UNAVAILABLE"),
           },
         },
       },
@@ -1554,6 +1567,42 @@ export function GET(request: Request) {
             events: { type: "array", maxItems: 5000, items: { $ref: "#/components/schemas/ConnectionEvent" } },
           },
           additionalProperties: false,
+        },
+        ConnectionInventoryItem: {
+          type: "object",
+          required: ["nativeId", "revision", "contentSha256", "sizeBytes", "mimeType", "aclObservationSha256"],
+          properties: {
+            nativeId: { type: "string", minLength: 1, description: "1-1024 UTF-8 bytes, no C0 control or DEL." },
+            revision: { type: "string", minLength: 1, description: "1-512 UTF-8 bytes, no C0 control or DEL." },
+            contentSha256: { type: ["string", "null"], pattern: "^[a-f0-9]{64}$" },
+            sizeBytes: { type: "integer", minimum: 0, maximum: 1099511627776 },
+            mimeType: { type: ["string", "null"], pattern: "^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$", maxLength: 127 },
+            aclObservationSha256: { type: ["string", "null"], pattern: "^[a-f0-9]{64}$", description: "An opaque digest of the permissions the agent observed. Recorded, never enforced as access." },
+          },
+          additionalProperties: false,
+        },
+        ConnectionInventoryRequest: {
+          description: "One step of a complete inventory scan. The workspace is always the caller's; the body cannot name one.",
+          oneOf: [
+            {
+              type: "object",
+              required: ["operation", "scanId", "scanEpoch", "expectedHeadEpoch", "itemCount", "pageCount"],
+              properties: { operation: { const: "inventory.begin" }, scanId: { type: "string", format: "uuid" }, scanEpoch: { type: "integer", minimum: 1 }, expectedHeadEpoch: { type: "integer", minimum: 0 }, itemCount: { type: "integer", minimum: 0, maximum: 100000 }, pageCount: { type: "integer", minimum: 1, maximum: 400 } },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["operation", "scanId", "pageIndex", "items"],
+              properties: { operation: { const: "inventory.page" }, scanId: { type: "string", format: "uuid" }, pageIndex: { type: "integer", minimum: 0, maximum: 399 }, items: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/ConnectionInventoryItem" } } },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["operation", "scanId", "complete", "itemCount", "pageCount"],
+              properties: { operation: { const: "inventory.finalize" }, scanId: { type: "string", format: "uuid" }, complete: { const: true }, itemCount: { type: "integer", minimum: 0, maximum: 100000 }, pageCount: { type: "integer", minimum: 1, maximum: 400 } },
+              additionalProperties: false,
+            },
+          ],
         },
       },
     },
