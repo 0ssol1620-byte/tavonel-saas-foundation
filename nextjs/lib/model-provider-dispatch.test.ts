@@ -27,6 +27,8 @@ function dependencies() {
     settle: vi.fn().mockResolvedValue({ ok: true, receipt: { status: "processed" } }),
     markIndeterminate: vi.fn().mockResolvedValue({ ok: true,
       receipt: { status: "pending_reconciliation" } }),
+    markDispatchStarted: vi.fn().mockResolvedValue({ ok: true,
+      receipt: { status: "dispatch_started", reservationId } }),
     commitAdmission: vi.fn().mockImplementation(async (proposal) => ({ ok: true,
       committedRevision: proposal.nextState.revision, eventId: proposal.event.eventId })),
     commitOutcome: vi.fn().mockImplementation(async (proposal) => ({ ok: true,
@@ -181,5 +183,73 @@ describe("governed paid-provider dispatch", () => {
       value: null, actualUnits: input.reservedUnits,
       dispatchFailureCode: "PROVIDER_CALL_FAILED",
     }));
+  });
+
+  it.each([
+    ["MODEL_PROVIDER_DISPATCH_ALREADY_STARTED", "MODEL_PROVIDER_DISPATCH_ALREADY_STARTED"],
+    ["MODEL_PROVIDER_LEDGER_FAILED", "MODEL_PROVIDER_DISPATCH_MARK_FAILED"],
+    ["MODEL_PROVIDER_RESERVATION_NOT_ACTIVE", "MODEL_PROVIDER_DISPATCH_MARK_FAILED"],
+  ])("withholds the call and keeps the hold when the dispatch mark returns %s", async (markCode, code) => {
+    const deps = dependencies();
+    deps.markDispatchStarted.mockResolvedValueOnce({ ok: false, code: markCode });
+    const call = vi.fn();
+    const lifecycle = {
+      admit: vi.fn().mockResolvedValue({ ok: true as const,
+        attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
+      recordTerminal: vi.fn().mockResolvedValue(true),
+    };
+    await expect(runGovernedModelProviderCall(input, call, deps as never, lifecycle)).resolves.toEqual({
+      ok: false, code, providerDispatched: false, reservationId, admissionId: input.admissionId,
+    });
+    expect(call).not.toHaveBeenCalled();
+    // Never released: the mark may have committed for this or another worker.
+    expect(deps.settle).not.toHaveBeenCalled();
+    expect(deps.markIndeterminate).not.toHaveBeenCalled();
+    expect(deps.commitOutcome).toHaveBeenCalledTimes(1);
+    // Not a provider failure: no request left this process, so provider health is untouched.
+    expect(deps.commitOutcome.mock.calls[0][0].event).toMatchObject({ kind: "outcome",
+      reason: "semantic_document" });
+    expect(deps.commitOutcome.mock.calls[0][0].nextState.correlatedFailures).toBe(0);
+    expect(lifecycle.recordTerminal).toHaveBeenCalledWith(expect.objectContaining({
+      value: null, actualUnits: 0, dispatchFailureCode: code,
+    }));
+  });
+
+  it("treats a thrown dispatch mark as unconfirmed and never calls the provider", async () => {
+    const deps = dependencies();
+    deps.markDispatchStarted.mockRejectedValueOnce(new Error("socket hang up"));
+    const call = vi.fn();
+    await expect(runGovernedModelProviderCall(input, call, deps as never)).resolves.toMatchObject({
+      ok: false, code: "MODEL_PROVIDER_DISPATCH_MARK_FAILED", providerDispatched: false,
+    });
+    expect(call).not.toHaveBeenCalled();
+    expect(deps.settle).not.toHaveBeenCalled();
+  });
+
+  it("commits the dispatch mark after every other admission and before the provider", async () => {
+    const deps = dependencies();
+    const order: string[] = [];
+    deps.commitAdmission.mockImplementationOnce(async (proposal) => {
+      order.push("circuit");
+      return { ok: true, committedRevision: proposal.nextState.revision, eventId: proposal.event.eventId };
+    });
+    deps.markDispatchStarted.mockImplementationOnce(async () => {
+      order.push("mark");
+      return { ok: true, receipt: { status: "dispatch_started", reservationId } };
+    });
+    const lifecycle = {
+      admit: vi.fn(async () => {
+        order.push("decision");
+        return { ok: true as const, attemptId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" };
+      }),
+      recordTerminal: vi.fn().mockResolvedValue(true),
+    };
+    await runGovernedModelProviderCall(input, async () => {
+      order.push("provider");
+      return { value: "ok", actualUnits: 1, reasonCode: "PROVIDER_RESULT_ACCEPTED",
+        circuitOutcome: { kind: "success" as const } };
+    }, deps as never, lifecycle);
+    expect(order).toEqual(["circuit", "decision", "mark", "provider"]);
+    expect(deps.markDispatchStarted).toHaveBeenCalledWith({ tenantId: input.tenantId, reservationId });
   });
 });

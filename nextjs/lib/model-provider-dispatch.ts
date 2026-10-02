@@ -11,6 +11,7 @@ import {
   readModelProviderCircuitSnapshot,
 } from "./model-provider-circuit-store";
 import {
+  markModelProviderSpendDispatchStarted,
   markModelProviderSpendIndeterminate,
   reserveModelProviderSpend,
   settleModelProviderSpend,
@@ -25,6 +26,7 @@ type DispatchDependencies = {
   reserve: typeof reserveModelProviderSpend;
   settle: typeof settleModelProviderSpend;
   markIndeterminate: typeof markModelProviderSpendIndeterminate;
+  markDispatchStarted: typeof markModelProviderSpendDispatchStarted;
 };
 
 export type ModelProviderAttemptAdmission = {
@@ -69,6 +71,7 @@ const defaults: DispatchDependencies = {
   reserve: reserveModelProviderSpend,
   settle: settleModelProviderSpend,
   markIndeterminate: markModelProviderSpendIndeterminate,
+  markDispatchStarted: markModelProviderSpendDispatchStarted,
 };
 
 export type GovernedModelProviderResult<T> =
@@ -213,6 +216,27 @@ export async function runGovernedModelProviderCall<T>(
       dispatchFailureCode: failureCode,
     }).catch(() => false);
   };
+
+  // K20: the last durable write before the provider call. Only a fresh mark authorizes dispatch.
+  // On any refusal or unconfirmed mark the call is withheld and the hold is NOT released: the mark
+  // may have committed for this or another worker, and the database refuses to release a marked
+  // hold anyway. An unmarked hold is refunded by the expiry sweep; a marked one is parked for
+  // reconciliation. No provider request happened here, so the circuit outcome is non-provider.
+  const started = await deps.markDispatchStarted({ tenantId: input.tenantId, reservationId })
+    .catch(() => ({ ok: false as const, code: "MODEL_PROVIDER_LEDGER_FAILED" as const }));
+  if (!started.ok) {
+    const code = started.code === "MODEL_PROVIDER_DISPATCH_ALREADY_STARTED"
+      ? started.code : "MODEL_PROVIDER_DISPATCH_MARK_FAILED";
+    await commitOutcome(deps, input.provider, admission.receipt, {
+      kind: "failure", scope: "semantic_document", code,
+    });
+    if (!await recordTerminal(null, 0, code)) {
+      return { ok: false, code: "MODEL_ATTEMPT_OUTCOME_UNAVAILABLE", providerDispatched: false,
+        reservationId, admissionId: input.admissionId };
+    }
+    return { ok: false, code, providerDispatched: false, reservationId,
+      admissionId: input.admissionId };
+  }
 
   try {
     const result = await call();

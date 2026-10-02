@@ -61,6 +61,12 @@ describe("db-rehearsal model-provider spend proof", () => {
     expect(loop).toContain("supabase/migrations/20261002110000_*.sql");
   });
 
+  it("replays the K20 dispatch-start mark after the queued-expiry recovery", () => {
+    const loop = replay.slice(0, replay.indexOf("supabase test db"));
+    expect(loop.indexOf("supabase/migrations/20261002120000_*.sql"))
+      .toBeGreaterThan(loop.indexOf("supabase/migrations/20261002110000_*.sql"));
+  });
+
   it("races only after every pgTAP pass, against a marker written into the fresh stack", () => {
     expect(raceStep).not.toBe("");
     expect(body.lastIndexOf("supabase test db")).toBeLessThan(body.indexOf("- name: Race model-provider settlement"));

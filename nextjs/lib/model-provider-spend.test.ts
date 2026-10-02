@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  markModelProviderSpendIndeterminate, reconcileModelProviderSpend,
+  markModelProviderSpendDispatchStarted, markModelProviderSpendIndeterminate,
+  reconcileModelProviderSpend,
   reserveModelProviderSpend, runReservedModelProviderCall, settleModelProviderSpend,
 } from "./model-provider-spend";
 
@@ -89,6 +90,8 @@ describe("model-provider spend RPC client", () => {
       settle: vi.fn(),
       markIndeterminate: vi.fn().mockResolvedValue({ ok: true,
         receipt: { status: "pending_reconciliation", reservationId } }),
+      markDispatchStarted: vi.fn().mockResolvedValue({ ok: true,
+        receipt: { status: "dispatch_started", reservationId } }),
     };
     await expect(runReservedModelProviderCall(base, async () => { throw new Error("offline"); }, ledger as never))
       .resolves.toMatchObject({ ok: false, code: "MODEL_PROVIDER_CALL_INDETERMINATE" });
@@ -105,6 +108,8 @@ describe("model-provider spend RPC client", () => {
       settle: vi.fn(),
       markIndeterminate: vi.fn().mockResolvedValue({ ok: true,
         receipt: { status: "pending_reconciliation", reservationId } }),
+      markDispatchStarted: vi.fn().mockResolvedValue({ ok: true,
+        receipt: { status: "dispatch_started", reservationId } }),
     };
     await expect(runReservedModelProviderCall(base, async () => ({
       value: "unsafe", actualUnits: base.reservedUnits + 1, reasonCode: "PROVIDER_COMPLETED",
@@ -115,6 +120,47 @@ describe("model-provider spend RPC client", () => {
     expect(ledger.markIndeterminate).toHaveBeenCalledWith(expect.objectContaining({
       reservationId, reasonCode: "PROVIDER_RESULT_INVALID",
     }));
+  });
+
+  it.each([
+    ["MODEL_PROVIDER_DISPATCH_ALREADY_STARTED", "MODEL_PROVIDER_DISPATCH_ALREADY_STARTED"],
+    ["MODEL_PROVIDER_LEDGER_FAILED", "MODEL_PROVIDER_DISPATCH_MARK_FAILED"],
+  ])("never calls the provider or releases when the dispatch mark returns %s", async (markCode, code) => {
+    const call = vi.fn();
+    const ledger = {
+      reserve: vi.fn().mockResolvedValue({ ok: true, dispatchAllowed: true, receipt: { reservationId } }),
+      settle: vi.fn(),
+      markIndeterminate: vi.fn(),
+      markDispatchStarted: vi.fn().mockResolvedValue({ ok: false, code: markCode }),
+    };
+    await expect(runReservedModelProviderCall(base, call, ledger as never))
+      .resolves.toEqual({ ok: false, code });
+    expect(call).not.toHaveBeenCalled();
+    expect(ledger.settle).not.toHaveBeenCalled();
+    expect(ledger.markIndeterminate).not.toHaveBeenCalled();
+  });
+
+  it("accepts only a fresh dispatch-start receipt bound to the reservation and tenant", async () => {
+    configure();
+    const fresh = { status: "dispatch_started", reservationId, tenantId: base.tenantId,
+      dispatchStartedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString() };
+    const reply = (body: unknown) => vi.fn().mockImplementation(async () =>
+      new Response(JSON.stringify(body), { status: 200 }));
+    vi.stubGlobal("fetch", reply(fresh));
+    await expect(markModelProviderSpendDispatchStarted({ tenantId: base.tenantId, reservationId }))
+      .resolves.toEqual({ ok: true, receipt: fresh });
+    for (const patch of [{ status: "duplicate" }, { reservationId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+      { tenantId: "other-tenant" }]) {
+      vi.stubGlobal("fetch", reply({ ...fresh, ...patch }));
+      await expect(markModelProviderSpendDispatchStarted({ tenantId: base.tenantId, reservationId }))
+        .resolves.toEqual({ ok: false, code: "MODEL_PROVIDER_DISPATCH_MARK_RECEIPT_INVALID" });
+    }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      message: "model_provider_dispatch_already_started" }), { status: 400 })));
+    await expect(markModelProviderSpendDispatchStarted({ tenantId: base.tenantId, reservationId }))
+      .resolves.toEqual({ ok: false, code: "MODEL_PROVIDER_DISPATCH_ALREADY_STARTED" });
+    await expect(markModelProviderSpendDispatchStarted({ tenantId: base.tenantId, reservationId: "x" }))
+      .resolves.toEqual({ ok: false, code: "MODEL_PROVIDER_RESERVATION_INVALID" });
   });
 
   it("rejects a mismatched reservation receipt", async () => {
@@ -364,5 +410,43 @@ describe("model-provider queued-expiry recovery migration contract", () => {
     expect(pgtap).toContain("public.reserve_model_provider_spend_v1(");
     expect(pgtap).toContain("public.settle_model_provider_spend_v1(");
     expect(pgtap).toContain("interval '16 minutes'");
+  });
+});
+
+describe("model-provider dispatch-start mark migration contract (K20)", () => {
+  const read = (path: string) => readFileSync(resolve(import.meta.dirname, "../../supabase", path), "utf8");
+  const mark = read("migrations/20261002120000_model_provider_dispatch_start_mark.sql")
+    .replace(/\r\n/g, "\n");
+  const pgtap = read("tests/model_provider_dispatch_start_mark.sql");
+
+  it("parks a marked expired hold before the refund sweep can select it", () => {
+    const park = mark.indexOf("'pending', 'DISPATCH_OUTCOME_UNKNOWN', expires_at");
+    const refund = mark.indexOf("set state = 'expired', reason_code = 'RESERVATION_EXPIRED', settled_at = v_now");
+    expect(park).toBeGreaterThan(0);
+    expect(refund).toBeGreaterThan(park);
+    expect(mark).toContain("where state = 'reserved' and expires_at <= v_now and dispatch_started_at is null");
+    expect(mark).toContain("if v_reservation.expires_at <= v_now and v_reservation.dispatch_started_at is null then");
+    expect(mark).toContain("if p_outcome = 'released' and v_reservation.dispatch_started_at is not null then");
+  });
+
+  it("is rerunnable and keeps every RPC service-role only", () => {
+    expect(mark).toContain("add column if not exists dispatch_started_at");
+    expect(mark).toContain("drop constraint if exists model_provider_spend_dispatch_mark_admitted");
+    expect(mark).not.toMatch(/^create function/m);
+    for (const fn of ["mark_model_provider_spend_dispatch_started_v1(text, uuid)",
+      "reserve_model_provider_spend_v1(text, text, text, text, text, text, bigint, integer)",
+      "settle_model_provider_spend_v1(text, uuid, text, bigint, text)"]) {
+      expect(mark).toContain(`revoke all on function public.${fn}\n  from public, anon, authenticated;`);
+      expect(mark).toContain(`grant execute on function public.${fn}\n  to service_role;`);
+    }
+  });
+
+  it("proves the crash boundaries against the real RPCs in a rollback-only pgTAP run", () => {
+    expect(pgtap).toMatch(/^begin;\r?$/m);
+    expect(pgtap.trimEnd().endsWith("rollback;")).toBe(true);
+    expect(pgtap).not.toMatch(/^\s*commit\s*;/im);
+    const planned = Number(/select plan\((\d+)\);/.exec(pgtap)?.[1]);
+    const assertions = pgtap.match(/^select (ok|is|throws_ok|has_column)\(/gm) ?? [];
+    expect(assertions.length).toBe(planned);
   });
 });
