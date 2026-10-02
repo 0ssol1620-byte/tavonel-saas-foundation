@@ -4,7 +4,7 @@
   G3-006: three pages said "eight tools" and the shipped server registers nine -- `list_worlds`
   was added and never counted, and the wrong number propagated from one changelog entry to
   /developers, /docs/integration-recipes and the MCP download tile. G3-016: the same shape again,
-  "five published files" on three surfaces against six in `channel.json`.
+  a typed count of published files on three surfaces against a longer list in `channel.json`.
 
   Both counts are now `.length` over the list below, and `lib/developer-distribution.test.ts`
   pins the list against the artifacts themselves -- `public/developer/tavonel-mcp.mjs` for the
@@ -44,12 +44,13 @@ export const MCP_TOOL_COUNT_WORD = spellNumber(MCP_TOOLS.length);
  * The published distribution, keyed by the `assets` key in `public/developer/channel.json`.
  *
  * The key order is the order the CLI page introduces them. A file added to the channel and not
- * described here fails `lib/developer-distribution.test.ts`, which is how the sixth asset went
- * uncounted on three surfaces the last time.
+ * described here fails `lib/developer-distribution.test.ts`, which is the check that was missing
+ * when an added asset went uncounted on three surfaces.
  */
 export const DEVELOPER_FILES: ReadonlyArray<{ key: string; file: string; purpose: string }> = [
   { key: "cli", file: "tavonel-cli.mjs", purpose: "The upload and compile path from a terminal." },
   { key: "mcp", file: "tavonel-mcp.mjs", purpose: "The read-only MCP bridge, with a --doctor preflight." },
+  { key: "consumerContext", file: "consumer-context.mjs", purpose: "The shared context sidecar a context-enabled CLI or MCP server loads from beside itself." },
   { key: "sourceAgent", file: "tavonel-source-agent.py", purpose: "Walks a folder or an S3-compatible bucket and pushes what it finds." },
   { key: "verifyExport", file: "tavonel-verify-export.mjs", purpose: "Checks an archive's signature, its file digests and that nothing was added." },
   { key: "verifyPackage", file: "tavonel-verify-package.mjs", purpose: "Checks what is inside: relations resolve, regions sit inside their page, the three graph formats agree." },

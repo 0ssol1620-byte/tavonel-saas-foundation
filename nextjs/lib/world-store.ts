@@ -422,6 +422,70 @@ export async function listFoundationWorldVersions(
   }
 }
 
+/**
+ * One promoted version of a collection, looked up by its exact opaque world_state_id -- however
+ * long ago it was promoted, where listFoundationWorldVersions stops at the 50 most recent.
+ *
+ * Read-only. All three keys are server-provided (the workspace from the authorized principal) and
+ * validated before any request is built; every request carries all three exact filters, so it can
+ * never widen into a history scan or reach another workspace or collection. At most two rows are
+ * read: one is the version, none is an explicit not-found, and two -- or a row that does not parse
+ * or names another world_state_id -- is refused rather than guessed between.
+ */
+export async function getFoundationWorldVersion(
+  workspaceKey: string,
+  collectionId: string,
+  worldStateId: string
+) {
+  // RegExp.test coerces, and String(undefined) is a valid workspace key and world_state_id.
+  if (
+    typeof workspaceKey !== "string" ||
+    !WORKSPACE_ID_PATTERN.test(workspaceKey) ||
+    typeof collectionId !== "string" ||
+    !COLLECTION_ID_PATTERN.test(collectionId) ||
+    typeof worldStateId !== "string" ||
+    !WORLD_STATE_ID.test(worldStateId)
+  ) {
+    return { ok: false as const, code: "WORLD_ID_INVALID" };
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config)
+    return { ok: false as const, code: "WORLD_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    select:
+      "manifest_digest,world_state_id,lifecycle_status,first_promoted_at,last_activated_at,activation_count",
+    workspace_key: `eq.${workspaceKey}`,
+    collection_id: `eq.${collectionId}`,
+    world_state_id: `eq.${worldStateId}`,
+    limit: "2",
+  });
+  try {
+    const response = await supabaseAdminRequest(
+      config,
+      `/rest/v1/foundation_world_versions?${query}`
+    );
+    if (!response.ok)
+      return { ok: false as const, code: "WORLD_STORE_READ_FAILED" };
+    const rows = (await response.json()) as unknown;
+    if (!Array.isArray(rows))
+      return { ok: false as const, code: "WORLD_VERSION_BINDING_INVALID" };
+    if (rows.length === 0) return { ok: true as const, found: false as const };
+    if (rows.length > 1)
+      return { ok: false as const, code: "WORLD_VERSION_AMBIGUOUS" };
+    const row = rows[0];
+    const version =
+      row !== null && typeof row === "object"
+        ? parseWorldVersion(row as Record<string, unknown>)
+        : null;
+    if (!version || version.world_state_id !== worldStateId) {
+      return { ok: false as const, code: "WORLD_VERSION_BINDING_INVALID" };
+    }
+    return { ok: true as const, found: true as const, version };
+  } catch {
+    return { ok: false as const, code: "WORLD_STORE_READ_FAILED" };
+  }
+}
+
 /*
   ---------------------------------------------------------------------------------------------
   Discovery, freshness and manifest-activation reads (audit X01, TM04, TM06)

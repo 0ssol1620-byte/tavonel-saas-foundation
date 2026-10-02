@@ -5,10 +5,11 @@ once. TAVONEL stores only its SHA-256 digest.
 
 ## Install: fetch, then check the bytes
 
-There is no npm, pip or Homebrew package. Six files are published at
-`https://tavonel.com/developer/`, and `channel.json` names the exact SHA-256 of
-each one. Installing is downloading a file and checking its digest; nothing is
-written to a registry, a PATH or a profile.
+There is no npm, pip or Homebrew package. Every file `channel.json` lists is
+published at `https://tavonel.com/developer/`, and `channel.json` names the
+exact SHA-256 of each one. Installing is downloading a file and checking its
+digest; nothing is written to a registry, a PATH or a profile. Download every
+listed file into one directory: the commands below do exactly that.
 
 ```bash
 curl -fsS https://tavonel.com/developer/channel.json -o channel.json
@@ -44,11 +45,50 @@ overwrites: updating is the install above, run again.
 **Uninstall.** Delete the files. The only state any of them writes is the
 connector cursor file you name yourself with `--state`.
 
-**Runtimes.** Node.js 20 or newer for the four `.mjs` files; Python 3.12 or
+**Runtimes.** Node.js 20 or newer for the `.mjs` files; Python 3.12 or
 newer for `tavonel-source-agent.py` and `tavonel-verify-roundtrip.py`. None of
 them has a required dependency: `boto3` is needed only for the agent S3 mode
 below, and `rdflib` only makes the round-trip checker strict about Turtle -- its
 absence is reported as a check that did not run, never as one that passed.
+
+## Consumer context (local synthetic evidence only)
+
+**This is local synthetic evidence, not production evidence.** The
+consumer-context tests in this repository run against a synthetic local API;
+they say nothing about how a deployed API handles these headers. Whatever API
+you point it at, `TAVONEL_CONSUMER_CONTEXT_REQUIRED=true` fails closed with
+`CONSUMER_CONTEXT_NOT_ACKNOWLEDGED` whenever a response lacks the
+acknowledgement.
+
+A context-enabled CLI or MCP server needs `consumer-context.mjs` in the same
+directory as `tavonel-cli.mjs` or `tavonel-mcp.mjs`. Each imports it relative to
+its own file -- not from the working directory, a PATH or `node_modules` -- so
+install every file `channel.json` lists into one directory with the commands
+above and check every digest, `consumer-context.mjs` included. Registering
+`tavonel-mcp.mjs` by absolute path keeps working as long as the sidecar sits
+beside it.
+
+| `TAVONEL_CONSUMER_CONTEXT` | `TAVONEL_CONSUMER_CONTEXT_REQUIRED` | Behaviour |
+| --- | --- | --- |
+| unset or blank | unset, blank or `false` | Legacy. `consumer-context.mjs` is not loaded and need not be present; requests carry no context or marker headers. |
+| a context | unset, blank or `false` | The context is checked locally and sent as headers with every request. An unusable context is refused, never dropped. An acknowledgement that names a different context or snapshot is refused; a missing one is tolerated. |
+| unset or blank | `true` | Every API read is refused with `CONSUMER_CONTEXT_REQUIRED` before any request is made. |
+| a context | `true` | The context and the `x-tavonel-consumer-context-required: true` marker go with every request, and a response that does not echo the context identity and a resolved snapshot is refused with `CONSUMER_CONTEXT_NOT_ACKNOWLEDGED`. |
+| any | any other value | Refused with `CONSUMER_CONTEXT_REQUIRED_FLAG_INVALID`. |
+
+The flag is trimmed and compared in any case. When a context is configured or
+the flag is anything but unset, blank or `false`, and `consumer-context.mjs` is
+missing, both files fail closed with `CONSUMER_CONTEXT_MODULE_UNAVAILABLE`
+before any request.
+
+```powershell
+$env:TAVONEL_CONSUMER_CONTEXT = '{"schemaVersion":"tavonel.consumer_context.v1","tenantId":"example-workspace","principalId":"example-agent","scope":["worlds:read"],"collectionId":"collection-00000000000000000000000000000000","snapshot":{"mode":"latest"}}'
+$env:TAVONEL_CONSUMER_CONTEXT_REQUIRED = "true"
+```
+
+The values above are synthetic placeholders; substitute your own. A pinned
+snapshot is `{"mode":"pinned","version":"example-world-state","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}`.
+`expiresAt` (an ISO timestamp) is optional; unknown fields are refused.
 
 ## CLI
 

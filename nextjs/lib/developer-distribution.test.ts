@@ -31,7 +31,7 @@ describe("developer distribution", () => {
     const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
     const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
     const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
-    expect(channel.version).toBe("2026.9.30.1");
+    expect(channel.version).toBe("2026.10.2.1");
     expect(channel.apiVersion).toBe(1);
     expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
     expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
@@ -41,6 +41,7 @@ describe("developer distribution", () => {
     const assetFiles = {
       cli: "tavonel-cli.mjs",
       mcp: "tavonel-mcp.mjs",
+      consumerContext: "consumer-context.mjs",
       sourceAgent: "tavonel-source-agent.py",
       verifyExport: "tavonel-verify-export.mjs",
       verifyPackage: "tavonel-verify-package.mjs",
@@ -181,8 +182,8 @@ describe("developer distribution", () => {
 
     "Eight tools" stood on /developers, /docs/integration-recipes and the 3 September changelog
     entry while the server registers nine -- `list_worlds` shipped and was never announced, and
-    the number propagated outward from the entry. "Five published files" stood three times
-    against six in channel.json. Neither was a typo: both were a number typed once and copied,
+    the number propagated outward from the entry. A typed count of published files stood three
+    times against a longer list in channel.json. Neither was a typo: both were a number typed once and copied,
     with nothing comparing it to the artifact. `lib/mcp-tools.ts` is now the one list every
     surface renders, and this is what binds it to the artifacts.
   */

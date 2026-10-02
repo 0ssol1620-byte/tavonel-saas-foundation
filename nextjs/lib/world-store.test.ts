@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getFoundationActiveWorld,
+  getFoundationWorldVersion,
   listFoundationWorldVersions,
   promoteFoundationCandidate,
   rollbackFoundationWorld,
@@ -328,5 +329,111 @@ describe("Foundation world lifecycle store", () => {
       ok: false,
       code: "WORLD_VERSION_BINDING_INVALID",
     });
+  });
+});
+
+describe("Foundation exact World-version lookup", () => {
+  const worldStateId = "wst_alpha-6.r1:b";
+  const versionRow = {
+    manifest_digest: manifestDigest,
+    world_state_id: worldStateId,
+    lifecycle_status: "superseded",
+    first_promoted_at: "2026-01-02T12:00:00Z",
+    last_activated_at: "2026-01-02T12:00:00Z",
+    activation_count: 1,
+  };
+
+  function answering(body: unknown, init?: ResponseInit) {
+    const fetchMock = vi.fn(async () => Response.json(body, init));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("validates the workspace, collection and world_state_id before building any request", async () => {
+    configure();
+    const fetchMock = answering([versionRow]);
+    const invalid: Array<[string, string, string]> = [
+      ["pilot world", collectionId, worldStateId],
+      ["", collectionId, worldStateId],
+      [undefined as unknown as string, collectionId, worldStateId],
+      [workspaceKey, "collection-xyz", worldStateId],
+      [workspaceKey, `${collectionId}&workspace_key=eq.pilot-other`, worldStateId],
+      [workspaceKey, collectionId, ""],
+      [workspaceKey, collectionId, "world state 6"],
+      [workspaceKey, collectionId, `${worldStateId}&collection_id=eq.other`],
+      [workspaceKey, collectionId, "w".repeat(257)],
+      [workspaceKey, collectionId, undefined as unknown as string],
+    ];
+    for (const [workspace, collection, id] of invalid) {
+      await expect(getFoundationWorldVersion(workspace, collection, id), JSON.stringify([workspace, collection, id]))
+        .resolves.toEqual({ ok: false, code: "WORLD_ID_INVALID" });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports an unconfigured store as such, without a request", async () => {
+    const fetchMock = answering([versionRow]);
+    await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId))
+      .resolves.toEqual({ ok: false, code: "WORLD_STORE_NOT_CONFIGURED" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reads one row with all three exact filters, capped at two rows and no history ordering", async () => {
+    configure();
+    const fetchMock = answering([versionRow]);
+    await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId)).resolves.toEqual({
+      ok: true,
+      found: true,
+      version: versionRow,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(String((fetchMock.mock.calls[0] as unknown[])[0]));
+    expect(url.pathname).toBe("/rest/v1/foundation_world_versions");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      select: "manifest_digest,world_state_id,lifecycle_status,first_promoted_at,last_activated_at,activation_count",
+      workspace_key: `eq.${workspaceKey}`,
+      collection_id: `eq.${collectionId}`,
+      world_state_id: `eq.${worldStateId}`,
+      limit: "2",
+    });
+  });
+
+  it("returns an explicit not-found for no row, distinct from any failure", async () => {
+    configure();
+    answering([]);
+    await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId))
+      .resolves.toEqual({ ok: true, found: false });
+  });
+
+  it("refuses duplicate, malformed or mismatched rows rather than choosing one", async () => {
+    configure();
+    const refusals: Array<[unknown, string]> = [
+      [[versionRow, { ...versionRow, manifest_digest: `sha256:${"a".repeat(64)}` }], "WORLD_VERSION_AMBIGUOUS"],
+      [[versionRow, versionRow], "WORLD_VERSION_AMBIGUOUS"],
+      [[{ ...versionRow, manifest_digest: "sha256:6" }], "WORLD_VERSION_BINDING_INVALID"],
+      [[{ ...versionRow, lifecycle_status: "candidate" }], "WORLD_VERSION_BINDING_INVALID"],
+      [[{ ...versionRow, activation_count: 0 }], "WORLD_VERSION_BINDING_INVALID"],
+      [[{ ...versionRow, world_state_id: "wst_alpha-7.r1" }], "WORLD_VERSION_BINDING_INVALID"],
+      [[null], "WORLD_VERSION_BINDING_INVALID"],
+      [{ rows: [versionRow] }, "WORLD_VERSION_BINDING_INVALID"],
+    ];
+    for (const [body, code] of refusals) {
+      answering(body);
+      await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId), JSON.stringify(body))
+        .resolves.toEqual({ ok: false, code });
+    }
+  });
+
+  it("keeps a backend read failure a read failure, never a not-found", async () => {
+    configure();
+    answering({ message: "upstream unavailable" }, { status: 503 });
+    await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId))
+      .resolves.toEqual({ ok: false, code: "WORLD_STORE_READ_FAILED" });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId))
+      .resolves.toEqual({ ok: false, code: "WORLD_STORE_READ_FAILED" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("not json", { status: 200 })));
+    await expect(getFoundationWorldVersion(workspaceKey, collectionId, worldStateId))
+      .resolves.toEqual({ ok: false, code: "WORLD_STORE_READ_FAILED" });
   });
 });

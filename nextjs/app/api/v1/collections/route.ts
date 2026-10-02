@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  bindConsumerContext,
+  releaseConsumerContext,
+  resolveBoundSnapshot,
+  snapshotOf,
+} from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import {
@@ -30,6 +36,9 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function GET(request: Request) {
   const auth = await authorizeFoundationRequest(request, "collections:read", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
+  // No collection in this path: a bound context's own collection is what the list narrows to.
+  const binding = bindConsumerContext(request.headers, auth.principal, { scope: "collections:read", collectionId: null });
+  if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
 
   const params = new URL(request.url).searchParams;
   const rawLimit = params.get("limit");
@@ -40,6 +49,30 @@ export async function GET(request: Request) {
   const cursor = params.get("cursor");
   if (cursor !== null && !COLLECTION_ID_PATTERN.test(cursor)) {
     return NextResponse.json({ code: "WORLD_PAGE_CURSOR_INVALID" }, { status: 400, headers: NO_STORE });
+  }
+
+  if (binding.bound) {
+    /*
+      Bound: the list is the bound collection alone, built from the resolved active row rather
+      than filtered out of a workspace page, so no other collection is ever read for it. The
+      cursor keeps its meaning -- a cursor at or past the collection is an empty last page -- and
+      a collection with no active World here has nothing to narrow to.
+    */
+    const snapshot = await resolveBoundSnapshot(binding, auth.principal.workspaceKey);
+    if (!snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
+    const world = snapshot.world;
+    const collections = cursor === null || world.collectionId > cursor
+      ? [{ collectionId: world.collectionId, manifestDigest: world.manifestDigest, revision: world.revision, updatedAt: world.updatedAt }]
+      : [];
+    const released = await releaseConsumerContext({
+      request, principal: auth.principal, scope: "collections:read", bound: binding, snapshot,
+      served: snapshotOf(world),
+    });
+    if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
+    return NextResponse.json(
+      { code: "COLLECTIONS_LISTED", collections, page: { limit, cursor: cursor ?? null, nextCursor: null } },
+      { headers: { ...released.headers } },
+    );
   }
 
   const listed = await listFoundationActiveWorlds(auth.principal.workspaceKey, { limit, cursor });
