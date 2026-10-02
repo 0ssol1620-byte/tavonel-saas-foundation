@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -208,5 +208,44 @@ describe("founder test reset covers the connection source inventory (20261002120
     expect(current).not.toMatch(/^\s*(grant|revoke)\b/im);
     expect(current.match(/security definer set search_path = '' as \$\$/g)).toHaveLength(3);
     expect(current.match(/create or replace function/gi)).toHaveLength(3);
+  });
+});
+
+describe("founder test reset keeps its archived-row DELETE allowance in every guard (20261002140000)", () => {
+  const directory = resolve(process.cwd(), "../supabase/migrations");
+  const files = readdirSync(directory).filter((name) => name.endsWith(".sql")).sort();
+  const read = (name: string) => readFileSync(resolve(directory, name), "utf8");
+  const ALLOWANCE = "if tg_op='DELETE' and public.founder_test_reset_archive_allows_delete(tg_table_name,to_jsonb(old)) then return old; end if;";
+  const bodies = (source: string, name: string) => [...source.matchAll(new RegExp(
+    `create(?:\\s+or\\s+replace)?\\s+function\\s+public\\.${name}\\(\\)[\\s\\S]*?\\bas\\s+\\$\\$([\\s\\S]*?)\\$\\$\\s*;`, "gi"))]
+    .map((match) => match[1]!);
+  const latest = (name: string) => {
+    const file = files.filter((candidate) => bodies(read(candidate), name).length > 0).at(-1);
+    expect(file, `no definition of ${name}`).toBeDefined();
+    return { file: file!, body: bodies(read(file!), name).at(-1)! };
+  };
+
+  // Every BEFORE DELETE guard on a table finalize_founder_test_reset deletes archived rows from. A later
+  // replacement that drops the first line makes finalize fail after R2 has been purged.
+  it.each([
+    "reject_foundation_job_event_mutation", "reject_foundation_compile_event_mutation",
+    "prevent_foundation_world_transition_receipt_mutation", "prevent_source_deletion_evidence_mutation",
+    "guard_connector_document_binding", "guard_connector_source_suspension",
+  ])("the live definition of %s starts with the reset allowance", (name) => {
+    const { body } = latest(name);
+    expect(body.replace(/^\s*begin\s*/i, "").split("\n")[0]!.trim()).toBe(ALLOWANCE);
+  });
+
+  it("restores the allowance on top of the 20261001150000 write boundary and changes nothing else", () => {
+    const fix = latest("guard_connector_document_binding");
+    expect(fix.file).toBe("20261002140000_connector_binding_guard_reset_allowance.sql");
+    const boundary = bodies(read("20261001150000_connector_binding_write_boundary.sql"), "guard_connector_document_binding");
+    expect(boundary).toHaveLength(1);
+    expect(fix.body.replace(`  ${ALLOWANCE}\n`, "")).toBe(boundary[0]);
+    expect(fix.body).toContain("raise exception 'CONNECTOR_BINDING_WRITE_PATH'");
+    const migration = read(fix.file);
+    expect(migration).toContain("returns trigger\nlanguage plpgsql set search_path = '' as $$");
+    expect(migration).not.toMatch(/security\s+definer|^\s*(grant|revoke|alter)\b/im);
+    expect(migration.match(/create or replace function/gi)).toHaveLength(1);
   });
 });
