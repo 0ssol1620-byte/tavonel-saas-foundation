@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { QUALIFICATION } from "@/lib/contact-qualification";
-import { contactText, koreanContactError, type ContactLocale } from "@/lib/contact-locale";
+import { CONTACT_EMAIL, contactErrorCopy, contactText, type ContactLocale } from "@/lib/contact-locale";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
@@ -11,19 +11,35 @@ type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
 
 export default function ContactForm({ locale = "en" }: { locale?: ContactLocale }) {
   const [state, setState] = useState<State>("idle");
-  const [message, setMessage] = useState("");
+  const [failure, setFailure] = useState(() => contactErrorCopy());
   const [planIntent, setPlanIntent] = useState<PlanIntent>("");
   const [startedAt] = useState(() => Date.now());
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const errorId = useId();
 
   useEffect(() => {
     const plan = new URLSearchParams(window.location.search).get("plan");
     setPlanIntent(plan === "Developer" || plan === "Team" || plan === "Enterprise" ? plan : "");
   }, []);
 
+  /*
+    UX06. The button is disabled while sending, so a keyboard submit leaves focus on <body> by
+    the time a failure returns. Once it is enabled again, focus goes back to it: the retry is one
+    keypress away, and the error it is described by is read with it -- which, where a retry
+    cannot help (403, 415), says so and gives the address to write to instead.
+  */
+  useEffect(() => {
+    if (state === "error") submitRef.current?.focus();
+  }, [state]);
+
+  function fail(status?: number) {
+    setFailure(contactErrorCopy(status));
+    setState("error");
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("sending");
-    setMessage("");
     const form = event.currentTarget;
     const formData = new FormData(form);
     // The endpoint returns the same response for honeypots; exclude those submissions locally.
@@ -40,12 +56,9 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         */
         body: JSON.stringify({ ...collect(formData), startedAt, locale }),
       });
-      const result = (await response.json()) as { error?: string };
+      // The response body is not shown: the status alone chooses the public copy.
       if (!response.ok) {
-        setState("error");
-        setMessage(locale === "ko"
-          ? koreanContactError(response.status)
-          : result.error || "We could not send your inquiry.");
+        fail(response.status);
         return;
       }
       const topic = formData.get("topic");
@@ -65,11 +78,9 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
       if (eligibleLead) trackFunnel("request_access_complete");
       form.reset();
       setState("sent");
-    } catch (reason) {
-      setState("error");
-      setMessage(locale === "ko"
-        ? koreanContactError()
-        : reason instanceof Error ? reason.message : "We could not send your inquiry.");
+    } catch {
+      // A network failure; the browser's exception text ("Failed to fetch") is never shown.
+      fail();
     }
   }
 
@@ -175,7 +186,13 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         <input name="website" tabIndex={-1} autoComplete="off" />
       </label>
       <div className="contact-submit">
-        <button className="btn" type="submit" disabled={state === "sending"}>
+        <button
+          ref={submitRef}
+          className="btn"
+          type="submit"
+          disabled={state === "sending"}
+          aria-describedby={state === "error" ? errorId : undefined}
+        >
           {contactText(state === "sending" ? "Sending..." : "Send inquiry", locale)}
         </button>
         <span>
@@ -187,7 +204,17 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
       </div>
       <div className="contact-status" aria-live="polite">
         {state === "sent" && <p data-state="sent">{contactText("Received. We will reply from an official TAVONEL address.", locale)}</p>}
-        {state === "error" && <p data-state="error">{message}</p>}
+        {state === "error" && (
+          <p data-state="error" id={errorId}>
+            {contactText(failure.message, locale)}
+            {failure.fallback ? (
+              <>
+                {" "}{contactText(failure.fallback, locale)}{" "}
+                <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+              </>
+            ) : null}
+          </p>
+        )}
       </div>
     </form>
   );
