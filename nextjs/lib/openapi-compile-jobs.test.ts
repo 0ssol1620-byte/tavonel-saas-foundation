@@ -47,6 +47,18 @@ describe("the published compile contract", () => {
     }
   });
 
+  it("publishes the complete approved direct-upload path set", async () => {
+    const document = await spec();
+    for (const path of ["/uploads/quote", "/uploads/approval", "/uploads/capability", "/uploads/confirm", "/uploads/release"]) {
+      expect(Object.keys(document.paths)).toContain(path);
+    }
+    expect(document.paths["/uploads/approval"].get).toBeTruthy();
+    expect(document.paths["/uploads/approval"].post).toBeTruthy();
+    const quote = document.paths["/uploads/quote"].post!.requestBody!.content["application/json"].schema;
+    expect(quote.properties?.files.minItems).toBe(1);
+    expect(quote.properties?.files.maxItems).toBe(128);
+  });
+
   it("says where those endpoints actually live", async () => {
     const document = await spec();
     // They are not under /api/v1, and a spec that implied they were would send every generated

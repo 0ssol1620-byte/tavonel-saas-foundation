@@ -12,7 +12,8 @@ Create the exact connection in the workspace and use its UUID. API credentials a
 
 ```sh
 python3 tavonel-source-agent.py --root /approved/documents \
-  --connection-id YOUR_CONNECTION_UUID --state /private/agent/state.json
+  --connection-id YOUR_CONNECTION_UUID --state /private/agent/state.json \
+  --approve-up-to-credits YOUR_MAXIMUM_CREDITS --allow-unknown-page-count
 ```
 
 Only an already-authorized environment variable supplies the key. Do not paste keys into documents, shell history or support logs.
@@ -126,6 +127,7 @@ Default execution performs one reconciliation and exits. `--watch` repeats with 
 ```sh
 python3 tavonel-source-agent.py --root /approved/documents \
   --connection-id YOUR_CONNECTION_UUID --state /private/agent/state.json \
+  --approve-up-to-credits YOUR_MAXIMUM_CREDITS --allow-unknown-page-count \
   --watch --poll-seconds 30 --max-cycles 10
 ```
 
@@ -135,9 +137,11 @@ A service manager may restart a stopped agent, but installing such a service or 
 
 ## Durable commit and recovery
 
-Each cycle validates its state, scans the complete source inventory and computes added/changed/deleted events. Supported changed files are uploaded using stable source idempotency keys. Before the sync POST, the agent atomically persists the exact batch UUID, body, manifest, source binding and resulting inventory in a private `.pending` journal.
+Each cycle validates its state, scans the complete source inventory and computes added/changed/deleted events. Before network work, every changed set must fit one complete approval (at most 128 files and the bounded manifest size); partial approved sets are refused. Sync requires the caller to set `--approve-up-to-credits` (a positive maximum no greater than 10,000,000) and `--allow-unknown-page-count` when a changed source has no trusted page estimate. It requests a no-hold quote for the exact whole manifest, compares the quote maximum with that caller limit, then persists the attempt key, manifest, quote and approval body before approval. A quote above the limit stops with instructions to review and rerun using an explicit higher caller limit. A retry never accepts a changed quote or server ceiling automatically. After approval, the agent persists approval/scope/document identities before asking for any capability; each member uses the same stable attempt/file identity for capability, direct PUT and atomic confirmation. The sync batch and cursor advance only after every selected member is confirmed and the server accepts the complete batch.
 
 It advances cursor state only after the server returns `applied` or `replayed`. If the server committed but its response was lost, the next attempt replays the same batch before scanning new input. If state was written but journal deletion failed, restart recognizes the already-committed cursor. Do not delete a pending journal to recover from an unknown server outcome.
+
+After a definitive object-store refusal, the agent first asks the server to release that member, then calls `POST /api/v1/uploads/approval/cancel` with the same `attemptKey`, `scopeDigest` and a member `fileKey`. The member key anchors the caller-scoped request; the server cancels the complete approval and releases remaining reserved member holds atomically. A reconciliation-required response means some work may already have settled and needs review. An uncertain PUT is never released or cancelled: retry the same saved attempt and let the server reconcile it.
 
 A state fingerprint binds the API URL and source root or bucket/prefix/endpoint. A changed scope fails closed; create a separate approved connection/state. Legacy state without a fingerprint requires `--adopt-legacy-state` after an operator verifies the original source and API target. This option does not approve a new scope.
 
@@ -145,9 +149,9 @@ The lock uses OS advisory locking, is released on process exit, and prevents con
 
 ## Bounded retries and costs
 
-`--retry-limit` defaults to 3 and allows 0–10 additional attempts per cycle. Only transient HTTP 408/429/5xx and network errors are retried with capped exponential backoff. Authentication, scope, invalid journal, unsupported server responses and cursor conflicts stop the process. Exhausting retries also stops, preserving state and pending journal.
+`--retry-limit` defaults to 3 and allows 010 additional attempts per cycle. Only transient HTTP 408/429/5xx and network errors are retried with capped exponential backoff. Authentication, scope, invalid journal, unsupported server responses and cursor conflicts stop the process. Exhausting retries also stops, preserving state and pending journal.
 
-`--max-events` is 1–5000; `--max-upload-bytes` defaults to 512 MiB per cycle; `--max-file-bytes` (default 512 MiB) remains a local upper bound and is not the Foundation ceiling. The Foundation's `maxSourceBytes` of 5,242,880 bytes and its 80-page ceiling still apply on the server, so normal sync can upload a file that the service then refuses. Use the dry-run plan to find such files first. Server plan/file limits still apply and may be lower. Inventory change count and supported upload bytes are checked before upload. A final bounded manifest check prevents oversized sync submission. These are input budgets, not a complete downstream OCR/LLM credit reservation system.
+`--max-events` is 15000; `--max-upload-bytes` defaults to 512 MiB per cycle; `--max-file-bytes` (default 512 MiB) remains a local upper bound and is not the Foundation ceiling. The Foundation's `maxSourceBytes` of 5,242,880 bytes and its 80-page ceiling still apply on the server, so normal sync can upload a file that the service then refuses. Use the dry-run plan to find such files first. Server plan/file limits still apply and may be lower. Inventory change count and supported upload bytes are checked before upload. A final bounded manifest check prevents oversized sync submission. These are input budgets, not a complete downstream OCR/LLM credit reservation system.
 
 The process prints one JSON result per completed cycle and sanitized retry/failure status. Failed main execution returns nonzero with `SOURCE_SYNC_FAILED`; no raw HTTP body or traceback is printed by main. Interrupt exits 130. Investigate configuration and server status through authorized tools, never expose credentials in support output.
 
@@ -167,7 +171,7 @@ The server decides how deleted sources are suspended. This change alone does not
 python3 -m unittest discover -s scripts/source-agent -p 'test_*.py' -v
 ```
 
-The suite covers unchanged sync, lost response and exact replay, scope changes, empty inventories, permission failure, symlink skipping, state outside source, budget preflight, explicit legacy adoption, local lock exclusion, bounded watch and retry, repeated S3 cursor and journal tampering. It uses temporary synthetic files and a mocked client; no live credentials, uploads or daemon are needed. The Vitest suite invokes these tests through `lib/source-agent-runtime.test.ts`.
+The suite covers unchanged sync, lost response and exact replay, scope changes, empty inventories, permission failure, symlink skipping, state outside source, budget preflight, explicit legacy adoption, local lock exclusion, bounded watch and retry, repeated S3 cursor and journal tampering. Most sync tests use a mocked client. A dedicated wire regression runs the real `FoundationClient.upload` against a local fake HTTP Foundation and storage server; it checks the capability body, stable idempotency key, unauthenticated byte PUT, and confirmation request. All fixtures are synthetic and local; no live credentials or remote upload is used. The Vitest suite invokes these tests through `lib/source-agent-runtime.test.ts`.
 
 The intake-plan tests cover:
 
@@ -258,3 +262,10 @@ A further revision by Claude Opus 5.5 (`claude-opus-5-5`), referred to here as r
 3. **Ancestor-rename test.** r2 skipped the test when Windows refused the rename. r3 asserts that refusal as a safe outcome and keeps every assertion for the case where the rename succeeds.
 
 r3 was also prepared without running the test suite. Run it on Windows and on Linux before accepting r3.
+
+
+## Approved upload compatibility revision
+
+The 2026-10-03 compatibility repair changes normal sync's upload path. The agent now quotes each complete changed manifest before work, requires the operator's `--approve-up-to-credits` bound, and requires `--allow-unknown-page-count` when non-image sources have no trusted estimate. It persists attempt, quote, approval and file identities before transfer, then confirms each upload before advancing the cursor batch. A changed quote, a larger set than the 128-file approval bound, or an approval refusal stops the cycle for operator review. Existing complete-set and legacy compile behavior is retained.
+
+The repair is a task-owned candidate against PR141 head `db8a8771e10211b7850cdf4ff5788537c2a0aca6`. The prior source-agent implementation was mixed-authored: Claude Opus 5.5 supplied the bounded-intake changes, and Codex added this revision's full-sync fake-HTTP recovery coverage, whole-set cancel call and API contract updates. Local synthetic tests do not prove a deployed API, a production upload, or downstream compile quality.

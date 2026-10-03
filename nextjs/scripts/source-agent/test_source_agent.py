@@ -10,8 +10,14 @@ in a temporary directory. The link-confinement tests create real directory junct
 on Windows with `cmd /c mklink /J` (no administrator or symlink privilege) and
 directory symlinks elsewhere; every link target is inside the same temporary
 directory, races only rename directories the test created, and no ACL or permission
-is changed. No test reads file contents.
+is changed. No plan test reads file contents.
+
+A later Claude Opus 5.5 revision moved sync uploads onto the quote/approval contract. WireTests
+run the real FoundationClient and sync against a synthetic Foundation and object store served by
+a ThreadingHTTPServer bound to 127.0.0.1 for the length of one test, with a synthetic key; no
+request leaves the host and every socket has a bounded timeout.
 """
+import hashlib
 import importlib.util
 import json
 import io
@@ -19,8 +25,13 @@ import os
 import stat
 import subprocess
 import sys
+import socket
+import threading
 import time
+import urllib.parse
+import uuid
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -147,14 +158,73 @@ def recorded_opens(backend, hook=None):
     with patch.object(backend, 'open_beneath', open_beneath):
         yield names
 
+CONNECTION = '11111111-1111-4111-8111-111111111111'
+FINGERPRINT = 'sha256:' + '7' * 64
+API_KEY = 'tvnl_live_synthetic_wire_fixture'
+
+def sha(data): return hashlib.sha256(data).hexdigest()
+
+# The intake contract, written out here independently of the agent (lib/intake-approval.ts).
+def expected_file_key(path, data, mime):
+    return 'fk_' + sha('\x1f'.join(['tavonel-intake-file-v1', path, sha(data), str(len(data)), mime]).encode())[:40]
+
+def expected_manifest_digest(files):
+    lines = ['|'.join([f['fileKey'], f['contentSha256'], str(f['byteLength']), f['mimeType'],
+                       '-' if f['claimedPages'] is None else str(f['claimedPages']), f['claimedBasis'] or '-'])
+             for f in sorted(files, key=lambda f: f['fileKey'])]
+    return 'sha256:' + sha('\n'.join(['tavonel-intake-manifest-v1', str(len(files)), *lines]).encode())
+
+def expected_source_key(attempt_key, file_key):
+    return sha(f'tavonel-approved-source-v1\x1f{attempt_key}\x1f{file_key}'.encode())
+
+def quote_for(body):
+    """A synthetic price: two credits per page, uncounted members at the 80-page ceiling."""
+    files = []
+    for entry in body['files']:
+        pages = entry['claimedPages'] or 80
+        files.append({'fileKey': entry['fileKey'], 'pageBasis': 'unknown' if entry['claimedPages'] is None else 'declared',
+                      'approvedMaxPages': pages, 'reservedCredits': pages, 'maximumCredits': 2 * pages})
+    reserved = sum(f['reservedCredits'] for f in files); maximum = sum(f['maximumCredits'] for f in files)
+    return {'code': 'INTAKE_QUOTE', 'clientManifestDigest': body['clientManifestDigest'], 'pricingFingerprint': FINGERPRINT,
+            'metadataLimitBytes': 32768, 'files': files,
+            'quote': {'maximumPages': sum(f['approvedMaxPages'] for f in files), 'reservedCredits': reserved,
+                      'maximumCredits': maximum, 'estimatedUsd': reserved / 100, 'maximumUsd': maximum / 100}}
+
+def approval_for(body):
+    quoted = {f['fileKey']: f for f in quote_for(body)['files']}
+    files = [{'fileKey': e['fileKey'], 'documentId': str(uuid.uuid5(uuid.NAMESPACE_URL, body['attemptKey'] + e['fileKey'])),
+              'fileState': 'approved', 'contentSha256': e['contentSha256'], 'byteLength': e['byteLength'], 'mimeType': e['mimeType'],
+              'pageBasis': quoted[e['fileKey']]['pageBasis'], 'approvedMaxPages': quoted[e['fileKey']]['approvedMaxPages'],
+              'approvedReservedCredits': quoted[e['fileKey']]['reservedCredits'],
+              'approvedMaximumCredits': quoted[e['fileKey']]['maximumCredits'],
+              'reservationId': None, 'reservationState': None, 'reservationExpiresAt': None} for e in body['files']]
+    return {'approvalId': str(uuid.uuid5(uuid.NAMESPACE_URL, body['attemptKey'])), 'attemptKey': body['attemptKey'],
+            'clientManifestDigest': body['clientManifestDigest'], 'scopeDigest': 'sha256:' + sha(body['clientManifestDigest'].encode()),
+            'pricingFingerprint': FINGERPRINT, 'state': 'approved', 'expiresAt': '2099-01-01T00:00:00Z', 'expired': False,
+            'fileCount': len(files), 'aggregateMaximumPages': sum(f['approvedMaxPages'] for f in files),
+            'aggregateReservedCredits': sum(f['approvedReservedCredits'] for f in files),
+            'aggregateMaximumCredits': sum(f['approvedMaximumCredits'] for f in files),
+            'compilable': False, 'idempotentReplay': False, 'files': files}
+
 class Client:
+    """Stands in for FoundationClient where the wire is not under test; WireTests use the real one."""
     bodies = []
     uploads = []
+    approvals = {}
     lose_response = False
     def __init__(self, *args): pass
-    def upload(self, path, mime, key, original_filename=None):
-        self.uploads.append((original_filename or path.name, key))
-        return '11111111-1111-4111-8111-111111111111'
+    def quote(self, body): return quote_for(body)
+    def create_approval(self, body):
+        Client.approvals.setdefault(body['attemptKey'], approval_for(body))
+        return json.loads(json.dumps(Client.approvals[body['attemptKey']]))
+    def read_approval(self, attempt_key):
+        approval = Client.approvals.get(attempt_key)
+        return None if approval is None else json.loads(json.dumps(approval))
+    def upload(self, path, member, attempt, on_phase=None):
+        self.uploads.append((member['originalFilename'], attempt['attemptKey']))
+        for held in Client.approvals[attempt['attemptKey']]['files']:
+            if held['fileKey'] == member['fileKey']: held['fileState'] = 'confirmed'
+        return member['documentId']
     def post(self, path, body):
         self.bodies.append(body)
         if self.lose_response:
@@ -167,8 +237,9 @@ class SyncFixture:
         self.tmp = tempfile.TemporaryDirectory()
         self.base = canonical_temp_base(self.tmp)
         self.root = self.base / 'source-root'; self.root.mkdir()
-        self.args = agent.parser().parse_args(['--root',str(self.root),'--connection-id','11111111-1111-4111-8111-111111111111','--state',str(self.base/'state.json')])
-        Client.bodies=[]; Client.uploads=[]; Client.lose_response=False
+        self.args = agent.parser().parse_args(['--root',str(self.root),'--connection-id',CONNECTION,'--state',str(self.base/'state.json'),
+                                               '--approve-up-to-credits','100000','--allow-unknown-page-count'])
+        Client.bodies=[]; Client.uploads=[]; Client.approvals={}; Client.lose_response=False
         self.fake = patch.object(agent,'FoundationClient',Client); self.fake.start()
     def tearDown(self):
         self.fake.stop(); self.tmp.cleanup()
@@ -1010,5 +1081,282 @@ class LinkConfinementTests(unittest.TestCase):
         self.assert_never_escaped(plan)
         self.assertEqual([(e['path'],e['status']) for e in plan['entries']],[('inside.pdf','eligible')])
         self.assertIsNone(plan['failClosedReason']);self.assertTrue(plan['scanComplete'])
+
+
+class SourceAgentWireTests(unittest.TestCase):
+    """Exercise the shipped FoundationClient.upload against a local fake HTTP Foundation and object store."""
+    def test_upload_uses_approved_capability_then_put_then_confirm_and_persists_confirmation(self):
+        data=b"real fake HTTP upload bytes"
+        digest='sha256:'+sha(data)
+        attempt_key='attempt_wire_fixture_0001'
+        file_key='fk_'+sha(b'wire file')[:40]
+        document_id='22222222-2222-4222-8222-222222222222'
+        scope_digest='sha256:'+'8'*64
+        calls=[]
+        state={'stored':False,'confirmed':False}
+        server_box={}
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version='HTTP/1.1'
+            def log_message(self,*args): pass
+            def send_json(self,status,payload):
+                raw=json.dumps(payload,separators=(',',':')).encode()
+                self.send_response(status);self.send_header('content-type','application/json');self.send_header('content-length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+            def do_POST(self):
+                length=int(self.headers.get('content-length','0'));body=json.loads(self.rfile.read(length) or b'{}')
+                calls.append((self.command,self.path,dict(self.headers),body))
+                if self.path=='/api/v1/uploads/capability':
+                    self.send_json(200,{'code':'QUALIFIED','documentId':document_id,'uploadUrl':server_box['base']+'/storage/put',
+                        'contentLength':len(data),'declaredMimeType':'application/pdf','computeReservation':{'maximumCredits':2}});return
+                if self.path=='/api/v1/uploads/confirm':
+                    self.assert_auth()
+                    if not state['stored'] or body.get('documentId')!=document_id or body.get('fileKey')!=file_key:
+                        self.send_json(409,{'code':'UPLOAD_OBJECT_MISSING'});return
+                    state['confirmed']=True
+                    approved={'fileKey':file_key,'documentId':document_id,'fileState':'confirmed'}
+                    self.send_json(200,{'code':'UPLOAD_CONFIRMED','approvedFile':approved});return
+                self.send_json(404,{'code':'NOT_FOUND'})
+            def do_GET(self):
+                calls.append((self.command,self.path,dict(self.headers),None))
+                if self.path.startswith('/api/v1/uploads/approval?'):
+                    self.assert_auth()
+                    files=[{'fileKey':file_key,'documentId':document_id,'fileState':'confirmed' if state['confirmed'] else 'approved'}]
+                    self.send_json(200,{'approval':{'files':files}});return
+                self.send_json(404,{'code':'NOT_FOUND'})
+            def do_PUT(self):
+                length=int(self.headers.get('content-length','0'));payload=self.rfile.read(length)
+                calls.append((self.command,self.path,dict(self.headers),payload))
+                state['stored']=payload==data
+                self.send_response(200);self.send_header('content-length','0');self.end_headers()
+            def assert_auth(self):
+                if self.headers.get('authorization')!='Bearer '+API_KEY: raise AssertionError('Foundation bearer missing or wrong')
+
+        server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        self.addCleanup(lambda:(server.shutdown(),server.server_close(),thread.join(timeout=2)))
+        server_box['base']=f'http://127.0.0.1:{server.server_address[1]}'
+        tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup)
+        path=Path(tmp.name)/'approved.pdf';path.write_bytes(data)
+        client=agent.FoundationClient(server_box['base'],API_KEY,2)
+        member={'fileKey':file_key,'documentId':document_id,'originalFilename':'approved.pdf','mimeType':'application/pdf',
+            'byteLength':len(data),'contentSha256':digest,'approvedMaximumCredits':2}
+        attempt={'attemptKey':attempt_key,'scopeDigest':scope_digest,'pricingFingerprint':FINGERPRINT}
+
+        self.assertEqual(client.upload(path,member,attempt),document_id)
+        routes=[entry[1].split('?',1)[0] for entry in calls]
+        self.assertEqual(routes,['/api/v1/uploads/capability','/storage/put','/api/v1/uploads/confirm'])
+        capability=calls[0]
+        self.assertEqual(capability[0],'POST');self.assertEqual(capability[3],{
+            'originalFilename':'approved.pdf','declaredMimeType':'application/pdf','requestedBytes':len(data),
+            'attemptKey':attempt_key,'scopeDigest':scope_digest,'pricingFingerprint':FINGERPRINT,
+            'fileKey':file_key,'contentSha256':digest})
+        headers={key.lower():value for key,value in capability[2].items()}
+        self.assertEqual(headers.get('x-tavonel-source-idempotency-key'),expected_source_key(attempt_key,file_key))
+        self.assertEqual(headers.get('authorization'),'Bearer '+API_KEY)
+        self.assertEqual(calls[1][0],'PUT');self.assertEqual(calls[1][3],data)
+        self.assertNotIn('authorization', {key.lower() for key in calls[1][2]})
+        self.assertEqual({key.lower():value for key,value in calls[1][2].items()}.get('content-type'),'application/pdf')
+        self.assertEqual(calls[2][3],{'documentId':document_id,'sourceSha256':digest,'attemptKey':attempt_key,
+            'scopeDigest':scope_digest,'fileKey':file_key})
+        self.assertTrue(state['confirmed'])
+
+
+class FullSyncWireTests(unittest.TestCase):
+    """Run the complete shipped sync flow against a bounded synthetic HTTP Foundation."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / 'source-root'; self.root.mkdir()
+        self.state_path = Path(self.tmp.name) / 'state.json'
+        self.calls = []
+        self.store = {'approval': None, 'stored': False, 'confirmed': False,
+                      'drop_approval_post': False, 'drop_approval_get': 0,
+                      'drop_confirm_post': False, 'approval_posts': 0,
+                      'put_refused': False, 'set_cancelled': False}
+        box = {'base': None, 'store': self.store, 'calls': self.calls,
+               'data': b'full sync wire bytes', 'document_id': str(uuid.uuid4()),
+               'tmp_path': self.state_path}
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+            def log_message(self, *args): pass
+            def send_json(self, status, payload):
+                raw = json.dumps(payload, separators=(',', ':')).encode()
+                self.send_response(status); self.send_header('content-type', 'application/json')
+                self.send_header('content-length', str(len(raw))); self.end_headers(); self.wfile.write(raw)
+            def lose_reply(self):
+                self.close_connection = True
+                try: self.connection.shutdown(socket.SHUT_RDWR)
+                except OSError: pass
+                self.connection.close()
+            def body(self):
+                return json.loads(self.rfile.read(int(self.headers.get('content-length', '0'))) or b'{}')
+            def auth(self):
+                return self.headers.get('authorization') == 'Bearer ' + API_KEY
+            def do_POST(self):
+                body = self.body()
+                box['calls'].append((self.command, self.path, dict(self.headers), body))
+                store = box['store']
+                if self.path == '/api/v1/uploads/quote':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    self.send_json(200, quote_for(body)); return
+                if self.path == '/api/v1/uploads/approval':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    journal=Path(box['tmp_path'].with_name(box['tmp_path'].name+'.pending'))
+                    box['calls'].append(('pending-before-approval',journal.exists()))
+                    store['approval_posts'] += 1
+                    store['approval'] = store['approval'] or approval_for(body)
+                    if store['drop_approval_post']:
+                        store['drop_approval_post'] = False; return self.lose_reply()
+                    self.send_json(200, {'code':'INTAKE_APPROVED','approval':store['approval']}); return
+                if self.path == '/api/v1/uploads/capability':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    journal=Path(box['tmp_path'].with_name(box['tmp_path'].name+'.pending'))
+                    try:
+                        intake=json.loads(journal.read_text(encoding='utf-8'))['intake']
+                        persisted=(intake['attemptKey']==body.get('attemptKey')
+                            and intake['approval']['scopeDigest']==store['approval']['scopeDigest']
+                            and intake['members'][body.get('fileKey')]['documentId']==store['approval']['files'][0]['documentId'])
+                    except (OSError,ValueError,KeyError,TypeError): persisted=False
+                    box['calls'].append(('identities-before-capability',persisted))
+                    member = next((f for f in store['approval']['files'] if f['fileKey']==body.get('fileKey')), None)
+                    if member is None: return self.send_json(409, {'code':'INTAKE_APPROVAL_FILE_OUT_OF_SCOPE'})
+                    self.send_json(200, {'code':'QUALIFIED','documentId':member['documentId'],
+                        'uploadUrl':box['base']+'/storage/put','contentLength':len(box['data']),
+                        'declaredMimeType':'application/pdf',
+                        'computeReservation':{'maximumCredits':member['approvedMaximumCredits']}}); return
+                if self.path == '/api/v1/uploads/confirm':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    if not store['stored']: return self.send_json(409, {'code':'UPLOAD_OBJECT_MISSING'})
+                    member = next(f for f in store['approval']['files'] if f['fileKey']==body.get('fileKey'))
+                    if body.get('documentId') != member['documentId']:
+                        return self.send_json(409, {'code':'INTAKE_APPROVAL_CONFLICT'})
+                    member['fileState']='confirmed'; store['confirmed']=True
+                    if store['drop_confirm_post']:
+                        store['drop_confirm_post']=False; return self.lose_reply()
+                    self.send_json(200, {'code':'UPLOAD_CONFIRMED','approvedFile':member}); return
+                if self.path == '/api/v1/uploads/release':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    self.send_json(200, {'code':'UPLOAD_CREDITS_RELEASED','result':{'fileKey':body.get('fileKey')}}); return
+                if self.path == '/api/v1/uploads/approval/cancel':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    approval=store['approval']
+                    if body.get('attemptKey') != approval['attemptKey'] or body.get('scopeDigest') != approval['scopeDigest']:
+                        return self.send_json(409, {'code':'INTAKE_APPROVAL_CONFLICT'})
+                    store['set_cancelled']=True; approval['state']='cancelled'
+                    for member in approval['files']: member['fileState']='cancelled'
+                    self.send_json(200, {'code':'INTAKE_SET_CANCELLED','result':{'status':'cancelled','reconciliationRequired':False}}); return
+                if self.path == f'/api/v1/connections/{CONNECTION}/sync':
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    box['calls'].append(('cursor-file-exists-before-accepted-reply', box['tmp_path'].exists()))
+                    self.send_json(200, {'status':'applied'}); return
+                self.send_json(404, {'code':'NOT_FOUND'})
+            def do_GET(self):
+                box['calls'].append((self.command, self.path, dict(self.headers), None))
+                store=box['store']
+                if self.path.startswith('/api/v1/uploads/approval?'):
+                    if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    if store['drop_approval_get']:
+                        store['drop_approval_get'] -= 1; return self.lose_reply()
+                    if store['approval'] is None: return self.send_json(404, {'code':'INTAKE_APPROVAL_NOT_FOUND'})
+                    return self.send_json(200, {'approval':store['approval']})
+                self.send_json(404, {'code':'NOT_FOUND'})
+            def do_PUT(self):
+                payload=self.rfile.read(int(self.headers.get('content-length','0')))
+                box['calls'].append((self.command,self.path,dict(self.headers),payload))
+                if self.path != '/storage/put' or self.headers.get('authorization') is not None:
+                    return self.send_json(403, {'code':'OBJECT_STORE_REFUSED'})
+                if box['store']['put_refused']:
+                    self.send_json(403, {'code':'OBJECT_STORE_REFUSED'}); return
+                box['store']['stored'] = payload == box['data']
+                self.send_response(200); self.send_header('content-length','0'); self.end_headers()
+
+        self.server=ThreadingHTTPServer(('127.0.0.1',0),Handler); self.server.daemon_threads=True
+        self.thread=threading.Thread(target=self.server.serve_forever,daemon=True); self.thread.start()
+        self.addCleanup(lambda:(self.server.shutdown(),self.server.server_close(),self.thread.join(timeout=2)))
+        base=f'http://127.0.0.1:{self.server.server_address[1]}'
+        box['base']=base
+        self.args=agent.parser().parse_args(['--root',str(self.root),'--connection-id',CONNECTION,'--state',str(self.state_path),
+            '--base-url',base,'--approve-up-to-credits','100000','--allow-unknown-page-count','--timeout-seconds','2'])
+        self.env=patch.dict(os.environ,{'TAVONEL_API_KEY':API_KEY}); self.env.start(); self.addCleanup(self.env.stop)
+        self.addCleanup(self.tmp.cleanup)
+        self.data=box['data']
+        (self.root/'a.pdf').write_bytes(self.data)
+
+    def request_paths(self):
+        return [call[1] for call in self.calls if len(call)==4 and call[0] in {'GET','POST','PUT'}]
+
+    def test_full_quote_approval_upload_commit_orders_cursor_after_accept(self):
+        result=agent.sync(self.args)
+        self.assertEqual(result['status'],'applied')
+        methods_paths=[(call[0],call[1]) for call in self.calls if len(call)==4]
+        self.assertEqual([pair for pair in methods_paths if pair[0] != 'GET'],[
+            ('POST','/api/v1/uploads/quote'),('POST','/api/v1/uploads/approval'),
+            ('POST','/api/v1/uploads/capability'),('PUT','/storage/put'),
+            ('POST','/api/v1/uploads/confirm'),('POST',f'/api/v1/connections/{CONNECTION}/sync')])
+        quote_body=next(c[3] for c in self.calls if c[1]=='/api/v1/uploads/quote')
+        approval_body=next(c[3] for c in self.calls if c[1]=='/api/v1/uploads/approval')
+        self.assertEqual(approval_body['clientManifestDigest'],quote_body['clientManifestDigest'])
+        self.assertLessEqual(quote_for(quote_body)['quote']['maximumCredits'],self.args.approve_up_to_credits)
+        self.assertTrue(self.store['confirmed']); self.assertTrue(self.state_path.exists())
+        self.assertIn(('pending-before-approval', True),self.calls)
+        self.assertIn(('identities-before-capability', True),self.calls)
+        commit_observation=next(c for c in self.calls if c[0]=='cursor-file-exists-before-accepted-reply')
+        self.assertFalse(commit_observation[1], 'cursor state must wait until server accepted the complete event batch')
+
+    def test_lost_approval_reply_reload_reads_committed_set_without_duplicate_post(self):
+        self.store['drop_approval_post']=True; self.store['drop_approval_get']=1
+        with self.assertRaises(agent.RetryableAgentError): agent.sync(self.args)
+        journal=self.state_path.with_name(self.state_path.name+'.pending')
+        self.assertTrue(journal.exists()); self.assertFalse(self.state_path.exists())
+        pending=json.loads(journal.read_text(encoding='utf-8'))
+        original=(pending['intake']['attemptKey'],pending['intake']['manifest'],pending['intake']['approvalBody'])
+        self.assertEqual(self.store['approval_posts'],1)
+        self.assertFalse(any(c[1]=='/api/v1/uploads/capability' for c in self.calls if len(c)==4))
+        self.assertEqual(agent.sync(self.args)['status'],'applied')
+        after=json.loads(journal.read_text(encoding='utf-8')) if journal.exists() else None
+        self.assertIsNone(after)
+        self.assertEqual(self.store['approval_posts'],1)
+        self.assertEqual(sum(c[1]=='/api/v1/uploads/quote' for c in self.calls if len(c)==4),1)
+        self.assertEqual(sum(c[1]=='/api/v1/uploads/capability' for c in self.calls if len(c)==4),1)
+        self.assertEqual(sum(c[1]=='/storage/put' for c in self.calls if len(c)==4),1)
+        self.assertEqual(sum(c[1]=='/api/v1/uploads/confirm' for c in self.calls if len(c)==4),1)
+        self.assertEqual(self.store['approval']['attemptKey'],original[0])
+        self.assertEqual(self.store['approval']['clientManifestDigest'],pending['intake']['clientManifestDigest'])
+        self.assertEqual(next(c[3] for c in self.calls if c[1]=='/api/v1/uploads/approval'),original[2])
+        capability=next(c for c in self.calls if c[1]=='/api/v1/uploads/capability')
+        self.assertEqual(capability[3]['attemptKey'],original[0])
+        self.assertEqual(capability[3]['fileKey'],original[1][0]['fileKey'])
+        self.assertEqual({k.lower():v for k,v in capability[2].items()}['x-tavonel-source-idempotency-key'],
+                         expected_source_key(original[0],original[1][0]['fileKey']))
+        self.assertTrue(self.state_path.exists())
+
+    def test_lost_confirmation_reply_reload_recovers_confirmed_member_without_reupload(self):
+        self.store['drop_confirm_post']=True; self.store['drop_approval_get']=1
+        with self.assertRaises(agent.RetryableAgentError): agent.sync(self.args)
+        journal=self.state_path.with_name(self.state_path.name+'.pending')
+        self.assertTrue(journal.exists()); self.assertFalse(self.state_path.exists())
+        saved=json.loads(journal.read_text(encoding='utf-8'))['intake']
+        identity=(saved['attemptKey'],saved['members'][saved['manifest'][0]['fileKey']].get('documentId'))
+        self.assertTrue(self.store['confirmed'])
+        self.assertEqual(agent.sync(self.args)['status'],'applied')
+        self.assertEqual(self.store['approval']['attemptKey'],identity[0])
+        self.assertEqual(self.store['approval']['files'][0]['documentId'],identity[1])
+        self.assertEqual(sum(c[1]=='/api/v1/uploads/approval' for c in self.calls if len(c)==4),1)
+        self.assertEqual(sum(c[1]=='/api/v1/uploads/capability' for c in self.calls if len(c)==4),1)
+        self.assertEqual(sum(c[1]=='/storage/put' for c in self.calls if len(c)==4),1)
+        self.assertEqual(sum(c[1]=='/api/v1/uploads/confirm' for c in self.calls if len(c)==4),1)
+        self.assertTrue(self.state_path.exists()); self.assertFalse(journal.exists())
+
+    def test_definitive_put_refusal_releases_member_then_cancels_whole_set(self):
+        self.store['put_refused']=True
+        with self.assertRaisesRegex(agent.ReviewRequiredError,'complete approved set was cancelled'):
+            agent.sync(self.args)
+        paths=[c[1] for c in self.calls if len(c)==4]
+        self.assertLess(paths.index('/api/v1/uploads/release'),paths.index('/api/v1/uploads/approval/cancel'))
+        self.assertTrue(self.store['set_cancelled'])
+        cancel=next(c for c in self.calls if c[1]=='/api/v1/uploads/approval/cancel')
+        self.assertEqual(cancel[3],{'attemptKey':self.store['approval']['attemptKey'],
+            'scopeDigest':self.store['approval']['scopeDigest'],'fileKey':self.store['approval']['files'][0]['fileKey']})
+        self.assertFalse(any(c[1]=='/api/v1/uploads/confirm' for c in self.calls if len(c)==4))
 
 if __name__=='__main__':unittest.main()

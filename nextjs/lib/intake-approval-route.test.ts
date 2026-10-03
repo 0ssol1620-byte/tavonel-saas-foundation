@@ -99,7 +99,7 @@ describe("approval route preserves one bounded complete selection", () => {
   });
 
   it("fits 128 valid rows using maximum-length escaped filenames below the shared byte bound", async () => {
-    const files = Array.from({ length: 128 }, (_, index) => ({
+    const files: IntakeManifestEntry[] = Array.from({ length: 128 }, (_, index) => ({
       fileKey: `fk_${String(index).padStart(8, "0")}${"x".repeat(116)}`,
       originalFilename: `${"\"".repeat(251)}.pdf`, contentSha256: hash,
       byteLength: 5_242_880, mimeType: "application/pdf", claimedPages: 80, claimedBasis: "pdf_page_tree",

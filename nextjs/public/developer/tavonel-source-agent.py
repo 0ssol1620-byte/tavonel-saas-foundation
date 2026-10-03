@@ -13,8 +13,12 @@ Opus 5.5 revision (r2) replaced the intake plan's path-based traversal and its
 before/after path re-checks with traversal anchored to held directory handles, and
 fails closed where that cannot be established. A Claude Opus 5.5 r3 revision made
 those Windows opens follow each directory's own case policy and fails closed where
-case-only sibling names could be confused. This file is of mixed authorship. Normal
-sync processing is unchanged by all three revisions.
+case-only sibling names could be confused. Normal sync processing is unchanged by
+all three revisions. A later Claude Opus 5.5 revision binds every sync upload to one
+quoted, caller-approved intake set per cursor cycle (see approve_and_upload); cycles
+without uploads are unchanged. A Codex follow-up sends whole-set cancellation after a
+definitive member PUT refusal, using the same persisted attempt and scope identity. This
+file is of mixed authorship.
 """
 
 from __future__ import annotations
@@ -25,8 +29,10 @@ import ctypes
 import errno
 import fnmatch
 import hashlib
+import http.client
 import json
 import os
+import re
 import stat as stat_module
 import struct
 import sys
@@ -100,6 +106,19 @@ PLAN_POLICY = {
         "pageCeilingCheck": "disclosed_not_enforced_at_intake",
     },
 }
+# The shared intake-approval contract: one approval covers a cycle's whole changed upload set
+# and is never split, so a larger set is refused before anything is quoted.
+MAX_APPROVAL_FILES = 128
+# Upper bound for --approve-up-to-credits, so a typo cannot authorize an unbounded spend.
+MAX_APPROVE_CREDITS = 10_000_000
+ATTEMPT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+SHA256_DIGEST_PATTERN = re.compile(r"^sha256:[a-f0-9]{64}$")
+UUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
+RESPONSE_CODE_PATTERN = re.compile(r"^[A-Z0-9_]{1,80}$")
+APPROVAL_FILE_STATES = frozenset({"approved", "reserved", "confirmed", "cancelled"})
+STALE_APPROVAL_CODES = frozenset({"INTAKE_PRICE_STALE", "INTAKE_APPROVAL_AGGREGATE_MISMATCH"})
+ALREADY_CONFIRMED_CODES = frozenset({"INTAKE_FILE_ALREADY_CONFIRMED", "INTAKE_APPROVAL_FILE_ALREADY_CONFIRMED"})
+DISCARD_HINT = "delete the state file's .pending journal and rerun to quote the current set again"
 
 
 class AgentError(RuntimeError):
@@ -108,6 +127,10 @@ class AgentError(RuntimeError):
 
 class RetryableAgentError(AgentError):
     """A bounded retry may recover; durable pending batches must be replayed."""
+
+
+class ReviewRequiredError(AgentError):
+    """The caller must decide; the message is safe to print and says what to do next."""
 
 
 def canonical(value: object) -> str:
@@ -129,6 +152,67 @@ def safe_url(value: str) -> bool:
     return parsed.scheme == "https" or (
         parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
     )
+
+
+def intake_file_key(relative_path: str, content_sha256: str, byte_length: int, mime_type: str) -> str:
+    """lib/intake-approval.ts#deriveFileKey: one member per (path, plain-hex content, length, type)."""
+    return "fk_" + sha256("\x1f".join(
+        ("tavonel-intake-file-v1", relative_path, content_sha256, str(byte_length), mime_type)
+    ))[:40]
+
+
+def intake_manifest_digest(entries: list[dict[str, Any]]) -> str:
+    """lib/intake-approval.ts#intakeManifestDigest: members sorted by file key, one line each."""
+    lines = [
+        "|".join((
+            entry["fileKey"], entry["contentSha256"], str(entry["byteLength"]), entry["mimeType"],
+            "-" if entry["claimedPages"] is None else str(entry["claimedPages"]), entry["claimedBasis"] or "-",
+        ))
+        for entry in sorted(entries, key=lambda entry: entry["fileKey"])
+    ]
+    return "sha256:" + sha256("\n".join(["tavonel-intake-manifest-v1", str(len(entries)), *lines]))
+
+
+def approved_source_idempotency_key(attempt_key: str, file_key: str) -> str:
+    """The capability's x-tavonel-source-idempotency-key, recomputed by the server from the member."""
+    return sha256("\x1f".join(("tavonel-approved-source-v1", attempt_key, file_key)))
+
+
+def intake_manifest_entry(native_id: str, item: dict[str, object]) -> dict[str, Any]:
+    mime_type = str(item["mimeType"])
+    size = int(item["sizeBytes"])
+    digest = str(item["contentSha256"])
+    image = mime_type.startswith("image/")
+    return {
+        "fileKey": intake_file_key(native_id, digest, size, mime_type),
+        "originalFilename": Path(native_id).name,
+        "contentSha256": "sha256:" + digest,
+        "byteLength": size,
+        "mimeType": mime_type,
+        # An image is one page; nothing else has a page count this agent can vouch for.
+        "claimedPages": 1 if image else None,
+        "claimedBasis": "image" if image else None,
+    }
+
+
+def response_code(value: dict[str, Any] | None, status: int) -> str:
+    code = value.get("code") if value is not None else None
+    return code if isinstance(code, str) and RESPONSE_CODE_PATTERN.match(code) else f"HTTP {status}"
+
+
+def reply_uncertain(status: int) -> bool:
+    """No reply, or one that says nothing about whether the request committed."""
+    return status == 0 or status in {408, 429} or status >= 500
+
+
+def refusal(action: str, code: str) -> AgentError:
+    if code in STALE_APPROVAL_CODES:
+        return ReviewRequiredError(f"the {action} was refused because the approved price is stale ({code}); {DISCARD_HINT}")
+    return AgentError(f"{action} was refused ({code})")
+
+
+def _count(value: object) -> bool:
+    return type(value) is int and value >= 0
 
 
 def read_state(path: Path, connection_id: str) -> dict[str, Any]:
@@ -198,19 +282,21 @@ class FoundationClient:
         self.timeout = timeout
         self.opener = urllib.request.build_opener(NoRedirect())
 
-    def post(
+    def _exchange(
         self,
+        method: str,
         path: str,
-        body: dict[str, object],
+        body: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> tuple[int, dict[str, Any] | None]:
+        """One authenticated Foundation request: any HTTP status is returned, a lost reply raises."""
         request = urllib.request.Request(  # noqa: S310 - base URL validated in __init__.
             f"{self.base_url}{path}",
-            data=canonical(body).encode("utf-8"),
-            method="POST",
+            data=None if body is None else canonical(body).encode("utf-8"),
+            method=method,
             headers={
                 "authorization": f"Bearer {self.api_key}",
-                "content-type": "application/json",
+                **({} if body is None else {"content-type": "application/json"}),
                 **(headers or {}),
             },
         )
@@ -218,46 +304,216 @@ class FoundationClient:
             with self.opener.open(  # noqa: S310 - request uses the validated base.
                 request, timeout=self.timeout
             ) as response:
+                status = response.status
                 raw = response.read(MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as exc:
-            error = RetryableAgentError if exc.code in {408, 429} or exc.code >= 500 else AgentError
-            raise error(f"Foundation HTTP {exc.code}") from exc
-        except urllib.error.URLError as exc:
+            status = exc.code
+            try:
+                raw = exc.read(MAX_RESPONSE_BYTES + 1)
+            except (OSError, http.client.HTTPException):
+                raw = b""
+            finally:
+                exc.close()
+        except (OSError, http.client.HTTPException) as exc:
+            # A reply that never arrived says nothing about whether the request committed.
             raise RetryableAgentError("Foundation network request failed") from exc
         if len(raw) > MAX_RESPONSE_BYTES:
-            raise AgentError("Foundation response exceeded the bounded limit")
+            if 200 <= status < 300:
+                raise AgentError("Foundation response exceeded the bounded limit")
+            raw = b""
         try:
             value = json.loads(raw)
-        except (UnicodeError, json.JSONDecodeError) as exc:
-            raise AgentError("Foundation returned invalid JSON") from exc
-        if not isinstance(value, dict):
-            raise AgentError("Foundation response must be an object")
+        except (UnicodeError, ValueError):
+            value = None
+        return status, value if isinstance(value, dict) else None
+
+    def post(
+        self,
+        path: str,
+        body: dict[str, object],
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        status, value = self._exchange("POST", path, body, headers)
+        if not 200 <= status < 300:
+            error = RetryableAgentError if status in {408, 429} or status >= 500 else AgentError
+            raise error(f"Foundation HTTP {status}")
+        if value is None:
+            raise AgentError("Foundation returned invalid JSON")
         return value
 
-    def upload(self, path: Path, mime_type: str, idempotency_key: str, original_filename: str | None = None) -> str:
-        size = path.stat().st_size
-        capability = self.post(
-            "/api/v1/uploads/capability",
-            {
-                "originalFilename": original_filename or path.name,
-                "declaredMimeType": mime_type,
-                "requestedBytes": size,
-            },
-            {"x-tavonel-source-idempotency-key": idempotency_key},
+    def quote(self, body: dict[str, Any]) -> dict[str, Any]:
+        """A quote holds nothing, so a lost reply is simply asked again."""
+        status, value = self._exchange("POST", "/api/v1/uploads/quote", body)
+        if reply_uncertain(status):
+            raise RetryableAgentError(f"Foundation quote returned HTTP {status}")
+        if status != 200 or value is None:
+            raise ReviewRequiredError(
+                f"the Foundation refused to quote the changed set ({response_code(value, status)}); nothing was "
+                f"approved, reserved or uploaded. Review the changed files, then {DISCARD_HINT}"
+            )
+        return value
+
+    def read_approval(self, attempt_key: str) -> dict[str, Any] | None:
+        """The committed state of one attempt, or None when the Foundation holds no such attempt."""
+        status, value = self._exchange(
+            "GET", "/api/v1/uploads/approval?attemptKey=" + urllib.parse.quote(attempt_key, safe=""),
         )
-        upload_url = capability.get("uploadUrl")
-        document_id = capability.get("documentId")
+        if status == 404:
+            return None
+        if reply_uncertain(status):
+            raise RetryableAgentError(f"approval status returned HTTP {status}")
+        approval = value.get("approval") if value is not None else None
+        if status != 200 or not isinstance(approval, dict):
+            raise AgentError(f"approval status was refused ({response_code(value, status)})")
+        return approval
+
+    def create_approval(self, body: dict[str, Any]) -> dict[str, Any]:
+        """POST the saved approval body; a lost reply is answered by reading it back, never by a guess."""
+        try:
+            status, value = self._exchange("POST", "/api/v1/uploads/approval", body)
+        except RetryableAgentError:
+            status, value = 0, None
+        approval = value.get("approval") if value is not None else None
+        if status == 200 and isinstance(approval, dict) and value.get("code") == "INTAKE_APPROVED":
+            return approval
+        if status == 200 or reply_uncertain(status):
+            recovered = self.read_approval(str(body["attemptKey"]))
+            if recovered is not None:
+                return recovered
+            raise RetryableAgentError(
+                "approval reply was lost before it committed; the retry re-reads, then re-sends the same saved approval"
+            )
+        code = response_code(value, status)
+        if code in STALE_APPROVAL_CODES:
+            raise ReviewRequiredError(
+                f"the saved quote is no longer the Foundation's price ({code}); nothing was approved or reserved. "
+                f"Review current pricing, then {DISCARD_HINT}"
+            )
+        raise ReviewRequiredError(
+            f"the Foundation refused to approve the saved set ({code}); nothing was approved or reserved. "
+            f"Resolve it and rerun to re-send the same approval, or {DISCARD_HINT}"
+        )
+
+    def _member_confirmed(self, attempt_key: str, file_key: str, document_id: str) -> bool:
+        approval = self.read_approval(attempt_key)
+        files = approval.get("files") if approval is not None else None
+        held = next(
+            (item for item in files if isinstance(item, dict) and item.get("fileKey") == file_key), None,
+        ) if isinstance(files, list) else None
+        return held is not None and held.get("fileState") == "confirmed" and held.get("documentId") == document_id
+
+    def cancel_approval(self, attempt_key: str, scope_digest: str, file_key: str) -> dict[str, Any]:
+        """Cancel the caller's complete approved set, anchored to one member identity."""
+        status, value = self._exchange(
+            "POST", "/api/v1/uploads/approval/cancel",
+            {"attemptKey": attempt_key, "scopeDigest": scope_digest, "fileKey": file_key},
+        )
+        code = response_code(value, status)
+        if status == 200 and code in {"INTAKE_SET_CANCELLED", "INTAKE_SET_CANCELLED_RECONCILIATION_REQUIRED"}:
+            result = value.get("result") if value is not None else None
+            if isinstance(result, dict):
+                return result
+            raise AgentError("Foundation returned an invalid set-cancellation result")
+        if reply_uncertain(status):
+            raise RetryableAgentError("approved-set cancellation reply was lost; retry the same attempt, scope and member")
+        raise refusal("approved-set cancellation", code)
+
+    def _release(
+        self, attempt_key: str, scope_digest: str, file_key: str, document_id: str, put_status: int,
+    ) -> None:
+        """After a definitive PUT refusal only: the Foundation checks for the object before releasing."""
+        status, value = self._exchange(
+            "POST",
+            "/api/v1/uploads/release",
+            {"documentId": document_id, "attemptKey": attempt_key, "fileKey": file_key},
+        )
+        code = response_code(value, status)
+        if status == 409 and code == "UPLOAD_ALREADY_STORED":
+            return  # The object landed and only the PUT's reply was a refusal: confirm it.
+        if status == 200 and code == "UPLOAD_CREDITS_RELEASED":
+            # A failed member makes the complete approved set unusable. Release the failed
+            # member first, then atomically cancel the remaining members under the same scope.
+            cancellation = self.cancel_approval(attempt_key, scope_digest, file_key)
+            reconciliation = cancellation.get("reconciliationRequired") is True
+            detail = "the complete set was cancelled, but a settled member needs reconciliation" if reconciliation \
+                else "the complete approved set was cancelled"
+            raise ReviewRequiredError(
+                f"the object store refused an approved file (HTTP {put_status}) and its hold was released; {detail}. "
+                f"Review the changed files, then {DISCARD_HINT}"
+            )
+        if reply_uncertain(status):
+            raise RetryableAgentError("upload release reply was lost")
+        raise AgentError(f"upload release was refused ({code})")
+
+    def upload(
+        self,
+        path: Path,
+        member: dict[str, Any],
+        attempt: dict[str, str],
+        on_phase: Callable[[str], None] | None = None,
+    ) -> str:
+        """Capability, direct PUT and confirmation for one approved member.
+
+        Returns only once the Foundation confirms the member, by its reply or by re-reading the
+        approval. Retries name the same attempt, file key and document; the bearer token never
+        travels to the object store, and a hold is released only after a definitive PUT refusal.
+        """
+        record = on_phase or (lambda phase: None)
+        attempt_key = attempt["attemptKey"]
+        file_key = str(member["fileKey"])
+        document_id = str(member["documentId"])
+        size = path.stat().st_size
+        if size != member["byteLength"]:
+            raise AgentError("sealed source does not match its approved length")
+        record("capability_sent")
+        try:
+            status, value = self._exchange(
+                "POST",
+                "/api/v1/uploads/capability",
+                {
+                    "originalFilename": member["originalFilename"],
+                    "declaredMimeType": member["mimeType"],
+                    "requestedBytes": size,
+                    "attemptKey": attempt_key,
+                    "scopeDigest": attempt["scopeDigest"],
+                    "pricingFingerprint": attempt["pricingFingerprint"],
+                    "fileKey": file_key,
+                    "contentSha256": member["contentSha256"],
+                },
+                {"x-tavonel-source-idempotency-key": approved_source_idempotency_key(attempt_key, file_key)},
+            )
+        except RetryableAgentError:
+            status, value = 0, None
+        code = response_code(value, status)
+        if reply_uncertain(status) or code in ALREADY_CONFIRMED_CODES:
+            if self._member_confirmed(attempt_key, file_key, document_id):
+                return document_id
+            if reply_uncertain(status):
+                raise RetryableAgentError("upload capability reply was lost; the retry reuses the same approved member")
+        if status != 200 or value is None:
+            raise refusal("upload capability", code)
+        upload_url = value.get("uploadUrl")
+        reservation = value.get("computeReservation")
         if not isinstance(upload_url, str) or not safe_url(upload_url):
             raise AgentError("upload capability URL is invalid")
-        if not isinstance(document_id, str):
-            raise AgentError("upload capability omitted its document binding")
+        if (
+            value.get("documentId") != document_id
+            or value.get("contentLength") != size
+            or value.get("declaredMimeType") != member["mimeType"]
+            or not isinstance(reservation, dict)
+            or reservation.get("maximumCredits") != member["approvedMaximumCredits"]
+        ):
+            raise AgentError("upload capability does not match the approved member")
+        record("put_sent")
         before = path.stat()
+        refused: int | None = None
         with path.open("rb") as source:
             request = urllib.request.Request(  # noqa: S310 - capability URL validated above.
                 upload_url,
                 data=source,
                 method="PUT",
-                headers={"content-type": mime_type, "content-length": str(size)},
+                # Signed URL only: the Foundation bearer token never travels to the object store.
+                headers={"content-type": member["mimeType"], "content-length": str(size)},
             )
             try:
                 with self.opener.open(  # noqa: S310 - validated capability URL.
@@ -266,14 +522,52 @@ class FoundationClient:
                     if response.status not in {200, 201, 204}:
                         raise AgentError(f"direct upload returned HTTP {response.status}")
             except urllib.error.HTTPError as exc:
-                error = RetryableAgentError if exc.code in {408, 429} or exc.code >= 500 else AgentError
-                raise error(f"direct upload returned HTTP {exc.code}") from exc
-            except urllib.error.URLError as exc:
+                exc.close()
+                if exc.code in {408, 429} or exc.code >= 500:
+                    raise RetryableAgentError(f"direct upload returned HTTP {exc.code}") from exc
+                if exc.code < 400:
+                    raise AgentError(f"direct upload returned HTTP {exc.code}") from exc
+                refused = exc.code
+            except (OSError, http.client.HTTPException) as exc:
+                # The object may exist now, so its hold is never released on this path.
                 raise RetryableAgentError("direct upload network request failed") from exc
         after = path.stat()
         if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
             raise AgentError(f"{path.name!r} changed during upload")
-        return document_id
+        if refused is not None:
+            self._release(attempt_key, attempt["scopeDigest"], file_key, document_id, refused)
+        record("confirm_sent")
+        try:
+            status, value = self._exchange(
+                "POST",
+                "/api/v1/uploads/confirm",
+                {
+                    "documentId": document_id,
+                    "sourceSha256": member["contentSha256"],
+                    "attemptKey": attempt_key,
+                    "scopeDigest": attempt["scopeDigest"],
+                    "fileKey": file_key,
+                },
+            )
+        except RetryableAgentError:
+            status, value = 0, None
+        approved = value.get("approvedFile") if value is not None else None
+        if (
+            status == 200
+            and isinstance(approved, dict)
+            and value.get("code") == "UPLOAD_CONFIRMED"
+            and approved.get("fileState") == "confirmed"
+            and approved.get("documentId") == document_id
+            and approved.get("fileKey") == file_key
+        ):
+            return document_id
+        if status == 200 or reply_uncertain(status):
+            if self._member_confirmed(attempt_key, file_key, document_id):
+                return document_id
+            raise RetryableAgentError(
+                "upload confirmation reply was lost; the retry re-reads the approval before reusing the same member"
+            )
+        raise refusal("upload confirmation", response_code(value, status))
 
 
 def file_digest(path: Path, max_file_bytes: int) -> tuple[int, str]:
@@ -1236,6 +1530,12 @@ def _sync(args: argparse.Namespace) -> dict[str, object]:
             raise AgentError("pending journal scope binding is invalid")
         body = pending.get("body")
         files = pending.get("files")
+        if body is None and isinstance(pending.get("intake"), dict) and isinstance(files, dict):
+            # An upload set that is not committed yet resumes under its saved attempt; nothing is rescanned.
+            check_intake(pending["intake"], files)
+            if state["serverCursorSha256"] != pending["intake"]["previousCursorSha256"]:
+                raise AgentError("pending journal cursor is not the current state")
+            return approve_and_upload(args, client, pending_path, pending, resumed=True)
         if not isinstance(body, dict) or not isinstance(files, dict) or not isinstance(body.get("events"), list):
             raise AgentError("pending journal contract is invalid")
         if body.get("manifestSha256") != "sha256:" + sha256(canonical(body["events"])):
@@ -1277,12 +1577,23 @@ def _sync(args: argparse.Namespace) -> dict[str, object]:
     upload_bytes = sum(int(current[key]["sizeBytes"]) for key in changed_ids if key in current and current[key].get("mimeType"))
     if len(changed_ids) > args.max_events or upload_bytes > args.max_upload_bytes:
         raise AgentError("source cycle exceeds event or upload-byte budget before upload")
+    uploads = sorted(key for key in changed_ids if key in current and isinstance(current[key].get("mimeType"), str))
+    if uploads:
+        # Every gate that needs no network runs before anything is quoted, held or read for upload.
+        require_upload_approval(args, [(str(current[key]["mimeType"]), int(current[key]["sizeBytes"])) for key in uploads])
+        if cloud is not None:
+            # An approval names content, so each changed object is hashed from one pinned read first.
+            for native_id in uploads:
+                item = current[native_id]
+                temp_path = download_s3(cloud, args, native_id, int(item["sizeBytes"]), str(item["revision"]))
+                try:
+                    _, item["contentSha256"] = file_digest(temp_path, args.max_file_bytes)
+                finally:
+                    temp_path.unlink(missing_ok=True)
     events: list[dict[str, object]] = []
-    for native_id in sorted(set(previous) | set(current)):
+    for native_id in sorted(changed_ids):
         old = previous.get(native_id)
         item = current.get(native_id)
-        if item == old:
-            continue
         if item is None:
             events.append(
                 {
@@ -1297,62 +1608,75 @@ def _sync(args: argparse.Namespace) -> dict[str, object]:
                 }
             )
             continue
-        kind = "changed" if old is not None else "added"
-        mime_type = item.get("mimeType")
-        document_id = None
-        source_key = None
-        temp_path: Path | None = None
-        snapshot_directory = None
-        source_path = root / Path(native_id) if root else None
-        if isinstance(mime_type, str):
-            source_key = sha256("\x1f".join((args.connection_id, native_id, str(item["revision"]))))
-            if source_path is None:
-                temp_path = download_s3(cloud, args, native_id, int(item["sizeBytes"]), str(item["revision"]))
-                source_path = temp_path
-                _, content_digest = file_digest(source_path, args.max_file_bytes)
-                item["contentSha256"] = content_digest
-            else:
-                source_path, snapshot_directory = snapshot_mount(source_path, item, args.max_file_bytes)
-            try:
-                document_id = client.upload(source_path, mime_type, source_key, Path(native_id).name)
-            finally:
-                if temp_path is not None:
-                    temp_path.unlink(missing_ok=True)
-                if snapshot_directory is not None:
-                    snapshot_directory.cleanup()
         events.append(
             {
-                "kind": kind,
+                "kind": "changed" if old is not None else "added",
                 "nativeId": native_id,
                 "revision": item["revision"],
                 "contentSha256": item.get("contentSha256"),
                 "sizeBytes": item["sizeBytes"],
-                "mimeType": mime_type,
-                "documentId": document_id,
-                "sourceIdempotencyKey": source_key,
+                "mimeType": item.get("mimeType"),
+                "documentId": None,
+                "sourceIdempotencyKey": None,
             }
         )
     if not events and next_cursor == state["serverCursorSha256"]:
         if existing_scope is None:
             write_state(args.state, args.connection_id, current, next_cursor, fingerprint)
         return {"status": "unchanged", "eventCount": 0}
-    if len(events) > args.max_events or len(canonical(events).encode("utf-8")) > 1_000_000:
-        raise AgentError("source batch exceeds bounded API limit; split the registered scope")
     batch_id = str(uuid.uuid4())
+    if not uploads:
+        check_batch_size(args, events)
+        pending = {
+            "scopeFingerprint": fingerprint,
+            "connectionId": args.connection_id,
+            "files": current,
+            "body": {
+                "batchId": batch_id,
+                "previousCursorSha256": state["serverCursorSha256"],
+                "nextCursorSha256": next_cursor,
+                "manifestSha256": "sha256:" + sha256(canonical(events)),
+                "events": events,
+            },
+        }
+        write_journal(pending_path, pending)
+        return commit_pending(args, client, pending_path, pending)
+    attempt_key = "att_" + uuid.uuid4().hex
+    entries = {native_id: intake_manifest_entry(native_id, current[native_id]) for native_id in uploads}
+    for event in events:
+        entry = entries.get(str(event["nativeId"]))
+        if entry is not None:
+            event["sourceIdempotencyKey"] = approved_source_idempotency_key(attempt_key, entry["fileKey"])
+    # Sized with every document identity in place, so the final batch cannot outgrow the API bound.
+    check_batch_size(args, [dict(event, documentId=str(uuid.UUID(int=0))) if event["nativeId"] in entries else event for event in events])
+    manifest = sorted(entries.values(), key=lambda entry: entry["fileKey"])
     pending = {
         "scopeFingerprint": fingerprint,
         "connectionId": args.connection_id,
         "files": current,
-        "body": {
+        "intake": {
             "batchId": batch_id,
             "previousCursorSha256": state["serverCursorSha256"],
             "nextCursorSha256": next_cursor,
-            "manifestSha256": "sha256:" + sha256(canonical(events)),
             "events": events,
+            "attemptKey": attempt_key,
+            "approveUpToCredits": args.approve_up_to_credits,
+            "allowUnknownPageCount": bool(getattr(args, "allow_unknown_page_count", False)),
+            "clientManifestDigest": intake_manifest_digest(manifest),
+            "manifest": manifest,
+            "members": {
+                entry["fileKey"]: {"nativeId": native_id, "documentId": None, "phase": "planned"}
+                for native_id, entry in entries.items()
+            },
+            "quote": None,
+            "approvalPosted": False,
+            "approvalBody": None,
+            "approval": None,
         },
     }
+    # Durable before the first request, so every retry repeats this attempt, these keys and this manifest.
     write_journal(pending_path, pending)
-    return commit_pending(args, client, pending_path, pending)
+    return approve_and_upload(args, client, pending_path, pending, resumed=False, cloud=cloud)
 
 
 def source_fingerprint(args: argparse.Namespace) -> str:
@@ -1399,6 +1723,313 @@ def commit_pending(args: argparse.Namespace, client: FoundationClient, path: Pat
     path.unlink(missing_ok=True)
     fsync_directory(path.parent)
     return {"status": result["status"], "eventCount": len(body["events"]), "batchId": body["batchId"]}
+
+
+def check_batch_size(args: argparse.Namespace, events: list[dict[str, object]]) -> None:
+    if len(events) > args.max_events or len(canonical(events).encode("utf-8")) > 1_000_000:
+        raise AgentError("source batch exceeds bounded API limit; split the registered scope")
+
+
+def approval_cap(args: argparse.Namespace, waiting: int = 0) -> int:
+    cap = getattr(args, "approve_up_to_credits", None)
+    if type(cap) is not int or not 1 <= cap <= MAX_APPROVE_CREDITS:
+        subject = f"{waiting} changed supported source file(s) need" if waiting else "uploads need"
+        raise ReviewRequiredError(
+            f"{subject} an explicit credit approval: rerun with --approve-up-to-credits N, where N is a whole "
+            f"number from 1 to {MAX_APPROVE_CREDITS} and the most credits you approve for one cycle's whole "
+            "changed set. The set is quoted first and nothing above N is approved; nothing was quoted, "
+            "approved or uploaded"
+        )
+    return cap
+
+
+def require_upload_approval(args: argparse.Namespace, members: list[tuple[str, int]]) -> int:
+    """Local gates for one cycle's whole upload set; none of them needs the network."""
+    if len(members) > MAX_APPROVAL_FILES:
+        raise ReviewRequiredError(
+            f"{len(members)} changed supported source files exceed the {MAX_APPROVAL_FILES}-file approval limit. "
+            "One approval covers a whole cycle and is never split: narrow the registered scope (a smaller "
+            "--root or --s3-prefix) and rerun. Nothing was quoted, approved or uploaded"
+        )
+    cap = approval_cap(args, len(members))
+    empty = sum(1 for _, size in members if size < 1)
+    if empty:
+        raise ReviewRequiredError(
+            f"{empty} changed supported source file(s) are empty and cannot be approved; remove or replace "
+            "them and rerun. Nothing was quoted, approved or uploaded"
+        )
+    unknown = sum(1 for mime_type, _ in members if not mime_type.startswith("image/"))
+    if unknown and not getattr(args, "allow_unknown_page_count", False):
+        raise ReviewRequiredError(
+            f"{unknown} changed non-image source file(s) have no trusted page count, so each would be quoted "
+            f"and approved at the {FOUNDATION_MAX_SOURCE_PAGES}-page server ceiling; rerun with "
+            "--allow-unknown-page-count to accept that ceiling. Nothing was quoted, approved or uploaded"
+        )
+    return cap
+
+
+def check_intake(intake: dict[str, Any], files: dict[str, Any]) -> None:
+    """A resumed attempt must still be exactly the manifest, keys and identities it was saved with."""
+    try:
+        manifest = intake["manifest"]
+        members = intake["members"]
+        quote = intake["quote"]
+        approval = intake["approval"]
+        valid = (
+            isinstance(manifest, list) and 1 <= len(manifest) <= MAX_APPROVAL_FILES
+            and isinstance(members, dict) and isinstance(intake["events"], list)
+            and isinstance(intake["batchId"], str) and isinstance(intake["attemptKey"], str)
+            and ATTEMPT_KEY_PATTERN.match(intake["attemptKey"]) is not None
+            and isinstance(intake["approvalPosted"], bool)
+            and [entry["fileKey"] for entry in manifest] == sorted(members)
+            and all(
+                isinstance(files.get(members[entry["fileKey"]]["nativeId"]), dict)
+                and entry["fileKey"] == intake_file_key(
+                    members[entry["fileKey"]]["nativeId"], entry["contentSha256"].removeprefix("sha256:"),
+                    entry["byteLength"], entry["mimeType"],
+                )
+                for entry in manifest
+            )
+            and (quote is None or (isinstance(quote["pricingFingerprint"], str) and _count(quote["quote"]["maximumCredits"])))
+            and (approval is None or all(isinstance(approval[name], str) for name in ("approvalId", "scopeDigest", "pricingFingerprint")))
+            and "previousCursorSha256" in intake and "nextCursorSha256" in intake and "approvalBody" in intake
+        )
+        digest_matches = valid and intake_manifest_digest(manifest) == intake["clientManifestDigest"]
+    except (KeyError, TypeError, AttributeError):
+        valid = digest_matches = False
+    if not valid:
+        raise AgentError("pending journal contract is invalid")
+    if not digest_matches:
+        raise AgentError("pending journal manifest is invalid")
+
+
+def verify_quote(intake: dict[str, Any], value: dict[str, Any]) -> dict[str, Any]:
+    keys = {entry["fileKey"] for entry in intake["manifest"]}
+    quote = value.get("quote")
+    files = value.get("files")
+    valid = (
+        value.get("code") == "INTAKE_QUOTE"
+        and value.get("clientManifestDigest") == intake["clientManifestDigest"]
+        and isinstance(value.get("pricingFingerprint"), str)
+        and SHA256_DIGEST_PATTERN.match(value["pricingFingerprint"]) is not None
+        and isinstance(quote, dict)
+        and all(_count(quote.get(name)) for name in ("maximumPages", "reservedCredits", "maximumCredits"))
+        and isinstance(files, list) and len(files) == len(keys)
+        and all(isinstance(item, dict) for item in files)
+        and {item.get("fileKey") for item in files} == keys
+        and all(
+            _count(item.get("approvedMaxPages")) and _count(item.get("reservedCredits")) and _count(item.get("maximumCredits"))
+            and (item.get("pageBasis") != "unknown" or item.get("approvedMaxPages") == FOUNDATION_MAX_SOURCE_PAGES)
+            for item in files
+        )
+    )
+    if not valid or sum(item["maximumCredits"] for item in files) != quote["maximumCredits"]:
+        raise AgentError("Foundation quote does not describe the saved manifest")
+    return value
+
+
+def verify_approval(intake: dict[str, Any], approval: dict[str, Any], cap: int) -> dict[str, dict[str, Any]]:
+    """The approval must be this attempt, this manifest and this quote, member for member."""
+    quote = intake["quote"]
+    files = approval.get("files")
+    if (
+        quote is None
+        or approval.get("attemptKey") != intake["attemptKey"]
+        or approval.get("clientManifestDigest") != intake["clientManifestDigest"]
+        or approval.get("pricingFingerprint") != quote["pricingFingerprint"]
+        or not isinstance(approval.get("approvalId"), str) or UUID_PATTERN.match(approval["approvalId"]) is None
+        or not isinstance(approval.get("scopeDigest"), str) or SHA256_DIGEST_PATTERN.match(approval["scopeDigest"]) is None
+        or not isinstance(files, list)
+    ):
+        raise AgentError("approval does not match the saved attempt, manifest and quote")
+    held: dict[str, dict[str, Any]] = {}
+    for item in files:
+        if not isinstance(item, dict) or not isinstance(item.get("fileKey"), str) or item["fileKey"] in held:
+            raise AgentError("approval members are malformed")
+        held[item["fileKey"]] = item
+    if set(held) != set(intake["members"]):
+        raise AgentError("approval does not cover exactly the saved manifest")
+    for entry in intake["manifest"]:
+        item = held[entry["fileKey"]]
+        if (
+            not isinstance(item.get("documentId"), str) or UUID_PATTERN.match(item["documentId"]) is None
+            or item.get("fileState") not in APPROVAL_FILE_STATES
+            or (item.get("contentSha256"), item.get("byteLength"), item.get("mimeType"))
+            != (entry["contentSha256"], entry["byteLength"], entry["mimeType"])
+            or not _count(item.get("approvedMaximumCredits"))
+        ):
+            raise AgentError("an approved member does not match its saved manifest entry")
+    if approval.get("state") != "approved" or (
+        approval.get("expired") is not False and any(item["fileState"] != "confirmed" for item in held.values())
+    ):
+        raise ReviewRequiredError(f"this attempt's approval is cancelled or expired, so the set cannot complete; {DISCARD_HINT}")
+    total = sum(item["approvedMaximumCredits"] for item in held.values())
+    if total != approval.get("aggregateMaximumCredits") or total != quote["quote"]["maximumCredits"]:
+        raise AgentError("approved credits do not match the saved quote")
+    if total > cap:
+        raise ReviewRequiredError(
+            f"this set is already approved at up to {total} credits, above --approve-up-to-credits {cap}; rerun "
+            f"with --approve-up-to-credits {total} or more to finish it, or {DISCARD_HINT}"
+        )
+    saved = intake["approval"]
+    if saved is not None and (
+        saved["approvalId"] != approval["approvalId"]
+        or saved["scopeDigest"] != approval["scopeDigest"]
+        or any(intake["members"][key]["documentId"] != item["documentId"] for key, item in held.items())
+    ):
+        raise AgentError("approval identities changed after they were saved")
+    return held
+
+
+def sealed_source(
+    args: argparse.Namespace,
+    root: Path | None,
+    cloud: Any,
+    native_id: str,
+    item: dict[str, Any],
+    entry: dict[str, Any],
+) -> tuple[Path, Callable[[], None]]:
+    """Exactly the bytes that were quoted, sealed so nothing can change them during the upload."""
+    expected = {"sizeBytes": entry["byteLength"], "contentSha256": entry["contentSha256"].removeprefix("sha256:")}
+    if root is not None:
+        path, directory = snapshot_mount(root / Path(native_id), expected, args.max_file_bytes)
+        return path, directory.cleanup
+    path = download_s3(cloud, args, native_id, int(entry["byteLength"]), str(item["revision"]))
+    try:
+        if file_digest(path, args.max_file_bytes) != (expected["sizeBytes"], expected["contentSha256"]):
+            raise AgentError("source changed after it was quoted")
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    return path, lambda: path.unlink(missing_ok=True)
+
+
+def approve_and_upload(
+    args: argparse.Namespace,
+    client: FoundationClient,
+    pending_path: Path,
+    pending: dict[str, Any],
+    *,
+    resumed: bool,
+    cloud: Any = None,
+) -> dict[str, object]:
+    """Quote, approve, upload and commit one cycle's whole changed set under one stable attempt.
+
+    The journal is written before every request that can commit, so a retry repeats the same
+    attempt, file keys and manifest, and reads committed state back rather than guessing.
+    """
+    intake = pending["intake"]
+    manifest = intake["manifest"]
+    members = intake["members"]
+    cap = require_upload_approval(args, [(entry["mimeType"], entry["byteLength"]) for entry in manifest])
+    allow_unknown = bool(getattr(args, "allow_unknown_page_count", False))
+    if intake["approval"] is None and (intake["approveUpToCredits"], intake["allowUnknownPageCount"]) != (cap, allow_unknown):
+        intake["approveUpToCredits"] = cap
+        intake["allowUnknownPageCount"] = allow_unknown
+        write_journal(pending_path, pending)
+    approval = None
+    if resumed and (intake["approvalPosted"] or intake["approval"] is not None):
+        # A reload never guesses: it reads this same attempt's committed state first.
+        approval = client.read_approval(intake["attemptKey"])
+        if approval is None and intake["approval"] is not None:
+            raise AgentError("the saved approval can no longer be read; refusing to approve the set again")
+    if approval is None:
+        if intake["quote"] is None:
+            intake["quote"] = verify_quote(
+                intake, client.quote({"clientManifestDigest": intake["clientManifestDigest"], "files": manifest}),
+            )
+            write_journal(pending_path, pending)
+        # A saved quote is never replaced: a changed price is the caller's decision, not this agent's.
+        quoted = intake["quote"]["quote"]
+        if quoted["maximumCredits"] > cap:
+            usd = quoted.get("maximumUsd")
+            price = f" (up to {usd} USD)" if type(usd) in (int, float) else ""
+            raise ReviewRequiredError(
+                f"the quoted maximum for this {len(manifest)}-file set is {quoted['maximumCredits']} credits{price}, "
+                f"above --approve-up-to-credits {cap}; nothing was approved, reserved or uploaded. Review the "
+                f"quote, then rerun with --approve-up-to-credits {quoted['maximumCredits']} or more to approve "
+                f"this same saved set, or {DISCARD_HINT}"
+            )
+        if not intake["approvalPosted"]:
+            intake["approvalBody"] = {
+                "attemptKey": intake["attemptKey"],
+                "clientManifestDigest": intake["clientManifestDigest"],
+                "pricingFingerprint": intake["quote"]["pricingFingerprint"],
+                "aggregateMaximumCredits": quoted["maximumCredits"],
+                "files": manifest,
+            }
+            intake["approvalPosted"] = True
+            write_journal(pending_path, pending)
+        approval = client.create_approval(intake["approvalBody"])
+    held = verify_approval(intake, approval, cap)
+    if intake["approval"] is None:
+        intake["approval"] = {
+            "approvalId": approval["approvalId"],
+            "scopeDigest": approval["scopeDigest"],
+            "pricingFingerprint": approval["pricingFingerprint"],
+            "aggregateMaximumCredits": approval["aggregateMaximumCredits"],
+        }
+        for file_key, member in members.items():
+            member["documentId"] = held[file_key]["documentId"]
+            member["phase"] = "approved"
+        # Every identity is durable before any capability is requested.
+        write_journal(pending_path, pending)
+    attempt = {
+        "attemptKey": intake["attemptKey"],
+        "scopeDigest": intake["approval"]["scopeDigest"],
+        "pricingFingerprint": intake["approval"]["pricingFingerprint"],
+    }
+    root = args.root.resolve(strict=True) if args.root else None
+    for entry in manifest:
+        file_key = entry["fileKey"]
+        member = members[file_key]
+        file_state = held[file_key]["fileState"]
+        if file_state == "confirmed":
+            # Confirmed under this attempt already: reuse its document and never upload it again.
+            if member["phase"] != "confirmed":
+                member["phase"] = "confirmed"
+                write_journal(pending_path, pending)
+            continue
+        if file_state == "cancelled":
+            raise ReviewRequiredError(
+                f"an approved file in this set was cancelled and its hold released, so the set cannot complete; {DISCARD_HINT}"
+            )
+        if root is None and cloud is None:
+            cloud = s3_client(args)
+        source, cleanup = sealed_source(args, root, cloud, member["nativeId"], pending["files"][member["nativeId"]], entry)
+
+        def record(phase: str, member: dict[str, Any] = member) -> None:
+            member["phase"] = phase
+            write_journal(pending_path, pending)
+
+        try:
+            document_id = client.upload(
+                source,
+                {**entry, "documentId": member["documentId"], "approvedMaximumCredits": held[file_key]["approvedMaximumCredits"]},
+                attempt,
+                record,
+            )
+        finally:
+            cleanup()
+        if document_id != member["documentId"]:
+            raise AgentError("Foundation confirmed a different document than the approved member")
+        record("confirmed")
+    documents = {member["nativeId"]: member["documentId"] for member in members.values()}
+    events = [
+        dict(event, documentId=documents[event["nativeId"]]) if event["nativeId"] in documents else event
+        for event in intake["events"]
+    ]
+    check_batch_size(args, events)
+    # The cursor advances only when the Foundation accepts this complete, original batch.
+    pending["body"] = {
+        "batchId": intake["batchId"],
+        "previousCursorSha256": intake["previousCursorSha256"],
+        "nextCursorSha256": intake["nextCursorSha256"],
+        "manifestSha256": "sha256:" + sha256(canonical(events)),
+        "events": events,
+    }
+    write_journal(pending_path, pending)
+    return commit_pending(args, client, pending_path, pending)
 
 
 @contextmanager
@@ -1462,6 +2093,8 @@ def run(args: argparse.Namespace, *, sleep=time.sleep, emit=print) -> int:
         raise AgentError("normal sync requires --connection-id and --state")
     if args.poll_seconds < 1 or args.retry_limit < 0 or args.retry_limit > 10 or args.max_cycles < 0 or args.max_events < 1 or args.max_events > 5000 or args.max_file_bytes < 1 or args.max_upload_bytes < 1 or args.timeout_seconds <= 0:
         raise AgentError("invalid bounded agent settings")
+    if getattr(args, "approve_up_to_credits", None) is not None:
+        approval_cap(args)
     cycle = 0
     while True:
         for attempt in range(args.retry_limit + 1):
@@ -1502,6 +2135,15 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--retry-limit", type=int, default=3, help="Bounded retries for transient HTTP/network errors")
     value.add_argument("--max-events", type=int, default=5000)
     value.add_argument("--max-upload-bytes", type=int, default=512 * 1024 * 1024, help="Maximum supported-file bytes uploaded per cycle")
+    value.add_argument(
+        "--approve-up-to-credits", type=int,
+        help=f"Most credits approved for one cycle's whole changed upload set (1-{MAX_APPROVE_CREDITS}); "
+        "required whenever a cycle has files to upload, which are quoted before anything is approved",
+    )
+    value.add_argument(
+        "--allow-unknown-page-count", action="store_true",
+        help=f"Approve non-image files, whose page count is not known, at the {FOUNDATION_MAX_SOURCE_PAGES}-page server ceiling",
+    )
     value.add_argument("--allow-empty-snapshot", action="store_true", help="Allow an empty complete inventory to suspend all previous sources")
     value.add_argument("--adopt-legacy-state", action="store_true", help="Bind old state after verifying unchanged source and API scope")
     value.add_argument("--s3-prefix", default="")
@@ -1516,6 +2158,10 @@ def main() -> int:
         return run(args)
     except KeyboardInterrupt:
         return 130
+    except ReviewRequiredError as exc:
+        # Counts, credits and flags only: never a path, URL, credential or raw response body.
+        print(canonical({"status": "failed", "code": "SOURCE_REVIEW_REQUIRED", "checkpointPreserved": True, "instructions": str(exc)}))
+        return 1
     except (AgentError, ValueError, OSError):
         # No raw HTTP body, source path, URL, credentials or traceback in unattended logs.
         print(canonical({"status": "failed", "code": "SOURCE_SYNC_FAILED", "checkpointPreserved": True}))

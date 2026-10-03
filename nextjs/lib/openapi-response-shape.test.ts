@@ -49,6 +49,7 @@ const {
   sourceAccess,
   revalidate,
   customerDataAdmission,
+  cancelApprovedFile,
 } = vi.hoisted(() => ({
   authorize: vi.fn(),
   enqueue: vi.fn(),
@@ -62,6 +63,11 @@ const {
   sourceAccess: vi.fn(),
   revalidate: vi.fn(),
   customerDataAdmission: vi.fn(),
+  cancelApprovedFile: vi.fn(),
+  readApproval: vi.fn(),
+  approvedReservation: vi.fn(),
+  assertCompileSet: vi.fn(async () => ({ ok: true })),
+  deterministicId: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -81,6 +87,10 @@ vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: custom
 vi.mock("@/lib/compute-reservation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./compute-reservation")>()),
   reserveFoundationCompute: compute,
+  assertFoundationIntakeCompileSet: assertCompileSet,
+  readFoundationIntakeApproval: readApproval,
+  reserveFoundationIntakeApprovedFile: approvedReservation,
+  cancelFoundationIntakeApprovedFile: cancelApprovedFile,
 }));
 vi.mock("@/lib/r2-synthetic-canary", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-synthetic-canary")>()),
@@ -98,12 +108,18 @@ vi.mock("@/lib/retrieval-pipeline", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./retrieval-pipeline")>()),
   runRetrievalPipeline: pipeline,
 }));
+vi.mock("@/lib/source-intake", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./source-intake")>()),
+  deterministicSourceDocumentId: deterministicId,
+}));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: sourceIds }));
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
 
 import { GET as openApi } from "../app/api/openapi/route";
 import { GET as capabilities } from "../app/api/v1/capabilities/route";
 import { POST as uploadCapability } from "../app/api/v1/uploads/capability/route";
+import { POST as cancelUploadSet } from "../app/api/v1/uploads/approval/cancel/route";
+import { POST as confirmApprovedUpload } from "../app/api/v1/uploads/confirm/route";
 import { POST as startCompile } from "../app/api/compile-jobs/route";
 import { POST as search } from "../app/api/v1/collections/[id]/search/route";
 import { POST as ask } from "../app/api/v1/collections/[id]/ask/route";
@@ -123,7 +139,7 @@ const CONTRACT_GAPS = new Set<string>([]);
 
 const WORKSPACE = "pilot-openapishape";
 const COLLECTION = `collection-${"e".repeat(32)}`;
-const DOCUMENT = "11111111-2222-3333-4444-555555555555";
+const DOCUMENT = "11111111-2222-4333-8444-555555555555";
 
 type Operation = {
   operationId: string;
@@ -273,7 +289,7 @@ describe("documented response shapes", () => {
     const { path, operation: published } = await operation("createDirectUploadCapability");
     expect(path).toBe("/uploads/capability");
     const required = published.requestBody?.content["application/json"].schema.required ?? [];
-    expect(required).toEqual(["originalFilename", "declaredMimeType", "requestedBytes"]);
+    expect(required).toEqual(["originalFilename", "declaredMimeType", "requestedBytes", "attemptKey", "scopeDigest", "pricingFingerprint", "fileKey", "contentSha256"]);
 
     grantKey();
     customerDataAdmission.mockResolvedValue(true);
@@ -290,9 +306,18 @@ describe("documented response shapes", () => {
       },
     });
     presign.mockReturnValue({ ok: true, uploadUrl: "https://r2.test/quarantine/put?signature=redacted" });
+    const attemptKey = "att_0123456789abcdef0123456789abcdef";
+    const scopeDigest = "sha256:" + "d".repeat(64);
+    const pricingFingerprint = "sha256:" + "c".repeat(64);
+    const contentSha256 = "sha256:" + "b".repeat(64);
+    const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
+    const sourceKey = createHash("sha256").update(["tavonel-approved-source-v1", attemptKey, fileKey].join("\x1f")).digest("hex");
+    deterministicId.mockResolvedValue(DOCUMENT);
+    readApproval.mockResolvedValue({ ok: true, result: { scopeDigest, pricingFingerprint, files: [{ fileKey, documentId: DOCUMENT, contentSha256, byteLength: 184_320, mimeType: "application/pdf" }] } });
+    approvedReservation.mockResolvedValue({ ok: true, result: { reservationId: "reservation-shape", approvedMaximumCredits: 12, approvedReservedCredits: 12, billingSource: "subscription", reservationExpiresAt: "2026-09-11T00:05:00.000Z", approvedMaxPages: 3, pageBasis: "declared" } });
 
-    const body = { originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184_320 };
-    const response = await uploadCapability(apiRequest("/api/v1/uploads/capability", body));
+    const body = { originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184_320, attemptKey, scopeDigest, pricingFingerprint, fileKey, contentSha256 };
+    const response = await uploadCapability(apiRequest("/api/v1/uploads/capability", body, { "x-tavonel-source-idempotency-key": sourceKey }));
     const payload = await response.json() as Record<string, unknown>;
     expect(response.status, JSON.stringify(payload)).toBe(200);
 
@@ -312,7 +337,7 @@ describe("documented response shapes", () => {
     for (const field of required) {
       const partial = { ...body } as Record<string, unknown>;
       delete partial[field];
-      const refused = await uploadCapability(apiRequest("/api/v1/uploads/capability", partial));
+      const refused = await uploadCapability(apiRequest("/api/v1/uploads/capability", partial, { "x-tavonel-source-idempotency-key": sourceKey }));
       expect(refused.status, `omitting the required field ${field} was accepted`).toBeGreaterThanOrEqual(400);
       expect(await refused.json()).toHaveProperty("code");
     }
@@ -600,5 +625,57 @@ describe("the quickstart names only endpoints the contract publishes", () => {
     for (const language of ["bash", "python", "typescript"]) {
       expect(languages, `the quickstart has no ${language} example`).toContain(language);
     }
+  });
+});
+
+describe("approved upload-set cancellation contract", () => {
+  it("publishes the A-bearer POST alias and delegates only after caller and scope validation", async () => {
+    vi.clearAllMocks();
+    const attemptKey = "att_0123456789abcdef0123456789abcdef";
+    const scopeDigest = `sha256:${"d".repeat(64)}`;
+    const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
+    const documentId = "33333333-3333-4333-8333-333333333333";
+    grantKey();
+    readApproval.mockResolvedValue({ ok: true, result: { scopeDigest, files: [{ fileKey, documentId }] } });
+    cancelApprovedFile.mockResolvedValue({ ok: true, result: { status: "cancelled", reconciliationRequired: false } });
+
+    const response = await cancelUploadSet(apiRequest("/api/v1/uploads/approval/cancel", { attemptKey, scopeDigest, fileKey }));
+    expect(response.status).toBe(200);
+    expect(authorize).toHaveBeenCalledWith(expect.any(Request), "documents:intake", "observer");
+    expect(await response.json()).toEqual({ code: "INTAKE_SET_CANCELLED", result: { status: "cancelled", reconciliationRequired: false } });
+    expect(cancelApprovedFile).toHaveBeenCalledWith({
+      workspaceKey: WORKSPACE, userId: "user-shape", attemptKey, fileKey, documentId,
+      reasonCode: "DEPENDENT_MEMBER_FAILED",
+    });
+
+    vi.clearAllMocks();
+    grantKey();
+    readApproval.mockResolvedValue({ ok: true, result: { scopeDigest: `sha256:${"e".repeat(64)}`, files: [{ fileKey, documentId }] } });
+    const mismatch = await cancelUploadSet(apiRequest("/api/v1/uploads/approval/cancel", { attemptKey, scopeDigest, fileKey }));
+    expect(mismatch.status).toBe(409);
+    expect(await mismatch.json()).toEqual({ code: "INTAKE_APPROVAL_CONFLICT" });
+    expect(cancelApprovedFile).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    authorize.mockResolvedValue({ ok: false, code: "AUTH_REQUIRED", status: 401 });
+    const unauthorized = await cancelUploadSet(apiRequest("/api/v1/uploads/approval/cancel", { attemptKey, scopeDigest, fileKey }));
+    expect(unauthorized.status).toBe(401);
+    expect(readApproval).not.toHaveBeenCalled();
+    expect(cancelApprovedFile).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    authorize.mockResolvedValue({ ok: false, code: "AUTH_REQUIRED", status: 401 });
+    const confirm = await confirmApprovedUpload(apiRequest("/api/v1/uploads/confirm", {
+      documentId, sourceSha256: `sha256:${"a".repeat(64)}`, attemptKey, scopeDigest, fileKey,
+    }));
+    expect(confirm.status).toBe(401);
+    expect(authorize).toHaveBeenCalledWith(expect.any(Request), "documents:intake", "observer");
+    expect(readApproval).not.toHaveBeenCalled();
+
+    const { path, method, operation: published } = await operation("cancelApprovedUploadSet");
+    expect({ path, method }).toEqual({ path: "/uploads/approval/cancel", method: "post" });
+    expect(published.requestBody?.content["application/json"].schema.required)
+      .toEqual(["attemptKey", "scopeDigest", "fileKey"]);
+    expect(published.responses["200"].description).toContain("reconciliationRequired");
   });
 });
