@@ -35,7 +35,7 @@ import {
   readApprovalPayload,
   matchReselection,
   shouldReuseAttemptKey,
-  compilableDocumentIds,
+  compilableDocumentIds as approvedCompilableDocumentIds,
   type IntakeAttemptRecord,
 } from "@/lib/intake-approval";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
@@ -286,8 +286,6 @@ function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
-  /** Distinguishes two uploads of the same file in one session. */
-  const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
@@ -1569,7 +1567,7 @@ export default function WorkspacePage() {
         return;
       }
       const final = await readApprovalStatus({ fetch, token: async () => token }, attemptKey);
-      const ids = compilableDocumentIds(final, fileKeys);
+      const ids = approvedCompilableDocumentIds(final, fileKeys);
       if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok) {
         setNotice("The server has not confirmed the complete approved set. Nothing was compiled.");
         return;
@@ -1641,6 +1639,8 @@ export default function WorkspacePage() {
   */
   const stagedCounted = stagedEstimates.filter((estimate): estimate is PageEstimate => estimate !== null);
   const stagedUncounted = stagedEstimates.length - stagedCounted.length;
+  // Files with an available page estimate only. Unknown files remain in the quote's maximum.
+  const stagedPages = stagedCounted.reduce((total, estimate) => total + estimate.pages, 0);
   const stagedManifestQuote = stagedSelection && stagedPageCounts?.length === stagedSelection.files.length
     ? quoteIntakeManifest(stagedSelection.files.map((entry, index) => ({
       bytes: entry.file.size,
@@ -1761,6 +1761,8 @@ export default function WorkspacePage() {
     const verdict = judgeCorpusSet(stagedSelection.files.length);
     if (!verdict.ok) { setNotice(verdict.message); return; }
     const files = stagedSelection.files.map((entry) => entry.file);
+    // The counts the accepted quote was formed from. Clearing the selection resets the state.
+    const counts = stagedPageCounts;
     setStagedSelection(null);
 
     /*
