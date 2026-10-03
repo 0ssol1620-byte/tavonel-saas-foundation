@@ -453,8 +453,9 @@ type Reply = { kind: "answer"; status: number; json: Record<string, unknown> } |
 async function send(deps: ApprovedUploadDeps, path: string, init: { method: "GET" | "POST"; body?: unknown; headers?: Record<string, string> }): Promise<Reply> {
   const token = await deps.token();
   if (!token) return { kind: "answer", status: 401, json: { code: "NOT_SIGNED_IN" } };
+  const fetchImpl = deps.fetch;
   try {
-    const response = await deps.fetch(path, {
+    const response = await fetchImpl(path, {
       method: init.method,
       headers: {
         authorization: `Bearer ${token}`,

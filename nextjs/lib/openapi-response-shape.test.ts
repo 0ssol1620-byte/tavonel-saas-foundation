@@ -50,6 +50,10 @@ const {
   revalidate,
   customerDataAdmission,
   cancelApprovedFile,
+  readApproval,
+  approvedReservation,
+  assertCompileSet,
+  deterministicId,
 } = vi.hoisted(() => ({
   authorize: vi.fn(),
   enqueue: vi.fn(),

@@ -95,6 +95,113 @@ test("a processing-ceiling refusal keeps the complete set out and leaves a retry
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
 });
 
+test("native fetch sends capability and reads approval state after a lost capability reply", async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+
+  type IntakeBody = {
+    attemptKey: string;
+    clientManifestDigest: string;
+    pricingFingerprint: string;
+    files: Array<{ fileKey: string; contentSha256: string; byteLength: number; mimeType: string }>;
+  };
+  let intakeBody: IntakeBody | null = null;
+  let approvalPosts = 0;
+  let approvalReads = 0;
+  let reservationCommitted = false;
+  const statusAttemptKeys: string[] = [];
+  const idempotencyKeys: string[] = [];
+  let confirmCalls = 0;
+  let compilePosts = 0;
+
+  const approval = (reserved: boolean) => {
+    const body = intakeBody!;
+    const file = body.files[0]!;
+    const reservationExpiresAt = reserved ? new Date(Date.now() + 60_000).toISOString() : null;
+    return {
+      approvalId: "11111111-1111-4111-8111-111111111111",
+      attemptKey: body.attemptKey,
+      clientManifestDigest: body.clientManifestDigest,
+      scopeDigest: `sha256:${"b".repeat(64)}`,
+      pricingFingerprint: body.pricingFingerprint,
+      state: "approved",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      expired: false,
+      fileCount: 1,
+      aggregateMaximumPages: 80,
+      aggregateReservedCredits: 320,
+      aggregateMaximumCredits: 480,
+      compilable: false,
+      idempotentReplay: false,
+      files: [{
+        fileKey: file.fileKey,
+        documentId: "22222222-2222-4222-8222-222222222222",
+        fileState: reserved ? "reserved" : "approved",
+        contentSha256: file.contentSha256,
+        byteLength: file.byteLength,
+        mimeType: file.mimeType,
+        pageBasis: "unknown",
+        approvedMaxPages: 80,
+        approvedReservedCredits: 320,
+        approvedMaximumCredits: 480,
+        reservationId: reserved ? "33333333-3333-4333-8333-333333333333" : null,
+        reservationState: reserved ? "reserved" : null,
+        reservationExpiresAt,
+      }],
+    };
+  };
+
+  await page.route("**/api/uploads/approval**", async route => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      approvalPosts += 1;
+      intakeBody = request.postDataJSON() as IntakeBody;
+      return route.fulfill({ status: 200, json: { code: "INTAKE_APPROVAL_CREATED", approval: approval(false) } });
+    }
+    if (request.method() === "GET" && intakeBody) {
+      approvalReads += 1;
+      const attempt = new URL(request.url()).searchParams.get("attemptKey");
+      statusAttemptKeys.push(attempt ?? "");
+      return route.fulfill({ status: 200, json: { code: "OK", approval: approval(reservationCommitted) } });
+    }
+    return route.fulfill({ status: 400, json: { code: "UNEXPECTED_APPROVAL_REQUEST" } });
+  });
+  await page.route("**/api/uploads/capability", async route => {
+    idempotencyKeys.push(route.request().headers()["x-tavonel-source-idempotency-key"] ?? "");
+    // Model a committed reservation whose capability reply was lost in transit.
+    reservationCommitted = true;
+    await route.abort("failed");
+  });
+  await page.route("**/api/uploads/confirm", route => {
+    confirmCalls += 1;
+    return route.fulfill({ status: 500, json: { code: "UNEXPECTED_CONFIRM" } });
+  });
+  await page.route("**/api/compile-jobs", route => {
+    if (route.request().method() === "POST") {
+      compilePosts += 1;
+      return route.fulfill({ status: 500, json: { code: "UNEXPECTED_COMPILE" } });
+    }
+    return route.fallback();
+  });
+
+  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".workspace-intake")).toHaveAttribute("data-inventory-state", "ready");
+  await page.locator('input[type="file"][multiple]').first().setInputFiles(pdfFixture());
+  const preflight = page.getByRole("region", { name: "Compile preflight" });
+  await expect(preflight.getByRole("button", { name: "Approve maximum & upload", exact: true })).toBeEnabled();
+  await preflight.getByRole("button", { name: "Approve maximum & upload", exact: true }).click();
+
+  await expect(page.locator("p.notice")).toContainText("Intake outcome is uncertain. Reselect the exact same files to recover status.", { timeout: 15_000 });
+  expect(approvalPosts).toBe(1);
+  expect(idempotencyKeys.length).toBeGreaterThan(0);
+  expect(idempotencyKeys.every(Boolean)).toBe(true);
+  expect(new Set(idempotencyKeys).size).toBe(1);
+  expect(approvalReads).toBe(1);
+  expect(statusAttemptKeys).toEqual([intakeBody!.attemptKey]);
+  expect(confirmCalls).toBe(0);
+  expect(compilePosts).toBe(0);
+});
+
 test.describe("a compile that cannot start", () => {
   test.beforeEach(async ({ page }) => {
     await installFixtureSession(page);

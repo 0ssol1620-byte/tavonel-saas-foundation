@@ -112,6 +112,39 @@ describe("approved intake identity and recovery", () => {
     expect(headersSeen[0]).toBe(headersSeen[1]);
   });
 
+  it("calls injected fetch without a receiver and reads approval state after a lost capability reply", async () => {
+    const receivers: unknown[] = [];
+    const paths: string[] = [];
+    const receiverSensitiveFetch: ApprovedUploadDeps["fetch"] = function (
+      this: unknown,
+      input: RequestInfo | URL,
+    ) {
+      receivers.push(this);
+      const path = String(input);
+      paths.push(path);
+      if (this !== undefined) return Promise.reject(new TypeError("Illegal invocation"));
+      if (path === "/api/uploads/capability") return Promise.reject(new Error("reply lost after commit"));
+      if (path.startsWith("/api/uploads/approval?attemptKey=")) return Promise.resolve(ok({ approval: status("reserved") }));
+      return Promise.resolve(ok({ code: "UNEXPECTED_REQUEST" }, 500));
+    };
+    const result = await uploadApprovedMember({
+      attempt: { attemptKey, scopeDigest: otherDigest, pricingFingerprint: digest },
+      member: approvedMember,
+    }, {
+      fetch: receiverSensitiveFetch,
+      token: async () => "test-token",
+      put: async () => ({ ok: true, sourceSha256: digest }),
+      maxAttempts: 1,
+    });
+
+    expect(receivers).toEqual([undefined, undefined]);
+    expect(paths).toEqual([
+      "/api/uploads/capability",
+      `/api/uploads/approval?attemptKey=${attemptKey}`,
+    ]);
+    expect(result).toEqual({ status: "uncertain", code: "CAPABILITY_RESPONSE_LOST", documentId });
+  });
+
   it("reconciles a lost confirm response from server state and leaves ambiguous state blocked", async () => {
     let confirmed = false;
     const fetchMock: ApprovedUploadDeps["fetch"] = async (input) => {
