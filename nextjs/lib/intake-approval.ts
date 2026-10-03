@@ -18,8 +18,10 @@ export const ATTEMPT_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 export const FILE_KEY_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 export const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-/** `foundation_intake_approvals.file_count`. A larger selection needs more than one approval. */
-export const MAX_APPROVAL_FILES = 20;
+/** Preserve the workspace's existing one-selection bound; a larger set must be selected again whole. */
+export const MAX_APPROVAL_FILES = 128;
+/** Bounded JSON metadata for the whole 128-file set; strings can require JSON escaping. */
+export const MAX_APPROVAL_METADATA_BYTES = 512 * 1024;
 const BASES = new Set<PageEstimateBasis>(["pdf_page_tree", "image", "pptx_slides", "docx_declared"]);
 
 async function sha256Hex(text: string) {

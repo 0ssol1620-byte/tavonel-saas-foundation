@@ -228,7 +228,9 @@ describe("approved one-path experience", () => {
   it("retains cost approval, automatic durable compile and human activation boundaries", () => {
     const page = text("app/workspace/page.tsx");
     expect(page).toContain("stagedSelection");
-    expect(page).toContain("if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids)");
+    expect(page).toContain("const ids = approvedCompilableDocumentIds(final, fileKeys)");
+    expect(page).toContain("if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok)");
+    expect(page).toContain("await startDurableCompile(ids)");
     expect(page).toContain("activationPolicy.customerIntake.enabled");
     expect(page).toContain("promoteCandidate");
     expect(page).toContain("rollbackWorld");

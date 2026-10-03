@@ -110,9 +110,8 @@ export async function POST(request: Request) {
   if (!DOCUMENT_ID_PATTERN.test(documentId)) {
     return NextResponse.json({ code: "UPLOAD_CONFIRM_BODY_INVALID" }, { status: 400, headers });
   }
-  // Absent is allowed and recorded as absent: a page served without a secure context cannot
-  // compute a digest, and saying so is honest where inventing one would not be. A malformed one
-  // is refused rather than dropped, because that is a client defect worth seeing.
+  // A malformed digest is refused rather than dropped. The approved manifest below binds every
+  // file to its content digest, so a missing digest cannot confirm a paid upload either.
   if (body.sourceSha256 !== undefined
     && (typeof body.sourceSha256 !== "string" || !SOURCE_SHA256.test(body.sourceSha256))) {
     return NextResponse.json({ code: "INVALID_SOURCE_DIGEST" }, { status: 400, headers });

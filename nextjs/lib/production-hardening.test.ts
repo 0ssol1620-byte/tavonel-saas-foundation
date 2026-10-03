@@ -34,7 +34,7 @@ describe("2026-09-05 production hardening", () => {
     expect(workspace).not.toContain("!activeWorld && !candidateNeedsDecision ? (");
     expect(workspace).toContain("Add more files while your published knowledge stays available.");
     expect(workspace).toContain("Add more files while the prepared version waits for your review.");
-    expect(workspace).toContain("Upload & compile");
+    expect(workspace).toContain("Approve maximum & upload");
     expect(workspace).toContain("Compile one or more ready sources");
     expect(workspace).not.toContain("Compile at least two ready sources");
     expect(workspace).toContain('navigateSurface("connections")');

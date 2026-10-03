@@ -31,6 +31,8 @@ const NOT_A_CODE = new Set([
   "CONTENT_TYPE", "NO_STORE", "CACHE_CONTROL", "RETRY_AFTER", "LAST_EVENT_ID",
   // Internal enum values that are not returned as `code`
   "LOCAL_AGENT", "FILE_SERVER", "READ_ONLY", "SERVICE_ROLE",
+  // Workflow state/reason values stored by the browser and cancellation RPC, not HTTP errors.
+  "DEPENDENT_MEMBER_FAILED", "UPLOAD_TRANSFER_FAILED",
 ]);
 
 function filesUnder(root: string): string[] {

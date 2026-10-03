@@ -33,16 +33,15 @@ const pdfFixture = (name = "audit-fixture.pdf") => ({
   buffer: Buffer.from("%PDF-1.7\n% audit fixture\n"),
 });
 
-/** Drive the intake to a refusal issued by `/api/uploads/capability`. */
-async function refuseIntake(page: import("@playwright/test").Page, code: string) {
+/** Drive the intake to a refusal issued while approving the complete set. */
+async function refuseIntake(page: import("@playwright/test").Page, code: string, status = 400) {
   await installFixtureSession(page);
   await installWorkspaceRoutes(page);
-  // The server enforces the byte and page ceilings, so the refusal is mocked at the boundary it
-  // is issued from rather than by pushing a 5 MiB fixture through the browser.
-  let capabilityCalls = 0;
-  await page.route("**/api/uploads/capability", route => {
-    capabilityCalls += 1;
-    return route.fulfill({ status: 400, json: { code } });
+  // The server validates the full manifest and current quote before any capability or bytes move.
+  let approvalCalls = 0;
+  await page.route("**/api/uploads/approval", route => {
+    approvalCalls += 1;
+    return route.fulfill({ status, json: { code } });
   });
 
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
@@ -62,20 +61,19 @@ async function refuseIntake(page: import("@playwright/test").Page, code: string)
     is about cannot even be reached without it.
   */
   await expect(
-    preflight.getByRole("button", { name: /Upload & compile/ }),
-    "an uncounted set must still be uploadable -- the quote is information, not authorisation",
+    preflight.getByRole("button", { name: "Approve maximum & upload", exact: true }),
+    "an unknown-page set must still be explicitly approved at its full maximum",
   ).toBeEnabled();
-  await preflight.getByRole("button", { name: /Upload & compile/ }).click();
-  return () => capabilityCalls;
+  await preflight.getByRole("button", { name: "Approve maximum & upload", exact: true }).click();
+  return () => approvalCalls;
 }
 
 test("a refused intake ends in a sentence and a usable control, not a spinner", async ({ page }) => {
-  const calls = await refuseIntake(page, "INTAKE_FILE_TOO_LARGE");
+  const calls = await refuseIntake(page, "INTAKE_PRICE_STALE");
   const notice = page.locator("p.notice");
-  await expect(notice).toContainText("0 of 1 files uploaded");
-  // Honest about state: nothing was retried behind the visitor's back.
-  await expect(notice).toContainText("nothing was retried automatically");
-  expect(calls(), "the refusal was never requested").toBe(1);
+  await expect(notice).toContainText("Pricing changed since this estimate");
+  await expect(notice).toContainText("Nothing was uploaded");
+  expect(calls(), "the approval refusal was never requested").toBe(1);
   // Not a spinner: the intake's own control is back, at every width. The header's Upload button
   // is not asserted here -- the topbar collapses below the desktop breakpoint and this check is
   // about the state the intake is left in, not about which chrome renders it.
@@ -83,13 +81,18 @@ test("a refused intake ends in a sentence and a usable control, not a spinner", 
   await expect(page.getByText("Uploading & compiling…")).toHaveCount(0);
 });
 
-test("a refused intake says why", async ({ page }) => {
+test("a processing-ceiling refusal keeps the complete set out and leaves a retry", async ({ page }) => {
   /*
-    Fixed at integration (stage 2 C7): the batch summary carries the per-file reasons, deduped,
-    so the sentence that survives says why and not only how many.
+    The approval endpoint uses SOURCE_EXCEEDS_PROCESSING_CEILING (413) when a selected file is
+    above the processor's supported byte/page ceiling. Keep this distinct from stale pricing.
   */
-  await refuseIntake(page, "INTAKE_FILE_TOO_LARGE");
-  await expect(page.locator("p.notice")).toContainText("INTAKE_FILE_TOO_LARGE", { timeout: 10_000 });
+  const calls = await refuseIntake(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413);
+  const notice = page.locator("p.notice");
+  await expect(notice).toContainText("The complete set was not approved.", { timeout: 10_000 });
+  await expect(notice).toContainText("Nothing was uploaded.");
+  await expect(notice).toContainText("Review the reason and retry the complete set.");
+  expect(calls(), "the ceiling refusal was never returned by approval").toBe(1);
+  await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
 });
 
 test.describe("a compile that cannot start", () => {

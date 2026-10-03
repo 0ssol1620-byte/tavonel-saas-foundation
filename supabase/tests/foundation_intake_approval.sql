@@ -16,7 +16,7 @@
 -- refused). The real concurrent run is
 -- supabase/rehearsal/foundation_intake_approval_concurrency.sql, with its own instructions.
 begin;
-select plan(154);
+select plan(165);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -57,6 +57,16 @@ language sql immutable as $fn$
     pg_temp.file('file-known-pdf', 'a', 120000, 'application/pdf', 'measured', 3, 12, 18),
     pg_temp.file('file-unknown-xlsx', 'b', 64000,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'unknown', 80, 40, 60))
+$fn$;
+
+create function pg_temp.cap_files(
+  p_count integer, p_basis text default 'measured', p_pages integer default 1
+) returns jsonb
+language sql immutable as $fn$
+  select jsonb_agg(pg_temp.file(
+    'file-cap-' || lpad(n::text, 3, '0'), 'c', 1000, 'application/pdf', p_basis, p_pages, 1, 1
+  ) order by n)
+  from generate_series(1, p_count) as n
 $fn$;
 
 create function pg_temp.approval(p_attempt text) returns uuid
@@ -225,6 +235,68 @@ select is(
   0,
   'none of the refused manifests left an approval row'
 );
+select is(pg_temp.balance('pilot-apprpaid01'), 2000, 'refused manifests reserved or charged no paid credits');
+
+-- ---------------------------------------------------------------------------------------------
+-- The server preserves one complete selection through the established 128-file limit.
+-- These call the real RPC and inspect its rows; 129 is refused before an approval is written.
+-- ---------------------------------------------------------------------------------------------
+
+select is(
+  public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-000001',
+    pg_temp.digest('6'), pg_temp.digest('f'), 1, pg_temp.cap_files(1))->>'fileCount',
+  '1', 'one file is approved as one complete selection'
+);
+select is(
+  public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-000013',
+    pg_temp.digest('6'), pg_temp.digest('f'), 13, pg_temp.cap_files(13))->>'fileCount',
+  '13', 'the ordinary thirteen-file selection remains whole'
+);
+select is(
+  public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-000020',
+    pg_temp.digest('6'), pg_temp.digest('f'), 20, pg_temp.cap_files(20))->>'fileCount',
+  '20', 'twenty files are approved as one selection'
+);
+select is(
+  public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-000021',
+    pg_temp.digest('6'), pg_temp.digest('f'), 21, pg_temp.cap_files(21))->>'fileCount',
+  '21', 'the server accepts more than the obsolete twenty-file cap'
+);
+select is(
+  public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-000128',
+    pg_temp.digest('6'), pg_temp.digest('f'), 128, pg_temp.cap_files(128))->>'fileCount',
+  '128', 'the server accepts the full existing corpus bound atomically'
+);
+select is(
+  public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-unknown-128',
+    pg_temp.digest('6'), pg_temp.digest('f'), 128, pg_temp.cap_files(128, 'unknown', 80))->>'aggregateMaximumPages',
+  '10240', '128 unknown members retain the 80-page maximum each in the aggregate'
+);
+select throws_ok(
+  $$select public.create_foundation_intake_approval(
+    'pilot-apprpaid01', '88880001-8888-4888-8888-888888888801', 'attempt-cap-000129',
+    pg_temp.digest('6'), pg_temp.digest('f'), 129, pg_temp.cap_files(129))$$,
+  'foundation_intake_approval_invalid',
+  '129 files are refused instead of split into independently approved subsets'
+);
+select is(
+  (select count(*)::integer from public.foundation_intake_approvals where attempt_key = 'attempt-cap-000129'),
+  0, 'the over-limit set creates no approval row, so no member reservation can be created'
+);
+select is(
+  (select count(*)::integer from public.foundation_compute_reservations r
+    join public.foundation_intake_approval_files f using (document_id)
+    join public.foundation_intake_approvals a using (approval_id)
+   where a.attempt_key like 'attempt-cap-%'),
+  0, 'creating or refusing cap-boundary approvals creates no reservation hold'
+);
+select is(pg_temp.balance('pilot-apprpaid01'), 2000, 'cap-boundary approvals preserve the paid credit balance');
 
 -- ---------------------------------------------------------------------------------------------
 -- Known cap and the mixed aggregate

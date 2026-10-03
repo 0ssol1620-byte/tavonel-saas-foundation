@@ -1368,7 +1368,7 @@ export default function WorkspacePage() {
     setCollectionResult(null);
     clearWorldState();
     try {
-      if (files.length > 20) { setNotice("This approval supports at most 20 files. Reduce the selected set and review its new maximum."); return; }
+      if (files.length > 128) { setNotice("This approval supports at most 128 files. Reduce the selected set and review its new maximum."); return; }
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
@@ -1464,7 +1464,7 @@ export default function WorkspacePage() {
               ? "Pricing changed since this estimate. Review the refreshed maximum and approve again. Nothing was uploaded."
               : result?.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
                 ? `The server recalculated this set's maximum as ${formatUsd(result.quote?.maximumUsd ?? Number.NaN)}. Review and approve the refreshed quote again. Nothing was uploaded.`
-                : `The complete set was not approved (${result?.code ?? response.status}). Nothing was uploaded.`);
+                : "The complete set was not approved. Nothing was uploaded. Review the reason and retry the complete set.");
             return;
           }
         } catch { /* repeat the same attempt identity, then look it up */ }

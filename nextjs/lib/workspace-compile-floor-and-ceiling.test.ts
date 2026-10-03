@@ -32,15 +32,17 @@ const workspaceCss = readFileSync(new URL("../app/workspace-no1.css", import.met
 describe("workspace compile floor and ceiling", () => {
   it("sends a single uploaded document on to compile", () => {
     expect(workspace).not.toContain("ids.length >= 2");
-    // The destination changed -- the batch now starts a durable job instead of driving the
-    // compile from here -- and the gate it passes through did not.
-    expect(workspace).toContain("if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);");
+    // One whole approved selection enters the compile only after every server member is confirmed.
+    expect(workspace).toContain("const ids = approvedCompilableDocumentIds(final, fileKeys);");
+    expect(workspace).toContain("if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok)");
+    expect(workspace).toContain("await startDurableCompile(ids);");
   });
 
   it("refuses an over-ceiling selection before anything is uploaded", () => {
     expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);");
     // The button cannot start an upload the compile step would refuse...
     expect(workspace).toContain("!stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}");
+    expect(workspace).toContain('"Approve maximum & upload"');
     // ...and the handler refuses it too, so the contract does not depend on the disabled prop.
     expect(workspace).toContain("const verdict = judgeCorpusSet(stagedSelection.files.length);");
     // The reason is shown rather than the files being silently dropped.

@@ -203,3 +203,29 @@ describe("approved intake identity and recovery", () => {
   });
 
 });
+
+describe("whole-selection file bound", () => {
+  it.each([1, 13, 20, 21, 128])("accepts %i members in one attempt record", (size) => {
+    const record: IntakeAttemptRecord = {
+      version: 1, attemptKey, approvalId, scopeDigest: otherDigest, pricingFingerprint: digest,
+      clientManifestDigest: digest, aggregateMaximumCredits: size, expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      files: Array.from({ length: size }, (_, index) => ({
+        fileKey: `fk_${String(index).padStart(8, "0")}`, relativePath: `file-${index}.pdf`, contentSha256: digest,
+        byteLength: 123, mimeType: "application/pdf", documentId: null, phase: "approved" as const, code: null,
+      })),
+    };
+    expect(readIntakeAttemptRecord(record)?.files).toHaveLength(size);
+  });
+
+  it("refuses 129 members as one attempt instead of splitting the selection", () => {
+    const record: IntakeAttemptRecord = {
+      version: 1, attemptKey, approvalId, scopeDigest: otherDigest, pricingFingerprint: digest,
+      clientManifestDigest: digest, aggregateMaximumCredits: 129, expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      files: Array.from({ length: 129 }, (_, index) => ({
+        fileKey: `fk_${String(index).padStart(8, "0")}`, relativePath: `file-${index}.pdf`, contentSha256: digest,
+        byteLength: 123, mimeType: "application/pdf", documentId: null, phase: "approved" as const, code: null,
+      })),
+    };
+    expect(readIntakeAttemptRecord(record)).toBeNull();
+  });
+});

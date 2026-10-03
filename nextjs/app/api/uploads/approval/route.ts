@@ -11,6 +11,7 @@ import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import {
   ATTEMPT_KEY_PATTERN,
   MAX_APPROVAL_FILES,
+  MAX_APPROVAL_METADATA_BYTES,
   SHA256_DIGEST_PATTERN,
   intakeManifestDigest,
   readManifestEntry,
@@ -29,8 +30,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const NO_STORE = { "Cache-Control": "no-store" };
-// Twenty members of metadata. No member carries bytes, so anything larger is not a manifest.
-const MAX_BODY_BYTES = 32_768;
+// No file bytes are accepted by this endpoint. Quote and approval share this metadata bound.
+export const MAX_BODY_BYTES = MAX_APPROVAL_METADATA_BYTES;
 // The page maximum an uncounted member is approved at. `readApprovalFilePayload` holds the
 // database to the same number; a deployment whose ceiling drifted from it must not approve.
 const UNKNOWN_MEMBER_PAGES = 80;
