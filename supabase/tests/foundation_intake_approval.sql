@@ -1219,6 +1219,7 @@ select public.settle_foundation_intake_approved_compute(
 
 select throws_ok(
   $$select pg_temp.cancel_then_abort('attempt-cancel-review-01','file-review-cancel')$$,
+  'P0001',
   'forced_cancel_rollback',
   'an error after cancellation work rolls the approval and all releases back'
 );

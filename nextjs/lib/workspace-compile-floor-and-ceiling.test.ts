@@ -53,7 +53,7 @@ describe("workspace compile floor and ceiling", () => {
     expect(workspace).toContain('navigateSurface("sources")');
     // Every surface starts at the top now; the anchor map that scrolled past shared blocks is gone.
     expect(workspace).toContain("window.scrollTo({ top: 0 });");
-    expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files)"));
+    expect(workspace.indexOf('navigateSurface("sources")')).toBeLessThan(workspace.indexOf("await uploadDocuments(files, counts)"));
   });
 
   /*

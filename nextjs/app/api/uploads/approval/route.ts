@@ -31,7 +31,7 @@ export const runtime = "nodejs";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 // No file bytes are accepted by this endpoint. Quote and approval share this metadata bound.
-export const MAX_BODY_BYTES = MAX_APPROVAL_METADATA_BYTES;
+const MAX_BODY_BYTES = MAX_APPROVAL_METADATA_BYTES;
 // The page maximum an uncounted member is approved at. `readApprovalFilePayload` holds the
 // database to the same number; a deployment whose ceiling drifted from it must not approve.
 const UNKNOWN_MEMBER_PAGES = 80;
