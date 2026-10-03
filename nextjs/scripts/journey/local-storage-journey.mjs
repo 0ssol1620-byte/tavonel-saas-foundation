@@ -8,6 +8,11 @@ import net from "node:net";
 import path from "node:path";
 import { stopOwnedChild } from "./stop-owned-child.mjs";
 
+// Fixture-only capacity, never a production storage setting. With SeaweedFS 4.48 each S3 bucket is its own collection
+// and a collection needs its own volume: one slot let the quarantine bucket write but a second bucket's PUT got HTTP 500.
+// Two slots cover two distinct buckets; the 16 MiB volume size limit is unchanged.
+const FIXTURE_VOLUME_MAX = 2;
+const FIXTURE_VOLUME_SIZE_LIMIT_MB = 16;
 const DIAGNOSTIC_TAIL_BYTES = 6000;
 const DIAGNOSTIC_PRINT_LIMIT = 6144;
 
@@ -67,7 +72,7 @@ await Promise.all(reservations.map(server => new Promise(resolve => server.close
 const [master, masterGrpc, volume, volumeGrpc, filer, filerGrpc, s3, s3Grpc, volumePublic] = ports;
 const args = ["mini", `-dir=${root}`, "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master.telemetry=false",
   `-filer.localSocket=${path.join(root, "filer.sock")}`,
-  "-admin.ui=false", "-webdav=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-volume.max=1", "-master.volumeSizeLimitMB=16",
+  "-admin.ui=false", "-webdav=false", "-s3.port.iceberg=0", "-s3.port.lance=0", `-volume.max=${FIXTURE_VOLUME_MAX}`, `-master.volumeSizeLimitMB=${FIXTURE_VOLUME_SIZE_LIMIT_MB}`,
   `-master.port=${master}`, `-master.port.grpc=${masterGrpc}`, `-volume.port=${volume}`, `-volume.port.grpc=${volumeGrpc}`,
   `-volume.port.public=${volumePublic}`, `-filer.port=${filer}`, `-filer.port.grpc=${filerGrpc}`, `-s3.port=${s3}`, `-s3.port.grpc=${s3Grpc}`,
   "-s3.externalUrl=https://00000000000000000000000000000000.r2.cloudflarestorage.com", `-bucket=${env.S3_BUCKET}`];
