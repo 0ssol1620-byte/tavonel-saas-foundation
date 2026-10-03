@@ -178,6 +178,24 @@ describe("the published OpenAPI document", () => {
       reservedCredits: file.reservedCredits,
     });
   });
+  it("keeps unintended C0 controls out of OpenAPI source and output strings", async () => {
+    const forbidden = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+    const codePoints = (text: string) => [...text.matchAll(forbidden)]
+      .map((match) => `U+${match[0].charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`);
+    const collectStrings = (value: unknown): string[] => {
+      if (typeof value === "string") return [value];
+      if (Array.isArray(value)) return value.flatMap(collectStrings);
+      if (value && typeof value === "object") {
+        return Object.values(value as Record<string, unknown>).flatMap(collectStrings);
+      }
+      return [];
+    };
+
+    const source = readFileSync(resolve(import.meta.dirname, "../app/api/openapi/route.ts"), "utf8");
+    expect(codePoints(source)).toEqual([]);
+    const emittedStrings = collectStrings(await document());
+    expect(emittedStrings.flatMap(codePoints)).toEqual([]);
+  });
   it("keeps unintended C0 controls out of developer documentation source", () => {
     const source = readFileSync(resolve(import.meta.dirname, "docs-content.ts"), "utf8");
     const controls = [...source.matchAll(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g)]

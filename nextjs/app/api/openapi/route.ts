@@ -45,7 +45,7 @@ function ok(description: string, schema: Schema, example: unknown) {
 function err(...codes: string[]) {
   const entries = codes.map(apiErrorCode);
   return {
-    description: entries.map((entry) => `${entry.code}  ${entry.meaning}`).join(" "),
+    description: entries.map((entry) => `${entry.code} — ${entry.meaning}`).join(" "),
     "x-tavonel-error-codes": codes,
     content: {
       "application/json": {
@@ -120,13 +120,13 @@ export async function GET(request: Request) {
       { name: "Questions", description: "Grounded answers and retrieval-only search over the active World." },
       { name: "Review", description: "Append-only human decisions over evidence, and the observed run-event stream." },
       { name: "Connections", description: "Durable source connections, their cursors, and the OAuth connectors that create them." },
-      { name: "Workspace administration", description: "Key rotation and the audit trail. Browser session only  no API key calls these." },
+      { name: "Workspace administration", description: "Key rotation and the audit trail. Browser session only — no API key calls these." },
     ],
     paths: {
       /*
         The capability manifest, unauthenticated, because deciding whether to send us a file
-        should not require a key. It is the same list `/uploads/capability` validates against 
-        the enum below is generated from it  so the spec cannot advertise a MIME type the
+        should not require a key. It is the same list `/uploads/capability` validates against —
+        the enum below is generated from it — so the spec cannot advertise a MIME type the
         upload route refuses.
       */
       "/capabilities": {
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
           summary: "Read the capability manifest",
           tags: ["Capabilities"],
           security: [],
-          description: "Every source format TAVONEL can read, with its support tier, what survives into the compiled World, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload. The two per-source ceilings TAVONEL enforces  bytes and pages  are published here as `knownLimitations` tokens.",
+          description: "Every source format TAVONEL can read, with its support tier, what survives into the compiled World, its known limitations and its qualification receipt when one exists. A verified tier without a receipt is not representable. Anything absent from the manifest is refused at upload. The two per-source ceilings TAVONEL enforces — bytes and pages — are published here as `knownLimitations` tokens.",
           responses: {
             "200": ok(
               "The capability manifest and the sha256 of its serialized form. `contentSha256` is taken over the manifest without that field: delete it, re-serialize with the key order unchanged, and hash.",
@@ -332,7 +332,7 @@ export async function GET(request: Request) {
           summary: "List documents",
           tags: ["Documents"],
           "x-tavonel-scope": "documents:read",
-          description: "The workspace's immutable document inventory with each document's processing state and version key. Uploading the same file twice produces two documents that share one content digest; nothing merges them. This operation takes no paging parameters  the inventory is returned whole.",
+          description: "The workspace's immutable document inventory with each document's processing state and version key. Uploading the same file twice produces two documents that share one content digest; nothing merges them. This operation takes no paging parameters — the inventory is returned whole.",
           responses: {
             "200": ok(
               "{ code: OK, workspaceId, documents }. A document whose source could not be resolved is present with its refusal rather than omitted.",
@@ -693,7 +693,7 @@ export async function GET(request: Request) {
           tags: ["Worlds"],
           "x-tavonel-scope": "collections:read",
           parameters: [{ $ref: "#/components/parameters/CollectionId" }],
-          description: "The reviewable candidate artifact  the raw compile package, before anyone activated it. This is not the World read model: GET /world/{id} is that, and it answers only for a version a person activated.",
+          description: "The reviewable candidate artifact — the raw compile package, before anyone activated it. This is not the World read model: GET /world/{id} is that, and it answers only for a version a person activated.",
           responses: {
             "200": ok(
               "The candidate artifact and its validation report.",
@@ -823,10 +823,10 @@ export async function GET(request: Request) {
               },
             },
           },
-          description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active World has no queryable compiled index, which also returns `retrievalIndex` and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score. An abstention is a 200 with `code: ANSWER_ABSTAINED`  a result, not a failure.",
+          description: "Grounded answer with exact page and bbox citations, or an explicit abstention. Both retrieval paths return the same fields: `answer`, `reason`, `citations`, `receipt`, `activeWorld`, `freshness`, `answerMode` and `retrievalPath`. `answerMode` is `evidence_excerpts` on both -- the answer is the cited excerpts, concatenated in rank order, and no language model writes any part of it. `retrievalPath` names which runtime answered: `compiled-retrieval-v1` (lexical + dense + structure, RRF-fused, reranked and World Gate filtered; also returns `contextPacket` and `retrieval` diagnostics) or `excerpt-concatenation-fallback` when the active World has no queryable compiled index, which also returns `retrievalIndex` and a human-readable `retrievalNotice`. Per-citation scoring differs by path and is not normalized across them: the fallback carries `relevance` with its lexical/graph/temporal/authority breakdown, the compiled path carries per-source ranks and the reranker score. An abstention is a 200 with `code: ANSWER_ABSTAINED` — a result, not a failure.",
           responses: {
             "200": ok(
-              "{ code, answer, reason, citations, receipt, activeWorld, freshness, answerMode, retrievalPath }. `answerMode` is `evidence_excerpts` on both paths. `retrievalPath` is `compiled-retrieval-v1` (which also returns `contextPacket` and `retrieval`) or `excerpt-concatenation-fallback` (which also returns `retrievalIndex` and `retrievalNotice`). An abstention is a 200 with `code` ANSWER_ABSTAINED and a `reason`  a result, not a failure. Read `retrievalPath` before comparing answers across Worlds: a difference between two answers can be a difference between two runtimes rather than between two corpora.",
+              "{ code, answer, reason, citations, receipt, activeWorld, freshness, answerMode, retrievalPath }. `answerMode` is `evidence_excerpts` on both paths. `retrievalPath` is `compiled-retrieval-v1` (which also returns `contextPacket` and `retrieval`) or `excerpt-concatenation-fallback` (which also returns `retrievalIndex` and `retrievalNotice`). An abstention is a 200 with `code` ANSWER_ABSTAINED and a `reason` — a result, not a failure. Read `retrievalPath` before comparing answers across Worlds: a difference between two answers can be a difference between two runtimes rather than between two corpora.",
               { $ref: "#/components/schemas/Answer" },
               {
                 code: "GROUNDED_ANSWER",
@@ -856,7 +856,7 @@ export async function GET(request: Request) {
           summary: "Stream observed run events",
           tags: ["Review"],
           "x-tavonel-scope": "documents:read",
-          description: "Replays append-only observed run events after Last-Event-ID, then streams new events and a bounded heartbeat. This is the second of two event streams and the one over *observed* runs  a connector sync, an intake  where /compile-jobs/{jobId}/events follows a compile's own transitions. `after` is the query-parameter form of Last-Event-ID, for clients that cannot set the header.",
+          description: "Replays append-only observed run events after Last-Event-ID, then streams new events and a bounded heartbeat. This is the second of two event streams and the one over *observed* runs — a connector sync, an intake — where /compile-jobs/{jobId}/events follows a compile's own transitions. `after` is the query-parameter form of Last-Event-ID, for clients that cannot set the header.",
           parameters: [
             { name: "runId", in: "path", required: true, schema: { type: "string" } },
             { name: "after", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
@@ -940,7 +940,7 @@ export async function GET(request: Request) {
           },
           responses: {
             "200": ok(
-              "{ code, retrievalPath, contextPacket, degradations, retrieval, activeWorld, freshness }. The `contextPacket` carries the evidence-bound retrieval units with their lexical, dense and structure ranks, the reranker score and the World Gate decisions; `retrieval` carries the per-source candidate counts and `gateRejections`. `retrievalPath` is always `compiled-retrieval-v1`. `degradations` is a named list of what did not run  dense retrieval skipped with no embedder configured, or the reranker degrading to the fused order  and reading it is how a full-pipeline result is told from a partial one, because the two otherwise look identical.",
+              "{ code, retrievalPath, contextPacket, degradations, retrieval, activeWorld, freshness }. The `contextPacket` carries the evidence-bound retrieval units with their lexical, dense and structure ranks, the reranker score and the World Gate decisions; `retrieval` carries the per-source candidate counts and `gateRejections`. `retrievalPath` is always `compiled-retrieval-v1`. `degradations` is a named list of what did not run — dense retrieval skipped with no embedder configured, or the reranker degrading to the fused order — and reading it is how a full-pipeline result is told from a partial one, because the two otherwise look identical.",
               { $ref: "#/components/schemas/SearchResult" },
               {
                 code: "SEARCH_RESULTS",
@@ -1183,7 +1183,7 @@ export async function GET(request: Request) {
           tags: ["Connections"],
           "x-tavonel-scope": "connections:sync",
           parameters: [{ $ref: "#/components/parameters/ConnectionId" }],
-          description: "Applies one batch of source events and advances the cursor. `previousCursorSha256` must match the committed cursor, so two collectors cannot both advance it; a mismatch is a 409 and nothing is applied. Replaying an identical `batchId` is idempotent  delivery is at-least-once and this is the consumer that makes it exactly-once.\n\nA body with an `operation` field is instead one step of a complete inventory scan: `inventory.begin` (compare-and-set on `expectedHeadEpoch`; `scanEpoch` must exceed every open scan's, and a newer one supersedes it), `inventory.page` (an identical page is an idempotent replay), `inventory.finalize` (requires `complete: true` and every declared page). An item missing from a finalized scan is marked unobserved  a deletion candidate, never a deletion  and `aclObservationSha256` is recorded as an observation that grants no access. An open scan expires six hours after begin.",
+          description: "Applies one batch of source events and advances the cursor. `previousCursorSha256` must match the committed cursor, so two collectors cannot both advance it; a mismatch is a 409 and nothing is applied. Replaying an identical `batchId` is idempotent — delivery is at-least-once and this is the consumer that makes it exactly-once.\n\nA body with an `operation` field is instead one step of a complete inventory scan: `inventory.begin` (compare-and-set on `expectedHeadEpoch`; `scanEpoch` must exceed every open scan's, and a newer one supersedes it), `inventory.page` (an identical page is an idempotent replay), `inventory.finalize` (requires `complete: true` and every declared page). An item missing from a finalized scan is marked unobserved — a deletion candidate, never a deletion — and `aclObservationSha256` is recorded as an observation that grants no access. An open scan expires six hours after begin.",
           requestBody: {
             required: true,
             content: {
@@ -1275,7 +1275,7 @@ export async function GET(request: Request) {
           tags: ["Connections"],
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
-          description: "Creates a single-use PKCE authorization. Fails closed unless the provider client and the managed secret broker are both configured  an authorization that cannot store a refresh secret is not started.",
+          description: "Creates a single-use PKCE authorization. Fails closed unless the provider client and the managed secret broker are both configured — an authorization that cannot store a refresh secret is not started.",
           requestBody: {
             required: true,
             content: {
@@ -1306,7 +1306,7 @@ export async function GET(request: Request) {
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
           parameters: [{ $ref: "#/components/parameters/OAuthConnectionId" }],
-          description: "Deletes the stored refresh secret and revokes the connection. Reported as done only when the secret is actually gone  a revoke that cannot be proven answers 503 rather than 204.",
+          description: "Deletes the stored refresh secret and revokes the connection. Reported as done only when the secret is actually gone — a revoke that cannot be proven answers 503 rather than 204.",
           responses: {
             "204": { description: "Refresh secret deleted and connection revoked. No body." },
             "400": err("OAUTH_CONNECTION_ID_INVALID"),
@@ -1323,7 +1323,7 @@ export async function GET(request: Request) {
           tags: ["Workspace administration"],
           "x-tavonel-auth": "browser-session",
           security: [{ TavonelUserSession: [] }],
-          description: "Atomically creates a replacement key, revokes the source key and writes an audit event. Plaintext is returned once and is not recoverable afterwards. Either all three happened or none did  there is no state where the old key is revoked and no replacement exists.",
+          description: "Atomically creates a replacement key, revokes the source key and writes an audit event. Plaintext is returned once and is not recoverable afterwards. Either all three happened or none did — there is no state where the old key is revoked and no replacement exists.",
           parameters: [{ $ref: "#/components/parameters/DeveloperKeyId" }],
           responses: {
             "201": ok(
@@ -1562,7 +1562,7 @@ export async function GET(request: Request) {
             evidenceId: str, sourceVersionKey: str,
             page: int,
             bbox1000: { type: "array", items: int, minItems: 4, maxItems: 4, description: "The region in a 0-1000 page frame, so it is resolution-independent." },
-            relevance: { type: "object", description: "Fallback path only. Not normalized against the compiled path's ranks  presenting one as the other would mean inventing a number neither path measured.", ...bestEffort },
+            relevance: { type: "object", description: "Fallback path only. Not normalized against the compiled path's ranks — presenting one as the other would mean inventing a number neither path measured.", ...bestEffort },
           },
           ...bestEffort,
         },
@@ -1573,7 +1573,7 @@ export async function GET(request: Request) {
             code: { enum: ["SEARCH_RESULTS", "SEARCH_EMPTY"] },
             retrievalPath: { const: "compiled-retrieval-v1", description: "Always this. Search has no excerpt fallback." },
             contextPacket: { type: "object", description: "Evidence-bound retrieval units with their per-source ranks and reranker score.", ...bestEffort },
-            degradations: { type: "array", items: str, description: "A named list of what did not run. Empty means every source ran. A degradation is reported, never hidden  the two otherwise look identical." },
+            degradations: { type: "array", items: str, description: "A named list of what did not run. Empty means every source ran. A degradation is reported, never hidden — the two otherwise look identical." },
             retrieval: { type: "object", ...bestEffort },
             activeWorld: { $ref: "#/components/schemas/ActiveWorldPointer" },
             freshness: { $ref: "#/components/schemas/Freshness" },
@@ -1644,7 +1644,7 @@ export async function GET(request: Request) {
           properties: {
             kind: { enum: ["added", "changed", "deleted"] },
             nativeId: { type: "string", maxLength: 1024, description: "The source's own identifier, stable across revisions." },
-            revision: { type: "string", maxLength: 512, description: "The source's own version marker  an ETag, an mtime, a version id." },
+            revision: { type: "string", maxLength: 512, description: "The source's own version marker — an ETag, an mtime, a version id." },
             contentSha256: { type: ["string", "null"], pattern: "^[a-f0-9]{64}$" },
             sizeBytes: { type: ["integer", "null"], minimum: 0, maximum: 524288000 },
             mimeType: { type: ["string", "null"] },

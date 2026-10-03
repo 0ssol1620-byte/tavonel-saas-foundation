@@ -1,5 +1,8 @@
 {
-  "source": "current delta paths supplied in fresh review; the changed-path list is tested without inventing a base/head receipt",
+  "source": "verified GitHub compare d290..a1e0; used by the real NUL-delimited Git-input regression",
+  "repairAnchorSha": "d2906acde291b77b73229623733736796f4fb8c8",
+  "pullRequestBaseSha": "7a7b4fed9e7d45ec596057f7f1cc5d0672465326",
+  "headSha": "a1e0abef998ce4c3a63fd3e0162ca55d583ae21c",
   "residualPaths": [
     "nextjs/app/api/openapi/route.ts",
     "nextjs/lib/api-error-codes.ts",
@@ -20,6 +23,7 @@
     "nextjs/scripts/repair-scope-gate.mjs",
     "nextjs/scripts/repair-scope.test.mjs",
     "nextjs/scripts/run-repair-check.mjs",
+    "nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json",
     "nextjs/scripts/verify-repair-workflows.mjs"
   ]
 }

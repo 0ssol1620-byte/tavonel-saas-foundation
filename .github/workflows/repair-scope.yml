@@ -20,7 +20,8 @@ jobs:
       run:
         working-directory: nextjs
     env:
-      REPAIR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      REPAIR_ANCHOR_SHA: d2906acde291b77b73229623733736796f4fb8c8
       REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
@@ -35,12 +36,20 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - name: Plan exact-head affected scope
+      - name: Plan audited-anchor affected scope
         id: plan
         env:
           RUN_REPAIR_SCOPE: "1"
         run: node scripts/repair-scope.mjs
+      - name: Verify workflow and selector contracts
+        id: workflow-static
+        if: steps.plan.outputs.workflow_static == 'true'
+        run: node scripts/verify-repair-workflows.mjs
+      - name: Run selector regression tests
+        id: selector-tests
+        if: steps.plan.outputs.selector_tests == 'true'
+        run: node --test scripts/repair-scope.test.mjs
+      - run: pnpm install --frozen-lockfile
       - name: Scan repository secrets
         id: secrets
         run: pnpm scan:secrets
@@ -63,16 +72,6 @@ jobs:
         id: full-scripts
         if: steps.plan.outputs.broader == 'true'
         run: pnpm test:scripts
-        continue-on-error: true
-      - name: Verify workflow and selector contracts
-        id: workflow-static
-        if: steps.plan.outputs.workflow_static == 'true'
-        run: node scripts/verify-repair-workflows.mjs
-        continue-on-error: true
-      - name: Run selector regression tests
-        id: selector-tests
-        if: steps.plan.outputs.selector_tests == 'true'
-        run: node --test scripts/repair-scope.test.mjs
         continue-on-error: true
       - name: Install Chromium for detail-integrity coverage
         id: browser-install

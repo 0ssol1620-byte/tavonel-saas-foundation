@@ -23,7 +23,11 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
       continue;
     }
     runResults[group] = 'passed in this run';
-    passedGroupAnchors[group] = { headSha: plan.headSha, baseSha: plan.baseSha };
+    passedGroupAnchors[group] = {
+      headSha: plan.headSha,
+      repairAnchorSha: plan.repairAnchorSha,
+      pullRequestBaseSha: plan.pullRequestBaseSha,
+    };
   }
 
   return {

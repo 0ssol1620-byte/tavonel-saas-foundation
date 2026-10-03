@@ -21,8 +21,8 @@ export function validateSelectedPath(value, kind, rootPath = repoRoot) {
     throw new Error(`Rejected traversal in ${kind} path: ${JSON.stringify(value)}`);
   }
   const pattern = kind === 'unit'
-    ? /^lib\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.test\.ts$/
-    : /^e2e\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.spec\.ts$/;
+    ? /^lib\/(?:[A-Za-z0-9_\[\]-]+\/)*[A-Za-z0-9_.\[\]-]+\.test\.ts$/
+    : /^e2e\/(?:[A-Za-z0-9_\[\]-]+\/)*[A-Za-z0-9_.\[\]-]+\.spec\.ts$/;
   if (!pattern.test(value)) throw new Error(`Unsupported ${kind} path: ${JSON.stringify(value)}`);
 
   const root = realpathSync(rootPath);
@@ -32,6 +32,29 @@ export function validateSelectedPath(value, kind, rootPath = repoRoot) {
   if (!isInsideWorkspace(root, actual)) throw new Error(`Selected ${kind} path escapes the workspace: ${value}`);
   if (!statSync(actual).isFile()) throw new Error(`Selected ${kind} path is not a file: ${value}`);
   return value;
+}
+
+export function liveBrowserEnv(sourceEnv = process.env) {
+  const env = { ...sourceEnv };
+  delete env.PADDLE_SANDBOX;
+  delete env.VERCEL_ENV;
+  Object.assign(env, {
+    COMMERCIAL_MODE: 'live',
+    TAVONEL_BILLING_LAUNCH_APPROVED: 'true',
+    PLAYWRIGHT_LOCAL_HTTP: '1',
+    NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'foundation-browser-e2e-anon-key',
+  });
+  return env;
+}
+
+export function auditBrowserFiles(files) {
+  return files.filter(file => file !== 'e2e/detail-integrity.spec.ts');
+}
+
+export function requireUnitFiles(files) {
+  if (!Array.isArray(files) || files.length === 0) throw new Error('The targeted unit plan selected no test files.');
+  return files;
 }
 
 function run(command, args, env = process.env) {
@@ -57,8 +80,7 @@ async function waitForServer(child, url) {
 
 async function runUnit() {
   const plan = readPlan();
-  const files = plan.unitFiles.map(file => validateSelectedPath(file, 'unit'));
-  if (files.length === 0) throw new Error('The targeted unit plan selected no test files.');
+  const files = requireUnitFiles(plan.unitFiles.map(file => validateSelectedPath(file, 'unit')));
   await run('pnpm', ['exec', 'vitest', 'run', ...files]);
 }
 
@@ -66,14 +88,8 @@ async function runBrowser() {
   const plan = readPlan();
   const files = plan.browserFiles.map(file => validateSelectedPath(file, 'browser'));
   const baseUrl = 'http://127.0.0.1:3117';
-  const env = {
-    ...process.env,
-    COMMERCIAL_MODE: 'live',
-    TAVONEL_BILLING_LAUNCH_APPROVED: 'true',
-    PLAYWRIGHT_LOCAL_HTTP: '1',
-    NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'foundation-browser-e2e-anon-key',
-  };
+  const env = liveBrowserEnv();
+  const auditFiles = auditBrowserFiles(files);
   const nextCli = resolve(repoRoot, 'node_modules/next/dist/bin/next');
   if (!existsSync(nextCli)) throw new Error('Next CLI is missing; the gated build/install did not complete.');
   const server = spawn(process.execPath, [nextCli, 'start', '--hostname', '127.0.0.1', '--port', '3117'], {
@@ -86,7 +102,7 @@ async function runBrowser() {
       'exec', 'playwright', 'test', 'e2e/detail-integrity.spec.ts', '--grep', 'API reference is scannable',
       '--project=1440', '--project=390', '--project=360', '--project=reduced-motion',
     ], browserEnv);
-    if (files.length) await run('pnpm', ['exec', 'playwright', 'test', ...files, '--project=audit'], browserEnv);
+    if (auditFiles.length) await run('pnpm', ['exec', 'playwright', 'test', ...auditFiles, '--project=audit'], browserEnv);
   } finally {
     if (server.exitCode === null) server.kill('SIGTERM');
   }

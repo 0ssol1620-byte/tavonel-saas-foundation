@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
 const sha = value => /^[0-9a-f]{40}$/i.test(value ?? '');
+export const AUDITED_REPAIR_ANCHOR_SHA = 'd2906acde291b77b73229623733736796f4fb8c8';
 const baselineDebt = ['docs', 'openapi', 'alias-auth', 'response-fixtures', 'detail-integrity'];
 const baselineVitest = [
   'lib/docs-content.test.ts', 'lib/docs-highlight.test.ts', 'lib/docs-navigation.test.ts',
@@ -17,8 +18,10 @@ const uploadTests = [
   'lib/upload-confirm-route.test.ts', 'lib/upload-release-route.test.ts',
 ];
 
-function normalizePath(raw) {
-  if (typeof raw !== 'string' || !/^[A-Za-z0-9_./-]+$/.test(raw)) {
+export function normalizePath(raw) {
+  // Brackets are allowed for literal Next route segments such as [id] and [...slug].
+  // Other shell syntax, controls, backslashes, and non-ASCII path spellings fail closed.
+  if (typeof raw !== 'string' || !/^[A-Za-z0-9_./\[\]-]+$/.test(raw)) {
     throw new Error(`Unsupported changed path encoding: ${JSON.stringify(raw)}`);
   }
   const path = raw.startsWith('nextjs/') ? raw.slice('nextjs/'.length) : raw;
@@ -28,8 +31,26 @@ function normalizePath(raw) {
   return path;
 }
 
-export function buildRepairPlan({ baseSha, headSha, pullRequest, changedPaths }) {
-  if (!sha(baseSha) || !sha(headSha)) throw new Error('Repair scope requires exact base and head SHAs.');
+export function parseNulPaths(output) {
+  const text = Buffer.isBuffer(output) ? output.toString('utf8') : String(output);
+  if (!text) return [];
+  if (!text.endsWith('\0')) throw new Error('Git filename output was not NUL terminated.');
+  return text.slice(0, -1).split('\0');
+}
+
+export function collectChangedPaths({ repairAnchorSha, headSha, repoRoot, exec = execFileSync }) {
+  if (!sha(repairAnchorSha) || !sha(headSha)) throw new Error('Repair scope requires exact anchor and head SHAs.');
+  const options = { cwd: repoRoot, stdio: 'pipe', shell: false };
+  exec('git', ['merge-base', '--is-ancestor', repairAnchorSha, headSha], options);
+  const diff = exec('git', ['diff', '--name-only', '-z', `${repairAnchorSha}..${headSha}`], { ...options, encoding: null });
+  return parseNulPaths(diff);
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths }) {
+  if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
+    throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
+  }
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) throw new Error('Repair scope anchor is not the audited d290 anchor.');
   const paths = [...new Set(changedPaths.map(normalizePath))].sort();
   const groups = new Set(baselineDebt);
   const unitFiles = new Set([...baselineVitest, ...baselineAuth]);
@@ -48,7 +69,7 @@ export function buildRepairPlan({ baseSha, headSha, pullRequest, changedPaths })
       workflowConfigChanged = true;
       matched = true;
     }
-    if (/^scripts\/(repair-scope|repair-scope-gate|run-repair-check|verify-repair-workflows)(\.test)?\.mjs$/i.test(path)) {
+    if (/^scripts\/(?:repair-scope|repair-scope-gate|run-repair-check|verify-repair-workflows)(\.test)?\.mjs$|^scripts\/fixtures\/current-foundation-residual-workflow-paths\.json$/i.test(path)) {
       groups.add('selector-config');
       qualificationReasons.add('selector changed');
       selectorChanged = true;
@@ -123,9 +144,12 @@ export function buildRepairPlan({ baseSha, headSha, pullRequest, changedPaths })
   const plan = {
     schemaVersion: 1,
     repository: '0ssol1620-byte/tavonel-saas-foundation',
-    pullRequest: Number(pullRequest), baseSha, headSha,
+    pullRequest: Number(pullRequest),
+    pullRequestBaseSha,
+    repairAnchorSha,
+    headSha,
     selector: 'foundation-phase1-2026-10-03',
-    source: 'exact PR base/head merge-base diff; no previous receipt consumed',
+    source: 'audited repair-anchor tree diff; PR base retained separately as qualification debt',
     changedPaths: paths,
     groups: [...groups].sort(),
     unknownPaths,
@@ -141,7 +165,7 @@ export function buildRepairPlan({ baseSha, headSha, pullRequest, changedPaths })
     broaderQualificationRequired: broader || workflowConfigChanged,
     fullQualification: 'pending',
     qualificationReasons: [...qualificationReasons],
-    pendingFullDebt: ['full CI', 'full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
+    pendingFullDebt: ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
     bootstrap: {
       baseSha: 'd2906acde291b77b73229623733736796f4fb8c8',
       unit: { passed: 6230, failed: 6, skipped: 1 },
@@ -155,15 +179,16 @@ export function buildRepairPlan({ baseSha, headSha, pullRequest, changedPaths })
 }
 
 if (process.env.RUN_REPAIR_SCOPE === '1') {
-  const baseSha = process.env.REPAIR_BASE_SHA;
+  const pullRequestBaseSha = process.env.PR_BASE_SHA;
+  const repairAnchorSha = process.env.REPAIR_ANCHOR_SHA;
   const headSha = process.env.REPAIR_HEAD_SHA;
-  if (!sha(baseSha) || !sha(headSha)) throw new Error('Repair scope requires exact 40-character base/head SHAs.');
+  if (!sha(pullRequestBaseSha) || !sha(headSha)) throw new Error('Repair scope requires exact 40-character PR-base/head SHAs.');
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) throw new Error('Repair scope must use the audited d290 repair anchor.');
   const checkoutHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   if (checkoutHead !== headSha) throw new Error(`checkout SHA ${checkoutHead} does not equal PR head ${headSha}`);
-  execFileSync('git', ['merge-base', baseSha, headSha], { encoding: 'utf8' }).trim();
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-  const changedPaths = execFileSync('git', ['-C', repoRoot, 'diff', '--name-only', `${baseSha}...${headSha}`], { encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
-  const plan = buildRepairPlan({ baseSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths });
+  const changedPaths = collectChangedPaths({ repairAnchorSha, headSha, repoRoot });
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {
@@ -178,7 +203,7 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
     for (const [key, value] of Object.entries(values)) writeFileSync(output, `${key}=${value}\n`, { flag: 'a' });
   }
   console.log(`Repair scope: ${plan.source}`);
-  console.log(`Exact head ${headSha}; base ${baseSha}; PR ${plan.pullRequest}`);
+  console.log(`Exact head ${headSha}; repair anchor ${repairAnchorSha}; PR base ${pullRequestBaseSha}; PR ${plan.pullRequest}`);
   console.log(`Groups: ${plan.groups.join(', ')}`);
   console.log(`Changed paths (${changedPaths.length}):\n${plan.changedPaths.map(p => `  ${p}`).join('\n')}`);
   console.log(`Broader suite: ${plan.runFullHermeticVitest}; full qualification: ${plan.fullQualification}`);

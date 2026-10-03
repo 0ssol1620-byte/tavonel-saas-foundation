@@ -6,6 +6,7 @@ const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8');
 const launch = readFileSync(resolve(repo, '.github/workflows/launch-qa.yml'), 'utf8');
 const repair = readFileSync(resolve(repo, '.github/workflows/repair-scope.yml'), 'utf8');
 const runner = readFileSync(resolve(repo, 'nextjs/scripts/run-repair-check.mjs'), 'utf8');
+const planner = readFileSync(resolve(repo, 'nextjs/scripts/repair-scope.mjs'), 'utf8');
 const branches = [
   'main',
   'codex/gate-acl-integration-20260927',
@@ -34,11 +35,22 @@ for (const result of ['needs.preflight.result', 'needs.browser-qa.result', 'need
 }
 assert(/pull_request:\n\s+types: \[opened, synchronize, reopened\]/.test(repair), 'repair event set changed');
 assert(repair.includes('name: Repair scope validation'), 'repair check must remain distinct');
+assert(repair.includes('PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}'), 'PR base must be retained separately');
+assert(repair.includes('REPAIR_ANCHOR_SHA: d2906acde291b77b73229623733736796f4fb8c8'), 'audited repair anchor changed');
+assert(planner.includes("['merge-base', '--is-ancestor', repairAnchorSha, headSha]"), 'anchor ancestry must be checked first');
+assert(planner.includes("['diff', '--name-only', '-z', `${repairAnchorSha}..${headSha}`]"), 'tree diff must use the audited anchor and NUL filenames');
+assert(planner.includes('PR_BASE_SHA'), 'CLI must receive the PR base independently');
+assert(repair.indexOf('Plan audited-anchor affected scope') < repair.indexOf('pnpm install --frozen-lockfile'), 'planning must precede dependency installation');
+assert(repair.indexOf('Verify workflow and selector contracts') < repair.indexOf('pnpm install --frozen-lockfile'), 'workflow verification must precede dependency installation');
+assert(repair.indexOf('Run selector regression tests') < repair.indexOf('pnpm install --frozen-lockfile'), 'selector regression must precede dependency installation');
 assert(repair.includes('node scripts/run-repair-check.mjs unit'), 'targeted Vitest must use the argv-safe runner');
 assert(repair.includes('node scripts/run-repair-check.mjs browser'), 'browser selection must use the argv-safe runner');
 assert(!repair.includes('${{ steps.plan.outputs.unit_files }}'), 'dynamic Vitest filenames must not enter a shell');
 assert(!repair.includes('${{ steps.plan.outputs.browser_files }}'), 'dynamic browser filenames must not enter a shell');
 assert(runner.includes('shell: false'), 'selected paths must be passed as process arguments');
 assert(runner.includes('realpathSync(resolved)'), 'selected paths must be checked after symlink resolution');
+assert(runner.includes("delete env.PADDLE_SANDBOX"), 'live browser runner must clear sandbox mode');
+assert(runner.includes("delete env.VERCEL_ENV"), 'live browser runner must clear deployment mode');
+assert(runner.includes("file !== 'e2e/detail-integrity.spec.ts'"), 'detail-integrity must not be repeated in audit');
 assert(!repair.includes('skip-ci') && !repair.includes('skipdrafttests'), 'skip marker is forbidden');
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
