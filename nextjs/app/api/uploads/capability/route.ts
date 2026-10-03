@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { reserveFoundationCompute } from "@/lib/compute-reservation";
+import { reserveFoundationIntakeApprovedFile, readFoundationIntakeApproval } from "@/lib/compute-reservation";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
@@ -14,8 +14,9 @@ import {
   presignFoundationQuarantinePut,
 } from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
-import { deterministicSourceDocumentId, validSourceIdempotencyKey } from "@/lib/source-intake";
-import { reservationPageCeiling } from "@/lib/usage-pricing";
+import { deterministicSourceDocumentId } from "@/lib/source-intake";
+import { intakePricingFingerprint } from "@/lib/usage-pricing";
+import { approvedSourceIdempotencyKey, ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,7 +38,10 @@ export async function POST(request: Request) {
 
   const parsed = await readBoundedJson(request, 8_192);
   if (!parsed.ok) return NextResponse.json({ code: "METADATA_ONLY_ENDPOINT" }, { status: 415, headers: NO_STORE });
-  const body = parsed.value as { originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown; estimatedPages?: unknown };
+  const body = parsed.value as {
+    originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown; estimatedPages?: unknown;
+    attemptKey?: unknown; scopeDigest?: unknown; pricingFingerprint?: unknown; fileKey?: unknown; contentSha256?: unknown;
+  };
 
   const originalFilename = typeof body.originalFilename === "string" ? body.originalFilename : "";
   const declaredMimeType = typeof body.declaredMimeType === "string" ? body.declaredMimeType : "";
@@ -83,120 +87,74 @@ export async function POST(request: Request) {
   if (!await canAdmitCustomerSource(workspaceId, "direct_upload")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
   }
-
-  /*
-    The reservation, not a page count. `reservationPageCeiling` falls back to the deployment's
-    documented page ceiling for a file whose format states no count -- a spreadsheet, which is
-    counted on the sanitized PDF after conversion -- instead of the `?? 1` that was here, which
-    held one page of credit against work that can settle at eighty. Nothing renders this number:
-    the client sends `?.pages` and shows the absence.
-  */
-  const serverEstimate = reservationPageCeiling({
-    bytes: requestedBytes,
-    mimeType: qualified.normalizedMimeType,
-  });
-  const clientEstimate = typeof body.estimatedPages === "number" && Number.isSafeInteger(body.estimatedPages)
-    && body.estimatedPages >= 1 ? body.estimatedPages : serverEstimate;
-  const reservationPages = Math.max(serverEstimate, clientEstimate);
-
   const signer = readR2SignerEnv();
-  if (!signer) {
-    return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
-  }
+  if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
 
+  // A capability must reference the immutable whole-set approval and its stable source key.
+  const attemptKey = typeof body.attemptKey === "string" ? body.attemptKey : "";
+  const scopeDigest = typeof body.scopeDigest === "string" ? body.scopeDigest : "";
+  const pricingFingerprint = typeof body.pricingFingerprint === "string" ? body.pricingFingerprint : "";
+  const fileKey = typeof body.fileKey === "string" ? body.fileKey : "";
+  const contentSha256 = typeof body.contentSha256 === "string" ? body.contentSha256 : "";
   const sourceIdempotencyKey = request.headers.get("x-tavonel-source-idempotency-key");
-  if (sourceIdempotencyKey !== null && !validSourceIdempotencyKey(sourceIdempotencyKey)) {
-    return NextResponse.json({ code: "SOURCE_IDEMPOTENCY_KEY_INVALID" }, { status: 400, headers: NO_STORE });
+  const expectedSourceIdempotencyKey = await approvedSourceIdempotencyKey(attemptKey, fileKey);
+  if (!ATTEMPT_KEY_PATTERN.test(attemptKey) || !SHA256_DIGEST_PATTERN.test(scopeDigest)
+    || !SHA256_DIGEST_PATTERN.test(pricingFingerprint) || !FILE_KEY_PATTERN.test(fileKey)
+    || !SHA256_DIGEST_PATTERN.test(contentSha256) || sourceIdempotencyKey === null
+    || sourceIdempotencyKey !== expectedSourceIdempotencyKey) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_REQUIRED" }, { status: 428, headers: NO_STORE });
   }
-  const documentId = sourceIdempotencyKey
-    ? await deterministicSourceDocumentId(workspaceId, sourceIdempotencyKey)
-    : crypto.randomUUID();
+  const approval = await readFoundationIntakeApproval({ workspaceKey: workspaceId, userId: auth.principal.userId, attemptKey });
+  if (!approval.ok) return NextResponse.json({ code: approval.code }, { status: approval.status, headers: NO_STORE });
+  if (approval.result.pricingFingerprint !== await intakePricingFingerprint()) {
+    return NextResponse.json({ code: "INTAKE_PRICE_STALE" }, { status: 409, headers: NO_STORE });
+  }
+  const approvedFile = approval.result.files.find((file) => file.fileKey === fileKey);
+  if (!approvedFile || approval.result.scopeDigest !== scopeDigest || approval.result.pricingFingerprint !== pricingFingerprint
+    || approvedFile.contentSha256 !== contentSha256 || approvedFile.byteLength !== requestedBytes
+    || approvedFile.mimeType !== qualified.normalizedMimeType) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" }, { status: 409, headers: NO_STORE });
+  }
+  const documentId = approvedFile.documentId;
+  if (await deterministicSourceDocumentId(workspaceId, sourceIdempotencyKey) !== documentId) {
+    return NextResponse.json({ code: "SOURCE_IDEMPOTENCY_KEY_INVALID" }, { status: 409, headers: NO_STORE });
+  }
   const objectKey = `quarantine/${workspaceId}/${documentId}/source`;
   const admission = await reserveFoundationIntake({
-    workspaceKey: workspaceId,
-    documentId,
-    userId: auth.principal.userId,
-    objectKey,
-    requestedBytes,
-    declaredMimeType: qualified.normalizedMimeType,
+    workspaceKey: workspaceId, documentId, userId: auth.principal.userId, objectKey,
+    requestedBytes, declaredMimeType: qualified.normalizedMimeType,
   });
-  if (!admission.ok) {
-    const rateLimited = admission.code === "INTAKE_RATE_LIMITED" || admission.code === "INTAKE_DAILY_QUOTA_EXCEEDED";
-    const trialLimited = admission.code === "TRIAL_FILE_LIMIT_EXCEEDED" || admission.code === "TRIAL_NOT_ACTIVE";
-    const tooLarge = admission.code === "INTAKE_FILE_TOO_LARGE" || admission.code === "TRIAL_FILE_TOO_LARGE";
-    const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT" || admission.code === "SOURCE_DELETED";
-    return NextResponse.json(
-      {
-        // The admission RPC guards at the same ceiling this route does (migration 0051), so this
-        // is a backstop rather than a second opinion; it answers with the same numbers either way.
-        code: admission.code === "INTAKE_FILE_TOO_LARGE" ? "SOURCE_EXCEEDS_PROCESSING_CEILING" : admission.code,
-        ...(tooLarge ? {
-          maxBytes: admission.code === "TRIAL_FILE_TOO_LARGE" ? FOUNDATION_TRIAL_INTAKE_MAX_BYTES : FOUNDATION_INTAKE_MAX_BYTES,
-          maxPages: PROCESSING_CEILING.maxSourcePages,
-          limit: PROCESSING_CEILING_SENTENCE,
-        } : {}),
-      },
-      {
-        status: tooLarge ? 413 : rateLimited ? 429 : trialLimited ? 402 : conflict ? 409 : 503,
-        headers: {
-          ...NO_STORE,
-          ...(rateLimited ? { "Retry-After": admission.code === "INTAKE_RATE_LIMITED" ? "60" : "3600" } : {}),
-        },
-      },
-    );
-  }
-  const compute = await reserveFoundationCompute({
-    workspaceKey: workspaceId,
-    documentId,
-    userId: auth.principal.userId,
-    estimatedPages: reservationPages,
+  if (!admission.ok) return NextResponse.json({ code: admission.code }, {
+    status: admission.code.includes("LIMIT") || admission.code.includes("QUOTA") ? 429 : admission.code.includes("TRIAL") ? 402 : 503,
+    headers: NO_STORE,
   });
-  if (!compute.ok) {
-    const paymentRequired = [
-      "STUDIO_SUBSCRIPTION_REQUIRED",
-      "GPU_CREDITS_REQUIRED",
-      "TRIAL_PAGE_LIMIT_EXCEEDED",
-      "TRIAL_NOT_ACTIVE",
-      "TRIAL_DISABLED",
-    ].includes(compute.code);
-    const capacity = compute.code === "TRIAL_CAPACITY_REACHED";
-    const conflict = compute.code === "COMPUTE_IDEMPOTENCY_CONFLICT";
-    return NextResponse.json(
-      { code: compute.code },
-      {
-        status: capacity ? 429 : paymentRequired ? 402 : conflict ? 409 : 503,
-        headers: { ...NO_STORE, ...(capacity ? { "Retry-After": "86400" } : {}) },
-      },
-    );
-  }
+  const compute = await reserveFoundationIntakeApprovedFile({
+    workspaceKey: workspaceId, userId: auth.principal.userId, attemptKey, scopeDigest, pricingFingerprint, fileKey, documentId,
+  });
+  if (!compute.ok) return NextResponse.json({ code: compute.code }, { status: compute.status, headers: NO_STORE });
   const signed = presignFoundationQuarantinePut(signer, {
-    key: objectKey,
-    contentType: qualified.normalizedMimeType,
-    contentLength: requestedBytes,
-    expiresInSeconds: 300,
+    key: objectKey, contentType: qualified.normalizedMimeType, contentLength: requestedBytes, expiresInSeconds: 300,
   });
-  if (!signed.ok) {
-    return NextResponse.json({ code: signed.code }, { status: 503, headers: NO_STORE });
-  }
-
+  if (!signed.ok) return NextResponse.json({ code: signed.code }, { status: 503, headers: NO_STORE });
   return NextResponse.json({
-    code: "QUALIFIED",
-    documentId,
-    objectKey,
-    uploadUrl: signed.uploadUrl,
-    expiresInSeconds: 300,
-    contentLength: requestedBytes,
-    originalFilename: qualified.originalFilename,
-    declaredMimeType: qualified.normalizedMimeType,
-    sanitization: "pending_cdr",
-    sourceIdempotency: sourceIdempotencyKey ? "stable" : "none",
+    code: "QUALIFIED", documentId, objectKey, uploadUrl: signed.uploadUrl, expiresInSeconds: 300,
+    contentLength: requestedBytes, originalFilename: qualified.originalFilename,
+    declaredMimeType: qualified.normalizedMimeType, sanitization: "pending_cdr", sourceIdempotency: "stable",
     admissionExpiresAt: admission.result.expiresAt,
     computeReservation: {
       reservationId: compute.result.reservationId,
-      reservedCredits: compute.result.reservedCredits,
+      reservedCredits: compute.result.approvedReservedCredits,
+      maximumCredits: compute.result.approvedMaximumCredits,
       billingSource: compute.result.billingSource,
-      expiresAt: compute.result.expiresAt,
-      quote: compute.result.quote,
+      expiresAt: compute.result.reservationExpiresAt,
+      quote: {
+        approvedMaxPages: compute.result.approvedMaxPages,
+        estimatedUsd: compute.result.approvedReservedCredits / 100,
+        maximumUsd: compute.result.approvedMaximumCredits / 100,
+        pageBasis: compute.result.pageBasis,
+      },
     },
   }, { headers: NO_STORE });
+
+
 }

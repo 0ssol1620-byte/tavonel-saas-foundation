@@ -177,3 +177,142 @@ export function estimateBillablePages(value: {
 export function reservationPageCeiling(value: Parameters<typeof estimateBillablePages>[0]): number {
   return estimateBillablePages(value)?.pages ?? PROCESSING_CEILING.maxSourcePages;
 }
+
+/*
+  Intake approval: the maximum for a whole selected set, quoted by the server before any byte moves.
+
+  Every number here is derived from the constants above and `PROCESSING_CEILING`; nothing in this
+  block prices anything new. The page count a client sends is a *claim* used to quote. It is never
+  a verified processing fact -- settlement bills what the pipeline produced, and the database
+  refuses a settlement above the maximum approved here (20261003120000).
+*/
+
+/** What the approval row records about where a member's page maximum came from. */
+export type IntakePageBasis = "measured" | "declared" | "unknown";
+
+export type IntakeFileClaim = {
+  bytes: number;
+  /** The normalized MIME type the capability will be signed for. */
+  mimeType: string;
+  claimedPages: number | null;
+  claimedBasis: PageEstimateBasis | null;
+};
+
+export type IntakeFileQuote = {
+  pageBasis: IntakePageBasis;
+  approvedMaxPages: number;
+  reservedCredits: number;
+  maximumCredits: number;
+  estimatedUsd: number;
+  maximumUsd: number;
+};
+
+export type IntakeManifestQuote = {
+  files: IntakeFileQuote[];
+  maximumPages: number;
+  reservedCredits: number;
+  maximumCredits: number;
+  estimatedUsd: number;
+  maximumUsd: number;
+};
+
+/*
+  A claimed basis is only accepted for the format it can describe. A spreadsheet that arrives
+  claiming `pdf_page_tree` -- or any page count at all -- is quoted as unknown, at the ceiling.
+*/
+const CLAIM_BASIS_FITS: Record<PageEstimateBasis, (mimeType: string) => boolean> = {
+  pdf_page_tree: (mimeType) => mimeType === "application/pdf",
+  image: (mimeType) => mimeType.startsWith("image/"),
+  pptx_slides: (mimeType) => mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  docx_declared: (mimeType) => mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+export function quoteIntakeFile(claim: IntakeFileClaim):
+  | { ok: true; quote: IntakeFileQuote }
+  | { ok: false; code: "INTAKE_QUOTE_INVALID" | "SOURCE_EXCEEDS_PROCESSING_CEILING" } {
+  if (!Number.isSafeInteger(claim.bytes) || claim.bytes < 1) return { ok: false, code: "INTAKE_QUOTE_INVALID" };
+  const mimeType = claim.mimeType.toLowerCase();
+  const basis = claim.claimedBasis && Object.hasOwn(CLAIM_BASIS_FITS, claim.claimedBasis)
+    && CLAIM_BASIS_FITS[claim.claimedBasis](mimeType) ? claim.claimedBasis : null;
+  const estimate = estimateBillablePages({
+    bytes: claim.bytes,
+    mimeType,
+    declaredPages: basis ? claim.claimedPages : null,
+    declaredBasis: basis,
+  });
+  if (estimate && estimate.pages > PROCESSING_CEILING.maxSourcePages) {
+    return { ok: false, code: "SOURCE_EXCEEDS_PROCESSING_CEILING" };
+  }
+  // No count is approved at the whole processing ceiling: the customer never approves less than
+  // the run is allowed to cost.
+  const pages = estimate?.pages ?? reservationPageCeiling({ bytes: claim.bytes, mimeType });
+  const pageBasis: IntakePageBasis = !estimate ? "unknown" : estimate.confidence === "verified" ? "measured" : "declared";
+  const quote = quoteCompilePages(pages);
+  if (!quote) return { ok: false, code: "INTAKE_QUOTE_INVALID" };
+  return {
+    ok: true,
+    quote: {
+      pageBasis,
+      approvedMaxPages: pages,
+      reservedCredits: quote.standardUnits,
+      maximumCredits: quote.maximumUnits,
+      estimatedUsd: quote.estimatedUsd,
+      maximumUsd: quote.maximumUsd,
+    },
+  };
+}
+
+/** The whole selection, every member included. An unknown member counts at its full ceiling. */
+export function quoteIntakeManifest(claims: readonly IntakeFileClaim[]):
+  | { ok: true; quote: IntakeManifestQuote }
+  | { ok: false; code: string; index: number } {
+  const files: IntakeFileQuote[] = [];
+  for (const [index, claim] of claims.entries()) {
+    const quoted = quoteIntakeFile(claim);
+    if (!quoted.ok) return { ok: false, code: quoted.code, index };
+    files.push(quoted.quote);
+  }
+  const maximumCredits = files.reduce((sum, file) => sum + file.maximumCredits, 0);
+  const reservedCredits = files.reduce((sum, file) => sum + file.reservedCredits, 0);
+  return {
+    ok: true,
+    quote: {
+      files,
+      maximumPages: files.reduce((sum, file) => sum + file.approvedMaxPages, 0),
+      reservedCredits,
+      maximumCredits,
+      estimatedUsd: reservedCredits * PROCESSING_UNIT_USD,
+      maximumUsd: maximumCredits * PROCESSING_UNIT_USD,
+    },
+  };
+}
+
+/** The heading an approved member's page maximum may appear under. */
+export function intakePageBasisLabel(basis: IntakePageBasis) {
+  if (basis === "measured") return "Measured pages (estimate)";
+  if (basis === "declared") return "Declared pages (the file's own claim)";
+  return `Not counted yet — approved at the ${PROCESSING_CEILING.maxSourcePages}-page processing ceiling`;
+}
+
+/*
+  The pricing fingerprint: a digest over the unchanged price and credit constants. An approval
+  records it, and a capability presented under a different fingerprint is refused -- a reprice
+  never silently widens or narrows an approval somebody already gave.
+*/
+export const INTAKE_PRICING_VERSION = "tavonel-intake-pricing-v1";
+
+export function intakePricingCanonical() {
+  return [
+    INTAKE_PRICING_VERSION,
+    `processing_unit_usd=${PROCESSING_UNIT_USD}`,
+    `standard_units_per_page=${STANDARD_UNITS_PER_PAGE}`,
+    `max_units_per_page=${MAX_UNITS_PER_PAGE}`,
+    `max_quoted_pages=${MAX_QUOTED_PAGES}`,
+    `max_source_pages=${PROCESSING_CEILING.maxSourcePages}`,
+  ].join("\n");
+}
+
+export async function intakePricingFingerprint(canonical = intakePricingCanonical()) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)));
+  return `sha256:${[...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}

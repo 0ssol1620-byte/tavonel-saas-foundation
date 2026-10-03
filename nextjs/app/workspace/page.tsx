@@ -17,13 +17,29 @@ import {
   estimateBillablePages,
   formatUsd,
   pageCountLabel,
-  quoteCompilePages,
+  quoteIntakeManifest,
+  intakePricingFingerprint,
   weakestConfidence,
   type PageEstimate,
   type PageEstimateConfidence,
 } from "@/lib/usage-pricing";
+import {
+  deriveFileKey,
+  intakeManifestDigest,
+  newAttemptKey,
+  uploadApprovedMember,
+  cancelFailedIntakeSetMember,
+  saveIntakeAttempt,
+  loadIntakeAttempt,
+  readApprovalStatus,
+  readApprovalPayload,
+  matchReselection,
+  shouldReuseAttemptKey,
+  compilableDocumentIds,
+  type IntakeAttemptRecord,
+} from "@/lib/intake-approval";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
-import { sourceFamilyChips, uploadAcceptAttribute } from "@/lib/qualified-input";
+import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
@@ -943,159 +959,6 @@ export default function WorkspacePage() {
   const patchUpload = (localId: string, patch: Partial<LocalUpload>) =>
     setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
 
-  const uploadDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
-    if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
-    const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
-    if (manageBusy) setBusy(true);
-    // The id is local until the capability call returns one. The board needs a row immediately,
-    // because issuing the capability is itself a wait the visitor should be able to see.
-    const localId = `local-${file.name}-${file.size}-${uploadSeq.current++}`;
-    /*
-      Every refusal path below already wrote its reason onto the upload row; `refuse` is that same
-      write with a second reader. The reason existed and was reachable -- it was on the board and in
-      a notice this function set -- and then the batch summary overwrote the one notice slot
-      milliseconds later, so the sentence that survived was a count. A visitor over the file ceiling
-      was told one file did not upload and never told it was too large, which is the only fact that
-      says what to do next.
-    */
-    const refuse = (reason: string) => {
-      patchUpload(localId, { phase: "failed", reason });
-      onRefusal?.(reason);
-    };
-    setUploads((current) => [
-      ...current,
-      { localId, filename: sourceLabel, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
-    ]);
-    try {
-      const client = getSupabaseBrowserClient();
-      if (!client) {
-        refuse("not signed in");
-        setNotice("Sign in with Google first.");
-        return null;
-      }
-      const { data } = await client.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) {
-        refuse("not signed in");
-        setNotice("Sign in with Google first.");
-        return null;
-      }
-      const capability = await fetch("/api/uploads/capability", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          originalFilename: file.name,
-          declaredMimeType: file.type || "application/pdf",
-          requestedBytes: file.size,
-          estimatedPages: estimateBillablePages({
-            bytes: file.size,
-            mimeType: file.type || "application/pdf",
-          })?.pages,
-        }),
-      });
-      const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
-      if (!capability.ok || !json.uploadUrl) {
-        if (json.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
-        refuse(failureSentence(json.code, capability.status));
-        setNotice(`Upload was not issued. ${failureSentence(json.code, capability.status)}`);
-        return null;
-      }
-
-      /*
-       * The PUT moved from `fetch` to `XMLHttpRequest` for one reason: fetch cannot report upload
-       * progress, so a large scan was a frozen button for as long as it took. These are bytes the
-       * transport acknowledged on the way to the quarantine bucket -- the application server is
-       * not in this path, and showing the transfer did not put it there.
-       */
-      patchUpload(localId, { documentId: json.documentId ?? null, phase: "sending", loaded: 0 });
-      // The one moment both halves exist in the same scope: the id the server just issued, and
-      // the name the visitor picked the file by.
-      if (json.documentId) setNames(rememberDocumentName(json.documentId, sourceLabel));
-      const transfer = putWithProgress(
-        json.uploadUrl,
-        file,
-        json.declaredMimeType ?? file.type,
-        ({ loaded }) => patchUpload(localId, { loaded }),
-      );
-      const result = await transfer.done;
-      if (!result.ok) {
-        const reason = result.reason === "http"
-          ? `secure upload failed (${result.status})`
-          : result.reason === "aborted" ? "transfer cancelled" : "network did not complete the transfer";
-        if (json.documentId) {
-          const client = getSupabaseBrowserClient();
-          const { data } = client ? await client.auth.getSession() : { data: { session: null } };
-          const token = data.session?.access_token;
-          if (token) {
-            await fetch("/api/uploads/release", {
-              method: "POST",
-              headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-              body: JSON.stringify({ documentId: json.documentId }),
-            }).catch(() => undefined);
-          }
-        }
-        refuse(reason);
-        setNotice(`${reason}. The file never entered the app server.`);
-        return null;
-      }
-      if (json.documentId) {
-        /*
-         * The digest travels with the confirmation, taken by SubtleCrypto over the very bytes the
-         * transfer sent. It is what lets the server compare the stored object against the
-         * capability it issued without downloading the source back onto the application server --
-         * which is how free evaluation used to be fingerprinted, through a 5 MiB-capped read that
-         * refused every larger trial upload with a 503 the board showed as "needs review".
-         *
-         * A page served without a secure context has no SubtleCrypto and reports null; the server
-         * records that as absent rather than inventing one, and refuses the trial gate outright
-         * instead of quietly skipping it.
-         */
-        const confirmed = await fetch("/api/uploads/confirm", {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            documentId: json.documentId,
-            ...(result.sourceSha256 ? { sourceSha256: result.sourceSha256 } : {}),
-          }),
-        });
-        if (!confirmed.ok) {
-          // "Needs review" was the wrong word for every one of these: confirmation refuses with a
-          // typed code, and calling that a review invented a queue nobody is working. Say the
-          // code, and say that the source stops here until it succeeds.
-          const failure = await confirmed.json().catch(() => null) as { code?: string } | null;
-          const code = failure?.code ?? `HTTP ${confirmed.status}`;
-          if (code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
-          refuse(failureSentence(code, confirmed.status));
-          setNotice(`${file.name} reached storage but was not confirmed. ${failureSentence(code, confirmed.status)} It is not queued for processing.`);
-          await loadDocuments();
-          return json.documentId;
-        }
-      }
-      patchUpload(localId, { phase: "stored", loaded: file.size });
-      // Stored, not issued: a capability that was never transferred is not a source.
-      trackFunnelOnce("workspace_first_source_added", { mode: "upload" });
-
-      /*
-       * What finished is the transfer, and that is all this may claim.
-       *
-       * It used to announce that TAVONEL was preparing and reading the source the moment the PUT
-       * returned -- before the CDR worker had seen the object, and regardless of whether it would
-       * refuse it seconds later. For everything above the processing ceiling that sentence was
-       * simply false, and it was the last thing the customer was told before the row went quiet.
-       * The board is now the place an outcome appears, because it is the only place that reads
-       * one, so this points there instead of guessing.
-       */
-      setNotice(activationPolicy.cdr.enabled && activationPolicy.ocrGpu.enabled
-        ? `${file.name} reached quarantine storage. Preparation has started; the source pipeline shows whether it is accepted or refused.`
-        : `${file.name} reached quarantine storage. This source needs operator review before reading can continue.`);
-      await loadDocuments();
-      return json.documentId ?? null;
-    } finally {
-      if (manageBusy) setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
-
   const sessionToken = async () => {
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -1500,34 +1363,220 @@ export default function WorkspacePage() {
    * failure and silently abandoned the rest; the ones already in the bucket are still there and
    * still being read, so the report now names the failure and keeps going.
    */
-  const uploadDocuments = async (files: File[]) => {
+  const uploadDocuments = async (files: File[], measured = stagedPageCounts) => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
     try {
-      setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
-      const refusals: string[] = [];
-      const settled = await runBounded(files, UPLOAD_CEILING, (file) =>
-        uploadDocument(file, false, (reason) => { refusals.push(reason); }));
-      const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
-      const lost = files.length - ids.length;
-      if (lost > 0) {
-        // Deduplicated: twenty files over the same ceiling is one fact, not twenty sentences.
-        const why = [...new Set(refusals)].join("; ");
-        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why}.` : ""}`);
+      if (files.length > 20) { setNotice("This approval supports at most 20 files. Reduce the selected set and review its new maximum."); return; }
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) { setNotice("Sign in again before approving this intake. Nothing was uploaded."); return; }
+      setNotice(`Hashing all ${files.length} selected files and preparing the complete approval. Nothing is uploaded yet.`);
+      const manifest = await Promise.all(files.map(async (file, index) => {
+        const contentSha256 = `sha256:${bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())))}`;
+        const relativePath = (file as WorkspaceUploadFile).tavonelRelativePath || file.webkitRelativePath || file.name;
+        const declared = normalizeDocumentMimeType(file.type);
+        const mimeType = declared && validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: declared }).valid
+          ? declared
+          : Object.keys(qualifiedDocumentInputs).find((candidate) => validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: candidate }).valid) ?? "";
+        const measuredFile = measured?.[index];
+        const claimedPages = measuredFile?.pages ?? null;
+        const claimedBasis = measuredFile && "basis" in measuredFile ? measuredFile.basis : null;
+        return {
+          file,
+          relativePath,
+          contentSha256,
+          byteLength: file.size,
+          mimeType,
+          claimedPages,
+          claimedBasis,
+          fileKey: await deriveFileKey({ relativePath, contentSha256, byteLength: file.size, mimeType }),
+        };
+      }));
+      if (manifest.some((entry) => !entry.mimeType)) {
+        setNotice("A selected file has no supported filename and MIME pairing. Nothing was approved or uploaded.");
+        return;
       }
-      /*
-        One uploaded file is a compile.
-
-        This gate compared the uploaded count against two, the last place the old floor
-        survived. The route accepts one, the compiler accepts one, and the preflight panel
-        offers one -- and then a visitor who dropped a single PDF watched it upload, sanitize
-        and read, and nothing happened. No error: the batch simply ended. Judging the set with
-        the shared verdict means this path cannot drift from the route again.
-      */
-      if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);
+      const quote = quoteIntakeManifest(manifest.map((entry) => ({
+        bytes: entry.byteLength, mimeType: entry.mimeType,
+        claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
+      })));
+      if (!quote.ok) { setNotice(`This selected set cannot be approved (${quote.code}). Nothing was uploaded.`); return; }
+      const clientManifestDigest = await intakeManifestDigest(manifest);
+      const pricingFingerprint = await intakePricingFingerprint();
+      const previous = loadIntakeAttempt(window.localStorage);
+      const fileKeys = manifest.map((entry) => entry.fileKey);
+      const sameCandidate = previous ? matchReselection(previous, fileKeys).ok && Date.parse(previous.expiresAt) > Date.now() : false;
+      const previousApproval = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint
+        ? await readApprovalStatus({ fetch, token: async () => token }, previous!.attemptKey) : null;
+      const sameReselection = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint
+        && shouldReuseAttemptKey(previousApproval);
+      const attemptKey = sameReselection && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint ? previous!.attemptKey : newAttemptKey();
+      const pendingRecord: IntakeAttemptRecord = {
+        version: 1, attemptKey, approvalId: sameReselection ? previous!.approvalId : crypto.randomUUID(),
+        scopeDigest: sameReselection ? previous!.scopeDigest : `sha256:${"0".repeat(64)}`,
+        pricingFingerprint, clientManifestDigest, aggregateMaximumCredits: quote.quote.maximumCredits,
+        expiresAt: sameReselection ? previous!.expiresAt : new Date(Date.now() + 10 * 60_000).toISOString(),
+        files: manifest.map((entry) => ({
+          fileKey: entry.fileKey, relativePath: entry.relativePath, contentSha256: entry.contentSha256,
+          byteLength: entry.byteLength, mimeType: entry.mimeType,
+          documentId: sameReselection ? previous!.files.find((file) => file.fileKey === entry.fileKey)?.documentId ?? null : null,
+          phase: "approved", code: null,
+        })),
+      };
+      // Persist the stable attempt identity before the write. A reload after a lost approval
+      // response can reselect, hash and replay this exact manifest under the same attempt key.
+      if (!saveIntakeAttempt(window.localStorage, pendingRecord)) {
+        setNotice("This browser cannot save the approved attempt identity. Nothing was approved or uploaded.");
+        return;
+      }
+      const approvalBody = {
+        attemptKey, clientManifestDigest, pricingFingerprint,
+        aggregateMaximumCredits: quote.quote.maximumCredits,
+        files: manifest.map((entry) => ({
+          fileKey: entry.fileKey, contentSha256: entry.contentSha256, byteLength: entry.byteLength,
+          mimeType: entry.mimeType, claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
+          originalFilename: entry.file.name,
+        })),
+      };
+      let approval = sameReselection
+        ? await readApprovalStatus({ fetch, token: async () => token }, attemptKey)
+        : null;
+      if (approval && (approval.clientManifestDigest !== clientManifestDigest || approval.pricingFingerprint !== pricingFingerprint)) {
+        setNotice("The saved attempt no longer matches this content or pricing. Review and approve the current selection again.");
+        return;
+      }
+      for (let n = 0; n < 3 && !approval; n += 1) {
+        try {
+          const response = await fetch("/api/uploads/approval", {
+            method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+            body: JSON.stringify(approvalBody), cache: "no-store",
+          });
+          const result = await response.json().catch(() => null) as { approval?: unknown; code?: string; quote?: { maximumUsd?: number } } | null;
+          if (response.ok) approval = readApprovalPayload(result?.approval);
+          else if (response.status < 500) {
+            setNotice(result?.code === "INTAKE_PRICE_STALE"
+              ? "Pricing changed since this estimate. Review the refreshed maximum and approve again. Nothing was uploaded."
+              : result?.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
+                ? `The server recalculated this set's maximum as ${formatUsd(result.quote?.maximumUsd ?? Number.NaN)}. Review and approve the refreshed quote again. Nothing was uploaded.`
+                : `The complete set was not approved (${result?.code ?? response.status}). Nothing was uploaded.`);
+            return;
+          }
+        } catch { /* repeat the same attempt identity, then look it up */ }
+        if (!approval) approval = await readApprovalStatus({ fetch, token: async () => token }, attemptKey);
+      }
+      if (!approval || approval.files.length !== manifest.length) {
+        setNotice("Approval result is uncertain. Recover this same attempt after reload; nothing compiles until every member is confirmed.");
+        return;
+      }
+      const record: IntakeAttemptRecord = {
+        version: 1, attemptKey, approvalId: approval.approvalId, scopeDigest: approval.scopeDigest,
+        pricingFingerprint: approval.pricingFingerprint, clientManifestDigest,
+        aggregateMaximumCredits: approval.aggregateMaximumCredits, expiresAt: approval.expiresAt,
+        files: manifest.map((entry) => ({
+          fileKey: entry.fileKey, relativePath: entry.relativePath, contentSha256: entry.contentSha256,
+          byteLength: entry.byteLength, mimeType: entry.mimeType,
+          documentId: approval!.files.find((member) => member.fileKey === entry.fileKey)?.documentId ?? null,
+          phase: "approved", code: null,
+        })),
+      };
+      saveIntakeAttempt(window.localStorage, record);
+      setNotice(`Approved maximum ${formatUsd(approval.aggregateMaximumCredits / 100)} for all ${manifest.length} files. Uploading the complete set.`);
+      const settled = await runBounded(manifest, UPLOAD_CEILING, async (entry) => {
+        const localId = `approved-${entry.fileKey}`;
+        const approvedFile = approval!.files.find((member) => member.fileKey === entry.fileKey);
+        if (!approvedFile) return { status: "failed" as const, code: "INTAKE_APPROVAL_FILE_MISSING", documentId: null };
+        setUploads((current) => current.some((upload) => upload.localId === localId) ? current : [
+          ...current, { localId, filename: entry.relativePath, bytes: entry.byteLength, documentId: null, phase: "issuing", loaded: 0 },
+        ]);
+        const result = await uploadApprovedMember({
+          attempt: { attemptKey, scopeDigest: approval!.scopeDigest, pricingFingerprint },
+          member: {
+            fileKey: entry.fileKey, originalFilename: entry.file.name, contentSha256: entry.contentSha256,
+            byteLength: entry.byteLength, mimeType: entry.mimeType,
+            approvedPageBasis: approvedFile.pageBasis, approvedMaxPages: approvedFile.approvedMaxPages,
+            approvedReservedCredits: approvedFile.approvedReservedCredits,
+            approvedMaximumCredits: approvedFile.approvedMaximumCredits,
+          },
+        }, {
+          fetch, token: async () => token,
+          put: async (url, contentType) => {
+            const outcome = await putWithProgress(url, entry.file, contentType, ({ loaded }) => patchUpload(localId, { loaded })).done;
+            return outcome.ok ? { ok: true as const, sourceSha256: outcome.sourceSha256 ?? null }
+              : { ok: false as const, reason: outcome.reason, status: outcome.status };
+          },
+          onPhase: (phase, documentId, code) => {
+            const viewPhase = phase === "confirmed" ? "stored" : phase === "uncertain" ? "uncertain" : phase === "failed" ? "failed" : phase === "put_sent" ? "sending" : "issuing";
+            patchUpload(localId, { phase: viewPhase, ...(documentId ? { documentId } : {}), ...(code ? { reason: code } : {}) });
+            if (documentId) setNames(rememberDocumentName(documentId, entry.relativePath));
+          },
+        });
+        if (result.status !== "confirmed") {
+          patchUpload(localId, {
+            phase: result.status === "uncertain" ? "uncertain" : "failed",
+            ...(result.documentId ? { documentId: result.documentId } : {}),
+            reason: result.code,
+          });
+        }
+        const updated = record.files.find((file) => file.fileKey === entry.fileKey);
+        if (updated) { updated.phase = result.status === "confirmed" ? "confirmed" : result.status; updated.code = result.status === "confirmed" ? null : result.code; updated.documentId = result.documentId; saveIntakeAttempt(window.localStorage, record); }
+        return result;
+      });
+      settled.forEach((item, index) => {
+        if (item.ok) return;
+        const entry = manifest[index];
+        const saved = record.files.find((file) => file.fileKey === entry?.fileKey);
+        if (saved) { saved.phase = "uncertain"; saved.code = "CLIENT_REQUEST_INTERRUPTED"; saveIntakeAttempt(window.localStorage, record); }
+        if (entry) patchUpload(`approved-${entry.fileKey}`, { phase: "uncertain", reason: "CLIENT_REQUEST_INTERRUPTED" });
+      });
+      const failedMemberIndex = settled.findIndex((item) => item.ok && item.value.status === "failed");
+      if (failedMemberIndex >= 0) {
+        const failedEntry = manifest[failedMemberIndex]!;
+        const cancelled = await cancelFailedIntakeSetMember(
+          { attemptKey, scopeDigest: approval.scopeDigest, fileKey: failedEntry.fileKey },
+          { fetch, token: async () => token },
+        );
+        if (cancelled.status !== "cancelled") {
+          setNotice("A member failed and whole-set cancellation is not yet confirmed. Reselect the exact same files to reconcile; no partial set will compile.");
+          return;
+        }
+        record.files.forEach((file) => {
+          file.phase = "cancelled";
+          file.code = cancelled.reconciliationRequired ? "BILLING_RECONCILIATION_REQUIRED" : "DEPENDENT_MEMBER_FAILED";
+        });
+        saveIntakeAttempt(window.localStorage, record);
+        manifest.forEach((entry) => patchUpload(`approved-${entry.fileKey}`, {
+          phase: "failed", reason: "DEPENDENT_MEMBER_FAILED",
+        }));
+        setNotice(cancelled.reconciliationRequired
+          ? "The approved set was cancelled and safe active holds were returned. A reservation needs billing reconciliation; the set cannot compile or retry until that is resolved."
+          : "One member failed. The approved set was cancelled, safe active holds were returned, and any completed charges were preserved; approve a fresh complete set to retry.");
+        return;
+      }
+      const complete = settled.length === manifest.length && settled.every((item) => item.ok && item.value.status === "confirmed");
+      if (!complete) {
+        const uncertain = settled.some((item) => item.ok && item.value.status === "uncertain");
+        setNotice(uncertain
+          ? "Intake outcome is uncertain. Reselect the exact same files to recover status. No partial set will compile."
+          : "At least one approved file failed. No reduced corpus was compiled; resolve the failed member and approve a new complete set.");
+        return;
+      }
+      const final = await readApprovalStatus({ fetch, token: async () => token }, attemptKey);
+      const ids = compilableDocumentIds(final, fileKeys);
+      if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok) {
+        setNotice("The server has not confirmed the complete approved set. Nothing was compiled.");
+        return;
+      }
+      await startDurableCompile(ids);
+    } catch {
+      setNotice("Intake stopped before a verified complete result. Re-select the exact same files to recover the server's attempt status; nothing compiles while status is uncertain.");
     } finally {
       setBusy(false);
     }
@@ -1536,6 +1585,8 @@ export default function WorkspacePage() {
   const stageWorkspaceFiles = async (files: File[]) => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
+    // A prior selection's measurements cannot price this newly chosen file set.
+    setStagedPageCounts(null);
     expanderRef.current ??= createArchiveExpander();
     stagingAbortRef.current?.abort();
     const controller = new AbortController();
@@ -1590,8 +1641,15 @@ export default function WorkspacePage() {
   */
   const stagedCounted = stagedEstimates.filter((estimate): estimate is PageEstimate => estimate !== null);
   const stagedUncounted = stagedEstimates.length - stagedCounted.length;
-  const stagedPages = stagedCounted.reduce((sum, estimate) => sum + estimate.pages, 0);
-  const stagedQuote = quoteCompilePages(stagedPages);
+  const stagedManifestQuote = stagedSelection && stagedPageCounts?.length === stagedSelection.files.length
+    ? quoteIntakeManifest(stagedSelection.files.map((entry, index) => ({
+      bytes: entry.file.size,
+      mimeType: entry.file.type || "application/octet-stream",
+      claimedPages: stagedPageCounts[index]?.pages ?? null,
+      claimedBasis: stagedPageCounts[index] && "basis" in stagedPageCounts[index] ? stagedPageCounts[index].basis : null,
+    })))
+    : null;
+  const stagedQuote = stagedManifestQuote?.ok ? stagedManifestQuote.quote : null;
   /*
     Audit D10. The counts above say how many files there are; this says what each one loses.
 
@@ -1719,7 +1777,7 @@ export default function WorkspacePage() {
     */
     navigateSurface("sources");
 
-    await uploadDocuments(files);
+    await uploadDocuments(files, counts);
   };
 
   const uploadPublicProof = async () => {
@@ -1737,7 +1795,10 @@ export default function WorkspacePage() {
         setNotice("Public proof PDF digest did not match. Nothing entered quarantine.");
         return;
       }
-      await uploadDocument(new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" }));
+      const proofFile = new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" });
+      const quote = quoteIntakeManifest([{ bytes: proofFile.size, mimeType: proofFile.type, claimedPages: null, claimedBasis: null }]);
+      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`)) return;
+      await uploadDocuments([proofFile], null);
     } catch {
       setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
     } finally {
@@ -1766,7 +1827,11 @@ export default function WorkspacePage() {
         }
         files.push(new File([bytes], proof.filename, { type: "application/pdf" }));
       }
-      await uploadDocuments(files);
+      const quote = quoteIntakeManifest(files.map((file) => ({
+        bytes: file.size, mimeType: file.type || "application/pdf", claimedPages: null, claimedBasis: null,
+      })));
+      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`)) return;
+      await uploadDocuments(files, null);
     } catch {
       setNotice("The public collection proof could not be prepared. Nothing was activated.");
     } finally {
@@ -2554,7 +2619,7 @@ export default function WorkspacePage() {
                   <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
                     <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
-                    Nothing has been uploaded yet. Review the estimate, then upload and compile.
+                    Nothing has been uploaded yet. The maximum covers every selected file, including files whose pages are unknown. This action approves the displayed maximum for the complete set.
                   </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
@@ -2589,7 +2654,7 @@ export default function WorkspacePage() {
                       {stagedUncounted - stagedSpreadsheets === 1
                         ? "One other file states no page count"
                         : `${stagedUncounted - stagedSpreadsheets} other files state no page count`} before being read,
-                      so they are not in the total either. Their pages are counted while the documents are processed.
+                      each is included in the approved maximum at the full 80-page processing ceiling.
                     </p>
                   ) : null}
                   {stagedPreflight.files.length > 0 ? (
@@ -2630,7 +2695,7 @@ export default function WorkspacePage() {
                       blocks is a corpus the compile step would refuse and a count still in
                       flight, both of which are answers rather than the absence of one.
                     */}
-                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
+                    <button type="button" disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Approve maximum & upload"}</button>
                     <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
                   </div>
                 </div>
