@@ -129,6 +129,7 @@ import { POST as search } from "../app/api/v1/collections/[id]/search/route";
 import { POST as ask } from "../app/api/v1/collections/[id]/ask/route";
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 import { DOCS_SECTIONS } from "./docs-content";
+import { intakePricingFingerprint } from "./usage-pricing";
 import { resetWorkspaceCostGuard } from "./workspace-cost-guard";
 
 /*
@@ -312,7 +313,7 @@ describe("documented response shapes", () => {
     presign.mockReturnValue({ ok: true, uploadUrl: "https://r2.test/quarantine/put?signature=redacted" });
     const attemptKey = "att_0123456789abcdef0123456789abcdef";
     const scopeDigest = "sha256:" + "d".repeat(64);
-    const pricingFingerprint = "sha256:" + "c".repeat(64);
+    const pricingFingerprint = await intakePricingFingerprint();
     const contentSha256 = "sha256:" + "b".repeat(64);
     const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
     const sourceKey = createHash("sha256").update(["tavonel-approved-source-v1", attemptKey, fileKey].join("\x1f")).digest("hex");
@@ -345,6 +346,32 @@ describe("documented response shapes", () => {
       expect(refused.status, `omitting the required field ${field} was accepted`).toBeGreaterThanOrEqual(400);
       expect(await refused.json()).toHaveProperty("code");
     }
+  });
+
+  it("refuses a stale approved pricing fingerprint before reserving or signing", async () => {
+    vi.clearAllMocks();
+    grantKey();
+    customerDataAdmission.mockResolvedValue(true);
+    signerEnv.mockReturnValue({ accessKeyId: "k", secretAccessKey: "s", bucket: "b", endpoint: "https://r2.test" });
+    const attemptKey = "att_0123456789abcdef0123456789abcdef";
+    const scopeDigest = `sha256:${"d".repeat(64)}`;
+    const currentFingerprint = await intakePricingFingerprint();
+    const stalePricingFingerprint = `${currentFingerprint.slice(0, -1)}${currentFingerprint.endsWith("0") ? "1" : "0"}`;
+    const contentSha256 = `sha256:${"b".repeat(64)}`;
+    const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
+    const sourceKey = createHash("sha256").update(["tavonel-approved-source-v1", attemptKey, fileKey].join("\x1f")).digest("hex");
+    readApproval.mockResolvedValue({ ok: true, result: { scopeDigest, pricingFingerprint: stalePricingFingerprint, files: [{ fileKey, documentId: DOCUMENT, contentSha256, byteLength: 184_320, mimeType: "application/pdf" }] } });
+
+    const response = await uploadCapability(apiRequest("/api/v1/uploads/capability", {
+      originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184_320,
+      attemptKey, scopeDigest, pricingFingerprint: stalePricingFingerprint, fileKey, contentSha256,
+    }, { "x-tavonel-source-idempotency-key": sourceKey }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_PRICE_STALE" });
+    expect(admission).not.toHaveBeenCalled();
+    expect(compute).not.toHaveBeenCalled();
+    expect(presign).not.toHaveBeenCalled();
   });
 
   it("refuses intake and compile before reserving compute or enqueueing when workspace approval is absent", async () => {

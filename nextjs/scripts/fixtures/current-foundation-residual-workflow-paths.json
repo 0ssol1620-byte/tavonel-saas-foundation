@@ -1,0 +1,25 @@
+{
+  "source": "current delta paths supplied in fresh review; the changed-path list is tested without inventing a base/head receipt",
+  "residualPaths": [
+    "nextjs/app/api/openapi/route.ts",
+    "nextjs/lib/api-error-codes.ts",
+    "nextjs/lib/docs-content.ts",
+    "nextjs/lib/openapi-routes.test.ts",
+    "nextjs/lib/openapi-response-shape.test.ts",
+    "nextjs/app/api/v1/uploads/approval/route.ts",
+    "nextjs/app/api/v1/uploads/approval/cancel/route.ts",
+    "nextjs/app/api/v1/uploads/confirm/route.ts",
+    "nextjs/app/api/v1/uploads/release/route.ts",
+    "nextjs/e2e/detail-integrity.spec.ts"
+  ],
+  "workflowAndSelectorPaths": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/launch-qa.yml",
+    ".github/workflows/repair-scope.yml",
+    "nextjs/scripts/repair-scope.mjs",
+    "nextjs/scripts/repair-scope-gate.mjs",
+    "nextjs/scripts/repair-scope.test.mjs",
+    "nextjs/scripts/run-repair-check.mjs",
+    "nextjs/scripts/verify-repair-workflows.mjs"
+  ]
+}
