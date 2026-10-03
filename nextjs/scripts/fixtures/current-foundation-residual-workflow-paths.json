@@ -25,5 +25,16 @@
     "nextjs/scripts/run-repair-check.mjs",
     "nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json",
     "nextjs/scripts/verify-repair-workflows.mjs"
+  ],
+  "reviewedApiReferenceRepairPaths": [
+    "nextjs/lib/api-reference.ts",
+    "nextjs/lib/developer-distribution.test.ts",
+    "nextjs/lib/docs-endpoints.ts",
+    "nextjs/lib/openapi-compile-jobs.test.ts",
+    "nextjs/lib/openapi-completeness.test.ts",
+    "nextjs/lib/openapi-contract.test.ts",
+    "nextjs/lib/openapi-response-shape.test.ts",
+    "nextjs/lib/retrieval-docs-parity.test.ts",
+    "nextjs/lib/openapi-routes.test.ts"
   ]
 }

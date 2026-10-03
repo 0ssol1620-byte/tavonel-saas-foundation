@@ -12,6 +12,13 @@ const baselineVitest = [
   'lib/route-classification.test.ts', 'lib/production-route-surface.test.ts',
 ];
 const baselineAuth = ['lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts'];
+const docsContractTests = [
+  'lib/docs-content.test.ts', 'lib/docs-highlight.test.ts', 'lib/docs-navigation.test.ts',
+  'lib/retrieval-docs-parity.test.ts', 'lib/openapi-compile-jobs.test.ts',
+  'lib/openapi-completeness.test.ts', 'lib/openapi-contract.test.ts',
+  'lib/openapi-response-shape.test.ts', 'lib/openapi-routes.test.ts',
+  'lib/developer-distribution.test.ts',
+];
 const uploadTests = [
   'lib/api-error-codes.test.ts', 'lib/customer-data-admission-routes.test.ts',
   'lib/intake-approval-route.test.ts', 'lib/intake-approval.test.ts',
@@ -84,6 +91,14 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     if (path === 'lib/docs-content.ts') {
       groups.add('docs');
       for (const file of baselineVitest.filter(file => /docs|retrieval/.test(file))) unitFiles.add(file);
+      matched = true;
+    }
+    // These two exact contract readers feed the API reference and documentation examples.
+    // Keep this mapping explicit: other lib production files remain unknown and fail closed.
+    if (path === 'lib/api-reference.ts' || path === 'lib/docs-endpoints.ts') {
+      groups.add('docs');
+      groups.add('openapi');
+      for (const file of docsContractTests) unitFiles.add(file);
       matched = true;
     }
     if (/^app\/api\/v1\/uploads\/(approval(?:\/cancel)?|confirm|release)\/route\.ts$/i.test(path)) {

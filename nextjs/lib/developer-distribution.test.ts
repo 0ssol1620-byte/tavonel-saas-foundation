@@ -13,7 +13,7 @@ const developerAsset = (name: string) => fileURLToPath(new URL(`../public/develo
 
 describe("developer distribution", () => {
   it("publishes a bounded API contract without decision endpoints", async () => {
-    const response = openApi(new Request("https://tavonel.com/api/openapi"));
+    const response = await openApi(new Request("https://tavonel.com/api/openapi"));
     const document = await response.json() as { paths: Record<string, unknown>; [key: string]: unknown };
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/documents"]).toBeTruthy();

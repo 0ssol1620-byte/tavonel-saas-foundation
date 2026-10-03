@@ -18,7 +18,7 @@ type PathItem = {
 };
 
 async function spec() {
-  const response = openApi(new Request("https://tavonel.com/api/openapi"));
+  const response = await openApi(new Request("https://tavonel.com/api/openapi"));
   return (await response.json()) as {
     servers: Array<{ url: string }>;
     paths: Record<string, PathItem>;

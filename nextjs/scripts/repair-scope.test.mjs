@@ -72,6 +72,52 @@ test('actual d290-to-a1 delta flows through NUL-delimited Git collection and sel
   }
 });
 
+test('reviewed API reference and docs endpoint repairs stay scoped to contract, distribution, and detail checks', () => {
+  const actualDelta = [
+    ...fixture.residualPaths,
+    ...fixture.workflowAndSelectorPaths,
+    ...fixture.reviewedApiReferenceRepairPaths,
+  ];
+  const plan = planFor(actualDelta);
+
+  assert.equal(plan.changedPaths.length, 26);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.runScriptContracts, false);
+  assert.equal(plan.unitFiles.length, 20);
+  for (const file of [
+    'lib/docs-content.test.ts', 'lib/docs-highlight.test.ts',
+    'lib/docs-navigation.test.ts', 'lib/retrieval-docs-parity.test.ts',
+    'lib/openapi-compile-jobs.test.ts', 'lib/openapi-completeness.test.ts',
+    'lib/openapi-contract.test.ts', 'lib/openapi-response-shape.test.ts',
+    'lib/openapi-routes.test.ts', 'lib/developer-distribution.test.ts',
+  ]) assert.ok(plan.unitFiles.includes(file), `missing docs/API reader coverage: ${file}`);
+  for (const repairTest of fixture.reviewedApiReferenceRepairPaths.filter(path => path.endsWith('.test.ts'))) {
+    assert.ok(plan.unitFiles.includes(repairTest.replace(/^nextjs\//, '')),
+      `changed OpenAPI caller test was omitted: ${repairTest}`);
+  }
+  assert.ok(plan.groups.includes('docs'));
+  assert.ok(plan.groups.includes('openapi'));
+  assert.equal(plan.runDetailIntegrity, true);
+  assert.equal(plan.fullQualification, 'pending');
+  assert.ok(plan.pendingFullDebt.includes('PR-base full CI'));
+
+  const isolated = planFor(fixture.reviewedApiReferenceRepairPaths);
+  assert.deepEqual(isolated.unknownPaths, []);
+  assert.equal(isolated.runFullHermeticVitest, false);
+  assert.equal(isolated.unitFiles.length, 14);
+  assert.ok(isolated.unitFiles.includes('lib/developer-distribution.test.ts'));
+
+  const productionOnly = planFor(fixture.reviewedApiReferenceRepairPaths
+    .filter(path => path.endsWith('/api-reference.ts') || path.endsWith('/docs-endpoints.ts')));
+  assert.deepEqual(productionOnly.unknownPaths, []);
+  assert.equal(productionOnly.runFullHermeticVitest, false);
+  assert.equal(productionOnly.unitFiles.length, 14);
+  assert.ok(productionOnly.unitFiles.includes('lib/docs-content.test.ts'));
+  assert.ok(productionOnly.unitFiles.includes('lib/openapi-routes.test.ts'));
+  assert.ok(productionOnly.unitFiles.includes('lib/developer-distribution.test.ts'));
+});
+
 test('safe literal Next route segments pass while traversal, controls, backslash, and shell syntax fail closed', () => {
   assert.equal(normalizePath('nextjs/app/api/collections/[id]/ask/route.ts'), 'app/api/collections/[id]/ask/route.ts');
   assert.equal(normalizePath('nextjs/app/api/docs/[...slug]/route.ts'), 'app/api/docs/[...slug]/route.ts');
@@ -128,6 +174,9 @@ test('unknown paths and non-ancestor anchor inputs fail closed', () => {
   const plan = planFor(['nextjs/new/unmapped-file.bin']);
   assert.equal(plan.runFullHermeticVitest, true);
   assert.deepEqual(plan.unknownPaths, ['new/unmapped-file.bin']);
+  const unreviewedLibraryFile = planFor(['nextjs/lib/unreviewed-production.ts']);
+  assert.equal(unreviewedLibraryFile.runFullHermeticVitest, true);
+  assert.deepEqual(unreviewedLibraryFile.unknownPaths, ['lib/unreviewed-production.ts']);
   assert.throws(() => collectChangedPaths({
     repairAnchorSha: 'f'.repeat(40), headSha: testHeadSha, repoRoot: process.cwd(),
   }), /Command failed|not a commit|Not a valid object/);

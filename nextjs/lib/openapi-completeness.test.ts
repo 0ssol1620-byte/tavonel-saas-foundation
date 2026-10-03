@@ -28,7 +28,8 @@ type Operation = {
 const METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
 async function operations() {
-  const spec = await openApiRoute(new Request("https://tavonel.com/api/openapi")).json() as {
+  const response = await openApiRoute(new Request("https://tavonel.com/api/openapi"));
+  const spec = await response.json() as {
     tags: Array<{ name: string }>;
     paths: Record<string, Record<string, unknown>>;
   };

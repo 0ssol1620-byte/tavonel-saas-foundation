@@ -75,7 +75,15 @@ jobs:
         continue-on-error: true
       - name: Install Chromium for detail-integrity coverage
         id: browser-install
-        if: steps.plan.outputs.browser == 'true'
+        if: >-
+          steps.plan.outputs.browser == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success' &&
+          ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
+           (steps.plan.outputs.broader != 'true' && steps.targeted-vitest.outcome == 'success')) &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         run: pnpm exec playwright install --with-deps chromium
         continue-on-error: true
       - name: Build the isolated live-commerce test bundle after scoped checks

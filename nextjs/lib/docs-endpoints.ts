@@ -86,7 +86,7 @@ let cached: Map<string, DocsEndpoint> | null = null;
 
 export async function readDocsEndpoints(): Promise<Map<string, DocsEndpoint>> {
   if (cached) return cached;
-  const response = openApiRoute(new Request("https://tavonel.com/api/openapi"));
+  const response = await openApiRoute(new Request("https://tavonel.com/api/openapi"));
   const document = await response.json() as {
     servers: Array<{ url: string }>;
     paths: Record<string, PathItem>;

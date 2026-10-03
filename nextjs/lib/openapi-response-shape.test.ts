@@ -153,7 +153,7 @@ type Operation = {
 };
 
 async function spec() {
-  const response = openApi(new Request("https://tavonel.com/api/openapi"));
+  const response = await openApi(new Request("https://tavonel.com/api/openapi"));
   return (await response.json()) as {
     paths: Record<string, Record<string, Operation>>;
   };

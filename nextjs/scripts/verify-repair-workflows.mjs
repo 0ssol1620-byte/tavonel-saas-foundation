@@ -16,6 +16,15 @@ const branches = [
   'codex/tavonel-foundation-p0p2-integration',
 ];
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const conditionForStep = (workflow, name) => {
+  const start = workflow.indexOf(`- name: ${name}`);
+  assert(start >= 0, `Repair workflow step is missing: ${name}`);
+  const next = workflow.indexOf('\n      - name:', start + 1);
+  const step = workflow.slice(start, next < 0 ? undefined : next);
+  const match = step.match(/\n        if: >-\r?\n((?:          .*\r?\n?)+)/);
+  assert(match, `${name}: expected a folded prerequisite condition`);
+  return match[1].split(/\r?\n/).map(line => line.trim()).filter(Boolean).join(' ');
+};
 const assertFullEvents = (workflow, name) => {
   assert(/pull_request:\n\s+types: \[ready_for_review\]/.test(workflow), `${name}: full PR run must be ready_for_review only`);
   assert(workflow.includes('workflow_dispatch:'), `${name}: manual full run is missing`);
@@ -45,6 +54,11 @@ assert(repair.indexOf('Verify workflow and selector contracts') < repair.indexOf
 assert(repair.indexOf('Run selector regression tests') < repair.indexOf('pnpm install --frozen-lockfile'), 'selector regression must precede dependency installation');
 assert(repair.includes('node scripts/run-repair-check.mjs unit'), 'targeted Vitest must use the argv-safe runner');
 assert(repair.includes('node scripts/run-repair-check.mjs browser'), 'browser selection must use the argv-safe runner');
+assert(
+  conditionForStep(repair, 'Install Chromium for detail-integrity coverage') ===
+    conditionForStep(repair, 'Build the isolated live-commerce test bundle after scoped checks'),
+  'Chromium installation must wait for the same successful scoped prerequisites as the browser build',
+);
 assert(!repair.includes('${{ steps.plan.outputs.unit_files }}'), 'dynamic Vitest filenames must not enter a shell');
 assert(!repair.includes('${{ steps.plan.outputs.browser_files }}'), 'dynamic browser filenames must not enter a shell');
 assert(runner.includes('shell: false'), 'selected paths must be passed as process arguments');
