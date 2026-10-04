@@ -8,8 +8,10 @@ const repoRoot = realpathSync(process.cwd());
 const readPlan = () => JSON.parse(readFileSync(resolve(repoRoot, 'repair-plan.json'), 'utf8'));
 const registeredUnitTestPaths = new Set([
   'app/api/documents/[id]/progress/route.test.ts',
+  'app/api/compile-jobs/route.test.ts',
   'components/compile-stage.test.tsx',
 ]);
+const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -116,7 +118,8 @@ export function buildUnitArgs(files, reportPath) {
   requireUnitFiles(files);
   if (typeof reportPath !== 'string' || !reportPath) throw new Error('Vitest report path is required.');
   const args = ['exec', 'vitest', 'run'];
-  if (files.some(file => registeredUnitTestPaths.has(file))) args.push('--config', 'vitest.repair-scope.config.ts');
+  if (files.includes(asyncRouteUnitTestPath)) args.push('--config', 'vitest.repair-scope.async.config.ts');
+  else if (files.some(file => registeredUnitTestPaths.has(file))) args.push('--config', 'vitest.repair-scope.config.ts');
   args.push('--reporter=default', '--reporter=json', `--outputFile=${reportPath}`, ...files);
   return args;
 }

@@ -230,6 +230,54 @@ export const GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze([
   "lib/world-promotion-current-source.test.ts",
 ]);
 
+export const ASYNC_COMPILE_JOB_AUTHORITY_PREDECESSOR_SHA = '2ff7c521233064915123dfbccb7680716d39cc28';
+export const ASYNC_COMPILE_JOB_AUTHORITY_PATHS = Object.freeze([
+  'app/api/compile-jobs/route.test.ts',
+  'app/api/compile-jobs/route.ts',
+  'lib/collection-compile-run.test.ts',
+  'lib/collection-compile-run.ts',
+  'lib/compile-job-authority.test.ts',
+  'lib/compile-job-authority.ts',
+  'lib/compile-job-idempotency.test.ts',
+  'lib/compile-job-scheduling.test.ts',
+  'lib/compile-job-store.ts',
+  'lib/compile-job-worker.test.ts',
+  'lib/compile-job-worker.ts',
+  'lib/global-collection-compile.test.ts',
+  'supabase/drafts/compile-job-viewer-authority.sql',
+  'supabase/tests/compile_job_viewer_authority.sql',
+]);
+export const ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS = Object.freeze({
+  'app/api/compile-jobs/route.test.ts': 'b84a3f05f74fb49d8e3875087b8d41bc63e7dd02',
+  'app/api/compile-jobs/route.ts': '6ffd4fb95cbb19f3cd63f01b12edb59ed29a53ba',
+  'lib/collection-compile-run.test.ts': '4c752679756bd5b9d59d9660608d311666f28730',
+  'lib/collection-compile-run.ts': '710abfb3a948cf3b6e879c02fe687d92d38686bf',
+  'lib/compile-job-authority.test.ts': '36cd1e1fe75cb4cbc75637c4367d88a7a58549a8',
+  'lib/compile-job-authority.ts': 'fe3ef33065230b435a6051b81d0ed3f31f4a3149',
+  'lib/compile-job-idempotency.test.ts': '454ae57c0526dcdff847fd61472e843988766bab',
+  'lib/compile-job-scheduling.test.ts': 'c50cbc627e6f7a7e85a805c0648ca704aaeb096b',
+  'lib/compile-job-store.ts': '30afb87e0c69168be4f36569f5e669ab63fd5440',
+  'lib/compile-job-worker.test.ts': 'a8c85248ffd86211356d44b7f90027d28bcde7c6',
+  'lib/compile-job-worker.ts': 'f065033ce7306bda0c0d6fa2d0cc29084f74b544',
+  'lib/global-collection-compile.test.ts': '046898a4ebdfed502722661915afbb7634ad21c4',
+  'supabase/drafts/compile-job-viewer-authority.sql': 'ad006f8832169aa9fbf67269aeac354b613bbb48',
+  'supabase/tests/compile_job_viewer_authority.sql': '29982a321f13368d856bc597d1cab3f893978b23',
+});
+export const ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS = Object.freeze([
+  'app/api/compile-jobs/route.test.ts',
+  'lib/collection-compile-run.test.ts',
+  'lib/compile-job-authority.test.ts',
+  'lib/compile-job-idempotency.test.ts',
+  'lib/compile-job-migration.test.ts',
+  'lib/compile-job-scheduling.test.ts',
+  'lib/global-collection-compile.test.ts',
+  'lib/compile-job-worker.test.ts',
+  'lib/connector-source-access.test.ts',
+  'lib/connector-source-identity.test.ts',
+  'lib/google-drive-viewer-link-request.test.ts',
+  'lib/google-drive-viewer-principal.test.ts',
+]);
+
 const uploadTests = [
   'lib/api-error-codes.test.ts', 'lib/customer-data-admission-routes.test.ts',
   'lib/intake-approval-route.test.ts', 'lib/intake-approval.test.ts',
@@ -351,10 +399,15 @@ export function collectChangedPaths({ repairAnchorSha, headSha, repoRoot, exec =
 
 function readPathBlob(revision, path, repoRoot, exec) {
   try {
-    return exec('git', ['rev-parse', `${revision}:${path.startsWith('supabase/') ? path : `nextjs/${path}`}`], { cwd: repoRoot, encoding: 'utf8', stdio: 'pipe', shell: false }).trim();
+    return exec('git', ['rev-parse', `${revision}:${selectorRepositoryPath(path)}`], { cwd: repoRoot, encoding: 'utf8', stdio: 'pipe', shell: false }).trim();
   } catch {
     return null;
   }
+}
+
+export function selectorRepositoryPath(rawPath) {
+  const path = normalizePath(rawPath);
+  return path.startsWith('supabase/') ? path : `nextjs/${path}`;
 }
 
 export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification = null, exec = execFileSync }) {
@@ -458,7 +511,31 @@ export function verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, c
   return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null }) {
+export function verifyAsyncCompileJobAuthorityScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => ASYNC_COMPILE_JOB_AUTHORITY_PATHS.includes(path)))].sort();
+  const expectedPaths = [...ASYNC_COMPILE_JOB_AUTHORITY_PATHS].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('async compile-job authority is not anchored to the authenticated 6401 baseline');
+  if (headSha === ASYNC_COMPILE_JOB_AUTHORITY_PREDECESSOR_SHA) reasons.push('async compile-job authority candidate head is not newer than its reviewed predecessor');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(expectedPaths)) reasons.push('async compile-job authority path set differs from the exact reviewed patch chain');
+  try {
+    exec('git', ['merge-base', '--is-ancestor', ASYNC_COMPILE_JOB_AUTHORITY_PREDECESSOR_SHA, headSha], {
+      cwd: repoRoot, stdio: 'pipe', shell: false,
+    });
+  } catch {
+    reasons.push('async compile-job authority predecessor is not an ancestor of the candidate head');
+  }
+  const candidateMismatches = Object.entries(ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push(`async compile-job authority candidate blobs differ from the reviewed patch chain: ${candidateMismatches.join(', ')}`);
+  const registeredMigrations = changedPaths.map(normalizePath)
+    .filter(path => /^supabase\/migrations\/[^/]*compile[_-]job[^/]*viewer[^/]*authority[^/]*\.sql$/i.test(path));
+  if (registeredMigrations.length) reasons.push('async compile-job authority SQL must remain an unregistered draft for disposable rehearsal');
+  return { eligible: reasons.length === 0, reasons, featurePaths, candidateMismatches, registeredMigrations };
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null, asyncCompileJobAuthorityVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -494,6 +571,15 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       qualificationReasons.add('Google Viewer ACL candidate did not match its exact reviewed predecessor/blob/path policy');
     }
   }
+  const asyncCompileJobAuthorityChanged = paths.some(path => ASYNC_COMPILE_JOB_AUTHORITY_PATHS.includes(path));
+  if (asyncCompileJobAuthorityChanged) {
+    groups.add('async-compile-job-authority');
+    for (const file of ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS) unitFiles.add(file);
+    if (!asyncCompileJobAuthorityVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('async compile-job authority candidate did not match its exact reviewed predecessor/blob/path policy');
+    }
+  }
   const docsPricingChanged = paths.some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
   if (docsPricingChanged) {
     groups.add('docs-pricing-layout');
@@ -522,7 +608,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       workflowConfigChanged = true;
       matched = true;
     }
-    if (/^scripts\/(?:repair-scope|repair-scope-gate|repair-test-report|run-repair-check|verify-repair-workflows|ci-repair-evidence)(\.test)?\.mjs$|^scripts\/fixtures\/(?:current-foundation-residual-workflow-paths\.json|ci-repair-evidence-policy\.json|ci-repair-evidence-source\.json)$/i.test(path)) {
+    if (/^scripts\/(?:repair-scope|repair-scope-gate|repair-test-report|run-repair-check|verify-repair-workflows|ci-repair-evidence)(\.test)?\.mjs$|^scripts\/fixtures\/(?:current-foundation-residual-workflow-paths\.json|ci-repair-evidence-policy\.json|ci-repair-evidence-source\.json)$/i.test(path) || path === 'vitest.repair-scope.async.config.ts') {
       groups.add('selector-config');
       qualificationReasons.add('selector changed');
       selectorChanged = true;
@@ -545,9 +631,18 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       groups.add('google-viewer-acl');
       matched = true;
     }
+    if (ASYNC_COMPILE_JOB_AUTHORITY_PATHS.includes(path)) {
+      groups.add('async-compile-job-authority');
+      matched = true;
+    }
     if (path === 'supabase/drafts/google-viewer-principal-boundary.sql' ||
-      path === 'supabase/tests/google_viewer_principal_boundary.sql') {
+      path === 'supabase/tests/google_viewer_principal_boundary.sql' ||
+      path === 'supabase/drafts/compile-job-viewer-authority.sql' ||
+      path === 'supabase/tests/compile_job_viewer_authority.sql') {
       groups.add('database-contract');
+      if (path.startsWith('supabase/drafts/compile-job-') || path === 'supabase/tests/compile_job_viewer_authority.sql') {
+        groups.add('async-compile-job-authority');
+      }
       unitFiles.add('lib/pgtap-fixtures.test.ts');
       databaseEvidenceInvalidated = true;
       matched = true;
@@ -716,6 +811,9 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     googleViewerAclSelection: googleViewerAclChanged
       ? { unitFiles: [...GOOGLE_VIEWER_ACL_UNIT_TESTS], evidence: googleViewerAclVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
       : null,
+    asyncCompileJobAuthoritySelection: asyncCompileJobAuthorityChanged
+      ? { unitFiles: [...ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS], evidence: asyncCompileJobAuthorityVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
+      : null,
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
     browserFiles: [...browserFiles].sort(),
@@ -760,6 +858,10 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const googleViewerAclVerification = googleViewerAclRelevant
     ? verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
     : null;
+  const asyncCompileJobAuthorityRelevant = changedPaths.map(normalizePath).some(path => ASYNC_COMPILE_JOB_AUTHORITY_PATHS.includes(path));
+  const asyncCompileJobAuthorityVerification = asyncCompileJobAuthorityRelevant
+    ? verifyAsyncCompileJobAuthorityScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
   const workspaceSourceVerification = verifyWorkspaceSourceScopeEvidence({
     repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification,
   });
@@ -771,7 +873,7 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const mobileNavVerification = mobileNavContrastChanged
     ? verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
     : null;
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification });
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification, asyncCompileJobAuthorityVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {

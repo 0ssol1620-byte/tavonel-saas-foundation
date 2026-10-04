@@ -30,6 +30,9 @@ type Row = {
   idempotencyKey: string;
   corpusId: string | null;
   batchIndex: number | null;
+  createdByUserId: string;
+  authorizationRevision: number;
+  connectorViewerEnabled: boolean;
 };
 
 /** How the database decides whether an enqueue has already happened. */
@@ -90,6 +93,8 @@ class FakeCompileJobs {
           job_id: existing.jobId,
           state: "preflight",
           created: false,
+          created_by_user_id: existing.createdByUserId,
+          authorization_revision: existing.authorizationRevision,
           corpus_id: existing.corpusId,
           batch_index: existing.batchIndex,
           ...(this.returnsIdempotencyKey ? { idempotency_key: existing.idempotencyKey } : {}),
@@ -103,12 +108,16 @@ class FakeCompileJobs {
       idempotencyKey: body.p_idempotency_key as string,
       corpusId: (body.p_corpus_id ?? null) as string | null,
       batchIndex: (body.p_batch_index ?? null) as number | null,
+      createdByUserId: body.p_created_by_user_id as string,
+      authorizationRevision: body.p_authorization_revision as number,
+      connectorViewerEnabled: body.p_connector_viewer_enabled as boolean,
     };
     this.rows.push(row);
     return {
       status: 200,
       rows: [{
         job_id: row.jobId, state: "preflight", created: true,
+        created_by_user_id: row.createdByUserId, authorization_revision: row.authorizationRevision,
         corpus_id: row.corpusId, batch_index: row.batchIndex,
         ...(this.returnsIdempotencyKey ? { idempotency_key: row.idempotencyKey } : {}),
       }],
@@ -155,6 +164,7 @@ function install(rule: LookupRule, returnsIdempotencyKey = true) {
 }
 
 beforeEach(() => {
+  vi.stubEnv("TAVONEL_COMPILE_JOB_AUTHORITY_VERSION", "v1");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "x".repeat(64));
 });
@@ -201,19 +211,89 @@ describe("the identity a compile is enqueued under", () => {
   });
 });
 
+describe("default-off compatibility when authority SQL is absent", () => {
+  it("uses the existing enqueue RPC for create and idempotent replay", async () => {
+    vi.stubEnv("TAVONEL_COMPILE_JOB_AUTHORITY_VERSION", "");
+    vi.stubEnv("TAVONEL_GOOGLE_DRIVE_ACL_MAX_AGE_SECONDS", "invalid");
+    const calls: string[] = [];
+    const bodies: Record<string, unknown>[] = [];
+    let created = true;
+    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
+      const href = typeof url === "string" ? url : url.toString();
+      if (href.includes("/foundation_compile_jobs?")) return new Response("[]", { status: 200 });
+      calls.push(href);
+      if (href.includes("/rpc/enqueue_foundation_compile_job")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        bodies.push(body);
+        const answer = [{ job_id: "cjob-00000000000000000000000000000001", state: "preflight", created,
+          idempotency_key: body.p_idempotency_key, corpus_id: null, batch_index: null }];
+        created = false;
+        return new Response(JSON.stringify(answer), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    const input = { workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 0,
+      connectorViewerEnabled: false, documentIds: docs(1, 1) };
+    expect((await enqueueCompileJob(input)).ok).toBe(true);
+    expect((await enqueueCompileJob(input)).ok).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((href) => href.includes("/rpc/enqueue_foundation_compile_job"))).toBe(true);
+    expect(calls.some((href) => href.includes("with_authority"))).toBe(false);
+    expect(bodies.every((body) => !("p_max_age_seconds" in body))).toBe(true);
+  });
+
+  it("requires the additive RPC in enabled mode and does not fall back when it is absent", async () => {
+    const calls: string[] = [];
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubEnv("TAVONEL_GOOGLE_DRIVE_ACL_MAX_AGE_SECONDS", "60");
+    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
+      const href = typeof url === "string" ? url : url.toString();
+      if (href.includes("/foundation_compile_jobs?")) return new Response("[]", { status: 200 });
+      calls.push(href);
+      bodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+      return new Response(JSON.stringify({ code: "PGRST202" }), { status: 404 });
+    });
+    const answer = await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER,
+      authorizationRevision: 1, connectorViewerEnabled: false, documentIds: docs(1, 1) });
+    expect(answer).toMatchObject({ ok: false, code: "COMPILE_JOB_RPC_UNDEFINED" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("enqueue_foundation_compile_job_with_authority");
+    expect(bodies[0]).toMatchObject({ p_max_age_seconds: 60 });
+  });
+
+  it("passes invalid ACL freshness as null and never falls back in enabled mode", async () => {
+    const calls: string[] = [];
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubEnv("TAVONEL_GOOGLE_DRIVE_ACL_MAX_AGE_SECONDS", "61seconds");
+    vi.stubGlobal("fetch", async (url: string | URL, init?: RequestInit) => {
+      const href = typeof url === "string" ? url : url.toString();
+      if (href.includes("/foundation_compile_jobs?")) return new Response("[]", { status: 200 });
+      calls.push(href);
+      bodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+      return new Response(JSON.stringify({ code: "PGRST202" }), { status: 404 });
+    });
+    const answer = await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER,
+      authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 1) });
+    expect(answer).toMatchObject({ ok: false, code: "COMPILE_JOB_RPC_UNDEFINED" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("enqueue_foundation_compile_job_with_authority");
+    expect(bodies[0]).toMatchObject({ p_max_age_seconds: null });
+  });
+});
+
 describe("A, then B, then C -- the scenario that was broken", () => {
   it("does not let the standalone job become part 0 of the corpus", async () => {
     const store = install("slot-aware");
 
     // A. Twelve documents compiled on their own.
     const standalone = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
     });
     expect(standalone.ok && standalone.value.created).toBe(true);
 
     // B. The same twelve arrive as the first part of a 128-document corpus.
     const corpus = await enqueueCorpusCompile({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 128),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 128),
     });
     expect(corpus.ok).toBe(true);
     if (!corpus.ok) return;
@@ -248,12 +328,12 @@ describe("A, then B, then C -- the scenario that was broken", () => {
     const store = install("legacy-document-set");
 
     const standalone = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
     });
     expect(standalone.ok && standalone.value.created).toBe(true);
 
     const answer = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       corpus: { corpusId: corpusIdFor(WORKSPACE, docs(1, 128)), batchIndex: 0, batchCount: 11 },
     });
 
@@ -278,9 +358,9 @@ describe("A, then B, then C -- the scenario that was broken", () => {
     // and gets its own row. Either half of the fix closes this on its own.
     const store = install("key-only");
 
-    await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12) });
+    await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12) });
     const part = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       corpus: { corpusId: corpusIdFor(WORKSPACE, docs(1, 128)), batchIndex: 0, batchCount: 11 },
     });
 
@@ -297,13 +377,13 @@ describe("an answer that is not the slot that was asked for", () => {
 
     // A database that hands back some other job for this slot: the shape the old key produced.
     store.rows.push({
-      jobId: "cjob-someone-else", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      jobId: "cjob-someone-else", workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }),
       corpusId: null, batchIndex: null,
     });
 
     const result = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       corpus: { corpusId, batchIndex: 0, batchCount: 11 },
     });
     expect(result.ok).toBe(false);
@@ -322,12 +402,12 @@ describe("an answer that is not the slot that was asked for", () => {
       ["doc-001"],
       [canonical, "not-a-uuid"],
     ]) {
-      const result = await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds });
+      const result = await enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds });
       expect(result.ok).toBe(false);
       expect(result.ok === false && result.code).toBe("COMPILE_JOB_SCOPE_INVALID");
     }
     await expect(
-      enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: [canonical] }),
+      enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: [canonical] }),
     ).resolves.toMatchObject({ ok: true });
   });
   it("reports a slot conflict from the database as a conflict, not a write failure", async () => {
@@ -335,13 +415,13 @@ describe("an answer that is not the slot that was asked for", () => {
     const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
 
     store.rows.push({
-      jobId: "cjob-other-documents", workspaceKey: WORKSPACE, documentIds: docs(25, 36),
+      jobId: "cjob-other-documents", workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(25, 36),
       idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(25, 36), { corpusId, batchIndex: 0 }),
       corpusId, batchIndex: 0,
     });
 
     const result = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       corpus: { corpusId, batchIndex: 0, batchCount: 11 },
     });
     expect(result.ok).toBe(false);
@@ -352,10 +432,10 @@ describe("an answer that is not the slot that was asked for", () => {
     // Resume. The parts that exist come back unchanged and no second row is written.
     install("slot-aware");
     const first = await enqueueCorpusCompile({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 128),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 128),
     });
     const second = await enqueueCorpusCompile({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 128),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 128),
     });
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
@@ -385,13 +465,13 @@ describe("an existing row must be the job this call described", () => {
     const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
 
     store.rows.push({
-      jobId: "cjob-race-winner", workspaceKey: WORKSPACE, documentIds: docs(25, 36),
+      jobId: "cjob-race-winner", workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(25, 36),
       idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(25, 36), { corpusId, batchIndex: 0 }),
       corpusId, batchIndex: 0,
     });
 
     const result = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(25, 36),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(25, 36),
       corpus: { corpusId, batchIndex: 0, batchCount: 11 },
     });
     // Same documents, same slot: this one is the caller's own job and must come back.
@@ -409,13 +489,13 @@ describe("an existing row must be the job this call described", () => {
     const store = install("slot-aware", false);
     const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
     store.rows.push({
-      jobId: "cjob-unverifiable", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      jobId: "cjob-unverifiable", workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }),
       corpusId, batchIndex: 0,
     });
 
     const result = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       corpus: { corpusId, batchIndex: 0, batchCount: 11 },
     });
     expect(result.ok).toBe(false);
@@ -425,13 +505,13 @@ describe("an existing row must be the job this call described", () => {
   it("applies the same check to a standalone compile", async () => {
     const store = install("key-only", false);
     store.rows.push({
-      jobId: "cjob-standalone", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      jobId: "cjob-standalone", workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12)),
       corpusId: null, batchIndex: null,
     });
 
     const result = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
     });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.code).toBe("COMPILE_JOB_SLOT_CONFLICT");
@@ -441,13 +521,13 @@ describe("an existing row must be the job this call described", () => {
     const store = install("slot-aware");
     const corpusId = corpusIdFor(WORKSPACE, docs(1, 128));
     store.rows.push({
-      jobId: "cjob-mine", workspaceKey: WORKSPACE, documentIds: docs(1, 12),
+      jobId: "cjob-mine", workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       idempotencyKey: compileIdempotencyKey(WORKSPACE, docs(1, 12), { corpusId, batchIndex: 0 }),
       corpusId, batchIndex: 0,
     });
 
     const result = await enqueueCompileJob({
-      workspaceKey: WORKSPACE, createdByUserId: USER, documentIds: docs(1, 12),
+      workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: true, documentIds: docs(1, 12),
       corpus: { corpusId, batchIndex: 0, batchCount: 11 },
     });
     expect(result.ok).toBe(true);

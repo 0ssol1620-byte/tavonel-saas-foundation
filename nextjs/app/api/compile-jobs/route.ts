@@ -9,7 +9,8 @@ import {
 } from "@/lib/compile-job-store";
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
+import { googleDriveViewerLinkEnabled } from "@/lib/connector-oauth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readCustomerSourceScope } from "@/lib/customer-source-scope";
 import { readBoundedJson } from "@/lib/enterprise-http";
@@ -84,12 +85,17 @@ export async function POST(request: Request) {
 
   // A deleted or suspended source would be refused by the worker anyway, but a queued job for it
   // also holds its deletion inventory open ("not quiescent") until the job is terminal.
-  const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(
+    auth.principal.workspaceKey, documentIds, auth.principal.userId,
+  );
   if (!sourceAccess.ok) {
     return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: HEADERS,
     });
   }
+  // The processing actor is the authenticated requester, and the membership epoch is durable.
+  // The enqueue RPC also captures connector binding and ACL evidence transactionally; this
+  // preflight is only an early rejection and is never the worker's authority.
 
   // The evaluation includes one Compiled World. A retry of the exact same document set must
   // remain idempotent rather than becoming "World #2", so the capacity check is given the same
@@ -113,6 +119,8 @@ export async function POST(request: Request) {
     const corpus = await enqueueCorpusCompile({
       workspaceKey: auth.principal.workspaceKey,
       createdByUserId: auth.principal.userId,
+      authorizationRevision: auth.principal.authorizationRevision,
+      connectorViewerEnabled: googleDriveViewerLinkEnabled(),
       documentIds,
     });
     if (!corpus.ok) {
@@ -155,6 +163,8 @@ export async function POST(request: Request) {
   const enqueued = await enqueueCompileJob({
     workspaceKey: auth.principal.workspaceKey,
     createdByUserId: auth.principal.userId,
+    authorizationRevision: auth.principal.authorizationRevision,
+    connectorViewerEnabled: googleDriveViewerLinkEnabled(),
     documentIds,
   });
   if (!enqueued.ok) {

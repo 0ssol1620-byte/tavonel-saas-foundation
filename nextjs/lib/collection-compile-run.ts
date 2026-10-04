@@ -12,7 +12,7 @@ import {
   type SignedCompileReceipt,
 } from "./compile-receipt-signing";
 import { CANONICAL_DOCUMENT_ID, mayPublish, registerCollectionArtifact } from "./compile-artifact-provenance";
-import { checkConnectorSourceAccess } from "./connector-source-access";
+import { authorizeCompileJobSourceAccess, classifyCompileJobSources, compileJobAuthorityEnabled } from "./compile-job-authority";
 import { readConnectorCompileIdentities } from "./connector-compile-identity";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import {
@@ -95,6 +95,7 @@ export async function runCollectionCompile(
   workspaceId: string,
   documentIds: readonly string[],
   logicalCollectionKey?: string,
+  compileJobId?: string,
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
   const globalCollection = logicalCollectionKey?.startsWith(GLOBAL_COLLECTION_KEY_PREFIX) === true;
@@ -108,6 +109,17 @@ export async function runCollectionCompile(
   // can only name a UUID. An id it could never name is refused here, before anything is paid for.
   if (documentIds.length === 0 || new Set(documentIds).size !== documentIds.length || !documentIds.every((id) => CANONICAL_DOCUMENT_ID.test(id))) {
     return { ok: false, status: 400, code: "DOCUMENT_SET_UNQUALIFIED", payload: {} };
+  }
+  if (compileJobAuthorityEnabled()) {
+    if (!compileJobId) return { ok: false, status: 403, code: "COMPILE_JOB_AUTHORITY_DENIED", payload: {} };
+    const beforeRead = await authorizeCompileJobSourceAccess({ jobId: compileJobId, workspaceKey: workspaceId,
+      documentIds, phase: "before_source_read" });
+    if (!beforeRead.ok) return { ok: false, status: beforeRead.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: beforeRead.code, payload: {} };
+  } else {
+    const source = await classifyCompileJobSources({ workspaceKey: workspaceId, documentIds });
+    if (!source.ok) return { ok: false, status: 503, code: source.code, payload: {} };
+    if (source.scope === "connector") return { ok: false, status: 403, code: "CONNECTOR_SOURCE_AUTHORITY_DISABLED", payload: {} };
   }
   if (logicalCollectionKey !== undefined && (!logicalCollectionKey.trim() || logicalCollectionKey.length > 256)) {
     return { ok: false, status: 400, code: "COLLECTION_IDENTITY_INVALID", payload: {} };
@@ -150,6 +162,14 @@ export async function runCollectionCompile(
   }
 
   const fetched: Awaited<ReturnType<typeof getWorkspaceOcrJson>>[] = [];
+  // Recheck immediately before reading source content. The earlier worker check only permits
+  // metadata listing and cannot authorize this later protected read by itself.
+  if (compileJobAuthorityEnabled()) {
+    const beforeOcr = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+      documentIds, phase: "before_source_read" });
+    if (!beforeOcr.ok) return { ok: false, status: beforeOcr.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: beforeOcr.code, payload: {} };
+  }
   let fetchedBytes = 0;
   let fetchedRegions = 0;
   const fanout = globalCollection ? 1 : 4;
@@ -223,15 +243,12 @@ export async function runCollectionCompile(
   }
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
-  const revalidate = async (): Promise<CollectionCompileRun | null> => {
-    const sourceAccess = await checkConnectorSourceAccess(workspaceId, expectedVersions.map((item) => item.documentId));
-    if (!sourceAccess.ok) {
-      return {
-        ok: false,
-        status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
-        code: sourceAccess.code,
-        payload: {},
-      };
+  const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {
+    if (compileJobAuthorityEnabled()) {
+      const jobAuthority = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+        documentIds, phase });
+      if (!jobAuthority.ok) return { ok: false, status: jobAuthority.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+        code: jobAuthority.code, payload: {} };
     }
     // A newer revision of a selected logical source bound while this compile was in flight
     // makes the result stale in the same way a changed byte version does.
@@ -255,7 +272,7 @@ export async function runCollectionCompile(
   // Check immediately before the paid Core dispatch, then again after it returns. The first
   // avoids known stale work; the second prevents a source update during Core execution from
   // becoming a persisted candidate.
-  const preDispatchVersionFailure = await revalidate();
+  const preDispatchVersionFailure = await revalidate("before_core");
   if (preDispatchVersionFailure) return preDispatchVersionFailure;
 
   /*
@@ -370,11 +387,17 @@ export async function runCollectionCompile(
     };
   }
 
-  const postDispatchVersionFailure = await revalidate();
+  const postDispatchVersionFailure = await revalidate("after_core");
   if (postDispatchVersionFailure) return postDispatchVersionFailure;
   // A revoked or expired approval cannot publish the result of a job already in flight.
   const persistenceGate = await readCompileAuthorization(workspaceId, documentIds);
   if (!persistenceGate.ok) return { ok: false, status: 503, code: persistenceGate.code, payload: {} };
+  if (compileJobAuthorityEnabled()) {
+    const beforePersist = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+      documentIds, phase: "before_persist" });
+    if (!beforePersist.ok) return { ok: false, status: beforePersist.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: beforePersist.code, payload: {} };
+  }
 
   const key = collectionCandidateKey(workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
   if (!key) return { ok: false, status: 500, code: "COLLECTION_KEY_INVALID", payload: {} };
@@ -434,6 +457,12 @@ export async function runCollectionCompile(
   const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
   if (!mayPublish(registered)) {
     return { ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {} };
+  }
+  if (compileJobAuthorityEnabled()) {
+    const finalAuthority = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+      documentIds, phase: "before_persist" });
+    if (!finalAuthority.ok) return { ok: false, status: finalAuthority.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: finalAuthority.code, payload: {} };
   }
   const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
   if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };

@@ -38,7 +38,7 @@ describe("bounded private whole-collection compilation", () => {
       return Response.json([{ job_id: body.p_job_id, state: "preflight", created: true,
         corpus_id: body.p_corpus_id, batch_index: body.p_batch_index, idempotency_key: body.p_idempotency_key }]);
     });
-    const result = await enqueueCorpusCompile({ workspaceKey: "pilot-alpha", createdByUserId: "00000000-0000-4000-8000-000000000001", documentIds });
+    const result = await enqueueCorpusCompile({ workspaceKey: "pilot-alpha", createdByUserId: "00000000-0000-4000-8000-000000000001", authorizationRevision: 1, connectorViewerEnabled: false, documentIds });
     expect(result.ok).toBe(true);
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain("/rpc/enqueue_foundation_global_collection_job");

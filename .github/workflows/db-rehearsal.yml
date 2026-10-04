@@ -107,8 +107,13 @@ jobs:
           shopt -s nullglob
           existing=(supabase/migrations/*_google_viewer_principal_boundary.sql)
           if ((${#existing[@]} > 0)); then
+            test "${#existing[@]}" -eq 1
+            acl_path="${existing[0]}"
+            [[ "$(basename "$acl_path")" =~ ^([0-9]{14})_google_viewer_principal_boundary\.sql$ ]]
             echo "A repository migration already registers this ACL test schema; normal db reset applies it."
             echo "state=registered" >> "$GITHUB_OUTPUT"
+            echo "path=$acl_path" >> "$GITHUB_OUTPUT"
+            echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -116,12 +121,69 @@ jobs:
           supabase migration new google_viewer_principal_boundary
           generated=(supabase/migrations/*_google_viewer_principal_boundary.sql)
           test "${#generated[@]}" -eq 1
-          [[ "$(basename "${generated[0]}")" =~ ^[0-9]{14}_google_viewer_principal_boundary\.sql$ ]]
+          [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_google_viewer_principal_boundary\.sql$ ]]
+          acl_version="${BASH_REMATCH[1]}"
           cp -- "$draft" "${generated[0]}"
           cmp -- "$draft" "${generated[0]}"
           sha256sum "$draft" "${generated[0]}"
           echo "state=ephemeral" >> "$GITHUB_OUTPUT"
           echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
+          echo "version=$acl_version" >> "$GITHUB_OUTPUT"
+
+      # Keep the async authority SQL a draft in the repository. This ordered runner-local copy
+      # exercises it only after the ACL35 schema/helper draft; the version assertion makes that
+      # dependency visible in the exact disposable migration chain. No production migration is
+      # registered, and both source and generated file hashes are printed for the rehearsal log.
+      - name: Stage the reviewed async authority draft after ACL
+        id: async-authority-draft
+        run: |
+          set -euo pipefail
+          draft=supabase/drafts/compile-job-viewer-authority.sql
+          test_file=supabase/tests/compile_job_viewer_authority.sql
+          if [[ ! -e "$draft" && ! -e "$test_file" ]]; then
+            echo "Neither async authority draft nor its pgTAP test is present; no temporary migration needed."
+            echo "state=absent" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test -f "$draft"
+          test -f "$test_file"
+          acl_state='${{ steps.acl-draft.outputs.state }}'
+          acl_version='${{ steps.acl-draft.outputs.version }}'
+          if [[ "$acl_state" == absent || ! "$acl_version" =~ ^[0-9]{14}$ ]]; then
+            echo "Async authority draft requires the ACL draft migration to be present first." >&2
+            exit 1
+          fi
+
+          shopt -s nullglob
+          existing=(supabase/migrations/*_compile_job_viewer_authority.sql)
+          if ((${#existing[@]} > 0)); then
+            echo "The async authority SQL must remain an unregistered draft during this phase." >&2
+            exit 1
+          fi
+
+          # The CLI versions migrations to the current UTC second. Wait for the ACL version's
+          # successor second so equal-version artifacts can never reverse the dependency order.
+          now_version="$(date -u +%Y%m%d%H%M%S)"
+          if [[ "$acl_version" > "$now_version" ]]; then
+            echo "ACL migration version is in the future; cannot generate a later disposable migration now." >&2
+            exit 1
+          fi
+          while [[ ! "$now_version" > "$acl_version" ]]; do
+            sleep 1
+            now_version="$(date -u +%Y%m%d%H%M%S)"
+          done
+          supabase migration new compile_job_viewer_authority
+          generated=(supabase/migrations/*_compile_job_viewer_authority.sql)
+          test "${#generated[@]}" -eq 1
+          [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_compile_job_viewer_authority\.sql$ ]]
+          async_version="${BASH_REMATCH[1]}"
+          [[ "$async_version" > "$acl_version" ]]
+          cp -- "$draft" "${generated[0]}"
+          cmp -- "$draft" "${generated[0]}"
+          sha256sum "$draft" "${generated[0]}"
+          echo "state=ephemeral" >> "$GITHUB_OUTPUT"
+          echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
+          echo "version=$async_version" >> "$GITHUB_OUTPUT"
 
       # Artifact names are derived from the post-staging migration folder, so the schema
       # artifact is named by the exact temporary head that db reset will apply.
@@ -245,10 +307,9 @@ jobs:
       # 0053 is also excluded: its global service_role revoke/regrant matrix predates later table
       # grants, so replaying it would erase those grants and leave the rehearsal in a state that a
       # sequential production migration never reaches.
-      # The runner-local ACL draft is also excluded from this replay loop: it intentionally has
-      # plain ADD COLUMN and CREATE TABLE statements, so replaying it would fail on duplicates.
-      # It is applied once by the disposable db reset; its pgTAP test runs both before and after
-      # the separate, explicitly replay-safe repair set below.
+      # The runner-local ACL and async authority drafts are excluded from this replay loop: they
+      # intentionally include create-once schema statements. They are each applied once by the
+      # disposable db reset, and their pgTAP tests run before and after the replay-safe repair set.
       # The old deletion-inventory migrations are not replayed here: 20260927102000 supersedes
       # their function bodies for uploaded sources. Replaying them after that create-once migration
       # would silently restore connector-only inventory logic. The first pass and pgTAP suite still

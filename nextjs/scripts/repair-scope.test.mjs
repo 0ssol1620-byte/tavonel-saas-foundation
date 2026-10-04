@@ -30,6 +30,12 @@ import {
   GOOGLE_VIEWER_ACL_FINAL_BLOBS,
   GOOGLE_VIEWER_ACL_UNIT_TESTS,
   verifyGoogleViewerAclScopeEvidence,
+  ASYNC_COMPILE_JOB_AUTHORITY_PREDECESSOR_SHA,
+  ASYNC_COMPILE_JOB_AUTHORITY_PATHS,
+  ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS,
+  ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS,
+  selectorRepositoryPath,
+  verifyAsyncCompileJobAuthorityScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
@@ -262,6 +268,27 @@ function googleViewerAclEvidence(headSha, overrides = {}, changedPaths = GOOGLE_
       return `${blob}\n`;
     },
   });
+}
+
+function asyncCompileJobAuthorityEvidence(headSha, overrides = {}, changedPaths = ASYNC_COMPILE_JOB_AUTHORITY_PATHS) {
+  const blobs = new Map(Object.entries(ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS)
+    .map(([path, blob]) => [`${headSha}:${selectorRepositoryPath(path)}`, blob]));
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  const calls = [];
+  const evidence = verifyAsyncCompileJobAuthorityScopeEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
+    headSha,
+    changedPaths,
+    repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      calls.push(args);
+      if (args[0] === 'merge-base') return '';
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error(`missing async compile-job blob fixture: ${args[1]}`);
+      return `${blob}\n`;
+    },
+  });
+  return { ...evidence, calls };
 }
 
 function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS, googleViewerAclVerification = null) {
@@ -988,6 +1015,70 @@ test('Google Viewer ACL selection fails closed on a partial or altered candidate
   assert.equal(routeOnlyWorkspace.eligible, false, 'the workspace exception must not accept ACL progress blobs without exact ACL evidence');
   const routeOnlyPlan = planFor(workspacePaths, { headSha, workspaceSourceVerification: routeOnlyWorkspace });
   assert.equal(routeOnlyPlan.runFullHermeticVitest, true);
+});
+
+test('async compile-job authority is bounded, includes route/scheduling/migration regressions, and keeps root SQL on DB debt', () => {
+  const headSha = 'd'.repeat(40);
+  assert.equal(ASYNC_COMPILE_JOB_AUTHORITY_PATHS.length, 14);
+  assert.deepEqual(Object.fromEntries([
+    'lib/compile-job-store.ts',
+    'lib/compile-job-worker.test.ts',
+    'lib/collection-compile-run.test.ts',
+    'lib/compile-job-scheduling.test.ts',
+    'lib/global-collection-compile.test.ts',
+  ].map(path => [path, ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS[path]])), {
+    'lib/compile-job-store.ts': '30afb87e0c69168be4f36569f5e669ab63fd5440',
+    'lib/compile-job-worker.test.ts': 'a8c85248ffd86211356d44b7f90027d28bcde7c6',
+    'lib/collection-compile-run.test.ts': '4c752679756bd5b9d59d9660608d311666f28730',
+    'lib/compile-job-scheduling.test.ts': 'c50cbc627e6f7a7e85a805c0648ca704aaeb096b',
+    'lib/global-collection-compile.test.ts': '046898a4ebdfed502722661915afbb7634ad21c4',
+  });
+  const actualPaths = ASYNC_COMPILE_JOB_AUTHORITY_PATHS.map(path => path.startsWith('supabase/') ? path : `nextjs/${path}`);
+  const evidence = asyncCompileJobAuthorityEvidence(headSha, {}, actualPaths);
+  assert.equal(evidence.eligible, true, evidence.reasons.join('; '));
+  assert.ok(evidence.calls.some(args => args[0] === 'merge-base' && args[1] === '--is-ancestor'));
+  assert.ok(evidence.calls.some(args => args[1] === `${headSha}:supabase/drafts/compile-job-viewer-authority.sql`));
+  assert.ok(!evidence.calls.some(args => args[1]?.includes(':nextjs/supabase/')));
+  assert.equal(selectorRepositoryPath('supabase/tests/compile_job_viewer_authority.sql'), 'supabase/tests/compile_job_viewer_authority.sql');
+  assert.equal(selectorRepositoryPath('lib/compile-job-authority.ts'), 'nextjs/lib/compile-job-authority.ts');
+
+  const configPaths = [
+    '.github/workflows/db-rehearsal.yml',
+    'nextjs/scripts/repair-scope.mjs',
+    'nextjs/scripts/repair-scope.test.mjs',
+    'nextjs/scripts/run-repair-check.mjs',
+    'nextjs/scripts/verify-repair-workflows.mjs',
+    'nextjs/vitest.repair-scope.async.config.ts',
+  ];
+  const plan = planFor([...actualPaths, ...configPaths], {
+    headSha,
+    asyncCompileJobAuthorityVerification: evidence,
+  });
+  assert.ok(plan.groups.includes('async-compile-job-authority'));
+  assert.ok(plan.groups.includes('database-contract'));
+  assert.ok(plan.groups.includes('selector-config'));
+  assert.ok(plan.groups.includes('workflow-static'));
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.runWorkflowStaticGate, true);
+  assert.equal(plan.runDatabaseRehearsal, false);
+  assert.ok(plan.deferredGroups.includes('database-contract'));
+  assert.equal(plan.fullQualification, 'pending');
+  for (const file of ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS) assert.ok(plan.unitFiles.includes(file), `missing async regression: ${file}`);
+  assert.ok(plan.unitFiles.includes('lib/global-collection-compile.test.ts'));
+  assert.ok(plan.unitFiles.includes('lib/pgtap-fixtures.test.ts'));
+  assert.deepEqual(buildUnitArgs(ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS, 'async-report.json').slice(0, 5), [
+    'exec', 'vitest', 'run', '--config', 'vitest.repair-scope.async.config.ts',
+  ]);
+
+  const altered = asyncCompileJobAuthorityEvidence(headSha, {
+    [`${headSha}:supabase/tests/compile_job_viewer_authority.sql`]: 'f'.repeat(40),
+  }, actualPaths);
+  assert.equal(altered.eligible, false);
+  assert.ok(altered.candidateMismatches.includes('supabase/tests/compile_job_viewer_authority.sql'));
+  const failClosed = planFor(actualPaths, { headSha, asyncCompileJobAuthorityVerification: altered });
+  assert.equal(failClosed.runFullHermeticVitest, true);
+  assert.deepEqual(failClosed.unitFiles, []);
 });
 
 test('Docs/pricing browser plan uses real projects for mobile, desktop, motion, consent and nav', () => {

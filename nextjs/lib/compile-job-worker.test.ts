@@ -11,12 +11,16 @@ import type { CompileJob, CompileJobResult, CompileState } from "./compile-job-s
 */
 
 // Typed as the store's own result so a case can hand the worker a refusal as well as a success.
-const advance = vi.fn(async (): Promise<CompileJobResult<{ state: CompileState; changed: boolean }>> => ({
+const advance = vi.fn(async (_input?: { jobId?: string }): Promise<CompileJobResult<{ state: CompileState; changed: boolean }>> => ({
   ok: true as const,
   value: { state: "reading" as CompileState, changed: true },
 }));
-const runCompile = vi.fn();
-const listObjects = vi.fn();
+const runCompile = vi.fn<(...args: unknown[]) => Promise<any>>();
+const listObjects = vi.fn<(...args: unknown[]) => Promise<any>>();
+const jobAuthority = vi.fn<(...args: [{ jobId: string; workspaceKey: string; documentIds: readonly string[]; phase: string }]) => Promise<{ ok: true } | { ok: false; code: string }>>(async () => ({ ok: true }));
+const authorityEnabled = vi.fn(() => false);
+type SourceClassificationInput = { workspaceKey: string; documentIds: readonly string[] };
+const classifySources = vi.fn<(...args: [SourceClassificationInput]) => Promise<{ ok: true; scope: "direct_upload" | "connector" } | { ok: false; code: string }>>(async () => ({ ok: true, scope: "direct_upload" }));
 const group = vi.fn();
 const countDeferrals = vi.fn(async (): Promise<CompileJobResult<number>> => ({ ok: true, value: 0 }));
 const recordDeferral = vi.fn(
@@ -41,6 +45,7 @@ vi.mock("./collection-compile-run", () => ({
   isCompileWaitingOnReading: (code: string) => code === "OCR_NOT_READY" || code === "SOURCE_VERSION_CHANGED",
 }));
 vi.mock("./r2-objects", () => ({ listImmutableWorkspaceObjects: (...args: unknown[]) => listObjects(...args) }));
+vi.mock("./compile-job-authority", () => ({ authorizeCompileJobSourceAccess: (input: { jobId: string; workspaceKey: string; documentIds: readonly string[]; phase: string }) => jobAuthority(input), classifyCompileJobSources: (input: SourceClassificationInput) => classifySources(input), compileJobAuthorityEnabled: () => authorityEnabled() }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "test" }) }));
 vi.mock("./immutable-keys", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./immutable-keys")>();
@@ -76,6 +81,8 @@ function job(overrides: Partial<CompileJob> = {}): CompileJob {
   return {
     jobId: "cjob-00000000000000000000000000000001",
     workspaceKey: "pilot-alpha",
+    createdByUserId: "00000000-0000-4000-8000-000000000001",
+    authorizationRevision: 1,
     documentIds: ["doc-a", "doc-b"],
     state: "reading",
     collectionId: null,
@@ -95,9 +102,15 @@ function job(overrides: Partial<CompileJob> = {}): CompileJob {
 }
 
 beforeEach(() => {
-  advance.mockClear();
+  advance.mockReset().mockResolvedValue({
+    ok: true as const,
+    value: { state: "reading" as CompileState, changed: true },
+  });
   runCompile.mockReset();
   listObjects.mockReset();
+  jobAuthority.mockReset().mockResolvedValue({ ok: true });
+  authorityEnabled.mockReset().mockReturnValue(false);
+  classifySources.mockReset().mockResolvedValue({ ok: true, scope: "direct_upload" });
   group.mockReset();
   countDeferrals.mockReset();
   recordDeferral.mockReset();
@@ -109,6 +122,127 @@ beforeEach(() => {
 });
 
 describe("the durable compile worker", () => {
+  it("preserves a legacy direct-upload job with no actor revision when the mode is off", async () => {
+    group.mockReturnValue([]);
+    const turn = await runCompileJobTurn(job({ createdByUserId: null, authorizationRevision: null }));
+    expect(turn.note).toBe("waiting");
+    expect(listObjects).toHaveBeenCalled();
+    expect(jobAuthority).not.toHaveBeenCalled();
+    expect(classifySources).toHaveBeenCalledWith({ workspaceKey: "pilot-alpha", documentIds: ["doc-a", "doc-b"] });
+  });
+
+  it("retries source-classification outages while keeping the job unread", async () => {
+    classifySources.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    group.mockReturnValue([]);
+    const queued = job({ createdByUserId: null, authorizationRevision: null });
+    const first = await runCompileJobTurn(queued);
+    expect(first).toMatchObject({ note: "waiting", state: queued.state });
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(recordDeferral).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "COMPILE_SOURCE_AUTHORITY_UNAVAILABLE", attempt: 1,
+    }));
+    const second = await runCompileJobTurn(queued);
+    expect(second.note).toBe("waiting");
+    expect(listObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("denies connector jobs in default-off mode without falling back to their creator", async () => {
+    classifySources.mockResolvedValueOnce({ ok: true, scope: "connector" });
+    const turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "failed", state: "failed" });
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(jobAuthority).not.toHaveBeenCalled();
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "COMPILE_SOURCE_AUTHORITY_DISABLED" }));
+  });
+
+  it("fails legacy jobs before listing any workspace objects when the mode is enabled", async () => {
+    authorityEnabled.mockReturnValue(true);
+    const turn = await runCompileJobTurn(job({ createdByUserId: null, authorizationRevision: null }));
+    expect(turn).toMatchObject({ note: "failed", state: "failed" });
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "COMPILE_SOURCE_AUTHORITY_MISSING" }));
+  });
+
+  it("retries an authority-store outage, then authorizes the same job after recovery", async () => {
+    authorityEnabled.mockReturnValue(true);
+    jobAuthority.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" })
+      .mockResolvedValueOnce({ ok: true });
+    group.mockReturnValue([]);
+    const queued = job();
+    const first = await runCompileJobTurn(queued);
+    expect(first).toMatchObject({ note: "waiting", state: queued.state });
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(recordDeferral).toHaveBeenCalledWith(expect.objectContaining({
+      job: queued, reason: "COMPILE_SOURCE_AUTHORITY_UNAVAILABLE", attempt: 1,
+    }));
+
+    const second = await runCompileJobTurn(queued);
+    expect(second.note).toBe("waiting");
+    expect((jobAuthority.mock.calls as Array<[{ jobId: string }]>).map(([input]) => input.jobId)).toEqual([queued.jobId, queued.jobId]);
+    expect(listObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("attempts the queue timestamp update when deferral-event recording fails", async () => {
+    classifySources.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    recordDeferral.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    const turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "waiting", retryable: true });
+    expect(recordDeferral).toHaveBeenCalledTimes(1);
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({ state: "reading" }));
+    expect(listObjects).not.toHaveBeenCalled();
+  });
+
+  it("checks a failed queue timestamp update and reports no persisted backoff", async () => {
+    authorityEnabled.mockReturnValue(true);
+    jobAuthority.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    const turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "waiting", retryable: true });
+    expect(recordDeferral).toHaveBeenCalledTimes(1);
+    expect(advance).toHaveBeenCalledTimes(1);
+    expect(listObjects).not.toHaveBeenCalled();
+  });
+
+  it("settles only after bounded authority-unavailable retries are exhausted", async () => {
+    authorityEnabled.mockReturnValue(true);
+    jobAuthority.mockResolvedValue({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    let deferrals = 0;
+    countDeferrals.mockImplementation(async () => ({ ok: true, value: deferrals }));
+    recordDeferral.mockImplementation(async (input) => {
+      deferrals = input.attempt;
+      return { ok: true, value: { recorded: true } };
+    });
+    let turn: Awaited<ReturnType<typeof runCompileJobTurn>> | undefined;
+    for (let index = 0; index < 11; index += 1) turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "failed", state: "failed" });
+    expect(recordDeferral).toHaveBeenCalledTimes(10);
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({
+      state: "failed", errorCode: "COMPILE_SOURCE_AUTHORITY_UNAVAILABLE",
+    }));
+  });
+
+  it("fails closed when the job-keyed authorization check denies", async () => {
+    authorityEnabled.mockReturnValue(true);
+    jobAuthority.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_DENIED" });
+    const turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "failed", state: "failed" });
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(advance).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "COMPILE_SOURCE_AUTHORITY_REVOKED" }));
+    expect(countDeferrals).not.toHaveBeenCalled();
+    expect(recordDeferral).not.toHaveBeenCalled();
+  });
+  it("keeps a revoked job blocked and retryable if terminal settlement cannot be written", async () => {
+    authorityEnabled.mockReturnValue(true);
+    jobAuthority.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_DENIED" });
+    advance.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    const turn = await runCompileJobTurn(job());
+    expect(turn).toMatchObject({ note: "waiting", retryable: true });
+    expect(listObjects).not.toHaveBeenCalled();
+    expect(countDeferrals).not.toHaveBeenCalled();
+    expect(recordDeferral).not.toHaveBeenCalled();
+  });
+
   it("waits rather than compiling a partial set", async () => {
     group.mockReturnValue([DOCUMENT("doc-a", "ocr_ready"), DOCUMENT("doc-b", "sanitized")]);
     const turn = await runCompileJobTurn(job());
@@ -139,7 +273,7 @@ describe("the durable compile worker", () => {
     }));
     expect(turn.note).toBe("compiled");
     expect(turn.state).toBe("ready");
-    expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"]);
+    expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001");
   });
 
   it("records the digest of the artifact it produced, on whichever advance lands", async () => {
@@ -253,10 +387,38 @@ describe("the durable compile worker", () => {
 
     const turns = await runCompileJobBatch(5);
 
-    expect(openJobs).toHaveBeenCalledWith(5);
+    expect(openJobs).toHaveBeenCalledWith(10);
     expect(turns.map((turn) => turn.note)).toEqual(["resting", "resting", "resting", "resting", "resting", "waiting"]);
     expect(advance).toHaveBeenCalledWith(expect.objectContaining({ jobId: fresh }));
     expect(listObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("scans past five authority-store failures to reach a healthy later job", async () => {
+    const blockedJobs = Array.from({ length: 5 }, (_, index) => job({
+      jobId: `cjob-${String(index + 1).padStart(32, "0")}`,
+      documentIds: [`blocked-${index}-a`, `blocked-${index}-b`],
+    }));
+    const healthyId = `cjob-${"f".repeat(32)}`;
+    openJobs.mockResolvedValue({ ok: true, value: [...blockedJobs, job({ jobId: healthyId,
+      documentIds: ["healthy-a", "healthy-b"] })] });
+    classifySources.mockImplementation(async ({ documentIds }) =>
+      documentIds[0].startsWith("blocked-")
+        ? { ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" }
+        : { ok: true, scope: "direct_upload" });
+    recordDeferral.mockResolvedValue({ ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    advance.mockImplementation(async (input) => input?.jobId === healthyId
+      ? { ok: true, value: { state: "reading", changed: true } }
+      : { ok: false, code: "COMPILE_JOB_STORE_WRITE_FAILED" });
+    group.mockReturnValue([DOCUMENT("healthy-a", "sanitized"), DOCUMENT("healthy-b", "sanitized")]);
+
+    const turns = await runCompileJobBatch(5);
+
+    expect(openJobs).toHaveBeenCalledWith(10);
+    expect(turns).toHaveLength(6);
+    expect(turns.slice(0, 5).every((turn) => turn.retryable)).toBe(true);
+    expect(turns[5]).toMatchObject({ jobId: healthyId });
+    expect(listObjects).toHaveBeenCalledTimes(1);
+    expect(runCompile).not.toHaveBeenCalled();
   });
 
   it("rests on every state the scheduler refuses to hand out", async () => {
@@ -370,7 +532,7 @@ describe("a compiler that keeps saying the reading is not finished", () => {
       errorCode: "READING_LISTING_DISAGREEMENT",
     }));
     // Every deferral before the settle is on the ledger, numbered, and each cost one attempt.
-    expect(recorded).toEqual(Array.from({ length: turns - 1 }, (_, index) => index + 1));
+    expect(recorded).toEqual(Array.from({ length: 10 }, (_, index) => index + 1));
     expect(runCompile).toHaveBeenCalledTimes(turns);
   });
 
@@ -407,6 +569,6 @@ it("compiles every document of a qualified global job into one logical collectio
   const turn = await runCompileJobTurn(job({ compilationMode: "global_collection", corpusId,
     batchIndex: 0, batchCount: 1, documentIds: ids, documentsTotal: 13 }));
   expect(turn.note).toBe("compiled");
-  expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`);
+  expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`, "cjob-00000000000000000000000000000001");
   vi.unstubAllEnvs();
 });
