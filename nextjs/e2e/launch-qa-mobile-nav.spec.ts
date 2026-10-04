@@ -79,7 +79,7 @@ test("Research stays footer-reachable without a false section owner", async ({ p
   await researchLink.scrollIntoViewIfNeeded();
   await expect(researchLink).toBeVisible();
   await researchLink.click();
-  await expect(page).toHaveURL(/\\/research$/);
+  await expect(page).toHaveURL(new RegExp('/research$'));
 
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
