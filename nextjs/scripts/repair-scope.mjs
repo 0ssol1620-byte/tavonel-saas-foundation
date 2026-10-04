@@ -250,18 +250,18 @@ export const ASYNC_COMPILE_JOB_AUTHORITY_PATHS = Object.freeze([
 export const ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS = Object.freeze({
   'app/api/compile-jobs/route.test.ts': 'b84a3f05f74fb49d8e3875087b8d41bc63e7dd02',
   'app/api/compile-jobs/route.ts': '6ffd4fb95cbb19f3cd63f01b12edb59ed29a53ba',
-  'lib/collection-compile-run.test.ts': '4c752679756bd5b9d59d9660608d311666f28730',
+  'lib/collection-compile-run.test.ts': '0d454d42e5c6ac26934dcc07a03efde1cd5ca46f',
   'lib/collection-compile-run.ts': '710abfb3a948cf3b6e879c02fe687d92d38686bf',
   'lib/compile-job-authority.test.ts': '36cd1e1fe75cb4cbc75637c4367d88a7a58549a8',
   'lib/compile-job-authority.ts': 'fe3ef33065230b435a6051b81d0ed3f31f4a3149',
   'lib/compile-job-idempotency.test.ts': '454ae57c0526dcdff847fd61472e843988766bab',
   'lib/compile-job-scheduling.test.ts': 'c50cbc627e6f7a7e85a805c0648ca704aaeb096b',
   'lib/compile-job-store.ts': '30afb87e0c69168be4f36569f5e669ab63fd5440',
-  'lib/compile-job-worker.test.ts': 'a8c85248ffd86211356d44b7f90027d28bcde7c6',
+  'lib/compile-job-worker.test.ts': '16dc3c13c73dae9af9224a42fc6b1d9b34667ce6',
   'lib/compile-job-worker.ts': 'f065033ce7306bda0c0d6fa2d0cc29084f74b544',
   'lib/global-collection-compile.test.ts': '046898a4ebdfed502722661915afbb7634ad21c4',
-  'supabase/drafts/compile-job-viewer-authority.sql': 'ad006f8832169aa9fbf67269aeac354b613bbb48',
-  'supabase/tests/compile_job_viewer_authority.sql': '29982a321f13368d856bc597d1cab3f893978b23',
+  'supabase/drafts/compile-job-viewer-authority.sql': '8c92051793c312b3c245d352c6a71d0e30c272ce',
+  'supabase/tests/compile_job_viewer_authority.sql': '1de9ce702ec340a66b06026cef45a53a48a07c0c',
 });
 export const ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS = Object.freeze([
   'app/api/compile-jobs/route.test.ts',

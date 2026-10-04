@@ -1,5 +1,7 @@
 import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { dispatchProductCoreV2 } from "./core-runtime-v2";
+import type { authorizeCompileJobSourceAccess, classifyCompileJobSources } from "./compile-job-authority";
 
 /*
   D7-03. What the compile route does with a source that was read before regions existed.
@@ -18,10 +20,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const listed = vi.fn();
 const fetched = vi.fn();
 const put = vi.fn();
-const dispatched = vi.fn<(...args: unknown[]) => Promise<any>>();
-const jobAuthority = vi.fn<(...args: unknown[]) => Promise<any>>();
+const dispatched = vi.fn<(...args: Parameters<typeof dispatchProductCoreV2>) => Promise<unknown>>();
+const jobAuthority = vi.fn<(...args: Parameters<typeof authorizeCompileJobSourceAccess>) => Promise<unknown>>();
 const authorityEnabled = vi.fn(() => true);
-const classifySources = vi.fn<(...args: unknown[]) => Promise<any>>(async () => ({ ok: true, scope: "direct_upload" }));
+const classifySources = vi.fn<(...args: Parameters<typeof classifyCompileJobSources>) => Promise<unknown>>(async () => ({ ok: true, scope: "direct_upload" }));
 const customerDataGate = vi.fn();
 const sourceScope = vi.fn();
 const compileIdentities = vi.fn();
@@ -46,7 +48,7 @@ vi.mock("./world-store", () => ({
 vi.mock("./core-runtime-v2", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./core-runtime-v2")>()),
   readProductCoreV2Env: () => ({ url: "https://core-v2.example", hmac: "x".repeat(32) }),
-  dispatchProductCoreV2: (...args: unknown[]) => dispatched(...args),
+  dispatchProductCoreV2: (...args: Parameters<typeof dispatchProductCoreV2>) => dispatched(...args),
   /*
     Enough of an artifact to reach persistence, and no more: these tests are about which
     request the Core is sent, not about what the projection makes of the answer -- that is
@@ -64,7 +66,7 @@ vi.mock("./core-runtime-v2", async (importOriginal) => ({
     reviewReasons: [],
   }),
 }));
-vi.mock("./compile-job-authority", () => ({ authorizeCompileJobSourceAccess: (...args: unknown[]) => jobAuthority(...args), compileJobAuthorityEnabled: () => authorityEnabled(), classifyCompileJobSources: (...args: unknown[]) => classifySources(...args) }));
+vi.mock("./compile-job-authority", () => ({ authorizeCompileJobSourceAccess: (...args: Parameters<typeof authorizeCompileJobSourceAccess>) => jobAuthority(...args), compileJobAuthorityEnabled: () => authorityEnabled(), classifyCompileJobSources: (...args: Parameters<typeof classifyCompileJobSources>) => classifySources(...args) }));
 vi.mock("./customer-data-admission", () => ({
   readCustomerSourceAuthorization: (...args: unknown[]) => customerDataGate(...args),
 }));

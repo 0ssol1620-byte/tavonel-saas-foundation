@@ -91,7 +91,9 @@ begin
       p_job_id, p_workspace_key, p_created_by_user_id, p_document_ids, p_idempotency_key,
       p_corpus_id, p_batch_index, p_batch_count);
   end if;
-  select * into v_job from public.foundation_compile_jobs where job_id = v_result.job_id for update;
+  select compile_job.* into v_job
+    from public.foundation_compile_jobs as compile_job
+   where compile_job.job_id = v_result.job_id for update;
   if not found or v_job.workspace_key is distinct from p_workspace_key
      or v_job.created_by_user_id is distinct from p_created_by_user_id
      or public.foundation_canonical_document_ids(v_job.document_ids)
@@ -100,8 +102,9 @@ begin
     raise exception 'COMPILE_JOB_AUTHORITY_REPLAY_CONFLICT';
   end if;
   if v_result.created then
-    update public.foundation_compile_jobs set authorization_revision = p_authorization_revision
-      where job_id = v_job.job_id;
+    update public.foundation_compile_jobs as compile_job
+       set authorization_revision = p_authorization_revision
+     where compile_job.job_id = v_job.job_id;
     v_job.authorization_revision := p_authorization_revision;
   end if;
 

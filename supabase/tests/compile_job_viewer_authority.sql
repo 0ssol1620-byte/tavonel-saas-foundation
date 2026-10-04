@@ -1,38 +1,32 @@
 -- Disposable pgTAP fixture. Run only after the base compile migrations plus both
 -- drafts/google-viewer-principal-boundary.sql and drafts/compile-job-viewer-authority.sql.
 begin;
-select plan(35);
+select plan(41);
 
 insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
-values ('00000000-0000-0000-0000-000000000000','caacacac-0000-4000-8000-000000000001','authenticated','authenticated','compile-actor@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now());
+values
+  ('00000000-0000-0000-0000-000000000000','caacacac-0000-4000-8000-000000000001','authenticated','authenticated','compile-actor@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now()),
+  ('00000000-0000-0000-0000-000000000002','caacacac-0000-4000-8000-000000000002','authenticated','authenticated','compile-owner@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now());
 insert into public.foundation_workspaces(workspace_key,display_name,created_by)
-values ('pilot-cjobtest','Compile authority fixture','caacacac-0000-4000-8000-000000000001');
-insert into public.foundation_workspace_members(workspace_key,user_id,role,state,accepted_at,authorization_revision)
-values ('pilot-cjobtest','caacacac-0000-4000-8000-000000000001','owner','active',now(),11);
+values ('pilot-cjobtest','Compile authority fixture','caacacac-0000-4000-8000-000000000002');
+insert into public.foundation_workspace_members(workspace_key,user_id,role,state,accepted_at)
+values
+  ('pilot-cjobtest','caacacac-0000-4000-8000-000000000002','owner','active',now()),
+  ('pilot-cjobtest','caacacac-0000-4000-8000-000000000001','admin','active',now());
+create temporary table compile_job_fixture_member_revision on commit drop as
+select authorization_revision as initial_revision, authorization_revision as current_revision
+  from public.foundation_workspace_members
+ where workspace_key='pilot-cjobtest' and user_id='caacacac-0000-4000-8000-000000000001';
 
 select lives_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000011','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',11,false,
+  'cjob-00000000000000000000000000000011','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select initial_revision from compile_job_fixture_member_revision),false,
   array['caacacac-0000-4000-8000-000000000011'],repeat('1',64),null,null,null,false)$$,
   'direct-upload intake job stores authenticated processing actor and authority revision');
-select is((select authorization_revision from public.foundation_compile_jobs where job_id='cjob-00000000000000000000000000000011'),11::bigint,
+select is((select authorization_revision from public.foundation_compile_jobs where job_id='cjob-00000000000000000000000000000011'),(select initial_revision from compile_job_fixture_member_revision),
   'the compile row durably retains the exact membership revision');
 select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000011','pilot-cjobtest',
   array['caacacac-0000-4000-8000-000000000011'],'before_source_read',false),true,
   'a same-epoch direct-upload processing actor is allowed while connector rollout remains off');
-select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000012','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',10,false,
-  array['caacacac-0000-4000-8000-000000000012'],repeat('2',64),null,null,null,false)$$,
-  'P0001','COMPILE_JOB_AUTHORITY_CHANGED','stale enqueue authority revision is rejected');
-
-update public.foundation_workspace_members set authorization_revision=12
-where workspace_key='pilot-cjobtest' and user_id='caacacac-0000-4000-8000-000000000001';
-select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000011','pilot-cjobtest',
-  array['caacacac-0000-4000-8000-000000000011'],'before_core',false),false,
-  'membership revocation after enqueue denies a queued job');
-select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000013','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',11,false,
-  array['caacacac-0000-4000-8000-000000000011'],repeat('1',64),null,null,null,false)$$,
-  'P0001','COMPILE_JOB_AUTHORITY_CHANGED','an old idempotency replay cannot transfer or revive stale authority');
 select ok(not has_function_privilege('authenticated',
   'public.authorize_foundation_compile_job(text,text,text[],text,boolean,integer)','EXECUTE'),
   'browser role cannot invoke the service-only job authorization RPC');
@@ -47,7 +41,7 @@ values ('sv-'||repeat('c',64),'src-'||repeat('c',64),'pilot-cjobtest','caacacac-
 insert into public.foundation_oauth_authorizations(authorization_id,workspace_key,provider,display_name,state_sha256,pkce_verifier_reference,redirect_uri,requested_scopes,created_by,authorization_revision,authorization_purpose,expires_at,consumed_at)
 values ('caacacac-0000-4000-8000-000000000023','pilot-cjobtest','google_drive','Link Google Drive',repeat('c',64),
   'vault://fixture/pkce','https://tavonel.example/api/v1/oauth-connectors/callback/google_drive',
-  array['https://www.googleapis.com/auth/drive.metadata.readonly'],'caacacac-0000-4000-8000-000000000001',12,
+  array['https://www.googleapis.com/auth/drive.metadata.readonly'],'caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),
   'viewer_acl_link',now()+interval '5 minutes',now());
 select lives_ok($$select public.record_google_drive_viewer_principal('caacacac-0000-4000-8000-000000000023','drive-permission-c')$$,
   'verified provider consent creates the server-owned viewer principal link');
@@ -56,19 +50,19 @@ select lives_ok($$select public.record_google_drive_source_acl_snapshot('pilot-c
 update public.source_acl_snapshots set captured_at=now()-interval '61 seconds'
 where workspace_key='pilot-cjobtest' and source_version_id='sv-'||repeat('c',64);
 select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',12,true,
+  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),true,
   array['caacacac-0000-4000-8000-000000000022'],repeat('3',64),null,null,null,false,p_max_age_seconds => null)$$,
   'P0001','COMPILE_JOB_ACL_FRESHNESS_INVALID','invalid server freshness configuration fails closed for connector enqueue');
 select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',12,true,
+  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),true,
   array['caacacac-0000-4000-8000-000000000022'],repeat('3',64),null,null,null,false,p_max_age_seconds => 901)$$,
   'P0001','COMPILE_JOB_ACL_FRESHNESS_INVALID','SQL rejects a freshness bound above 900 seconds');
 select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',12,true,
+  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),true,
   array['caacacac-0000-4000-8000-000000000022'],repeat('3',64),null,null,null,false,p_max_age_seconds => 60)$$,
   'P0001','COMPILE_JOB_CONNECTOR_AUTHORITY_DENIED','a 61-second-old capture fails the configured 60-second enqueue bound');
 select lives_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
-  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',12,true,
+  'cjob-00000000000000000000000000000021','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),true,
   array['caacacac-0000-4000-8000-000000000022'],repeat('3',64),null,null,null,false)$$,
   'connector enqueue persists actor, connection, source version, consent link and ACL snapshot in one transaction');
 select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000021','pilot-cjobtest',
@@ -132,23 +126,61 @@ select lives_ok($$select public.record_google_drive_source_acl_snapshot('pilot-c
 select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000021','pilot-cjobtest',
   array['caacacac-0000-4000-8000-000000000022'],'before_core',true),true,
   'a fresh current grant is admitted before authority-change checks');
-update public.foundation_workspace_members set authorization_revision=13
-where workspace_key='pilot-cjobtest' and user_id='caacacac-0000-4000-8000-000000000001';
-select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000021','pilot-cjobtest',
-  array['caacacac-0000-4000-8000-000000000022'],'before_core',true),false,
-  'a workspace authorization revision change denies the connector job');
-update public.foundation_workspace_members set authorization_revision=12
-where workspace_key='pilot-cjobtest' and user_id='caacacac-0000-4000-8000-000000000001';
+select is((select authorization_revision from public.foundation_compile_job_source_authority
+  where job_id='cjob-00000000000000000000000000000021' and document_id='caacacac-0000-4000-8000-000000000022'),
+  (select current_revision from compile_job_fixture_member_revision),
+  'connector job source authority stores the actual active membership revision');
 select throws_ok($$update public.connector_document_bindings set source_version_id='sv-'||repeat('b',64)
   where source_version_id='sv-'||repeat('c',64)$$,
   'P0001','CONNECTOR_BINDING_IMMUTABLE','an enqueued source-version binding cannot be rewritten');
 select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000021','pilot-cjobtest',
   array['caacacac-0000-4000-8000-000000000099'],'before_core',true),false,
   'worker cannot substitute a different document/source scope for the pinned job version');
-select lives_ok($$select public.revoke_google_drive_viewer_principals('pilot-cjobtest','caacacac-0000-4000-8000-000000000001',12)$$,
+select lives_ok($$select public.revoke_google_drive_viewer_principals('pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision))$$,
   'revoking the explicit provider link is recorded');
 select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000021','pilot-cjobtest',
   array['caacacac-0000-4000-8000-000000000022'],'after_core',true),false,
   'provider-link revocation blocks the queued job before persistence');
+
+-- Establish a separate valid connector control after the first provider link was revoked.
+-- Its subsequent denial therefore isolates membership revocation from provider-link state.
+insert into public.foundation_oauth_authorizations(authorization_id,workspace_key,provider,display_name,state_sha256,pkce_verifier_reference,redirect_uri,requested_scopes,created_by,authorization_revision,authorization_purpose,expires_at,consumed_at)
+values ('caacacac-0000-4000-8000-000000000024','pilot-cjobtest','google_drive','Relink Google Drive',repeat('d',64),
+  'vault://fixture/pkce-relink','https://tavonel.example/api/v1/oauth-connectors/callback/google_drive',
+  array['https://www.googleapis.com/auth/drive.metadata.readonly'],'caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),
+  'viewer_acl_link',now()+interval '5 minutes',now());
+select lives_ok($$select public.record_google_drive_viewer_principal('caacacac-0000-4000-8000-000000000024','drive-permission-d')$$,
+  'a fresh verified consent creates an independent provider-link control');
+select lives_ok($$select public.record_google_drive_source_acl_snapshot('pilot-cjobtest','caacacac-0000-4000-8000-000000000021','sv-'||repeat('c',64),'[{"kind":"user","principalId":"drive-permission-d","permission":"read"}]','sha256:'||repeat('4',64))$$,
+  'fresh ACL evidence grants the independent provider-link control');
+select lives_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
+  'cjob-00000000000000000000000000000022','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select current_revision from compile_job_fixture_member_revision),true,
+  array['caacacac-0000-4000-8000-000000000022'],repeat('4',64),null,null,null,false)$$,
+  'a distinct connector job is enqueued while membership and its fresh provider link are valid');
+select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000022','pilot-cjobtest',
+  array['caacacac-0000-4000-8000-000000000022'],'before_core',true),true,
+  'positive control confirms the independent connector job is authorized before membership revocation');
+update public.foundation_workspace_members set state='revoked', revoked_at=clock_timestamp()
+where workspace_key='pilot-cjobtest' and user_id='caacacac-0000-4000-8000-000000000001';
+update compile_job_fixture_member_revision set current_revision=(
+  select authorization_revision from public.foundation_workspace_members
+  where workspace_key='pilot-cjobtest' and user_id='caacacac-0000-4000-8000-000000000001');
+select is((select current_revision from compile_job_fixture_member_revision),
+  (select initial_revision + 1 from compile_job_fixture_member_revision),
+  'membership revocation advances the server-owned authorization revision');
+select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000011','pilot-cjobtest',
+  array['caacacac-0000-4000-8000-000000000011'],'before_core',false),false,
+  'membership revocation after enqueue denies the direct-upload job');
+select is(public.authorize_foundation_compile_job('cjob-00000000000000000000000000000022','pilot-cjobtest',
+  array['caacacac-0000-4000-8000-000000000022'],'after_core',true),false,
+  'membership revocation denies the independently authorized connector job');
+select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
+  'cjob-00000000000000000000000000000012','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select initial_revision from compile_job_fixture_member_revision),false,
+  array['caacacac-0000-4000-8000-000000000012'],repeat('2',64),null,null,null,false)$$,
+  'P0001','COMPILE_JOB_AUTHORITY_CHANGED','stale enqueue authority revision is rejected');
+select throws_ok($$select * from public.enqueue_foundation_compile_job_with_authority(
+  'cjob-00000000000000000000000000000013','pilot-cjobtest','caacacac-0000-4000-8000-000000000001',(select initial_revision from compile_job_fixture_member_revision),false,
+  array['caacacac-0000-4000-8000-000000000011'],repeat('1',64),null,null,null,false)$$,
+  'P0001','COMPILE_JOB_AUTHORITY_CHANGED','an old idempotency replay cannot transfer or revive stale authority');
 select * from finish();
 rollback;

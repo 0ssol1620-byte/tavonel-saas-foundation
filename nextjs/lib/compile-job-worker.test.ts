@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompileJob, CompileJobResult, CompileState } from "./compile-job-store";
+import type { runCollectionCompile } from "./collection-compile-run";
+import type { authorizeCompileJobSourceAccess } from "./compile-job-authority";
+import type { listImmutableWorkspaceObjects } from "./r2-objects";
 
 /*
   What the worker must never do on its own.
@@ -15,9 +18,9 @@ const advance = vi.fn(async (_input?: { jobId?: string }): Promise<CompileJobRes
   ok: true as const,
   value: { state: "reading" as CompileState, changed: true },
 }));
-const runCompile = vi.fn<(...args: unknown[]) => Promise<any>>();
-const listObjects = vi.fn<(...args: unknown[]) => Promise<any>>();
-const jobAuthority = vi.fn<(...args: [{ jobId: string; workspaceKey: string; documentIds: readonly string[]; phase: string }]) => Promise<{ ok: true } | { ok: false; code: string }>>(async () => ({ ok: true }));
+const runCompile = vi.fn<(...args: Parameters<typeof runCollectionCompile>) => Promise<unknown>>();
+const listObjects = vi.fn<(...args: Parameters<typeof listImmutableWorkspaceObjects>) => Promise<unknown>>();
+const jobAuthority = vi.fn<(...args: Parameters<typeof authorizeCompileJobSourceAccess>) => Promise<unknown>>(async () => ({ ok: true }));
 const authorityEnabled = vi.fn(() => false);
 type SourceClassificationInput = { workspaceKey: string; documentIds: readonly string[] };
 const classifySources = vi.fn<(...args: [SourceClassificationInput]) => Promise<{ ok: true; scope: "direct_upload" | "connector" } | { ok: false; code: string }>>(async () => ({ ok: true, scope: "direct_upload" }));
@@ -41,11 +44,11 @@ vi.mock("./compile-job-store", async (importOriginal) => {
   };
 });
 vi.mock("./collection-compile-run", () => ({
-  runCollectionCompile: (...args: unknown[]) => runCompile(...args),
+  runCollectionCompile: (...args: Parameters<typeof runCollectionCompile>) => runCompile(...args),
   isCompileWaitingOnReading: (code: string) => code === "OCR_NOT_READY" || code === "SOURCE_VERSION_CHANGED",
 }));
-vi.mock("./r2-objects", () => ({ listImmutableWorkspaceObjects: (...args: unknown[]) => listObjects(...args) }));
-vi.mock("./compile-job-authority", () => ({ authorizeCompileJobSourceAccess: (input: { jobId: string; workspaceKey: string; documentIds: readonly string[]; phase: string }) => jobAuthority(input), classifyCompileJobSources: (input: SourceClassificationInput) => classifySources(input), compileJobAuthorityEnabled: () => authorityEnabled() }));
+vi.mock("./r2-objects", () => ({ listImmutableWorkspaceObjects: (...args: Parameters<typeof listImmutableWorkspaceObjects>) => listObjects(...args) }));
+vi.mock("./compile-job-authority", () => ({ authorizeCompileJobSourceAccess: (...args: Parameters<typeof authorizeCompileJobSourceAccess>) => jobAuthority(...args), classifyCompileJobSources: (input: SourceClassificationInput) => classifySources(input), compileJobAuthorityEnabled: () => authorityEnabled() }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "test" }) }));
 vi.mock("./immutable-keys", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./immutable-keys")>();

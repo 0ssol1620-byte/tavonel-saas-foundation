@@ -1028,8 +1028,8 @@ test('async compile-job authority is bounded, includes route/scheduling/migratio
     'lib/global-collection-compile.test.ts',
   ].map(path => [path, ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS[path]])), {
     'lib/compile-job-store.ts': '30afb87e0c69168be4f36569f5e669ab63fd5440',
-    'lib/compile-job-worker.test.ts': 'a8c85248ffd86211356d44b7f90027d28bcde7c6',
-    'lib/collection-compile-run.test.ts': '4c752679756bd5b9d59d9660608d311666f28730',
+    'lib/compile-job-worker.test.ts': '16dc3c13c73dae9af9224a42fc6b1d9b34667ce6',
+    'lib/collection-compile-run.test.ts': '0d454d42e5c6ac26934dcc07a03efde1cd5ca46f',
     'lib/compile-job-scheduling.test.ts': 'c50cbc627e6f7a7e85a805c0648ca704aaeb096b',
     'lib/global-collection-compile.test.ts': '046898a4ebdfed502722661915afbb7634ad21c4',
   });
