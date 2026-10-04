@@ -125,7 +125,7 @@ async function runUnit() {
   rmSync(reportPath, { force: true });
   let runError;
   try {
-    await run('pnpm', ['exec', 'vitest', 'run', '--reporter=json', `--outputFile=${reportPath}`, ...files]);
+    await run('pnpm', ['exec', 'vitest', 'run', '--reporter=default', '--reporter=json', `--outputFile=${reportPath}`, ...files]);
   } catch (error) {
     runError = error;
   }

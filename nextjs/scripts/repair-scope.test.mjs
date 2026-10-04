@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -23,6 +23,76 @@ function planFor(paths, overrides = {}) {
     ...overrides,
   });
 }
+
+function runGateCli({ browserFiles = [], overrides = {} } = {}) {
+  const repoRoot = mkdtempSync(resolve(tmpdir(), 'repair-gate-cli-'));
+  const headSha = 'c'.repeat(40);
+  const plan = {
+    repository: '0ssol1620-byte/tavonel-saas-foundation',
+    pullRequest: 141,
+    pullRequestBaseSha: fixture.pullRequestBaseSha,
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
+    headSha,
+    groups: ['unit-regression'],
+    deferredGroups: [],
+    pendingQualificationDebt: [],
+    unitFiles: ['lib/selected.test.ts'],
+    browserFiles,
+    runDetailIntegrity: false,
+    runFullHermeticVitest: false,
+    runWorkflowStaticGate: false,
+  };
+  writeFileSync(resolve(repoRoot, 'repair-plan.json'), JSON.stringify(plan));
+  const env = {
+    ...process.env,
+    PLAN_RESULT: 'success', SECRET_RESULT: 'success', CHECK_RESULT: 'success',
+    VITEST_RESULT: 'success', AUX_RESULT: 'success', WORKFLOW_RESULT: 'success',
+    HEAD_SHA: headSha,
+    ...overrides,
+  };
+  for (const key of ['BROWSER_INSTALL_RESULT', 'BROWSER_BUILD_RESULT', 'BROWSER_RESULT']) {
+    if (Object.hasOwn(overrides, key)) env[key] = overrides[key];
+    else delete env[key];
+  }
+  try {
+    const script = fileURLToPath(new URL('./repair-scope-gate.mjs', import.meta.url));
+    const result = spawnSync(process.execPath, [script], { cwd: repoRoot, env, encoding: 'utf8' });
+    if (result.error) throw result.error;
+    const receipt = JSON.parse(readFileSync(resolve(repoRoot, 'repair-receipt.json'), 'utf8'));
+    return { status: result.status, stdout: result.stdout, stderr: result.stderr, receipt };
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+}
+
+test('runGate CLI enforces browser requirements and writes failure receipts', () => {
+  const selectedBrowser = ['e2e/selected.spec.ts'];
+  const passed = runGateCli({
+    browserFiles: selectedBrowser,
+    overrides: { BROWSER_INSTALL_RESULT: 'success', BROWSER_BUILD_RESULT: 'success', BROWSER_RESULT: 'success' },
+  });
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.equal(passed.receipt.gate, 'passed-scoped-only');
+
+  for (const browserResult of ['skipped', 'failure']) {
+    const failed = runGateCli({
+      browserFiles: selectedBrowser,
+      overrides: { BROWSER_INSTALL_RESULT: 'success', BROWSER_BUILD_RESULT: 'success', BROWSER_RESULT: browserResult },
+    });
+    assert.equal(failed.status, 1);
+    assert.equal(failed.receipt.gate, 'failed');
+    assert.ok(failed.receipt.gateFailures.includes('selected browser checks: ' + browserResult));
+  }
+
+  const noBrowser = runGateCli({ browserFiles: [] });
+  assert.equal(noBrowser.status, 0, noBrowser.stderr);
+  assert.equal(noBrowser.receipt.gate, 'passed-scoped-only');
+
+  const failedUnit = runGateCli({ overrides: { VITEST_RESULT: 'failure' } });
+  assert.equal(failedUnit.status, 1);
+  assert.equal(failedUnit.receipt.gate, 'failed');
+  assert.ok(failedUnit.receipt.gateFailures.includes('targeted Vitest: failure'));
+});
 
 test('6401 anchor excludes historical developer-store changes from the current delta', () => {
   const repoRoot = mkdtempSync(resolve(tmpdir(), 'repair-scope-git-'));

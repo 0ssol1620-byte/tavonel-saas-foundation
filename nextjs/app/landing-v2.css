@@ -10,6 +10,7 @@
   --lv2-meta: 13px;
   --lv2-gutter: var(--chrome-gutter);
   --space-section: clamp(56px, 5.2vw, 88px);
+  --lv2-film-summary-accent: #2447b3;
   --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
   color: var(--text-hi);
   font-family: var(--f-sans);
@@ -301,7 +302,7 @@
   gap: 16px;
   padding: 12px 0;
   border-block: 1px solid var(--border-dark);
-  color: #2447b3;
+  color: var(--lv2-film-summary-accent);
   cursor: pointer;
   font: 600 15px/22px var(--f-sans);
   list-style: none;

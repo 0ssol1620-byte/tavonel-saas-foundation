@@ -10,7 +10,6 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
   const runResults = {};
   const pendingDebt = new Set(plan.pendingQualificationDebt ?? []);
   const passedGroupAnchors = {};
-  const browserRequired = plan.runDetailIntegrity || plan.browserFiles.length > 0;
 
   for (const group of plan.groups) {
     if (deferred.has(group)) {
@@ -47,6 +46,7 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
 function runGate() {
   const plan = JSON.parse(readFileSync('repair-plan.json', 'utf8'));
   const env = process.env;
+  const browserRequired = plan.runDetailIntegrity || plan.browserFiles.length > 0;
   const requirements = [
     ['plan', env.PLAN_RESULT], ['secret scan', env.SECRET_RESULT], ['pnpm check', env.CHECK_RESULT],
     [plan.runFullHermeticVitest ? 'hermetic Vitest' : (plan.unitFiles.length ? 'targeted Vitest' : 'selected unit tests'), env.VITEST_RESULT],
