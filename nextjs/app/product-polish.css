@@ -613,7 +613,7 @@
   --unresolved: #b42318;
   background: #fff;
   color: #171c20;
-  padding-top: clamp(88px, 7vw, 100px);
+  padding-top: clamp(40px, 4vw, 56px);
   padding-bottom: 72px;
 }
 .scene.doc.docs-reading-surface .docs-code {
@@ -647,7 +647,7 @@
 }
 @media (max-width: 760px) {
   .scene.doc.docs-reading-surface {
-    padding-top: 76px;
+    padding-top: 32px;
     padding-bottom: 56px;
   }
   .scene.doc.docs-hub .docs-hub-body {

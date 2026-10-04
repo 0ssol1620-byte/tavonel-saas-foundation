@@ -137,10 +137,12 @@ export default function LandingPage({
               <h1 id="lv2-hero-title">{korean ? <>문서에서 찾은 지식,<br />원문에서 확인하세요</> : <>Knowledge from your documents.<br /><span>Evidence you can inspect.</span></>}</h1>
               <p className="paper-hero-description">{korean ? "흩어진 내용을 근거와 함께 살펴보고, 어떤 문서와 버전에서 나왔는지 확인하세요. 사용할 AI에 연결하는 경로도 함께 제공합니다." : "Explore what your documents say, trace it to the original passage, and understand which version your AI is using."}</p>
               <HeroActions exploreLabel={korean ? "공개 샘플 열기" : "Open the public sample"} exploreHref={heroActions.exploreHref} pricingLabel={access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : startActions.accessLabel} pricingHref={access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref} scene="1" />
+            </div>
+            <HeroSourceCard korean={korean} />
+            <div className="paper-hero-notes">
               <p className="paper-hero-note">{korean ? "로그인 없이 실제 공개 자료의 결과와 근거를 확인하세요." : "No sign-up. Real public documents, readable evidence."}</p>
               <p className="paper-hero-note">{korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats} · <Link href={korean ? "/ko/pricing" : "/pricing"}>{korean ? "가격과 이용 조건" : "Pricing and conditions"}</Link></p>
             </div>
-            <HeroSourceCard korean={korean} />
           </div>
         </section>
 

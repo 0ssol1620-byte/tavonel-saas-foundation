@@ -147,3 +147,68 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(await nav.locator(".btn").evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
+
+test("the home first screen shows source evidence without colliding with public chrome", async ({ page }) => {
+  const width = page.viewportSize()?.width ?? 0;
+  test.skip(width !== 390 && width !== 1440, "This focused layout check runs at the phone and desktop reference widths.");
+
+  await page.goto("/");
+  const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
+  await expect(consent).toBeVisible();
+
+  const expectFirstScreen = async (consentVisible: boolean) => {
+    const layout = await page.evaluate(() => {
+      const rect = (selector: string) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        if (!element) throw new Error(`Missing home proof element: ${selector}`);
+        const box = element.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      };
+      const banner = document.querySelector<HTMLElement>("[data-marketing-consent-panel]");
+      const bannerBox = banner?.getBoundingClientRect();
+      return {
+        width: innerWidth,
+        height: innerHeight,
+        overflow: document.documentElement.scrollWidth - innerWidth,
+        header: rect("header.nav.chrome-v2-header"),
+        banner: bannerBox ? { top: bannerBox.top, bottom: bannerBox.bottom } : null,
+        availability: rect(".paper-availability"),
+        action: rect(".paper-hero-copy a.lv2-cta"),
+        source: rect(".paper-source"),
+        sourcePage: rect(".paper-source-page img"),
+        excerpt: rect(".paper-source-result blockquote"),
+      };
+    });
+
+    const hasVisibleArea = (box: { top: number; bottom: number }) =>
+      Math.max(0, Math.min(layout.height, box.bottom) - Math.max(0, box.top)) > 0;
+    const doesNotOverlap = (a: { top: number; bottom: number }, b: { top: number; bottom: number }) =>
+      a.bottom <= b.top || b.bottom <= a.top;
+
+    expect(layout.overflow).toBeLessThanOrEqual(1);
+    expect(hasVisibleArea(layout.availability)).toBe(true);
+    expect(hasVisibleArea(layout.action)).toBe(true);
+    expect(layout.action.bottom).toBeLessThanOrEqual(layout.height);
+    expect(hasVisibleArea(layout.source)).toBe(true);
+    expect(hasVisibleArea(layout.sourcePage)).toBe(true);
+    expect(hasVisibleArea(layout.excerpt)).toBe(true);
+    if (consentVisible && layout.banner) {
+      expect(doesNotOverlap(layout.banner, layout.header)).toBe(true);
+      expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
+    }
+    for (const content of [layout.availability, layout.action, layout.source, layout.sourcePage, layout.excerpt]) {
+      expect(content.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
+      if (consentVisible && layout.banner) expect(content.top).toBeGreaterThanOrEqual(layout.banner.bottom - 1);
+    }
+    if (layout.width <= 600) expect(layout.source.top).toBeGreaterThanOrEqual(layout.action.bottom - 1);
+
+    await test.info().attach(consentVisible ? "home-first-screen-consent-visible" : "home-first-screen-consent-dismissed", {
+      body: await page.screenshot({ animations: "disabled" }),
+      contentType: "image/png",
+    });
+  };
+
+  await expectFirstScreen(true);
+  await dismissConsent(page);
+  await expectFirstScreen(false);
+});
