@@ -13,6 +13,8 @@ import {
   WORKSPACE_SOURCE_BROWSER_FILE,
   WORKSPACE_SOURCE_FEATURE_PATHS,
   WORKSPACE_SOURCE_FEATURE_BLOBS,
+  WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS,
+  WORKSPACE_SOURCE_FIXTURE_PATCH_SHA256,
   WORKSPACE_SOURCE_REPAIR_CONFIG,
   WORKSPACE_SOURCE_UNIT_FILES,
   verifyWorkspaceSourceScopeEvidence,
@@ -172,9 +174,10 @@ test('6401 anchor excludes historical developer-store changes from the current d
   }
 });
 
-function workspaceSourceEvidence(headSha, overrides = {}) {
+function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS) {
   const blobs = new Map([
     [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/app/workspace/page.tsx`, '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3'],
+    ...Object.entries(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS).map(([path, blob]) => [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/${path}`, blob]),
     [`${headSha}:nextjs/vitest.repair-scope.config.ts`, 'f2065bec72452aa1c80b29afb2768339b7397db8'],
     [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/vitest.config.ts`, '91bb009bae9930952594c8fb8164b714a43e8686'],
     [`${headSha}:nextjs/vitest.config.ts`, '91bb009bae9930952594c8fb8164b714a43e8686'],
@@ -185,7 +188,7 @@ function workspaceSourceEvidence(headSha, overrides = {}) {
   return verifyWorkspaceSourceScopeEvidence({
     repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
     headSha,
-    changedPaths: WORKSPACE_SOURCE_FEATURE_PATHS,
+    changedPaths,
     repoRoot: 'fixture-root',
     exec: (_command, args) => {
       const blob = blobs.get(args[1]);
@@ -195,23 +198,33 @@ function workspaceSourceEvidence(headSha, overrides = {}) {
   });
 }
 
-test('workspace source feature uses its exact twelve-unit, one-browser plan and blob-bound narrow policy', () => {
+test('workspace source feature uses its exact fourteen-unit, one-browser plan and blob-bound narrow policy', () => {
   const headSha = 'c'.repeat(40);
   const verification = workspaceSourceEvidence(headSha);
   assert.equal(verification.eligible, true);
   assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['components/compile-stage.test.tsx'], 'c8f82fc84db149c855052417a5e6abcf98b37a0e');
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['components/compile-stage.module.css'], 'f5d3855553275a1b58105c3362e4dfdedadbe740');
   assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS[WORKSPACE_SOURCE_BROWSER_FILE], '7009383c1078dc876a40174833ed63daf61a7bee');
+  assert.equal(WORKSPACE_SOURCE_FIXTURE_PATCH_SHA256, '0acc6b5613e65d183ab0688c2d02c76eff7353d8161e50025fe49e35fb010b6c');
+  assert.deepEqual(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS, {
+    'app/dev/compile-stage/page.tsx': '15325287c9cbe9c367093d724828f02729db4119',
+    'lib/compile-stage-view.test.ts': '0d35f28062e1f8c76bcd7bf24798ed739ced876d',
+    'lib/progress-poll.test.ts': '52092bd8be3470c5cb7f8a675a1b4fc409969bf3',
+  });
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['app/dev/compile-stage/page.tsx'], '65fe16411e0fee1e026f40e82dd9d96fda6ad294');
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['lib/compile-stage-view.test.ts'], '505bd18cd58dff06294998715e95e09fc312ea3b');
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['lib/progress-poll.test.ts'], '2145bf161cf7db871fa55180d7ec02e06729e16c');
   const plan = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, WORKSPACE_SOURCE_REPAIR_CONFIG], {
     headSha,
     workspaceSourceVerification: verification,
   });
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
-  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 12);
+  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 14);
   assert.deepEqual(plan.workspaceSourceSelection.unitFiles, WORKSPACE_SOURCE_UNIT_FILES);
   assert.deepEqual(plan.workspaceSourceSelection.browserFiles, [WORKSPACE_SOURCE_BROWSER_FILE]);
   assert.deepEqual(planBrowserRuns([WORKSPACE_SOURCE_BROWSER_FILE], false), [{ kind: 'project', project: '1440', files: [WORKSPACE_SOURCE_BROWSER_FILE] }]);
-  assert.equal(plan.unitFiles.length, 12);
+  assert.equal(plan.unitFiles.length, 14);
   assert.deepEqual(plan.browserFiles, ['e2e/failure-states-audit.spec.ts', WORKSPACE_SOURCE_BROWSER_FILE].sort());
   assert.equal(plan.fullQualification, 'pending');
 });
@@ -231,7 +244,7 @@ test('reviewed source-observation test follow-up stays focused and selects known
   assert.equal(verification.eligible, true);
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
-  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 12);
+  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 14);
   for (const file of [
     'lib/brand-copy.test.ts',
     'lib/landing-v2-traceability.test.ts',
@@ -258,7 +271,7 @@ test('combined pending UI and workspace source delta reports the full selected u
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
   assert.equal(plan.runFullHermeticVitest, false);
-  assert.equal(plan.unitFiles.length, 21);
+  assert.equal(plan.unitFiles.length, 23);
   assert.equal(plan.browserFiles.length, 6);
   assert.equal(plan.requirePublicUiScreenshots, true);
   assert.equal(plan.fullQualification, 'pending');
@@ -270,8 +283,10 @@ test('workspace source policy fails closed on stale page/browser/config blobs or
   const wrongPage = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/app/workspace/page.tsx`]: 'd'.repeat(40) });
   const wrongBrowser = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/${WORKSPACE_SOURCE_BROWSER_FILE}`]: 'e'.repeat(40) });
   const changedGlobal = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/vitest.config.ts`]: 'f'.repeat(40) });
+  const wrongFixturePreimage = workspaceSourceEvidence(headSha, { [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/app/dev/compile-stage/page.tsx`]: 'a'.repeat(40) });
+  const wrongFixtureResult = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/app/dev/compile-stage/page.tsx`]: 'b'.repeat(40) });
   assert.equal(good.eligible, true);
-  for (const verification of [wrongPage, wrongBrowser, changedGlobal]) {
+  for (const verification of [wrongPage, wrongBrowser, changedGlobal, wrongFixturePreimage, wrongFixtureResult]) {
     assert.equal(verification.eligible, false);
     const plan = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, WORKSPACE_SOURCE_REPAIR_CONFIG], { headSha, workspaceSourceVerification: verification });
     assert.equal(plan.runFullHermeticVitest, true);
@@ -279,6 +294,25 @@ test('workspace source policy fails closed on stale page/browser/config blobs or
   const unknown = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, 'app/workspace/unreviewed.tsx'], { headSha, workspaceSourceVerification: good });
   assert.equal(unknown.runFullHermeticVitest, true);
   assert.deepEqual(unknown.unknownPaths, ['app/workspace/unreviewed.tsx']);
+});
+
+test('dev compile-stage fixture path is narrowly qualified only with the exact reviewed three-file patch', () => {
+  const headSha = 'c'.repeat(40);
+  const exact = workspaceSourceEvidence(headSha);
+  const plan = planFor(WORKSPACE_SOURCE_FEATURE_PATHS, { headSha, workspaceSourceVerification: exact });
+  assert.equal(exact.eligible, true);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.workspaceSourceSelection.unitFiles, WORKSPACE_SOURCE_UNIT_FILES);
+  assert.ok(plan.unitFiles.includes('lib/compile-stage-view.test.ts'));
+  assert.ok(plan.unitFiles.includes('lib/progress-poll.test.ts'));
+
+  const partialPaths = WORKSPACE_SOURCE_FEATURE_PATHS.filter(path => path !== 'lib/progress-poll.test.ts');
+  const partial = planFor(partialPaths, {
+    headSha,
+    workspaceSourceVerification: workspaceSourceEvidence(headSha, {}, partialPaths),
+  });
+  assert.equal(partial.runFullHermeticVitest, true);
 });
 
 test('repair-only Vitest config adds the two exact out-of-default-include files without touching global config', () => {
@@ -579,6 +613,7 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
   const workspacePaths = [
     'nextjs/app/api/documents/[id]/progress/route.test.ts',
     'nextjs/app/api/documents/[id]/progress/route.ts',
+    'nextjs/app/dev/compile-stage/page.tsx',
     'nextjs/app/workspace/page.tsx',
     'nextjs/components/compile-stage.module.css',
     'nextjs/components/compile-stage.test.tsx',
@@ -586,6 +621,8 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
     'nextjs/e2e/workspace-source-observation.spec.ts',
     'nextjs/lib/ocr-progress.test.ts',
     'nextjs/lib/ocr-progress.ts',
+    'nextjs/lib/compile-stage-view.test.ts',
+    'nextjs/lib/progress-poll.test.ts',
     'nextjs/scripts/repair-scope.mjs',
     'nextjs/scripts/repair-scope.test.mjs',
     'nextjs/scripts/run-repair-check.mjs',
@@ -624,20 +661,21 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
     'nextjs/scripts/verify-repair-workflows.mjs',
   ];
   const candidatePaths = [...workspacePaths, ...consentPaths];
-  assert.equal(new Set(candidatePaths).size, 19);
+  assert.equal(new Set(candidatePaths).size, 22);
   const combined = [...new Set([...baselinePaths, ...candidatePaths])];
-  assert.equal(combined.length, 35);
+  assert.equal(combined.length, 38);
   const headSha = 'c'.repeat(40);
   const plan = planFor(combined, { headSha, workspaceSourceVerification: workspaceSourceEvidence(headSha) });
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
-  assert.equal(plan.changedPaths.length, 35);
-  assert.equal(plan.unitFiles.length, 22);
+  assert.equal(plan.changedPaths.length, 38);
+  assert.equal(plan.unitFiles.length, 24);
   assert.equal(plan.browserFiles.length, 7);
   assert.deepEqual(plan.unitFiles, [
     'app/api/documents/[id]/progress/route.test.ts',
     'components/compile-stage.test.tsx',
     'lib/brand-copy.test.ts',
+    'lib/compile-stage-view.test.ts',
     'lib/connector-source-access.test.ts',
     'lib/connector-source-identity.test.ts',
     'lib/document-derived-route-access.test.ts',
@@ -651,6 +689,7 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
     'lib/ocr-progress.test.ts',
     'lib/one-path-contract.test.ts',
     'lib/production-hardening.test.ts',
+    'lib/progress-poll.test.ts',
     'lib/r2-progress-capability.test.ts',
     'lib/r2-source-pdf.test.ts',
     'lib/site-nav-model.test.ts',

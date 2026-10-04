@@ -60,12 +60,14 @@ const sharedVisualRegressionTest = 'lib/visual-refinement.test.ts';
 export const WORKSPACE_SOURCE_UNIT_FILES = Object.freeze([
   'app/api/documents/[id]/progress/route.test.ts',
   'components/compile-stage.test.tsx',
+  'lib/compile-stage-view.test.ts',
   'lib/connector-source-access.test.ts',
   'lib/connector-source-identity.test.ts',
   'lib/document-derived-route-access.test.ts',
   'lib/document-source-route.test.ts',
   'lib/ocr-progress.test.ts',
   'lib/production-hardening.test.ts',
+  'lib/progress-poll.test.ts',
   'lib/r2-progress-capability.test.ts',
   'lib/r2-source-pdf.test.ts',
   'lib/source-version-guard.test.ts',
@@ -75,6 +77,7 @@ export const WORKSPACE_SOURCE_BROWSER_FILE = 'e2e/workspace-source-observation.s
 export const WORKSPACE_SOURCE_FEATURE_PATHS = Object.freeze([
   'app/api/documents/[id]/progress/route.test.ts',
   'app/api/documents/[id]/progress/route.ts',
+  'app/dev/compile-stage/page.tsx',
   'app/workspace/page.tsx',
   'components/compile-stage.module.css',
   'components/compile-stage.test.tsx',
@@ -82,11 +85,14 @@ export const WORKSPACE_SOURCE_FEATURE_PATHS = Object.freeze([
   'e2e/workspace-source-observation.spec.ts',
   'lib/ocr-progress.test.ts',
   'lib/ocr-progress.ts',
+  'lib/compile-stage-view.test.ts',
+  'lib/progress-poll.test.ts',
 ]);
 export const WORKSPACE_SOURCE_REPAIR_CONFIG = 'vitest.repair-scope.config.ts';
 export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
   'app/api/documents/[id]/progress/route.test.ts': '54e35fd493a56857cdf6393167017538e826aa2e',
   'app/api/documents/[id]/progress/route.ts': 'c2ab73f10f2590eec7118fe85aa98bd6d023a305',
+  'app/dev/compile-stage/page.tsx': '65fe16411e0fee1e026f40e82dd9d96fda6ad294',
   'app/workspace/page.tsx': '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
   'components/compile-stage.module.css': 'f5d3855553275a1b58105c3362e4dfdedadbe740',
   'components/compile-stage.test.tsx': 'c8f82fc84db149c855052417a5e6abcf98b37a0e',
@@ -94,6 +100,14 @@ export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
   'e2e/workspace-source-observation.spec.ts': '7009383c1078dc876a40174833ed63daf61a7bee',
   'lib/ocr-progress.test.ts': '766e4ca5fcde9156f5d60e99d5397ac6206ce40a',
   'lib/ocr-progress.ts': 'ddd83aea6ad50b3b4b4a1c4d1f5c3a09d752e0cf',
+  'lib/compile-stage-view.test.ts': '505bd18cd58dff06294998715e95e09fc312ea3b',
+  'lib/progress-poll.test.ts': '2145bf161cf7db871fa55180d7ec02e06729e16c',
+});
+export const WORKSPACE_SOURCE_FIXTURE_PATCH_SHA256 = '0acc6b5613e65d183ab0688c2d02c76eff7353d8161e50025fe49e35fb010b6c';
+export const WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS = Object.freeze({
+  'app/dev/compile-stage/page.tsx': '15325287c9cbe9c367093d724828f02729db4119',
+  'lib/compile-stage-view.test.ts': '0d35f28062e1f8c76bcd7bf24798ed739ced876d',
+  'lib/progress-poll.test.ts': '52092bd8be3470c5cb7f8a675a1b4fc409969bf3',
 });
 const reviewedWorkspacePageBlobs = Object.freeze({
   base: '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3',
@@ -163,6 +177,10 @@ export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, c
     .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
     .map(([path]) => path);
   if (featureBlobMismatches.length) reasons.push(`workspace source feature blobs differ from reviewed candidate: ${featureBlobMismatches.join(', ')}`);
+  const fixtureBaseBlobMismatches = Object.entries(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(repairAnchorSha, path, repoRoot, exec) !== expected)
+    .map(([path]) => path);
+  if (fixtureBaseBlobMismatches.length) reasons.push(`workspace source fixture preimages differ from reviewed patch: ${fixtureBaseBlobMismatches.join(', ')}`);
   const scopedConfigBlob = readPathBlob(headSha, WORKSPACE_SOURCE_REPAIR_CONFIG, repoRoot, exec);
   if (scopedConfigBlob !== reviewedScopedConfigBlob) reasons.push('repair-only Vitest config blob differs from reviewed candidate');
   const globalConfigBase = readPathBlob(repairAnchorSha, 'vitest.config.ts', repoRoot, exec);
