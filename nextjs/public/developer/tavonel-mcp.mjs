@@ -11,6 +11,12 @@
  *   TAVONEL_BASE_URL=https://tavonel.com           (default)
  *   node tavonel-mcp.mjs --version                 (record the exact build before registering it)
  *   node tavonel-mcp.mjs --doctor                  (check the key, the channel and one real read)
+ *   TAVONEL_CONSUMER_CONTEXT='{...}'               (optional; needs consumer-context.mjs beside this file)
+ *   TAVONEL_CONSUMER_CONTEXT_REQUIRED=true         (every tool call fails closed without a usable context)
+ *
+ * Consumer-context enforcement is local synthetic evidence only, not production API support: the
+ * production API does not acknowledge the context headers. With no context and the required flag
+ * unset, blank or false, consumer-context.mjs is not loaded and nothing about this server changes.
  *
  * Transport is stdio with newline-delimited JSON-RPC 2.0, which is what the MCP stdio transport
  * specifies, so this needs no dependency and no build step. It is a file you can read before
@@ -49,7 +55,7 @@ export const DEFAULT_BASE_URL = "https://tavonel.com";
  * Separate from `SERVER_VERSION`, which is the API contract this speaks. A rebuild that changes
  * these bytes changes this; a change to what the API answers changes that.
  */
-export const DISTRIBUTION_VERSION = "2026.9.20.1";
+export const DISTRIBUTION_VERSION = "2026.10.2.1";
 export const API_VERSION_HEADER = "1";
 
 const COLLECTION_ID = /^collection-[a-f0-9]{32}$/;
@@ -358,7 +364,30 @@ export function validateSuccess(tool, payload) {
   return payload;
 }
 
-export function createClient({ baseUrl, apiKey, fetcher = fetch }) {
+/**
+ * The consumer-context binding from `consumer-context.mjs`, or null when none is configured.
+ *
+ * Imported only for a nonblank context or a required flag that is neither blank nor false (trimmed,
+ * any case) -- the module's own rule, so an invalid flag still loads it to be refused -- and the
+ * legacy server stays a single file. A configured context that cannot be loaded becomes a binding
+ * that refuses every call -- the operator asked for a boundary, and answering without it would be
+ * the wrong failure.
+ */
+export async function loadConsumerContext(env = process.env) {
+  const flag = String(env.TAVONEL_CONSUMER_CONTEXT_REQUIRED ?? "").trim().toLowerCase();
+  const configured = String(env.TAVONEL_CONSUMER_CONTEXT ?? "").trim() !== "" || (flag !== "" && flag !== "false");
+  if (!configured) return null;
+  try {
+    const module = await import(new URL("./consumer-context.mjs", import.meta.url).href);
+    return module.createConsumerContextBinding({ env });
+  } catch {
+    const refusal = new Error("CONSUMER_CONTEXT_MODULE_UNAVAILABLE: consumer-context.mjs must sit beside tavonel-mcp.mjs");
+    const refuse = () => { throw refusal; };
+    return Object.freeze({ required: true, context: null, error: refusal, identity: null, prepare: refuse, verify: refuse });
+  }
+}
+
+export function createClient({ baseUrl, apiKey, fetcher = fetch, context = null }) {
   const base = (baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   return async function call(request) {
     /*
@@ -367,6 +396,8 @@ export function createClient({ baseUrl, apiKey, fetcher = fetch }) {
       credential looks broken at exactly the moment someone is setting it up.
     */
     if (!apiKey) throw new Error("API_KEY_MISSING: set TAVONEL_API_KEY to a key from your workspace");
+    // The same rule for a required consumer context: checked per call, refused before the network.
+    const contextHeaders = context ? context.prepare(request) : {};
     const response = await fetcher(`${base}${request.path}`, {
       method: request.method,
       headers: {
@@ -374,6 +405,7 @@ export function createClient({ baseUrl, apiKey, fetcher = fetch }) {
         // The published media type. The API answers a version, and a mismatch is caught below.
         accept: "application/vnd.tavonel.v1+json",
         ...(request.body ? { "content-type": "application/json" } : {}),
+        ...contextHeaders,
       },
       ...(request.body ? { body: JSON.stringify(request.body) } : {}),
     });
@@ -390,6 +422,7 @@ export function createClient({ baseUrl, apiKey, fetcher = fetch }) {
       };
       await response.body?.cancel?.();
       if (!response.ok) throw new Error(`API_ERROR_${response.status}`);
+      if (context) context.verify(request, response);
       return descriptor;
     }
     const text = await response.text();
@@ -408,6 +441,7 @@ export function createClient({ baseUrl, apiKey, fetcher = fetch }) {
       // A newer contract may have moved a field this client reads. Stopping is the safe answer.
       throw new Error(`API_VERSION_UNSUPPORTED: served v${served}, this client speaks v${API_VERSION_HEADER}`);
     }
+    if (context) context.verify(request, response);
     return payload;
   };
 }
@@ -484,9 +518,11 @@ export function createServer({ call }) {
  * a diagnostic that prints a stack trace has told the operator nothing.
  *
  * It performs reads only, through the same `TOOLS` table and the same `assertReadOnly` gate the
- * server starts behind, so the doctor cannot reach an endpoint the server itself may not.
+ * server starts behind, so the doctor cannot reach an endpoint the server itself may not. The
+ * authenticated read goes through the same consumer-context binding as a tool call, so a context
+ * that would refuse every tool call refuses the doctor's read too, before the network.
  */
-export async function runDoctor({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetcher = fetch, now = () => new Date() } = {}) {
+export async function runDoctor({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetcher = fetch, now = () => new Date(), context = null } = {}) {
   assertReadOnly();
   const base = (baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   const checks = [];
@@ -511,7 +547,7 @@ export async function runDoctor({ baseUrl = DEFAULT_BASE_URL, apiKey = "", fetch
     record("distribution_version", false, `could not reach ${base}/developer/channel.json`);
   }
 
-  const call = createClient({ baseUrl: base, apiKey, fetcher });
+  const call = createClient({ baseUrl: base, apiKey, fetcher, context });
   const listWorlds = TOOLS.find((tool) => tool.name === "list_worlds");
   try {
     const payload = await call(listWorlds.request({ limit: 5 }));
@@ -557,8 +593,9 @@ export function formatDoctor(report) {
 
 async function main() {
   assertReadOnly();
+  const context = await loadConsumerContext(process.env);
   const handle = createServer({
-    call: createClient({ baseUrl: process.env.TAVONEL_BASE_URL, apiKey: process.env.TAVONEL_API_KEY }),
+    call: createClient({ baseUrl: process.env.TAVONEL_BASE_URL, apiKey: process.env.TAVONEL_API_KEY, context }),
   });
 
   let buffer = "";
@@ -588,7 +625,8 @@ if (process.argv.includes("--version")) {
   // Recorded before registration, so a support conversation can start from the exact build.
   process.stdout.write(`tavonel-mcp ${DISTRIBUTION_VERSION} (api v${API_VERSION_HEADER}, contract ${SERVER_VERSION})\n`);
 } else if (process.argv.includes("--doctor")) {
-  const report = await runDoctor({ baseUrl: process.env.TAVONEL_BASE_URL, apiKey: process.env.TAVONEL_API_KEY });
+  const context = await loadConsumerContext(process.env);
+  const report = await runDoctor({ baseUrl: process.env.TAVONEL_BASE_URL, apiKey: process.env.TAVONEL_API_KEY, context });
   process.stdout.write(`${formatDoctor(report)}\n`);
   // A non-zero exit so a setup script, a CI job or a support runbook can branch on it instead
   // of grepping the text.

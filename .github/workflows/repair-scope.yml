@@ -1,0 +1,142 @@
+name: Repair scope
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-scope-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  repair-scope:
+    name: Repair scope validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: nextjs
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      REPAIR_ANCHOR_SHA: d2906acde291b77b73229623733736796f4fb8c8
+      REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - name: Plan audited-anchor affected scope
+        id: plan
+        env:
+          RUN_REPAIR_SCOPE: "1"
+        run: node scripts/repair-scope.mjs
+      - name: Verify workflow and selector contracts
+        id: workflow-static
+        if: steps.plan.outputs.workflow_static == 'true'
+        run: node scripts/verify-repair-workflows.mjs
+      - name: Run selector regression tests
+        id: selector-tests
+        if: steps.plan.outputs.selector_tests == 'true'
+        run: node --test scripts/repair-scope.test.mjs
+      - run: pnpm install --frozen-lockfile
+      - name: Scan repository secrets
+        id: secrets
+        run: pnpm scan:secrets
+        continue-on-error: true
+      - name: Run TypeScript and lint checks
+        id: check
+        run: pnpm check
+        continue-on-error: true
+      - name: Run Foundation focused unit checks
+        id: targeted-vitest
+        if: steps.plan.outputs.broader != 'true'
+        run: node scripts/run-repair-check.mjs unit
+        continue-on-error: true
+      - name: Run hermetic full Vitest for shared or unknown changes
+        id: full-vitest
+        if: steps.plan.outputs.broader == 'true'
+        run: node scripts/run-hermetic-vitest.mjs
+        continue-on-error: true
+      - name: Run script contract suite for shared or unknown changes
+        id: full-scripts
+        if: steps.plan.outputs.broader == 'true'
+        run: pnpm test:scripts
+        continue-on-error: true
+      - name: Install Chromium for detail-integrity coverage
+        id: browser-install
+        if: >-
+          steps.plan.outputs.browser == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success' &&
+          ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
+           (steps.plan.outputs.broader != 'true' && steps.targeted-vitest.outcome == 'success')) &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
+        run: pnpm exec playwright install --with-deps chromium
+        continue-on-error: true
+      - name: Build the isolated live-commerce test bundle after scoped checks
+        id: browser-build
+        if: >-
+          steps.plan.outputs.browser == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success' &&
+          ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
+           (steps.plan.outputs.broader != 'true' && steps.targeted-vitest.outcome == 'success')) &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
+        env:
+          COMMERCIAL_MODE: live
+          TAVONEL_BILLING_LAUNCH_APPROVED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: foundation-browser-e2e-anon-key
+          PLAYWRIGHT_LOCAL_HTTP: "1"
+        run: pnpm exec next build
+        continue-on-error: true
+      - name: Run selected browser checks against one production server
+        id: browser
+        if: steps.browser-build.outcome == 'success'
+        env:
+          COMMERCIAL_MODE: live
+          TAVONEL_BILLING_LAUNCH_APPROVED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: foundation-browser-e2e-anon-key
+          PLAYWRIGHT_LOCAL_HTTP: "1"
+        run: node scripts/run-repair-check.mjs browser
+        continue-on-error: true
+      - name: Fail closed on missing or failed scoped checks
+        id: gate
+        if: always()
+        env:
+          PLAN_RESULT: ${{ steps.plan.outcome }}
+          SECRET_RESULT: ${{ steps.secrets.outcome }}
+          CHECK_RESULT: ${{ steps.check.outcome }}
+          VITEST_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome || steps.targeted-vitest.outcome }}
+          AUX_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-scripts.outcome || 'success' }}
+          WORKFLOW_RESULT: ${{ steps.plan.outputs.workflow_static == 'true' && steps.workflow-static.outcome || 'success' }}
+          SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
+          BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}
+          BROWSER_INSTALL_RESULT: ${{ steps.browser-install.outcome }}
+          BROWSER_RESULT: ${{ steps.browser.outcome }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/repair-scope-gate.mjs
+      - name: Publish exact-head scope receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-scope-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: nextjs/repair-receipt.json
+          if-no-files-found: error
+          retention-days: 30

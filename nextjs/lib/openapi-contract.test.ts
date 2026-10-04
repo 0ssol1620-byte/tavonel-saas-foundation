@@ -19,7 +19,7 @@ afterEach(() => {
 const routeSource = readFileSync(resolve(import.meta.dirname, "../app/api/openapi/route.ts"), "utf8");
 
 async function specFor(url: string) {
-  const response = openApi(new Request(url));
+  const response = await openApi(new Request(url));
   return (await response.json()) as { servers: Array<{ url: string }>; paths: Record<string, unknown> };
 }
 

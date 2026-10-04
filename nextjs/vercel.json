@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
+  "ignoreCommand": "node scripts/vercel-ignore-build.mjs",
   "regions": [
     "icn1"
   ],

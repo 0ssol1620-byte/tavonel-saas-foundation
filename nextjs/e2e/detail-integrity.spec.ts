@@ -149,7 +149,7 @@ test('source endpoints stay attached after a width change, without a page reload
 test('API reference is scannable while endpoint contracts stay reachable by keyboard', async ({ page }) => {
   await page.goto('/api');
   const operations = page.locator('article[id]');
-  await expect(operations).toHaveCount(33);
+  await expect(operations).toHaveCount(39);
   const operation = operations.first();
   const details = operation.locator('details').first();
   await expect(details).not.toHaveAttribute('open');

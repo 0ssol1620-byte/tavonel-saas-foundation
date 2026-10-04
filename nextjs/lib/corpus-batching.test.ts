@@ -330,7 +330,11 @@ describe("where the corpus path is wired in", () => {
     */
     expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok}");
     expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(");
-    expect(workspace).toContain("if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);");
+    // The approved complete set is compiled only after the server returns every approved member.
+    expect(workspace).toContain("await uploadDocuments(files, counts);");
+    expect(workspace).toContain("const ids = approvedCompilableDocumentIds(final, fileKeys);");
+    expect(workspace).toContain("if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok)");
+    expect(workspace).toContain("await startDurableCompile(ids);");
   });
 
   it("follows a corpus by following one part at a time", () => {

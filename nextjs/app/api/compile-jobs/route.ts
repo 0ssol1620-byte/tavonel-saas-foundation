@@ -16,6 +16,7 @@ import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { checkTrialCompileCapacity } from "@/lib/self-service-trial";
+import { assertFoundationIntakeCompileSet } from "@/lib/compute-reservation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,6 +67,9 @@ export async function POST(request: Request) {
       { status: 400, headers: HEADERS },
     );
   }
+
+  const intakeSet = await assertFoundationIntakeCompileSet({ workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, documentIds });
+  if (!intakeSet.ok) return NextResponse.json({ code: intakeSet.code }, { status: intakeSet.status, headers: HEADERS });
 
   // Do not enqueue work the compiler must later reject for a missing or revoked receipt.
   let sourceScope: "direct_upload" | "connector" = "direct_upload";

@@ -5,6 +5,7 @@ import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
+import { assertFoundationIntakeCompileSet } from "@/lib/compute-reservation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
     and `candidate_ready` only on a package that exists. `review_required` is a candidate too:
     it is the state that asks for a person, not a failed compile.
   */
+  const intakeSet = await assertFoundationIntakeCompileSet({ workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, documentIds });
+  if (!intakeSet.ok) return NextResponse.json({ code: intakeSet.code }, { status: intakeSet.status, headers: { "Cache-Control": "no-store" } });
+
   recordServerFunnel("compile_started", {
     mode: "sync",
     plan: auth.principal.accessSource ?? "unknown",

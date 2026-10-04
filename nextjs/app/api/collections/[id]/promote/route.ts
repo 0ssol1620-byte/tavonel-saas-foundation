@@ -16,6 +16,7 @@ import { getWorkspaceCollectionCandidate, listImmutableWorkspaceObjects } from "
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { ensureRetrievalIndexForActiveWorld } from "@/lib/retrieval-index-status";
 import { promoteFoundationCandidate } from "@/lib/world-store";
+import { buildWorldReadModel } from "@/lib/world-read-model";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -191,6 +192,13 @@ export async function POST(
     );
   }
 
+  const model = buildWorldReadModel(loaded.json, id);
+  if (!model || model.evidence.length === 0) {
+    return NextResponse.json({ code: "WORLD_CANDIDATE_EVIDENCE_REQUIRED" }, {
+      status: 422, headers: NO_STORE,
+    });
+  }
+
   /*
     The full-rebuild equivalence gate (audit TM02), on the receipt as it was stored.
 
@@ -282,9 +290,12 @@ export async function POST(
     expectedCurrentManifest,
     expectedCurrentRevision,
     reason,
+    sourceDocumentIds: sourceDocuments.map((item) => item.documentId as string),
   });
   if (!promoted.ok) {
     const status =
+      promoted.code === "WORLD_SOURCE_REVISION_SUPERSEDED" ||
+      promoted.code === "WORLD_SOURCE_REVISION_AMBIGUOUS" ||
       promoted.code === "ACTIVE_WORLD_CONFLICT" ||
       promoted.code === "WORLD_TRANSITION_IDEMPOTENCY_CONFLICT" ||
       promoted.code === "WORLD_VERSION_BINDING_CONFLICT"

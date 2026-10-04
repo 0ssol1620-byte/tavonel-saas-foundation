@@ -1,4 +1,12 @@
 import { NextResponse } from "next/server";
+import {
+  bindConsumerContext,
+  consumerSnapshotMoved,
+  reconfirmConsumerSnapshot,
+  releaseConsumerContext,
+  resolveBoundSnapshot,
+  snapshotOf,
+} from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
@@ -237,6 +245,10 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
+  // A consumer context is bound to the principal just verified, before anything is read.
+  const binding = bindConsumerContext(request.headers, auth.principal, { scope: "ask:read", collectionId: id });
+  if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
+  const bound = binding.bound ? binding : null;
   const parsed = await readBoundedJson(request, 2_048);
   if (!parsed.ok) return NextResponse.json(
     { code: parsed.code === "REQUEST_TOO_LARGE" ? "QUESTION_TOO_LARGE" : "INVALID_JSON" },
@@ -259,14 +271,24 @@ export async function POST(
   const workspaceKey = auth.principal.workspaceKey;
   const idempotencyKey = request.headers.get("idempotency-key");
   const requestDigest = `${id}\n${question}`;
-  const active = await getFoundationActiveWorld(workspaceKey, id);
+  // A bound context resolves its exact World here, which is that same "before a cache".
+  const resolution = bound ? await resolveBoundSnapshot(bound, workspaceKey) : null;
+  if (resolution && !resolution.ok) {
+    return NextResponse.json({ code: resolution.code }, { status: resolution.status, headers: NO_STORE });
+  }
+  const active = resolution
+    ? { ok: true as const, world: resolution.world }
+    : await getFoundationActiveWorld(workspaceKey, id);
   if (!active.ok) return NextResponse.json({ code: active.code }, {
     status: active.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : 503, headers: NO_STORE,
   });
+  // A bound request is also keyed by its context identity, so a legacy request reusing the same
+  // idempotency key is never handed a bound answer, nor a bound one a legacy answer.
   const identity = JSON.stringify([auth.principal.kind, auth.principal.userId,
     auth.principal.keyId ?? null, [...auth.principal.scopes].sort(),
     auth.principal.authorizationRevision, id,
-    active.world.manifestDigest, active.world.worldStateId, active.world.revision]);
+    active.world.manifestDigest, active.world.worldStateId, active.world.revision,
+    ...(bound ? [bound.identity] : [])]);
   const lease = await acquireWorkspaceOperation("ask", workspaceKey, {
     key: idempotencyKey, identity, body: requestDigest,
   });
@@ -297,11 +319,21 @@ export async function POST(
         status: authorizedNow.status, headers: NO_STORE,
       });
       const current = await getFoundationActiveWorld(workspaceKey, id);
-      if (!current.ok) return NextResponse.json({ code: current.code }, { status: 503, headers: NO_STORE });
-      if (current.world.manifestDigest !== active.world.manifestDigest
-          || current.world.worldStateId !== active.world.worldStateId
-          || current.world.revision !== active.world.revision) {
-        return NextResponse.json({ code: "ACTIVE_WORLD_CHANGED_RETRY" }, { status: 409, headers: NO_STORE });
+      if (bound && resolution) {
+        // Bound: a World that moved -- or is gone -- is the context's own refusal, never remembered.
+        const confirmed = current.ok
+          ? reconfirmConsumerSnapshot(bound, resolution.resolved, snapshotOf(current.world))
+          : current.code === "ACTIVE_WORLD_NOT_FOUND"
+            ? consumerSnapshotMoved(bound)
+            : { ok: false as const, code: current.code, status: 503 };
+        if (!confirmed.ok) return NextResponse.json({ code: confirmed.code }, { status: confirmed.status, headers: NO_STORE });
+      } else {
+        if (!current.ok) return NextResponse.json({ code: current.code }, { status: 503, headers: NO_STORE });
+        if (current.world.manifestDigest !== active.world.manifestDigest
+            || current.world.worldStateId !== active.world.worldStateId
+            || current.world.revision !== active.world.revision) {
+          return NextResponse.json({ code: "ACTIVE_WORLD_CHANGED_RETRY" }, { status: 409, headers: NO_STORE });
+        }
       }
     }
     // Only a completed answer is remembered. Replaying a 503 would turn a transient outage into
@@ -318,7 +350,21 @@ export async function POST(
   }
   // Cache completion and lease cleanup can await the database. Recheck after both,
   // including for old cached answers, before constructing a response containing knowledge.
-  if (answered.status === 200) {
+  let acknowledgement: Readonly<Record<string, string>> = {};
+  if (answered.status === 200 && bound && resolution) {
+    /*
+      Bound: the same three late checks, made by the release -- source access and derived-data
+      admission over the resolved World's sources, then authorization -- followed by a last read
+      of the active World. A replayed answer is released the same way, against the pair it
+      carries: it is acknowledged only while that is still the resolved, active one.
+    */
+    const released = await releaseConsumerContext({
+      request, principal: auth.principal, scope: "ask:read", bound, snapshot: resolution,
+      served: snapshotOf(answered.body.activeWorld),
+    });
+    if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
+    acknowledgement = released.headers;
+  } else if (answered.status === 200) {
     const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
@@ -355,6 +401,7 @@ export async function POST(
       recordServerFunnel("external_consumer_succeeded", { from: "ask" });
     }
   }
-  return NextResponse.json(answered.body, { status: answered.status, headers: lease.replay
-    ? { ...NO_STORE, "X-Tavonel-Idempotent-Replay": "true" } : NO_STORE });
+  return NextResponse.json(answered.body, { status: answered.status, headers: {
+    ...NO_STORE, ...acknowledgement, ...(lease.replay ? { "X-Tavonel-Idempotent-Replay": "true" } : {}),
+  } });
 }

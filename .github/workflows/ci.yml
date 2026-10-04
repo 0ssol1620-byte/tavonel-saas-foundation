@@ -1,8 +1,16 @@
 name: CI
 on:
   pull_request:
+    types: [ready_for_review]
   push:
-    branches: [main, "agent/**"]
+    branches:
+      - main
+      - codex/gate-acl-integration-20260927
+      - codex/gate-lifecycle-integration-20260927
+      - codex/operations-integration-20260830
+      - codex/site-truth-integration-20260924
+      - codex/tavonel-foundation-p0p2-integration
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

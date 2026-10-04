@@ -3,10 +3,11 @@ import { microsoftGraphItemUrl, type OAuthSourceItem, type OAuthSourceTarget } f
 import type { OAuthConnectorProvider } from "./connector-oauth";
 import { safeFetch } from "./safe-url";
 import { quickXorHash } from "./quick-xor-hash";
+import { dropboxContentHash } from "./dropbox-source-integrity";
 
 export type SourceVersionObservation = {
   id: string; version: string; contentTag: string | null; mimeType: string;
-  size: number | null; hash: string | null; algorithm: "sha256" | "sha1" | "md5" | "quickxor" | null;
+  size: number | null; hash: string | null; algorithm: "sha256" | "sha1" | "md5" | "quickxor" | "dropbox" | null;
 };
 const refused = () => new Error("SOURCE_REVISION_UNQUALIFIED");
 const text = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 512;
@@ -22,7 +23,7 @@ function digest(value: unknown, length: number): string | null {
 
 export async function observeSourceVersion(provider: OAuthConnectorProvider, item: OAuthSourceItem,
   target: OAuthSourceTarget, accessToken: string, fetcher: typeof fetch): Promise<SourceVersionObservation | null> {
-  if (provider === "dropbox") return null; // Its download response binds an exact requested revision.
+  if (provider === "dropbox") return observeDropboxVersion(item, accessToken, fetcher);
   if (!text(item.nativeId)) throw refused();
   const google = provider === "google_drive";
   const url = new URL(google ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(item.nativeId)}` : microsoftGraphItemUrl(item.nativeId, target));
@@ -67,11 +68,49 @@ export async function observeSourceVersion(provider: OAuthConnectorProvider, ite
     algorithm: sha1 ? "sha1" : "quickxor" };
 }
 
+/*
+  Dropbox's `rev:` download pins the bytes of the listed revision, but says nothing about whether that
+  revision is still the file's current one: a stale or replayed list page would bind an older rev after
+  a newer one. `files/get_metadata` on the stable `id:` path returns the current revision, so the listed
+  rev must equal it. Revisions are opaque: they are compared for equality only, never ordered.
+*/
+async function observeDropboxVersion(item: OAuthSourceItem, accessToken: string, fetcher: typeof fetch): Promise<SourceVersionObservation> {
+  if (!text(item.nativeId) || !item.nativeId.startsWith("id:")) throw refused();
+  const url = "https://api.dropboxapi.com/2/files/get_metadata";
+  const response = await safeFetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ path: item.nativeId, include_deleted: false }),
+  }, { origins: ["https://api.dropboxapi.com"], pathPrefix: "/2/files/", maxRedirects: 0, maxResponseBytes: 32768, timeoutMs: 8000 }, fetcher);
+  if (response.ok && response.status === 409) {
+    // A file that no longer exists at its id is not current at any revision.
+    let notFound = false;
+    try {
+      const error = object(object(JSON.parse(response.text)).error);
+      notFound = error[".tag"] === "path" && object(error.path)[".tag"] === "not_found";
+    } catch { notFound = false; }
+    throw new Error(notFound ? "SOURCE_REVISION_SUPERSEDED" : "SOURCE_VERSION_READ_FAILED");
+  }
+  if (!response.ok || response.status !== 200) throw new Error("SOURCE_VERSION_READ_FAILED");
+  let row: Record<string, unknown>;
+  try { row = object(JSON.parse(response.text)); } catch { throw refused(); }
+  if (row.id !== item.nativeId || row[".tag"] !== "file") throw new Error("SOURCE_REVISION_MISMATCH");
+  if (!text(row.rev) || !/^[A-Za-z0-9_-]{1,512}$/.test(row.rev) || row.is_downloadable === false
+    || !Number.isSafeInteger(row.size) || (row.size as number) < 0) throw refused();
+  const hash = digest(row.content_hash, 64);
+  if (!hash) throw refused();
+  // The provider names a different current revision of the same file: the listed one is superseded.
+  // Its change feed reports that newer revision (or the deletion) after this page's cursor.
+  if (row.rev !== item.revision) throw new Error("SOURCE_REVISION_SUPERSEDED");
+  return { id: item.nativeId, version: row.rev, contentTag: null, mimeType: "", size: row.size as number, hash, algorithm: "dropbox" };
+}
+
 export function verifySourceVersion(before: SourceVersionObservation | null, after: SourceVersionObservation | null, bytes: Uint8Array): string | null {
   if (JSON.stringify(before) !== JSON.stringify(after)) return "SOURCE_REVISION_MISMATCH";
   if (before?.size !== null && before?.size !== undefined && before.size !== bytes.byteLength) return "SOURCE_CONTENT_HASH_MISMATCH";
   if (before?.hash && before.algorithm) {
-    const actual = before.algorithm === "quickxor" ? quickXorHash(bytes) : createHash(before.algorithm).update(bytes).digest("hex");
+    const actual = before.algorithm === "quickxor" ? quickXorHash(bytes)
+      : before.algorithm === "dropbox" ? dropboxContentHash(bytes) : createHash(before.algorithm).update(bytes).digest("hex");
     if (actual !== before.hash) return "SOURCE_CONTENT_HASH_MISMATCH";
   }
   return null;

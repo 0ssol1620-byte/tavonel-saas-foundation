@@ -23,7 +23,7 @@ const block = (slug: string) => {
 };
 
 async function openApiDocument() {
-  const response = openApi(new Request("https://tavonel.com/api/openapi"));
+  const response = await openApi(new Request("https://tavonel.com/api/openapi"));
   return (await response.json()) as {
     paths: Record<string, { post?: { responses: Record<string, { description?: string }> } }>;
   };

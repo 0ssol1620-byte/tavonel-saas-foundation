@@ -421,7 +421,8 @@ describe("public copy", () => {
     const rendered = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map(
       match => match[1]!
     );
-    expect(rendered).toEqual(["hero", "proof", "recompile", "trust", "start"]);
+    expect(rendered).toEqual(["proof", "recompile", "trust", "start"]);
+    expect(page).toContain("<HeroSourceCard korean={korean}");
     for (const removed of ["sources", "evidence", "why", "use"]) {
       expect(page).not.toContain(`copy={copy.${removed}}`);
     }
@@ -493,13 +494,14 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("opens on the four-cut film, then the specimen and live inspector", () => {
+  it("opens on committed source evidence, then the specimen and live inspector", () => {
     const page = landingSource();
     /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
        film opens the landmark that explains how the World was compiled. The entry pages preload
        the hero's own raster because that is the image above the fold now. */
-    expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<HeroFilm"));
-    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
+    expect(page.indexOf('id="lv2-hero-title"')).toBeLessThan(page.indexOf("<HeroSourceCard"));
+    expect(page.indexOf("<HeroSourceCard")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
+    expect(page).not.toContain("<HeroFilm");
     expect(page.indexOf("<CompilerSpecimen")).toBeLessThan(page.indexOf("<HeroProof"));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
@@ -1319,7 +1321,7 @@ describe("public copy", () => {
     const order = [
       'id="s1"',
       "<HeroActions",
-      "<HeroFilm",
+      "<HeroSourceCard",
       'id="s2"',
       "<CompilerSpecimen",
       "<HeroProof",
@@ -1365,7 +1367,7 @@ describe("public copy", () => {
     at the demo rather than two pages away from it.
   */
   it("states what the Apple sample does not represent, next to the sample", () => {
-    const stage = read("components/explore/explore-stage.tsx");
+    const stage = read("components/explore/evidence-workbench.tsx");
     /*
       BA-037 rewrote the note this guards: six scoping clauses at 11px sitting under the page's
       central promise became three sentences at 15px, and "Apple&apos;s" became U+2019. The fact
@@ -1390,8 +1392,8 @@ describe("public copy", () => {
       stage,
       "and what the read does not recover is still one link away"
     ).toContain('href="/sources"');
-    expect(read("components/explore/explore-stage.module.css")).toMatch(
-      /\.entryNote \{[^}]*font-size: 1[5-9]px/
+    expect(read("components/explore/evidence-workbench.module.css")).toMatch(
+      /\.boundary \{[^}]*font-size:\s*1[5-9]px/
     );
   });
 });

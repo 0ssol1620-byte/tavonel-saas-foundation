@@ -109,7 +109,10 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
   await page.keyboard.press("Enter");
   const panel = page.locator("header.nav details.mobile-primary-nav > nav");
   await expect(panel).toBeVisible();
-  await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "2px");
+  // The source-first paper surface uses the same 3px blue keyboard ring for every control.
+  await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "3px");
+  await expect(summary).toHaveCSS("outline-offset", "3px");
+  await expect(summary).toHaveCSS("outline-color", "rgb(36, 71, 179)");
   await expect(summary).not.toHaveCSS("outline-style", "none");
 
   await panel.locator(":scope > a").last().focus();

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
+import {
+  bindConsumerContext,
+  releaseConsumerContext,
+  resolveBoundSnapshot,
+  worldModelSnapshot,
+} from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
+import { getFoundationActiveWorld } from "@/lib/world-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -48,6 +55,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const auth = await authorizeFoundationRequest(request, "worlds:read", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const { id, lens } = await context.params;
+  // A consumer context is bound to the principal just verified, before anything is read.
+  const binding = bindConsumerContext(request.headers, auth.principal, { scope: "worlds:read", collectionId: id });
+  if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
   if (!LENSES.has(lens)) return NextResponse.json({ code: "WORLD_LENS_NOT_FOUND" }, { status: 404, headers: NO_STORE });
 
   const search = new URL(request.url).searchParams;
@@ -64,7 +74,22 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ code: "WORLD_PAGE_LIMIT_INVALID" }, { status: 400, headers: NO_STORE });
   }
 
-  const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id);
+  // Bound: resolved before the World is read, and the read is the resolved digest, never the
+  // preferred candidate. Legacy reads the active World list_worlds reports, and the preferred
+  // candidate only when no World is active; a pointer that cannot be read is an outage, never a
+  // reason to answer with some other candidate.
+  const snapshot = binding.bound ? await resolveBoundSnapshot(binding, auth.principal.workspaceKey) : null;
+  if (snapshot && !snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
+  let selected: string | undefined;
+  if (snapshot) selected = snapshot.resolved.snapshot.manifestDigest;
+  else {
+    const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
+    if (active.ok) selected = active.world.manifestDigest;
+    else if (active.code !== "ACTIVE_WORLD_NOT_FOUND") {
+      return NextResponse.json({ code: active.code }, { status: active.code === "WORLD_ID_INVALID" ? 400 : 503, headers: NO_STORE });
+    }
+  }
+  const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
   if (!loaded.ok) return NextResponse.json({ code: loaded.code }, { status: loaded.status, headers: NO_STORE });
   const shared = {
     code: "OK",
@@ -73,32 +98,36 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     freshness: loaded.model.freshness,
   };
 
+  let body: Record<string, unknown>;
   if (paged && limit !== null) {
     const all = loaded.model[lens as "objects" | "relations" | "evidence"] as Identified[];
     const page = paginate(all, limit, cursor);
     if (!page) {
       return NextResponse.json({ code: "WORLD_PAGE_CURSOR_INVALID" }, { status: 400, headers: NO_STORE });
     }
-    return NextResponse.json(
-      {
-        ...shared,
-        [lens]: page.items,
-        page: { limit, cursor, nextCursor: page.nextCursor, total: page.total },
-      },
-      { headers: NO_STORE },
-    );
-  }
-
-  const payload = lens === "files"
-    ? { files: loaded.model.files, signature: loaded.model.signature }
-    : { [lens]: loaded.model[lens as keyof Pick<typeof loaded.model, "objects" | "relations" | "evidence" | "history" | "review">] };
-  const whole = (payload as Record<string, unknown>)[lens];
-  return NextResponse.json(
-    {
+    body = {
+      ...shared,
+      [lens]: page.items,
+      page: { limit, cursor, nextCursor: page.nextCursor, total: page.total },
+    };
+  } else {
+    const payload = lens === "files"
+      ? { files: loaded.model.files, signature: loaded.model.signature }
+      : { [lens]: loaded.model[lens as keyof Pick<typeof loaded.model, "objects" | "relations" | "evidence" | "history" | "review">] };
+    const whole = (payload as Record<string, unknown>)[lens];
+    body = {
       ...shared,
       ...payload,
       page: { limit: null, cursor: null, nextCursor: null, total: Array.isArray(whole) ? whole.length : null },
-    },
-    { headers: NO_STORE },
-  );
+    };
+  }
+
+  if (!binding.bound || !snapshot) return NextResponse.json(body, { headers: NO_STORE });
+  // Acknowledged only for the World the model itself says it was built from.
+  const released = await releaseConsumerContext({
+    request, principal: auth.principal, scope: "worlds:read", bound: binding, snapshot,
+    served: worldModelSnapshot(loaded.model),
+  });
+  if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
+  return NextResponse.json(body, { headers: { ...released.headers } });
 }

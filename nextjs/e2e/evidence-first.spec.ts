@@ -25,7 +25,7 @@ import { expect, test } from "@playwright/test";
 
 test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("Knowledge you can verify.");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("Evidence you can inspect.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   await expect(page.locator("[data-source-sheet]")).toHaveCount(0);
 
@@ -47,7 +47,8 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await expect(page.locator("section#s2 .lv2-hero-inspector")).toHaveCount(1);
   await expect(page.locator("section#s2 .lv2-hero-stats a")).toHaveCount(4);
   await expect(page.locator("section#s1 canvas")).toHaveCount(0);
-  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(1);
+  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(0);
+  await expect(page.locator("section#s1 .paper-source").locator("blockquote")).not.toBeEmpty();
   await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(0);
   await expect(page.locator("section#s2 .lv2-film-note")).toHaveCount(0);
   await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(1);
@@ -97,7 +98,7 @@ test("the hero and every scene below it fit the viewport at the active product-Q
 
 test("Korean visitors get the same story and the same route behind it", async ({ page }) => {
   await page.goto("/ko");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("AI가 활용할 수 있는 지식으로.");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("원문에서 확인하세요");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   // The same six scenes, and the same real source page behind the same claim.
   await expect(page.locator("main > section[data-scene]")).toHaveCount(6);
@@ -105,9 +106,10 @@ test("Korean visitors get the same story and the same route behind it", async ({
   await expect(page.locator('section#s3 a[href^="/explore?act=evidence&evidence="]').first())
     .toBeVisible();
   await expect(page.locator("section#s2 .lv2-hero-inspector")).toHaveCount(1);
-  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(1);
+  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(0);
+  await expect(page.locator("section#s1 .paper-source").locator("blockquote")).not.toBeEmpty();
   await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(0);
   await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "공개 Compiled World 열기" }).first()).toHaveAttribute("href", "/explore");
+  await expect(page.getByRole("link", { name: "공개 샘플 열기" }).first()).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

@@ -580,3 +580,14 @@
 @media (hover: hover) and (pointer: fine) {
   .node:hover { color: var(--text-hi); }
 }
+
+/* UX03: preserve readable cards instead of compressing a fixed-coordinate graph into overlap. */
+@media (min-width: 821px) {
+  .field { width:100%; min-height:560px; }
+}
+@media (min-width: 821px) and (max-width: 1100px) {
+  .field { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; min-height:0; aspect-ratio:auto; padding-block:16px; }
+  .field .edges { display:none; }
+  .field .node { position:relative; inset:auto !important; width:100%; height:auto; transform:none; --node-x:0px; --node-y:0px; min-height:110px; }
+  .field .node:active { transform:none; }
+}

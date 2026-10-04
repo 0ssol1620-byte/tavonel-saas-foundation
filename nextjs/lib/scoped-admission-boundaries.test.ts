@@ -95,6 +95,9 @@ describe("compile-jobs v2 origin classification", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string) => {
       const url = new URL(input);
       if (url.pathname.endsWith("/rpc/connector_documents_blocked")) return new Response("false");
+      if (url.pathname.endsWith("/rpc/assert_foundation_intake_compile_set")) {
+        return new Response(JSON.stringify({ allowed: true, approvalRequired: false }), { headers: { "content-type": "application/json" } });
+      }
       const rows = (url.pathname.endsWith("connector_document_bindings") ? bindings : admissions)
         .filter((r) => url.searchParams.get("document_id")!.includes(r.document_id));
       return new Response(JSON.stringify(rows), { headers: { "content-range": `0-${rows.length - 1}/${rows.length}` } });

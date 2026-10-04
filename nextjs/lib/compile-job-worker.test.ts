@@ -384,3 +384,29 @@ describe("a compiler that keeps saying the reading is not finished", () => {
     expect(recordDeferral).toHaveBeenCalledWith(expect.objectContaining({ attempt: 1 }));
   });
 });
+
+describe("private global collection worker", () => {
+  it("leaves a durable global job pending while qualification is disabled", async () => {
+    vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_COMPILE", "0");
+    const result = await runCompileJobTurn(job({ compilationMode: "global_collection", corpusId: `corpus-${"a".repeat(32)}` }));
+    expect(result.note).toBe("skipped");
+    expect(runCompile).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+});
+
+
+it("compiles every document of a qualified global job into one logical collection", async () => {
+  vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_COMPILE", "1");
+  vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+  vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256", `sha256:${"a".repeat(64)}`);
+  const ids = Array.from({ length: 13 }, (_, i) => `doc-${i}`);
+  group.mockReturnValue(ids.map((id) => DOCUMENT(id, "ocr_ready")));
+  runCompile.mockResolvedValue({ ok: true, status: 200, payload: { collectionId: `collection-${"b".repeat(32)}`, lifecycle: "candidate" } });
+  const corpusId = `corpus-${"a".repeat(32)}`;
+  const turn = await runCompileJobTurn(job({ compilationMode: "global_collection", corpusId,
+    batchIndex: 0, batchCount: 1, documentIds: ids, documentsTotal: 13 }));
+  expect(turn.note).toBe("compiled");
+  expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`);
+  vi.unstubAllEnvs();
+});

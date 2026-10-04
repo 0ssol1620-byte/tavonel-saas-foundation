@@ -38,19 +38,18 @@ const isNarrow = (page: Page) => (page.viewportSize()?.width ?? 1440) <= NARROW_
 
 async function enterWorld(page: Page) {
   await page.goto("/explore");
-  await page.getByRole("button", { name: "ENTER WORLD" }).click();
+  await page.getByRole("button", { name: "Relations ↗" }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "world");
 }
 
-test("the entry is one way in, with the world already behind it", async ({ page }) => {
+test("the entry offers source evidence before graph navigation", async ({ page }) => {
   await page.goto("/explore");
-  await expect(page.getByRole("heading", { name: "Step inside a Compiled World." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Follow it to the source/ })).toBeVisible();
   await expect(
-    page.getByText(/Explore how knowledge, relationships and answers remain connected/),
+    page.getByLabel("Find a sample question"),
   ).toBeVisible();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "entry");
-  // The sample declares itself once, in the header badge, and never argues with itself again.
-  await expect(page.getByText("INTERACTIVE SAMPLE")).toHaveCount(1);
+  await expect(page.getByText(/Read-only sample · sources captured/)).toBeVisible();
   // §49: none of this is on the default surface.
   await expect(page.locator("body")).not.toContainText(/sha256:/);
   await expect(page.locator("body")).not.toContainText(/BBOX|not_yet/i);

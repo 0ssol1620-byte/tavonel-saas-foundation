@@ -1,0 +1,45 @@
+/*
+  VISUAL_QA_REPORT: "/status still has a narrow reading column and substantial unused desktop
+  width." The page is a one-track document (its title stack holds only the H1, so product-polish.css
+  collapses `.body` to one column) and every paragraph is capped at 68ch by `.public-page .body p`.
+  The two status grids already spanned the column; the prose between them did not, so at 1440 the
+  right half of the column was empty for most of the page's height.
+
+  The measure stays. What changes is that related prose sits side by side instead of in one stack:
+  the scheduled-check explanation beside its last-run stamps, the incident record beside the way to
+  be told about one, and the two contact sentences together. The two status grids keep the full
+  width and their own styling in tavonel.css, so configuration rows and request outcomes still read
+  as two different lists.
+
+  Below 901px everything is a single stack in source order. (`.status-list` itself changes to one
+  column at a different width -- 1320px, in its shared rule in tavonel.css.) No transition or animation is declared here, so the reduced-motion
+  contract has nothing new to turn off.
+*/
+.sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px clamp(32px, 4vw, 64px);
+  align-items: start;
+}
+
+/* The same 14px rhythm `.policy-copy` gives its direct children, which these sections now are. */
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  min-width: 0;
+}
+
+.guidance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px clamp(32px, 4vw, 64px);
+  align-items: start;
+}
+
+@media (min-width: 901px) {
+  .sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wide { grid-column: 1 / -1; }
+  .guidance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

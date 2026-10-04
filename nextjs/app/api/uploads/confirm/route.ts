@@ -12,6 +12,9 @@ import {
 } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "@/lib/supabase-admin";
 import { assessTrialSourceReuse } from "@/lib/trial-source-risk";
+import { readFoundationIntakeApproval } from "@/lib/compute-reservation";
+import { ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
+import { intakePricingFingerprint } from "@/lib/usage-pricing";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -54,45 +57,37 @@ const RPC_ERRORS: Array<[string, string, number]> = [
 ];
 
 async function confirmAdmission(value: {
-  workspaceKey: string;
-  documentId: string;
-  userId: string;
-  sourceSha256: string | null;
-  observedBytes: number | null;
-  observedMime: string | null;
+  workspaceKey: string; documentId: string; userId: string; attemptKey: string; scopeDigest: string; fileKey: string;
+  sourceSha256: string | null; observedBytes: number | null; observedMime: string | null;
 }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "INTAKE_CONFIRMATION_NOT_CONFIGURED", status: 503 };
   let response: Response;
   try {
-    response = await supabaseAdminRequest(config, "/rest/v1/rpc/confirm_foundation_intake_admission", {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/confirm_foundation_intake_approved_upload", {
       method: "POST",
       body: JSON.stringify({
-        p_workspace_key: value.workspaceKey,
-        p_document_id: value.documentId,
-        p_user_id: value.userId,
-        p_source_sha256: value.sourceSha256,
-        p_observed_bytes: value.observedBytes,
-        p_observed_mime: value.observedMime,
+        p_workspace_key: value.workspaceKey, p_user_id: value.userId, p_attempt_key: value.attemptKey,
+        p_scope_digest: value.scopeDigest, p_file_key: value.fileKey, p_document_id: value.documentId,
+        p_source_sha256: value.sourceSha256, p_observed_bytes: value.observedBytes, p_observed_mime: value.observedMime,
       }),
     });
-  } catch {
-    return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 };
-  }
+  } catch { return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 }; }
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { message?: unknown } | null;
     const message = typeof body?.message === "string" ? body.message : "";
     const mapped = RPC_ERRORS.find(([needle]) => message.includes(needle));
-    return mapped
-      ? { ok: false as const, code: mapped[1], status: mapped[2] }
+    return mapped ? { ok: false as const, code: mapped[1], status: mapped[2] }
       : { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 };
   }
   const result = await response.json().catch(() => null) as Record<string, unknown> | null;
-  if (!result || result.documentId !== value.documentId || result.status !== "confirmed"
-    || typeof result.confirmedAt !== "string" || !Number.isFinite(Date.parse(result.confirmedAt))) {
-    return { ok: false as const, code: "INTAKE_CONFIRMATION_RECEIPT_INVALID", status: 503 };
-  }
-  return { ok: true as const, result };
+  const admission = result?.admission as Record<string, unknown> | null;
+  const approvedFile = result?.approvedFile as Record<string, unknown> | null;
+  if (!admission || admission.documentId !== value.documentId || admission.status !== "confirmed"
+    || typeof admission.confirmedAt !== "string" || !Number.isFinite(Date.parse(admission.confirmedAt))
+    || !approvedFile || approvedFile.fileKey !== value.fileKey || approvedFile.documentId !== value.documentId
+    || approvedFile.fileState !== "confirmed") return { ok: false as const, code: "INTAKE_CONFIRMATION_RECEIPT_INVALID", status: 503 };
+  return { ok: true as const, result: admission, approvedFile };
 }
 
 export async function POST(request: Request) {
@@ -108,19 +103,38 @@ export async function POST(request: Request) {
     { code: parsed.code === "REQUEST_TOO_LARGE" ? "UPLOAD_CONFIRM_REQUEST_TOO_LARGE" : "UPLOAD_CONFIRM_BODY_INVALID" },
     { status: parsed.status, headers },
   );
-  const body = parsed.value as { documentId?: unknown; sourceSha256?: unknown };
+  const body = parsed.value as {
+    documentId?: unknown; sourceSha256?: unknown; attemptKey?: unknown; scopeDigest?: unknown; fileKey?: unknown;
+  };
   const documentId = typeof body.documentId === "string" ? body.documentId : "";
   if (!DOCUMENT_ID_PATTERN.test(documentId)) {
     return NextResponse.json({ code: "UPLOAD_CONFIRM_BODY_INVALID" }, { status: 400, headers });
   }
-  // Absent is allowed and recorded as absent: a page served without a secure context cannot
-  // compute a digest, and saying so is honest where inventing one would not be. A malformed one
-  // is refused rather than dropped, because that is a client defect worth seeing.
+  // A malformed digest is refused rather than dropped. The approved manifest below binds every
+  // file to its content digest, so a missing digest cannot confirm a paid upload either.
   if (body.sourceSha256 !== undefined
     && (typeof body.sourceSha256 !== "string" || !SOURCE_SHA256.test(body.sourceSha256))) {
     return NextResponse.json({ code: "INVALID_SOURCE_DIGEST" }, { status: 400, headers });
   }
   const sourceSha256 = typeof body.sourceSha256 === "string" ? body.sourceSha256 : null;
+  const attemptKey = typeof body.attemptKey === "string" ? body.attemptKey : "";
+  const scopeDigest = typeof body.scopeDigest === "string" ? body.scopeDigest : "";
+  const fileKey = typeof body.fileKey === "string" ? body.fileKey : "";
+  if (!ATTEMPT_KEY_PATTERN.test(attemptKey) || !SHA256_DIGEST_PATTERN.test(scopeDigest) || !FILE_KEY_PATTERN.test(fileKey)) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_REQUIRED" }, { status: 428, headers });
+  }
+  const approval = await readFoundationIntakeApproval({
+    workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, attemptKey,
+  });
+  if (!approval.ok) return NextResponse.json({ code: approval.code }, { status: approval.status, headers });
+  if (approval.result.pricingFingerprint !== await intakePricingFingerprint()) {
+    return NextResponse.json({ code: "INTAKE_PRICE_STALE" }, { status: 409, headers });
+  }
+  const approvedFile = approval.result.files.find((file) => file.fileKey === fileKey);
+  if (!approvedFile || approvedFile.documentId !== documentId || approval.result.scopeDigest !== scopeDigest
+    || approvedFile.contentSha256 !== sourceSha256) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" }, { status: 409, headers });
+  }
 
   // Approval may be revoked after a short-lived capability was issued.
   if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "direct_upload")) {
@@ -206,9 +220,9 @@ export async function POST(request: Request) {
     userId: auth.principal.userId,
     sourceSha256,
     observedBytes: object.sizeBytes,
-    observedMime: object.contentType,
+    observedMime: object.contentType, attemptKey, scopeDigest, fileKey,
   });
   if (!confirmed.ok) return NextResponse.json({ code: confirmed.code }, { status: confirmed.status, headers });
 
-  return NextResponse.json({ code: "UPLOAD_CONFIRMED", result: confirmed.result }, { headers });
+  return NextResponse.json({ code: "UPLOAD_CONFIRMED", result: confirmed.result, approvedFile: confirmed.approvedFile }, { headers });
 }

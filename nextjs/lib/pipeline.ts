@@ -137,7 +137,7 @@ export type LocalUpload = {
   bytes: number;
   /** Set once the capability call returns; this is what joins it to the server list. */
   documentId: string | null;
-  phase: "issuing" | "sending" | "stored" | "failed";
+  phase: "issuing" | "sending" | "stored" | "failed" | "uncertain";
   loaded: number;
   /** Set when phase is "failed". Shown verbatim; it is the reason, not a category. */
   reason?: string;
@@ -230,6 +230,7 @@ function rowFor(
 function quarantineStage(upload: LocalUpload | null, server: PipelineDocument | null): Stage {
   if (upload) {
     if (upload.phase === "failed") return stage("quarantine", "failed", upload.reason ?? "upload did not complete");
+    if (upload.phase === "uncertain") return stage("quarantine", "held", upload.reason ?? "upload outcome is uncertain; check the approved attempt");
     if (upload.phase === "issuing") return stage("quarantine", "active", "preparing secure upload");
     if (upload.phase === "sending") {
       const pct = upload.bytes > 0 ? Math.floor((upload.loaded / upload.bytes) * 100) : 0;

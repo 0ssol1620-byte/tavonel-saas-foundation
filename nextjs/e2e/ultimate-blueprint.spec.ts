@@ -43,7 +43,7 @@ test("the homepage Verify frame opens the no-login Compiled World sample on its 
 test("the sample opens onto real provenance and claims nothing it has not compiled", async ({ page }) => {
   await page.goto("/explore");
   const stage = page.locator('[data-visual-world="explore"]');
-  await page.getByRole("button", { name: "ENTER WORLD" }).click();
+  await page.getByRole("button", { name: "Relations ↗" }).click();
   /*
     A filing, opened the way a reader opens one: select the object, then ask for its evidence.
 

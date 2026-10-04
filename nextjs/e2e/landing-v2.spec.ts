@@ -2,7 +2,7 @@
  * Landing V2 browser contract after the 2026-09-20 six-beat edit.
  *
  * The home page is one short narrative: film, compiler explanation, proof, change, trust, action.
- * The hero uses the four approved film cuts; the deterministic CompilerSpecimen follows in its
+ * The hero reads the committed source artifact; the deterministic CompilerSpecimen follows in its
  * own semantic section so the explanation does not compete with the opening statement.
  */
 
@@ -12,13 +12,11 @@ import {
   COMPILER_SPECIMEN_STAGES,
 } from "../lib/compiler-specimen";
 
-const HEADLINE = "Your documents. Knowledge you can verify.";
+const HEADLINE = "Knowledge from your documents. Evidence you can inspect.";
 const REQUIRED_WIDTHS = new Set(["1920", "1440", "1280", "1024", "768", "390", "360"]);
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"] as const;
-/* The four film cuts are the first visual in Scene 01; the inspector follows in Scene 02. */
-const FILM = "#s1 .compile-film-sequence";
-const HERO_POSTER = "/film/poster-1-hero-2x.webp";
-const HERO_VIDEO = "/film/compile-cut.mp4";
+/* Source evidence is the first visual; the interactive explanation follows in Scene 02. */
+const HERO_EVIDENCE = "#s1 .paper-source";
 
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(
@@ -57,7 +55,7 @@ test.describe("six-beat page structure", () => {
     test(`${path} offers the next action before the How it compiles explanation`, async ({ page }) => {
       await page.goto(path);
       const actions = page.locator("#s1 .lv2-actions");
-      const film = page.locator(FILM);
+      const film = page.locator(HERO_EVIDENCE);
       const heading = page.locator("#s2 .lv2-how-head");
       const specimen = page.locator("#s2 [data-compiler-specimen]");
       const actionBox = await actions.boundingBox();
@@ -69,7 +67,12 @@ test.describe("six-beat page structure", () => {
       expect(headingBox).not.toBeNull();
       expect(specimenBox).not.toBeNull();
       expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-      expect(actionBox!.y + actionBox!.height).toBeLessThan(filmBox!.y);
+      if (page.viewportSize()!.width >= 1024) {
+        // Desktop evidence sits alongside the copy; both columns must remain distinct.
+        expect(actionBox!.x + actionBox!.width).toBeLessThanOrEqual(filmBox!.x);
+      } else {
+        expect(actionBox!.y + actionBox!.height).toBeLessThan(filmBox!.y);
+      }
       expect(filmBox!.y + filmBox!.height).toBeLessThan(headingBox!.y);
       expect(headingBox!.y + headingBox!.height).toBeLessThan(specimenBox!.y);
     });
@@ -175,66 +178,48 @@ for (const [path, label] of [["/", "Inspect all source regions"], ["/ko", "모�
   });
 }
 
-test.describe("HeroFilm", () => {
-  test("opens with visible four-cut film controls and aligned captions", async ({ page }) => {
+test.describe("source-first hero", () => {
+  test("opens with real source evidence and a working inspector route", async ({ page }) => {
     await page.goto("/");
-    const film = page.locator(FILM);
-    await expect(film).toHaveCount(1);
-    await expect(film.locator(".compile-film-viewport")).toBeVisible();
-    await expect(film.getByRole("tab")).toHaveCount(4);
-    await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
-    await expect(page.getByText("Choose a film cut")).toHaveCount(0);
+    const source = page.locator(HERO_EVIDENCE);
+    await expect(source).toHaveCount(1);
+    await expect(source.locator("blockquote")).not.toBeEmpty();
+    await expect(source).toContainText("Public sample · read only");
+    await expect(source).toContainText("not a customer performance claim");
+    await expect(page.locator("#s1 video")).toHaveCount(0);
     await expect(page.locator("#s2 [data-compiler-specimen]")).toHaveCount(1);
-    await expect(page.locator("#s2 .compile-film-sequence")).toHaveCount(0);
-    await expect(page.locator("#s2 .lv2-film-note")).toHaveCount(0);
-    /* The hero's own visual, in the landmark the film left. */
-    await expect(page.locator("#s2 .lv2-hero-inspector")).toHaveCount(1);
-    await expect(page.locator("#s1 canvas")).toHaveCount(0);
-    const edges = await page.locator("#s1 .lv2-film").evaluate(root => {
-      const caption = root.querySelector(".compile-film-caption")!.getBoundingClientRect();
-      const note = root.querySelector(":scope > .fine")!.getBoundingClientRect();
-      return { caption: caption.left, note: note.left, width: caption.width - note.width };
-    });
-    expect(Math.abs(edges.caption - edges.note)).toBeLessThanOrEqual(1);
-    expect(Math.abs(edges.width)).toBeLessThanOrEqual(1);
-    expect(await page.locator("main").innerText()).not.toContain(
-      ["A directed film", "not a screen recording."].join(", "),
-    );
+    await source.getByRole("link", { name: "Inspect this evidence" }).click();
+    await expect(page).toHaveURL(/\/explore\?act=evidence&evidence=/);
+    await expect(page.locator("[data-source-sheet]")).toBeVisible();
   });
 
-  test("server-renders the high-resolution first poster", async ({ page }) => {
+  test("server-renders an eager source page with dimensions and async decoding", async ({ page }) => {
     const response = await page.request.get("/");
     expect(response.status()).toBe(200);
     const html = await response.text();
-    const poster = html.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
-    expect(poster).toContain(HERO_POSTER);
-    expect(poster).toMatch(/ width="[1-9]\d*"/);
-    expect(poster).toMatch(/ height="[1-9]\d*"/);
-    expect(poster).toMatch(/fetchpriority="high"/i);
-    expect(poster).toMatch(/loading="eager"/i);
-    const heroCrop = html.match(/<img[^>]*data-source-image="region"[^>]*>/)?.[0] ?? "";
-    expect(heroCrop, "the hero server-renders no source-linked crop").not.toBe("");
-    expect(heroCrop).toMatch(/loading="lazy"/i);
-    expect(heroCrop).not.toMatch(/fetchpriority="high"/i);
-    expect(heroCrop).toMatch(/ width="[1-9]\d*"/);
-    expect(heroCrop).toMatch(/ height="[1-9]\d*"/);
+    const source = html.match(/<article class="paper-source"[\s\S]*?<\/article>/)?.[0] ?? "";
+    const image = source.match(/<img[^>]*>/)?.[0] ?? "";
+    expect(image).toMatch(/src="\/explore-sample\//);
+    expect(image).toMatch(/ width="[1-9]\d*"/);
+    expect(image).toMatch(/ height="[1-9]\d*"/);
+    expect(image).toMatch(/fetchpriority="high"/i);
+    expect(image).toMatch(/loading="eager"/i);
+    expect(image).toMatch(/decoding="async"/i);
   });
 
-  test("selects the verified locked master on desktop", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "1440", "the desktop source-selection contract");
-    await page.goto("/");
-    const film = page.locator(FILM);
-    await film.scrollIntoViewIfNeeded();
-    await expect(film).toHaveAttribute("data-video-primary-src", HERO_VIDEO);
-  });
-
-  test("keeps the verified locked master on phones", async ({ page }, testInfo) => {
-    test.skip(!["390", "360"].includes(testInfo.project.name), "the required phone sources");
-    await page.goto("/");
-    const film = page.locator(FILM);
-    await film.scrollIntoViewIfNeeded();
-    await expect(film).toHaveAttribute("data-video-primary-src", HERO_VIDEO);
-  });
+  for (const route of ["/", "/ko"]) {
+    test(`${route} retains the same source page under reduced motion`, async ({ page }) => {
+      await page.goto(route);
+      const source = page.locator(HERO_EVIDENCE);
+      const before = await source.locator("img").getAttribute("src");
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.reload();
+      await expect(source.locator("img")).toHaveAttribute("src", before!);
+      await expect(source.locator("img")).toBeVisible();
+      await expect(source.locator("blockquote")).not.toBeEmpty();
+      await expect(source.locator('a[href*="act=evidence"]')).toHaveCount(1);
+    });
+  }
 });
 
 test.describe("lower CompilerSpecimen explanation", () => {

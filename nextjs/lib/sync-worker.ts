@@ -59,6 +59,12 @@ const PERMANENT_SOURCE_SKIPS = new Set([
   "SOURCE_TOO_LARGE",
   "SOURCE_NATIVE_TYPE_UNSUPPORTED",
   "SOURCE_SIZE_UNQUALIFIED",
+  /*
+    The provider affirmatively named a different current revision, or no longer has the file. The
+    page is a stored snapshot, so retrying it would refuse the same stale entry forever; the change
+    feed delivers the newer revision or the deletion after this page's cursor. Nothing is bound.
+  */
+  "SOURCE_REVISION_SUPERSEDED",
 ]);
 const DAILY_QUOTA_RETRY_SECONDS = 60 * 60;
 

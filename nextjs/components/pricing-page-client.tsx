@@ -802,7 +802,7 @@ export default function PricingPageClient({
     Boolean(plan.offerCode) && liveCheckout && signedIn && !ownerBillingExempt;
 
   return (
-    <div className="page pricing-page">
+    <div className="page pricing-page paper-product">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(pricingJsonLd(initialLiveCheckout, faqRows)) }}
@@ -847,6 +847,12 @@ export default function PricingPageClient({
               product is sold on, and rendering it in `.notice.static` beside a closed gate made a
               designed property read as a defect.
             */}
+            <aside className="paper-purchase-boundary" aria-label="Before choosing a plan">
+              <h2>{selfService ? "Check the scope before choosing a plan" : "Start with the sample. Agree on your evaluation."}</h2>
+              {!ownFilesOpen ? <p>{gates.find(gate => gate.id === "customerData")?.reason}</p> : null}
+              <p>Developer and Team are currently single-member workspaces. The Team name does not include team invitations, shared roles, or organization administration.</p>
+              <p><Link href="/evaluation">Discuss an evaluation</Link> · <Link href="/sources">Read processing limits</Link> · <Link href="/status">Check current availability</Link></p>
+            </aside>
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>

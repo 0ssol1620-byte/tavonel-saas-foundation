@@ -4,6 +4,8 @@ const playwrightModule = await import(playwrightPackage);
 const { expect, test } =
   "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
+import { acceptEvidenceThroughUi, activateCandidateThroughUi } from "./support/workspace-review-actions";
+
 type Page = {
   addInitScript: (
     fn: (...args: never[]) => unknown,
@@ -12,8 +14,8 @@ type Page = {
   route: (
     url: string,
     handler: (route: {
-      fulfill: (options: { json: unknown; status?: number }) => Promise<void>;
-      request: () => { headers: () => Record<string, string> };
+      fulfill: (options: { json?: unknown; status?: number; contentType?: string; body?: Uint8Array }) => Promise<void>;
+      request: () => { headers: () => Record<string, string>; url: () => string };
     }) => Promise<void>
   ) => Promise<void>;
 };
@@ -69,6 +71,10 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
   await page.route("**/api/compile-jobs", route =>
     route.fulfill({ json: { code: "OK", jobs: [] } })
   );
+  await page.route("**/api/documents/*/source?**", route => {
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+  });
   await page.route("**/api/documents", route =>
     route.fulfill({ json: { documents: [] } })
   );
@@ -92,15 +98,16 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
       },
     })
   );
-  await page.route(`**/api/collections/${collectionId}`, route =>
-    route.fulfill({
+  await page.route(`**/api/collections/${collectionId}{,?*}`, route => {
+    const selectedManifest = new URL(route.request().url()).searchParams.get("manifest") ?? artifactManifest;
+    return route.fulfill({
       json: {
         candidatePromotion: false,
-        artifactKey: `immutable/pilot-test/pilot-test/collections/${collectionId}/${artifactManifest.replace("sha256:", "")}/candidate-world.json`,
+        artifactKey: `immutable/pilot-test/pilot-test/collections/${collectionId}/${selectedManifest.replace("sha256:", "")}/candidate-world.json`,
         artifact: {
           schemaVersion: "tavonel.collection_candidate.v1",
           collectionId,
-          manifestDigest: artifactManifest,
+          manifestDigest: selectedManifest,
           lifecycle: reviewRequired ? "review_required" : "candidate",
           candidatePromotion: false,
           reviewReasons: reviewRequired ? ["CONTRADICTION_CANDIDATE:claim-a:claim-b"] : [],
@@ -141,8 +148,8 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
           },
         },
       },
-    })
-  );
+    });
+  });
   await page.route(`**/api/collections/${collectionId}/world`, route =>
     route.fulfill({
       json: {
@@ -177,9 +184,10 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
       },
     })
   );
-  await page.route(`**/api/v1/world/${collectionId}`, async route => {
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, async route => {
     expect(route.request().headers().authorization).toMatch(/^Bearer \S+$/);
-    await route.fulfill({ json: { model: null } });
+    const manifest = new URL(route.request().url()).searchParams.get("manifest") ?? artifactManifest;
+    await route.fulfill({ json: { model: reviewRequired ? null : { ...worldModel, world: { ...worldModel.world, manifestDigest: manifest, status: manifest === activeManifest ? "active" : "candidate" } } } });
   });
   await page.route(`**/api/collections/${collectionId}/ask`, route =>
     route.fulfill({
@@ -230,7 +238,7 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
 const worldModel = {
   schemaVersion: "tavonel.world_read_model.v1",
   contract: { origin: "compiled_artifact", deterministicSample: false, realObjectsOnly: true, missingData: "not_yet" },
-  world: { id: collectionId, manifestDigest: activeManifest, status: "active", revision: 2 },
+  world: { id: collectionId, manifestDigest: candidateManifest, status: "candidate", revision: 2 },
   objects: [
     { id: "object-doc", stableKey: "doc", label: "Annual filing", type: "Document", status: "active", aliases: [], claims: [], relations: ["relation-topic", "relation-segment"], evidenceRefs: ["evidence-1"], sourceVersions: ["version-1"], firstSeen: "not_yet", lastChanged: "not_yet", readState: "read" },
     { id: "object-topic", stableKey: "topic", label: "Quarterly revenue", type: "Topic", status: "active", aliases: [], claims: [], relations: ["relation-topic", "relation-entity"], evidenceRefs: ["evidence-1"], sourceVersions: ["version-1"], firstSeen: "not_yet", lastChanged: "not_yet", readState: "read" },
@@ -258,11 +266,101 @@ const worldModel = {
  * Serve the World above instead of the `null` `mockWorkspace` installs. Registered after it, and
  * Playwright matches the most recently added handler first.
  */
-async function withCompiledWorld(page: Page) {
-  await page.route(`**/api/v1/world/${collectionId}`, route => route.fulfill({ json: { model: worldModel } }));
+async function withCompiledWorld(page: Page, manifest = candidateManifest) {
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: { model: { ...worldModel, world: { ...worldModel.world, manifestDigest: manifest, status: manifest === activeManifest ? "active" : "candidate" } } } }));
 }
 
 const NARROW_STAGE_MAX = 820;
+
+for (const action of ["activation", "rollback"] as const) {
+  test(`${action} lost response preserves input and reports an uncertain outcome`, async ({ page }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await installSession(page);
+    await mockWorkspace(page);
+    let requests = 0;
+    const endpoint = action === "activation" ? "promote" : "world/rollback";
+    await page.route(`**/api/collections/${collectionId}/${endpoint}`, async route => {
+      requests++;
+      await route.abort("connectionfailed");
+    });
+    await page.goto(`/workspace/review?collection=${collectionId}`);
+    const reason = page.getByLabel(action === "activation" ? "Human review record" : "Rollback reason");
+    await reason.fill("Synthetic review of retained source evidence.");
+    const button = page.getByRole("button", { name: action === "activation" ? "Activate reviewed candidate" : "Rollback to this version" });
+    page.once("dialog", dialog => dialog.accept());
+    await button.click();
+    await expect(page.getByText(`The ${action} response could not be confirmed.`, { exact: false })).toBeVisible();
+    await expect(page.getByText("the active pointer may have changed.", { exact: false })).toBeVisible();
+    await expect(reason).toHaveValue("Synthetic review of retained source evidence.");
+    await expect(button).toBeEnabled();
+    expect(requests).toBe(1);
+    expect(errors).toEqual([]);
+    await testInfo.attach(`uncertain-${action}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  });
+}
+
+test("a lost correction response retains the proposed edit and never announces a recorded decision", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await withCompiledWorld(page);
+  let requests = 0;
+  await page.route("**/api/v1/reviews", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    requests++;
+    if (requests === 1) return route.abort("connectionfailed");
+    await route.fulfill({ json: { resultingManifestDigest: `sha256:${"d".repeat(64)}` } });
+  });
+  await page.route(`**/api/collections/${collectionId}?manifest=**`, route => route.abort("connectionfailed"));
+  await page.goto(`/workspace/review?collection=${collectionId}`);
+  await page.getByRole("button", { name: "Correct", exact: true }).click();
+  await page.getByLabel("What should it say?").fill("Corrected synthetic source label");
+  await page.getByLabel("What needs to change?").fill("The synthetic source supports this corrected label.");
+  const submit = page.getByRole("button", { name: "Correct and compile a new candidate" });
+  await submit.click();
+  await expect(page.getByText("The review response could not be confirmed.", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("What should it say?")).toHaveValue("Corrected synthetic source label");
+  await expect(page.getByLabel("What needs to change?")).toHaveValue("The synthetic source supports this corrected label.");
+  await expect(submit).toBeEnabled();
+  expect(requests).toBe(1);
+  // The decision can be recorded while the subsequent candidate read fails.
+  // Keep the proposed edit available rather than clearing it before that read.
+  await submit.click();
+  await expect.poll(() => requests).toBe(2);
+  await expect(submit).toBeEnabled();
+  await expect(page.getByLabel("What should it say?")).toHaveValue("Corrected synthetic source label");
+  await expect(page.getByLabel("What needs to change?")).toHaveValue("The synthetic source supports this corrected label.");
+  expect(errors).toEqual([]);
+  await testInfo.attach("uncertain-correction", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+});
+
+test("Ask connection failure retains the question and allows an explicit grounded retry", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  let requests = 0;
+  await page.route(`**/api/collections/${collectionId}/ask`, async route => {
+    requests++;
+    if (requests === 1) return route.abort("connectionfailed");
+    await route.fallback();
+  });
+  await page.goto(`/workspace/ask?collection=${collectionId}`);
+  await page.getByLabel("Question").fill("What changed in quarterly revenue?");
+  const submit = page.getByRole("button", { name: "Ask the active World" });
+  await submit.click();
+  await expect(page.getByText("The answer response could not be read.", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("Question")).toHaveValue("What changed in quarterly revenue?");
+  await expect(page.getByText("Grounded answer", { exact: true })).toHaveCount(0);
+  await expect(submit).toBeEnabled();
+  expect(requests).toBe(1);
+  await submit.click();
+  await expect(page.getByText("Grounded answer", { exact: true })).toBeVisible();
+  expect(requests).toBe(2);
+  expect(errors).toEqual([]);
+});
 
 test("a first candidate does not claim consumers are reading a previous active World", async ({ page }, testInfo) => {
   await installSession(page);
@@ -270,7 +368,7 @@ test("a first candidate does not claim consumers are reading a previous active W
   await page.route(`**/api/collections/${collectionId}/world`, route =>
     route.fulfill({ status: 404, json: { code: "ACTIVE_WORLD_NOT_FOUND" } })
   );
-  await page.route(`**/api/v1/world/${collectionId}`, route =>
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route =>
     route.fulfill({ json: { model: {
       ...worldModel,
       world: { ...worldModel.world, status: "candidate", revision: null },
@@ -297,7 +395,7 @@ test("a first candidate does not claim consumers are reading a previous active W
 test("reopening the active World does not label it as a waiting candidate", async ({ page }, testInfo) => {
   await installSession(page);
   await mockWorkspace(page, false, activeManifest);
-  await withCompiledWorld(page);
+  await withCompiledWorld(page, activeManifest);
   await page.goto(`/workspace/world?collection=${collectionId}`);
   await expect(page.getByText("Active World loaded. Its required package entries and state were checked.")).toBeVisible();
   await expect(page.locator('[aria-labelledby="world-studio-title"]')).toContainText("Inspect the current World first");
@@ -355,7 +453,7 @@ test("source preview reuses bytes across pages and clears the previous document 
     { ...model.evidence[0], id: "evidence-page-one", page: 1, excerpt: "Preview fixture page one." },
     { ...model.evidence[0], id: "evidence-other-source", sourceId: "doc-b", page: 1, excerpt: "Preview fixture other source." },
   );
-  await page.route(`**/api/v1/world/${collectionId}`, route => route.fulfill({ json: { model } }));
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: { model } }));
   let reads = 0;
   let finishOther: (() => void) | undefined;
   const otherReady = new Promise<void>(resolve => { finishOther = resolve; });
@@ -384,7 +482,7 @@ test("source preview reuses bytes across pages and clears the previous document 
     await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
     expect(reads).toBe(2);
     const canvasBox = await inspector.locator("canvas").boundingBox();
-    const evidenceBox = await inspector.locator('[aria-label^="Evidence bounding box"]').boundingBox();
+    const evidenceBox = await inspector.locator('[data-evidence-bbox]').boundingBox();
     expect(canvasBox).not.toBeNull();
     expect(evidenceBox).not.toBeNull();
     expect(Math.abs(evidenceBox!.y - (canvasBox!.y + canvasBox!.height * 0.2))).toBeLessThan(2);
@@ -664,4 +762,193 @@ test("surfaces immutable OCR operator-review receipts without offering an automa
     body: await page.screenshot({ fullPage: true }),
     contentType: "image/png",
   });
+});
+
+
+test("pins correction, evidence, activation and browser history to the selected revision", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page);
+  const corrected = `sha256:${"c".repeat(64)}`;
+  const reads: string[] = [];
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => {
+    const digest = new URL(route.request().url()).searchParams.get("manifest")!;
+    reads.push(digest);
+    return route.fulfill({ json: { model: { ...worldModel,
+      world: { ...worldModel.world, manifestDigest: digest },
+      evidence: [{ ...worldModel.evidence[0], excerpt: digest === corrected ? "Corrected revision evidence." : "Original revision evidence." }],
+    } } });
+  });
+  await page.route("**/api/v1/reviews", async route => {
+    expect(route.request().postDataJSON().manifestDigest).toBe(candidateManifest);
+    await route.fulfill({ json: { resultingManifestDigest: corrected } });
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByText("Original revision evidence.", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Correct", exact: true }).click();
+  await page.getByLabel("What should it say?").fill("Corrected selected-revision label");
+  await page.getByLabel("What needs to change?").fill("This correction is bound to the source revision.");
+  await page.getByRole("button", { name: "Correct and compile a new candidate" }).click();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(corrected)));
+  await expect(page.getByText("Corrected revision evidence.", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Original revision evidence.", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Human review record").fill("Reviewed the corrected selected-revision evidence.");
+  await page.route(`**/api/collections/${collectionId}/promote`, async route => {
+    expect(route.request().postDataJSON()).toMatchObject({ manifestDigest: corrected, expectedCurrentManifest: activeManifest, expectedCurrentRevision: 2 });
+    await route.fulfill({ status: 409, json: { code: "WORLD_COMPARE_AND_SWAP_CONFLICT" } });
+  });
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Activate reviewed candidate" }).click();
+  await expect(page.getByText("Activation failed.", { exact: false })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
+  await expect(page.getByText("Original revision evidence.", { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel("Human review record")).toHaveValue("");
+  await page.goForward();
+  await expect(page.getByText("Corrected revision evidence.", { exact: true }).first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Corrected revision evidence.", { exact: true }).first()).toBeVisible();
+  expect(reads).toContain(candidateManifest); expect(reads).toContain(corrected);
+  await expect(page.getByRole("complementary", { name: "World selection inspector" }).locator('[data-state="ready"] canvas')).toBeVisible();
+  const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+  const sourceLabel = await inspector.locator('[data-state="ready"] canvas').locator("xpath=..").getAttribute("aria-label");
+  expect(sourceLabel).toBeTruthy();
+  const evidenceViewer = inspector.getByRole("group", { name: sourceLabel!, exact: true });
+  await expect(evidenceViewer).toHaveAttribute("data-state", "ready");
+  await expect(evidenceViewer.getByRole("img", { name: /, page \d+, evidence bounding box [\d.]+, [\d.]+, [\d.]+, [\d.]+$/ })).toBeVisible();
+  await expect(evidenceViewer.locator("i")).toHaveAttribute("aria-hidden", "true");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  await testInfo.attach("selected-revision", { body: await page.screenshot({ path: testInfo.outputPath("selected-revision.png"), fullPage: true }), contentType: "image/png" });
+});
+
+test("refuses a model returned for a different selected revision", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page);
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: {
+    model: { ...worldModel, world: { ...worldModel.world, manifestDigest: activeManifest } },
+  } }));
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByText("Compiled candidate loaded.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Total net sales increased.", { exact: true })).toHaveCount(0);
+});
+
+test("a hydrated acceptance refreshes the exact revision ledger before publishing", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page);
+  let recorded = false;
+  await page.route("**/api/v1/reviews**", route => {
+    if (route.request().method() === "POST") {
+      recorded = true;
+      return route.fulfill({ status: 201, json: { code: "RECORDED", recordedAt: "2026-09-30T00:00:00Z" } });
+    }
+    return route.fulfill({ json: { code: "OK", decisions: recorded ? [{ evidenceId: worldModel.evidence[0].id, manifestDigest: candidateManifest, recordedAt: "2026-09-30T00:00:00Z" }] : [], truncated: false } });
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
+  expect((await acceptEvidenceThroughUi(page, collectionId, candidateManifest)).status()).toBe(201);
+  await expect(page.getByText("First review decision", { exact: false }).first()).toBeVisible();
+  await page.route(`**/api/collections/${collectionId}/promote`, route => route.fulfill({ status: 409, json: { code: "ACTIVE_WORLD_CONFLICT" } }));
+  expect((await activateCandidateThroughUi(page, { collectionId, manifestDigest: candidateManifest, expectedCurrentManifest: activeManifest, expectedCurrentRevision: 2 }, "Reviewed this exact source revision.")).status()).toBe(409);
+  await expect(page.getByText("Activation failed.", { exact: false })).toBeVisible();
+  await testInfo.attach("hydrated-review-ledger", { body: await page.screenshot({ path: testInfo.outputPath("hydrated-review-ledger.png"), fullPage: true }), contentType: "image/png" });
+});
+
+test("a late correction reply cannot replace a revision selected through Back", async ({ page }, testInfo) => {
+  await installSession(page); await mockWorkspace(page);
+  const corrected = `sha256:${"c".repeat(64)}`;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  let submitted!: () => void;
+  const posted = new Promise<void>(resolve => { submitted = resolve; });
+  await page.route("**/api/v1/reviews", async route => {
+    submitted(); await pending;
+    await route.fulfill({ status: 201, json: { code: "RECORDED", resultingManifestDigest: corrected } });
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(activeManifest)}`);
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  await page.evaluate(url => { history.pushState(null, "", url); dispatchEvent(new PopStateEvent("popstate")); }, `/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByLabel("Human review record")).toBeVisible();
+  await page.getByRole("button", { name: "Correct", exact: true }).click();
+  await page.getByLabel("What should it say?").fill("A reviewed correction");
+  await page.getByLabel("What needs to change?").fill("Correct the exact evidence-bound label.");
+  await page.getByRole("button", { name: "Correct and compile a new candidate" }).click();
+  await posted;
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(activeManifest)));
+  release();
+  await expect(page.getByText("previously selected revision", { exact: false })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(activeManifest)));
+  await testInfo.attach("retained-history-selection", { body: await page.screenshot({ path: testInfo.outputPath("retained-history-selection.png"), fullPage: true }), contentType: "image/png" });
+});
+
+
+for (const refusal of ["wrong-revision", "network", "unauthorized", "valid"] as const) {
+  test(`version comparison refuses ${refusal} without offering rollback`, async ({ page }) => {
+    await installSession(page); await mockWorkspace(page);
+    await page.route(`**/api/v1/world/${collectionId}?manifest=**`, async route => {
+      const digest = new URL(route.request().url()).searchParams.get("manifest");
+      if (digest !== candidateManifest) {
+        if (refusal === "network") return route.abort("connectionfailed");
+        if (refusal === "unauthorized") return route.fulfill({ status: 403, json: { code: "SOURCE_ACCESS_REVOKED" } });
+        return route.fulfill({ json: { model: refusal === "valid" ? { ...worldModel, world: { ...worldModel.world, manifestDigest: activeManifest }, objects: worldModel.objects.map(object => ({ ...object, label: `${object.label} before correction` })) } : worldModel } });
+      }
+      return route.fulfill({ json: { model: { ...worldModel, history: [
+        { version: "v1", manifestDigest: activeManifest, status: "superseded", activatedAt: { state: "read", value: "2026-09-01T00:00:00Z" }, activationCount: { state: "read", value: 1 } },
+        { version: "v2", manifestDigest: candidateManifest, status: "candidate", activatedAt: { state: "not_yet", reason: "Not activated" }, activationCount: { state: "not_yet", reason: "Not activated" } },
+      ] } } });
+    });
+    await page.goto(`/workspace/world?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+    await page.getByRole("tab", { name: "Versions", exact: true }).click();
+    if (refusal === "valid") {
+      await expect(page.getByText("Annual filing before correction", { exact: false })).toBeVisible();
+      await expect(page.getByText("That version’s artifact could not be read", { exact: false })).toHaveCount(0);
+      return;
+    }
+    await expect(page.getByText("That version’s artifact could not be read", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Roll back to this version", exact: true })).toHaveCount(0);
+  });
+}
+
+
+test("late revision reads cannot overwrite a newer history selection", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page);
+  const delayed = `sha256:${"c".repeat(64)}`;
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let entered = false;
+  let finished = false;
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => {
+    const digest = new URL(route.request().url()).searchParams.get("manifest")!;
+    return route.fulfill({ json: { model: { ...worldModel, world: { ...worldModel.world, manifestDigest: digest }, evidence: [{ ...worldModel.evidence[0], excerpt: digest === delayed ? "Late wrong revision." : "Current selected revision." }] } } });
+  });
+  await page.route(`**/api/collections/${collectionId}?manifest=${encodeURIComponent(delayed)}`, async route => {
+    entered = true; await gate; await route.fallback(); finished = true;
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  await page.evaluate(({ collectionId, delayed }) => {
+    history.pushState(null, "", `/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(delayed)}`);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, { collectionId, delayed });
+  await expect.poll(() => entered).toBe(true);
+  await page.goBack();
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  release!();
+  await expect.poll(() => finished).toBe(true);
+  await expect(page.getByText("Current selected revision.", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Late wrong revision.", { exact: true })).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  const body = await page.locator("body").innerText();
+  expect(body).not.toContain("Immutable collection verification failed");
+});
+
+
+test("an unversioned entry pins its first verified candidate across reload", async ({ page }) => {
+  await installSession(page); await mockWorkspace(page);
+  await page.goto(`/workspace/review?collection=${collectionId}`);
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+  // The preferred candidate advances, but this tab's inspected revision does not.
+  await mockWorkspace(page, false, `sha256:${"c".repeat(64)}`);
+  await page.reload();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
+  await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
 });

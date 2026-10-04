@@ -316,6 +316,30 @@ describe("batching", () => {
     expect((completeJobBatch.mock.calls[0][3] as { outcome: string }).outcome).toBe("succeeded");
   });
 
+  it("skips a revision the provider names as superseded instead of retrying the stored page forever", async () => {
+    importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) =>
+      item.nativeId === "edited"
+        ? { ok: false, nativeId: "edited", code: "SOURCE_REVISION_SUPERSEDED" }
+        : { ok: true, nativeId: item.nativeId, documentId: "doc", filename: "f.pdf" });
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("edited"), sourceItem("good")], cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch(JOB, "worker-1");
+
+    expect(result.ok && result.value.skipped).toEqual([{ nativeId: "edited", code: "SOURCE_REVISION_SUPERSEDED" }]);
+    expect(importSourceObject).toHaveBeenCalledTimes(2);
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ itemsSeen: 2, itemsDone: 1, cursorToken: "next" });
+  });
+
+  it("still retries an unexplained revision mismatch rather than skipping it", async () => {
+    importSourceObject.mockResolvedValue({ ok: false, nativeId: "odd", code: "SOURCE_REVISION_MISMATCH" });
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("odd")], cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch(JOB, "worker-1");
+
+    expect(result).toEqual({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: "SOURCE_REVISION_MISMATCH" });
+  });
+
   it("does not advance past a transient import failure", async () => {
     const items = [sourceItem("good"), sourceItem("limited"), sourceItem("later")];
     importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) =>

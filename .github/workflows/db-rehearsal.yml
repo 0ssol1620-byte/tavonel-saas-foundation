@@ -39,6 +39,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      # Manual run 36803612422 failed on a fresh runner: right after the image pull, Docker could
+      # not bind 0.0.0.0:54322 ("address already in use"), before any SQL ran. The socket's owner
+      # was not recorded, so the cause is unproven. Hypothesis: 54320-54329 lie inside Linux's
+      # default ephemeral range (32768-60999), so an earlier outbound connection on this runner
+      # (checkout, the parallel layer pull) may be handed one as its source port. Mitigation:
+      # exclude them from automatic source-port allocation, on GitHub-hosted disposable runners
+      # only, appending to (never replacing) any existing reservation. Explicit binds (the local
+      # stack) still work. The CLI default ports stay, because real-auth-ci-contract.mjs accepts
+      # only them. Nothing is stopped or killed; `ss` records any holder before the bind.
+      - name: Keep the local stack ports out of this runner's ephemeral range
+        run: |
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          key=/proc/sys/net/ipv4/ip_local_reserved_ports
+          before="$(cat "$key")"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${before:+$before,}54320-54329"
+          after="$(cat "$key")"
+          echo "reserved before='$before' after='$after'"
+          covered() { echo "$after" | tr ',' '\n' | awk -F- -v p="$1" 'NF { hi = ($2 == "" ? $1 : $2); if (p >= $1 && p <= hi) f = 1 } END { exit !f }'; }
+          for port in $(seq 54320 54329) $(echo "$before" | tr ',-' '  '); do covered "$port"; done
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
+
       - uses: actions/checkout@v4
 
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
@@ -90,6 +111,8 @@ jobs:
             version="$(basename "$file" | sed -E 's/^([0-9]+)_.*/\1/')"
             if [ "$version" \> "$HISTORY_BOUNDARY" ]; then mv "$file" /tmp/deferred-migrations/; fi
           done
+          # Evidence only: any socket still holding a stack port is printed before the bind.
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
           supabase db start
           eval "$(supabase status --output env | grep '^DB_URL=')"
           psql "$DB_URL" -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" \
@@ -192,8 +215,167 @@ jobs:
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
           for file in supabase/migrations/005[245]_*.sql supabase/migrations/20260911*_*.sql \
-                      supabase/migrations/20260929152100_*.sql; do
+                      supabase/migrations/20260929152100_*.sql \
+                      supabase/migrations/20261002110000_*.sql \
+                      supabase/migrations/20261002130000_*.sql; do
             echo "replaying $file"
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$file"
           done
           supabase test db
+
+      # Last on purpose: the race commits synthetic budgets, reservations and append-only ledger
+      # rows it cannot remove, so it must follow every pgTAP pass. Loopback, port and password do
+      # not prove the target is disposable, so this step writes a fresh random marker into the
+      # stack `supabase status` names, and the script refuses to write unless its own connection
+      # finds that marker. psql is the runner's /usr/bin/psql, pinned inside the script.
+      - name: Race model-provider settlement against another tenant's reserve on the disposable database
+        env:
+          MODEL_PROVIDER_SPEND_RACE_TEST: "1"
+          PGPORT: "54322"
+          PGPASSWORD: postgres
+        run: |
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          marker="tavonel-disposable-$(cat /proc/sys/kernel/random/uuid)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c "create schema tavonel_ci_fixture;" \
+            -c "create table tavonel_ci_fixture.disposable_marker (value text primary key);" \
+            -c "insert into tavonel_ci_fixture.disposable_marker values ('$marker');"
+          MODEL_PROVIDER_SPEND_RACE_MARKER="$marker" node nextjs/scripts/db/model-provider-spend-race.mjs
+
+  real-auth-journey:
+    name: Real local Auth journey
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
+    steps:
+      # Same hypothesis-driven ephemeral-port exclusion as db-rehearsal (see there);
+      # `supabase start` binds 54321-54329.
+      - name: Keep the local stack ports out of this runner's ephemeral range
+        run: |
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          key=/proc/sys/net/ipv4/ip_local_reserved_ports
+          before="$(cat "$key")"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${before:+$before,}54320-54329"
+          after="$(cat "$key")"
+          echo "reserved before='$before' after='$after'"
+          covered() { echo "$after" | tr ',' '\n' | awk -F- -v p="$1" 'NF { hi = ($2 == "" ? $1 : $2); if (p >= $1 && p <= hi) f = 1 } END { exit !f }'; }
+          for port in $(seq 54320 54329) $(echo "$before" | tr ',-' '  '); do covered "$port"; done
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+      - name: Use official Docker Hub images for this disposable stack
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io' >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the existing frozen Foundation dependencies
+        working-directory: nextjs
+        run: pnpm install --frozen-lockfile
+      - name: Preserve the existing Foundation validation gates
+        working-directory: nextjs
+        run: |
+          pnpm scan:secrets
+          pnpm check
+          pnpm test
+          node --test scripts/journey/real-auth-ci-contract.test.mjs scripts/journey/stop-owned-child.test.mjs
+      - name: Start genuine Auth in the disposable local Supabase stack
+        run: |
+          test ! -f supabase/config.toml
+          supabase init
+          grep -qx 'major_version = 17' supabase/config.toml
+          # Only this newly created runner-local configuration changes. No project is linked.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          config = Path('supabase/config.toml')
+          original = config.read_text()
+          updated, count = re.subn(r'^jwt_expiry = [0-9]+$', 'jwt_expiry = 60', original, flags=re.M)
+          assert count == 1, 'Expected the pinned CLI default Auth lifetime field'
+          config.write_text(updated)
+          PY
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
+          supabase start
+          supabase status --output json > "$RUNNER_TEMP/tavonel-auth-status.json"
+          chmod 600 "$RUNNER_TEMP/tavonel-auth-status.json"
+      - name: Fetch only the official checksum-qualified portable local S3 runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/tavonel-auth-runtime"
+          curl --fail --location --retry 3 --max-time 180 \
+            https://github.com/seaweedfs/seaweedfs/releases/download/4.48/linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/tavonel-auth-runtime/release.tar.gz"
+          echo "4a7d108384d044d95212d1342cdda9533fa55842c1c9b41f606ca3c8a9561124  $RUNNER_TEMP/tavonel-auth-runtime/release.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/tavonel-auth-runtime/release.tar.gz" -C "$RUNNER_TEMP/tavonel-auth-runtime" weed
+          echo "8c07a1ccc4ec058cd90989ac0533c30436832e41c63de2b26f37253d9f744c4d  $RUNNER_TEMP/tavonel-auth-runtime/weed" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/tavonel-auth-runtime/weed"
+      - name: Install one isolated Chromium runtime
+        working-directory: nextjs
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Qualify real provider login, interrupted callback, refresh, logout and selected-revision UI
+        working-directory: nextjs
+        run: |
+          export TAVONEL_AUTH_STACK_STATUS="$RUNNER_TEMP/tavonel-auth-status.json"
+          export TAVONEL_LOCAL_SEAWEED_EXE="$RUNNER_TEMP/tavonel-auth-runtime/weed"
+          node scripts/journey/real-auth-ci-journey.mjs
+      - name: Preserve only the redacted qualification ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-auth-journey-${{ github.sha }}
+          path: nextjs/output/real-auth-journey.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Stop only the runner's disposable local stack
+        if: always()
+        run: |
+          supabase stop --no-backup
+          rm -f "$RUNNER_TEMP/tavonel-auth-status.json"
+
+  # On Windows, actual Chromium + SeaweedFS 4.48 left both valid signed PUTs hanging and the S3
+  # gateway never reported ready, so the transport is unqualified there. This proposes Linux as the
+  # runner; a log here is the evidence, not this comment. Loopback only: no Supabase stack, no
+  # secret, no database credentials. The harness creates its own disposable keys and S3.
+  browser-storage-transport:
+    name: Local Chromium signed-storage transport
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the existing frozen Foundation dependencies
+        working-directory: nextjs
+        run: pnpm install --frozen-lockfile
+      - name: Install one isolated Chromium runtime
+        working-directory: nextjs
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Fetch only the official checksum-qualified portable local S3 runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/tavonel-transport-runtime"
+          curl --fail --location --retry 3 --max-time 180 \
+            https://github.com/seaweedfs/seaweedfs/releases/download/4.48/linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/tavonel-transport-runtime/release.tar.gz"
+          echo "4a7d108384d044d95212d1342cdda9533fa55842c1c9b41f606ca3c8a9561124  $RUNNER_TEMP/tavonel-transport-runtime/release.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/tavonel-transport-runtime/release.tar.gz" -C "$RUNNER_TEMP/tavonel-transport-runtime" weed
+          echo "8c07a1ccc4ec058cd90989ac0533c30436832e41c63de2b26f37253d9f744c4d  $RUNNER_TEMP/tavonel-transport-runtime/weed" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/tavonel-transport-runtime/weed"
+      - name: Qualify actual Chromium signed PUT, CORS, refusal, redirect and host guards against actual local S3
+        working-directory: nextjs
+        # Disposable SeaweedFS data and TLS fixtures on the runner's temp area (SeaweedFS needs >=1% free there).
+        env:
+          TAVONEL_LOCAL_S3_TMPDIR: ${{ runner.temp }}
+        run: |
+          export TAVONEL_LOCAL_SEAWEED_EXE="$RUNNER_TEMP/tavonel-transport-runtime/weed"
+          node scripts/journey/local-browser-storage-transport-journey.mjs

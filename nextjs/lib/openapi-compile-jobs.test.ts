@@ -18,7 +18,7 @@ type PathItem = {
 };
 
 async function spec() {
-  const response = openApi(new Request("https://tavonel.com/api/openapi"));
+  const response = await openApi(new Request("https://tavonel.com/api/openapi"));
   return (await response.json()) as {
     servers: Array<{ url: string }>;
     paths: Record<string, PathItem>;
@@ -45,6 +45,18 @@ describe("the published compile contract", () => {
     ]) {
       expect(Object.keys(document.paths)).toContain(path);
     }
+  });
+
+  it("publishes the complete approved direct-upload path set", async () => {
+    const document = await spec();
+    for (const path of ["/uploads/quote", "/uploads/approval", "/uploads/capability", "/uploads/confirm", "/uploads/release"]) {
+      expect(Object.keys(document.paths)).toContain(path);
+    }
+    expect(document.paths["/uploads/approval"].get).toBeTruthy();
+    expect(document.paths["/uploads/approval"].post).toBeTruthy();
+    const quote = document.paths["/uploads/quote"].post!.requestBody!.content["application/json"].schema;
+    expect(quote.properties?.files.minItems).toBe(1);
+    expect(quote.properties?.files.maxItems).toBe(128);
   });
 
   it("says where those endpoints actually live", async () => {

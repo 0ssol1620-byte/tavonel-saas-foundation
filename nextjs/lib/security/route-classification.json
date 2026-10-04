@@ -1,6 +1,6 @@
 {
   "$schema": "./route-classification.md",
-  "purpose": "Blueprint 2026-09-08 §34: every state-changing API route classified by the credential it accepts, so the CSRF posture of the surface is a checked-in fact rather than a re-derived opinion. lib/route-classification.test.ts fails when a route gains a state-changing method without an entry here, when an entry names a file that no longer exists, or when a route's methods drift from what is recorded.",
+  "purpose": "Blueprint 2026-09-08 �34: every state-changing API route classified by the credential it accepts, so the CSRF posture of the surface is a checked-in fact rather than a re-derived opinion. lib/route-classification.test.ts fails when a route gains a state-changing method without an entry here, when an entry names a file that no longer exists, or when a route's methods drift from what is recorded.",
   "legend": {
     "A-bearer": "Privilege comes only from an Authorization: Bearer header. A cross-site request cannot attach one ambiently, so classic browser CSRF does not reach it. Requires: no wildcard credentialed CORS origin.",
     "B-cookie": "Privilege comes from an ambient cookie or session. Requires SameSite policy plus Origin/Referer validation or an anti-CSRF token. NO ROUTE IN THIS REPOSITORY IS TYPE B; adding one without an origin guard fails the test.",
@@ -302,6 +302,23 @@
       "credential": "none",
       "note": "Research Updates opt-in (M-05). Shared origin allowlist (lib/public-form-origin.ts), application/json only, 4KB cap, honeypot, closed-shape parse. Stores nothing and answers 503 on every path: the table and the privacy wording are founder items, and no form on the site points here. Its rate limit is the RPC the contact route is blocked on, and having one is a precondition of enabling it."
     },
+    "app/api/uploads/approval/cancel/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Cancels the caller's complete approved intake set and releases remaining reserved member holds; the attempt, scope and member identity anchor are revalidated against the stored approval."
+    },
+    "app/api/uploads/approval/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "POST recomputes the quote and pricing fingerprint and atomically records one approval for the exact complete manifest, or refuses a changed price. GET is read-only reconciliation by attemptKey within the caller's workspace."
+    },
     "app/api/uploads/capability/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -432,7 +449,48 @@
       ],
       "credential": "bearer:supabase-jwt"
     },
+    "app/api/v1/uploads/approval/cancel/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Re-export; delegates caller, scope and whole-set cancellation checks to the unversioned handler."
+    },
+    "app/api/v1/uploads/approval/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Re-export."
+    },
     "app/api/v1/uploads/capability/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Re-export."
+    },
+    "app/api/v1/uploads/confirm/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Re-export; the unversioned confirmation revalidates the caller's approval and stored object before atomically confirming."
+    },
+    "app/api/v1/uploads/quote/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "No-hold quote: validates and prices the whole manifest and writes nothing -- no approval, admission reservation or compute ledger entry. Bounded by MAX_APPROVAL_METADATA_BYTES."
+    },
+    "app/api/v1/uploads/release/route.ts": {
       "type": "A-bearer",
       "methods": [
         "POST"
