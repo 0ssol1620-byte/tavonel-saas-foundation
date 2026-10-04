@@ -168,6 +168,10 @@ def sha(data): return hashlib.sha256(data).hexdigest()
 def expected_file_key(path, data, mime):
     return 'fk_' + sha('\x1f'.join(['tavonel-intake-file-v1', path, sha(data), str(len(data)), mime]).encode())[:40]
 
+def expected_file_key_from_digest(path, content_sha256, size, mime):
+    canonical='\x1f'.join(['tavonel-intake-file-v1',path,content_sha256,str(size),mime])
+    return 'fk_'+sha(canonical.encode())[:40]
+
 def expected_manifest_digest(files):
     lines = ['|'.join([f['fileKey'], f['contentSha256'], str(f['byteLength']), f['mimeType'],
                        '-' if f['claimedPages'] is None else str(f['claimedPages']), f['claimedBasis'] or '-'])
@@ -192,7 +196,7 @@ def quote_for(body):
 
 def approval_for(body):
     quoted = {f['fileKey']: f for f in quote_for(body)['files']}
-    files = [{'fileKey': e['fileKey'], 'documentId': str(uuid.uuid5(uuid.NAMESPACE_URL, body['attemptKey'] + e['fileKey'])),
+    files = [{'fileKey': e['fileKey'], 'documentId': str(uuid.uuid4()),
               'fileState': 'approved', 'contentSha256': e['contentSha256'], 'byteLength': e['byteLength'], 'mimeType': e['mimeType'],
               'pageBasis': quoted[e['fileKey']]['pageBasis'], 'approvedMaxPages': quoted[e['fileKey']]['approvedMaxPages'],
               'approvedReservedCredits': quoted[e['fileKey']]['reservedCredits'],
@@ -1171,7 +1175,8 @@ class FullSyncWireTests(unittest.TestCase):
         self.store = {'approval': None, 'stored': False, 'confirmed': False,
                       'drop_approval_post': False, 'drop_approval_get': 0,
                       'drop_confirm_post': False, 'approval_posts': 0,
-                      'put_refused': False, 'set_cancelled': False}
+                      'put_refused': False, 'set_cancelled': False, 'drop_sync_reply': False,
+                      'sync_batches': {}, 'sync_mutations': 0, 'cursor_advances': 0}
         box = {'base': None, 'store': self.store, 'calls': self.calls,
                'data': b'full sync wire bytes', 'document_id': str(uuid.uuid4()),
                'tmp_path': self.state_path}
@@ -1247,8 +1252,32 @@ class FullSyncWireTests(unittest.TestCase):
                     self.send_json(200, {'code':'INTAKE_SET_CANCELLED','result':{'status':'cancelled','reconciliationRequired':False}}); return
                 if self.path == f'/api/v1/connections/{CONNECTION}/sync':
                     if not self.auth(): return self.send_json(401, {'code':'UNAUTHORIZED'})
+                    approval=store['approval']
+                    events=body.get('events')
+                    if not store['confirmed'] or not isinstance(events,list) or len(events)!=1:
+                        return self.send_json(409, {'code':'CONNECTION_BATCH_APPROVED_SOURCE_INVALID'})
+                    event=events[0]
+                    member=next((f for f in approval['files'] if f['documentId']==event.get('documentId')),None)
+                    expected_key=expected_source_key(approval['attemptKey'],member['fileKey']) if member else None
+                    if (member is None or member['fileState']!='confirmed'
+                        or event.get('sourceIdempotencyKey')!=expected_key
+                        or event.get('contentSha256')!=member['contentSha256'].split(':',1)[-1]
+                        or event.get('sizeBytes')!=member['byteLength']
+                        or event.get('mimeType')!=member['mimeType']
+                        or member['fileKey']!=expected_file_key_from_digest(event.get('nativeId',''),
+                            event.get('contentSha256',''),event.get('sizeBytes'),event.get('mimeType',''))):
+                        return self.send_json(409, {'code':'CONNECTION_BATCH_APPROVED_SOURCE_INVALID'})
+                    batch_id=body.get('batchId');manifest=body.get('manifestSha256')
+                    previous=store['sync_batches'].get(batch_id)
+                    if previous is not None and previous['manifestSha256']!=manifest:
+                        return self.send_json(409, {'code':'CONNECTION_BATCH_CONFLICT'})
+                    if previous is None:
+                        store['sync_batches'][batch_id]={'manifestSha256':manifest,'nextCursorSha256':body.get('nextCursorSha256')}
+                        store['sync_mutations']+=1;store['cursor_advances']+=1
                     box['calls'].append(('cursor-file-exists-before-accepted-reply', box['tmp_path'].exists()))
-                    self.send_json(200, {'status':'applied'}); return
+                    if store['drop_sync_reply']:
+                        store['drop_sync_reply']=False;return self.lose_reply()
+                    self.send_json(200, {'status':'replayed' if previous is not None else 'applied'}); return
                 self.send_json(404, {'code':'NOT_FOUND'})
             def do_GET(self):
                 box['calls'].append((self.command, self.path, dict(self.headers), None))
@@ -1298,10 +1327,31 @@ class FullSyncWireTests(unittest.TestCase):
         self.assertEqual(approval_body['clientManifestDigest'],quote_body['clientManifestDigest'])
         self.assertLessEqual(quote_for(quote_body)['quote']['maximumCredits'],self.args.approve_up_to_credits)
         self.assertTrue(self.store['confirmed']); self.assertTrue(self.state_path.exists())
+        document_id=self.store['approval']['files'][0]['documentId']
+        self.assertEqual(uuid.UUID(document_id).version,4)
+        event=next(c[3]['events'][0] for c in self.calls if c[1]==f'/api/v1/connections/{CONNECTION}/sync')
+        member=self.store['approval']['files'][0]
+        self.assertEqual(event['documentId'],document_id)
+        self.assertEqual(event['sourceIdempotencyKey'],expected_source_key(self.store['approval']['attemptKey'],member['fileKey']))
         self.assertIn(('pending-before-approval', True),self.calls)
         self.assertIn(('identities-before-capability', True),self.calls)
         commit_observation=next(c for c in self.calls if c[0]=='cursor-file-exists-before-accepted-reply')
         self.assertFalse(commit_observation[1], 'cursor state must wait until server accepted the complete event batch')
+
+    def test_v4_approved_member_event_retry_replays_without_second_mutation_or_cursor_advance(self):
+        self.store['drop_sync_reply']=True
+        with self.assertRaises(agent.RetryableAgentError): agent.sync(self.args)
+        journal=self.state_path.with_name(self.state_path.name+'.pending')
+        self.assertTrue(journal.exists());self.assertFalse(self.state_path.exists())
+        first=next(c[3] for c in self.calls if c[1]==f'/api/v1/connections/{CONNECTION}/sync')
+        self.assertEqual(uuid.UUID(self.store['approval']['files'][0]['documentId']).version,4)
+        self.assertEqual((self.store['sync_mutations'],self.store['cursor_advances']),(1,1))
+        self.assertEqual(agent.sync(self.args)['status'],'replayed')
+        commits=[c[3] for c in self.calls if c[1]==f'/api/v1/connections/{CONNECTION}/sync']
+        self.assertEqual(commits,[first,first])
+        self.assertEqual((self.store['sync_mutations'],self.store['cursor_advances']),(1,1))
+        self.assertTrue(self.state_path.exists());self.assertFalse(journal.exists())
+        self.assertEqual(sum(c[1]=='/storage/put' for c in self.calls if len(c)==4),1)
 
     def test_lost_approval_reply_reload_reads_committed_set_without_duplicate_post(self):
         self.store['drop_approval_post']=True; self.store['drop_approval_get']=1

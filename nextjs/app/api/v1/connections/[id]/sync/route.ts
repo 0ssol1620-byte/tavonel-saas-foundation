@@ -44,7 +44,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     return NextResponse.json({ code: "OK", ...inventory.result }, { headers: NO_STORE });
   }
-  const batch = await parseConnectionBatchInput(body, auth.principal.workspaceKey);
+  // The atomic batch RPC validates source identity: legacy deterministic IDs or a
+  // confirmed approval member bound to this authenticated principal. Leave the
+  // workspace-only parser check out here so server-minted approval UUIDv4 IDs can
+  // reach that transaction; no request flag or caller-provided approval claim is used.
+  const batch = await parseConnectionBatchInput(body);
   if (!batch) return NextResponse.json({ code: "CONNECTION_BATCH_INVALID" }, { status: 400, headers: NO_STORE });
   const result = await applyFoundationConnectionBatch(auth.principal.workspaceKey, id, {
     userId: auth.principal.userId,
