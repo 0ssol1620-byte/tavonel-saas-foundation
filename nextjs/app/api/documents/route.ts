@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { readTombstonedUploadDocumentIds } from "@/lib/customer-source-lifecycle";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { ambiguousPipelineDocument, type PipelineDocument } from "@/lib/pipeline";
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
   const documents = selected.documents.filter((item) => !tombstoned.ids.has(item.documentId.toLowerCase()));
   const ambiguousDocumentIds = selected.ambiguousDocumentIds.filter((id) => !tombstoned.ids.has(id.toLowerCase()));
   const visibleDocumentIds = [...documents.map((item) => item.documentId), ...ambiguousDocumentIds];
-  const sourceAccess = await checkConnectorSourceAccess(workspaceId, visibleDocumentIds);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceId, visibleDocumentIds, auth.principal.userId);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
@@ -113,7 +113,7 @@ export async function GET(request: Request) {
       : {}),
   }));
   const returnedDocumentIds = [...visibleDocumentIds, ...refused.map((item) => item.documentId)];
-  const currentAccess = await checkConnectorSourceAccess(workspaceId, returnedDocumentIds);
+  const currentAccess = await checkConnectorSourceAccessForViewer(workspaceId, returnedDocumentIds, auth.principal.userId);
   if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, {
     status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },

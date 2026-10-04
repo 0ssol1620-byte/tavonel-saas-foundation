@@ -34,6 +34,17 @@ const PROVIDER_ENV = {
   microsoft_graph: "MICROSOFT_GRAPH",
 } as const;
 
+export const GOOGLE_DRIVE_VIEWER_LINK_SCOPE = "https://www.googleapis.com/auth/drive.metadata.readonly";
+
+export function googleDriveViewerLinkEnabled(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  return env.TAVONEL_GOOGLE_VIEWER_LINK_ENABLED === "true";
+}
+
+export function googleDriveViewerLinkRuntime(runtime: OAuthProviderRuntime): OAuthProviderRuntime {
+  if (runtime.provider !== "google_drive") throw new Error("OAUTH_VIEWER_LINK_PROVIDER_UNSUPPORTED");
+  return { ...runtime, scopes: [GOOGLE_DRIVE_VIEWER_LINK_SCOPE] };
+}
+
 const PROVIDER_CONTRACTS: Record<OAuthConnectorProvider, Omit<OAuthProviderRuntime, "clientId" | "clientSecretReference" | "redirectUri">> = {
   google_drive: {
     provider: "google_drive",
@@ -120,7 +131,9 @@ export async function buildOAuthAuthorizationUrl(runtime: OAuthProviderRuntime, 
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("scope", runtime.scopes.join(" "));
   if (runtime.provider === "google_drive") {
-    url.searchParams.set("access_type", "offline");
+    if (runtime.scopes.includes("https://www.googleapis.com/auth/drive.readonly")) {
+      url.searchParams.set("access_type", "offline");
+    }
     url.searchParams.set("prompt", "consent");
   }
   if (runtime.provider === "dropbox") url.searchParams.set("token_access_type", "offline");
@@ -153,7 +166,9 @@ export async function exchangeOAuthCode(input: {
   const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
   const accessToken = typeof payload.access_token === "string" ? payload.access_token : "";
   const refreshToken = typeof payload.refresh_token === "string" ? payload.refresh_token : "";
-  if (!response.ok || !accessToken || !refreshToken) throw new Error("OAUTH_TOKEN_EXCHANGE_FAILED");
+  const viewerLinkOnly = input.runtime.provider === "google_drive" && input.runtime.scopes.length === 1 &&
+    input.runtime.scopes[0] === GOOGLE_DRIVE_VIEWER_LINK_SCOPE;
+  if (!response.ok || !accessToken || (!viewerLinkOnly && !refreshToken)) throw new Error("OAUTH_TOKEN_EXCHANGE_FAILED");
   const grantedScopes = typeof payload.scope === "string"
     ? payload.scope.split(/[ ,]+/).filter(Boolean)
     : [...input.runtime.scopes];

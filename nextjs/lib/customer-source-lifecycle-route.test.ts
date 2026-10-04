@@ -16,7 +16,7 @@ vi.mock("@/lib/enterprise-store", () => ({ appendServiceAuditEvent }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({ FOUNDATION_R2_BUCKET: "foundation", readR2SignerEnv,
   authorizeSyntheticCanary: (header: string | null, secret: string) => header === `Bearer ${secret}` }));
 vi.mock("@/lib/export-signing", () => ({ readExportSignerEnv }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess, checkConnectorSourceAccessForViewer: checkConnectorSourceAccess }));
 vi.mock("@/lib/supabase-admin", () => ({
   readSupabaseAdminConfig: () => ({}),
   supabaseAdminRequest: async (_config: unknown, path: string, init: { body: string }) => {
@@ -79,7 +79,7 @@ describe("customer source lifecycle route", () => {
     expect((await response.json()).export).toMatchObject({ workspaceKey: "pilot-acme01", objects });
     expect(listFoundationSourceInventory.mock.calls.every(call => call[1] === "pilot-acme01")).toBe(true);
     expect(rpcCalls("customer_source_deletion_status")).toEqual([{ p_workspace_key: "pilot-acme01", p_document_id: DOC }]);
-    expect(checkConnectorSourceAccess).toHaveBeenCalledWith("pilot-acme01", [DOC]);
+    expect(checkConnectorSourceAccess).toHaveBeenCalledWith("pilot-acme01", [DOC], "user-1");
   });
 
   it("does not reveal inventory metadata for a connector document whose ACL denies access", async () => {

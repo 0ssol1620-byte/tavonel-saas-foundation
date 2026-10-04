@@ -24,6 +24,12 @@ import {
   MOBILE_NAV_CONTRAST_BLOBS,
   verifyMobileNavContrastEvidence,
   verifyDocsPricingScopeEvidence,
+  GOOGLE_VIEWER_ACL_PREDECESSOR_SHA,
+  GOOGLE_VIEWER_ACL_FEATURE_PATHS,
+  GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS,
+  GOOGLE_VIEWER_ACL_FINAL_BLOBS,
+  GOOGLE_VIEWER_ACL_UNIT_TESTS,
+  verifyGoogleViewerAclScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
@@ -234,7 +240,31 @@ function docsPricingEvidence(headSha, overrides = {}, changedPaths = DOCS_PRICIN
     },
   });
 }
-function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS) {
+
+function googleViewerAclEvidence(headSha, overrides = {}, changedPaths = GOOGLE_VIEWER_ACL_FEATURE_PATHS) {
+  const blobs = new Map();
+  for (const [path, blob] of Object.entries(GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS)) {
+    if (blob) blobs.set(`${GOOGLE_VIEWER_ACL_PREDECESSOR_SHA}:${path.startsWith('supabase/') ? path : `nextjs/${path}`}`, blob);
+  }
+  for (const [path, blob] of Object.entries(GOOGLE_VIEWER_ACL_FINAL_BLOBS)) {
+    blobs.set(`${headSha}:${path.startsWith('supabase/') ? path : `nextjs/${path}`}`, blob);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyGoogleViewerAclScopeEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
+    headSha,
+    changedPaths,
+    repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      if (args[0] === 'merge-base') return '';
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error(`missing Google Viewer ACL blob fixture: ${args[1]}`);
+      return `${blob}\n`;
+    },
+  });
+}
+
+function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS, googleViewerAclVerification = null) {
   const blobs = new Map([
     [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/app/workspace/page.tsx`, '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3'],
     ...Object.entries(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS).map(([path, blob]) => [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/${path}`, blob]),
@@ -250,6 +280,7 @@ function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPA
     headSha,
     changedPaths,
     repoRoot: 'fixture-root',
+    googleViewerAclVerification,
     exec: (_command, args) => {
       const blob = blobs.get(args[1]);
       if (!blob) throw new Error(`missing blob fixture: ${args[1]}`);
@@ -832,6 +863,131 @@ test('reviewed Docs/pricing patch preserves exact CSS blobs and selects layout r
   const partial = docsPricingEvidence(headSha, {}, docsPaths.slice(0, -1));
   assert.equal(partial.eligible, false);
   assert.ok(partial.reasons.some(reason => reason.includes('path set')));
+});
+
+test('reviewed Google Viewer ACL patch selects direct and helper suites while preserving Docs/pricing and workspace checks', () => {
+  const headSha = 'e'.repeat(40);
+  const changedPaths = [...new Set([
+    ...WORKSPACE_SOURCE_FEATURE_PATHS,
+    ...DOCS_PRICING_FEATURE_PATHS,
+    ...GOOGLE_VIEWER_ACL_FEATURE_PATHS,
+  ])].map(path => path.startsWith('supabase/') ? path : `nextjs/${path}`);
+  const aclEvidence = googleViewerAclEvidence(headSha, {}, changedPaths);
+  const workspaceEvidence = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.test.ts`]: GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.test.ts'],
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.ts`]: GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.ts'],
+  }, changedPaths, aclEvidence);
+  const docsEvidence = docsPricingEvidence(headSha, {}, changedPaths);
+  assert.equal(workspaceEvidence.eligible, true);
+  assert.equal(docsEvidence.eligible, true);
+  assert.equal(aclEvidence.eligible, true);
+  assert.equal(GOOGLE_VIEWER_ACL_FEATURE_PATHS.length, 35);
+  assert.equal(Object.keys(GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS).length, 35);
+  assert.equal(Object.keys(GOOGLE_VIEWER_ACL_FINAL_BLOBS).length, 35);
+
+  const plan = planFor(changedPaths, {
+    headSha,
+    workspaceSourceVerification: workspaceEvidence,
+    docsPricingVerification: docsEvidence,
+    googleViewerAclVerification: aclEvidence,
+  });
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.fullQualification, 'pending');
+  assert.equal(plan.googleViewerAclSelection.sqlStatus, 'unregistered-draft-pending-disposable-pgtap');
+  assert.equal(plan.databaseRehearsalStatus, 'invalidated-pending-rehearsal');
+  assert.deepEqual(plan.pendingQualificationDebt, ['database-contract']);
+  for (const file of WORKSPACE_SOURCE_UNIT_FILES) assert.ok(plan.unitFiles.includes(file), `workspace unit selection missing: ${file}`);
+  for (const file of GOOGLE_VIEWER_ACL_UNIT_TESTS) assert.ok(plan.unitFiles.includes(file), `ACL/helper coverage missing: ${file}`);
+  assert.ok(plan.unitFiles.includes('lib/connector-oauth-store.test.ts'));
+  assert.ok(plan.unitFiles.includes('lib/connector-oauth.test.ts'));
+  assert.ok(plan.unitFiles.includes('lib/connector-source-identity.test.ts'));
+  assert.deepEqual(plan.docsPricingSelection.unitFiles, ['lib/design-tokens.test.ts', 'lib/docs-navigation.test.ts']);
+  assert.deepEqual(plan.docsPricingSelection.browserFiles, [
+    'e2e/contrast-zoom-audit.spec.ts',
+    'e2e/docs-reading-layout.spec.ts',
+    'e2e/launch-qa-mobile-nav.spec.ts',
+    'e2e/marketing-consent.spec.ts',
+    'e2e/premium-craft.spec.ts',
+    'e2e/public-layout-balance.spec.ts',
+    'e2e/site-nav.spec.ts',
+  ]);
+  assert.deepEqual(plan.workspaceSourceSelection.unitFiles, [...WORKSPACE_SOURCE_UNIT_FILES]);
+  assert.deepEqual(plan.workspaceSourceSelection.browserFiles, [WORKSPACE_SOURCE_BROWSER_FILE]);
+  for (const file of [...plan.docsPricingSelection.browserFiles, WORKSPACE_SOURCE_BROWSER_FILE]) {
+    assert.ok(plan.browserFiles.includes(file), `existing browser selection missing: ${file}`);
+  }
+  const unitArgs = buildUnitArgs(plan.unitFiles, 'repair-scope-reports/vitest.json');
+  assert.ok(unitArgs.includes('--config'), 'the special progress-route test must use the repair-only Vitest config');
+  assert.ok(unitArgs.includes('app/api/documents/[id]/progress/route.test.ts'));
+  for (const file of GOOGLE_VIEWER_ACL_UNIT_TESTS.filter(path => path.startsWith('lib/'))) {
+    assert.ok(unitArgs.includes(file), `argv-safe runner omitted selected helper test: ${file}`);
+  }
+});
+
+test('Google Viewer ACL selection fails closed on a partial or altered candidate and unexpected registered ACL migration', () => {
+  const headSha = 'e'.repeat(40);
+  const changedPaths = [...new Set([
+    ...WORKSPACE_SOURCE_FEATURE_PATHS,
+    ...DOCS_PRICING_FEATURE_PATHS,
+    ...GOOGLE_VIEWER_ACL_FEATURE_PATHS,
+  ])].map(path => path.startsWith('supabase/') ? path : `nextjs/${path}`);
+  const exactAcl = googleViewerAclEvidence(headSha, {}, changedPaths);
+  const workspaceEvidence = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.test.ts`]: GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.test.ts'],
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.ts`]: GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.ts'],
+  }, changedPaths, exactAcl);
+  const docsEvidence = docsPricingEvidence(headSha, {}, changedPaths);
+  const partialPaths = changedPaths.filter(path => path !== 'nextjs/lib/google-drive-acl-capture.ts');
+  const partial = googleViewerAclEvidence(headSha, {}, partialPaths);
+  assert.equal(partial.eligible, false);
+  assert.ok(partial.reasons.some(reason => reason.includes('path set')));
+  const partialPlan = planFor(partialPaths, {
+    headSha,
+    workspaceSourceVerification: workspaceEvidence,
+    docsPricingVerification: docsEvidence,
+    googleViewerAclVerification: partial,
+  });
+  assert.equal(partialPlan.runFullHermeticVitest, true);
+  assert.deepEqual(partialPlan.unitFiles, [], 'a broader plan must not masquerade as a scoped selection');
+
+  const altered = googleViewerAclEvidence(headSha, {
+    [`${headSha}:nextjs/lib/google-drive-acl-capture.ts`]: 'f'.repeat(40),
+  }, changedPaths);
+  assert.equal(altered.eligible, false);
+  assert.ok(altered.candidateMismatches.includes('lib/google-drive-acl-capture.ts'));
+  const alteredPlan = planFor(changedPaths, {
+    headSha,
+    workspaceSourceVerification: workspaceEvidence,
+    docsPricingVerification: docsEvidence,
+    googleViewerAclVerification: altered,
+  });
+  assert.equal(alteredPlan.runFullHermeticVitest, true);
+
+  const migrationPath = 'nextjs/supabase/migrations/20261004130000_google_viewer_principal_boundary.sql';
+  const withMigration = [...changedPaths, migrationPath];
+  const draftOnly = googleViewerAclEvidence(headSha, {}, withMigration);
+  assert.equal(draftOnly.eligible, false);
+  assert.ok(draftOnly.reasons.some(reason => reason.includes('unregistered draft')));
+  const migrationPlan = planFor(withMigration, {
+    headSha,
+    workspaceSourceVerification: workspaceEvidence,
+    docsPricingVerification: docsEvidence,
+    googleViewerAclVerification: draftOnly,
+  });
+  assert.equal(migrationPlan.runFullHermeticVitest, true);
+  assert.ok(migrationPlan.pendingQualificationDebt.includes('database-contract'));
+
+  const workspacePaths = WORKSPACE_SOURCE_FEATURE_PATHS.map(path => `nextjs/${path}`);
+  const routeOnlyAcl = googleViewerAclEvidence(headSha, {}, workspacePaths);
+  assert.equal(routeOnlyAcl.eligible, false, 'overlapped progress paths alone cannot establish the ACL candidate');
+  const routeOnlyWorkspace = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.test.ts`]: GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.test.ts'],
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.ts`]: GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.ts'],
+  }, workspacePaths, routeOnlyAcl);
+  assert.equal(routeOnlyWorkspace.eligible, false, 'the workspace exception must not accept ACL progress blobs without exact ACL evidence');
+  const routeOnlyPlan = planFor(workspacePaths, { headSha, workspaceSourceVerification: routeOnlyWorkspace });
+  assert.equal(routeOnlyPlan.runFullHermeticVitest, true);
 });
 
 test('Docs/pricing browser plan uses real projects for mobile, desktop, motion, consent and nav', () => {

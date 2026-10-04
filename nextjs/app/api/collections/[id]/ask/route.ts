@@ -24,7 +24,7 @@ import { getFoundationActiveWorld, getWorldFreshness, type ActiveWorld } from "@
 import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import {
   attemptedRetrievalModelRoles,
@@ -305,7 +305,7 @@ export async function POST(
     const sources = await loadActiveWorldSourceIds(workspaceKey, id, active.world);
     if (!sources.ok) return NextResponse.json({ code: sources.code }, { status: 503, headers: NO_STORE });
     documentIds = sources.documentIds;
-    const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+    const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, documentIds, auth.principal.userId);
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
     });
@@ -339,7 +339,7 @@ export async function POST(
     // Only a completed answer is remembered. Replaying a 503 would turn a transient outage into
     // a ten-minute one for every client that retried politely with the same key.
     if (answered.status === 200 && !lease.replay) {
-      const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+      const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, documentIds, auth.principal.userId);
       if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
         status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
       });
@@ -365,7 +365,7 @@ export async function POST(
     if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
     acknowledgement = released.headers;
   } else if (answered.status === 200) {
-    const sourceAccess = await checkConnectorSourceAccess(workspaceKey, documentIds);
+    const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, documentIds, auth.principal.userId);
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
     });

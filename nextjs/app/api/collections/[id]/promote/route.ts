@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { validatePromotableCollectionArtifact } from "@/lib/collection-download";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { recordServerFunnel } from "@/lib/funnel-events";
@@ -254,9 +254,9 @@ export async function POST(
       { status: 409, headers: NO_STORE }
     );
   }
-  const sourceAccess = await checkConnectorSourceAccess(
-    membership.workspaceId,
-    sourceDocuments.map((item) => item.documentId as string)
+  const sourceAccess = await checkConnectorSourceAccessForViewer(
+      membership.workspaceId,
+      sourceDocuments.map((item) => item.documentId as string), user.id
   );
   if (!sourceAccess.ok) {
     return NextResponse.json(

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const reserveFoundationIntake = vi.fn<(...args: any[]) => Promise<any>>();
 const reserveFoundationCompute = vi.fn<(...args: any[]) => Promise<any>>();
@@ -8,8 +8,13 @@ const presignFoundationQuarantinePut = vi.fn<(...args: any[]) => any>();
 const recordConnectorDocumentBinding = vi.fn<(...args: any[]) => Promise<any>>();
 const readConnectorLatestBinding = vi.fn<(...args: any[]) => Promise<any>>();
 const canAdmitCustomerSource = vi.fn<(...args: any[]) => Promise<boolean>>();
+const captureGoogleDriveUserAcl = vi.fn<(...args: any[]) => Promise<any>>();
+const recordGoogleDriveSourceAclCaptureFailure = vi.fn<(...args: any[]) => Promise<any>>();
+const recordGoogleDriveSourceAclSnapshot = vi.fn<(...args: any[]) => Promise<any>>();
 vi.mock("./connector-binding-store", () => ({ readConnectorLatestBinding, recordConnectorDocumentBinding }));
 vi.mock("./customer-data-admission", () => ({ canAdmitCustomerSource }));
+vi.mock("./google-drive-acl-capture", () => ({ captureGoogleDriveUserAcl }));
+vi.mock("./connector-source-access", () => ({ recordGoogleDriveSourceAclCaptureFailure, recordGoogleDriveSourceAclSnapshot }));
 
 vi.mock("./intake-admission", () => ({ confirmFoundationIntake, reserveFoundationIntake }));
 vi.mock("./compute-reservation", () => ({ reserveFoundationCompute }));
@@ -29,9 +34,15 @@ function withGoogleMetadata(fetcher: typeof fetch): typeof fetch {
   };
 }
 
+afterEach(() => { vi.unstubAllEnvs(); });
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("TAVONEL_GOOGLE_VIEWER_LINK_ENABLED", "true");
   canAdmitCustomerSource.mockResolvedValue(true);
+  captureGoogleDriveUserAcl.mockResolvedValue({ principals: [{ kind: "user", principalId: "drive-id", permission: "read" }], snapshotSha256: `sha256:${"a".repeat(64)}` });
+  recordGoogleDriveSourceAclSnapshot.mockResolvedValue({ ok: true });
+  recordGoogleDriveSourceAclCaptureFailure.mockResolvedValue({ ok: true });
   recordConnectorDocumentBinding.mockResolvedValue({ ok: true });
   readConnectorLatestBinding.mockResolvedValue({ ok: true, sourceVersionIds: [] });
   reserveFoundationIntake.mockResolvedValue({
@@ -184,6 +195,23 @@ describe("source import replay safety", () => {
     expect(presignFoundationQuarantinePut).not.toHaveBeenCalled();
   });
 
+  it("does not call the draft capture RPC or provider ACL endpoint while the feature is disabled", async () => {
+    vi.stubEnv("TAVONEL_GOOGLE_VIEWER_LINK_ENABLED", "false");
+    const fetcher = vi.fn(async (_input: string | URL | Request) => new Response(new Uint8Array([37, 80, 68]), {
+      status: 200, headers: { "content-type": "application/pdf" },
+    }));
+    await importSourceObject({ workspaceKey: "pilot-acme01", userId: "11111111-1111-4111-8111-111111111111",
+      connectionId: "22222222-2222-4222-8222-222222222222", provider: "google_drive", accessToken: "access", target: {},
+      signer: { accountId: "a", bucket: "b", accessKeyId: "k", secretAccessKey: "s" }, fetcher: withGoogleMetadata(fetcher) },
+      { nativeId: "drive-file", name: "Paper.pdf", revision: "1", mimeType: "application/pdf", sizeBytes: 3,
+        modifiedAt: null, kind: "file" });
+    expect(captureGoogleDriveUserAcl).not.toHaveBeenCalled();
+    expect(recordGoogleDriveSourceAclSnapshot).not.toHaveBeenCalled();
+    expect(recordGoogleDriveSourceAclCaptureFailure).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(String(fetcher.mock.calls[0][0])).not.toContain("/permissions");
+  });
+
   it("does not reserve compute or overwrite R2 for an admitted revision", async () => {
     const fetcher = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), {
       status: 200,
@@ -209,8 +237,13 @@ describe("source import replay safety", () => {
       kind: "file",
     });
 
-    expect(outcome.ok).toBe(true);
-    expect(recordConnectorDocumentBinding).toHaveBeenCalledOnce();
+      expect(outcome.ok).toBe(true);
+      expect(recordConnectorDocumentBinding).toHaveBeenCalledOnce();
+      expect(captureGoogleDriveUserAcl).toHaveBeenCalledWith(expect.objectContaining({ fileId: "drive-file", accessToken: "access" }));
+      expect(recordGoogleDriveSourceAclSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+        sourceVersionId: expect.stringMatching(/^sv-[a-f0-9]{64}$/),
+        principals: [{ kind: "user", principalId: "drive-id", permission: "read" }],
+      }));
     expect(reserveFoundationCompute).not.toHaveBeenCalled();
     expect(presignFoundationQuarantinePut).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(1);

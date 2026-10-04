@@ -56,6 +56,17 @@ assert(planner.includes('latestMigrationReplayed: false'), 'baseline must not cl
 assert(planner.includes('baseline-pgtap-passed-latest-migration-not-replayed-37172599535'), 'database status must preserve the migration replay limitation');
 assert(!planner.includes('migrationReapplyPassed: true'), 'latest migration replay cannot be reported as passed');
 assert(planner.includes("selector: 'foundation-repair-anchor-6401-v2'"), 'selector policy version changed');
+assert(planner.includes("GOOGLE_VIEWER_ACL_PREDECESSOR_SHA = '2ff7c521233064915123dfbccb7680716d39cc28'"), 'Google Viewer ACL scope must bind the exact PR #141 predecessor');
+assert(planner.includes('GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS = Object.freeze({') && planner.includes('GOOGLE_VIEWER_ACL_FINAL_BLOBS = Object.freeze({'), 'Google Viewer ACL selector must pin every exact preimage and candidate blob');
+assert(planner.includes('GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze(['), 'Google Viewer ACL direct and helper test selection is missing');
+assert(planner.includes('GOOGLE_VIEWER_ACL_WORKSPACE_OVERLAP_PATHS = new Set(['), 'ACL scope must account for the two exact workspace-progress overlaps');
+assert(planner.includes('googleViewerAclVerification?.eligible') && planner.includes('WORKSPACE_SOURCE_ACL_VARIANT_BLOBS'), 'workspace overlap may accept ACL progress blobs only with exact ACL evidence');
+assert(planner.includes('verifyGoogleViewerAclScopeEvidence') && planner.includes('googleViewerAclVerification?.eligible'), 'Google Viewer ACL scope must fail closed on missing or mismatched evidence');
+assert(planner.includes('unregistered-draft-pending-disposable-pgtap') && planner.includes('supabase/drafts/google-viewer-principal-boundary.sql'), 'Google Viewer ACL SQL must remain an explicitly unregistered draft with database debt');
+assert(planner.includes("'app/api/documents/[id]/progress/route.test.ts': '54e35fd493a56857cdf6393167017538e826aa2e'"), 'original workspace source proof must remain intact');
+assert(planner.includes("'app/api/documents/[id]/progress/route.ts': 'c2ab73f10f2590eec7118fe85aa98bd6d023a305'"), 'original workspace route pin must remain intact');
+assert(planner.includes("'app/api/documents/[id]/progress/route.test.ts': GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.test.ts']"), 'workspace proof must accept the exact ACL-overlapped progress test blob');
+assert(planner.includes("'app/api/documents/[id]/progress/route.ts': GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.ts']"), 'workspace proof must accept the exact ACL-overlapped progress source blob');
 assert(planner.includes("export const WORKSPACE_SOURCE_BROWSER_FILE = 'e2e/workspace-source-observation.spec.ts'"), 'workspace source browser path must remain exact');
 assert(planner.includes('export const WORKSPACE_SOURCE_UNIT_FILES = Object.freeze(['), 'workspace source must expose its exact ten-unit selection');
 assert(planner.includes("'lib/source-version-guard.test.ts'"), 'workspace source guard contract must remain selected');
@@ -63,6 +74,7 @@ assert(planner.includes('verifyWorkspaceSourceScopeEvidence'), 'workspace narrow
 assert(planner.includes('reviewedWorkspacePageBlobs') && planner.includes('reviewedWorkspaceBrowserBlob'), 'workspace exception must bind the reviewed page pair and E2E blob');
 assert(planner.includes('globalConfigBase !== reviewedScopedConfigGlobalBlob') && planner.includes('globalConfigHead !== reviewedScopedConfigGlobalBlob'), 'workspace exception must fail closed if global Vitest config changes');
 assert(runner.includes("args.push('--config', 'vitest.repair-scope.config.ts')"), 'out-of-default-include tests must use the repair-only Vitest config');
+assert(runner.includes("'app/api/documents/[id]/progress/route.test.ts'"), 'ACL progress-route unit path must remain supported by the repair runner');
 assert(scopedVitest.includes('...inheritedIncludes') && scopedVitest.includes('components/compile-stage.test.tsx') && scopedVitest.includes('app/api/documents/**/route.test.ts'), 'repair-only config must inherit base settings and add only reviewed special test discovery');
 assert(!globalVitest.includes('compile-stage.test.tsx') && !globalVitest.includes('workspace-source-observation'), 'global Vitest config must remain unchanged');
 assert(planner.includes("browser: String(plan.runDetailIntegrity || plan.browserFiles.length > 0)"), 'no-browser plans must skip browser install/build');

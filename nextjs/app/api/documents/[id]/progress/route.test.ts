@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: mocks.user, foundationPilotAccess: mocks.pilot }));
 vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: mocks.product }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: mocks.connector }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccessForViewer: mocks.connector }));
 vi.mock("@/lib/immutable-keys", () => ({
   DOCUMENT_ID_PATTERN: /^[A-Za-z0-9_-]+$/,
   groupImmutableDocuments: mocks.group,
@@ -59,6 +59,7 @@ describe("authorized source-version progress descriptor", () => {
       sourceImmutableKey: sanitizedKey,
       sourceSha256: `sha256:${versionKey}`,
     });
+    expect(mocks.connector).toHaveBeenCalledWith("pilot-test", [documentId], "user-1");
     expect(mocks.presign).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       workspaceId: "pilot-test",
       key: sanitizedKey.replace(/sanitized\.pdf$/, "ocr-progress.json"),

@@ -75,16 +75,6 @@ jobs:
       - name: Use the official Docker Hub image registry for the local stack
         run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io" >> "$GITHUB_ENV"
 
-      # Artifact names are derived, never typed. `schema-after-0050` was hard-coded and went
-      # stale the day 0051 was written; a receipt whose name lies about its contents is worse
-      # than one with an awkward name.
-      - name: Read the head migration version out of the folder
-        id: chain
-        run: |
-          head_version="$(ls supabase/migrations/*.sql | sed 's#.*/##' | sed -E 's/^([0-9]+)_.*/\1/' | sort | tail -1)"
-          test -n "$head_version"
-          echo "head=$head_version" >> "$GITHUB_OUTPUT"
-          echo "head migration = $head_version, history boundary = $HISTORY_BOUNDARY"
 
       # The repository carries migrations and tests but no config.toml, because the CLI's
       # config is local-stack tooling rather than schema. `init` writes it and needs no Docker.
@@ -94,6 +84,54 @@ jobs:
         run: |
           test -f supabase/config.toml || supabase init
           grep -qx 'major_version = 17' supabase/config.toml
+      # The ACL pgTAP file is intentionally checked in beside its SQL draft, not as a production
+      # migration. `supabase test db` discovers every file under supabase/tests, while db reset
+      # only applies supabase/migrations; without this runner-local bridge that test would run
+      # against a schema with no ACL functions/table. Create a timestamp using the pinned official
+      # CLI, then copy the exact reviewed draft into that generated file. The checkout and local
+      # Postgres stack are disposable; this file is never committed, pushed, or applied remotely.
+      - name: Stage the reviewed ACL draft as a runner-local migration
+        id: acl-draft
+        run: |
+          set -euo pipefail
+          draft=supabase/drafts/google-viewer-principal-boundary.sql
+          test_file=supabase/tests/google_viewer_principal_boundary.sql
+          if [[ ! -e "$draft" && ! -e "$test_file" ]]; then
+            echo "Neither ACL draft nor its pgTAP test is present; no temporary migration needed."
+            echo "state=absent" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test -f "$draft"
+          test -f "$test_file"
+
+          shopt -s nullglob
+          existing=(supabase/migrations/*_google_viewer_principal_boundary.sql)
+          if ((${#existing[@]} > 0)); then
+            echo "A repository migration already registers this ACL test schema; normal db reset applies it."
+            echo "state=registered" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          supabase migration new --help
+          supabase migration new google_viewer_principal_boundary
+          generated=(supabase/migrations/*_google_viewer_principal_boundary.sql)
+          test "${#generated[@]}" -eq 1
+          [[ "$(basename "${generated[0]}")" =~ ^[0-9]{14}_google_viewer_principal_boundary\.sql$ ]]
+          cp -- "$draft" "${generated[0]}"
+          cmp -- "$draft" "${generated[0]}"
+          sha256sum "$draft" "${generated[0]}"
+          echo "state=ephemeral" >> "$GITHUB_OUTPUT"
+          echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
+
+      # Artifact names are derived from the post-staging migration folder, so the schema
+      # artifact is named by the exact temporary head that db reset will apply.
+      - name: Read the head migration version out of the folder
+        id: chain
+        run: |
+          head_version="$(ls supabase/migrations/*.sql | sed 's#.*/##' | sed -E 's/^([0-9]+)_.*/\1/' | sort | tail -1)"
+          test -n "$head_version"
+          echo "head=$head_version" >> "$GITHUB_OUTPUT"
+          echo "head migration = $head_version, history boundary = $HISTORY_BOUNDARY"
 
       # Approach: move everything past the boundary aside and let `supabase db start` apply what
       # is left, then restore the files and re-apply the whole chain with `supabase db reset`.
@@ -207,6 +245,10 @@ jobs:
       # 0053 is also excluded: its global service_role revoke/regrant matrix predates later table
       # grants, so replaying it would erase those grants and leave the rehearsal in a state that a
       # sequential production migration never reaches.
+      # The runner-local ACL draft is also excluded from this replay loop: it intentionally has
+      # plain ADD COLUMN and CREATE TABLE statements, so replaying it would fail on duplicates.
+      # It is applied once by the disposable db reset; its pgTAP test runs both before and after
+      # the separate, explicitly replay-safe repair set below.
       # The old deletion-inventory migrations are not replayed here: 20260927102000 supersedes
       # their function bodies for uploaded sources. Replaying them after that create-once migration
       # would silently restore connector-only inventory logic. The first pass and pgTAP suite still

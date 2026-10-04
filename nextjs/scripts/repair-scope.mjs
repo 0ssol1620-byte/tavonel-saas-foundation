@@ -88,6 +88,141 @@ const docsPricingBrowserTests = [
   'e2e/site-nav.spec.ts',
 ];
 
+export const GOOGLE_VIEWER_ACL_PREDECESSOR_SHA = '2ff7c521233064915123dfbccb7680716d39cc28';
+export const GOOGLE_VIEWER_ACL_FEATURE_PATHS = Object.freeze([
+  "app/api/collections/[id]/ask/route.ts",
+  "app/api/collections/[id]/download/route.ts",
+  "app/api/collections/[id]/promote/route.ts",
+  "app/api/collections/[id]/route.ts",
+  "app/api/documents/[id]/candidates/route.ts",
+  "app/api/documents/[id]/lifecycle/route.ts",
+  "app/api/documents/[id]/progress/route.test.ts",
+  "app/api/documents/[id]/progress/route.ts",
+  "app/api/documents/[id]/source/route.ts",
+  "app/api/documents/route.ts",
+  "app/api/v1/collections/[id]/retrieval-index/route.ts",
+  "app/api/v1/oauth-connectors/authorize/route.ts",
+  "app/api/v1/oauth-connectors/callback/[provider]/route.ts",
+  "app/api/v1/oauth-connectors/viewer-links/revoke/route.ts",
+  "app/workspace/google-drive-access/page.tsx",
+  "lib/connector-oauth-callback-route.test.ts",
+  "lib/connector-oauth-route.test.ts",
+  "lib/connector-oauth-store.ts",
+  "lib/connector-oauth.ts",
+  "lib/connector-source-access.test.ts",
+  "lib/connector-source-access.ts",
+  "lib/customer-source-lifecycle-route.test.ts",
+  "lib/document-derived-route-access.test.ts",
+  "lib/document-source-route.test.ts",
+  "lib/documents-route.test.ts",
+  "lib/google-drive-acl-capture.test.ts",
+  "lib/google-drive-acl-capture.ts",
+  "lib/google-drive-viewer-principal.test.ts",
+  "lib/google-drive-viewer-principal.ts",
+  "lib/progress-route.test.ts",
+  "lib/source-import.test.ts",
+  "lib/source-import.ts",
+  "lib/world-promotion-current-source.test.ts",
+  "supabase/drafts/google-viewer-principal-boundary.sql",
+  "supabase/tests/google_viewer_principal_boundary.sql",
+]);
+const GOOGLE_VIEWER_ACL_WORKSPACE_OVERLAP_PATHS = new Set([
+  'app/api/documents/[id]/progress/route.test.ts',
+  'app/api/documents/[id]/progress/route.ts',
+]);
+export const GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS = Object.freeze({
+  "app/api/collections/[id]/ask/route.ts": "7162910f5cf7222b1f632251b362f179094b4dd5",
+  "app/api/collections/[id]/download/route.ts": "95bfe77a274510176b35b87582a521dccaf45e68",
+  "app/api/collections/[id]/promote/route.ts": "89b7104906069a8fdaec24e3f4101a032b54a121",
+  "app/api/collections/[id]/route.ts": "611ba0ef7004357b236c5d7ca69baf770bd05c1c",
+  "app/api/documents/[id]/candidates/route.ts": "b90ed727cf121f73ce8191dba683a4a94cd7de61",
+  "app/api/documents/[id]/lifecycle/route.ts": "f13f805c8244062540cb0b3630ffc8661808dbfa",
+  "app/api/documents/[id]/progress/route.test.ts": "54e35fd493a56857cdf6393167017538e826aa2e",
+  "app/api/documents/[id]/progress/route.ts": "c2ab73f10f2590eec7118fe85aa98bd6d023a305",
+  "app/api/documents/[id]/source/route.ts": "c5c98949fa0625c0e93c966541f8e08a2203d4ac",
+  "app/api/documents/route.ts": "3d3318f72ff5989e8c6625a7638d35e35a8a6bcd",
+  "app/api/v1/collections/[id]/retrieval-index/route.ts": "faff378dc4fba34e46c2d17a18fc4908682f4fe8",
+  "app/api/v1/oauth-connectors/authorize/route.ts": "7ead0b651b754b49d316487bf3cdf6ece0cba00c",
+  "app/api/v1/oauth-connectors/callback/[provider]/route.ts": "f52887c35339a6eea9eed54995f9ecf0de8a5f10",
+  "app/api/v1/oauth-connectors/viewer-links/revoke/route.ts": null,
+  "app/workspace/google-drive-access/page.tsx": null,
+  "lib/connector-oauth-callback-route.test.ts": null,
+  "lib/connector-oauth-route.test.ts": "abec86782e9ee19abd8b425a5881db3eabad16f2",
+  "lib/connector-oauth-store.ts": "63cd31a4301c7b950b0c0674d4165ee414d72a31",
+  "lib/connector-oauth.ts": "8ceb9c52ff6df1a355063cc696f582be88dac127",
+  "lib/connector-source-access.test.ts": "8a7f1541b0f0bb03ea3a298fde9956d2eedd37a0",
+  "lib/connector-source-access.ts": "48f50d153a5b2ba82fe904bd24aa040ff2074bf7",
+  "lib/customer-source-lifecycle-route.test.ts": "05c953dd7fd3421710bc434ca6ed30f56cfe5f4b",
+  "lib/document-derived-route-access.test.ts": "a6f7ce65406dd56d70557773a8566617496f0f96",
+  "lib/document-source-route.test.ts": "becdaaac2ebdee81422a9724bc8a709d416f0879",
+  "lib/documents-route.test.ts": "20e35588b914978bc9537996a0b9b851037cb12e",
+  "lib/google-drive-acl-capture.test.ts": null,
+  "lib/google-drive-acl-capture.ts": null,
+  "lib/google-drive-viewer-principal.test.ts": null,
+  "lib/google-drive-viewer-principal.ts": null,
+  "lib/progress-route.test.ts": null,
+  "lib/source-import.test.ts": "3fdc5429ee4564a8941636b701ee78e8efdff015",
+  "lib/source-import.ts": "b444bc6e8126129fb839cdc672689a435039e555",
+  "lib/world-promotion-current-source.test.ts": "b471b237577a1fa1a62edae5bcb2b34936384707",
+  "supabase/drafts/google-viewer-principal-boundary.sql": null,
+  "supabase/tests/google_viewer_principal_boundary.sql": null,
+});
+export const GOOGLE_VIEWER_ACL_FINAL_BLOBS = Object.freeze({
+  "app/api/collections/[id]/ask/route.ts": "f4651addc6dfd569e05576f1a3e6700f1c793f51",
+  "app/api/collections/[id]/download/route.ts": "69f2ddc6ac168b7dfce64acdcb3f9af6856253e6",
+  "app/api/collections/[id]/promote/route.ts": "da71754822552b7299d4eb6b1d9d9009a71d8a41",
+  "app/api/collections/[id]/route.ts": "5006034407d47b7cd389542c484e11ebb2bc8e25",
+  "app/api/documents/[id]/candidates/route.ts": "601a35aa5467208a0461b95626053f16e8dec713",
+  "app/api/documents/[id]/lifecycle/route.ts": "33ae42fcce99173238044e48d9f05b75bdaa9c99",
+  "app/api/documents/[id]/progress/route.test.ts": "02d8c66affc97e502089b981265fc2d21e219cee",
+  "app/api/documents/[id]/progress/route.ts": "c14b5d8940019ea84e3ca01e7fbfe73cb7c4d7b5",
+  "app/api/documents/[id]/source/route.ts": "7156d279fb876547aefa8e74f32b9e1450582177",
+  "app/api/documents/route.ts": "d9fa3ba6db0ccef3dd362b951dc2e03aae847433",
+  "app/api/v1/collections/[id]/retrieval-index/route.ts": "9b9c1b89636c228d716ede877d302a526936819e",
+  "app/api/v1/oauth-connectors/authorize/route.ts": "8dcd8bdbe2806e79c6d0795db4181531bfc4a842",
+  "app/api/v1/oauth-connectors/callback/[provider]/route.ts": "b9fe645b0422b2c76c762b5cfc20093b40704d4c",
+  "app/api/v1/oauth-connectors/viewer-links/revoke/route.ts": "49529f8e70f47de048e32e67656be96329b1c0e2",
+  "app/workspace/google-drive-access/page.tsx": "5fa08b5814637613a6808790acc8004dac0af8ff",
+  "lib/connector-oauth-callback-route.test.ts": "669179d61004ea84ad81dde008be14bb6f826171",
+  "lib/connector-oauth-route.test.ts": "b366a457138086378c0284d89b3bc6854b184ae4",
+  "lib/connector-oauth-store.ts": "85dd2efe233fc7f555e914addacc494567b6afc9",
+  "lib/connector-oauth.ts": "f8fe20c15764678ef9922ca5d3b8f6fd069b959e",
+  "lib/connector-source-access.test.ts": "13e1d781ebbbf7cba116c03a919e311d0a5a749e",
+  "lib/connector-source-access.ts": "9b82ed3c9d2927e33967cf0f7106abc0587822e8",
+  "lib/customer-source-lifecycle-route.test.ts": "3c8dc8a105ca4fdbb309692db8aa81d85a551ab3",
+  "lib/document-derived-route-access.test.ts": "1d482d67c4e8e375ac262e79333a10b77d7a5064",
+  "lib/document-source-route.test.ts": "6b9512f82b6f8c2e0295b2f928864fc4709528e8",
+  "lib/documents-route.test.ts": "77150f40f3df8d413929c906c564e2e259551fa3",
+  "lib/google-drive-acl-capture.test.ts": "3d10ea3a345bd5a7acaa1a5726ad93b152fa1fa5",
+  "lib/google-drive-acl-capture.ts": "489500dd94fce18950e2f1845e442a6bbe4b9404",
+  "lib/google-drive-viewer-principal.test.ts": "98fab71058a30f97b15ede359e64a145948d7caf",
+  "lib/google-drive-viewer-principal.ts": "5a4e86b55cd315293f42b41d251591df74c09ded",
+  "lib/progress-route.test.ts": "4a5721cc5b4a6aa528926c47be23b92eefddd40c",
+  "lib/source-import.test.ts": "9af2a5b273af28b9d7409ba98cb47821e9a9a85f",
+  "lib/source-import.ts": "60a0e089a27d0d90e9acff21c0f13bf0d76ee3df",
+  "lib/world-promotion-current-source.test.ts": "cf4053ec354b045acfd3d3508778143ee0e7a4a9",
+  "supabase/drafts/google-viewer-principal-boundary.sql": "0e109d8cebc659de10386f40cc6d3dd91ffc9860",
+  "supabase/tests/google_viewer_principal_boundary.sql": "b8e8e16f5725240d0d49d5039b2158788fcb598d",
+});
+export const GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze([
+  "app/api/documents/[id]/progress/route.test.ts",
+  "lib/connector-oauth-callback-route.test.ts",
+  "lib/connector-oauth-route.test.ts",
+  "lib/connector-oauth-store.test.ts",
+  "lib/connector-oauth.test.ts",
+  "lib/connector-source-access.test.ts",
+  "lib/connector-source-identity.test.ts",
+  "lib/customer-source-lifecycle-route.test.ts",
+  "lib/document-derived-route-access.test.ts",
+  "lib/document-source-route.test.ts",
+  "lib/documents-route.test.ts",
+  "lib/google-drive-acl-capture.test.ts",
+  "lib/google-drive-viewer-principal.test.ts",
+  "lib/progress-route.test.ts",
+  "lib/source-import.test.ts",
+  "lib/world-promotion-current-source.test.ts",
+]);
+
 const uploadTests = [
   'lib/api-error-codes.test.ts', 'lib/customer-data-admission-routes.test.ts',
   'lib/intake-approval-route.test.ts', 'lib/intake-approval.test.ts',
@@ -147,6 +282,10 @@ export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
   'lib/compile-stage-view.test.ts': '505bd18cd58dff06294998715e95e09fc312ea3b',
   'lib/progress-poll.test.ts': '2145bf161cf7db871fa55180d7ec02e06729e16c',
 });
+const WORKSPACE_SOURCE_ACL_VARIANT_BLOBS = Object.freeze({
+  'app/api/documents/[id]/progress/route.test.ts': GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.test.ts'],
+  'app/api/documents/[id]/progress/route.ts': GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.ts'],
+});
 export const WORKSPACE_SOURCE_FIXTURE_PATCH_SHA256 = '0acc6b5613e65d183ab0688c2d02c76eff7353d8161e50025fe49e35fb010b6c';
 export const WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS = Object.freeze({
   'app/dev/compile-stage/page.tsx': '15325287c9cbe9c367093d724828f02729db4119',
@@ -205,13 +344,13 @@ export function collectChangedPaths({ repairAnchorSha, headSha, repoRoot, exec =
 
 function readPathBlob(revision, path, repoRoot, exec) {
   try {
-    return exec('git', ['rev-parse', `${revision}:nextjs/${path}`], { cwd: repoRoot, encoding: 'utf8', stdio: 'pipe', shell: false }).trim();
+    return exec('git', ['rev-parse', `${revision}:${path.startsWith('supabase/') ? path : `nextjs/${path}`}`], { cwd: repoRoot, encoding: 'utf8', stdio: 'pipe', shell: false }).trim();
   } catch {
     return null;
   }
 }
 
-export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification = null, exec = execFileSync }) {
   const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => WORKSPACE_SOURCE_FEATURE_PATHS.includes(path)))].sort();
   const reasons = [];
   if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('source feature is not anchored to the audited 6401 baseline');
@@ -221,10 +360,15 @@ export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, c
   if (pageBase !== reviewedWorkspacePageBlobs.base || pageResult !== reviewedWorkspacePageBlobs.result) reasons.push('workspace page blob pair differs from reviewed candidate');
   const browserBlob = readPathBlob(headSha, WORKSPACE_SOURCE_BROWSER_FILE, repoRoot, exec);
   if (browserBlob !== reviewedWorkspaceBrowserBlob) reasons.push('workspace browser test blob differs from reviewed candidate');
-  const featureBlobMismatches = Object.entries(WORKSPACE_SOURCE_FEATURE_BLOBS)
+  const featureBlobVariants = googleViewerAclVerification?.eligible
+    ? [WORKSPACE_SOURCE_FEATURE_BLOBS, { ...WORKSPACE_SOURCE_FEATURE_BLOBS, ...WORKSPACE_SOURCE_ACL_VARIANT_BLOBS }]
+    : [WORKSPACE_SOURCE_FEATURE_BLOBS];
+  const featureBlobMismatches = featureBlobVariants.map(variant => Object.entries(variant)
     .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
-    .map(([path]) => path);
-  if (featureBlobMismatches.length) reasons.push(`workspace source feature blobs differ from reviewed candidate: ${featureBlobMismatches.join(', ')}`);
+    .map(([path]) => path));
+  if (featureBlobMismatches.every(mismatches => mismatches.length > 0)) {
+    reasons.push(`workspace source feature blobs differ from reviewed candidates: ${[...new Set(featureBlobMismatches.flat())].join(', ')}`);
+  }
   const fixtureBaseBlobMismatches = Object.entries(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS)
     .filter(([path, expected]) => readPathBlob(repairAnchorSha, path, repoRoot, exec) !== expected)
     .map(([path]) => path);
@@ -279,7 +423,35 @@ export function verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, chan
   return { eligible: reasons.length === 0, reasons, featurePaths, anchorMismatches, predecessorMismatches, candidateMismatches };
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null }) {
+export function verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path)))].sort();
+  const expectedPaths = [...GOOGLE_VIEWER_ACL_FEATURE_PATHS].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('Google Viewer ACL candidate is not anchored to the authenticated 6401 baseline');
+  if (headSha === GOOGLE_VIEWER_ACL_PREDECESSOR_SHA) reasons.push('Google Viewer ACL candidate head is not newer than its reviewed predecessor');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(expectedPaths)) reasons.push('Google Viewer ACL path set differs from the exact reviewed 35-path patch');
+  try {
+    exec('git', ['merge-base', '--is-ancestor', GOOGLE_VIEWER_ACL_PREDECESSOR_SHA, headSha], {
+      cwd: repoRoot, stdio: 'pipe', shell: false,
+    });
+  } catch {
+    reasons.push('Google Viewer ACL predecessor is not an ancestor of the candidate head');
+  }
+  const predecessorMismatches = Object.entries(GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(GOOGLE_VIEWER_ACL_PREDECESSOR_SHA, path, repoRoot, exec) !== expected)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push(`Google Viewer ACL predecessor blobs differ from reviewed preimages: ${predecessorMismatches.join(', ')}`);
+  const candidateMismatches = Object.entries(GOOGLE_VIEWER_ACL_FINAL_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push(`Google Viewer ACL candidate blobs differ from reviewed patch: ${candidateMismatches.join(', ')}`);
+  const registeredAclMigration = changedPaths.map(normalizePath)
+    .filter(path => /^supabase\/migrations\/[^/]*google[^/]*viewer[^/]*\.sql$/i.test(path));
+  if (registeredAclMigration.length) reasons.push('Google Viewer ACL SQL must remain an unregistered draft during this phase');
+  return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -305,6 +477,16 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     }
   }
 
+  const googleViewerAclChanged = paths.some(path =>
+    GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path) && !GOOGLE_VIEWER_ACL_WORKSPACE_OVERLAP_PATHS.has(path));
+  if (googleViewerAclChanged) {
+    groups.add('google-viewer-acl');
+    for (const file of GOOGLE_VIEWER_ACL_UNIT_TESTS) unitFiles.add(file);
+    if (!googleViewerAclVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('Google Viewer ACL candidate did not match its exact reviewed predecessor/blob/path policy');
+    }
+  }
   const docsPricingChanged = paths.some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
   if (docsPricingChanged) {
     groups.add('docs-pricing-layout');
@@ -350,6 +532,17 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
 
     if (DOCS_PRICING_TRIGGER_PATHS.includes(path)) {
       groups.add('docs-pricing-layout');
+      matched = true;
+    }
+    if (GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path)) {
+      groups.add('google-viewer-acl');
+      matched = true;
+    }
+    if (path === 'supabase/drafts/google-viewer-principal-boundary.sql' ||
+      path === 'supabase/tests/google_viewer_principal_boundary.sql') {
+      groups.add('database-contract');
+      unitFiles.add('lib/pgtap-fixtures.test.ts');
+      databaseEvidenceInvalidated = true;
       matched = true;
     }
     if (path === 'app/api/openapi/route.ts') {
@@ -513,6 +706,9 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     docsPricingSelection: docsPricingChanged
       ? { unitFiles: docsPricingUnitTests, browserFiles: docsPricingBrowserTests, evidence: docsPricingVerification }
       : null,
+    googleViewerAclSelection: googleViewerAclChanged
+      ? { unitFiles: [...GOOGLE_VIEWER_ACL_UNIT_TESTS], evidence: googleViewerAclVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
+      : null,
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
     browserFiles: [...browserFiles].sort(),
@@ -553,7 +749,13 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   if (checkoutHead !== headSha) throw new Error(`checkout SHA ${checkoutHead} does not equal PR head ${headSha}`);
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   const changedPaths = collectChangedPaths({ repairAnchorSha, headSha, repoRoot });
-  const workspaceSourceVerification = verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot });
+  const googleViewerAclRelevant = changedPaths.map(normalizePath).some(path => GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path));
+  const googleViewerAclVerification = googleViewerAclRelevant
+    ? verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
+  const workspaceSourceVerification = verifyWorkspaceSourceScopeEvidence({
+    repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification,
+  });
   const docsPricingChanged = changedPaths.map(normalizePath).some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
   const docsPricingVerification = docsPricingChanged
     ? verifyDocsPricingScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
@@ -562,7 +764,7 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const mobileNavVerification = mobileNavContrastChanged
     ? verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
     : null;
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification });
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {

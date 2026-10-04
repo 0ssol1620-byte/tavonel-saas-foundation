@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
-import { buildOAuthAuthorizationUrl, createOAuthPkce, parseOAuthConnectorProvider, readOAuthProviderRuntime, sha256Hex } from "@/lib/connector-oauth";
+import { buildOAuthAuthorizationUrl, createOAuthPkce, googleDriveViewerLinkEnabled, googleDriveViewerLinkRuntime, parseOAuthConnectorProvider, readOAuthProviderRuntime, sha256Hex } from "@/lib/connector-oauth";
 import { deleteOAuthSecret, putOAuthSecret, readOAuthSecretBrokerConfig } from "@/lib/connector-oauth-secrets";
 import { createOAuthAuthorization } from "@/lib/connector-oauth-store";
 
@@ -21,12 +21,20 @@ export async function POST(request: Request) {
   try { body = JSON.parse(text) as Record<string, unknown>; }
   catch { return NextResponse.json({ code: "INVALID_JSON" }, { status: 400, headers: HEADERS }); }
   const provider = parseOAuthConnectorProvider(body.provider);
+  const authorizationPurpose = body.purpose === undefined ? "connector_connection"
+    : body.purpose === "viewer_acl_link" ? "viewer_acl_link" : null;
   const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
-  if (!provider || !displayName || displayName.length > 100) return NextResponse.json({ code: "OAUTH_CONNECTOR_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+  if (!provider || !authorizationPurpose || !displayName || displayName.length > 100 ||
+      (authorizationPurpose === "viewer_acl_link" && provider !== "google_drive")) return NextResponse.json({ code: "OAUTH_CONNECTOR_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+  if (authorizationPurpose === "viewer_acl_link" && !googleDriveViewerLinkEnabled()) {
+    return NextResponse.json({ code: "GOOGLE_VIEWER_LINK_NOT_ENABLED" }, { status: 503, headers: HEADERS });
+  }
   if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "connector")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: HEADERS });
   }
-  const runtime = readOAuthProviderRuntime(provider);
+  const baseRuntime = readOAuthProviderRuntime(provider);
+  const runtime = baseRuntime && authorizationPurpose === "viewer_acl_link"
+    ? googleDriveViewerLinkRuntime(baseRuntime) : baseRuntime;
   const broker = readOAuthSecretBrokerConfig();
   if (!runtime || !broker) return NextResponse.json({ code: "OAUTH_PROVIDER_NOT_CONFIGURED" }, { status: 503, headers: HEADERS });
 
@@ -45,6 +53,7 @@ export async function POST(request: Request) {
       redirectUri: runtime.redirectUri,
       requestedScopes: runtime.scopes,
       authorizationRevision: auth.principal.authorizationRevision,
+      authorizationPurpose,
     });
     if (!stored.ok) {
       await deleteOAuthSecret(broker, verifierReference).catch(() => undefined);

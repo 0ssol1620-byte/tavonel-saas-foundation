@@ -33,7 +33,7 @@ vi.mock("@/lib/world-store", async (original) => ({
   would answer every case with a transport error instead of the behaviour under test.
 */
 vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: async () => ({ ok: true }) }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 vi.mock("@/lib/retrieval-index-status", () => ({ ensureRetrievalIndexForActiveWorld: ensureIndex }));
 
 import { POST } from "../app/api/collections/[id]/promote/route";
