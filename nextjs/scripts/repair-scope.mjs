@@ -260,7 +260,7 @@ export const ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS = Object.freeze({
   'lib/compile-job-worker.test.ts': '16dc3c13c73dae9af9224a42fc6b1d9b34667ce6',
   'lib/compile-job-worker.ts': 'f065033ce7306bda0c0d6fa2d0cc29084f74b544',
   'lib/global-collection-compile.test.ts': '046898a4ebdfed502722661915afbb7634ad21c4',
-  'supabase/drafts/compile-job-viewer-authority.sql': '8c92051793c312b3c245d352c6a71d0e30c272ce',
+  'supabase/drafts/compile-job-viewer-authority.sql': 'f9221eda0a1eb1d1df578b6ec3aeed9ba187319c',
   'supabase/tests/compile_job_viewer_authority.sql': 'b2c9e95a51273b14cf809b83d6f96f964eddb2be',
 });
 export const ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS = Object.freeze([

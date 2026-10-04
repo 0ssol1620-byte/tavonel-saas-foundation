@@ -160,7 +160,7 @@ begin
           and p->>'permission' in ('read', 'write', 'owner'))
     where b.workspace_key = p_workspace_key and b.document_id::text = any(p_document_ids)
       and b.provider = 'google_drive'
-    on conflict (job_id, document_id) do nothing;
+    on conflict on constraint foundation_compile_job_source_authority_pkey do nothing;
 
     if (select pg_catalog.count(*) from public.foundation_compile_job_source_authority a
           where a.job_id = v_job.job_id) <> v_connector_count then
