@@ -44,6 +44,41 @@ const docsContractTests = [
   'lib/openapi-response-shape.test.ts', 'lib/openapi-routes.test.ts',
   'lib/developer-distribution.test.ts',
 ];
+export const DOCS_PRICING_PREDECESSOR_SHA = '333688f096b2df59254e210b92d9491c7db6ac12';
+export const DOCS_PRICING_FEATURE_PATHS = Object.freeze([
+  'app/docs/page.tsx',
+  'app/docs/[section]/page.tsx',
+  'app/product-polish.css',
+  'app/paper-product.css',
+  'lib/docs-navigation.test.ts',
+  'e2e/docs-reading-layout.spec.ts',
+]);
+const DOCS_PRICING_TRIGGER_PATHS = Object.freeze([
+  'app/docs/page.tsx',
+  'app/docs/[section]/page.tsx',
+  'app/product-polish.css',
+  'lib/docs-navigation.test.ts',
+  'e2e/docs-reading-layout.spec.ts',
+]);
+const docsPricingBlobs = Object.freeze({
+  'app/docs/page.tsx': { anchor: 'd4951fe8fab06a8fba30828e7e0d5a676bd9d07b', predecessor: 'd4951fe8fab06a8fba30828e7e0d5a676bd9d07b', candidate: '1dfcd722cdb72d9ac669677755c1a10cdd4694e5' },
+  'app/docs/[section]/page.tsx': { anchor: '07d4543f24b06c410b8a13147c146a1c35d0033c', predecessor: '07d4543f24b06c410b8a13147c146a1c35d0033c', candidate: '39bd1adc6b57e00750d5a5ae7e3def42a1b3fda3' },
+  'app/product-polish.css': { anchor: '645a73854ebd49d79f1b368d18ac62d424827efd', predecessor: '645a73854ebd49d79f1b368d18ac62d424827efd', candidate: 'aa07be3595dc10b688394a42170639ff9f4e5639' },
+  'app/paper-product.css': { anchor: 'ea81aa1a36afa673e905b8c9fd78fc58abc007fa', predecessor: '2191de5c2179e601c97154886534d8786e4ad405', candidate: 'a1e1278e9eccbd714c522119ed66cee5857d0fd3' },
+  'lib/docs-navigation.test.ts': { anchor: '27a19c495f128e42e802ea3fce13f00182c76726', predecessor: '27a19c495f128e42e802ea3fce13f00182c76726', candidate: '4b1bdbcd38336166528680b01e9f5477ca9132e8' },
+  'e2e/docs-reading-layout.spec.ts': { anchor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', predecessor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', candidate: '34699a578c834e05bdd27dc7d71971be231ab4af' },
+});
+const docsPricingUnitTests = ['lib/design-tokens.test.ts', 'lib/docs-navigation.test.ts'];
+const docsPricingBrowserTests = [
+  'e2e/contrast-zoom-audit.spec.ts',
+  'e2e/docs-reading-layout.spec.ts',
+  'e2e/launch-qa-mobile-nav.spec.ts',
+  'e2e/marketing-consent.spec.ts',
+  'e2e/premium-craft.spec.ts',
+  'e2e/public-layout-balance.spec.ts',
+  'e2e/site-nav.spec.ts',
+];
+
 const uploadTests = [
   'lib/api-error-codes.test.ts', 'lib/customer-data-admission-routes.test.ts',
   'lib/intake-approval-route.test.ts', 'lib/intake-approval.test.ts',
@@ -117,6 +152,10 @@ const reviewedWorkspaceBrowserBlob = 'b3d630da8751062dfbb24c0cd80d82c665ae2311';
 const reviewedScopedConfigBlob = 'f2065bec72452aa1c80b29afb2768339b7397db8';
 const reviewedScopedConfigGlobalBlob = '91bb009bae9930952594c8fb8164b714a43e8686';
 const reviewedBrowserFiles = new Set([
+  'e2e/contrast-zoom-audit.spec.ts',
+  'e2e/docs-reading-layout.spec.ts',
+  'e2e/premium-craft.spec.ts',
+  'e2e/public-layout-balance.spec.ts',
   'e2e/detail-integrity.spec.ts',
   'e2e/failure-states-audit.spec.ts',
   WORKSPACE_SOURCE_BROWSER_FILE,
@@ -189,7 +228,28 @@ export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, c
   return { eligible: reasons.length === 0, reasons, featurePaths, pageBase, pageResult, browserBlob, scopedConfigBlob, globalConfigBase, globalConfigHead };
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null }) {
+export function verifyDocsPricingScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => DOCS_PRICING_FEATURE_PATHS.includes(path)))].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('Docs/pricing candidate is not anchored to the authenticated 6401 baseline');
+  if (JSON.stringify(featurePaths) !== JSON.stringify([...DOCS_PRICING_FEATURE_PATHS].sort())) reasons.push('Docs/pricing path set differs from the exact reviewed six-file patch');
+  if (headSha === DOCS_PRICING_PREDECESSOR_SHA) reasons.push('Docs/pricing candidate head is not newer than its reviewed predecessor');
+  const anchorMismatches = Object.entries(docsPricingBlobs)
+    .filter(([path, expected]) => readPathBlob(repairAnchorSha, path, repoRoot, exec) !== expected.anchor)
+    .map(([path]) => path);
+  if (anchorMismatches.length) reasons.push(`Docs/pricing anchor blobs differ from reviewed preimages: ${anchorMismatches.join(', ')}`);
+  const predecessorMismatches = Object.entries(docsPricingBlobs)
+    .filter(([path, expected]) => readPathBlob(DOCS_PRICING_PREDECESSOR_SHA, path, repoRoot, exec) !== expected.predecessor)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push(`Docs/pricing predecessor blobs differ from reviewed preimages: ${predecessorMismatches.join(', ')}`);
+  const candidateMismatches = Object.entries(docsPricingBlobs)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push(`Docs/pricing candidate blobs differ from reviewed patch: ${candidateMismatches.join(', ')}`);
+  return { eligible: reasons.length === 0, reasons, featurePaths, anchorMismatches, predecessorMismatches, candidateMismatches };
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -206,6 +266,16 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   let runDetailIntegrity = false;
   let databaseEvidenceInvalidated = false;
 
+  const docsPricingChanged = paths.some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
+  if (docsPricingChanged) {
+    groups.add('docs-pricing-layout');
+    for (const file of docsPricingUnitTests) unitFiles.add(file);
+    for (const file of docsPricingBrowserTests) browserFiles.add(file);
+    if (!docsPricingVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('Docs/pricing candidate did not match its exact reviewed six-file/blob policy');
+    }
+  }
   const workspaceSourceChanged = paths.some(path => WORKSPACE_SOURCE_FEATURE_PATHS.includes(path));
   const workspaceScopedConfigChanged = paths.includes(WORKSPACE_SOURCE_REPAIR_CONFIG);
   if (workspaceSourceChanged || workspaceScopedConfigChanged) {
@@ -239,6 +309,10 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       matched = true;
     }
 
+    if (DOCS_PRICING_TRIGGER_PATHS.includes(path)) {
+      groups.add('docs-pricing-layout');
+      matched = true;
+    }
     if (path === 'app/api/openapi/route.ts') {
       groups.add('openapi');
       for (const file of baselineVitest.filter(file => /openapi|docs|retrieval/.test(file))) unitFiles.add(file);
@@ -397,6 +471,9 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     workspaceSourceSelection: workspaceSourceChanged || workspaceScopedConfigChanged
       ? { unitFiles: [...WORKSPACE_SOURCE_UNIT_FILES], browserFiles: [WORKSPACE_SOURCE_BROWSER_FILE], evidence: workspaceSourceVerification }
       : null,
+    docsPricingSelection: docsPricingChanged
+      ? { unitFiles: docsPricingUnitTests, browserFiles: docsPricingBrowserTests, evidence: docsPricingVerification }
+      : null,
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
     browserFiles: [...browserFiles].sort(),
@@ -438,7 +515,11 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   const changedPaths = collectChangedPaths({ repairAnchorSha, headSha, repoRoot });
   const workspaceSourceVerification = verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot });
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification });
+  const docsPricingChanged = changedPaths.map(normalizePath).some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
+  const docsPricingVerification = docsPricingChanged
+    ? verifyDocsPricingScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {

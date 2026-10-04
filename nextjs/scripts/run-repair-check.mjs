@@ -64,6 +64,10 @@ export function browserRunOutputDir(workspaceRoot, index) {
 }
 
 const browserProjectsByFile = new Map([
+  ['e2e/contrast-zoom-audit.spec.ts', ['audit', 'audit-768', 'audit-1280']],
+  ['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],
+  ['e2e/premium-craft.spec.ts', ['1440', '390', 'reduced-motion']],
+  ['e2e/public-layout-balance.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/workspace-source-observation.spec.ts', ['1440']],
   ['e2e/failure-states-audit.spec.ts', ['audit']],
   ['e2e/site-nav.spec.ts', ['1440']],
@@ -96,7 +100,7 @@ export function planBrowserRuns(files, runDetailIntegrity) {
       filesByProject.get(project).push(file);
     }
   }
-  for (const project of ['audit', '1440', '390', '360', 'reduced-motion', 'launch-chromium']) {
+  for (const project of ['audit', 'audit-768', 'audit-1280', '1440', '390', '360', 'reduced-motion', 'launch-chromium']) {
     const projectFiles = filesByProject.get(project);
     if (projectFiles) runs.push({ kind: 'project', project, files: [...new Set(projectFiles)].sort() });
   }

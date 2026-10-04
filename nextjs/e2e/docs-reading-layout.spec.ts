@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli"]) {
+for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli", "/docs/mcp"]) {
   test(`${route} places the title above a readable article instead of an empty middle column`, async ({ page }) => {
     await page.goto(route);
     await expect(page.locator(".docs-body")).toBeVisible();

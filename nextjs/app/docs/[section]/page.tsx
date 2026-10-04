@@ -212,7 +212,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   return (
     <PublicPageShell>
       <BreadcrumbJsonLd trail={trail} />
-      <section className="scene doc"><div className="shell"><div className={layout.layout}>
+      <section className="scene doc docs-reading-surface"><div className="shell"><div className={layout.layout}>
         <DocsToc current={section} />
         <div className="body">
           <div className="stack">

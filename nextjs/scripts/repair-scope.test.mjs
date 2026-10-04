@@ -17,6 +17,9 @@ import {
   WORKSPACE_SOURCE_FIXTURE_PATCH_SHA256,
   WORKSPACE_SOURCE_REPAIR_CONFIG,
   WORKSPACE_SOURCE_UNIT_FILES,
+  DOCS_PRICING_PREDECESSOR_SHA,
+  DOCS_PRICING_FEATURE_PATHS,
+  verifyDocsPricingScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
@@ -174,6 +177,35 @@ test('6401 anchor excludes historical developer-store changes from the current d
   }
 });
 
+const DOCS_PRICING_EXPECTED_BLOBS = Object.freeze({
+  'app/docs/page.tsx': { anchor: 'd4951fe8fab06a8fba30828e7e0d5a676bd9d07b', predecessor: 'd4951fe8fab06a8fba30828e7e0d5a676bd9d07b', candidate: '1dfcd722cdb72d9ac669677755c1a10cdd4694e5' },
+  'app/docs/[section]/page.tsx': { anchor: '07d4543f24b06c410b8a13147c146a1c35d0033c', predecessor: '07d4543f24b06c410b8a13147c146a1c35d0033c', candidate: '39bd1adc6b57e00750d5a5ae7e3def42a1b3fda3' },
+  'app/product-polish.css': { anchor: '645a73854ebd49d79f1b368d18ac62d424827efd', predecessor: '645a73854ebd49d79f1b368d18ac62d424827efd', candidate: 'aa07be3595dc10b688394a42170639ff9f4e5639' },
+  'app/paper-product.css': { anchor: 'ea81aa1a36afa673e905b8c9fd78fc58abc007fa', predecessor: '2191de5c2179e601c97154886534d8786e4ad405', candidate: 'a1e1278e9eccbd714c522119ed66cee5857d0fd3' },
+  'lib/docs-navigation.test.ts': { anchor: '27a19c495f128e42e802ea3fce13f00182c76726', predecessor: '27a19c495f128e42e802ea3fce13f00182c76726', candidate: '4b1bdbcd38336166528680b01e9f5477ca9132e8' },
+  'e2e/docs-reading-layout.spec.ts': { anchor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', predecessor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', candidate: '34699a578c834e05bdd27dc7d71971be231ab4af' },
+});
+
+function docsPricingEvidence(headSha, overrides = {}, changedPaths = DOCS_PRICING_FEATURE_PATHS) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(DOCS_PRICING_EXPECTED_BLOBS)) {
+    blobs.set('6401c3524b5294f3a395acede35e4632eb89c0fb:nextjs/' + path, expected.anchor);
+    blobs.set(DOCS_PRICING_PREDECESSOR_SHA + ':nextjs/' + path, expected.predecessor);
+    blobs.set(headSha + ':nextjs/' + path, expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyDocsPricingScopeEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
+    headSha,
+    changedPaths,
+    repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error('missing Docs/pricing blob fixture: ' + args[1]);
+      return blob + '\n';
+    },
+  });
+}
 function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS) {
   const blobs = new Map([
     [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/app/workspace/page.tsx`, '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3'],
@@ -714,6 +746,70 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
   ]);
 });
 
+test('reviewed Docs/pricing patch preserves exact CSS blobs and selects layout regressions', () => {
+  const headSha = 'd'.repeat(40);
+  const docsPaths = DOCS_PRICING_FEATURE_PATHS.map(path => 'nextjs/' + path);
+  const evidence = docsPricingEvidence(headSha, {}, docsPaths);
+  assert.equal(evidence.eligible, true);
+  assert.deepEqual(evidence.anchorMismatches, []);
+  assert.deepEqual(evidence.predecessorMismatches, []);
+  assert.deepEqual(evidence.candidateMismatches, []);
+  const plan = planFor(docsPaths, { headSha, docsPricingVerification: evidence });
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.ok(plan.unitFiles.includes('lib/docs-navigation.test.ts'));
+  assert.ok(plan.unitFiles.includes('lib/design-tokens.test.ts'));
+  assert.ok(plan.unitFiles.length < 40, 'Docs/pricing selection stays bounded');
+  assert.deepEqual(plan.docsPricingSelection.unitFiles, ['lib/design-tokens.test.ts', 'lib/docs-navigation.test.ts']);
+  assert.ok(plan.browserFiles.includes('e2e/docs-reading-layout.spec.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/contrast-zoom-audit.spec.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/premium-craft.spec.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/public-layout-balance.spec.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/marketing-consent.spec.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/launch-qa-mobile-nav.spec.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/site-nav.spec.ts'));
+  const wrongCss = docsPricingEvidence(headSha, {
+    [headSha + ':nextjs/app/product-polish.css']: 'f'.repeat(40),
+  }, docsPaths);
+  assert.equal(wrongCss.eligible, false);
+  const failClosed = planFor(docsPaths, { headSha, docsPricingVerification: wrongCss });
+  assert.equal(failClosed.runFullHermeticVitest, true);
+  const partial = docsPricingEvidence(headSha, {}, docsPaths.slice(0, -1));
+  assert.equal(partial.eligible, false);
+  assert.ok(partial.reasons.some(reason => reason.includes('path set')));
+});
+
+test('Docs/pricing browser plan uses real projects for mobile, desktop, motion, consent and nav', () => {
+  const selected = [
+    'e2e/contrast-zoom-audit.spec.ts',
+    'e2e/docs-reading-layout.spec.ts',
+    'e2e/launch-qa-mobile-nav.spec.ts',
+    'e2e/marketing-consent.spec.ts',
+    'e2e/premium-craft.spec.ts',
+    'e2e/public-layout-balance.spec.ts',
+    'e2e/site-nav.spec.ts',
+  ];
+  const runs = planBrowserRuns(selected, false);
+  assert.deepEqual(runs.map(run => run.project), ['audit', 'audit-768', 'audit-1280', '1440', '390', 'reduced-motion', 'launch-chromium']);
+  for (const project of ['1440', '390', 'reduced-motion']) {
+    const files = runs.find(run => run.project === project).files;
+    assert.ok(files.includes('e2e/docs-reading-layout.spec.ts'));
+    assert.ok(files.includes('e2e/public-layout-balance.spec.ts'));
+    assert.ok(files.includes('e2e/premium-craft.spec.ts'));
+  }
+  assert.deepEqual(runs.find(run => run.project === 'audit').files, ['e2e/contrast-zoom-audit.spec.ts']);
+  assert.deepEqual(runs.find(run => run.project === 'audit-768').files, ['e2e/contrast-zoom-audit.spec.ts']);
+  assert.deepEqual(runs.find(run => run.project === 'audit-1280').files, ['e2e/contrast-zoom-audit.spec.ts']);
+  assert.deepEqual(runs.find(run => run.project === 'launch-chromium').files, ['e2e/launch-qa-mobile-nav.spec.ts']);
+  const config = readFileSync(new URL('../playwright.config.ts', import.meta.url), 'utf8');
+  assert.ok(config.includes('name: "audit"'));
+  assert.ok(config.includes('name: `audit-${width}`'));
+  assert.ok(config.includes('auditWidthSpecs'));
+  assert.ok(config.includes('name: "reduced-motion"'));
+  const siteNav = readFileSync(new URL('../e2e/site-nav.spec.ts', import.meta.url), 'utf8');
+  assert.ok(siteNav.includes('public UI visual review'));
+  assert.ok(siteNav.includes('public-ui-${review.name}-${route.name}.png'));
+});
 test('reviewed Playwright projects discover selected specs and avoid project-level skips', () => {
   const config = readFileSync(new URL('../playwright.config.ts', import.meta.url), 'utf8');
   const mobileNav = readFileSync(new URL('../e2e/launch-qa-mobile-nav.spec.ts', import.meta.url), 'utf8');

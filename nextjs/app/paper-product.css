@@ -66,3 +66,29 @@
 .paper-product { --chrome-measure:1280px; --ink-900:#fff; --ink-850:#f0f1ec; --border-dark:#d8ddd9; --border-dark-hi:#88928d; }
 .paper-product .nav .btn { color:#fff; background:#2447b3; border-color:#2447b3; }
 .paper-product .lv2-hero-stats a { color:#171c20; }
+
+
+@media (max-width: 760px) {
+  /* Move the plan choice up by tightening rhythm, while keeping every gate and qualifier visible. */
+  .pricing-page .scene.doc {
+    padding-top: 64px;
+    padding-bottom: 48px;
+  }
+  .pricing-page .scene.doc > .shell > .document-title { margin-bottom: 12px; }
+  .pricing-page .paper-purchase-boundary {
+    margin-block: 12px;
+    padding: 10px 12px;
+  }
+  .pricing-page .paper-purchase-boundary h2 {
+    margin-bottom: 5px;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+  .pricing-page .paper-purchase-boundary p {
+    margin: 4px 0;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .pricing-page .plans { margin-top: 12px; gap: 12px; }
+  .pricing-page .plan { padding: 16px; gap: 12px; }
+}
