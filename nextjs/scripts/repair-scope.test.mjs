@@ -204,7 +204,7 @@ test('workspace source feature uses its exact fourteen-unit, one-browser plan an
   assert.equal(verification.eligible, true);
   assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['components/compile-stage.test.tsx'], 'c8f82fc84db149c855052417a5e6abcf98b37a0e');
   assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['components/compile-stage.module.css'], 'f5d3855553275a1b58105c3362e4dfdedadbe740');
-  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS[WORKSPACE_SOURCE_BROWSER_FILE], '7009383c1078dc876a40174833ed63daf61a7bee');
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS[WORKSPACE_SOURCE_BROWSER_FILE], 'b3d630da8751062dfbb24c0cd80d82c665ae2311');
   assert.equal(WORKSPACE_SOURCE_FIXTURE_PATCH_SHA256, '0acc6b5613e65d183ab0688c2d02c76eff7353d8161e50025fe49e35fb010b6c');
   assert.deepEqual(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS, {
     'app/dev/compile-stage/page.tsx': '15325287c9cbe9c367093d724828f02729db4119',

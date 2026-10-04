@@ -3,7 +3,9 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { fixtureDocument, installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
 const DOCUMENT_ID = "audit-source-observation";
-const PROGRESS_ORIGIN = "https://progress.fixture.invalid";
+// Matches the production connect-src allowlist. Every request is intercepted below; the
+// synthetic host never reaches object storage.
+const PROGRESS_ORIGIN = "https://progress.fixture.r2.cloudflarestorage.com";
 
 function syntheticPdf(text: string): Buffer {
   const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET`;
@@ -83,6 +85,15 @@ async function fulfillPdf(route: Route, bytes: Buffer) {
   await route.fulfill({ status: 200, contentType: "application/pdf", body: bytes });
 }
 
+async function fulfillProgress(route: Route, payload: unknown, status = 200) {
+  await route.fulfill({
+    status,
+    contentType: "application/json",
+    headers: { "Access-Control-Allow-Origin": "*" },
+    body: JSON.stringify(payload),
+  });
+}
+
 test("an A 404 advances the same document to B and keeps polling until B is observed", async ({ page }) => {
   test.setTimeout(30_000);
   const pdfA = syntheticPdf("SYNTHETIC_VERSION_A");
@@ -91,6 +102,7 @@ test("an A 404 advances the same document to B and keeps polling until B is obse
   const documentB = readingDocument(pdfB);
   let inventoryAdvanced = false;
   let aProgressCalls = 0;
+  let aSidecarReads = 0;
   let bProgressReads = 0;
   let a404Returned!: () => void;
   const a404Gate = new Promise<void>(resolve => { a404Returned = resolve; });
@@ -118,16 +130,18 @@ test("an A 404 advances the same document to B and keeps polling until B is obse
   });
   await page.route(`${PROGRESS_ORIGIN}/**`, async route => {
     if (route.request().url().includes(documentA.versionKey)) {
-      return route.fulfill({ json: progress(documentA, "A_OCR_ONLY_SECRET") });
+      aSidecarReads += 1;
+      return fulfillProgress(route, progress(documentA, "A_OCR_ONLY_SECRET"));
     }
     bProgressReads += 1;
-    if (bProgressReads === 1) return route.fulfill({ status: 404, json: { code: "STREAM_NOT_READY" } });
-    return route.fulfill({ json: progress(documentB, "B_OCR_ONLY_SECRET") });
+    if (bProgressReads === 1) return fulfillProgress(route, { code: "STREAM_NOT_READY" }, 404);
+    return fulfillProgress(route, progress(documentB, "B_OCR_ONLY_SECRET"));
   });
 
   await page.goto("/workspace/sources");
   const sourcePanel = page.locator(`[data-source-id="${DOCUMENT_ID}"]`);
   await expect(sourcePanel.getByRole("button", { name: "A_OCR_ONLY_SECRET" })).toBeVisible();
+  await expect.poll(() => aSidecarReads).toBeGreaterThan(0);
   await a404Gate;
   await expect(page.getByText("A_OCR_ONLY_SECRET")).toHaveCount(0);
   await expect.poll(() => bProgressReads, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
@@ -164,7 +178,7 @@ test("a late source response cannot restore content after progress authorization
     await fulfillPdf(route, pdf);
     sourceResponseCompleted();
   });
-  await page.route(`${PROGRESS_ORIGIN}/**`, route => route.fulfill({ json: progress(document, "LATE_SOURCE_AUTH_SECRET") }));
+  await page.route(`${PROGRESS_ORIGIN}/**`, route => fulfillProgress(route, progress(document, "LATE_SOURCE_AUTH_SECRET")));
 
   try {
     await page.goto("/workspace/sources");
@@ -208,13 +222,14 @@ test("a late progress response cannot restore content after authorization is rev
     sidecarReads += 1;
     sidecarStarted();
     await progressGate;
-    await route.fulfill({ json: progress(document, "LATE_PROGRESS_AUTH_SECRET") });
+    await fulfillProgress(route, progress(document, "LATE_PROGRESS_AUTH_SECRET"));
     sidecarResponseCompleted();
   });
 
   try {
     await page.goto("/workspace/sources");
     await sidecarStartedGate;
+    expect(sidecarReads).toBeGreaterThan(0);
     await forbiddenGate;
     await page.waitForTimeout(100);
   } finally {
@@ -246,7 +261,7 @@ test("a sanitized PDF digest mismatch blocks both the preview and its progress s
   });
   await page.route(`${PROGRESS_ORIGIN}/**`, async route => {
     progressSidecarReads += 1;
-    return route.fulfill({ json: progress(document, "DIGEST_MISMATCH_SECRET") });
+    return fulfillProgress(route, progress(document, "DIGEST_MISMATCH_SECRET"));
   });
 
   await page.goto("/workspace/sources");

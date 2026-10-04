@@ -97,7 +97,7 @@ export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
   'components/compile-stage.module.css': 'f5d3855553275a1b58105c3362e4dfdedadbe740',
   'components/compile-stage.test.tsx': 'c8f82fc84db149c855052417a5e6abcf98b37a0e',
   'components/compile-stage.tsx': 'fb8c4a9020afab4ee9496e2133588e8ebf446e55',
-  'e2e/workspace-source-observation.spec.ts': '7009383c1078dc876a40174833ed63daf61a7bee',
+  'e2e/workspace-source-observation.spec.ts': 'b3d630da8751062dfbb24c0cd80d82c665ae2311',
   'lib/ocr-progress.test.ts': '766e4ca5fcde9156f5d60e99d5397ac6206ce40a',
   'lib/ocr-progress.ts': 'ddd83aea6ad50b3b4b4a1c4d1f5c3a09d752e0cf',
   'lib/compile-stage-view.test.ts': '505bd18cd58dff06294998715e95e09fc312ea3b',
@@ -113,7 +113,7 @@ const reviewedWorkspacePageBlobs = Object.freeze({
   base: '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3',
   result: '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
 });
-const reviewedWorkspaceBrowserBlob = '7009383c1078dc876a40174833ed63daf61a7bee';
+const reviewedWorkspaceBrowserBlob = 'b3d630da8751062dfbb24c0cd80d82c665ae2311';
 const reviewedScopedConfigBlob = 'f2065bec72452aa1c80b29afb2768339b7397db8';
 const reviewedScopedConfigGlobalBlob = '91bb009bae9930952594c8fb8164b714a43e8686';
 const reviewedBrowserFiles = new Set([
