@@ -88,7 +88,7 @@ export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
   'app/api/documents/[id]/progress/route.test.ts': '54e35fd493a56857cdf6393167017538e826aa2e',
   'app/api/documents/[id]/progress/route.ts': 'c2ab73f10f2590eec7118fe85aa98bd6d023a305',
   'app/workspace/page.tsx': '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
-  'components/compile-stage.module.css': '3a0ccd03335e4e77435af8c671a77df902b9bfd3',
+  'components/compile-stage.module.css': 'f5d3855553275a1b58105c3362e4dfdedadbe740',
   'components/compile-stage.test.tsx': 'c8f82fc84db149c855052417a5e6abcf98b37a0e',
   'components/compile-stage.tsx': 'fb8c4a9020afab4ee9496e2133588e8ebf446e55',
   'e2e/workspace-source-observation.spec.ts': '7009383c1078dc876a40174833ed63daf61a7bee',
