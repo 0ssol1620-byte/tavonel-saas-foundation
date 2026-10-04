@@ -110,7 +110,8 @@ describe("compile stage separates durable run state from source-version observat
       <CompileStage rows={[row("reused")]} state="reading" sourceObservation={observation("reused", "old version text")}
         selectedSourceVersion={{ documentId: "reused", versionKey: newerVersion }} />,
     );
-    expect(markup).toContain("Original preview unavailable");
+    expect(markup).toContain('data-visual="none"');
+    expect(markup).not.toContain('data-source-id="reused"');
     expect(markup).not.toContain("old version text");
   });
 
@@ -138,7 +139,8 @@ describe("compile stage separates durable run state from source-version observat
         sourceObservation={observation(documentId, "private OCR from version A", versionA)}
         selectedSourceVersion={sourceB} />,
     );
-    expect(beforeB).toContain("Original preview unavailable");
+    expect(beforeB).toContain('data-visual="none"');
+    expect(beforeB).not.toContain('data-source-id="reused"');
     expect(beforeB).not.toContain("private OCR from version A");
 
     markSourceVersionUnavailable(unavailable, sourceB);
@@ -160,7 +162,8 @@ describe("compile stage separates durable run state from source-version observat
         sourceObservation={{ ...observation("reused", "must not show"), sourceSha256: `sha256:${wrongDigest}` }}
         selectedSourceVersion={{ documentId: "reused", versionKey: digest }} />,
     );
-    expect(markup).toContain("Original preview unavailable");
+    expect(markup).toContain('data-visual="none"');
+    expect(markup).not.toContain('data-source-id="reused"');
     expect(markup).not.toContain("must not show");
   });
 

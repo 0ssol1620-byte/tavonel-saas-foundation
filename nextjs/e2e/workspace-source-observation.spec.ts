@@ -143,9 +143,11 @@ test("a late source response cannot restore content after progress authorization
   let progressCalls = 0;
   let releaseSource!: () => void;
   let sourceStarted!: () => void;
+  let sourceResponseCompleted!: () => void;
   let secondProgressReturned!: () => void;
   const sourceGate = new Promise<void>(resolve => { releaseSource = resolve; });
   const sourceStartedGate = new Promise<void>(resolve => { sourceStarted = resolve; });
+  const sourceResponseCompletedGate = new Promise<void>(resolve => { sourceResponseCompleted = resolve; });
   const forbiddenGate = new Promise<void>(resolve => { secondProgressReturned = resolve; });
 
   await installWorkspace(page, document);
@@ -159,7 +161,8 @@ test("a late source response cannot restore content after progress authorization
   await page.route(`**/api/documents/${DOCUMENT_ID}/source**`, async route => {
     sourceStarted();
     await sourceGate;
-    return fulfillPdf(route, pdf);
+    await fulfillPdf(route, pdf);
+    sourceResponseCompleted();
   });
   await page.route(`${PROGRESS_ORIGIN}/**`, route => route.fulfill({ json: progress(document, "LATE_SOURCE_AUTH_SECRET") }));
 
@@ -171,6 +174,8 @@ test("a late source response cannot restore content after progress authorization
   } finally {
     releaseSource();
   }
+  await sourceResponseCompletedGate;
+  await page.waitForTimeout(100);
   await expect(page.locator(`[data-source-id="${DOCUMENT_ID}"]`)).toHaveCount(0);
   await expect(page.getByText("LATE_SOURCE_AUTH_SECRET")).toHaveCount(0);
 });
@@ -183,9 +188,11 @@ test("a late progress response cannot restore content after authorization is rev
   let sidecarReads = 0;
   let releaseProgress!: () => void;
   let sidecarStarted!: () => void;
+  let sidecarResponseCompleted!: () => void;
   let secondProgressReturned!: () => void;
   const progressGate = new Promise<void>(resolve => { releaseProgress = resolve; });
   const sidecarStartedGate = new Promise<void>(resolve => { sidecarStarted = resolve; });
+  const sidecarResponseCompletedGate = new Promise<void>(resolve => { sidecarResponseCompleted = resolve; });
   const forbiddenGate = new Promise<void>(resolve => { secondProgressReturned = resolve; });
 
   await installWorkspace(page, document);
@@ -201,7 +208,8 @@ test("a late progress response cannot restore content after authorization is rev
     sidecarReads += 1;
     sidecarStarted();
     await progressGate;
-    return route.fulfill({ json: progress(document, "LATE_PROGRESS_AUTH_SECRET") });
+    await route.fulfill({ json: progress(document, "LATE_PROGRESS_AUTH_SECRET") });
+    sidecarResponseCompleted();
   });
 
   try {
@@ -212,6 +220,8 @@ test("a late progress response cannot restore content after authorization is rev
   } finally {
     releaseProgress();
   }
+  await sidecarResponseCompletedGate;
+  await page.waitForTimeout(100);
   await expect(page.locator(`[data-source-id="${DOCUMENT_ID}"]`)).toHaveCount(0);
   await expect(page.getByText("LATE_PROGRESS_AUTH_SECRET")).toHaveCount(0);
   expect(sidecarReads).toBe(1);
