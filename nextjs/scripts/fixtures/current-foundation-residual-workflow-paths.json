@@ -1,29 +1,36 @@
 {
-  "source": "verified GitHub compare d290..a1e0; used by the real NUL-delimited Git-input regression",
+  "source": "verified GitHub compare d290..fc7; exact path set for NUL-delimited Git-input regression, plus capability route under review",
   "repairAnchorSha": "d2906acde291b77b73229623733736796f4fb8c8",
   "pullRequestBaseSha": "7a7b4fed9e7d45ec596057f7f1cc5d0672465326",
-  "headSha": "a1e0abef998ce4c3a63fd3e0162ca55d583ae21c",
+  "headSha": "fc7b1dcfddc8cf2c318dfe5cb70c215bd06d5243",
   "residualPaths": [
     "nextjs/app/api/openapi/route.ts",
-    "nextjs/lib/api-error-codes.ts",
-    "nextjs/lib/docs-content.ts",
-    "nextjs/lib/openapi-routes.test.ts",
-    "nextjs/lib/openapi-response-shape.test.ts",
-    "nextjs/app/api/v1/uploads/approval/route.ts",
     "nextjs/app/api/v1/uploads/approval/cancel/route.ts",
+    "nextjs/app/api/v1/uploads/approval/route.ts",
     "nextjs/app/api/v1/uploads/confirm/route.ts",
     "nextjs/app/api/v1/uploads/release/route.ts",
-    "nextjs/e2e/detail-integrity.spec.ts"
+    "nextjs/e2e/detail-integrity.spec.ts",
+    "nextjs/lib/api-error-codes.ts",
+    "nextjs/lib/api-reference.ts",
+    "nextjs/lib/developer-distribution.test.ts",
+    "nextjs/lib/docs-content.ts",
+    "nextjs/lib/docs-endpoints.ts",
+    "nextjs/lib/openapi-compile-jobs.test.ts",
+    "nextjs/lib/openapi-completeness.test.ts",
+    "nextjs/lib/openapi-contract.test.ts",
+    "nextjs/lib/openapi-response-shape.test.ts",
+    "nextjs/lib/openapi-routes.test.ts",
+    "nextjs/lib/retrieval-docs-parity.test.ts"
   ],
   "workflowAndSelectorPaths": [
     ".github/workflows/ci.yml",
     ".github/workflows/launch-qa.yml",
     ".github/workflows/repair-scope.yml",
-    "nextjs/scripts/repair-scope.mjs",
+    "nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json",
     "nextjs/scripts/repair-scope-gate.mjs",
+    "nextjs/scripts/repair-scope.mjs",
     "nextjs/scripts/repair-scope.test.mjs",
     "nextjs/scripts/run-repair-check.mjs",
-    "nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json",
     "nextjs/scripts/verify-repair-workflows.mjs"
   ],
   "reviewedApiReferenceRepairPaths": [
@@ -36,5 +43,6 @@
     "nextjs/lib/openapi-response-shape.test.ts",
     "nextjs/lib/retrieval-docs-parity.test.ts",
     "nextjs/lib/openapi-routes.test.ts"
-  ]
+  ],
+  "reviewedCapabilityRoutePath": "nextjs/app/api/uploads/capability/route.ts"
 }

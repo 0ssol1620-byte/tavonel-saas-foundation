@@ -192,7 +192,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium runtime
         run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm build
+      - run: pnpm exec next build
       - name: Start production app
         run: pnpm start --hostname 127.0.0.1 --port 3117 > /tmp/tavonel-next.log 2>&1 &
       - name: Wait for health

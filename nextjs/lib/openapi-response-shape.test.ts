@@ -186,6 +186,43 @@ function apiRequest(path: string, body: unknown, headers: Record<string, string>
   });
 }
 
+async function approvedCapabilityFixture() {
+  grantKey();
+  customerDataAdmission.mockResolvedValue(true);
+  signerEnv.mockReturnValue({ accessKeyId: "k", secretAccessKey: "s", bucket: "b", endpoint: "https://r2.test" });
+  admission.mockResolvedValue({ ok: true, result: { expiresAt: "2026-09-11T00:05:00.000Z" } });
+  approvedReservation.mockResolvedValue({
+    ok: true,
+    result: {
+      reservationId: "reservation-shape", approvedMaximumCredits: 12, approvedReservedCredits: 12,
+      billingSource: "subscription", reservationExpiresAt: "2026-09-11T00:05:00.000Z",
+      approvedMaxPages: 3, pageBasis: "declared",
+    },
+  });
+  presign.mockReturnValue({ ok: true, uploadUrl: "https://r2.test/quarantine/put?signature=redacted" });
+
+  const attemptKey = "att_0123456789abcdef0123456789abcdef";
+  const scopeDigest = `sha256:${"d".repeat(64)}`;
+  const pricingFingerprint = await intakePricingFingerprint();
+  const contentSha256 = `sha256:${"b".repeat(64)}`;
+  const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
+  const body = {
+    originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184_320,
+    attemptKey, scopeDigest, pricingFingerprint, fileKey, contentSha256,
+  };
+  const sourceKey = createHash("sha256")
+    .update(["tavonel-approved-source-v1", attemptKey, fileKey].join("\x1f"))
+    .digest("hex");
+  readApproval.mockResolvedValue({
+    ok: true,
+    result: {
+      scopeDigest, pricingFingerprint,
+      files: [{ fileKey, documentId: DOCUMENT, contentSha256, byteLength: 184_320, mimeType: "application/pdf" }],
+    },
+  });
+  return { body, sourceKey, attemptKey, scopeDigest, fileKey };
+}
+
 function grantKey(extra: Record<string, unknown> = {}) {
   authorize.mockResolvedValue({
     ok: true,
@@ -291,6 +328,7 @@ describe("documented response shapes", () => {
   });
 
   it("createDirectUploadCapability answers every field the spec's 200 names, and refuses a missing required one", async () => {
+    vi.clearAllMocks();
     const { path, operation: published } = await operation("createDirectUploadCapability");
     expect(path).toBe("/uploads/capability");
     const required = published.requestBody?.content["application/json"].schema.required ?? [];
@@ -317,7 +355,10 @@ describe("documented response shapes", () => {
     const contentSha256 = "sha256:" + "b".repeat(64);
     const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
     const sourceKey = createHash("sha256").update(["tavonel-approved-source-v1", attemptKey, fileKey].join("\x1f")).digest("hex");
-    deterministicId.mockResolvedValue(DOCUMENT);
+    // The database-approved id is UUIDv4. A distinct UUIDv5 result proves the
+    // capability path does not recompute or compare against the legacy id scheme.
+    expect(DOCUMENT).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    deterministicId.mockResolvedValue("99999999-9999-5999-8999-999999999999");
     readApproval.mockResolvedValue({ ok: true, result: { scopeDigest, pricingFingerprint, files: [{ fileKey, documentId: DOCUMENT, contentSha256, byteLength: 184_320, mimeType: "application/pdf" }] } });
     approvedReservation.mockResolvedValue({ ok: true, result: { reservationId: "reservation-shape", approvedMaximumCredits: 12, approvedReservedCredits: 12, billingSource: "subscription", reservationExpiresAt: "2026-09-11T00:05:00.000Z", approvedMaxPages: 3, pageBasis: "declared" } });
 
@@ -337,6 +378,16 @@ describe("documented response shapes", () => {
     expect(payload.declaredMimeType).toBe("application/pdf");
     expect(payload.contentLength).toBe(184_320);
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(deterministicId).not.toHaveBeenCalled();
+
+    const retry = await uploadCapability(apiRequest("/api/v1/uploads/capability", body, {
+      "x-tavonel-source-idempotency-key": sourceKey,
+    }));
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toMatchObject({ documentId: DOCUMENT, objectKey: `quarantine/${WORKSPACE}/${DOCUMENT}/source` });
+    expect(approvedReservation).toHaveBeenCalledTimes(2);
+    expect(approvedReservation.mock.calls.map(([input]) => input.documentId)).toEqual([DOCUMENT, DOCUMENT]);
+    expect(admission.mock.calls.map(([input]) => input.documentId)).toEqual([DOCUMENT, DOCUMENT]);
 
     // The failure path for each documented required field: refused, not defaulted.
     for (const field of required) {
@@ -346,6 +397,57 @@ describe("documented response shapes", () => {
       expect(refused.status, `omitting the required field ${field} was accepted`).toBeGreaterThanOrEqual(400);
       expect(await refused.json()).toHaveProperty("code");
     }
+  });
+
+  it("refuses a capability whose scope digest differs from the approved member", async () => {
+    vi.clearAllMocks();
+    const { body, sourceKey } = await approvedCapabilityFixture();
+    const response = await uploadCapability(apiRequest("/api/v1/uploads/capability", {
+      ...body, scopeDigest: `sha256:${"e".repeat(64)}`,
+    }, { "x-tavonel-source-idempotency-key": sourceKey }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" });
+    expect(admission).not.toHaveBeenCalled();
+    expect(approvedReservation).not.toHaveBeenCalled();
+    expect(presign).not.toHaveBeenCalled();
+  });
+
+  it("refuses a capability when its source idempotency key is altered", async () => {
+    vi.clearAllMocks();
+    const { body, sourceKey } = await approvedCapabilityFixture();
+    const alteredSourceKey = `${sourceKey[0] === "0" ? "1" : "0"}${sourceKey.slice(1)}`;
+    const response = await uploadCapability(apiRequest("/api/v1/uploads/capability", body, {
+      "x-tavonel-source-idempotency-key": alteredSourceKey,
+    }));
+
+    expect(response.status).toBe(428);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_APPROVAL_REQUIRED" });
+    expect(readApproval).not.toHaveBeenCalled();
+    expect(admission).not.toHaveBeenCalled();
+    expect(approvedReservation).not.toHaveBeenCalled();
+    expect(presign).not.toHaveBeenCalled();
+  });
+
+  it("refuses a capability attempt that has no matching approved member", async () => {
+    vi.clearAllMocks();
+    const { body, attemptKey, fileKey, sourceKey } = await approvedCapabilityFixture();
+    const alteredAttemptKey = `${attemptKey.slice(0, -1)}${attemptKey.endsWith("0") ? "1" : "0"}`;
+    const alteredAttemptSourceKey = createHash("sha256")
+      .update(["tavonel-approved-source-v1", alteredAttemptKey, fileKey].join("\x1f"))
+      .digest("hex");
+    readApproval.mockResolvedValue({ ok: false, code: "INTAKE_APPROVAL_NOT_FOUND", status: 404 });
+    const response = await uploadCapability(apiRequest("/api/v1/uploads/capability", {
+      ...body, attemptKey: alteredAttemptKey,
+    }, { "x-tavonel-source-idempotency-key": alteredAttemptSourceKey }));
+
+    expect(sourceKey).not.toBe(alteredAttemptSourceKey);
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_APPROVAL_NOT_FOUND" });
+    expect(readApproval).toHaveBeenCalledWith({ workspaceKey: WORKSPACE, userId: "user-shape", attemptKey: alteredAttemptKey });
+    expect(admission).not.toHaveBeenCalled();
+    expect(approvedReservation).not.toHaveBeenCalled();
+    expect(presign).not.toHaveBeenCalled();
   });
 
   it("refuses a stale approved pricing fingerprint before reserving or signing", async () => {

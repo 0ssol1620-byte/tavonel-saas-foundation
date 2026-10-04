@@ -112,6 +112,11 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       for (const file of uploadTests) unitFiles.add(file);
       matched = true;
     }
+    if (path === 'app/api/uploads/capability/route.ts') {
+      groups.add('upload-intake');
+      for (const file of [...uploadTests, 'lib/source-intake.test.ts']) unitFiles.add(file);
+      matched = true;
+    }
     if (path === 'app/workspace/page.tsx') {
       groups.add('workspace-ui');
       browserFiles.add('e2e/failure-states-audit.spec.ts');

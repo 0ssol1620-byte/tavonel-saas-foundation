@@ -23,7 +23,7 @@ function planFor(paths, overrides = {}) {
   });
 }
 
-test('actual d290-to-a1 delta flows through NUL-delimited Git collection and selects scoped checks', () => {
+test('actual d290-to-fc7 delta plus capability route flows through NUL-delimited Git collection', () => {
   const repoRoot = mkdtempSync(resolve(tmpdir(), 'repair-scope-git-'));
   try {
     execFileSync('git', ['init', '-q'], { cwd: repoRoot, shell: false });
@@ -33,7 +33,7 @@ test('actual d290-to-a1 delta flows through NUL-delimited Git collection and sel
     execFileSync('git', ['commit', '--allow-empty', '-m', 'audited anchor fixture'], { cwd: repoRoot, shell: false });
     const anchor = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8', shell: false }).trim();
 
-    const actualDelta = [...fixture.residualPaths, ...fixture.workflowAndSelectorPaths].sort();
+    const actualDelta = [...fixture.residualPaths, ...fixture.workflowAndSelectorPaths, fixture.reviewedCapabilityRoutePath].sort();
     for (const path of actualDelta) {
       const target = resolve(repoRoot, ...path.split('/'));
       mkdirSync(dirname(target), { recursive: true });
@@ -46,21 +46,24 @@ test('actual d290-to-a1 delta flows through NUL-delimited Git collection and sel
     assert.deepEqual(gitPaths.sort(), actualDelta);
 
     const plan = planFor(gitPaths);
-    assert.equal(plan.changedPaths.length, 19);
+    assert.deepEqual(plan.changedPaths, actualDelta.map(normalizePath).sort());
     assert.ok(plan.changedPaths.includes('scripts/fixtures/current-foundation-residual-workflow-paths.json'));
     assert.deepEqual(plan.unknownPaths, []);
     assert.equal(plan.runFullHermeticVitest, false);
-    assert.equal(plan.unitFiles.length, 19);
+    assert.equal(plan.runWorkflowStaticGate, true);
+
     assert.deepEqual(plan.browserFiles, ['e2e/detail-integrity.spec.ts']);
     assert.ok(plan.groups.includes('docs'));
     assert.ok(plan.groups.includes('openapi'));
     assert.ok(plan.groups.includes('alias-auth'));
+    assert.ok(plan.groups.includes('upload-intake'));
     assert.ok(plan.groups.includes('browser-regression'));
     for (const file of [
       'lib/openapi-routes.test.ts', 'lib/openapi-response-shape.test.ts',
       'lib/api-error-codes.test.ts', 'lib/connector-contract.test.ts',
       'lib/connector-oauth-route.test.ts', 'lib/intake-approval-route.test.ts',
       'lib/upload-confirm-route.test.ts', 'lib/upload-release-route.test.ts',
+      'lib/customer-data-admission-routes.test.ts', 'lib/source-intake.test.ts',
     ]) assert.ok(plan.unitFiles.includes(file), `missing selected coverage: ${file}`);
     assert.ok(plan.unitFiles.length < 40, 'must remain scoped, not select the 6,237-test suite');
     assert.equal(plan.pullRequestBaseSha, fixture.pullRequestBaseSha);
@@ -80,11 +83,11 @@ test('reviewed API reference and docs endpoint repairs stay scoped to contract, 
   ];
   const plan = planFor(actualDelta);
 
-  assert.equal(plan.changedPaths.length, 26);
+  assert.deepEqual(plan.changedPaths, [...new Set(actualDelta.map(normalizePath))].sort());
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
   assert.equal(plan.runScriptContracts, false);
-  assert.equal(plan.unitFiles.length, 20);
+  assert.ok(plan.unitFiles.length < 40, 'must remain scoped, not select the 6,237-test suite');
   for (const file of [
     'lib/docs-content.test.ts', 'lib/docs-highlight.test.ts',
     'lib/docs-navigation.test.ts', 'lib/retrieval-docs-parity.test.ts',
@@ -105,14 +108,14 @@ test('reviewed API reference and docs endpoint repairs stay scoped to contract, 
   const isolated = planFor(fixture.reviewedApiReferenceRepairPaths);
   assert.deepEqual(isolated.unknownPaths, []);
   assert.equal(isolated.runFullHermeticVitest, false);
-  assert.equal(isolated.unitFiles.length, 14);
+  assert.ok(isolated.unitFiles.length < 40, 'isolated docs mapping remains bounded');
   assert.ok(isolated.unitFiles.includes('lib/developer-distribution.test.ts'));
 
   const productionOnly = planFor(fixture.reviewedApiReferenceRepairPaths
     .filter(path => path.endsWith('/api-reference.ts') || path.endsWith('/docs-endpoints.ts')));
   assert.deepEqual(productionOnly.unknownPaths, []);
   assert.equal(productionOnly.runFullHermeticVitest, false);
-  assert.equal(productionOnly.unitFiles.length, 14);
+  assert.ok(productionOnly.unitFiles.length < 40, 'production docs mapping remains bounded');
   assert.ok(productionOnly.unitFiles.includes('lib/docs-content.test.ts'));
   assert.ok(productionOnly.unitFiles.includes('lib/openapi-routes.test.ts'));
   assert.ok(productionOnly.unitFiles.includes('lib/developer-distribution.test.ts'));

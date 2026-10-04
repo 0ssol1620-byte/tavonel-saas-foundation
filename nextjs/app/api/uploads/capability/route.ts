@@ -14,7 +14,6 @@ import {
   presignFoundationQuarantinePut,
 } from "@/lib/r2-presign";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
-import { deterministicSourceDocumentId } from "@/lib/source-intake";
 import { intakePricingFingerprint } from "@/lib/usage-pricing";
 import { approvedSourceIdempotencyKey, ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
 
@@ -116,9 +115,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" }, { status: 409, headers: NO_STORE });
   }
   const documentId = approvedFile.documentId;
-  if (await deterministicSourceDocumentId(workspaceId, sourceIdempotencyKey) !== documentId) {
-    return NextResponse.json({ code: "SOURCE_IDEMPOTENCY_KEY_INVALID" }, { status: 409, headers: NO_STORE });
-  }
+  // The approval row owns this identity. Its UUID is minted by the database; the
+  // source idempotency key remains independently validated above and is never used
+  // to replace or recompute the approved document id.
   const objectKey = `quarantine/${workspaceId}/${documentId}/source`;
   const admission = await reserveFoundationIntake({
     workspaceKey: workspaceId, documentId, userId: auth.principal.userId, objectKey,
