@@ -613,7 +613,7 @@
   --unresolved: #b42318;
   background: #fff;
   color: #171c20;
-  padding-top: clamp(40px, 4vw, 56px);
+  padding-top: clamp(40px, 4vw, 50px);
   padding-bottom: 72px;
 }
 .scene.doc.docs-reading-surface .docs-code {
