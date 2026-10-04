@@ -37,6 +37,68 @@ async function openMenu(page: Page) {
   return { menu, panel };
 }
 
+function rgbChannels(value: string): [number, number, number] {
+  const channels = value.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+  if (!channels || channels.length !== 3) throw new Error(`Expected a resolved RGB color, got ${value}`);
+  return channels as [number, number, number];
+}
+
+function relativeLuminance(color: [number, number, number]) {
+  const linear = color.map(channel => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const [first, second] = [relativeLuminance(rgbChannels(foreground)), relativeLuminance(rgbChannels(background))]
+    .sort((a, b) => b - a);
+  return (first + 0.05) / (second + 0.05);
+}
+
+test("the open menu keeps AA contrast and stays inside 760, 768, and 900px viewports", async ({ page }) => {
+  await page.goto("/product");
+  const menu = page.locator("header.nav details.mobile-primary-nav");
+  const summary = menu.locator(":scope > summary");
+  const panel = menu.locator(":scope > nav");
+
+  for (const width of [760, 768, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(menu).toBeVisible();
+    await expect(panel, "closed disclosure links must not be displayed or measured").toHaveCSS("display", "none");
+
+    await summary.click();
+    await expect(panel).toBeVisible();
+    const bounds = await panel.evaluate(element => {
+      const { left, right } = element.getBoundingClientRect();
+      return { left, right };
+    });
+    expect(bounds.left, `panel left edge at ${width}px`).toBeGreaterThanOrEqual(0);
+    expect(bounds.right, `panel right edge at ${width}px`).toBeLessThanOrEqual(width);
+
+    const links = panel.locator("a.mobile-nav-direct, a.mobile-nav-signin");
+    await expect(links).toHaveCount(4);
+    const measurements = await links.evaluateAll(elements => elements.map(element => {
+      const style = getComputedStyle(element);
+      return {
+        text: element.textContent?.trim() ?? "",
+        foreground: style.color,
+        background: style.backgroundColor,
+        fontSize: Number.parseFloat(style.fontSize),
+      };
+    }));
+    for (const measurement of measurements) {
+      const ratio = contrastRatio(measurement.foreground, measurement.background);
+      expect(measurement.fontSize, `${measurement.text} remains body text`).toBeGreaterThanOrEqual(15);
+      expect(ratio, `${measurement.text} at ${width}px: ${measurement.foreground} on ${measurement.background}`).toBeGreaterThanOrEqual(4.5);
+    }
+
+    await summary.click();
+    await expect(panel).toHaveCSS("display", "none");
+  }
+});
+
 test("the mobile menu ships only the customer choices and one commercial action", async ({ request }) => {
   // Verify destinations from the server response rather than repeatedly asking Windows WebKit's
   // DOM bridge for attributes. In long stress runs WebKit has returned an empty attribute value

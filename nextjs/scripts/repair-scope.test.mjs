@@ -19,6 +19,10 @@ import {
   WORKSPACE_SOURCE_UNIT_FILES,
   DOCS_PRICING_PREDECESSOR_SHA,
   DOCS_PRICING_FEATURE_PATHS,
+  MOBILE_NAV_CONTRAST_PREDECESSOR_SHA,
+  MOBILE_NAV_CONTRAST_PATHS,
+  MOBILE_NAV_CONTRAST_BLOBS,
+  verifyMobileNavContrastEvidence,
   verifyDocsPricingScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
 } from './repair-scope.mjs';
@@ -30,12 +34,15 @@ const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/curren
 const testHeadSha = 'b'.repeat(40);
 
 function planFor(paths, overrides = {}) {
+  const normalizedPaths = paths.map(normalizePath);
+  const mobileNavTouched = normalizedPaths.some(path => MOBILE_NAV_CONTRAST_PATHS.includes(path));
   return buildRepairPlan({
     pullRequestBaseSha: fixture.pullRequestBaseSha,
     repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
     headSha: fixture.headSha,
     pullRequest: 141,
     changedPaths: paths,
+    ...(mobileNavTouched ? { mobileNavVerification: { eligible: true, reasons: [] } } : {}),
     ...overrides,
   });
 }
@@ -185,6 +192,27 @@ const DOCS_PRICING_EXPECTED_BLOBS = Object.freeze({
   'lib/docs-navigation.test.ts': { anchor: '27a19c495f128e42e802ea3fce13f00182c76726', predecessor: '27a19c495f128e42e802ea3fce13f00182c76726', candidate: '4b1bdbcd38336166528680b01e9f5477ca9132e8' },
   'e2e/docs-reading-layout.spec.ts': { anchor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', predecessor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', candidate: '34699a578c834e05bdd27dc7d71971be231ab4af' },
 });
+
+function mobileNavContrastEvidence(headSha, overrides = {}, changedPaths = MOBILE_NAV_CONTRAST_PATHS) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(MOBILE_NAV_CONTRAST_BLOBS)) {
+    blobs.set(`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/${path}`, expected.anchor);
+    blobs.set(`${MOBILE_NAV_CONTRAST_PREDECESSOR_SHA}:nextjs/${path}`, expected.predecessor);
+    blobs.set(`${headSha}:nextjs/${path}`, expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyMobileNavContrastEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
+    headSha,
+    changedPaths,
+    repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error('missing mobile navigation blob fixture: ' + args[1]);
+      return blob + '\n';
+    },
+  });
+}
 
 function docsPricingEvidence(headSha, overrides = {}, changedPaths = DOCS_PRICING_FEATURE_PATHS) {
   const blobs = new Map();
@@ -744,6 +772,33 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
     { kind: 'project', project: '1440', files: ['e2e/marketing-consent.spec.ts'] },
     { kind: 'project', project: '390', files: ['e2e/marketing-consent.spec.ts'] },
   ]);
+});
+
+test('mobile navigation contrast fix requires exact CSS and opened-menu regression blobs', () => {
+  const headSha = 'e'.repeat(40);
+  const paths = MOBILE_NAV_CONTRAST_PATHS.map(path => 'nextjs/' + path);
+  const evidence = mobileNavContrastEvidence(headSha, {}, paths);
+  assert.equal(evidence.eligible, true);
+  assert.deepEqual(evidence.anchorMismatches, []);
+  assert.deepEqual(evidence.predecessorMismatches, []);
+  assert.deepEqual(evidence.candidateMismatches, []);
+
+  const planPaths = [...paths, 'nextjs/scripts/repair-scope.mjs'];
+  const plan = planFor(planPaths, { headSha, mobileNavVerification: evidence });
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.runWorkflowStaticGate, true, 'changing the selector still requests its static gate');
+  assert.ok(plan.groups.includes('mobile-nav-contrast'));
+  assert.ok(plan.browserFiles.includes('e2e/launch-qa-mobile-nav.spec.ts'));
+  assert.deepEqual(plan.unknownPaths, []);
+
+  const staleCss = mobileNavContrastEvidence(headSha, {
+    [`6401c3524b5294f3a395acede35e4632eb89c0fb:nextjs/app/chrome-v2.css`]: 'f'.repeat(40),
+  }, paths);
+  assert.equal(staleCss.eligible, false);
+  assert.ok(staleCss.reasons.some(reason => reason.includes('anchor blobs')));
+  const missingPair = mobileNavContrastEvidence(headSha, {}, ['app/chrome-v2.css']);
+  assert.equal(missingPair.eligible, false);
+  assert.ok(missingPair.reasons.some(reason => reason.includes('path set')));
 });
 
 test('reviewed Docs/pricing patch preserves exact CSS blobs and selects layout regressions', () => {

@@ -68,6 +68,15 @@ const docsPricingBlobs = Object.freeze({
   'lib/docs-navigation.test.ts': { anchor: '27a19c495f128e42e802ea3fce13f00182c76726', predecessor: '27a19c495f128e42e802ea3fce13f00182c76726', candidate: '4b1bdbcd38336166528680b01e9f5477ca9132e8' },
   'e2e/docs-reading-layout.spec.ts': { anchor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', predecessor: 'ebe6a1e6ba37df99cc8139811c82584ed206a085', candidate: '34699a578c834e05bdd27dc7d71971be231ab4af' },
 });
+export const MOBILE_NAV_CONTRAST_PREDECESSOR_SHA = '2ff7c521233064915123dfbccb7680716d39cc28';
+export const MOBILE_NAV_CONTRAST_PATHS = Object.freeze([
+  'app/chrome-v2.css',
+  'e2e/launch-qa-mobile-nav.spec.ts',
+]);
+export const MOBILE_NAV_CONTRAST_BLOBS = Object.freeze({
+  'app/chrome-v2.css': { anchor: 'a3edbd4aea405c1bca8b361576fb371c3fe48b65', predecessor: '6da83d43e0aff2e11517d9a7ea5c82ce73eab91a', candidate: '3064d38ea14fd38bae953f72962ea2e79676e397' },
+  'e2e/launch-qa-mobile-nav.spec.ts': { anchor: 'e55517b0d48a1229217e4c23eb85935d02c75061', predecessor: '6c80d0156ac5eef02f4ea3ea50e6a448eafa86a5', candidate: 'ddc06f582de18fe14c2a52afd304a77721f1d004' },
+});
 const docsPricingUnitTests = ['lib/design-tokens.test.ts', 'lib/docs-navigation.test.ts'];
 const docsPricingBrowserTests = [
   'e2e/contrast-zoom-audit.spec.ts',
@@ -249,7 +258,28 @@ export function verifyDocsPricingScopeEvidence({ repairAnchorSha, headSha, chang
   return { eligible: reasons.length === 0, reasons, featurePaths, anchorMismatches, predecessorMismatches, candidateMismatches };
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null }) {
+export function verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => MOBILE_NAV_CONTRAST_PATHS.includes(path)))].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('mobile navigation contrast fix is not anchored to the authenticated 6401 baseline');
+  if (JSON.stringify(featurePaths) !== JSON.stringify([...MOBILE_NAV_CONTRAST_PATHS].sort())) reasons.push('mobile navigation contrast path set differs from the reviewed CSS/test pair');
+  if (headSha === MOBILE_NAV_CONTRAST_PREDECESSOR_SHA) reasons.push('mobile navigation contrast candidate head is not newer than its reviewed predecessor');
+  const anchorMismatches = Object.entries(MOBILE_NAV_CONTRAST_BLOBS)
+    .filter(([path, expected]) => readPathBlob(repairAnchorSha, path, repoRoot, exec) !== expected.anchor)
+    .map(([path]) => path);
+  if (anchorMismatches.length) reasons.push(`mobile navigation anchor blobs differ from reviewed preimages: ${anchorMismatches.join(', ')}`);
+  const predecessorMismatches = Object.entries(MOBILE_NAV_CONTRAST_BLOBS)
+    .filter(([path, expected]) => readPathBlob(MOBILE_NAV_CONTRAST_PREDECESSOR_SHA, path, repoRoot, exec) !== expected.predecessor)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push(`mobile navigation predecessor blobs differ from reviewed preimages: ${predecessorMismatches.join(', ')}`);
+  const candidateMismatches = Object.entries(MOBILE_NAV_CONTRAST_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push(`mobile navigation candidate blobs differ from reviewed patch: ${candidateMismatches.join(', ')}`);
+  return { eligible: reasons.length === 0, reasons, featurePaths, anchorMismatches, predecessorMismatches, candidateMismatches };
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -265,6 +295,15 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   let selectorChanged = false;
   let runDetailIntegrity = false;
   let databaseEvidenceInvalidated = false;
+
+  const mobileNavContrastChanged = paths.some(path => MOBILE_NAV_CONTRAST_PATHS.includes(path));
+  if (mobileNavContrastChanged) {
+    groups.add('mobile-nav-contrast');
+    if (!mobileNavVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('mobile navigation contrast candidate did not match its exact reviewed CSS/test blob policy');
+    }
+  }
 
   const docsPricingChanged = paths.some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
   if (docsPricingChanged) {
@@ -519,7 +558,11 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const docsPricingVerification = docsPricingChanged
     ? verifyDocsPricingScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
     : null;
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification });
+  const mobileNavContrastChanged = changedPaths.map(normalizePath).some(path => MOBILE_NAV_CONTRAST_PATHS.includes(path));
+  const mobileNavVerification = mobileNavContrastChanged
+    ? verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {

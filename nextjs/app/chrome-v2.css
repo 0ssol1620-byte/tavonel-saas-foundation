@@ -30,6 +30,23 @@
   background: #f7f5ef;
   border-bottom-color: #d8ddd9;
 }
+
+/* The disclosure panel is a public reading surface, including on dark product routes. */
+.nav.chrome-v2-header .one-path-mobile-nav {
+  --ground: #fff;
+  --seam: #d8ddd9;
+  --g1: #f7f5ef;
+  --text-hi: #171c20;
+  --text-mid: #53606a;
+  --text-lo: #53606a;
+  --hairline: #d8ddd9;
+  --hairline-hi: #d8ddd9;
+  --border-dark: #d8ddd9;
+}
+/* Author display:grid on the panel overrides the browser's closed-details default. */
+.nav.chrome-v2-header .one-path-mobile-nav:not([open]) > nav {
+  display: none;
+}
 @media (max-width: 767px) {
   :root { --chrome-header-height: 56px; }
   .nav.chrome-v2-header { height: 56px; min-height: 56px; }
