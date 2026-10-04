@@ -118,6 +118,8 @@ export const GOOGLE_VIEWER_ACL_FEATURE_PATHS = Object.freeze([
   "lib/google-drive-acl-capture.test.ts",
   "lib/google-drive-acl-capture.ts",
   "lib/google-drive-viewer-principal.test.ts",
+  "lib/google-drive-viewer-link-request.test.ts",
+  "lib/google-drive-viewer-link-request.ts",
   "lib/google-drive-viewer-principal.ts",
   "lib/progress-route.test.ts",
   "lib/source-import.test.ts",
@@ -159,6 +161,8 @@ export const GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS = Object.freeze({
   "lib/google-drive-acl-capture.test.ts": null,
   "lib/google-drive-acl-capture.ts": null,
   "lib/google-drive-viewer-principal.test.ts": null,
+  "lib/google-drive-viewer-link-request.test.ts": null,
+  "lib/google-drive-viewer-link-request.ts": null,
   "lib/google-drive-viewer-principal.ts": null,
   "lib/progress-route.test.ts": null,
   "lib/source-import.test.ts": "3fdc5429ee4564a8941636b701ee78e8efdff015",
@@ -182,9 +186,9 @@ export const GOOGLE_VIEWER_ACL_FINAL_BLOBS = Object.freeze({
   "app/api/v1/oauth-connectors/authorize/route.ts": "8dcd8bdbe2806e79c6d0795db4181531bfc4a842",
   "app/api/v1/oauth-connectors/callback/[provider]/route.ts": "b9fe645b0422b2c76c762b5cfc20093b40704d4c",
   "app/api/v1/oauth-connectors/viewer-links/revoke/route.ts": "49529f8e70f47de048e32e67656be96329b1c0e2",
-  "app/workspace/google-drive-access/page.tsx": "5fa08b5814637613a6808790acc8004dac0af8ff",
+  "app/workspace/google-drive-access/page.tsx": "c4d13bb27471e8648cf51b984c1f2107ec11ef21",
   "lib/connector-oauth-callback-route.test.ts": "669179d61004ea84ad81dde008be14bb6f826171",
-  "lib/connector-oauth-route.test.ts": "b366a457138086378c0284d89b3bc6854b184ae4",
+  "lib/connector-oauth-route.test.ts": "f53031262d65b252524cf5c4f0d0424b8c1ebcf5",
   "lib/connector-oauth-store.ts": "85dd2efe233fc7f555e914addacc494567b6afc9",
   "lib/connector-oauth.ts": "f8fe20c15764678ef9922ca5d3b8f6fd069b959e",
   "lib/connector-source-access.test.ts": "13e1d781ebbbf7cba116c03a919e311d0a5a749e",
@@ -195,14 +199,16 @@ export const GOOGLE_VIEWER_ACL_FINAL_BLOBS = Object.freeze({
   "lib/documents-route.test.ts": "77150f40f3df8d413929c906c564e2e259551fa3",
   "lib/google-drive-acl-capture.test.ts": "3d10ea3a345bd5a7acaa1a5726ad93b152fa1fa5",
   "lib/google-drive-acl-capture.ts": "489500dd94fce18950e2f1845e442a6bbe4b9404",
-  "lib/google-drive-viewer-principal.test.ts": "98fab71058a30f97b15ede359e64a145948d7caf",
+  "lib/google-drive-viewer-principal.test.ts": "311bdfd3cae11a40eed9c1bec15b8e4851a26b99",
+  "lib/google-drive-viewer-link-request.test.ts": "980bbb2a5bb00a5933358bfab5a0c96a4012384b",
+  "lib/google-drive-viewer-link-request.ts": "01d25fbdaf50da048e8387ec219c0cbd85878f87",
   "lib/google-drive-viewer-principal.ts": "5a4e86b55cd315293f42b41d251591df74c09ded",
   "lib/progress-route.test.ts": "4a5721cc5b4a6aa528926c47be23b92eefddd40c",
   "lib/source-import.test.ts": "9af2a5b273af28b9d7409ba98cb47821e9a9a85f",
   "lib/source-import.ts": "60a0e089a27d0d90e9acff21c0f13bf0d76ee3df",
   "lib/world-promotion-current-source.test.ts": "cf4053ec354b045acfd3d3508778143ee0e7a4a9",
-  "supabase/drafts/google-viewer-principal-boundary.sql": "0e109d8cebc659de10386f40cc6d3dd91ffc9860",
-  "supabase/tests/google_viewer_principal_boundary.sql": "b8e8e16f5725240d0d49d5039b2158788fcb598d",
+  "supabase/drafts/google-viewer-principal-boundary.sql": "d1cb532b646742cade16407e64da07dcda0499f2",
+  "supabase/tests/google_viewer_principal_boundary.sql": "144d3262ee2f2208fe96281283bcb8f0dc0aab9d",
 });
 export const GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze([
   "app/api/documents/[id]/progress/route.test.ts",
@@ -218,6 +224,7 @@ export const GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze([
   "lib/documents-route.test.ts",
   "lib/google-drive-acl-capture.test.ts",
   "lib/google-drive-viewer-principal.test.ts",
+  "lib/google-drive-viewer-link-request.test.ts",
   "lib/progress-route.test.ts",
   "lib/source-import.test.ts",
   "lib/world-promotion-current-source.test.ts",
@@ -429,7 +436,7 @@ export function verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, c
   const reasons = [];
   if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('Google Viewer ACL candidate is not anchored to the authenticated 6401 baseline');
   if (headSha === GOOGLE_VIEWER_ACL_PREDECESSOR_SHA) reasons.push('Google Viewer ACL candidate head is not newer than its reviewed predecessor');
-  if (JSON.stringify(featurePaths) !== JSON.stringify(expectedPaths)) reasons.push('Google Viewer ACL path set differs from the exact reviewed 35-path patch');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(expectedPaths)) reasons.push('Google Viewer ACL path set differs from the exact reviewed Google Viewer ACL patch');
   try {
     exec('git', ['merge-base', '--is-ancestor', GOOGLE_VIEWER_ACL_PREDECESSOR_SHA, headSha], {
       cwd: repoRoot, stdio: 'pipe', shell: false,

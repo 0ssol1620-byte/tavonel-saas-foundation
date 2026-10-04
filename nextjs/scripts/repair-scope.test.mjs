@@ -881,9 +881,9 @@ test('reviewed Google Viewer ACL patch selects direct and helper suites while pr
   assert.equal(workspaceEvidence.eligible, true);
   assert.equal(docsEvidence.eligible, true);
   assert.equal(aclEvidence.eligible, true);
-  assert.equal(GOOGLE_VIEWER_ACL_FEATURE_PATHS.length, 35);
-  assert.equal(Object.keys(GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS).length, 35);
-  assert.equal(Object.keys(GOOGLE_VIEWER_ACL_FINAL_BLOBS).length, 35);
+  assert.equal(GOOGLE_VIEWER_ACL_FEATURE_PATHS.length, 37);
+  assert.equal(Object.keys(GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS).length, 37);
+  assert.equal(Object.keys(GOOGLE_VIEWER_ACL_FINAL_BLOBS).length, 37);
 
   const plan = planFor(changedPaths, {
     headSha,

@@ -208,29 +208,34 @@ revoke all on function public.record_google_drive_source_acl_capture_failure(tex
 grant execute on function public.record_google_drive_source_acl_capture_failure(text, uuid, text, text) to service_role;
 
 -- The server passes an explicit per-request ACL max age (default 300 seconds, bounded to 60..900).
--- Expired and future captures deny. The newest incomplete marker denies even while an older complete
--- snapshot would otherwise remain inside the freshness window.
+-- Use statement_timestamp as the common authorization-time boundary: it is stable for this statement,
+-- but unlike transaction-start now(), it includes evidence written by earlier statements in this transaction.
+-- Select the newest evidence before validating time/completeness so a future, expired, or incomplete newest
+-- capture cannot be filtered out and replaced by older evidence. Tied newest rows are all evaluated.
 create or replace function public.source_version_acl_admits(
   p_workspace_key text, p_source_version_id text, p_provider text, p_viewer_principals jsonb,
   p_max_age_seconds integer
 ) returns boolean
 language sql stable set search_path = '' as $$
-  with fresh as (
-    select a.principals, a.capture_complete, a.captured_at
+  with ranked as (
+    select a.principals, a.capture_complete, a.captured_at,
+      pg_catalog.rank() over (order by a.captured_at desc) as evidence_rank
     from public.source_acl_snapshots a
     where a.workspace_key = p_workspace_key and a.source_version_id = p_source_version_id
-      and a.provider_id = p_provider and a.captured_at <= pg_catalog.now()
-      and a.captured_at > pg_catalog.clock_timestamp() - pg_catalog.make_interval(secs => p_max_age_seconds::double precision)
+      and a.provider_id = p_provider
   ), latest as (
-    select f.principals, f.capture_complete
-    from fresh f where f.captured_at = (select max(captured_at) from fresh)
+    select r.principals, r.capture_complete, r.captured_at
+    from ranked r where r.evidence_rank = 1
   )
-  select coalesce(bool_and(l.capture_complete and exists (
-    select 1 from pg_catalog.jsonb_array_elements(l.principals) grant_row,
-      pg_catalog.jsonb_array_elements(case when pg_catalog.jsonb_typeof(p_viewer_principals) = 'array'
-        then p_viewer_principals else '[]'::jsonb end) viewer
-    where grant_row->>'kind' = viewer->>'kind' and grant_row->>'principalId' = viewer->>'principalId'
-      and grant_row->>'permission' in ('read', 'write', 'owner')
+  select coalesce(bool_and(l.capture_complete
+    and l.captured_at <= pg_catalog.statement_timestamp()
+    and l.captured_at > pg_catalog.statement_timestamp() - pg_catalog.make_interval(secs => p_max_age_seconds::double precision)
+    and exists (
+      select 1 from pg_catalog.jsonb_array_elements(l.principals) grant_row,
+        pg_catalog.jsonb_array_elements(case when pg_catalog.jsonb_typeof(p_viewer_principals) = 'array'
+          then p_viewer_principals else '[]'::jsonb end) viewer
+      where grant_row->>'kind' = viewer->>'kind' and grant_row->>'principalId' = viewer->>'principalId'
+        and grant_row->>'permission' in ('read', 'write', 'owner')
   )), false) from latest l;
 $$;
 revoke all on function public.source_version_acl_admits(text, text, text, jsonb, integer) from public, anon, authenticated, service_role;
@@ -255,7 +260,8 @@ begin
     join public.foundation_workspace_members m on m.workspace_key = l.workspace_key and m.user_id = l.foundation_user_id
     where l.workspace_key = p_workspace_key and l.foundation_user_id = p_viewer_user_id
       and l.provider = 'google_drive' and l.revoked_at is null
-      and l.verified_at <= pg_catalog.now() and l.verified_at > pg_catalog.now() - interval '24 hours'
+      and l.verified_at <= pg_catalog.statement_timestamp()
+      and l.verified_at > pg_catalog.statement_timestamp() - interval '24 hours'
       and m.state = 'active' and m.authorization_revision = l.authorization_revision;
   return exists (
     select 1 from public.connector_document_bindings b

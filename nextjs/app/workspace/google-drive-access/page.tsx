@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { postGoogleViewerLinkRequest } from "@/lib/google-drive-viewer-link-request";
 
 export default function GoogleDriveAccessPage() {
   const [message, setMessage] = useState("");
@@ -8,7 +9,7 @@ export default function GoogleDriveAccessPage() {
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("oauth") === "linked") {
-      setMessage("Google Drive identity linked. This link expires in 24 hours unless you renew it.");
+      setMessage("Returned from Google. Source access is checked when you request data.");
     }
   }, []);
 
@@ -16,17 +17,16 @@ export default function GoogleDriveAccessPage() {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/v1/oauth-connectors/authorize", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ provider: "google_drive", displayName: "Google Drive viewer identity", purpose: "viewer_acl_link" }),
-      });
-      const body = await response.json() as { authorizationUrl?: unknown; code?: unknown };
-      if (!response.ok || typeof body.authorizationUrl !== "string") {
-        setMessage(typeof body.code === "string" ? body.code : "GOOGLE_VIEWER_LINK_FAILED");
+      const result = await postGoogleViewerLinkRequest("authorize");
+      if (!result.ok) {
+        setMessage(result.code);
         return;
       }
-      window.location.assign(body.authorizationUrl);
+      if (typeof result.authorizationUrl !== "string") {
+        setMessage("GOOGLE_VIEWER_LINK_FAILED");
+        return;
+      }
+      window.location.assign(result.authorizationUrl);
     } catch {
       setMessage("GOOGLE_VIEWER_LINK_FAILED");
     } finally {
@@ -38,9 +38,8 @@ export default function GoogleDriveAccessPage() {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/v1/oauth-connectors/viewer-links/revoke", { method: "POST" });
-      const body = await response.json() as { code?: unknown };
-      setMessage(response.ok ? "Google Drive identity link removed." : typeof body.code === "string" ? body.code : "GOOGLE_VIEWER_UNLINK_FAILED");
+      const result = await postGoogleViewerLinkRequest("revoke");
+      setMessage(result.ok ? "Google Drive identity link removed." : result.code);
     } catch {
       setMessage("GOOGLE_VIEWER_UNLINK_FAILED");
     } finally {

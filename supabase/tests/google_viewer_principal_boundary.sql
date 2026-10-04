@@ -1,6 +1,6 @@
 -- Disposable pgTAP fixture for drafts/google-viewer-principal-boundary.sql.
 begin;
-select plan(16);
+select plan(19);
 
 insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at) values
 ('00000000-0000-0000-0000-000000000000','acacacac-acac-4cac-8cac-acacacacacac','authenticated','authenticated','viewer-a@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now()),
@@ -23,6 +23,18 @@ select lives_ok($$select public.record_google_drive_source_acl_snapshot('pilot-a
   'complete capture stores Permission.id against exact workspace, connection and source version');
 select is(public.connector_documents_blocked_for_viewer('pilot-acltest',array['0d0ac100-0000-4000-8000-000000000001'],'acacacac-acac-4cac-8cac-acacacacacac',300),false,
   'linked Google permission ID admits its exact user');
+update public.foundation_provider_principal_links set verified_at=statement_timestamp()+interval '1 minute' where principal_id='drive-permission-a';
+select is(public.connector_documents_blocked_for_viewer('pilot-acltest',array['0d0ac100-0000-4000-8000-000000000001'],'acacacac-acac-4cac-8cac-acacacacacac',300),true,
+  'future-dated viewer verification is denied');
+update public.foundation_provider_principal_links set verified_at=statement_timestamp() where principal_id='drive-permission-a';
+select lives_ok($$select public.record_google_drive_source_acl_snapshot('pilot-acltest','0c0ac100-0000-4000-8000-000000000001','sv-'||repeat('a',64),'[{"kind":"user","principalId":"drive-permission-a","permission":"read"}]','sha256:'||repeat('e',64))$$,
+  'a second complete capture coexists with the earlier fresh snapshot');
+update public.source_acl_snapshots set captured_at=statement_timestamp()+interval '1 minute'
+  where workspace_key='pilot-acltest' and source_version_id='sv-'||repeat('a',64) and snapshot_sha256='sha256:'||repeat('e',64);
+select is(public.connector_documents_blocked_for_viewer('pilot-acltest',array['0d0ac100-0000-4000-8000-000000000001'],'acacacac-acac-4cac-8cac-acacacacacac',300),true,
+  'future-dated newest capture denies instead of falling back to an older fresh snapshot');
+update public.source_acl_snapshots set captured_at=statement_timestamp()
+  where workspace_key='pilot-acltest' and source_version_id='sv-'||repeat('a',64) and snapshot_sha256='sha256:'||repeat('e',64);
 select throws_ok($$select public.connector_documents_blocked_for_viewer('pilot-acltest',array['0d0ac100-0000-4000-8000-000000000001'],'acacacac-acac-4cac-8cac-acacacacacac',3600)$$,
   'P0001','CONNECTOR_AUTH_SCOPE_INVALID','freshness must remain inside the configured 15-minute maximum');
 select is(public.connector_documents_blocked_for_viewer('pilot-acltest',array['0d0ac100-0000-4000-8000-000000000001'],'bdbdbdbd-bdbd-4dbd-8dbd-bdbdbdbdbdbd',300),true,

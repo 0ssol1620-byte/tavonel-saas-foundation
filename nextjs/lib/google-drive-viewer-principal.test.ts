@@ -3,7 +3,7 @@ import { fetchGoogleDriveViewerPermissionId } from "./google-drive-viewer-princi
 
 describe("Google Drive viewer principal", () => {
   it("uses about.user.permissionId and ignores email and OIDC ids", async () => {
-    const fetcher = vi.fn(async () => Response.json({ user: {
+    const fetcher = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => Response.json({ user: {
       permissionId: "opaque-drive-id", emailAddress: "viewer@example.invalid", id: "oidc-subject",
     } }));
     await expect(fetchGoogleDriveViewerPermissionId("synthetic-token", fetcher as typeof fetch)).resolves.toBe("opaque-drive-id");
