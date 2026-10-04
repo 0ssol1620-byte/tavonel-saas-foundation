@@ -195,23 +195,52 @@ function workspaceSourceEvidence(headSha, overrides = {}) {
   });
 }
 
-test('workspace source feature uses its exact ten-unit, one-browser plan and blob-bound narrow policy', () => {
+test('workspace source feature uses its exact twelve-unit, one-browser plan and blob-bound narrow policy', () => {
   const headSha = 'c'.repeat(40);
   const verification = workspaceSourceEvidence(headSha);
   assert.equal(verification.eligible, true);
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS['components/compile-stage.test.tsx'], 'c8f82fc84db149c855052417a5e6abcf98b37a0e');
+  assert.equal(WORKSPACE_SOURCE_FEATURE_BLOBS[WORKSPACE_SOURCE_BROWSER_FILE], '7009383c1078dc876a40174833ed63daf61a7bee');
   const plan = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, WORKSPACE_SOURCE_REPAIR_CONFIG], {
     headSha,
     workspaceSourceVerification: verification,
   });
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
-  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 10);
+  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 12);
   assert.deepEqual(plan.workspaceSourceSelection.unitFiles, WORKSPACE_SOURCE_UNIT_FILES);
   assert.deepEqual(plan.workspaceSourceSelection.browserFiles, [WORKSPACE_SOURCE_BROWSER_FILE]);
   assert.deepEqual(planBrowserRuns([WORKSPACE_SOURCE_BROWSER_FILE], false), [{ kind: 'project', project: '1440', files: [WORKSPACE_SOURCE_BROWSER_FILE] }]);
-  assert.equal(plan.unitFiles.length, 10);
+  assert.equal(plan.unitFiles.length, 12);
   assert.deepEqual(plan.browserFiles, ['e2e/failure-states-audit.spec.ts', WORKSPACE_SOURCE_BROWSER_FILE].sort());
   assert.equal(plan.fullQualification, 'pending');
+});
+
+test('reviewed source-observation test follow-up stays focused and selects known legacy regressions', () => {
+  const headSha = 'c'.repeat(40);
+  const verification = workspaceSourceEvidence(headSha);
+  const paths = [
+    ...WORKSPACE_SOURCE_FEATURE_PATHS,
+    WORKSPACE_SOURCE_REPAIR_CONFIG,
+    'scripts/repair-scope.mjs',
+    'scripts/repair-scope.test.mjs',
+    ...fixture.pairedPublicUiCaptureCandidate.paths,
+  ];
+  const plan = planFor(paths, { headSha, workspaceSourceVerification: verification });
+
+  assert.equal(verification.eligible, true);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 12);
+  for (const file of [
+    'lib/brand-copy.test.ts',
+    'lib/landing-v2-traceability.test.ts',
+    'lib/production-hardening.test.ts',
+    'lib/visual-refinement.test.ts',
+    'lib/workspace-compile-floor-and-ceiling.test.ts',
+  ]) assert.ok(plan.unitFiles.includes(file), `missing focused regression: ${file}`);
+  assert.ok(plan.browserFiles.includes(WORKSPACE_SOURCE_BROWSER_FILE));
+  assert.equal(plan.requirePublicUiScreenshots, true);
 });
 
 test('combined pending UI and workspace source delta reports the full selected union without advancing anchor', () => {
@@ -229,7 +258,7 @@ test('combined pending UI and workspace source delta reports the full selected u
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
   assert.equal(plan.runFullHermeticVitest, false);
-  assert.equal(plan.unitFiles.length, 16);
+  assert.equal(plan.unitFiles.length, 21);
   assert.equal(plan.browserFiles.length, 6);
   assert.equal(plan.requirePublicUiScreenshots, true);
   assert.equal(plan.fullQualification, 'pending');
@@ -315,7 +344,11 @@ test('shared chrome-only fit changes select navigation contracts and desktop/mob
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
   assert.equal(plan.runScriptContracts, false);
-  assert.deepEqual(plan.unitFiles, ['lib/one-path-contract.test.ts', 'lib/site-nav-model.test.ts']);
+  assert.deepEqual(plan.unitFiles, [
+    'lib/one-path-contract.test.ts',
+    'lib/site-nav-model.test.ts',
+    'lib/visual-refinement.test.ts',
+  ]);
   assert.deepEqual(plan.browserFiles, ['e2e/launch-qa-mobile-nav.spec.ts', 'e2e/site-nav.spec.ts']);
   assert.equal(plan.runDetailIntegrity, false);
   assert.equal(plan.fullQualification, 'pending');
@@ -325,6 +358,7 @@ test('shared chrome-only fit changes select navigation contracts and desktop/mob
     'lib/landing-v2-page.test.ts',
     'lib/one-path-contract.test.ts',
     'lib/site-nav-model.test.ts',
+    'lib/visual-refinement.test.ts',
   ]);
 });
 
@@ -346,9 +380,13 @@ test('landing film continuity paths select only their reviewed landing/film cont
   for (const [index, sourcePath] of scope.sourcePaths.slice(0, 2).entries()) {
     const plan = planFor([sourcePath]);
     assert.deepEqual(plan.unknownPaths, []);
-    assert.deepEqual(plan.unitFiles, index === 0
-      ? ['lib/landing-v2-recompile.test.ts', 'lib/landing-v2-tokens.test.ts']
-      : ['lib/landing-v2-page.test.ts', landingUnit].sort());
+    assert.deepEqual(plan.unitFiles, [
+      ...(index === 0 ? [] : ['lib/landing-v2-page.test.ts', landingUnit]),
+      ...(index === 0 ? ['lib/landing-v2-recompile.test.ts', 'lib/landing-v2-tokens.test.ts'] : []),
+      'lib/brand-copy.test.ts',
+      'lib/landing-v2-traceability.test.ts',
+      'lib/visual-refinement.test.ts',
+    ].sort());
     assert.deepEqual(plan.browserFiles, [browser]);
     assert.equal(plan.runFullHermeticVitest, false);
     assert.deepEqual(planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map(run => run.project), ['390', '360']);
@@ -356,7 +394,10 @@ test('landing film continuity paths select only their reviewed landing/film cont
 
   const filmPlan = planFor([scope.sourcePaths[2]]);
   assert.deepEqual(filmPlan.unknownPaths, []);
-  assert.deepEqual(filmPlan.unitFiles, [filmUnit, landingUnit].sort());
+  assert.deepEqual(filmPlan.unitFiles, [
+    filmUnit, landingUnit,
+    'lib/brand-copy.test.ts', 'lib/landing-v2-traceability.test.ts', 'lib/visual-refinement.test.ts',
+  ].sort());
   assert.deepEqual(filmPlan.browserFiles, [browser]);
   assert.deepEqual(planBrowserRuns(filmPlan.browserFiles, filmPlan.runDetailIntegrity).map(run => run.project), ['390', '360']);
 
@@ -365,11 +406,22 @@ test('landing film continuity paths select only their reviewed landing/film cont
   assert.deepEqual(planBrowserRuns(e2eOnly.browserFiles, e2eOnly.runDetailIntegrity).map(run => run.project), ['390', '360']);
 });
 
+test('landing design record selects its traceability contract without broadening Vitest', () => {
+  const plan = planFor(['docs/LANDING_V2_2026-09-19.md']);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.deepEqual(plan.unitFiles, ['lib/landing-v2-traceability.test.ts']);
+  assert.equal(plan.runFullHermeticVitest, false);
+});
+
 test('disclosure source selects both film and landing contracts while loading coverage runs only on its phone project', () => {
   const scope = fixture.reviewedLandingFilmDisclosure;
   const plan = planFor([scope.sourcePath]);
   assert.deepEqual(plan.unknownPaths, []);
-  assert.deepEqual(plan.unitFiles, ['lib/film-motion-control.test.ts', 'lib/landing-v2-recompile.test.ts']);
+  assert.deepEqual(plan.unitFiles, [
+    'lib/brand-copy.test.ts', 'lib/film-motion-control.test.ts',
+    'lib/landing-v2-recompile.test.ts', 'lib/landing-v2-traceability.test.ts',
+    'lib/visual-refinement.test.ts',
+  ]);
   assert.deepEqual(plan.browserFiles, []);
 
   const e2eOnly = planFor([scope.browserTestPath]);
@@ -411,12 +463,15 @@ test('the complete 22-path Repair, public UI, and film candidate stays targeted 
   assert.deepEqual(plan.unknownPaths, []);
   assert.equal(plan.runFullHermeticVitest, false);
   assert.deepEqual(plan.unitFiles, [
+    'lib/brand-copy.test.ts',
     'lib/film-motion-control.test.ts',
     'lib/landing-v2-page.test.ts',
     'lib/landing-v2-recompile.test.ts',
     'lib/landing-v2-tokens.test.ts',
+    'lib/landing-v2-traceability.test.ts',
     'lib/one-path-contract.test.ts',
     'lib/site-nav-model.test.ts',
+    'lib/visual-refinement.test.ts',
   ]);
   assert.deepEqual(plan.browserFiles, [
     'e2e/landing-hero-film-loading.spec.ts',
@@ -575,13 +630,14 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
   const headSha = 'c'.repeat(40);
   const plan = planFor(combined, { headSha, workspaceSourceVerification: workspaceSourceEvidence(headSha) });
   assert.deepEqual(plan.unknownPaths, []);
-  assert.equal(false, plan.runFullHermeticVitest);
+  assert.equal(plan.runFullHermeticVitest, false);
   assert.equal(plan.changedPaths.length, 35);
-  assert.equal(plan.unitFiles.length, 17);
+  assert.equal(plan.unitFiles.length, 22);
   assert.equal(plan.browserFiles.length, 7);
   assert.deepEqual(plan.unitFiles, [
     'app/api/documents/[id]/progress/route.test.ts',
     'components/compile-stage.test.tsx',
+    'lib/brand-copy.test.ts',
     'lib/connector-source-access.test.ts',
     'lib/connector-source-identity.test.ts',
     'lib/document-derived-route-access.test.ts',
@@ -590,13 +646,17 @@ test('combined workspace and consent candidate stays targeted with reviewed 1440
     'lib/landing-v2-page.test.ts',
     'lib/landing-v2-recompile.test.ts',
     'lib/landing-v2-tokens.test.ts',
+    'lib/landing-v2-traceability.test.ts',
     'lib/marketing-analytics.test.ts',
     'lib/ocr-progress.test.ts',
     'lib/one-path-contract.test.ts',
+    'lib/production-hardening.test.ts',
     'lib/r2-progress-capability.test.ts',
     'lib/r2-source-pdf.test.ts',
     'lib/site-nav-model.test.ts',
     'lib/source-version-guard.test.ts',
+    'lib/visual-refinement.test.ts',
+    'lib/workspace-compile-floor-and-ceiling.test.ts',
   ]);
   assert.deepEqual(plan.browserFiles, [
     'e2e/failure-states-audit.spec.ts',

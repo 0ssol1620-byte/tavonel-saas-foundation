@@ -51,6 +51,12 @@ const uploadTests = [
 ];
 const siteNavigationTests = ['lib/one-path-contract.test.ts', 'lib/site-nav-model.test.ts'];
 const responsiveNavigationBrowsers = ['e2e/site-nav.spec.ts', 'e2e/launch-qa-mobile-nav.spec.ts'];
+const landingLegacyRegressionTests = [
+  'lib/brand-copy.test.ts',
+  'lib/landing-v2-traceability.test.ts',
+  'lib/visual-refinement.test.ts',
+];
+const sharedVisualRegressionTest = 'lib/visual-refinement.test.ts';
 export const WORKSPACE_SOURCE_UNIT_FILES = Object.freeze([
   'app/api/documents/[id]/progress/route.test.ts',
   'components/compile-stage.test.tsx',
@@ -59,9 +65,11 @@ export const WORKSPACE_SOURCE_UNIT_FILES = Object.freeze([
   'lib/document-derived-route-access.test.ts',
   'lib/document-source-route.test.ts',
   'lib/ocr-progress.test.ts',
+  'lib/production-hardening.test.ts',
   'lib/r2-progress-capability.test.ts',
   'lib/r2-source-pdf.test.ts',
   'lib/source-version-guard.test.ts',
+  'lib/workspace-compile-floor-and-ceiling.test.ts',
 ]);
 export const WORKSPACE_SOURCE_BROWSER_FILE = 'e2e/workspace-source-observation.spec.ts';
 export const WORKSPACE_SOURCE_FEATURE_PATHS = Object.freeze([
@@ -81,9 +89,9 @@ export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
   'app/api/documents/[id]/progress/route.ts': 'c2ab73f10f2590eec7118fe85aa98bd6d023a305',
   'app/workspace/page.tsx': '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
   'components/compile-stage.module.css': '3a0ccd03335e4e77435af8c671a77df902b9bfd3',
-  'components/compile-stage.test.tsx': 'a03e5676b74e462b37cb290d4dc5b0ecf9a4aded',
+  'components/compile-stage.test.tsx': 'c8f82fc84db149c855052417a5e6abcf98b37a0e',
   'components/compile-stage.tsx': 'fb8c4a9020afab4ee9496e2133588e8ebf446e55',
-  'e2e/workspace-source-observation.spec.ts': 'c3e95865e50edada3efa987125f112f8dd71272e',
+  'e2e/workspace-source-observation.spec.ts': '7009383c1078dc876a40174833ed63daf61a7bee',
   'lib/ocr-progress.test.ts': '766e4ca5fcde9156f5d60e99d5397ac6206ce40a',
   'lib/ocr-progress.ts': 'ddd83aea6ad50b3b4b4a1c4d1f5c3a09d752e0cf',
 });
@@ -91,7 +99,7 @@ const reviewedWorkspacePageBlobs = Object.freeze({
   base: '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3',
   result: '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
 });
-const reviewedWorkspaceBrowserBlob = 'c3e95865e50edada3efa987125f112f8dd71272e';
+const reviewedWorkspaceBrowserBlob = '7009383c1078dc876a40174833ed63daf61a7bee';
 const reviewedScopedConfigBlob = 'f2065bec72452aa1c80b29afb2768339b7397db8';
 const reviewedScopedConfigGlobalBlob = '91bb009bae9930952594c8fb8164b714a43e8686';
 const reviewedBrowserFiles = new Set([
@@ -191,7 +199,6 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       qualificationReasons.add('workspace source candidate did not match its exact reviewed blob/path policy');
     }
   }
-
   for (const path of paths) {
     let matched = false;
     if (/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/i.test(path)) {
@@ -256,6 +263,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     if (['app/chrome-v2.css', 'app/paper-product.css', 'lib/site-navigation.ts'].includes(path)) {
       groups.add('site-chrome');
       for (const file of siteNavigationTests) unitFiles.add(file);
+      unitFiles.add(sharedVisualRegressionTest);
       if (path === 'app/paper-product.css') unitFiles.add('lib/landing-v2-page.test.ts');
       for (const file of responsiveNavigationBrowsers) browserFiles.add(file);
       matched = true;
@@ -271,6 +279,15 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       unitFiles.add('lib/film-motion-control.test.ts');
       browserFiles.add('e2e/landing-hero-mobile.spec.ts');
       matched = true;
+    }
+    if (path === 'docs/LANDING_V2_2026-09-19.md') {
+      groups.add('landing-film-continuity');
+      unitFiles.add('lib/landing-v2-traceability.test.ts');
+      matched = true;
+    }
+    if (['app/landing-v2.css', 'components/landing-v2/landing-page.tsx',
+      'components/landing-v2/hero-film.tsx', 'components/landing-v2/hero-film-disclosure.tsx'].includes(path)) {
+      for (const file of landingLegacyRegressionTests) unitFiles.add(file);
     }
     if (path === 'app/landing-v2.css') {
       groups.add('landing-film-continuity');

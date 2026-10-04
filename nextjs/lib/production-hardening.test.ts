@@ -86,8 +86,8 @@ describe("2026-09-05 production hardening", () => {
     expect(stage).toContain("state?: CompileState | null");
     // Four chapters, and a position in them taken from the job record.
     expect(read("lib/compile-stage-view.ts")).toContain("const POSITION: Record<CompileState, number>");
-    expect(stage).toContain("PIPELINE_STAGES.forEach((stage, i)");
-    expect(stage).toContain('stopped ? "STOPPED" : "WAITING"');
+    expect(stage).toContain("PIPELINE_STAGES.map((stage, index)");
+    expect(stage).toContain('const stageState = failed ? "stopped" : attention ? "attention"');
   });
 
   /*

@@ -71,12 +71,12 @@ describe("workspace compile floor and ceiling", () => {
     expect(workspace).toContain("<CompileStage rows={pipelineRows}");
 
     // One pane, chosen by how far the run has got -- not four columns.
-    expect(compileStage).toContain("/* One pane. Not four, and not four with three of them empty. */");
+    expect(compileStage).toContain('aria-label="Compilation stages"');
     expect(compileStage).toContain("if (reached === 0) drawSources");
     expect(compileStage).not.toContain("if (width < 760)");
     // The chapter names are the shared vocabulary, not a fifth set of labels.
     expect(compileStage).toContain('import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary"');
-    expect(compileStage).toContain("PIPELINE_STAGES.forEach((stage, i)");
+    expect(compileStage).toContain("PIPELINE_STAGES.map((stage, index)");
     expect(compileStage).toContain('className="compile-stage-film-caption"');
     expect(compileStage).toContain("String(PIPELINE_STAGES.length).padStart(2, \"0\")");
     expect(compileStage).not.toContain('const labels = ["SOURCES", "READ", "STRUCTURE", "WORLD"]');
@@ -89,10 +89,10 @@ describe("workspace compile floor and ceiling", () => {
     stay true is a branch in a client component and a selector in a sheet no DOM test reads.
   */
   it("reserves the aspect-ratio frame only while a run is playing", () => {
-    expect(compileStage).toContain('const framed = hasVisual && view.visual !== "sources" && drawable;');
+    expect(compileStage).toContain('const framed = hasCanvasVisual && view.visual !== "sources" && drawable;');
     expect(compileStage).toContain('data-framed={framed ? "true" : "false"}');
     // Idle it carries its own drawn height, and the sheet stops reserving a ratio.
-    expect(compileStage).toContain('{hasVisual ? <canvas');
+    expect(compileStage).toContain('{hasCanvasVisual ? <canvas');
     expect(compileStage).toContain('className="compile-stage-status" role="status"');
     expect(workspaceCss).toContain('.compile-stage[data-framed="false"] { aspect-ratio: auto; min-height: 0; }');
   });
@@ -109,8 +109,8 @@ describe("workspace compile floor and ceiling", () => {
     expect(compileStage).not.toMatch(/(?:fillStyle|strokeStyle) = "(?:#|rgb)/);
     expect(compileStage).toContain("const computed = window.getComputedStyle(section)");
     // A stage that has been passed stays passed: position is the max of observation and record.
-    expect(compileStage).toContain("deriveCompileStageView(rows, reading, world, state, resultId)");
-    expect(compileStage).toContain("const done = settled || i < current;");
+    expect(compileStage).toContain("deriveCompileStageView(rows, {}, world, state, resultId)");
+    expect(compileStage).toContain("const complete = settled || index < reached;");
     // A canvas with no context reports itself instead of painting nothing.
     expect(compileStage).toContain("setDrawable(false)");
   });

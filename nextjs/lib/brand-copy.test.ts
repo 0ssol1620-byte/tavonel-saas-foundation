@@ -501,7 +501,7 @@ describe("public copy", () => {
        the hero's own raster because that is the image above the fold now. */
     expect(page.indexOf('id="lv2-hero-title"')).toBeLessThan(page.indexOf("<HeroSourceCard"));
     expect(page.indexOf("<HeroSourceCard")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
-    expect(page).not.toContain("<HeroFilm");
+    expect(page.indexOf("<CompilerSpecimen")).toBeLessThan(page.indexOf("<HeroFilm"));
     expect(page.indexOf("<CompilerSpecimen")).toBeLessThan(page.indexOf("<HeroProof"));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
