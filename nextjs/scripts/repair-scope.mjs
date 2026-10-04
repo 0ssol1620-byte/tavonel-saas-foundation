@@ -261,7 +261,7 @@ export const ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS = Object.freeze({
   'lib/compile-job-worker.ts': 'f065033ce7306bda0c0d6fa2d0cc29084f74b544',
   'lib/global-collection-compile.test.ts': '046898a4ebdfed502722661915afbb7634ad21c4',
   'supabase/drafts/compile-job-viewer-authority.sql': '8c92051793c312b3c245d352c6a71d0e30c272ce',
-  'supabase/tests/compile_job_viewer_authority.sql': '1de9ce702ec340a66b06026cef45a53a48a07c0c',
+  'supabase/tests/compile_job_viewer_authority.sql': 'b2c9e95a51273b14cf809b83d6f96f964eddb2be',
 });
 export const ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS = Object.freeze([
   'app/api/compile-jobs/route.test.ts',

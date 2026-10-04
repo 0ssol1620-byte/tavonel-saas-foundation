@@ -6,12 +6,12 @@ select plan(41);
 insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values
   ('00000000-0000-0000-0000-000000000000','caacacac-0000-4000-8000-000000000001','authenticated','authenticated','compile-actor@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now()),
-  ('00000000-0000-0000-0000-000000000002','caacacac-0000-4000-8000-000000000002','authenticated','authenticated','compile-owner@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now());
+  ('00000000-0000-0000-0000-000000000002','cbacacac-0000-4000-8000-000000000002','authenticated','authenticated','compile-owner@example.invalid','$2a$10$fixture',now(),'{}','{}',now(),now());
 insert into public.foundation_workspaces(workspace_key,display_name,created_by)
-values ('pilot-cjobtest','Compile authority fixture','caacacac-0000-4000-8000-000000000002');
+values ('pilot-cjobtest','Compile authority fixture','cbacacac-0000-4000-8000-000000000002');
 insert into public.foundation_workspace_members(workspace_key,user_id,role,state,accepted_at)
 values
-  ('pilot-cjobtest','caacacac-0000-4000-8000-000000000002','owner','active',now()),
+  ('pilot-cjobtest','cbacacac-0000-4000-8000-000000000002','owner','active',now()),
   ('pilot-cjobtest','caacacac-0000-4000-8000-000000000001','admin','active',now());
 create temporary table compile_job_fixture_member_revision on commit drop as
 select authorization_revision as initial_revision, authorization_revision as current_revision
