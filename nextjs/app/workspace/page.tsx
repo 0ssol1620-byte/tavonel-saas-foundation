@@ -42,8 +42,7 @@ import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type Workspace
 import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
-import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
-import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
+import { clearSourceVersionUnavailable, filterPollableSourceVersions, isCurrentSourceObservation, markSourceVersionUnavailable, matchesSanitizedSourceDigest, pruneUnavailableSourceVersions, qualifyProgress, qualifySourceVersionDescriptor, type OcrProgress, type VerifiedSourceObservation } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
@@ -527,6 +526,14 @@ export default function WorkspacePage() {
    * path this product tells people it never travels.
    */
   const [reading, setReading] = useState<Record<string, OcrProgress>>({});
+  const [sourceObservation, setSourceObservation] = useState<VerifiedSourceObservation | null>(null);
+  const progressAuthorityRef = useRef<{ token: string | null; epoch: number }>({ token: null, epoch: 0 });
+  const progressGenerationRef = useRef(0);
+  const progressSequenceRef = useRef(new Map<string, number>());
+  const sourceBytesCacheRef = useRef(new Map<string, { epoch: number; bytes: Uint8Array }>());
+  const unavailableSourceVersionsRef = useRef(new Map<string, string>());
+  const focusedSourceIdentityRef = useRef<string | null>(null);
+  const focusedSourceIdentityLiveRef = useRef<string | null>(null);
 
   /* The board is derived, never stored. Storing it would let it disagree with the objects. */
   const pipelineRows = buildPipeline(
@@ -534,6 +541,54 @@ export default function WorkspacePage() {
     documents,
     collectionResult?.sourceDocuments.map((item) => item.documentId) ?? [],
   );
+  const focusedObservationRow = pipelineRows.find((row) => row.transfer)
+    ?? pipelineRows.find((row) => row.stages.some((stage) => stage.state === "active"))
+    ?? pipelineRows[pipelineRows.length - 1]
+    ?? null;
+  const focusedObservationSourceId = focusedObservationRow?.id ?? null;
+  const focusedObservationVersionKey = documents?.find((item) => item.documentId === focusedObservationSourceId)?.versionKey ?? null;
+  const focusedObservationIdentity = focusedObservationSourceId && focusedObservationVersionKey
+    ? `${focusedObservationSourceId}:${focusedObservationVersionKey}`
+    : null;
+  focusedSourceIdentityLiveRef.current = focusedObservationIdentity;
+  const readingForCurrentVersions = Object.fromEntries(Object.entries(reading).filter(([documentId, progress]) =>
+    documents?.some((item) => item.documentId === documentId && item.versionKey.toLowerCase() === progress.versionKey.toLowerCase()),
+  ));
+  const selectedObservationVersion = documents?.find((item) => item.documentId === focusedObservationSourceId)?.versionKey;
+  const selectedObservationState = documents?.find((item) => item.documentId === focusedObservationSourceId)?.processingState ?? null;
+  const sourceObservationForDisplay = sourceObservation
+    && sourceObservation.documentId === focusedObservationSourceId
+    && sourceObservation.versionKey.toLowerCase() === selectedObservationVersion?.toLowerCase()
+      ? sourceObservation
+      : null;
+
+  useEffect(() => {
+    if (focusedSourceIdentityRef.current === focusedObservationIdentity) return;
+    focusedSourceIdentityRef.current = focusedObservationIdentity;
+    sourceBytesCacheRef.current.clear();
+    setSourceObservation(null);
+  }, [focusedObservationIdentity]);
+
+  useEffect(() => {
+    if (documents) pruneUnavailableSourceVersions(unavailableSourceVersionsRef.current, documents);
+    // Inventory identity is the dependency; the effect reads the current records, not watches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documents?.map((item) => `${item.documentId}:${item.versionKey}`).join("|")]);
+
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, nextSession) => {
+      const token = nextSession?.access_token ?? null;
+      if (progressAuthorityRef.current.token === token) return;
+      progressAuthorityRef.current = { token, epoch: progressAuthorityRef.current.epoch + 1 };
+      sourceBytesCacheRef.current.clear();
+       unavailableSourceVersionsRef.current.clear();
+      setReading({});
+      setSourceObservation(null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   /**
    * Until this resolves the workspace knows nothing, and it must not fill that gap with
    * plausible-looking values. A signed-out visitor previously saw the whole shell -- tabs, a
@@ -545,6 +600,11 @@ export default function WorkspacePage() {
   const signOut = async () => {
     const client = getSupabaseBrowserClient();
     if (!client) return;
+    progressAuthorityRef.current = { token: null, epoch: progressAuthorityRef.current.epoch + 1 };
+    sourceBytesCacheRef.current.clear();
+    unavailableSourceVersionsRef.current.clear();
+    setReading({});
+    setSourceObservation(null);
     await client.auth.signOut();
     window.location.replace("/");
   };
@@ -869,22 +929,32 @@ export default function WorkspacePage() {
     if (session !== "signed-in" || !documents) return;
     let readingNow = documents
       .filter((item) => item.sanitizedKey && !item.hasOcrJson && item.processingState !== "operator_review")
-      .map((item) => item.documentId);
+      .map((item) => ({ documentId: item.documentId, versionKey: item.versionKey }));
     if (readingNow.length === 0) return;
 
     let cancelled = false;
-    const pollStates = new Map<string, ProgressPollState>();
+    const generation = ++progressGenerationRef.current;
     const tick = async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
       if (!token || cancelled) return;
-      const observed = await Promise.all(readingNow.map((documentId) => readProgressFor(documentId, token)));
-      readingNow = readingNow.filter((documentId, index) => {
-        const decision = advanceProgressPoll(pollStates.get(documentId), observed[index] ?? null);
-        pollStates.set(documentId, decision.state);
-        return decision.continuePolling;
-      });
+      if (progressAuthorityRef.current.token !== token) {
+        progressAuthorityRef.current = { token, epoch: progressAuthorityRef.current.epoch + 1 };
+        sourceBytesCacheRef.current.clear();
+        unavailableSourceVersionsRef.current.clear();
+        setReading({});
+        setSourceObservation(null);
+      }
+      const authority = progressAuthorityRef.current.epoch;
+      await Promise.all(readingNow.map(({ documentId, versionKey }) =>
+        readProgressFor(documentId, token, versionKey, generation, authority, documentId === focusedObservationSourceId),
+      ));
+      if (cancelled || generation !== progressGenerationRef.current || authority !== progressAuthorityRef.current.epoch) return;
+      // The mutable stream may be absent (JSON-only OCR), read, or refused before the durable
+      // receipt appears. Keep checking the actual document inventory; its immutable OCR/review
+      // state ends this effect, never a timer or an invented page-growth signal.
+      readingNow = filterPollableSourceVersions(readingNow, unavailableSourceVersionsRef.current);
       if (!cancelled) await loadDocuments();
       if (readingNow.length === 0) {
         cancelled = true;
@@ -896,10 +966,11 @@ export default function WorkspacePage() {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      if (progressGenerationRef.current === generation) progressGenerationRef.current += 1;
     };
     // The identity of what is being read is the dependency; the handlers are read, not watched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, documents?.map((item) => `${item.documentId}:${item.hasOcrJson}:${item.processingState}`).join("|")]);
+  }, [session, documents?.map((item) => `${item.documentId}:${item.versionKey}:${item.hasOcrJson}:${item.processingState}`).join("|"), focusedObservationSourceId]);
 
   const openBillingPortal = async () => {
     setBillingBusy(true);
@@ -929,27 +1000,118 @@ export default function WorkspacePage() {
   /**
    * Reads one document's progress object.
    *
-   * Two hops on purpose: this server issues a capability, the bucket serves the bytes. A failure
-   * at either hop is silent, because progress is a view and losing a frame of it must never
-   * surface as an error about the document itself.
+   * Progress text still travels directly from the bucket through its short-lived read capability.
+   * The selected source preview uses the existing authorized exact-version PDF route and is
+   * checked against the sanitized-output digest before it can accompany that text. A lost frame
+   * stays a missing observation, never an error about the source itself.
    */
-  const readProgressFor = async (documentId: string, token: string): Promise<OcrProgress | null> => {
+  const readProgressFor = async (
+    documentId: string,
+    token: string,
+    expectedVersionKey: string | null,
+    generation: number,
+    authority: number,
+    includePreview: boolean,
+  ): Promise<OcrProgress | null> => {
+    const sequence = (progressSequenceRef.current.get(documentId) ?? 0) + 1;
+    progressSequenceRef.current.set(documentId, sequence);
+    const current = () => generation === progressGenerationRef.current
+      && authority === progressAuthorityRef.current.epoch
+      && progressSequenceRef.current.get(documentId) === sequence
+      && (!includePreview || focusedSourceIdentityLiveRef.current === `${documentId}:${expectedVersionKey}`);
+    const clearDocument = () => {
+      setReading((previous) => { const next = { ...previous }; delete next[documentId]; return next; });
+      if (includePreview) setSourceObservation(null);
+    };
+    const revoke = () => {
+      if (authority !== progressAuthorityRef.current.epoch) return;
+      progressAuthorityRef.current = { token, epoch: authority + 1 };
+      sourceBytesCacheRef.current.clear();
+      if (expectedVersionKey) markSourceVersionUnavailable(unavailableSourceVersionsRef.current, { documentId, versionKey: expectedVersionKey });
+      setReading({});
+      setSourceObservation(null);
+    };
     try {
-      const issued = await fetch(`/api/documents/${documentId}/progress`, {
+      if (!expectedVersionKey) { if (current()) clearDocument(); return null; }
+      const issued = await fetch(`/api/documents/${encodeURIComponent(documentId)}/progress`, {
         headers: { authorization: `Bearer ${token}` },
         cache: "no-store",
       });
-      if (!issued.ok) return null;
-      const { readUrl } = await issued.json() as { readUrl?: string };
-      if (!readUrl) return null;
-      const object = await fetch(readUrl, { cache: "no-store" });
-      if (!object.ok) return null;
-      const progress = qualifyProgress(await object.json());
-      if (!progress) return null;
-      setReading((current) => ({ ...current, [documentId]: progress }));
+      if (issued.status === 401 || issued.status === 403) { revoke(); return null; }
+      if (!issued.ok) {
+        if (current() && (issued.status === 404 || issued.status === 409) && expectedVersionKey) {
+          markSourceVersionUnavailable(unavailableSourceVersionsRef.current, { documentId, versionKey: expectedVersionKey });
+        }
+        if (current()) clearDocument();
+        return null;
+      }
+      const response = await issued.json() as { readUrl?: unknown };
+      const descriptor = qualifySourceVersionDescriptor(response, documentId);
+      if (!descriptor || descriptor.versionKey.toLowerCase() !== expectedVersionKey.toLowerCase()
+        || typeof response.readUrl !== "string" || !response.readUrl) {
+        if (current()) clearDocument();
+        return null;
+      }
+      if (!isCurrentSourceObservation(
+        descriptor,
+        { documentId, versionKey: expectedVersionKey },
+        authority,
+        progressAuthorityRef.current.epoch,
+        sequence,
+        progressSequenceRef.current.get(documentId) ?? 0,
+      )) { if (current()) clearDocument(); return null; }
+      if (!current()) return null;
+      clearSourceVersionUnavailable(unavailableSourceVersionsRef.current, descriptor);
+
+      const cacheKey = `${documentId}:${descriptor.versionKey}`;
+      for (const key of sourceBytesCacheRef.current.keys()) {
+        if (key.startsWith(`${documentId}:`) && key !== cacheKey) sourceBytesCacheRef.current.delete(key);
+      }
+      let pdfBytes: Uint8Array | null = null;
+      if (includePreview) {
+        const cached = sourceBytesCacheRef.current.get(cacheKey);
+        if (cached?.epoch === authority) {
+          pdfBytes = cached.bytes;
+        } else {
+          const source = await fetch(
+            `/api/documents/${encodeURIComponent(documentId)}/source?version=${encodeURIComponent(descriptor.versionKey)}&format=pdf`,
+            { headers: { authorization: `Bearer ${token}` }, cache: "no-store" },
+          );
+          if (source.status === 401 || source.status === 403) { revoke(); return null; }
+          if (!source.ok || !source.headers.get("content-type")?.startsWith("application/pdf")) {
+            if (current() && source.status === 404) {
+              markSourceVersionUnavailable(unavailableSourceVersionsRef.current, descriptor);
+            }
+            if (current()) clearDocument();
+            return null;
+          }
+          pdfBytes = new Uint8Array(await source.arrayBuffer());
+          const digest = await crypto.subtle.digest("SHA-256", pdfBytes.slice().buffer as ArrayBuffer);
+          const sourceSha256 = `sha256:${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+          if (!matchesSanitizedSourceDigest(descriptor.sourceSha256, sourceSha256)) {
+            if (current()) clearDocument();
+            return null;
+          }
+          if (!current()) return null;
+          sourceBytesCacheRef.current.set(cacheKey, { epoch: authority, bytes: pdfBytes });
+        }
+      }
+
+      const object = await fetch(response.readUrl, { cache: "no-store" });
+      const progress = object.ok ? qualifyProgress(await object.json(), descriptor) : null;
+      if (!current()) return null;
+      setReading((previous) => {
+        if (!current()) return previous;
+        if (!progress) { const next = { ...previous }; delete next[documentId]; return next; }
+        return { ...previous, [documentId]: progress };
+      });
+      if (includePreview && pdfBytes) {
+        setSourceObservation({ ...descriptor, pdfBytes, progress });
+      }
       return progress;
     } catch {
       // A dropped frame of a live view is not an error about the document.
+      if (current()) clearDocument();
       return null;
     }
   };
@@ -2262,10 +2424,14 @@ export default function WorkspacePage() {
     travel together so Home never shows a progress row without its picture or a picture without
     its counts.
   */
-  const compileBlock = compileJob || hasActiveSourceWork(pipelineRows) ? (
+  const showCompileStage = Boolean(compileJob || hasActiveSourceWork(pipelineRows) || sourceObservationForDisplay);
+  const compileBlock = showCompileStage ? (
     <div className="workspace-compile-block">
-      {compileJob || hasActiveSourceWork(pipelineRows) ? (
-        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} resultId={compileJob?.collectionId ?? null} />
+      {showCompileStage ? (
+        <CompileStage rows={pipelineRows} reading={readingForCurrentVersions} sourceObservation={sourceObservationForDisplay}
+          selectedSourceVersion={focusedObservationSourceId && selectedObservationVersion ? { documentId: focusedObservationSourceId, versionKey: selectedObservationVersion } : null}
+          selectedSourceState={selectedObservationState}
+          names={names} world={worldReadModel} state={compileJob?.state ?? null} resultId={compileJob?.collectionId ?? null} runProgress={compileJob ? { jobId: compileJob.jobId, documentsTotal: compileJob.documentsTotal, documentsReady: compileJob.documentsReady } : null} />
       ) : null}
       {compileJob ? (
         <CompileJobPanel
@@ -2725,7 +2891,7 @@ export default function WorkspacePage() {
           <div id="workspace-board">
             <PipelineBoard
               rows={pipelineRows}
-              reading={reading}
+              reading={readingForCurrentVersions}
               names={names}
               customerDataAccess={customerDataAccess}
               noComputeAccess={accessSource === "unentitled"}
@@ -2734,7 +2900,7 @@ export default function WorkspacePage() {
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
                 ? current.filter((id) => id !== documentId)
                 : [...current, documentId])}
-              onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
+              onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); setSourceObservation(null); sourceBytesCacheRef.current.clear(); } : undefined}
             />
           </div>
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">

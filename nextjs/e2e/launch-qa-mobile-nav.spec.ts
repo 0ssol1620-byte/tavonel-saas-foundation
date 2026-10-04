@@ -125,3 +125,44 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
   await page.keyboard.press("Tab");
   await expect(panel.locator(":scope > a:focus"), "focus must be able to leave the disclosure").toHaveCount(0);
 });
+
+const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product", "/ko", "/ko/pricing"] as const;
+
+for (const route of PUBLIC_HEADER_ROUTES) {
+  test(`the mobile menu has a high-contrast ink surface on ${route}`, async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.clear());
+    await page.goto(route);
+    const summary = page.locator("header.nav details.mobile-primary-nav > summary");
+    await expect(summary).toBeVisible();
+    await expect(summary).toHaveCSS("background-color", "rgb(17, 21, 25)");
+    await expect(summary).toHaveCSS("color", "rgb(247, 245, 239)");
+    const glyphColor = await summary.evaluate((element) => getComputedStyle(element, "::before").color);
+    expect(glyphColor).toBe("rgb(247, 245, 239)");
+  });
+}
+
+async function expectAvailabilityBelowHeader(page: Page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const text = document.querySelector(".paper-availability");
+    const nav = document.querySelector("header.nav");
+    if (!text || !nav) return false;
+    return text.getBoundingClientRect().top >= nav.getBoundingClientRect().bottom;
+  })).toBe(true);
+}
+
+test("the consent notice, header, and home availability occupy separate phone bands", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+  await expect(page.locator("section[data-marketing-consent-panel]")).toBeVisible();
+  await expectAvailabilityBelowHeader(page);
+});
+
+test("dismissing the consent notice leaves the fixed header above home availability", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+  const panel = page.locator("section[data-marketing-consent-panel]");
+  await expect(panel).toBeVisible();
+  await panel.locator("button").first().click();
+  await expect(panel).toBeHidden();
+  await expectAvailabilityBelowHeader(page);
+});

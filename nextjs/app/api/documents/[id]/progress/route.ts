@@ -16,10 +16,10 @@ const READ_CAPABILITY_SECONDS = 120;
 /**
  * A capability to read one document's progress object -- not the progress itself.
  *
- * This endpoint returns a URL and nothing else. That is the whole point: the workspace page says
- * the application server never carries file bytes, and streaming the reading through here would
- * quietly make that untrue. The browser fetches the object directly from the bucket, exactly the
- * way it PUT the original file, and this server only decides whether it may.
+ * This endpoint returns a short-lived URL and the selected immutable source identity, never the
+ * progress object or PDF bytes. The browser fetches progress directly from the bucket, while the
+ * separately authorized source route serves the exact sanitized PDF version when a preview is
+ * needed. This server only decides which version the caller may observe.
  *
  * The decision has three parts and all three are required: the caller is signed in, the pilot and
  * product gates admit them, and the key belongs to a document that is genuinely in their own
@@ -87,6 +87,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     {
       code: "OK",
       documentId: id,
+      versionKey: match.versionKey,
+      sourceImmutableKey: match.sanitizedKey,
+      // OCR's input digest is over the sanitized PDF. The immutable version key is the CDR
+      // output digest, not the original upload digest. Only a full digest can be compared.
+      sourceSha256: /^[a-f0-9]{64}$/i.test(match.versionKey) ? `sha256:${match.versionKey.toLowerCase()}` : null,
       readUrl: signed.readUrl,
       expiresInSeconds: READ_CAPABILITY_SECONDS,
       // Said plainly, because the object is mutable and the rest of this workspace is not.

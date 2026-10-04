@@ -51,13 +51,58 @@ const uploadTests = [
 ];
 const siteNavigationTests = ['lib/one-path-contract.test.ts', 'lib/site-nav-model.test.ts'];
 const responsiveNavigationBrowsers = ['e2e/site-nav.spec.ts', 'e2e/launch-qa-mobile-nav.spec.ts'];
+export const WORKSPACE_SOURCE_UNIT_FILES = Object.freeze([
+  'app/api/documents/[id]/progress/route.test.ts',
+  'components/compile-stage.test.tsx',
+  'lib/connector-source-access.test.ts',
+  'lib/connector-source-identity.test.ts',
+  'lib/document-derived-route-access.test.ts',
+  'lib/document-source-route.test.ts',
+  'lib/ocr-progress.test.ts',
+  'lib/r2-progress-capability.test.ts',
+  'lib/r2-source-pdf.test.ts',
+  'lib/source-version-guard.test.ts',
+]);
+export const WORKSPACE_SOURCE_BROWSER_FILE = 'e2e/workspace-source-observation.spec.ts';
+export const WORKSPACE_SOURCE_FEATURE_PATHS = Object.freeze([
+  'app/api/documents/[id]/progress/route.test.ts',
+  'app/api/documents/[id]/progress/route.ts',
+  'app/workspace/page.tsx',
+  'components/compile-stage.module.css',
+  'components/compile-stage.test.tsx',
+  'components/compile-stage.tsx',
+  'e2e/workspace-source-observation.spec.ts',
+  'lib/ocr-progress.test.ts',
+  'lib/ocr-progress.ts',
+]);
+export const WORKSPACE_SOURCE_REPAIR_CONFIG = 'vitest.repair-scope.config.ts';
+export const WORKSPACE_SOURCE_FEATURE_BLOBS = Object.freeze({
+  'app/api/documents/[id]/progress/route.test.ts': '54e35fd493a56857cdf6393167017538e826aa2e',
+  'app/api/documents/[id]/progress/route.ts': 'c2ab73f10f2590eec7118fe85aa98bd6d023a305',
+  'app/workspace/page.tsx': '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
+  'components/compile-stage.module.css': '3a0ccd03335e4e77435af8c671a77df902b9bfd3',
+  'components/compile-stage.test.tsx': 'a03e5676b74e462b37cb290d4dc5b0ecf9a4aded',
+  'components/compile-stage.tsx': 'fb8c4a9020afab4ee9496e2133588e8ebf446e55',
+  'e2e/workspace-source-observation.spec.ts': 'c3e95865e50edada3efa987125f112f8dd71272e',
+  'lib/ocr-progress.test.ts': '766e4ca5fcde9156f5d60e99d5397ac6206ce40a',
+  'lib/ocr-progress.ts': 'ddd83aea6ad50b3b4b4a1c4d1f5c3a09d752e0cf',
+});
+const reviewedWorkspacePageBlobs = Object.freeze({
+  base: '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3',
+  result: '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0',
+});
+const reviewedWorkspaceBrowserBlob = 'c3e95865e50edada3efa987125f112f8dd71272e';
+const reviewedScopedConfigBlob = 'f2065bec72452aa1c80b29afb2768339b7397db8';
+const reviewedScopedConfigGlobalBlob = '91bb009bae9930952594c8fb8164b714a43e8686';
 const reviewedBrowserFiles = new Set([
   'e2e/detail-integrity.spec.ts',
   'e2e/failure-states-audit.spec.ts',
+  WORKSPACE_SOURCE_BROWSER_FILE,
   'e2e/site-nav.spec.ts',
   'e2e/launch-qa-mobile-nav.spec.ts',
   'e2e/landing-hero-mobile.spec.ts',
   'e2e/landing-hero-film-loading.spec.ts',
+  'e2e/marketing-consent.spec.ts',
 ]);
 
 export function normalizePath(raw) {
@@ -88,7 +133,37 @@ export function collectChangedPaths({ repairAnchorSha, headSha, repoRoot, exec =
   return parseNulPaths(diff);
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths }) {
+function readPathBlob(revision, path, repoRoot, exec) {
+  try {
+    return exec('git', ['rev-parse', `${revision}:nextjs/${path}`], { cwd: repoRoot, encoding: 'utf8', stdio: 'pipe', shell: false }).trim();
+  } catch {
+    return null;
+  }
+}
+
+export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => WORKSPACE_SOURCE_FEATURE_PATHS.includes(path)))].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('source feature is not anchored to the audited 6401 baseline');
+  if (JSON.stringify(featurePaths) !== JSON.stringify([...WORKSPACE_SOURCE_FEATURE_PATHS].sort())) reasons.push('workspace source feature path set differs from reviewed candidate');
+  const pageBase = readPathBlob(repairAnchorSha, 'app/workspace/page.tsx', repoRoot, exec);
+  const pageResult = readPathBlob(headSha, 'app/workspace/page.tsx', repoRoot, exec);
+  if (pageBase !== reviewedWorkspacePageBlobs.base || pageResult !== reviewedWorkspacePageBlobs.result) reasons.push('workspace page blob pair differs from reviewed candidate');
+  const browserBlob = readPathBlob(headSha, WORKSPACE_SOURCE_BROWSER_FILE, repoRoot, exec);
+  if (browserBlob !== reviewedWorkspaceBrowserBlob) reasons.push('workspace browser test blob differs from reviewed candidate');
+  const featureBlobMismatches = Object.entries(WORKSPACE_SOURCE_FEATURE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
+    .map(([path]) => path);
+  if (featureBlobMismatches.length) reasons.push(`workspace source feature blobs differ from reviewed candidate: ${featureBlobMismatches.join(', ')}`);
+  const scopedConfigBlob = readPathBlob(headSha, WORKSPACE_SOURCE_REPAIR_CONFIG, repoRoot, exec);
+  if (scopedConfigBlob !== reviewedScopedConfigBlob) reasons.push('repair-only Vitest config blob differs from reviewed candidate');
+  const globalConfigBase = readPathBlob(repairAnchorSha, 'vitest.config.ts', repoRoot, exec);
+  const globalConfigHead = readPathBlob(headSha, 'vitest.config.ts', repoRoot, exec);
+  if (globalConfigBase !== reviewedScopedConfigGlobalBlob || globalConfigHead !== reviewedScopedConfigGlobalBlob) reasons.push('global Vitest config changed from the reviewed blob');
+  return { eligible: reasons.length === 0, reasons, featurePaths, pageBase, pageResult, browserBlob, scopedConfigBlob, globalConfigBase, globalConfigHead };
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -105,6 +180,18 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   let runDetailIntegrity = false;
   let databaseEvidenceInvalidated = false;
 
+  const workspaceSourceChanged = paths.some(path => WORKSPACE_SOURCE_FEATURE_PATHS.includes(path));
+  const workspaceScopedConfigChanged = paths.includes(WORKSPACE_SOURCE_REPAIR_CONFIG);
+  if (workspaceSourceChanged || workspaceScopedConfigChanged) {
+    groups.add('workspace-source-observation');
+    for (const file of WORKSPACE_SOURCE_UNIT_FILES) unitFiles.add(file);
+    browserFiles.add(WORKSPACE_SOURCE_BROWSER_FILE);
+    if (!workspaceSourceVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('workspace source candidate did not match its exact reviewed blob/path policy');
+    }
+  }
+
   for (const path of paths) {
     let matched = false;
     if (/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/i.test(path)) {
@@ -116,6 +203,14 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       groups.add('selector-config');
       qualificationReasons.add('selector changed');
       selectorChanged = true;
+      matched = true;
+    }
+    if (path === WORKSPACE_SOURCE_REPAIR_CONFIG) {
+      groups.add('workspace-source-observation');
+      matched = true;
+    }
+    if (WORKSPACE_SOURCE_FEATURE_PATHS.includes(path)) {
+      groups.add('workspace-source-observation');
       matched = true;
     }
 
@@ -163,6 +258,12 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       for (const file of siteNavigationTests) unitFiles.add(file);
       if (path === 'app/paper-product.css') unitFiles.add('lib/landing-v2-page.test.ts');
       for (const file of responsiveNavigationBrowsers) browserFiles.add(file);
+      matched = true;
+    }
+    if (['components/marketing-consent.module.css', 'components/marketing-consent.tsx'].includes(path)) {
+      groups.add('marketing-consent');
+      unitFiles.add('lib/marketing-analytics.test.ts');
+      browserFiles.add('e2e/marketing-consent.spec.ts');
       matched = true;
     }
     if (path === 'components/compile-stage-player.tsx') {
@@ -258,6 +359,9 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     source: 'authenticated full-pass anchor tree diff; PR-base release debt tracked separately',
     changedPaths: paths,
     groups: [...groups].sort(),
+    workspaceSourceSelection: workspaceSourceChanged || workspaceScopedConfigChanged
+      ? { unitFiles: [...WORKSPACE_SOURCE_UNIT_FILES], browserFiles: [WORKSPACE_SOURCE_BROWSER_FILE], evidence: workspaceSourceVerification }
+      : null,
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
     browserFiles: [...browserFiles].sort(),
@@ -298,7 +402,8 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   if (checkoutHead !== headSha) throw new Error(`checkout SHA ${checkoutHead} does not equal PR head ${headSha}`);
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   const changedPaths = collectChangedPaths({ repairAnchorSha, headSha, repoRoot });
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths });
+  const workspaceSourceVerification = verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot });
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {

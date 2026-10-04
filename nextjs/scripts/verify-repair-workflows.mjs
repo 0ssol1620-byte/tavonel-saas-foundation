@@ -7,6 +7,8 @@ const launch = readFileSync(resolve(repo, '.github/workflows/launch-qa.yml'), 'u
 const repair = readFileSync(resolve(repo, '.github/workflows/repair-scope.yml'), 'utf8');
 const runner = readFileSync(resolve(repo, 'nextjs/scripts/run-repair-check.mjs'), 'utf8');
 const planner = readFileSync(resolve(repo, 'nextjs/scripts/repair-scope.mjs'), 'utf8');
+const scopedVitest = readFileSync(resolve(repo, 'nextjs/vitest.repair-scope.config.ts'), 'utf8');
+const globalVitest = readFileSync(resolve(repo, 'nextjs/vitest.config.ts'), 'utf8');
 const reportValidator = readFileSync(resolve(repo, 'nextjs/scripts/repair-test-report.mjs'), 'utf8');
 const repairFixture = JSON.parse(readFileSync(resolve(repo, 'nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json'), 'utf8'));
 const branches = [
@@ -54,6 +56,15 @@ assert(planner.includes('latestMigrationReplayed: false'), 'baseline must not cl
 assert(planner.includes('baseline-pgtap-passed-latest-migration-not-replayed-37172599535'), 'database status must preserve the migration replay limitation');
 assert(!planner.includes('migrationReapplyPassed: true'), 'latest migration replay cannot be reported as passed');
 assert(planner.includes("selector: 'foundation-repair-anchor-6401-v2'"), 'selector policy version changed');
+assert(planner.includes("export const WORKSPACE_SOURCE_BROWSER_FILE = 'e2e/workspace-source-observation.spec.ts'"), 'workspace source browser path must remain exact');
+assert(planner.includes('export const WORKSPACE_SOURCE_UNIT_FILES = Object.freeze(['), 'workspace source must expose its exact ten-unit selection');
+assert(planner.includes("'lib/source-version-guard.test.ts'"), 'workspace source guard contract must remain selected');
+assert(planner.includes('verifyWorkspaceSourceScopeEvidence'), 'workspace narrow scope must verify exact source blobs and path set');
+assert(planner.includes('reviewedWorkspacePageBlobs') && planner.includes('reviewedWorkspaceBrowserBlob'), 'workspace exception must bind the reviewed page pair and E2E blob');
+assert(planner.includes('globalConfigBase !== reviewedScopedConfigGlobalBlob') && planner.includes('globalConfigHead !== reviewedScopedConfigGlobalBlob'), 'workspace exception must fail closed if global Vitest config changes');
+assert(runner.includes("args.push('--config', 'vitest.repair-scope.config.ts')"), 'out-of-default-include tests must use the repair-only Vitest config');
+assert(scopedVitest.includes('...inheritedIncludes') && scopedVitest.includes('components/compile-stage.test.tsx') && scopedVitest.includes('app/api/documents/**/route.test.ts'), 'repair-only config must inherit base settings and add only reviewed special test discovery');
+assert(!globalVitest.includes('compile-stage.test.tsx') && !globalVitest.includes('workspace-source-observation'), 'global Vitest config must remain unchanged');
 assert(planner.includes("browser: String(plan.runDetailIntegrity || plan.browserFiles.length > 0)"), 'no-browser plans must skip browser install/build');
 assert(repairFixture.repairAnchorSha === '6401c3524b5294f3a395acede35e4632eb89c0fb', 'repair path fixture must use the authenticated full-pass anchor');
 assert(repairFixture.reviewedFilmScope.unitTestPath === 'nextjs/lib/film-motion-control.test.ts', 'film motion control test mapping changed');

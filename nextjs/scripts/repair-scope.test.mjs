@@ -5,9 +5,20 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { buildRepairPlan, collectChangedPaths, normalizePath, AUDITED_REPAIR_ANCHOR_SHA } from './repair-scope.mjs';
+import {
+  buildRepairPlan,
+  collectChangedPaths,
+  normalizePath,
+  AUDITED_REPAIR_ANCHOR_SHA,
+  WORKSPACE_SOURCE_BROWSER_FILE,
+  WORKSPACE_SOURCE_FEATURE_PATHS,
+  WORKSPACE_SOURCE_FEATURE_BLOBS,
+  WORKSPACE_SOURCE_REPAIR_CONFIG,
+  WORKSPACE_SOURCE_UNIT_FILES,
+  verifyWorkspaceSourceScopeEvidence,
+} from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
-import { auditBrowserFiles, browserRunOutputDir, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
+import { auditBrowserFiles, browserRunOutputDir, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
@@ -159,6 +170,99 @@ test('6401 anchor excludes historical developer-store changes from the current d
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }
+});
+
+function workspaceSourceEvidence(headSha, overrides = {}) {
+  const blobs = new Map([
+    [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/app/workspace/page.tsx`, '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3'],
+    [`${headSha}:nextjs/vitest.repair-scope.config.ts`, 'f2065bec72452aa1c80b29afb2768339b7397db8'],
+    [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/vitest.config.ts`, '91bb009bae9930952594c8fb8164b714a43e8686'],
+    [`${headSha}:nextjs/vitest.config.ts`, '91bb009bae9930952594c8fb8164b714a43e8686'],
+  ]);
+  for (const [path, blob] of Object.entries(WORKSPACE_SOURCE_FEATURE_BLOBS)) blobs.set(`${headSha}:nextjs/${path}`, blob);
+  blobs.set(`${headSha}:nextjs/app/workspace/page.tsx`, '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0');
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyWorkspaceSourceScopeEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
+    headSha,
+    changedPaths: WORKSPACE_SOURCE_FEATURE_PATHS,
+    repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error(`missing blob fixture: ${args[1]}`);
+      return `${blob}\n`;
+    },
+  });
+}
+
+test('workspace source feature uses its exact ten-unit, one-browser plan and blob-bound narrow policy', () => {
+  const headSha = 'c'.repeat(40);
+  const verification = workspaceSourceEvidence(headSha);
+  assert.equal(verification.eligible, true);
+  const plan = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, WORKSPACE_SOURCE_REPAIR_CONFIG], {
+    headSha,
+    workspaceSourceVerification: verification,
+  });
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.workspaceSourceSelection.unitFiles.length, 10);
+  assert.deepEqual(plan.workspaceSourceSelection.unitFiles, WORKSPACE_SOURCE_UNIT_FILES);
+  assert.deepEqual(plan.workspaceSourceSelection.browserFiles, [WORKSPACE_SOURCE_BROWSER_FILE]);
+  assert.deepEqual(planBrowserRuns([WORKSPACE_SOURCE_BROWSER_FILE], false), [{ kind: 'project', project: '1440', files: [WORKSPACE_SOURCE_BROWSER_FILE] }]);
+  assert.equal(plan.unitFiles.length, 10);
+  assert.deepEqual(plan.browserFiles, ['e2e/failure-states-audit.spec.ts', WORKSPACE_SOURCE_BROWSER_FILE].sort());
+  assert.equal(plan.fullQualification, 'pending');
+});
+
+test('combined pending UI and workspace source delta reports the full selected union without advancing anchor', () => {
+  const headSha = 'c'.repeat(40);
+  const ui = [
+    'app/chrome-v2.css', 'app/landing-v2.css', 'app/paper-product.css',
+    'components/landing-v2/hero-film-disclosure.tsx', 'components/landing-v2/hero-film.tsx',
+    'components/landing-v2/landing-page.tsx', 'e2e/landing-hero-film-loading.spec.ts',
+    'e2e/launch-qa-mobile-nav.spec.ts', 'e2e/site-nav.spec.ts',
+    'lib/one-path-contract.test.ts', 'lib/site-nav-model.test.ts', 'lib/site-navigation.ts',
+  ];
+  const paths = [...WORKSPACE_SOURCE_FEATURE_PATHS, WORKSPACE_SOURCE_REPAIR_CONFIG, ...ui,
+    'scripts/repair-scope.mjs', 'scripts/repair-scope.test.mjs', 'scripts/run-repair-check.mjs', 'scripts/verify-repair-workflows.mjs'];
+  const plan = planFor(paths, { headSha, workspaceSourceVerification: workspaceSourceEvidence(headSha) });
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.unitFiles.length, 16);
+  assert.equal(plan.browserFiles.length, 6);
+  assert.equal(plan.requirePublicUiScreenshots, true);
+  assert.equal(plan.fullQualification, 'pending');
+});
+
+test('workspace source policy fails closed on stale page/browser/config blobs or an unknown path', () => {
+  const headSha = 'c'.repeat(40);
+  const good = workspaceSourceEvidence(headSha);
+  const wrongPage = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/app/workspace/page.tsx`]: 'd'.repeat(40) });
+  const wrongBrowser = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/${WORKSPACE_SOURCE_BROWSER_FILE}`]: 'e'.repeat(40) });
+  const changedGlobal = workspaceSourceEvidence(headSha, { [`${headSha}:nextjs/vitest.config.ts`]: 'f'.repeat(40) });
+  assert.equal(good.eligible, true);
+  for (const verification of [wrongPage, wrongBrowser, changedGlobal]) {
+    assert.equal(verification.eligible, false);
+    const plan = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, WORKSPACE_SOURCE_REPAIR_CONFIG], { headSha, workspaceSourceVerification: verification });
+    assert.equal(plan.runFullHermeticVitest, true);
+  }
+  const unknown = planFor([...WORKSPACE_SOURCE_FEATURE_PATHS, 'app/workspace/unreviewed.tsx'], { headSha, workspaceSourceVerification: good });
+  assert.equal(unknown.runFullHermeticVitest, true);
+  assert.deepEqual(unknown.unknownPaths, ['app/workspace/unreviewed.tsx']);
+});
+
+test('repair-only Vitest config adds the two exact out-of-default-include files without touching global config', () => {
+  const scoped = readFileSync(new URL('../vitest.repair-scope.config.ts', import.meta.url), 'utf8');
+  const global = readFileSync(new URL('../vitest.config.ts', import.meta.url), 'utf8');
+  assert.match(scoped, /import baseConfig from ["']\.\/vitest\.config["']/);
+  assert.match(scoped, /\.\.\.inheritedIncludes/);
+  assert.match(scoped, /components\/compile-stage\.test\.tsx/);
+  assert.match(scoped, /app\/api\/documents\/\*\*\/route\.test\.ts/);
+  assert.doesNotMatch(global, /compile-stage\.test|workspace-source-observation/);
+  const args = buildUnitArgs(WORKSPACE_SOURCE_UNIT_FILES, 'node_modules/.cache/repair-scope-reports/vitest.json');
+  assert.deepEqual(args.slice(0, 6), ['exec', 'vitest', 'run', '--config', 'vitest.repair-scope.config.ts', '--reporter=default']);
+  assert.deepEqual(args.slice(-WORKSPACE_SOURCE_UNIT_FILES.length), WORKSPACE_SOURCE_UNIT_FILES);
 });
 
 test('reviewed API reference and docs endpoint repairs stay scoped to contract, distribution, and detail checks', () => {
@@ -403,6 +507,10 @@ test('selected browser files route to projects that discover and execute them', 
   assert.deepEqual(planBrowserRuns(['e2e/failure-states-audit.spec.ts'], false), [
     { kind: 'project', project: 'audit', files: ['e2e/failure-states-audit.spec.ts'] },
   ]);
+  assert.deepEqual(planBrowserRuns(['e2e/marketing-consent.spec.ts'], false), [
+    { kind: 'project', project: '1440', files: ['e2e/marketing-consent.spec.ts'] },
+    { kind: 'project', project: '390', files: ['e2e/marketing-consent.spec.ts'] },
+  ]);
   assert.deepEqual(planBrowserRuns([], true), [{
     kind: 'detail-integrity',
     files: ['e2e/detail-integrity.spec.ts'],
@@ -410,6 +518,101 @@ test('selected browser files route to projects that discover and execute them', 
     grep: 'API reference is scannable',
   }]);
   assert.throws(() => planBrowserRuns(['e2e/unmapped.spec.ts'], false), /No reviewed Playwright project mapping/);
+});
+
+test('combined workspace and consent candidate stays targeted with reviewed 1440/390 coverage', () => {
+  const workspacePaths = [
+    'nextjs/app/api/documents/[id]/progress/route.test.ts',
+    'nextjs/app/api/documents/[id]/progress/route.ts',
+    'nextjs/app/workspace/page.tsx',
+    'nextjs/components/compile-stage.module.css',
+    'nextjs/components/compile-stage.test.tsx',
+    'nextjs/components/compile-stage.tsx',
+    'nextjs/e2e/workspace-source-observation.spec.ts',
+    'nextjs/lib/ocr-progress.test.ts',
+    'nextjs/lib/ocr-progress.ts',
+    'nextjs/scripts/repair-scope.mjs',
+    'nextjs/scripts/repair-scope.test.mjs',
+    'nextjs/scripts/run-repair-check.mjs',
+    'nextjs/scripts/verify-repair-workflows.mjs',
+    'nextjs/vitest.repair-scope.config.ts',
+  ];
+  const consentPaths = [
+    'nextjs/components/marketing-consent.module.css',
+    'nextjs/components/marketing-consent.tsx',
+    'nextjs/app/chrome-v2.css',
+    'nextjs/e2e/launch-qa-mobile-nav.spec.ts',
+    'nextjs/e2e/marketing-consent.spec.ts',
+  ];
+  const baselinePaths = [
+    '.github/workflows/repair-scope.yml',
+    'nextjs/app/chrome-v2.css',
+    'nextjs/app/landing-v2.css',
+    'nextjs/app/paper-product.css',
+    'nextjs/components/compile-stage-player.tsx',
+    'nextjs/components/landing-v2/hero-film-disclosure.tsx',
+    'nextjs/components/landing-v2/hero-film.tsx',
+    'nextjs/components/landing-v2/landing-page.tsx',
+    'nextjs/e2e/landing-hero-film-loading.spec.ts',
+    'nextjs/e2e/launch-qa-mobile-nav.spec.ts',
+    'nextjs/e2e/site-nav.spec.ts',
+    'nextjs/lib/film-motion-control.test.ts',
+    'nextjs/lib/one-path-contract.test.ts',
+    'nextjs/lib/site-nav-model.test.ts',
+    'nextjs/lib/site-navigation.ts',
+    'nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json',
+    'nextjs/scripts/repair-scope-gate.mjs',
+    'nextjs/scripts/repair-scope.mjs',
+    'nextjs/scripts/repair-scope.test.mjs',
+    'nextjs/scripts/repair-test-report.mjs',
+    'nextjs/scripts/run-repair-check.mjs',
+    'nextjs/scripts/verify-repair-workflows.mjs',
+  ];
+  const candidatePaths = [...workspacePaths, ...consentPaths];
+  assert.equal(new Set(candidatePaths).size, 19);
+  const combined = [...new Set([...baselinePaths, ...candidatePaths])];
+  assert.equal(combined.length, 35);
+  const headSha = 'c'.repeat(40);
+  const plan = planFor(combined, { headSha, workspaceSourceVerification: workspaceSourceEvidence(headSha) });
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(false, plan.runFullHermeticVitest);
+  assert.equal(plan.changedPaths.length, 35);
+  assert.equal(plan.unitFiles.length, 17);
+  assert.equal(plan.browserFiles.length, 7);
+  assert.deepEqual(plan.unitFiles, [
+    'app/api/documents/[id]/progress/route.test.ts',
+    'components/compile-stage.test.tsx',
+    'lib/connector-source-access.test.ts',
+    'lib/connector-source-identity.test.ts',
+    'lib/document-derived-route-access.test.ts',
+    'lib/document-source-route.test.ts',
+    'lib/film-motion-control.test.ts',
+    'lib/landing-v2-page.test.ts',
+    'lib/landing-v2-recompile.test.ts',
+    'lib/landing-v2-tokens.test.ts',
+    'lib/marketing-analytics.test.ts',
+    'lib/ocr-progress.test.ts',
+    'lib/one-path-contract.test.ts',
+    'lib/r2-progress-capability.test.ts',
+    'lib/r2-source-pdf.test.ts',
+    'lib/site-nav-model.test.ts',
+    'lib/source-version-guard.test.ts',
+  ]);
+  assert.deepEqual(plan.browserFiles, [
+    'e2e/failure-states-audit.spec.ts',
+    'e2e/landing-hero-film-loading.spec.ts',
+    'e2e/landing-hero-mobile.spec.ts',
+    'e2e/launch-qa-mobile-nav.spec.ts',
+    'e2e/marketing-consent.spec.ts',
+    'e2e/site-nav.spec.ts',
+    'e2e/workspace-source-observation.spec.ts',
+  ]);
+  assert.ok(plan.unitFiles.includes('lib/marketing-analytics.test.ts'));
+  assert.ok(plan.browserFiles.includes('e2e/marketing-consent.spec.ts'));
+  assert.deepEqual(planBrowserRuns(['e2e/marketing-consent.spec.ts'], false), [
+    { kind: 'project', project: '1440', files: ['e2e/marketing-consent.spec.ts'] },
+    { kind: 'project', project: '390', files: ['e2e/marketing-consent.spec.ts'] },
+  ]);
 });
 
 test('reviewed Playwright projects discover selected specs and avoid project-level skips', () => {

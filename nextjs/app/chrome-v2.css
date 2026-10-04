@@ -2,6 +2,7 @@
 :root {
   --chrome-gutter: clamp(20px, 2.5vw, 32px);
   --chrome-measure: 1280px;
+  --chrome-header-height: 64px;
 }
 
 
@@ -30,7 +31,9 @@
   border-bottom-color: #d8ddd9;
 }
 @media (max-width: 767px) {
+  :root { --chrome-header-height: 56px; }
   .nav.chrome-v2-header { height: 56px; min-height: 56px; }
+  body:not(:has([data-marketing-consent-panel])) .paper-product .lv2-hero { padding-top: 76px; }
 }
 @media (max-width: 1249px) {
   .nav > .one-path-primary-nav { display: none; }
@@ -38,6 +41,20 @@
   .nav-signin.chrome-v2-signin { display: none; }
 }
 .nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; color: #53606a; }
+
+/* The phone disclosure stays legible on paper, scrolled, and unscrolled public headers. */
+.nav.chrome-v2-header .one-path-mobile-nav > summary {
+  border-color: #111519;
+  background: #111519;
+  color: #f7f5ef;
+}
+@media (max-width: 400px) {
+  .nav.chrome-v2-header .one-path-mobile-nav > summary::before,
+  .nav.chrome-v2-header .one-path-mobile-nav > summary::after {
+    color: #f7f5ef;
+    background: currentColor;
+  }
+}
 .nav.chrome-v2-header .nav-actions .btn { color: #fff; background: #2447b3; border-color: #2447b3; }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }

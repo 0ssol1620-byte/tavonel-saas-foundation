@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
 
 const repoRoot = realpathSync(process.cwd());
-const unsafeChars = /[^A-Za-z0-9_./-]/;
 const readPlan = () => JSON.parse(readFileSync(resolve(repoRoot, 'repair-plan.json'), 'utf8'));
+const registeredUnitTestPaths = new Set([
+  'app/api/documents/[id]/progress/route.test.ts',
+  'components/compile-stage.test.tsx',
+]);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -14,7 +17,8 @@ export function isInsideWorkspace(rootPath, targetPath) {
 }
 
 export function validateSelectedPath(value, kind, rootPath = repoRoot) {
-  if (typeof value !== 'string' || !value || unsafeChars.test(value) || value.startsWith('/')) {
+  const safeSpelling = kind === 'unit' ? /^[A-Za-z0-9_./\[\]-]+$/ : /^[A-Za-z0-9_./-]+$/;
+  if (typeof value !== 'string' || !value || !safeSpelling.test(value) || value.startsWith('/')) {
     throw new Error(`Rejected unsafe ${kind} path: ${JSON.stringify(value)}`);
   }
   const segments = value.split('/');
@@ -24,7 +28,8 @@ export function validateSelectedPath(value, kind, rootPath = repoRoot) {
   const pattern = kind === 'unit'
     ? /^lib\/(?:[A-Za-z0-9_\[\]-]+\/)*[A-Za-z0-9_.\[\]-]+\.test\.ts$/
     : /^e2e\/(?:[A-Za-z0-9_\[\]-]+\/)*[A-Za-z0-9_.\[\]-]+\.spec\.ts$/;
-  if (!pattern.test(value)) throw new Error(`Unsupported ${kind} path: ${JSON.stringify(value)}`);
+  const registeredUnit = kind === 'unit' && registeredUnitTestPaths.has(value);
+  if (!(pattern.test(value) || registeredUnit)) throw new Error(`Unsupported ${kind} path: ${JSON.stringify(value)}`);
 
   const root = realpathSync(rootPath);
   const resolved = resolve(root, ...segments);
@@ -59,11 +64,13 @@ export function browserRunOutputDir(workspaceRoot, index) {
 }
 
 const browserProjectsByFile = new Map([
+  ['e2e/workspace-source-observation.spec.ts', ['1440']],
   ['e2e/failure-states-audit.spec.ts', ['audit']],
   ['e2e/site-nav.spec.ts', ['1440']],
   ['e2e/launch-qa-mobile-nav.spec.ts', ['launch-chromium']],
   ['e2e/landing-hero-mobile.spec.ts', ['360', '390']],
   ['e2e/landing-hero-film-loading.spec.ts', ['390']],
+  ['e2e/marketing-consent.spec.ts', ['1440', '390']],
 ]);
 
 export function planBrowserRuns(files, runDetailIntegrity) {
@@ -101,6 +108,15 @@ export function requireUnitFiles(files) {
   return files;
 }
 
+export function buildUnitArgs(files, reportPath) {
+  requireUnitFiles(files);
+  if (typeof reportPath !== 'string' || !reportPath) throw new Error('Vitest report path is required.');
+  const args = ['exec', 'vitest', 'run'];
+  if (files.some(file => registeredUnitTestPaths.has(file))) args.push('--config', 'vitest.repair-scope.config.ts');
+  args.push('--reporter=default', '--reporter=json', `--outputFile=${reportPath}`, ...files);
+  return args;
+}
+
 function run(command, args, env = process.env) {
   return new Promise((resolveRun, rejectRun) => {
     const child = spawn(command, args, { cwd: repoRoot, env, shell: false, stdio: 'inherit' });
@@ -130,7 +146,7 @@ async function runUnit() {
   rmSync(reportPath, { force: true });
   let runError;
   try {
-    await run('pnpm', ['exec', 'vitest', 'run', '--reporter=default', '--reporter=json', `--outputFile=${reportPath}`, ...files]);
+    await run('pnpm', buildUnitArgs(files, reportPath));
   } catch (error) {
     runError = error;
   }

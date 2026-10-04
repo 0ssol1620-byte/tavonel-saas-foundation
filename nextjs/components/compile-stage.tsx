@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PipelineRow } from "@/lib/pipeline";
-import type { OcrProgress } from "@/lib/ocr-progress";
+import { matchesSanitizedSourceDigest, type OcrProgress } from "@/lib/ocr-progress";
 import { displayName, type DocumentNames } from "@/lib/document-names";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import type { CompileState } from "@/lib/compile-job-store";
+import PdfEvidenceViewer from "@/components/pdf-evidence-viewer";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 import { deriveCompileStageView } from "@/lib/compile-stage-view";
+import styles from "./compile-stage.module.css";
 
 /*
   The compile, played as chapters.
@@ -82,20 +84,37 @@ function place(index: number, total: number): { x: number; y: number } {
   return { x: 0.5 + radius * 0.46 * Math.cos(angle), y: 0.5 + radius * 0.46 * Math.sin(angle) };
 }
 
-export default function CompileStage({ rows, reading = {}, names = {}, world = null, state = null, resultId = null }: {
+type SourceObservation = {
+    documentId: string;
+    versionKey: string;
+    sourceImmutableKey: string;
+    sourceSha256: string;
+    pdfBytes: Uint8Array;
+    progress: OcrProgress | null;
+};
+
+export default function CompileStage({ rows, reading = {}, sourceObservation = null, selectedSourceVersion = null, selectedSourceState = null, names = {}, world = null, state = null, resultId = null, runProgress = null }: {
   rows: PipelineRow[];
   reading?: Record<string, OcrProgress>;
+  sourceObservation?: SourceObservation | null;
+  selectedSourceVersion?: { documentId: string; versionKey: string } | null;
+  selectedSourceState?: "sanitized" | "ocr_ready" | "operator_review" | null;
   names?: DocumentNames;
   world?: WorldReadModel | null;
   state?: CompileState | null;
   resultId?: string | null;
+  runProgress?: { jobId: string; documentsTotal: number; documentsReady: number } | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
   /* No silent fallback: a browser that cannot give us a 2D context gets the words instead. */
   const [drawable, setDrawable] = useState(true);
-  const stateRef = useRef({ rows, reading, names, world, state });
-  stateRef.current = { rows, reading, names, world, state };
+  const [pageSelection, setPageSelection] = useState<{ source: string; page: number } | null>(null);
+  const [boxSelection, setBoxSelection] = useState<{ source: string; index: number } | null>(null);
+  // The board can show bound OCR counts, while this source pane requires authorized source bytes.
+  void reading;
+  const stateRef = useRef({ rows, names, world, state });
+  stateRef.current = { rows, names, world, state };
 
   /*
     How far the run has got, and therefore which chapter is playing.
@@ -105,22 +124,49 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     and during a local run the reverse is true. Taking the maximum of the two is what keeps a
     finished stage finished.
   */
-  const view = deriveCompileStageView(rows, reading, world, state, resultId);
+  const view = deriveCompileStageView(rows, {}, world, state, resultId);
   const reached = view.position;
   const settled = view.tone === "ready";
   const stopped = view.tone === "stopped";
   const hasVisual = view.visual !== "none";
-  const framed = hasVisual && view.visual !== "sources" && drawable;
+  const hasCanvasVisual = hasVisual;
+  const framed = hasCanvasVisual && view.visual !== "sources" && drawable;
   const idleHeight = 132 + Math.min(Math.max(rows.length, 1), 8) * 22;
-  const observedTextBoxes = view.progressId
-    ? reading[view.progressId]?.pages.reduce((count, page) => count + page.boxes.filter((box) => box.text.trim()).length, 0) ?? 0
-    : 0;
-  const canvasHeight = !framed ? idleHeight : view.visual === "structure"
-    ? Math.min(380, Math.max(220, 160 + observedTextBoxes * 19))
-    : undefined;
+  const canvasHeight = !framed ? idleHeight : undefined;
+  const selectedRow = rows.find((row) => row.transfer)
+    ?? rows.find((row) => row.stages.some((stage) => stage.state === "active"))
+    ?? rows[rows.length - 1]
+    ?? null;
+  const currentObservation = sourceObservation && selectedRow?.id === sourceObservation.documentId
+    && selectedSourceVersion !== null
+    && selectedSourceVersion.documentId === sourceObservation.documentId
+    && selectedSourceVersion.versionKey.toLowerCase() === sourceObservation.versionKey.toLowerCase()
+    && sourceObservation.sourceImmutableKey.endsWith(`/${sourceObservation.documentId}/${sourceObservation.versionKey}/sanitized.pdf`)
+    && matchesSanitizedSourceDigest(sourceObservation.sourceSha256, `sha256:${sourceObservation.versionKey}`)
+    ? sourceObservation
+    : null;
+  const progress = currentObservation?.progress
+    && currentObservation.progress.documentId === currentObservation.documentId
+    && currentObservation.progress.versionKey.toLowerCase() === currentObservation.versionKey.toLowerCase()
+    && currentObservation.progress.sourceImmutableKey === currentObservation.sourceImmutableKey
+    && currentObservation.progress.sourceSha256 === currentObservation.sourceSha256
+      ? currentObservation.progress
+      : null;
+  const observationKey = currentObservation ? `${currentObservation.documentId}:${currentObservation.versionKey}` : "";
+  const availablePages = progress?.pages ?? [];
+  const selectedPageNumber = pageSelection?.source === observationKey
+    && availablePages.some((page) => page.pageNumber1 === pageSelection.page)
+      ? pageSelection.page
+      : availablePages[availablePages.length - 1]?.pageNumber1 ?? 1;
+  const selectedPage = availablePages.find((page) => page.pageNumber1 === selectedPageNumber) ?? null;
+  const selectedBoxIndex = boxSelection?.source === observationKey
+    && selectedPage?.boxes[boxSelection.index]
+      ? boxSelection.index
+      : 0;
+  const selectedBox = selectedPage?.boxes[selectedBoxIndex] ?? null;
 
   useEffect(() => {
-    if (!hasVisual) return;
+    if (!hasCanvasVisual) return;
     const canvas = canvasRef.current;
     const section = sectionRef.current;
     const context = canvas?.getContext("2d");
@@ -174,9 +220,8 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       context.stroke();
     };
 
-    const focusOf = (list: PipelineRow[], readMap: Record<string, OcrProgress>): PipelineRow | null => {
-      return list.find((row) => readMap[row.id] && row.stages[2].state === "active")
-        ?? list.find((row) => row.transfer)
+    const focusOf = (list: PipelineRow[]): PipelineRow | null => {
+      return list.find((row) => row.transfer)
         ?? list.find((row) => row.stages.some((stage) => stage.state === "active"))
         ?? list[list.length - 1]
         ?? null;
@@ -203,49 +248,6 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
           context.fillStyle = colour["--changed"]; context.font = mono(12, 500); context.textAlign = "right";
           context.fillText("REVIEW", x + w - 12, yy); context.textAlign = "left";
         }
-      });
-    };
-
-    const drawPage = (x: number, y: number, w: number, h: number, progress: OcrProgress) => {
-      const page = progress.pages[progress.pages.length - 1];
-      if (!page) return;
-      pane(x, y, w, h, PIPELINE_STAGES[1].label, `p.${page.pageNumber1}/${page.pageCount}`);
-      const px = x + 18; const py = y + 44; const pw = w - 36; const ph = h - 58;
-      /* The only light surface in this product is a page, and --paper is that surface. */
-      context.fillStyle = colour["--paper"];
-      context.fillRect(px, py, pw, ph);
-      page.boxes.forEach((box) => {
-        const [x0, y0, x1, y1] = box.bbox1000;
-        const bx = px + (x0 / 1000) * pw; const by = py + (y0 / 1000) * ph;
-        const bw = ((x1 - x0) / 1000) * pw; const bh = ((y1 - y0) / 1000) * ph;
-        const sure = box.confidence >= 0.75;
-        context.strokeStyle = sure ? colour["--verified"] : colour["--changed"];
-        context.lineWidth = 1.5;
-        context.strokeRect(bx, by, bw, bh);
-      });
-    };
-
-    const drawExtract = (x: number, y: number, w: number, h: number, progress: OcrProgress) => {
-      const found = progress.regionsFound ?? 0;
-      pane(x, y, w, h, PIPELINE_STAGES[2].label, `${found} regions`);
-      const lines: { text: string; sure: boolean }[] = [];
-      progress.pages.forEach((page) => page.boxes.forEach((box) => { if (box.text) lines.push({ text: box.text, sure: box.confidence >= 0.75 }); }));
-      context.font = sans(13);
-      const packed: { text: string; sure: boolean }[] = [];
-      lines.forEach((line) => wrap(context, line.text, w - 64).forEach((part) => packed.push({ text: part, sure: line.sure })));
-      const rowH = 19;
-      const maxRows = Math.max(1, Math.floor((h - 80) / rowH));
-      context.fillStyle = colour["--text-lo"];
-      context.font = mono(10, 500);
-      context.fillText("OBSERVED TEXT · MOST RECENT", x + 16, y + 50);
-      packed.slice(Math.max(0, packed.length - maxRows)).forEach((line, i) => {
-        const yy = y + 74 + i * rowH;
-        context.fillStyle = colour["--text-lo"];
-        context.font = mono(11);
-        context.fillText(String(i + 1).padStart(2, "0"), x + 16, yy);
-        context.font = sans(13);
-        context.fillStyle = line.sure ? colour["--text-mid"] : colour["--changed"];
-        context.fillText(line.text, x + 48, yy);
       });
     };
 
@@ -276,50 +278,17 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
       read off how far the run has got rather than off what it happens to be doing this second.
       That is the whole of BQ-022.
     */
-    const drawStrip = (x: number, y: number, w: number, current: number) => {
-      const stepW = w / PIPELINE_STAGES.length;
-      PIPELINE_STAGES.forEach((stage, i) => {
-        const done = settled || i < current;
-        const active = view.tone === "active" && i === current;
-        const needsReview = view.tone === "attention" && i === current;
-        const cx = x + stepW * i + stepW / 2;
-        context.fillStyle = stopped && i === current ? colour["--failed"] : needsReview ? colour["--changed"] : active ? colour["--verified"] : done ? colour["--text-mid"] : colour["--text-lo"];
-        context.beginPath();
-        context.arc(cx, y + 11, active ? 4 : 3, 0, Math.PI * 2);
-        context.fill();
-        context.font = sans(12, active ? 600 : 500);
-        context.fillStyle = active ? colour["--text-hi"] : done ? colour["--text-mid"] : colour["--text-lo"];
-        context.textAlign = "center";
-        context.fillText(i === 3 ? (width < 540 ? (settled ? "AI ready" : "Activate") : view.finalLabel) : stage.label, cx, y + 31);
-        if (active) {
-          context.fillStyle = colour["--verified"];
-          context.fillRect(x + stepW * i + 8, y + 40, Math.max(10, stepW - 16), 2);
-        }
-      });
-      context.textAlign = "left";
-    };
-
     const draw = () => {
-      const { rows: list, reading: readMap, names: nameMap, world: model } = stateRef.current;
+      const { rows: list, names: nameMap, world: model } = stateRef.current;
       if (width <= 0 || height <= 0) return;
       colour = readPalette();
       context.fillStyle = colour["--ground"];
       context.fillRect(0, 0, width, height);
-      const focus = focusOf(list, readMap);
-      const progress = view.progressId ? readMap[view.progressId] : undefined;
+      const focus = focusOf(list);
       const pad = 12;
-      const stripH = 46;
 
-      roundRect(context, pad, pad, width - pad * 2, stripH, 8);
-      context.fillStyle = colour["--g1"];
-      context.fill();
-      context.strokeStyle = colour["--hairline-hi"];
-      context.lineWidth = 1;
-      context.stroke();
-      drawStrip(pad, pad, width - pad * 2, reached);
-
-      /* One pane. Not four, and not four with three of them empty. */
-      const paneY = pad + stripH + 10;
+      /* The durable stage strip lives in semantic HTML above this canvas. */
+      const paneY = pad;
       const paneW = width - pad * 2;
       const paneH = height - paneY - pad;
       if (paneH < 40) return;
@@ -330,15 +299,8 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
           .forEach((line, index) => context.fillText(line, pad + 20, paneY + 64 + index * 20));
       };
       if (reached === 0) drawSources(pad, paneY, paneW, paneH, list, focus, nameMap);
-      else if (reached === 1) {
-        if (progress?.pages?.length) drawPage(pad, paneY, paneW, paneH, progress);
-        else waiting(PIPELINE_STAGES[1].label);
-      } else if (reached === 2) {
-        const structured = progress && ((progress.regionsFound ?? 0) > 0 || progress.pages.some((page) => page.boxes.some((box) => Boolean(box.text))));
-        if (structured && progress) drawExtract(pad, paneY, paneW, paneH, progress);
-        else waiting(PIPELINE_STAGES[2].label);
-      } else if (model && model.objects.length > 0) drawWorld(pad, paneY, paneW, paneH, model);
-      else waiting(PIPELINE_STAGES[3].label);
+      else if (reached === 3 && model && model.objects.length > 0) drawWorld(pad, paneY, paneW, paneH, model);
+      else waiting(PIPELINE_STAGES[reached].label);
     };
 
     let frame = 0;
@@ -352,21 +314,110 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
     onResize();
     window.addEventListener("resize", onResize);
     return () => { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", onResize); };
-  }, [names, reading, rows, state, world, reached, settled, stopped, hasVisual, view.finalLabel, view.progressId, view.tone]);
+  }, [names, rows, state, world, reached, settled, stopped, hasVisual, view.finalLabel, view.progressId, view.tone, hasCanvasVisual]);
 
-  const observedPages = Object.values(reading).reduce((sum, item) => sum + (item.pages?.length ?? 0), 0);
-  const observedRegions = Object.values(reading).reduce((sum, item) => sum + (item.regionsFound ?? 0), 0);
+  const showCounts = rows.length > 0 || state !== null;
+  const showEvidenceUnavailable = runProgress !== null && (state === "reading" || state === "structuring");
+  const observationState = selectedSourceState === "operator_review" ? "operator_review"
+    : selectedSourceState === "ocr_ready" ? "ocr_ready"
+      : progress?.state ?? "unavailable";
+  const observationLabel = selectedSourceState === "operator_review" ? "Needs review"
+    : selectedSourceState === "ocr_ready" ? "OCR record ready"
+      : progress?.state === "reading" ? "Reading"
+        : progress?.state === "read" ? "Read stream ended"
+          : progress?.state === "refused" ? "Read refused" : "Page stream unavailable";
 
   return (
-    <section className="compile-stage" aria-label="Live compilation view" ref={sectionRef} data-stage={PIPELINE_STAGES[reached].key}
-      data-tone={view.tone} data-visual={view.visual} data-framed={framed ? "true" : "false"}>
+    <section className={"compile-stage " + styles.stage} aria-label="Live compilation view" ref={sectionRef} data-stage={PIPELINE_STAGES[reached].key}
+      data-tone={view.tone} data-visual={view.visual} data-framed={framed ? "true" : "false"} data-run-id={runProgress?.jobId ?? undefined}>
       <div className="compile-stage-status" role="status">
         <strong>{view.title}</strong>
-        <p>{(view.visual === "page" || view.visual === "structure") && view.tone === "active"
-          ? "Observed content from this run, updated as sources are read."
-          : view.detail}</p>
+        <p>{view.detail}</p>
       </div>
-      {hasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
+      <ol className={styles.sequence} aria-label="Compilation stages">
+        {PIPELINE_STAGES.map((stage, index) => {
+          const active = view.tone === "active" && index === reached;
+          const attention = view.tone === "attention" && index === reached;
+          const failed = stopped && index === reached;
+          const complete = settled || index < reached;
+          const stageState = failed ? "stopped" : attention ? "attention" : active ? "active" : complete ? "complete" : "waiting";
+          return (
+            <li className={styles.stageItem} data-state={stageState} aria-current={active ? "step" : undefined} key={stage.key}>
+              <span>{index === 3 ? view.finalLabel : stage.label}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {showCounts ? <dl className={styles.metrics} aria-label="Compilation counts">
+        <div><dt>{runProgress ? "Run sources" : "Sources in view"}</dt><dd>{runProgress?.documentsTotal ?? rows.length}</dd></div>
+        {runProgress ? <div><dt>Sources read</dt><dd>{runProgress.documentsReady}</dd></div> : null}
+        {world && view.visual === "world" ? <>
+          <div><dt>Compiled objects</dt><dd>{world.objects.length}</dd></div>
+          <div><dt>Recorded relations</dt><dd>{world.relations.length}</dd></div>
+        </> : null}
+      </dl> : null}
+      {currentObservation ? (
+        <section className={styles.sourcePanel} aria-label="Selected source version and OCR observation"
+          data-source-id={currentObservation.documentId} data-source-version={currentObservation.versionKey}>
+          <header className={styles.sourceHeader}>
+            <div>
+              <span className={styles.eyebrow}>SOURCE VERSION · LIVE OCR VIEW</span>
+              <h3>{displayName(currentObservation.documentId, names, selectedRow?.filename)}</h3>
+              <p>Version <code>{currentObservation.versionKey}</code></p>
+            </div>
+            <span className={styles.observationState} data-state={observationState}>
+              {observationLabel}
+            </span>
+          </header>
+          <p className={styles.sourceNote}>This is a mutable source-version observation, not saved OCR evidence and not a compile-run record.</p>
+          <div className={styles.sourceGrid}>
+            <div className={styles.sourcePage}>
+              {selectedPage ? <label className={styles.pagePicker}>
+                Observed page
+                <select aria-label="Select observed source page" value={selectedPageNumber}
+                  onChange={(event) => { setPageSelection({ source: observationKey, page: Number(event.currentTarget.value) }); setBoxSelection(null); }}>
+                  {availablePages.map((page) => <option key={page.pageNumber1} value={page.pageNumber1}>Page {page.pageNumber1} of {page.pageCount}</option>)}
+                </select>
+              </label> : <span className={styles.pageLabel}>Original · page 1</span>}
+              <PdfEvidenceViewer
+                key={`${observationKey}:${selectedPageNumber}`}
+                data={currentObservation.pdfBytes}
+                page={selectedPageNumber}
+                bbox={selectedBox?.bbox1000 ?? [0, 0, 0, 0]}
+                label={`Authorized sanitized source ${currentObservation.documentId}, version ${currentObservation.versionKey}, page ${selectedPageNumber}`}
+              />
+            </div>
+            <div className={styles.extracted}>
+              <div className={styles.extractedHeading}>
+                <strong>Extracted lines</strong>
+                {progress ? <span>{progress.pagesRead}{progress.pageCount ? ` / ${progress.pageCount} pages` : " pages observed"} · {progress.regionsFound} lines</span> : null}
+              </div>
+              {progress?.state === "refused" ? <p role="status">The OCR stream reported a refusal. The source page remains available for review.</p>
+                : selectedPage?.boxes.length ? <ol>
+                  {selectedPage.boxes.map((box, index) => <li key={`${box.regionId}:${index}`}>
+                    <button type="button" aria-pressed={selectedBoxIndex === index}
+                      onClick={() => setBoxSelection({ source: observationKey, index })}>
+                      {box.text || "Empty OCR line"}
+                    </button>
+                  </li>)}
+                </ol>
+                : <p>{progress ? "No OCR lines were observed on this page." : selectedSourceState === "ocr_ready"
+                  ? "The immutable OCR result is ready. This source-version preview has no live page stream."
+                  : selectedSourceState === "operator_review"
+                    ? "Processing needs operator review. The source row retains the review state."
+                    : "No source-bound page stream is available yet. This is not a completion signal."}</p>}
+            </div>
+          </div>
+        </section>
+      ) : null}
+      {showEvidenceUnavailable && !currentObservation ? (
+        <section className={styles.original} aria-label="Selected source evidence unavailable">
+          <span className={styles.eyebrow}>SOURCE EVIDENCE</span>
+          <h3>Original preview unavailable</h3>
+          <p>The selected source version could not be authorized and verified. No page or extracted OCR text is shown.</p>
+        </section>
+      ) : null}
+      {hasCanvasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
         style={canvasHeight ? { height: canvasHeight } : undefined} /> : null}
       {hasVisual ? <div className="compile-stage-film-caption" aria-label="Observed compilation chapter">
         <span>{PIPELINE_STAGES[reached].label}</span>
@@ -374,11 +425,7 @@ export default function CompileStage({ rows, reading = {}, names = {}, world = n
           {String(reached + 1).padStart(2, "0")} / {String(PIPELINE_STAGES.length).padStart(2, "0")}
         </span>
       </div> : null}
-      {hasVisual ? <p className="compile-stage-summary" data-sensitive="content">
-        {rows.length} source{rows.length === 1 ? "" : "s"} · {observedPages} observed page{observedPages === 1 ? "" : "s"} · {observedRegions} observed region{observedRegions === 1 ? "" : "s"}
-        {world && view.visual === "world" ? ` · ${world.objects.length} compiled objects · ${world.relations.length} recorded relations` : ""}
-        {drawable ? "" : " The visual is unavailable in this browser; the run details remain available below."}
-      </p> : null}
+      {showCounts && !drawable && hasCanvasVisual ? <p className="compile-stage-summary">The visual is unavailable in this browser; run details remain available below.</p> : null}
     </section>
   );
 }
