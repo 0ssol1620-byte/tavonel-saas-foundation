@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const LOCALES = [
-  { path: "/", language: "English", summary: "Watch the illustrative product walkthrough" },
-  { path: "/ko", language: "Korean", summary: "예시 제품 흐름 영상 보기" },
+  { path: "/", language: "English", summary: "Watch the illustrative product walkthrough", focus: "Focus details", fit: "Fit full frame", fittedHint: "Full frame · Focus details to inspect small type.", focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame." },
+  { path: "/ko", language: "Korean", summary: "예시 제품 흐름 영상 보기", focus: "세부 내용 확대", fit: "전체 화면 보기", fittedHint: "전체 화면 · 작은 글자는 세부 내용 확대에서 확인하세요.", focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요." },
 ] as const;
 const MOTION_PREFERENCES = [
   { preference: "reduce" as const, name: "reduced motion" },
@@ -50,6 +50,41 @@ for (const locale of LOCALES) {
       await expect(disclosure).toHaveAttribute("open", "");
       await expect(disclosure.locator(".compile-film-motion-control")).toBeVisible();
       await expect.poll(() => requests.some((url) => new URL(url).pathname.startsWith("/film/"))).toBe(true);
+
+      const sequence = disclosure.locator(".compile-film-sequence");
+      const focusControl = disclosure.locator(".compile-film-focus-control");
+      const viewport = disclosure.locator(".compile-film-viewport");
+      const stages = disclosure.getByRole("tab");
+
+      // The mounted phone player starts fitted and exposes the localized action and explanation.
+      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
+      await expect(focusControl).toHaveAttribute("aria-pressed", "false");
+      await expect(focusControl).toHaveText(locale.focus);
+      await expect(disclosure.locator(".compile-film-mobile-tools p")).toHaveText(locale.fittedHint);
+
+      // Focus is an explicit opt-in and pans to the selected stage's authored pane.
+      await focusControl.click();
+      await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+      await expect(focusControl).toHaveAttribute("aria-pressed", "true");
+      await expect(focusControl).toHaveText(locale.fit);
+      await expect(disclosure.locator(".compile-film-mobile-tools p")).toHaveText(locale.focusedHint);
+      await stages.nth(1).click();
+      await expect(stages.nth(1)).toHaveAttribute("aria-selected", "true");
+      await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
+      await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+
+      // Returning to fit works, and changing stages in fit mode keeps the visitor's choice.
+      await focusControl.click();
+      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "1");
+      await expect(focusControl).toHaveAttribute("aria-pressed", "false");
+      await expect(focusControl).toHaveText(locale.focus);
+      await stages.nth(0).click();
+      await expect(stages.nth(0)).toHaveAttribute("aria-selected", "true");
+      await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+      await expect(sequence).toHaveAttribute("data-mobile-focus-pane", "0");
     });
   }
 }

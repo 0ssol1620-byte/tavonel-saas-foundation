@@ -53,6 +53,11 @@ export function auditBrowserFiles(files) {
   return files.filter(file => file !== 'e2e/detail-integrity.spec.ts');
 }
 
+export function browserRunOutputDir(workspaceRoot, index) {
+  if (!Number.isInteger(index) || index < 0) throw new Error('Browser run index must be a non-negative integer.');
+  return resolve(workspaceRoot, 'test-results', `repair-scope-playwright-${index + 1}`);
+}
+
 const browserProjectsByFile = new Map([
   ['e2e/failure-states-audit.spec.ts', ['audit']],
   ['e2e/site-nav.spec.ts', ['1440']],
@@ -151,9 +156,11 @@ async function runBrowser() {
     const browserEnv = { ...env, PLAYWRIGHT_EXTERNAL_SERVER: '1', PLAYWRIGHT_BASE_URL: baseUrl };
     for (const [index, planned] of plannedRuns.entries()) {
       const reportPath = resolve(repoRoot, `node_modules/.cache/repair-scope-reports/playwright-${index + 1}.json`);
+      const outputDir = browserRunOutputDir(repoRoot, index);
       mkdirSync(dirname(reportPath), { recursive: true });
       rmSync(reportPath, { force: true });
       const args = ['exec', 'playwright', 'test', ...planned.files];
+      args.push('--output', outputDir);
       args.push('--reporter=json');
       if (planned.grep) args.push('--grep', planned.grep);
       if (planned.projects) args.push(...planned.projects.map(project => `--project=${project}`));
@@ -164,7 +171,7 @@ async function runBrowser() {
       } catch (error) {
         runError = error;
       }
-      const summary = readAndValidatePlaywrightReport(reportPath, planned.files);
+      const summary = readAndValidatePlaywrightReport(reportPath, planned.files, repoRoot);
       console.log(`Playwright report ${planned.kind}${planned.project ? `/${planned.project}` : ''}: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.flaky} flaky, ${summary.failed} failed across ${summary.files} selected files.`);
       if (runError) throw runError;
     }

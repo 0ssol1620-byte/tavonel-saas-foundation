@@ -72,6 +72,8 @@ assert(planner.includes('PR_BASE_SHA'), 'CLI must receive the PR base independen
 assert(repair.indexOf('Plan changes since the authenticated full-pass anchor') < repair.indexOf('pnpm install --frozen-lockfile'), 'planning must precede dependency installation');
 assert(repair.indexOf('Verify workflow and selector contracts') < repair.indexOf('pnpm install --frozen-lockfile'), 'workflow verification must precede dependency installation');
 assert(repair.indexOf('Run selector regression tests') < repair.indexOf('pnpm install --frozen-lockfile'), 'selector regression must precede dependency installation');
+assert(repair.includes('node --test scripts/repair-scope.test.mjs'), 'report path and output-directory regressions must run before dependency installation');
+assert(repair.indexOf('Run browser report and screenshot regressions') < repair.indexOf('pnpm install --frozen-lockfile'), 'browser report and screenshot regressions must precede dependency installation');
 assert(repair.includes('node scripts/run-repair-check.mjs unit'), 'targeted Vitest must use the argv-safe runner');
 assert(repair.includes("steps.plan.outputs.unit == 'true'"), 'empty affected-unit scope must skip targeted Vitest safely');
 assert(conditionForStep(repair, 'Install Chromium for detail-integrity coverage').includes("steps.plan.outputs.browser == 'true'"), 'no-browser plans must skip browser installation');
@@ -82,8 +84,16 @@ assert(repair.includes('node scripts/run-repair-check.mjs browser'), 'browser se
 assert(planner.includes('public_ui_capture: String(plan.requirePublicUiScreenshots)'), 'screenshot requirement must be scoped to the exact paired candidate');
 assert(runner.includes("'e2e/landing-hero-film-loading.spec.ts', ['390']"), 'new phone loading spec project mapping changed');
 assert(runner.includes("'e2e/site-nav.spec.ts', ['1440']"), 'site-nav screenshots must be captured once by the desktop project');
-assert(repair.includes("find nextjs/test-results -type f -name 'public-ui-*.png'"), 'public UI screenshot collection must stay within named PNG outputs');
-assert(repair.includes('screenshots[@]} != 6'), 'public UI screenshot artifact must require exactly six images');
+assert(repair.includes("find test-results/repair-scope-playwright-* -type f -name 'public-ui-*.png'"), 'public UI screenshot collection must stay within unique Playwright output directories from the nextjs working directory');
+for (const screenshot of [
+  'public-ui-desktop-1440x900-docs-mcp.png',
+  'public-ui-desktop-1440x900-home.png',
+  'public-ui-desktop-1440x900-pricing.png',
+  'public-ui-mobile-390x844-docs-mcp.png',
+  'public-ui-mobile-390x844-home.png',
+  'public-ui-mobile-390x844-pricing.png',
+]) assert(repair.includes(screenshot), `public UI screenshot allowlist is missing ${screenshot}`);
+assert(repair.includes('screenshots[@]} != ${#expected[@]}'), 'public UI screenshot artifact must require exactly six images');
 assert(repair.includes("steps.plan.outputs.public_ui_capture == 'true'"), 'only the exact paired candidate may require screenshots');
 assert(repair.includes('path: nextjs/test-results/**/public-ui-*.png'), 'public UI artifact must upload only the bounded screenshot path');
 assert(repair.includes('retention-days: 3'), 'public UI screenshots must expire after three days');
@@ -96,8 +106,16 @@ assert(!repair.includes('${{ steps.plan.outputs.unit_files }}'), 'dynamic Vitest
 assert(!repair.includes('${{ steps.plan.outputs.browser_files }}'), 'dynamic browser filenames must not enter a shell');
 assert(runner.includes('shell: false'), 'selected paths must be passed as process arguments');
 assert(runner.includes("'--reporter=json'"), 'selected unit and browser runs must write machine-readable JSON reports');
+assert(runner.includes("args.push('--output', outputDir)"), 'each Playwright invocation must use its own screenshot output directory');
+assert(runner.includes("resolve(workspaceRoot, 'test-results', `repair-scope-playwright-${index + 1}`)"), 'Playwright output directories must remain uniquely numbered under test-results');
 assert(runner.includes('readAndValidateVitestReport') && runner.includes('readAndValidatePlaywrightReport'), 'test success must be checked against per-file JSON results');
 assert(reportValidator.includes('no executed passing test'), 'reports with skipped-only selected files must fail');
+assert(reportValidator.includes('actual === selected') && reportValidator.includes('relative(root, absolute)'), 'JSON report paths must resolve to exact files beneath the workspace root');
+const playwrightMatcherStart = reportValidator.indexOf('function playwrightReportContainsPath');
+const playwrightMatcherEnd = reportValidator.indexOf('\n}', playwrightMatcherStart);
+assert(playwrightMatcherStart >= 0 && playwrightMatcherEnd > playwrightMatcherStart, 'Playwright report matcher is missing');
+assert(!reportValidator.slice(playwrightMatcherStart, playwrightMatcherEnd).includes('endsWith('), 'Playwright report matching must not accept suffix-only path identity');
+assert(reportValidator.includes('report.config?.rootDir') && reportValidator.includes('resolveWorkspaceRoot(reportRootDir, workspaceRoot)'), 'relative Playwright report paths must resolve against validated JSON config.rootDir metadata');
 assert(runner.includes('realpathSync(resolved)'), 'selected paths must be checked after symlink resolution');
 assert(runner.includes("delete env.PADDLE_SANDBOX"), 'live browser runner must clear sandbox mode');
 assert(runner.includes("delete env.VERCEL_ENV"), 'live browser runner must clear deployment mode');

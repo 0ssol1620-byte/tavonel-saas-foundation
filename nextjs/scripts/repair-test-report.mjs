@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
 
 function requireObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} is malformed.`);
@@ -10,6 +11,28 @@ function requireCount(value, label) {
   return value;
 }
 
+function resolveReportPath(value, workspaceRoot) {
+  if (typeof value !== 'string' || !value) return '';
+  const normalized = value.replaceAll('\\', '/');
+  if (normalized.split('/').some(segment => segment === '.' || segment === '..')) return '';
+  const root = resolve(workspaceRoot);
+  const absolute = isAbsolute(normalized) ? resolve(normalized) : resolve(root, normalized);
+  const fromRoot = relative(root, absolute);
+  if (!fromRoot || fromRoot === '..' || fromRoot.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(fromRoot)) return '';
+  return absolute;
+}
+
+function resolveWorkspaceRoot(value, workspaceRoot) {
+  if (typeof value !== 'string' || !value) return '';
+  const normalized = value.replaceAll('\\', '/');
+  if (!isAbsolute(normalized) || normalized.split('/').some(segment => segment === '.' || segment === '..')) return '';
+  const root = resolve(workspaceRoot);
+  const absolute = resolve(normalized);
+  const fromRoot = relative(root, absolute);
+  if (fromRoot === '..' || fromRoot.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(fromRoot)) return '';
+  return absolute;
+}
+
 function normalizeReportPath(value) {
   return typeof value === 'string' ? value.replaceAll('\\', '/') : '';
 }
@@ -17,6 +40,20 @@ function normalizeReportPath(value) {
 function reportContainsPath(reportPath, selectedPath) {
   const actual = normalizeReportPath(reportPath);
   return actual === selectedPath || actual.endsWith(`/${selectedPath}`);
+}
+
+function playwrightReportContainsPath(reportPath, selectedPath, workspaceRoot, reportRootDir) {
+  const selected = resolveReportPath(selectedPath, workspaceRoot);
+  if (!selected || typeof reportPath !== 'string' || !reportPath) return false;
+  const normalized = reportPath.replaceAll('\\', '/');
+  let actual;
+  if (isAbsolute(normalized)) actual = resolveReportPath(normalized, workspaceRoot);
+  else {
+    const reportRoot = resolveWorkspaceRoot(reportRootDir, workspaceRoot);
+    if (!reportRoot) return false;
+    actual = resolveReportPath(normalized, reportRoot);
+  }
+  return Boolean(actual && actual === selected);
 }
 
 export function validateVitestReport(report, selectedFiles) {
@@ -77,7 +114,7 @@ function collectPlaywrightTests(suites, output = []) {
   return output;
 }
 
-export function validatePlaywrightReport(report, selectedFiles) {
+export function validatePlaywrightReport(report, selectedFiles, workspaceRoot = process.cwd()) {
   requireObject(report, 'Playwright JSON report');
   if (!Array.isArray(report.suites) || selectedFiles.length === 0) throw new Error('Playwright JSON report is missing required suite data.');
   requireObject(report.stats, 'Playwright report stats');
@@ -89,8 +126,9 @@ export function validatePlaywrightReport(report, selectedFiles) {
   let flaky = 0;
   let failed = 0;
   const missing = [];
+  const reportRootDir = report.config?.rootDir;
   for (const file of selectedFiles) {
-    const matches = tests.filter(entry => reportContainsPath(entry.file, file));
+    const matches = tests.filter(entry => playwrightReportContainsPath(entry.file, file, workspaceRoot, reportRootDir));
     if (matches.length === 0) { missing.push(file); continue; }
     let filePassed = 0;
     for (const { test } of matches) {
@@ -130,4 +168,4 @@ function readJsonReport(path, label) {
 }
 
 export const readAndValidateVitestReport = (path, selectedFiles) => validateVitestReport(readJsonReport(path, 'Vitest'), selectedFiles);
-export const readAndValidatePlaywrightReport = (path, selectedFiles) => validatePlaywrightReport(readJsonReport(path, 'Playwright'), selectedFiles);
+export const readAndValidatePlaywrightReport = (path, selectedFiles, workspaceRoot = process.cwd()) => validatePlaywrightReport(readJsonReport(path, 'Playwright'), selectedFiles, workspaceRoot);

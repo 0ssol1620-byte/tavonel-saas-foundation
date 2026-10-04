@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { buildRepairPlan, collectChangedPaths, normalizePath, AUDITED_REPAIR_ANCHOR_SHA } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
-import { auditBrowserFiles, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
+import { auditBrowserFiles, browserRunOutputDir, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
@@ -452,19 +452,67 @@ test('Vitest JSON reports require executed passing tests for each selected file 
 });
 
 test('Playwright JSON reports require executed passing tests per selected file and preserve skipped counts', () => {
+  const workspaceRoot = resolve(tmpdir(), 'repair-playwright-report-root');
   const passing = {
+    config: { rootDir: resolve(workspaceRoot, 'e2e') },
     stats: { expected: 1, skipped: 1, unexpected: 0, flaky: 0 },
     suites: [{
-      file: '/work/nextjs/e2e/selected.spec.ts',
+      file: 'site-nav.spec.ts',
       specs: [{ tests: [
         { status: 'expected', results: [{ status: 'passed' }] },
         { status: 'skipped', results: [{ status: 'skipped' }] },
       ] }],
     }],
   };
-  assert.deepEqual(validatePlaywrightReport(passing, ['e2e/selected.spec.ts']), { files: 1, passed: 1, skipped: 1, flaky: 0, failed: 0 });
-  assert.throws(() => validatePlaywrightReport({ ...passing, stats: { ...passing.stats, expected: 0 }, suites: [{ file: '/work/nextjs/e2e/selected.spec.ts', specs: [{ tests: [{ status: 'skipped', results: [{ status: 'skipped' }] }] }] }] }, ['e2e/selected.spec.ts']), /no executed passing test/);
-  assert.throws(() => validatePlaywrightReport(passing, ['e2e/missing.spec.ts']), /omitted selected file/);
+  const selected = ['e2e/site-nav.spec.ts'];
+  assert.deepEqual(validatePlaywrightReport(passing, selected, workspaceRoot), { files: 1, passed: 1, skipped: 1, flaky: 0, failed: 0 });
+  const absolute = { suites: [{ ...passing.suites[0], file: resolve(workspaceRoot, 'e2e/site-nav.spec.ts') }], stats: passing.stats };
+  assert.deepEqual(validatePlaywrightReport(absolute, selected, workspaceRoot), { files: 1, passed: 1, skipped: 1, flaky: 0, failed: 0 });
+  for (const [rootDir, file] of [
+    [resolve(workspaceRoot, 'other'), 'site-nav.spec.ts'],
+    [resolve(workspaceRoot, 'e2e'), '../e2e/site-nav.spec.ts'],
+    [workspaceRoot, 'site-nav.spec.ts'],
+  ]) {
+    const mismatched = {
+      ...passing,
+      config: { rootDir },
+      suites: [{ ...passing.suites[0], file }],
+    };
+    assert.throws(() => validatePlaywrightReport(mismatched, selected, workspaceRoot), /omitted selected file/);
+  }
+  const missingRoot = { ...passing, config: undefined };
+  assert.throws(() => validatePlaywrightReport(missingRoot, selected, workspaceRoot), /omitted selected file/);
+  const outsideRoot = { ...passing, config: { rootDir: resolve(workspaceRoot, '..', 'outside') } };
+  assert.throws(() => validatePlaywrightReport(outsideRoot, selected, workspaceRoot), /omitted selected file/);
+  const traversalRoot = { ...passing, config: { rootDir: `${resolve(workspaceRoot, 'e2e')}\\..\\outside` } };
+  assert.throws(() => validatePlaywrightReport(traversalRoot, selected, workspaceRoot), /omitted selected file/);
+  assert.throws(() => validatePlaywrightReport({ ...passing, stats: { ...passing.stats, expected: 0 }, suites: [{ file: 'site-nav.spec.ts', specs: [{ tests: [{ status: 'skipped', results: [{ status: 'skipped' }] }] }] }] }, selected, workspaceRoot), /no executed passing test/);
+  assert.throws(() => validatePlaywrightReport(passing, ['e2e/missing.spec.ts'], workspaceRoot), /omitted selected file/);
+});
+
+test('browser invocations use distinct output directories so later Playwright runs preserve earlier screenshots', () => {
+  const workspaceRoot = resolve(tmpdir(), 'repair-playwright-output-root');
+  const first = browserRunOutputDir(workspaceRoot, 0);
+  const second = browserRunOutputDir(workspaceRoot, 1);
+  assert.notEqual(first, second);
+  assert.equal(first, resolve(workspaceRoot, 'test-results/repair-scope-playwright-1'));
+  assert.equal(second, resolve(workspaceRoot, 'test-results/repair-scope-playwright-2'));
+  assert.throws(() => browserRunOutputDir(workspaceRoot, -1), /non-negative integer/);
+
+  const screenshots = [
+    'public-ui-desktop-1440x900-docs-mcp.png',
+    'public-ui-desktop-1440x900-home.png',
+    'public-ui-desktop-1440x900-pricing.png',
+    'public-ui-mobile-390x844-docs-mcp.png',
+    'public-ui-mobile-390x844-home.png',
+    'public-ui-mobile-390x844-pricing.png',
+  ];
+  mkdirSync(first, { recursive: true });
+  for (const screenshot of screenshots) writeFileSync(resolve(first, screenshot), 'screenshot');
+  mkdirSync(second, { recursive: true });
+  writeFileSync(resolve(second, 'later-run-output.txt'), 'later run');
+  rmSync(second, { recursive: true, force: true });
+  assert.deepEqual(readdirSync(first).sort(), screenshots.sort());
 });
 
 test('failed, skipped, unrun, or apparent-success database results cannot pass an unrun rehearsal', () => {

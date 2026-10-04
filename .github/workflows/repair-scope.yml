@@ -49,6 +49,10 @@ jobs:
         id: selector-tests
         if: steps.plan.outputs.selector_tests == 'true'
         run: node --test scripts/repair-scope.test.mjs
+      - name: Run browser report and screenshot regressions
+        id: browser-report-tests
+        if: steps.plan.outputs.workflow_static == 'true'
+        run: node --test scripts/repair-scope.test.mjs
       - run: pnpm install --frozen-lockfile
       - name: Scan repository secrets
         id: secrets
@@ -83,6 +87,7 @@ jobs:
           ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
            (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         run: pnpm exec playwright install --with-deps chromium
         continue-on-error: true
@@ -96,6 +101,7 @@ jobs:
           ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
            (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         env:
           COMMERCIAL_MODE: live
@@ -121,9 +127,17 @@ jobs:
         if: always() && steps.plan.outputs.public_ui_capture == 'true' && steps.browser.outcome != 'skipped'
         shell: bash
         run: |
-          mapfile -t screenshots < <(find nextjs/test-results -type f -name 'public-ui-*.png' -print 2>/dev/null | sort)
-          if (( ${#screenshots[@]} != 6 )); then
-            echo "::error::Expected exactly six public-ui PNGs; found ${#screenshots[@]}."
+          mapfile -t screenshots < <(find test-results/repair-scope-playwright-* -type f -name 'public-ui-*.png' -printf '%f\n' 2>/dev/null | sort)
+          expected=(
+            public-ui-desktop-1440x900-docs-mcp.png
+            public-ui-desktop-1440x900-home.png
+            public-ui-desktop-1440x900-pricing.png
+            public-ui-mobile-390x844-docs-mcp.png
+            public-ui-mobile-390x844-home.png
+            public-ui-mobile-390x844-pricing.png
+          )
+          if (( ${#screenshots[@]} != ${#expected[@]} )) || ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${screenshots[@]}"); then
+            echo "::error::Expected the exact six paired public-ui PNGs; found ${#screenshots[@]}."
             exit 1
           fi
       - name: Upload bounded public UI screenshots
