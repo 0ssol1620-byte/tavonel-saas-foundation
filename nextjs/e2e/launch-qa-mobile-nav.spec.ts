@@ -1,7 +1,7 @@
 /**
  * The customer mobile menu, exercised in Chromium, Firefox and WebKit.
  *
- * The public header exposes four section choices: Product, How it works, Resources and Docs.
+ * The public header exposes Product, Explore and Developers; Pricing stays the emphasized header action.
  * Pricing is the one emphasized header action. Trust, legal and the remaining
  * technical destinations stay in the footer/docs instead of becoming nested disclosures in the
  * phone menu. These tests keep the parts
@@ -19,9 +19,8 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 const CUSTOMER_LINKS = [
   { label: "Product", href: "/product" },
-  { label: "How it works", href: "/knowledge-compiler" },
-  { label: "Resources", href: "/resources" },
-  { label: "Docs", href: "/docs" },
+  { label: "Explore", href: "/explore" },
+  { label: "Developers", href: "/developers" },
 ] as const;
 
 async function openMenu(page: Page) {
@@ -58,23 +57,30 @@ test("the mobile menu ships only the customer choices and one commercial action"
 });
 
 /*
-  Landing V2: /sources lost its owner when Integrations left the bar, and /research gained one.
-
-  The rule this was written for is unchanged -- a page the bar speaks for is marked, and the bar
-  does not grow a sixth choice to say so. What changed is which page that is: Resources speaks for
-  the five hub pages with no item of their own, and nothing speaks for /sources, which is a footer
-  row. Marking some other item current there would tell a reader something false about where they
-  are, so the second test asserts the mark is absent.
+  The Developers entry owns the existing documentation and API routes. Explore is the public
+  sample itself; research pages remain reachable through the footer.
 */
-test("Resources owns the hub pages without adding another top-level choice", async ({ page }) => {
-  await page.goto("/research");
+test("Developers owns its documentation routes", async ({ page }) => {
+  await page.goto("/docs/mcp");
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
-  await expect(panel.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(panel.getByRole("link", { name: "Developers", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("no customer choice claims a page the bar does not own", async ({ page }) => {
   await page.goto("/sources");
+  const { panel } = await openMenu(page);
+  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+});
+
+test("Research stays footer-reachable without a false section owner", async ({ page }) => {
+  await page.goto("/");
+  const researchLink = page.locator('footer.site a[href="/research"]').first();
+  await researchLink.scrollIntoViewIfNeeded();
+  await expect(researchLink).toBeVisible();
+  await researchLink.click();
+  await expect(page).toHaveURL(/\\/research$/);
+
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
 });
@@ -90,15 +96,15 @@ test("Escape closes the menu and returns focus to the control that opened it", a
 test("following a customer link closes the menu", async ({ page }) => {
   await page.goto("/");
   const { panel } = await openMenu(page);
-  const docs = panel.getByRole("link", { name: "Docs", exact: true });
+  const developers = panel.getByRole("link", { name: "Developers", exact: true });
   // The destination is separately direct-entry tested by the launch route suite. Abort this one
   // navigation so the assertion measures the interaction contract itself: the disclosure closes
   // synchronously on activation, before the destination network request can complete or fail.
-  await page.route("**/docs", route => route.abort());
+  await page.route("**/developers", route => route.abort());
   // Windows WebKit's headless compositor can stall while Playwright performs a forced pointer
   // click on a native <details> descendant. dispatchEvent still sends the real DOM click that
   // React handles here, but removes the unrelated compositor/actionability bridge from this test.
-  await docs.dispatchEvent("click");
+  await developers.dispatchEvent("click");
   await expect(panel).toBeHidden();
 });
 

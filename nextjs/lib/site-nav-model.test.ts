@@ -181,7 +181,7 @@ describe("the global menu's destinations", () => {
 });
 
 /*
-  Landing V2, 2026-09-19 (blueprint §8, contract D2). The bar a reader actually sees.
+  Landing V2, 2026-09-19 (blueprint §8, contract D2). The public destinations a reader actually sees.
 
   Everything above this describes `NAV_GROUPS`, which is the 2026-09-11 IA model and is rendered
   by nothing today -- `app/tavonel.css` records where its disclosures used to be. `CUSTOMER_NAV`
@@ -190,7 +190,16 @@ describe("the global menu's destinations", () => {
   are silent in a browser: a bar link to a route the site does not publish, and a /ko header with
   an English label in it because the Korean table was not extended with the bar.
 */
-describe("the five destinations in the bar", () => {
+describe("the four destinations in the bar", () => {
+  it("shows Product, Explore, Developers and Pricing in the requested order", () => {
+    expect(CUSTOMER_NAV).toEqual([
+      { href: "/product", label: "Product" },
+      { href: "/explore", label: "Explore" },
+      { href: "/developers", label: "Developers" },
+      { href: "/pricing", label: "Pricing" },
+    ]);
+  });
+
   it("offers no link the site cannot answer", () => {
     for (const item of CUSTOMER_NAV) {
       expect(SITEMAP_PATHS.has(item.href), `${item.href} is not in app/sitemap.ts`).toBe(true);

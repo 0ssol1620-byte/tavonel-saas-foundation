@@ -1,5 +1,5 @@
 /**
- * The global menu, as a reader uses it: five destinations in the bar, the rest in the footer.
+ * The public header, as a reader uses it: Product, Explore and Developers, with Pricing as its action.
  *
  * The five questions below are the design document's own find-tasks (§12) and they are still why
  * this file exists. What changed is the IA that answers them. The 2026-09-17 brand-quality pass
@@ -83,10 +83,14 @@ const TASKS = [
     question: "what worked example can I follow, and what does it produce?",
     trail: ["/resources", "/explore"],
   },
+  {
+    question: "where can I read about ongoing research?",
+    trail: ["/research"],
+  },
 ] as const;
 
 /** The four section links; Pricing has its own emphasized header control. */
-const CUSTOMER_HREFS = ["/product", "/knowledge-compiler", "/resources", "/docs"] as const;
+const CUSTOMER_HREFS = ["/product", "/explore", "/developers"] as const;
 
 const BAR = 'header.nav nav[aria-label="Sections"]';
 const SHEET = "header.nav details.mobile-primary-nav";
@@ -137,7 +141,7 @@ const DESKTOP: Scenario[] = [
     run: (page: Page) => followTrail(page, task.trail),
   })),
   {
-    name: "the bar publishes the four sections and the header offers Pricing",
+    name: "the bar publishes Product, Explore and Developers, with Pricing as its action",
     width: 1440,
     run: async (page) => {
       await page.goto("/");
@@ -164,26 +168,30 @@ const DESKTOP: Scenario[] = [
       value assistive technology acts on, and the reason the two CSS rules that styled "true"
       never matched anything.
 
-      /research is the case worth measuring rather than /resources itself: it is one of the five
-      pages the hub collects that have no bar item of their own, so the mark appears there only if
-      `NAV_ALSO_OWNS` is wired up, and that is exactly the kind of mapping that silently stops
-      covering a path. The second half is the failure path -- /sources lost its owner when
-      Integrations left the bar, and no item may claim it.
+      /docs/mcp is the case worth measuring: Developers owns the existing documentation route even
+       though its URL is nested. Research is still reachable from the shared footer, but no direct
+       primary item claims it. The second half is /sources, which remains unowned as well.
     */
     name: "the link that owns the page being read is marked, and no other is",
     width: 1440,
     run: async (page) => {
-      await page.goto("/research");
-      await expect(page.locator(`${BAR} a[href="/resources"]`)).toHaveAttribute("aria-current", "page");
-      await expect(page.locator(`${BAR} a[href="/docs"]`)).not.toHaveAttribute("aria-current", "page");
+      await page.goto("/docs/mcp");
+      await expect(page.locator(`${BAR} a[href="/developers"]`)).toHaveAttribute("aria-current", "page");
+      await expect(page.locator(`${BAR} a[href="/explore"]`)).not.toHaveAttribute("aria-current", "page");
       expect(
         await page.locator(`${BAR} a[aria-current]`).count(),
         "more than one bar link claims to be the page being read",
       ).toBe(1);
+      await page.goto("/research");
+      expect(
+        await page.locator(`${BAR} a[aria-current]`).count(),
+        "Research must stay unowned by a different primary section",
+      ).toBe(0);
+      await expect(page.locator('footer.site a[href="/research"]').first()).toHaveAttribute("href", "/research");
       await page.goto("/sources");
       expect(
         await page.locator(`${BAR} a[aria-current]`).count(),
-        "a bar link claims /sources, which no item in the five-link bar owns",
+        "a bar link claims /sources, which no visible section owns",
       ).toBe(0);
     },
   },
@@ -210,7 +218,13 @@ const DESKTOP: Scenario[] = [
 
 const PHONE: Scenario[] = [
   {
-    name: "the phone sheet offers the same four sections as the bar, flat",
+    name: "Docs remains reachable from the footer and within the reading flow on phone",
+    width: 390,
+    touch: true,
+    run: (page: Page) => followTrail(page, ["/docs", "/docs/mcp"]),
+  },
+  {
+    name: "the phone sheet offers the same three sections as the bar, flat",
     width: 390,
     touch: true,
     run: async (page) => {
@@ -310,6 +324,35 @@ test.describe("chromium", () => {
     });
   }
 });
+
+const PUBLIC_UI_REVIEW_ROUTES = [
+  { path: "/", name: "home" },
+  { path: "/pricing", name: "pricing" },
+  { path: "/docs/mcp", name: "docs-mcp" },
+] as const;
+
+const PUBLIC_UI_REVIEW_VIEWPORTS = [
+  { name: "desktop-1440x900", viewport: { width: 1440, height: 900 }, hasTouch: false },
+  { name: "mobile-390x844", viewport: { width: 390, height: 844 }, hasTouch: true },
+] as const;
+
+for (const review of PUBLIC_UI_REVIEW_VIEWPORTS) {
+  test.describe(`public UI visual review ${review.name}`, () => {
+    test.use({ viewport: review.viewport, hasTouch: review.hasTouch });
+    test("captures Home, Pricing and Docs", async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "site-nav uses the 1440 project for its explicit review viewports");
+      for (const route of PUBLIC_UI_REVIEW_ROUTES) {
+        await page.goto(route.path, { waitUntil: "domcontentloaded" });
+        await expect(page).toHaveURL(arrivedAt(route.path));
+        await expect(page.locator("header.nav")).toBeVisible();
+        await expect(page.locator("main h1").first()).toBeVisible();
+        await page.screenshot({
+          path: testInfo.outputPath(`public-ui-${review.name}-${route.name}.png`),
+        });
+      }
+    });
+  });
+}
 
 /*
   The same scenarios in WebKit: one browser, one context per width.

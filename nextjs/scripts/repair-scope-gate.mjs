@@ -8,8 +8,9 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
   const gateFailures = [...failures];
   if (headSha !== plan.headSha) gateFailures.push(`exact checkout SHA mismatch: ${headSha ?? 'missing'}`);
   const runResults = {};
-  const pendingDebt = new Set();
+  const pendingDebt = new Set(plan.pendingQualificationDebt ?? []);
   const passedGroupAnchors = {};
+  const browserRequired = plan.runDetailIntegrity || plan.browserFiles.length > 0;
 
   for (const group of plan.groups) {
     if (deferred.has(group)) {
@@ -48,12 +49,12 @@ function runGate() {
   const env = process.env;
   const requirements = [
     ['plan', env.PLAN_RESULT], ['secret scan', env.SECRET_RESULT], ['pnpm check', env.CHECK_RESULT],
-    [plan.runFullHermeticVitest ? 'hermetic Vitest' : 'targeted Vitest', env.VITEST_RESULT],
+    [plan.runFullHermeticVitest ? 'hermetic Vitest' : (plan.unitFiles.length ? 'targeted Vitest' : 'selected unit tests'), env.VITEST_RESULT],
     [plan.runFullHermeticVitest ? 'test:scripts' : 'alias auth/contract tests', env.AUX_RESULT],
     ['workflow static gates', plan.runWorkflowStaticGate ? env.WORKFLOW_RESULT : 'success'],
-    ['Chromium install', plan.runDetailIntegrity ? env.BROWSER_INSTALL_RESULT : 'success'],
-    ['single production build', plan.runDetailIntegrity ? env.BROWSER_BUILD_RESULT : 'success'],
-    ['detail-integrity browser checks', env.BROWSER_RESULT],
+    ['Chromium install', browserRequired ? env.BROWSER_INSTALL_RESULT : 'success'],
+    ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
+    ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
   if (plan.groups.includes('selector-config')) requirements.push(['selector regression tests', env.SELECTOR_TEST_RESULT]);
   const failures = requirements.filter(([, result]) => result !== 'success').map(([name, result]) => `${name}: ${result ?? 'not run'}`);

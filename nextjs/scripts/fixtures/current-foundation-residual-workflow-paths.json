@@ -1,30 +1,75 @@
 {
-  "source": "verified GitHub compare d290..fc7; exact path set for NUL-delimited Git-input regression, plus capability route under review",
-  "repairAnchorSha": "d2906acde291b77b73229623733736796f4fb8c8",
+  "source": "authenticated Repair full-pass artifact and GitHub compare for PR 141",
+  "repairAnchorSha": "6401c3524b5294f3a395acede35e4632eb89c0fb",
   "pullRequestBaseSha": "7a7b4fed9e7d45ec596057f7f1cc5d0672465326",
-  "headSha": "fc7b1dcfddc8cf2c318dfe5cb70c215bd06d5243",
-  "residualPaths": [
-    "nextjs/app/api/openapi/route.ts",
-    "nextjs/app/api/v1/uploads/approval/cancel/route.ts",
-    "nextjs/app/api/v1/uploads/approval/route.ts",
-    "nextjs/app/api/v1/uploads/confirm/route.ts",
-    "nextjs/app/api/v1/uploads/release/route.ts",
-    "nextjs/e2e/detail-integrity.spec.ts",
-    "nextjs/lib/api-error-codes.ts",
-    "nextjs/lib/api-reference.ts",
-    "nextjs/lib/developer-distribution.test.ts",
-    "nextjs/lib/docs-content.ts",
-    "nextjs/lib/docs-endpoints.ts",
-    "nextjs/lib/openapi-compile-jobs.test.ts",
-    "nextjs/lib/openapi-completeness.test.ts",
-    "nextjs/lib/openapi-contract.test.ts",
-    "nextjs/lib/openapi-response-shape.test.ts",
-    "nextjs/lib/openapi-routes.test.ts",
-    "nextjs/lib/retrieval-docs-parity.test.ts"
+  "headSha": "6401c3524b5294f3a395acede35e4632eb89c0fb",
+  "historicalPathsAtAnchor": [
+    "nextjs/lib/developer-store.ts",
+    "nextjs/lib/developer-store.test.ts",
+    "nextjs/scripts/source-agent/test_source_agent.py"
   ],
-  "workflowAndSelectorPaths": [
+  "reviewedSiteChromeScope": {
+    "sourcePaths": [
+      "nextjs/app/chrome-v2.css",
+      "nextjs/app/paper-product.css",
+      "nextjs/lib/site-navigation.ts"
+    ],
+    "contractTests": [
+      "nextjs/lib/one-path-contract.test.ts",
+      "nextjs/lib/site-nav-model.test.ts"
+    ],
+    "responsiveBrowserTests": [
+      "nextjs/e2e/launch-qa-mobile-nav.spec.ts",
+      "nextjs/e2e/site-nav.spec.ts"
+    ]
+  },
+  "reviewedFilmScope": {
+    "sourcePath": "nextjs/components/compile-stage-player.tsx",
+    "unitTestPath": "nextjs/lib/film-motion-control.test.ts",
+    "browserTestPath": "nextjs/e2e/landing-hero-mobile.spec.ts"
+  },
+  "reviewedLandingFilmContinuity": {
+    "sourcePaths": [
+      "nextjs/app/landing-v2.css",
+      "nextjs/components/landing-v2/landing-page.tsx",
+      "nextjs/components/landing-v2/hero-film.tsx"
+    ],
+    "landingUnitTestPath": "nextjs/lib/landing-v2-recompile.test.ts",
+    "filmUnitTestPath": "nextjs/lib/film-motion-control.test.ts",
+    "browserTestPath": "nextjs/e2e/landing-hero-mobile.spec.ts",
+    "browserProjects": ["360", "390"]
+  },
+  "reviewedLandingFilmDisclosure": {
+    "sourcePath": "nextjs/components/landing-v2/hero-film-disclosure.tsx",
+    "unitTestPaths": [
+      "nextjs/lib/landing-v2-recompile.test.ts",
+      "nextjs/lib/film-motion-control.test.ts"
+    ],
+    "browserTestPath": "nextjs/e2e/landing-hero-film-loading.spec.ts",
+    "browserProjects": ["390"],
+    "coverage": ["English and Korean", "reduced and allowed motion", "keyboard open", "no film or film assets before open"]
+  },
+  "pairedPublicUiCaptureCandidate": {
+    "paths": [
+      "nextjs/app/chrome-v2.css",
+      "nextjs/app/landing-v2.css",
+      "nextjs/app/paper-product.css",
+      "nextjs/components/landing-v2/hero-film-disclosure.tsx",
+      "nextjs/components/landing-v2/hero-film.tsx",
+      "nextjs/components/landing-v2/landing-page.tsx",
+      "nextjs/e2e/landing-hero-film-loading.spec.ts",
+      "nextjs/e2e/launch-qa-mobile-nav.spec.ts",
+      "nextjs/e2e/site-nav.spec.ts",
+      "nextjs/lib/one-path-contract.test.ts",
+      "nextjs/lib/site-nav-model.test.ts",
+      "nextjs/lib/site-navigation.ts"
+    ],
+    "captureSpecPath": "nextjs/e2e/site-nav.spec.ts",
+    "requiredScreenshotCount": 6,
+    "exactPathSetOnly": true
+  },
+  "postAnchorWorkflowAndSelectorPaths": [
     ".github/workflows/ci.yml",
-    ".github/workflows/launch-qa.yml",
     ".github/workflows/repair-scope.yml",
     "nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json",
     "nextjs/scripts/repair-scope-gate.mjs",

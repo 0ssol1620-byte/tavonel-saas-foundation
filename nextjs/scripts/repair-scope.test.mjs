@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { buildRepairPlan, collectChangedPaths, normalizePath, AUDITED_REPAIR_ANCHOR_SHA } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
-import { auditBrowserFiles, isInsideWorkspace, liveBrowserEnv, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
+import { auditBrowserFiles, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
+import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
 const testHeadSha = 'b'.repeat(40);
@@ -23,17 +24,21 @@ function planFor(paths, overrides = {}) {
   });
 }
 
-test('actual d290-to-fc7 delta plus capability route flows through NUL-delimited Git collection', () => {
+test('6401 anchor excludes historical developer-store changes from the current delta', () => {
   const repoRoot = mkdtempSync(resolve(tmpdir(), 'repair-scope-git-'));
   try {
     execFileSync('git', ['init', '-q'], { cwd: repoRoot, shell: false });
     execFileSync('git', ['config', 'core.autocrlf', 'false'], { cwd: repoRoot, shell: false });
     execFileSync('git', ['config', 'user.name', 'Scope Test'], { cwd: repoRoot, shell: false });
     execFileSync('git', ['config', 'user.email', 'scope-test@example.invalid'], { cwd: repoRoot, shell: false });
-    execFileSync('git', ['commit', '--allow-empty', '-m', 'audited anchor fixture'], { cwd: repoRoot, shell: false });
+    const historicalFile = resolve(repoRoot, 'nextjs/lib/developer-store.ts');
+    mkdirSync(dirname(historicalFile), { recursive: true });
+    writeFileSync(historicalFile, 'historical change already included in the reviewed full-pass anchor\n');
+    execFileSync('git', ['add', '--all'], { cwd: repoRoot, shell: false });
+    execFileSync('git', ['commit', '-m', 'authenticated full-pass anchor fixture'], { cwd: repoRoot, shell: false });
     const anchor = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8', shell: false }).trim();
 
-    const actualDelta = [...fixture.residualPaths, ...fixture.workflowAndSelectorPaths, fixture.reviewedCapabilityRoutePath].sort();
+    const actualDelta = [...fixture.postAnchorWorkflowAndSelectorPaths, fixture.reviewedCapabilityRoutePath].sort();
     for (const path of actualDelta) {
       const target = resolve(repoRoot, ...path.split('/'));
       mkdirSync(dirname(target), { recursive: true });
@@ -52,24 +57,35 @@ test('actual d290-to-fc7 delta plus capability route flows through NUL-delimited
     assert.equal(plan.runFullHermeticVitest, false);
     assert.equal(plan.runWorkflowStaticGate, true);
 
-    assert.deepEqual(plan.browserFiles, ['e2e/detail-integrity.spec.ts']);
-    assert.ok(plan.groups.includes('docs'));
-    assert.ok(plan.groups.includes('openapi'));
-    assert.ok(plan.groups.includes('alias-auth'));
+    assert.deepEqual(plan.browserFiles, []);
     assert.ok(plan.groups.includes('upload-intake'));
-    assert.ok(plan.groups.includes('browser-regression'));
     for (const file of [
-      'lib/openapi-routes.test.ts', 'lib/openapi-response-shape.test.ts',
-      'lib/api-error-codes.test.ts', 'lib/connector-contract.test.ts',
-      'lib/connector-oauth-route.test.ts', 'lib/intake-approval-route.test.ts',
+      'lib/api-error-codes.test.ts', 'lib/intake-approval-route.test.ts',
       'lib/upload-confirm-route.test.ts', 'lib/upload-release-route.test.ts',
       'lib/customer-data-admission-routes.test.ts', 'lib/source-intake.test.ts',
     ]) assert.ok(plan.unitFiles.includes(file), `missing selected coverage: ${file}`);
     assert.ok(plan.unitFiles.length < 40, 'must remain scoped, not select the 6,237-test suite');
     assert.equal(plan.pullRequestBaseSha, fixture.pullRequestBaseSha);
     assert.equal(plan.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
+    assert.equal(plan.repairAnchorSha, fixture.repairAnchorSha);
+    assert.ok(!plan.changedPaths.includes('lib/developer-store.ts'));
+    assert.deepEqual(plan.unknownPaths, []);
     assert.equal(plan.fullQualification, 'pending');
     assert.ok(plan.pendingFullDebt.includes('PR-base full CI'));
+    assert.equal(plan.pendingFullDebt.length, 4);
+    assert.deepEqual(plan.pendingQualificationDebt, []);
+    assert.equal(plan.databaseRehearsalStatus, 'baseline-pgtap-passed-latest-migration-not-replayed-37172599535');
+    assert.deepEqual(plan.databaseBaselineEvidence, {
+      runId: 37172599535,
+      commit: '6401c3524b5294f3a395acede35e4632eb89c0fb',
+      pullRequestBaseSha: '7a7b4fed9e7d45ec596057f7f1cc5d0672465326',
+      conclusion: 'success',
+      pgTapPassedPerRun: 1333,
+      pgTapRuns: 2,
+      latestMigrationReplayed: false,
+      latestMigrationReplayEvidence: 'not replayed by the recorded replay list',
+    });
+    assert.ok(!buildRepairReceipt(plan, { headSha: plan.headSha }).pendingDebt.includes('database-contract'));
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }
@@ -77,8 +93,7 @@ test('actual d290-to-fc7 delta plus capability route flows through NUL-delimited
 
 test('reviewed API reference and docs endpoint repairs stay scoped to contract, distribution, and detail checks', () => {
   const actualDelta = [
-    ...fixture.residualPaths,
-    ...fixture.workflowAndSelectorPaths,
+    ...fixture.postAnchorWorkflowAndSelectorPaths,
     ...fixture.reviewedApiReferenceRepairPaths,
   ];
   const plan = planFor(actualDelta);
@@ -101,7 +116,7 @@ test('reviewed API reference and docs endpoint repairs stay scoped to contract, 
   }
   assert.ok(plan.groups.includes('docs'));
   assert.ok(plan.groups.includes('openapi'));
-  assert.equal(plan.runDetailIntegrity, true);
+  assert.equal(plan.runDetailIntegrity, false);
   assert.equal(plan.fullQualification, 'pending');
   assert.ok(plan.pendingFullDebt.includes('PR-base full CI'));
 
@@ -119,6 +134,151 @@ test('reviewed API reference and docs endpoint repairs stay scoped to contract, 
   assert.ok(productionOnly.unitFiles.includes('lib/docs-content.test.ts'));
   assert.ok(productionOnly.unitFiles.includes('lib/openapi-routes.test.ts'));
   assert.ok(productionOnly.unitFiles.includes('lib/developer-distribution.test.ts'));
+});
+
+test('shared chrome-only fit changes select navigation contracts and desktop/mobile browser coverage', () => {
+  const plan = planFor([fixture.reviewedSiteChromeScope.sourcePaths[0]]);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.runScriptContracts, false);
+  assert.deepEqual(plan.unitFiles, ['lib/one-path-contract.test.ts', 'lib/site-nav-model.test.ts']);
+  assert.deepEqual(plan.browserFiles, ['e2e/launch-qa-mobile-nav.spec.ts', 'e2e/site-nav.spec.ts']);
+  assert.equal(plan.runDetailIntegrity, false);
+  assert.equal(plan.fullQualification, 'pending');
+
+  const productCss = planFor(['nextjs/app/paper-product.css']);
+  assert.deepEqual(productCss.unitFiles, [
+    'lib/landing-v2-page.test.ts',
+    'lib/one-path-contract.test.ts',
+    'lib/site-nav-model.test.ts',
+  ]);
+});
+
+test('film motion control changes select its contract test and mobile hero browser regression', () => {
+  const plan = planFor([fixture.reviewedFilmScope.sourcePath]);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.unitFiles, ['lib/film-motion-control.test.ts']);
+  assert.deepEqual(plan.browserFiles, ['e2e/landing-hero-mobile.spec.ts']);
+  assert.equal(plan.runDetailIntegrity, false);
+});
+
+test('landing film continuity paths select only their reviewed landing/film contracts and phone E2E', () => {
+  const scope = fixture.reviewedLandingFilmContinuity;
+  const landingUnit = scope.landingUnitTestPath.replace(/^nextjs\//, '');
+  const filmUnit = scope.filmUnitTestPath.replace(/^nextjs\//, '');
+  const browser = scope.browserTestPath.replace(/^nextjs\//, '');
+
+  for (const [index, sourcePath] of scope.sourcePaths.slice(0, 2).entries()) {
+    const plan = planFor([sourcePath]);
+    assert.deepEqual(plan.unknownPaths, []);
+    assert.deepEqual(plan.unitFiles, index === 0
+      ? ['lib/landing-v2-recompile.test.ts', 'lib/landing-v2-tokens.test.ts']
+      : ['lib/landing-v2-page.test.ts', landingUnit].sort());
+    assert.deepEqual(plan.browserFiles, [browser]);
+    assert.equal(plan.runFullHermeticVitest, false);
+    assert.deepEqual(planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map(run => run.project), ['390', '360']);
+  }
+
+  const filmPlan = planFor([scope.sourcePaths[2]]);
+  assert.deepEqual(filmPlan.unknownPaths, []);
+  assert.deepEqual(filmPlan.unitFiles, [filmUnit, landingUnit].sort());
+  assert.deepEqual(filmPlan.browserFiles, [browser]);
+  assert.deepEqual(planBrowserRuns(filmPlan.browserFiles, filmPlan.runDetailIntegrity).map(run => run.project), ['390', '360']);
+
+  const e2eOnly = planFor([browser]);
+  assert.deepEqual(e2eOnly.unitFiles, []);
+  assert.deepEqual(planBrowserRuns(e2eOnly.browserFiles, e2eOnly.runDetailIntegrity).map(run => run.project), ['390', '360']);
+});
+
+test('disclosure source selects both film and landing contracts while loading coverage runs only on its phone project', () => {
+  const scope = fixture.reviewedLandingFilmDisclosure;
+  const plan = planFor([scope.sourcePath]);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.deepEqual(plan.unitFiles, ['lib/film-motion-control.test.ts', 'lib/landing-v2-recompile.test.ts']);
+  assert.deepEqual(plan.browserFiles, []);
+
+  const e2eOnly = planFor([scope.browserTestPath]);
+  assert.deepEqual(e2eOnly.unknownPaths, []);
+  assert.deepEqual(e2eOnly.unitFiles, []);
+  assert.deepEqual(planBrowserRuns(e2eOnly.browserFiles, false).map(run => run.project), ['390']);
+});
+
+test('only the complete twelve-path paired public UI candidate requires six screenshots', () => {
+  const paths = fixture.pairedPublicUiCaptureCandidate.paths;
+  const plan = planFor(paths);
+  assert.equal(paths.length, 12);
+  assert.equal(plan.requirePublicUiScreenshots, true);
+  assert.equal(planFor([...paths, 'nextjs/lib/unrelated.test.ts']).requirePublicUiScreenshots, true);
+  assert.equal(planFor(paths.filter(path => path !== 'nextjs/e2e/site-nav.spec.ts')).requirePublicUiScreenshots, false);
+  assert.equal(planFor(['nextjs/e2e/site-nav.spec.ts']).requirePublicUiScreenshots, false);
+});
+
+test('the complete 22-path Repair, public UI, and film candidate stays targeted and known', () => {
+  const repairPaths = [
+    '.github/workflows/repair-scope.yml',
+    'nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json',
+    'nextjs/scripts/repair-scope-gate.mjs',
+    'nextjs/scripts/repair-scope.mjs',
+    'nextjs/scripts/repair-scope.test.mjs',
+    'nextjs/scripts/repair-test-report.mjs',
+    'nextjs/scripts/run-repair-check.mjs',
+    'nextjs/scripts/verify-repair-workflows.mjs',
+  ];
+  const filmPaths = [
+    'nextjs/components/compile-stage-player.tsx',
+    'nextjs/lib/film-motion-control.test.ts',
+  ];
+  const combined = [...repairPaths, ...fixture.pairedPublicUiCaptureCandidate.paths, ...filmPaths];
+  assert.equal(new Set(combined).size, 22);
+
+  const plan = planFor(combined);
+  assert.equal(plan.changedPaths.length, 22);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.unitFiles, [
+    'lib/film-motion-control.test.ts',
+    'lib/landing-v2-page.test.ts',
+    'lib/landing-v2-recompile.test.ts',
+    'lib/landing-v2-tokens.test.ts',
+    'lib/one-path-contract.test.ts',
+    'lib/site-nav-model.test.ts',
+  ]);
+  assert.deepEqual(plan.browserFiles, [
+    'e2e/landing-hero-film-loading.spec.ts',
+    'e2e/landing-hero-mobile.spec.ts',
+    'e2e/launch-qa-mobile-nav.spec.ts',
+    'e2e/site-nav.spec.ts',
+  ]);
+  assert.equal(plan.requirePublicUiScreenshots, true);
+});
+
+test('control-only changes select workflow and selector controls, not product unit suites', () => {
+  const plan = planFor(['.github/workflows/repair-scope.yml', 'nextjs/scripts/repair-scope.mjs']);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runWorkflowStaticGate, true);
+  assert.ok(plan.groups.includes('selector-config'));
+  assert.deepEqual(plan.unitFiles, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.browserFiles, []);
+  assert.equal(plan.runDetailIntegrity, false);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity), []);
+});
+
+test('shared identity and unclassified changes continue to select broad suites', () => {
+  const shared = planFor(['nextjs/lib/auth/session.ts']);
+  assert.equal(shared.runFullHermeticVitest, true);
+  assert.equal(shared.runScriptContracts, true);
+  assert.deepEqual(shared.unitFiles, []);
+
+  const unknown = planFor(['nextjs/lib/new-shared-runtime.ts']);
+  assert.equal(unknown.runFullHermeticVitest, true);
+  assert.ok(unknown.unknownPaths.includes('lib/new-shared-runtime.ts'));
+
+  const dbSchema = planFor(['nextjs/lib/schema/record-contract.ts']);
+  assert.equal(dbSchema.runFullHermeticVitest, true);
+  assert.equal(dbSchema.databaseRehearsalStatus, 'invalidated-pending-rehearsal');
+  assert.deepEqual(dbSchema.pendingQualificationDebt, ['database-contract']);
 });
 
 test('safe literal Next route segments pass while traversal, controls, backslash, and shell syntax fail closed', () => {
@@ -157,6 +317,84 @@ test('detail-integrity is not repeated in the incompatible audit project', () =>
     'e2e/detail-integrity.spec.ts', 'e2e/failure-states-audit.spec.ts',
   ]), ['e2e/failure-states-audit.spec.ts']);
   assert.deepEqual(auditBrowserFiles(['e2e/detail-integrity.spec.ts']), []);
+});
+
+test('selected browser files route to projects that discover and execute them', () => {
+  assert.deepEqual(planBrowserRuns(['e2e/site-nav.spec.ts'], false), [
+    { kind: 'project', project: '1440', files: ['e2e/site-nav.spec.ts'] },
+  ]);
+  assert.deepEqual(planBrowserRuns(['e2e/launch-qa-mobile-nav.spec.ts'], false), [
+    { kind: 'project', project: 'launch-chromium', files: ['e2e/launch-qa-mobile-nav.spec.ts'] },
+  ]);
+  assert.deepEqual(planBrowserRuns(['e2e/landing-hero-mobile.spec.ts'], false), [
+    { kind: 'project', project: '390', files: ['e2e/landing-hero-mobile.spec.ts'] },
+    { kind: 'project', project: '360', files: ['e2e/landing-hero-mobile.spec.ts'] },
+  ]);
+  assert.deepEqual(planBrowserRuns(['e2e/failure-states-audit.spec.ts'], false), [
+    { kind: 'project', project: 'audit', files: ['e2e/failure-states-audit.spec.ts'] },
+  ]);
+  assert.deepEqual(planBrowserRuns([], true), [{
+    kind: 'detail-integrity',
+    files: ['e2e/detail-integrity.spec.ts'],
+    projects: ['1440', '390', '360', 'reduced-motion'],
+    grep: 'API reference is scannable',
+  }]);
+  assert.throws(() => planBrowserRuns(['e2e/unmapped.spec.ts'], false), /No reviewed Playwright project mapping/);
+});
+
+test('reviewed Playwright projects discover selected specs and avoid project-level skips', () => {
+  const config = readFileSync(new URL('../playwright.config.ts', import.meta.url), 'utf8');
+  const mobileNav = readFileSync(new URL('../e2e/launch-qa-mobile-nav.spec.ts', import.meta.url), 'utf8');
+  const landingHero = readFileSync(new URL('../e2e/landing-hero-mobile.spec.ts', import.meta.url), 'utf8');
+  assert.match(config, /const widths\s*=\s*\[[^\]]*\b1440\b[^\]]*\b390\b[^\]]*\b360\b[^\]]*\]/);
+  assert.match(config, /name:\s*`\$\{width\}`/);
+  assert.match(config, /name:\s*`launch-\$\{browserName\}`[\s\S]*?testMatch:\s*\/launch-qa/);
+  assert.match(config, /failure-states-audit/);
+  assert.match(mobileNav, /test\.use\(\{\s*viewport:\s*\{\s*width:\s*390,\s*height:\s*844/);
+  assert.match(landingHero, /PHONE_PROJECTS\s*=\s*new Set\(\["360",\s*"390"\]\)/);
+  assert.match(landingHero, /test\.skip\(!PHONE_PROJECTS\.has\(info\.project\.name\)/);
+});
+
+test('Vitest JSON reports require executed passing tests for each selected file and reject missing or malformed reports', () => {
+  const passing = {
+    success: true,
+    numTotalTests: 2,
+    numPassedTests: 1,
+    numFailedTests: 0,
+    numPendingTests: 1,
+    numTodoTests: 0,
+    testResults: [{
+      name: '/work/nextjs/lib/selected.test.ts',
+      status: 'passed',
+      assertionResults: [{ status: 'passed' }, { status: 'skipped' }],
+    }],
+  };
+  assert.deepEqual(validateVitestReport(passing, ['lib/selected.test.ts']), { files: 1, passed: 1, skipped: 1, failed: 0 });
+  assert.throws(() => validateVitestReport({ ...passing, numPassedTests: 0, numPendingTests: 2, testResults: [{ ...passing.testResults[0], assertionResults: [{ status: 'skipped' }, { status: 'todo' }] }] }, ['lib/selected.test.ts']), /no executed passing test/);
+  assert.throws(() => validateVitestReport(passing, ['lib/missing.test.ts']), /omitted selected file/);
+  const missing = resolve(tmpdir(), 'repair-report-that-does-not-exist.json');
+  rmSync(missing, { force: true });
+  assert.throws(() => readAndValidateVitestReport(missing, ['lib/selected.test.ts']), /report is missing/);
+  const malformed = resolve(tmpdir(), 'repair-report-malformed.json');
+  writeFileSync(malformed, '{');
+  try { assert.throws(() => readAndValidateVitestReport(malformed, ['lib/selected.test.ts']), /malformed JSON/); }
+  finally { rmSync(malformed, { force: true }); }
+});
+
+test('Playwright JSON reports require executed passing tests per selected file and preserve skipped counts', () => {
+  const passing = {
+    stats: { expected: 1, skipped: 1, unexpected: 0, flaky: 0 },
+    suites: [{
+      file: '/work/nextjs/e2e/selected.spec.ts',
+      specs: [{ tests: [
+        { status: 'expected', results: [{ status: 'passed' }] },
+        { status: 'skipped', results: [{ status: 'skipped' }] },
+      ] }],
+    }],
+  };
+  assert.deepEqual(validatePlaywrightReport(passing, ['e2e/selected.spec.ts']), { files: 1, passed: 1, skipped: 1, flaky: 0, failed: 0 });
+  assert.throws(() => validatePlaywrightReport({ ...passing, stats: { ...passing.stats, expected: 0 }, suites: [{ file: '/work/nextjs/e2e/selected.spec.ts', specs: [{ tests: [{ status: 'skipped', results: [{ status: 'skipped' }] }] }] }] }, ['e2e/selected.spec.ts']), /no executed passing test/);
+  assert.throws(() => validatePlaywrightReport(passing, ['e2e/missing.spec.ts']), /omitted selected file/);
 });
 
 test('failed, skipped, unrun, or apparent-success database results cannot pass an unrun rehearsal', () => {

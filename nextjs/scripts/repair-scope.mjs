@@ -2,8 +2,33 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
 const sha = value => /^[0-9a-f]{40}$/i.test(value ?? '');
-export const AUDITED_REPAIR_ANCHOR_SHA = 'd2906acde291b77b73229623733736796f4fb8c8';
-const baselineDebt = ['docs', 'openapi', 'alias-auth', 'response-fixtures', 'detail-integrity'];
+export const AUDITED_REPAIR_ANCHOR_SHA = '6401c3524b5294f3a395acede35e4632eb89c0fb';
+export const TESTED_FULL_PASS_SHA = '6401c3524b5294f3a395acede35e4632eb89c0fb';
+const pendingFullDebt = ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'];
+const databaseBaselineEvidence = {
+  runId: 37172599535,
+  commit: '6401c3524b5294f3a395acede35e4632eb89c0fb',
+  pullRequestBaseSha: '7a7b4fed9e7d45ec596057f7f1cc5d0672465326',
+  conclusion: 'success',
+  pgTapPassedPerRun: 1333,
+  pgTapRuns: 2,
+  latestMigrationReplayed: false,
+  latestMigrationReplayEvidence: 'not replayed by the recorded replay list',
+};
+const pairedPublicUiCandidatePaths = [
+  'app/chrome-v2.css',
+  'app/landing-v2.css',
+  'app/paper-product.css',
+  'components/landing-v2/hero-film-disclosure.tsx',
+  'components/landing-v2/hero-film.tsx',
+  'components/landing-v2/landing-page.tsx',
+  'e2e/landing-hero-film-loading.spec.ts',
+  'e2e/launch-qa-mobile-nav.spec.ts',
+  'e2e/site-nav.spec.ts',
+  'lib/one-path-contract.test.ts',
+  'lib/site-nav-model.test.ts',
+  'lib/site-navigation.ts',
+].sort();
 const baselineVitest = [
   'lib/docs-content.test.ts', 'lib/docs-highlight.test.ts', 'lib/docs-navigation.test.ts',
   'lib/retrieval-docs-parity.test.ts', 'lib/openapi-compile-jobs.test.ts',
@@ -24,6 +49,16 @@ const uploadTests = [
   'lib/intake-approval-route.test.ts', 'lib/intake-approval.test.ts',
   'lib/upload-confirm-route.test.ts', 'lib/upload-release-route.test.ts',
 ];
+const siteNavigationTests = ['lib/one-path-contract.test.ts', 'lib/site-nav-model.test.ts'];
+const responsiveNavigationBrowsers = ['e2e/site-nav.spec.ts', 'e2e/launch-qa-mobile-nav.spec.ts'];
+const reviewedBrowserFiles = new Set([
+  'e2e/detail-integrity.spec.ts',
+  'e2e/failure-states-audit.spec.ts',
+  'e2e/site-nav.spec.ts',
+  'e2e/launch-qa-mobile-nav.spec.ts',
+  'e2e/landing-hero-mobile.spec.ts',
+  'e2e/landing-hero-film-loading.spec.ts',
+]);
 
 export function normalizePath(raw) {
   // Brackets are allowed for literal Next route segments such as [id] and [...slug].
@@ -57,17 +92,18 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
-  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) throw new Error('Repair scope anchor is not the audited d290 anchor.');
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) throw new Error('Repair scope anchor is not the authenticated 6401 full-pass anchor.');
   const paths = [...new Set(changedPaths.map(normalizePath))].sort();
-  const groups = new Set(baselineDebt);
-  const unitFiles = new Set([...baselineVitest, ...baselineAuth]);
+  const groups = new Set();
+  const unitFiles = new Set();
   const browserFiles = new Set();
   const unknownPaths = [];
   const qualificationReasons = new Set(['selector/workflow qualification has not yet been rerun on this head']);
   let broader = false;
   let workflowConfigChanged = false;
   let selectorChanged = false;
-  let migrationChanged = false;
+  let runDetailIntegrity = false;
+  let databaseEvidenceInvalidated = false;
 
   for (const path of paths) {
     let matched = false;
@@ -76,7 +112,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       workflowConfigChanged = true;
       matched = true;
     }
-    if (/^scripts\/(?:repair-scope|repair-scope-gate|run-repair-check|verify-repair-workflows)(\.test)?\.mjs$|^scripts\/fixtures\/current-foundation-residual-workflow-paths\.json$/i.test(path)) {
+    if (/^scripts\/(?:repair-scope|repair-scope-gate|repair-test-report|run-repair-check|verify-repair-workflows|ci-repair-evidence)(\.test)?\.mjs$|^scripts\/fixtures\/(?:current-foundation-residual-workflow-paths\.json|ci-repair-evidence-policy\.json|ci-repair-evidence-source\.json)$/i.test(path)) {
       groups.add('selector-config');
       qualificationReasons.add('selector changed');
       selectorChanged = true;
@@ -122,9 +158,58 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       browserFiles.add('e2e/failure-states-audit.spec.ts');
       matched = true;
     }
+    if (['app/chrome-v2.css', 'app/paper-product.css', 'lib/site-navigation.ts'].includes(path)) {
+      groups.add('site-chrome');
+      for (const file of siteNavigationTests) unitFiles.add(file);
+      if (path === 'app/paper-product.css') unitFiles.add('lib/landing-v2-page.test.ts');
+      for (const file of responsiveNavigationBrowsers) browserFiles.add(file);
+      matched = true;
+    }
+    if (path === 'components/compile-stage-player.tsx') {
+      groups.add('film-motion-control');
+      unitFiles.add('lib/film-motion-control.test.ts');
+      browserFiles.add('e2e/landing-hero-mobile.spec.ts');
+      matched = true;
+    }
+    if (path === 'app/landing-v2.css') {
+      groups.add('landing-film-continuity');
+      unitFiles.add('lib/landing-v2-recompile.test.ts');
+      unitFiles.add('lib/landing-v2-tokens.test.ts');
+      browserFiles.add('e2e/landing-hero-mobile.spec.ts');
+      matched = true;
+    }
+    if (path === 'components/landing-v2/landing-page.tsx') {
+      groups.add('landing-film-continuity');
+      unitFiles.add('lib/landing-v2-recompile.test.ts');
+      unitFiles.add('lib/landing-v2-page.test.ts');
+      browserFiles.add('e2e/landing-hero-mobile.spec.ts');
+      matched = true;
+    }
+    if (path === 'components/landing-v2/hero-film.tsx') {
+      groups.add('landing-film-continuity');
+      unitFiles.add('lib/landing-v2-recompile.test.ts');
+      unitFiles.add('lib/film-motion-control.test.ts');
+      browserFiles.add('e2e/landing-hero-mobile.spec.ts');
+      matched = true;
+    }
+    if (path === 'components/landing-v2/hero-film-disclosure.tsx') {
+      groups.add('landing-film-continuity');
+      unitFiles.add('lib/landing-v2-recompile.test.ts');
+      unitFiles.add('lib/film-motion-control.test.ts');
+      matched = true;
+    }
     if (/^e2e\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.spec\.ts$/i.test(path)) {
       groups.add('browser-regression');
       browserFiles.add(path);
+      if (!reviewedBrowserFiles.has(path)) {
+        groups.add('unknown');
+        unknownPaths.push(path);
+        broader = true;
+      }
+      if (path === 'e2e/detail-integrity.spec.ts') {
+        groups.add('detail-integrity');
+        runDetailIntegrity = true;
+      }
       matched = true;
     }
     if (/^lib\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.test\.ts$/i.test(path)) {
@@ -141,7 +226,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     if (/^supabase\/(migrations|tests)\/[A-Za-z0-9_.-]+\.sql$/i.test(path)) {
       groups.add('database-contract');
       unitFiles.add('lib/pgtap-fixtures.test.ts');
-      migrationChanged ||= /^supabase\/migrations\//i.test(path);
+      databaseEvidenceInvalidated = true;
       matched = true;
     }
 
@@ -153,6 +238,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     }
     if (/(^|\/)(schema|schemas|parser|parsers|compiler)(\/|\.)|openapi\.(json|ya?ml)$/i.test(path)) {
       groups.add('schema-parser'); broader = true; matched = true;
+      if (/(^|\/)(schema|schemas)(\/|\.)|\.sql$/i.test(path)) databaseEvidenceInvalidated = true;
     }
     if (/(^|\/)(pnpm-lock\.yaml|package\.json|pnpm-workspace\.yaml|tsconfig[^/]*\.json|vitest\.config\.[^/]+)$/i.test(path)) {
       groups.add('toolchain'); broader = true; matched = true;
@@ -168,31 +254,35 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     pullRequestBaseSha,
     repairAnchorSha,
     headSha,
-    selector: 'foundation-phase1-2026-10-03',
-    source: 'audited repair-anchor tree diff; PR base retained separately as qualification debt',
+    selector: 'foundation-repair-anchor-6401-v2',
+    source: 'authenticated full-pass anchor tree diff; PR-base release debt tracked separately',
     changedPaths: paths,
     groups: [...groups].sort(),
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
     browserFiles: [...browserFiles].sort(),
-    runDetailIntegrity: true,
+    runDetailIntegrity,
     runWorkflowStaticGate: workflowConfigChanged || selectorChanged,
     runFullHermeticVitest: broader,
     runScriptContracts: broader,
     runDatabaseRehearsal: false,
     deferredGroups: groups.has('database-contract') ? ['database-contract'] : [],
-    databaseRehearsalStatus: migrationChanged ? 'deferred-pending-full-qualification' : 'not-applicable',
+    databaseRehearsalStatus: databaseEvidenceInvalidated
+      ? 'invalidated-pending-rehearsal'
+      : 'baseline-pgtap-passed-latest-migration-not-replayed-37172599535',
+    requirePublicUiScreenshots: pairedPublicUiCandidatePaths.every(path => paths.includes(path)),
     broaderQualificationRequired: broader || workflowConfigChanged,
     fullQualification: 'pending',
     qualificationReasons: [...qualificationReasons],
-    pendingFullDebt: ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
-    bootstrap: {
-      baseSha: 'd2906acde291b77b73229623733736796f4fb8c8',
-      unit: { passed: 6230, failed: 6, skipped: 1 },
-      check: 'passed', browser: { passed: 3 },
-      productQA: { passed: 1071, skipped: 279, failed: 4 },
-      fullBuild: 'not-run', lighthouse: 'not-run', testScripts: 'not-run',
-      unresolvedDebtGroups: baselineDebt,
+    pendingFullDebt,
+    pendingQualificationDebt: databaseEvidenceInvalidated ? ['database-contract'] : [],
+    databaseBaselineEvidence,
+    testedBaseline: {
+      commit: TESTED_FULL_PASS_SHA,
+      repairRunId: 37172599524,
+      artifactId: 11291413396,
+      artifactDigest: 'sha256:7a7714a0d711840f25155d2d70af321699bb48f1cb7a29b8ef132d8446bacbfd',
+      scope: 'unit-regression and script-contract evidence only; release qualification remains pending',
     },
   };
   return plan;
@@ -203,7 +293,7 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const repairAnchorSha = process.env.REPAIR_ANCHOR_SHA;
   const headSha = process.env.REPAIR_HEAD_SHA;
   if (!sha(pullRequestBaseSha) || !sha(headSha)) throw new Error('Repair scope requires exact 40-character PR-base/head SHAs.');
-  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) throw new Error('Repair scope must use the audited d290 repair anchor.');
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) throw new Error('Repair scope must use the authenticated 6401 full-pass anchor.');
   const checkoutHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   if (checkoutHead !== headSha) throw new Error(`checkout SHA ${checkoutHead} does not equal PR head ${headSha}`);
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
@@ -214,7 +304,9 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   if (output) {
     const values = {
       broader: String(plan.runFullHermeticVitest),
-      browser: 'true',
+      unit: String(plan.unitFiles.length > 0),
+      browser: String(plan.runDetailIntegrity || plan.browserFiles.length > 0),
+      public_ui_capture: String(plan.requirePublicUiScreenshots),
       workflow_static: String(plan.runWorkflowStaticGate),
       selector_tests: String(plan.groups.includes('selector-config')),
       head: headSha,

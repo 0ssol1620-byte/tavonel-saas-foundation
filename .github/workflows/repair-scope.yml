@@ -21,7 +21,7 @@ jobs:
         working-directory: nextjs
     env:
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      REPAIR_ANCHOR_SHA: d2906acde291b77b73229623733736796f4fb8c8
+      REPAIR_ANCHOR_SHA: 6401c3524b5294f3a395acede35e4632eb89c0fb
       REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
@@ -36,7 +36,7 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
-      - name: Plan audited-anchor affected scope
+      - name: Plan changes since the authenticated full-pass anchor
         id: plan
         env:
           RUN_REPAIR_SCOPE: "1"
@@ -60,7 +60,7 @@ jobs:
         continue-on-error: true
       - name: Run Foundation focused unit checks
         id: targeted-vitest
-        if: steps.plan.outputs.broader != 'true'
+        if: steps.plan.outputs.broader != 'true' && steps.plan.outputs.unit == 'true'
         run: node scripts/run-repair-check.mjs unit
         continue-on-error: true
       - name: Run hermetic full Vitest for shared or unknown changes
@@ -81,7 +81,7 @@ jobs:
           steps.secrets.outcome == 'success' &&
           steps.check.outcome == 'success' &&
           ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
-           (steps.plan.outputs.broader != 'true' && steps.targeted-vitest.outcome == 'success')) &&
+           (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         run: pnpm exec playwright install --with-deps chromium
@@ -94,7 +94,7 @@ jobs:
           steps.secrets.outcome == 'success' &&
           steps.check.outcome == 'success' &&
           ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
-           (steps.plan.outputs.broader != 'true' && steps.targeted-vitest.outcome == 'success')) &&
+           (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         env:
@@ -116,6 +116,24 @@ jobs:
           PLAYWRIGHT_LOCAL_HTTP: "1"
         run: node scripts/run-repair-check.mjs browser
         continue-on-error: true
+      - name: Require screenshots for the exact paired public UI candidate
+        id: public-ui-screenshots
+        if: always() && steps.plan.outputs.public_ui_capture == 'true' && steps.browser.outcome != 'skipped'
+        shell: bash
+        run: |
+          mapfile -t screenshots < <(find nextjs/test-results -type f -name 'public-ui-*.png' -print 2>/dev/null | sort)
+          if (( ${#screenshots[@]} != 6 )); then
+            echo "::error::Expected exactly six public-ui PNGs; found ${#screenshots[@]}."
+            exit 1
+          fi
+      - name: Upload bounded public UI screenshots
+        if: always() && steps.public-ui-screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-ui-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: nextjs/test-results/**/public-ui-*.png
+          if-no-files-found: warn
+          retention-days: 3
       - name: Fail closed on missing or failed scoped checks
         id: gate
         if: always()
@@ -123,7 +141,7 @@ jobs:
           PLAN_RESULT: ${{ steps.plan.outcome }}
           SECRET_RESULT: ${{ steps.secrets.outcome }}
           CHECK_RESULT: ${{ steps.check.outcome }}
-          VITEST_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome || steps.targeted-vitest.outcome }}
+          VITEST_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome || (steps.plan.outputs.unit == 'true' && steps.targeted-vitest.outcome) || 'success' }}
           AUX_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-scripts.outcome || 'success' }}
           WORKFLOW_RESULT: ${{ steps.plan.outputs.workflow_static == 'true' && steps.workflow-static.outcome || 'success' }}
           SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}

@@ -68,4 +68,15 @@ describe("film motion control", () => {
     expect(source.match(/setPlayRequested\(/g)).toHaveLength(1);
     expect(source).toContain("const autoplay = (!reducedMotion && !saveData) || playRequested;");
   });
+
+  it("starts fitted and focuses details only after an explicit toggle", () => {
+    expect(source).toContain("const [mobileFilmFit, setMobileFilmFit] = useState(true);");
+    expect(source).toContain('data-mobile-view={mobileFilmFit ? "fit" : "focus"}');
+    expect(source).toContain('onClick={() => setMobileFilmFit(value => !value)}');
+    expect(source).toContain('aria-pressed={!mobileFilmFit}');
+    expect(source).toContain("if (!viewport || !narrow || mobileFilmFit) return;");
+    expect(source).toContain('const NARROW_FRAME = "(max-width: 899px), (pointer: coarse) and (max-width: 1023px)";');
+    // This setter belongs only to the explicit button: tabs and viewport changes preserve the choice.
+    expect(source.match(/setMobileFilmFit\(/g)).toHaveLength(1);
+  });
 });

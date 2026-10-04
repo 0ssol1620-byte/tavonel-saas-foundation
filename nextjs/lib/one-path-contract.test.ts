@@ -10,19 +10,14 @@ const text = (relative: string) => readFileSync(fileURLToPath(new URL(`../${rela
 
 describe("approved one-path experience", () => {
   /*
-    Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five.
-
-    The order is the reader's path through the site rather than the repository's: what it is,
-    how it works, what to read, how to build, what it costs. Both chromes render the same array,
-    which is the half of this that used to be the defect -- the desktop bar and the phone sheet
-    read two different constants and made two different offers at two widths.
+    One shared row carries the product, inspectable public sample, developer entry and pricing.
+    Desktop and phone render the same route list, including the same sign-in destination.
   */
-  it("has exactly five shared customer destinations", () => {
+  it("has exactly four shared customer destinations", () => {
     expect(CUSTOMER_NAV).toEqual([
       { href: "/product", label: "Product" },
-      { href: "/knowledge-compiler", label: "How it works" },
-      { href: "/resources", label: "Resources" },
-      { href: "/docs", label: "Docs" },
+      { href: "/explore", label: "Explore" },
+      { href: "/developers", label: "Developers" },
       { href: "/pricing", label: "Pricing" },
     ]);
     expect(HEADER_NAV).toEqual(CUSTOMER_NAV.filter((item) => item.href !== "/pricing"));
@@ -33,29 +28,25 @@ describe("approved one-path experience", () => {
   it("does not confuse a prefix with an unrelated route", () => {
     expect(customerNavOwns("/product", "/product/document-intelligence/")).toBe(true);
     expect(customerNavOwns("/product", "/productivity")).toBe(false);
-    expect(customerNavOwns("/docs", "/docs/mcp")).toBe(true);
-    expect(customerNavOwns("/docs", "/docsearch")).toBe(false);
+    expect(customerNavOwns("/developers", "/docs/mcp")).toBe(true);
+    expect(customerNavOwns("/explore", "/explore")).toBe(true);
+    expect(customerNavOwns("/developers", "/docsearch")).toBe(false);
     expect(customerNavOwns("/pricing", "/privacy")).toBe(false);
   });
   /*
-    What Resources speaks for, and what nothing in the bar does.
-
-    The hub collects nine destinations; five of them have no bar item of their own, and a reader
-    on one of those five is in the Resources section whether or not the URL says so. The failure
-    path is the second half: /sources lost its owner when Integrations left the bar, and marking
-    some other item current there would tell the reader something false about where they are.
+    Developers is the visible entry for docs, API and changelog routes. Explore owns its own
+    public sample only; the research and trust pages remain reachable from the footer.
   */
-  it("lets Resources own the five hub pages that have no bar item, and leaves /sources unowned", () => {
-    for (const path of ["/research", "/research/notes", "/evidence", "/reproducibility", "/benchmarks", "/changelog"]) {
-      expect(customerNavOwns("/resources", path), path).toBe(true);
+  it("marks developer pages from the shared bar and leaves unrelated pages unowned", () => {
+    for (const path of ["/developers", "/docs", "/docs/mcp", "/api", "/changelog"]) {
+      expect(customerNavOwns("/developers", path), path).toBe(true);
     }
     for (const href of CUSTOMER_NAV.map((item) => item.href)) {
       expect(customerNavOwns(href, "/sources"), `${href} claims /sources`).toBe(false);
       expect(customerNavOwns(href, "/integrations"), `${href} claims /integrations`).toBe(false);
     }
-    // /explore and /api are hub entries too, and deliberately not Resources' to claim.
-    expect(customerNavOwns("/resources", "/explore")).toBe(false);
-    expect(customerNavOwns("/resources", "/api")).toBe(false);
+    expect(customerNavOwns("/explore", "/research")).toBe(false);
+    expect(customerNavOwns("/explore", "/api")).toBe(false);
   });
   it.each(films.files)("preserves the approved $file bytes", ({ file, bytes, sha256 }) => {
     const data = readFileSync(fileURLToPath(new URL(`../public/film/${file}`, import.meta.url)));
@@ -71,7 +62,7 @@ describe("approved one-path experience", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
     expect(page).toContain("<HeroSourceCard");
-    expect(page).not.toContain("<HeroFilm");
+    expect(page).toContain("<HeroFilm");
     expect(page).toContain("<CompilerSpecimen");
     const order = [
       'id="s1"',
@@ -80,6 +71,7 @@ describe("approved one-path experience", () => {
       "<HeroSourceCard",
       'id="s2"',
       "<CompilerSpecimen",
+      "<HeroFilm",
       "<HeroProof",
       "<ProofScene",
       "<RecompileScene",
@@ -93,13 +85,19 @@ describe("approved one-path experience", () => {
       expect(page, `${gone} belongs to the retired landing`).not.toContain(gone);
     }
     const film = text("components/landing-v2/hero-film.tsx");
+    expect(film).not.toContain('"use client"');
+    expect(film).toContain("<HeroFilmDisclosure");
     expect(film).toContain('src: "/film/compile-cut.mp4"');
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
-    /* The film is the first visual again, so its poster owns the eager image slot. */
-    expect(film).toContain("preferVideo");
-    expect(film).toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
+    /* The client disclosure gates the real player, not a still-hidden native details subtree. */
+    const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
+    expect(disclosure).toContain('"use client"');
+    expect(disclosure).toContain('className="lv2-film-story" onToggle=');
+    expect(disclosure).toContain("{open ? (");
+    expect(disclosure).toContain('<CompileStagePlayer stages={stages} preferVideo');
+    expect(disclosure).not.toContain("priorityPoster");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");

@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
 
 const repoRoot = realpathSync(process.cwd());
 const unsafeChars = /[^A-Za-z0-9_./-]/;
@@ -52,6 +53,44 @@ export function auditBrowserFiles(files) {
   return files.filter(file => file !== 'e2e/detail-integrity.spec.ts');
 }
 
+const browserProjectsByFile = new Map([
+  ['e2e/failure-states-audit.spec.ts', ['audit']],
+  ['e2e/site-nav.spec.ts', ['1440']],
+  ['e2e/launch-qa-mobile-nav.spec.ts', ['launch-chromium']],
+  ['e2e/landing-hero-mobile.spec.ts', ['360', '390']],
+  ['e2e/landing-hero-film-loading.spec.ts', ['390']],
+]);
+
+export function planBrowserRuns(files, runDetailIntegrity) {
+  const selected = [...new Set(files)].sort();
+  const detailFile = 'e2e/detail-integrity.spec.ts';
+  const hasDetail = selected.includes(detailFile);
+  if (hasDetail && !runDetailIntegrity) throw new Error('detail-integrity was selected without its required browser gate.');
+
+  const runs = [];
+  if (runDetailIntegrity) runs.push({
+    kind: 'detail-integrity',
+    files: [detailFile],
+    projects: ['1440', '390', '360', 'reduced-motion'],
+    grep: 'API reference is scannable',
+  });
+
+  const filesByProject = new Map();
+  for (const file of selected.filter(file => file !== detailFile)) {
+    const projects = browserProjectsByFile.get(file);
+    if (!projects) throw new Error(`No reviewed Playwright project mapping for ${file}`);
+    for (const project of projects) {
+      if (!filesByProject.has(project)) filesByProject.set(project, []);
+      filesByProject.get(project).push(file);
+    }
+  }
+  for (const project of ['audit', '1440', '390', '360', 'reduced-motion', 'launch-chromium']) {
+    const projectFiles = filesByProject.get(project);
+    if (projectFiles) runs.push({ kind: 'project', project, files: [...new Set(projectFiles)].sort() });
+  }
+  return runs;
+}
+
 export function requireUnitFiles(files) {
   if (!Array.isArray(files) || files.length === 0) throw new Error('The targeted unit plan selected no test files.');
   return files;
@@ -81,15 +120,27 @@ async function waitForServer(child, url) {
 async function runUnit() {
   const plan = readPlan();
   const files = requireUnitFiles(plan.unitFiles.map(file => validateSelectedPath(file, 'unit')));
-  await run('pnpm', ['exec', 'vitest', 'run', ...files]);
+  const reportPath = resolve(repoRoot, 'node_modules/.cache/repair-scope-reports/vitest.json');
+  mkdirSync(dirname(reportPath), { recursive: true });
+  rmSync(reportPath, { force: true });
+  let runError;
+  try {
+    await run('pnpm', ['exec', 'vitest', 'run', '--reporter=json', `--outputFile=${reportPath}`, ...files]);
+  } catch (error) {
+    runError = error;
+  }
+  const summary = readAndValidateVitestReport(reportPath, files);
+  console.log(`Vitest report: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.failed} failed across ${summary.files} selected files.`);
+  if (runError) throw runError;
 }
 
 async function runBrowser() {
   const plan = readPlan();
   const files = plan.browserFiles.map(file => validateSelectedPath(file, 'browser'));
+  const plannedRuns = planBrowserRuns(files, plan.runDetailIntegrity);
+  if (plannedRuns.length === 0) return;
   const baseUrl = 'http://127.0.0.1:3117';
   const env = liveBrowserEnv();
-  const auditFiles = auditBrowserFiles(files);
   const nextCli = resolve(repoRoot, 'node_modules/next/dist/bin/next');
   if (!existsSync(nextCli)) throw new Error('Next CLI is missing; the gated build/install did not complete.');
   const server = spawn(process.execPath, [nextCli, 'start', '--hostname', '127.0.0.1', '--port', '3117'], {
@@ -98,11 +149,25 @@ async function runBrowser() {
   try {
     await waitForServer(server, `${baseUrl}/workspace`);
     const browserEnv = { ...env, PLAYWRIGHT_EXTERNAL_SERVER: '1', PLAYWRIGHT_BASE_URL: baseUrl };
-    await run('pnpm', [
-      'exec', 'playwright', 'test', 'e2e/detail-integrity.spec.ts', '--grep', 'API reference is scannable',
-      '--project=1440', '--project=390', '--project=360', '--project=reduced-motion',
-    ], browserEnv);
-    if (auditFiles.length) await run('pnpm', ['exec', 'playwright', 'test', ...auditFiles, '--project=audit'], browserEnv);
+    for (const [index, planned] of plannedRuns.entries()) {
+      const reportPath = resolve(repoRoot, `node_modules/.cache/repair-scope-reports/playwright-${index + 1}.json`);
+      mkdirSync(dirname(reportPath), { recursive: true });
+      rmSync(reportPath, { force: true });
+      const args = ['exec', 'playwright', 'test', ...planned.files];
+      args.push('--reporter=json');
+      if (planned.grep) args.push('--grep', planned.grep);
+      if (planned.projects) args.push(...planned.projects.map(project => `--project=${project}`));
+      if (planned.project) args.push(`--project=${planned.project}`);
+      let runError;
+      try {
+        await run('pnpm', args, { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath });
+      } catch (error) {
+        runError = error;
+      }
+      const summary = readAndValidatePlaywrightReport(reportPath, planned.files);
+      console.log(`Playwright report ${planned.kind}${planned.project ? `/${planned.project}` : ''}: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.flaky} flaky, ${summary.failed} failed across ${summary.files} selected files.`);
+      if (runError) throw runError;
+    }
   } finally {
     if (server.exitCode === null) server.kill('SIGTERM');
   }

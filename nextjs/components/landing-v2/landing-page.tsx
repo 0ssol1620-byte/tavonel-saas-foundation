@@ -5,6 +5,7 @@ import {
 } from "@/components/public-site-chrome";
 import CompilerSpecimen from "./compiler-specimen";
 import HeroSourceCard from "./hero-source-card";
+import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
 import HeroProof from "./hero-proof";
 
@@ -46,7 +47,7 @@ import {
   WHY THIS IS A SERVER COMPONENT
   The public World is compiled into a committed snapshot and checked against the source at build
   time. This component reads the snapshot and hands each scene a flat, serializable projection.
-  Browser interactions stay in the action row and the specimen's play/pause control.
+  Browser interactions stay in the action row, source evidence control, specimen controls and optional film disclosure.
 */
 
 /*
@@ -144,7 +145,7 @@ export default function LandingPage({
         </section>
 
         {/*
-          02 The source-linked specimen, then the Evidence Inspector over the committed World.
+          02 Explain the source-to-knowledge path, then offer the film and Evidence Inspector.
         */}
         <section
           id="s2"
@@ -159,6 +160,7 @@ export default function LandingPage({
               <h2 className="lv2-h2" id="lv2-how-title">{specimenCopy.title}</h2>
             </div>
             <CompilerSpecimen korean={korean} />
+            <HeroFilm korean={korean} />
             <div className="lv2-scene-head">
               <p className="lv2-eyebrow lv2-meta">{sampleCopy.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-s2-title">{sampleCopy.title}</h2>

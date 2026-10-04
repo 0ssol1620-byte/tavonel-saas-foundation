@@ -289,6 +289,32 @@
   text-align: center;
 }
 .lv2-hero-intake-tail { white-space: nowrap; }
+.lv2-film-story {
+  width: min(100%, 1120px);
+  margin: 28px auto 0;
+}
+.lv2-film-story > summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-block: 1px solid var(--border-dark);
+  color: #2447b3;
+  cursor: pointer;
+  font: 600 15px/22px var(--f-sans);
+  list-style: none;
+}
+.lv2-film-story > summary::-webkit-details-marker { display: none; }
+.lv2-film-story > summary::after {
+  content: "+";
+  flex: none;
+  color: var(--text-mid);
+  font: 400 20px/1 var(--f-mono);
+}
+.lv2-film-story[open] > summary::after { content: "−"; }
+.lv2-film-story .lv2-film { margin-top: 16px; }
 .lv2-film {
   margin-top: 40px;
   --lv2-film-w: 1120px;

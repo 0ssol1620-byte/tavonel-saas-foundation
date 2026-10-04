@@ -206,7 +206,7 @@ export default function CompileStagePlayer({
   const [ended, setEnded] = useState(false);
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
-  const [mobileFilmFit, setMobileFilmFit] = useState(false);
+  const [mobileFilmFit, setMobileFilmFit] = useState(true);
   const [videoError, setVideoError] = useState(false);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
