@@ -174,6 +174,12 @@ export const DOCS_SECTIONS: DocsSection[] = [
           ["releaseFailedApprovedUpload", "POST /api/v1/uploads/release", "Release a member only after a definitive PUT refusal and server verification that no object landed."],
         ],
       },
+      { kind: "endpoint", operationId: "quoteApprovedUploadSet" },
+      { kind: "endpoint", operationId: "getUploadApproval" },
+      { kind: "endpoint", operationId: "createUploadApproval" },
+      { kind: "endpoint", operationId: "cancelApprovedUploadSet" },
+      { kind: "endpoint", operationId: "confirmApprovedUpload" },
+      { kind: "endpoint", operationId: "releaseFailedApprovedUpload" },
       { kind: "heading", text: "The seven steps" },
       {
         kind: "steps",

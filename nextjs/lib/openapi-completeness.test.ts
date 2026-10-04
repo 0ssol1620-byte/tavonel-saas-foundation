@@ -43,7 +43,7 @@ describe("OpenAPI completeness", () => {
   it("gives every operation an id, a summary, a known tag and a description", async () => {
     const { spec, list } = await operations();
     const tagNames = new Set(spec.tags.map((tag) => tag.name));
-    expect(list.length).toBe(33);
+    expect(list.length).toBe(39);
     for (const { path, method, operation } of list) {
       const where = `${method.toUpperCase()} ${path}`;
       expect(operation.operationId, where).toBeTruthy();

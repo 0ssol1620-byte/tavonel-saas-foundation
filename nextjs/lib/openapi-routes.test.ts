@@ -24,7 +24,15 @@ import { intakePricingFingerprint, quoteIntakeManifest } from "./usage-pricing";
   pull request where the regression would be introduced.
 */
 
-type Operation = { operationId: string; summary?: string; description?: string; tags?: string[]; responses?: Record<string, unknown>; requestBody?: unknown };
+type ExampleMedia = { examples?: Record<string, { value?: unknown }> };
+type Operation = {
+  operationId: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  responses?: Record<string, { content?: Record<string, ExampleMedia> }>;
+  requestBody?: { content?: Record<string, ExampleMedia> };
+};
 type PathItem = Record<string, unknown> & { servers?: Array<{ url: string }> };
 type Document = {
   servers: Array<{ url: string }>;
@@ -139,42 +147,56 @@ describe("the published OpenAPI document", () => {
     const pricingFingerprint = await intakePricingFingerprint();
     const actual = operations(await document());
     const operation = (id: string) => actual.find((entry) => entry.operation.operationId === id)!.operation;
+    const asRecord = (value: unknown): Record<string, unknown> => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error("Expected an OpenAPI example object.");
+      }
+      return value as Record<string, unknown>;
+    };
+    const firstRecord = (value: unknown) => {
+      if (!Array.isArray(value) || !value[0] || typeof value[0] !== "object" || Array.isArray(value[0])) {
+        throw new Error("Expected an OpenAPI example array with an object member.");
+      }
+      return value[0] as Record<string, unknown>;
+    };
     const responseExample = (id: string) => {
-      const op = operation(id);
-      return (op.responses?.["200"] as any).content["application/json"].examples.default.value;
+      const media = operation(id).responses?.["200"]?.content?.["application/json"];
+      return asRecord(media?.examples?.default?.value);
     };
     const quoteExample = responseExample("quoteApprovedUploadSet");
-    expect(quoteExample.pricingFingerprint).toBe(pricingFingerprint);
-    expect(quoteExample.quote).toEqual({
+    expect(quoteExample["pricingFingerprint"]).toBe(pricingFingerprint);
+    const quotedTotals = asRecord(quoteExample["quote"]);
+    expect(quotedTotals).toEqual({
       maximumPages: totals.maximumPages,
       reservedCredits: totals.reservedCredits,
       maximumCredits: totals.maximumCredits,
       estimatedUsd: totals.estimatedUsd,
       maximumUsd: totals.maximumUsd,
     });
-    expect(quoteExample.files[0]).toMatchObject({
+    expect(firstRecord(quoteExample["files"])).toMatchObject({
       pageBasis: file.pageBasis,
       approvedMaxPages: file.approvedMaxPages,
       reservedCredits: file.reservedCredits,
       maximumCredits: file.maximumCredits,
     });
 
-    const approvalRequest = (operation("createUploadApproval").requestBody as any)
-      .content["application/json"].examples.default.value;
-    expect(approvalRequest.pricingFingerprint).toBe(pricingFingerprint);
-    expect(approvalRequest.aggregateMaximumCredits).toBe(totals.maximumCredits);
+    const approvalRequest = asRecord(operation("createUploadApproval").requestBody?.content?.["application/json"]?.examples?.default?.value);
+    expect(approvalRequest["pricingFingerprint"]).toBe(pricingFingerprint);
+    expect(approvalRequest["aggregateMaximumCredits"]).toBe(totals.maximumCredits);
 
     const approvalExample = responseExample("createUploadApproval");
-    expect(approvalExample.approval.pricingFingerprint).toBe(pricingFingerprint);
-    expect(approvalExample.approval.aggregateMaximumCredits).toBe(totals.maximumCredits);
-    expect(approvalExample.approval.files[0].approvedMaximumCredits).toBe(file.maximumCredits);
-    expect(approvalExample.quote).toEqual(quoteExample.quote);
+    const approval = asRecord(approvalExample["approval"]);
+    expect(approval["pricingFingerprint"]).toBe(pricingFingerprint);
+    expect(approval["aggregateMaximumCredits"]).toBe(totals.maximumCredits);
+    expect(firstRecord(approval["files"])["approvedMaximumCredits"]).toBe(file.maximumCredits);
+    expect(approvalExample["quote"]).toEqual(quoteExample["quote"]);
 
     const recoveredApproval = responseExample("getUploadApproval");
-    expect(recoveredApproval.approval.pricingFingerprint).toBe(pricingFingerprint);
-    expect(recoveredApproval.approval.aggregateMaximumCredits).toBe(totals.maximumCredits);
+    const recovered = asRecord(recoveredApproval["approval"]);
+    expect(recovered["pricingFingerprint"]).toBe(pricingFingerprint);
+    expect(recovered["aggregateMaximumCredits"]).toBe(totals.maximumCredits);
     const capability = responseExample("createDirectUploadCapability");
-    expect(capability.computeReservation).toMatchObject({
+    expect(asRecord(capability["computeReservation"])).toMatchObject({
       maximumCredits: file.maximumCredits,
       reservedCredits: file.reservedCredits,
     });
