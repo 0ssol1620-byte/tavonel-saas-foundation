@@ -173,7 +173,7 @@ begin
     source_version_id, workspace_key, provider_id, principals, snapshot_sha256, captured_at, capture_complete
   ) values (
     p_source_version_id, p_workspace_key, 'google_drive', p_principals, p_snapshot_sha256, pg_catalog.clock_timestamp(), true
-  ) on conflict (source_version_id, provider_id, snapshot_sha256) do nothing;
+  );
 end;
 $$;
 revoke all on function public.record_google_drive_source_acl_snapshot(text, uuid, text, jsonb, text) from public, anon, authenticated;
@@ -201,7 +201,7 @@ begin
   ) values (
     p_source_version_id, p_workspace_key, 'google_drive', '[]'::jsonb, p_marker_sha256,
     pg_catalog.clock_timestamp(), false
-  ) on conflict (source_version_id, provider_id, snapshot_sha256) do nothing;
+  );
 end;
 $$;
 revoke all on function public.record_google_drive_source_acl_capture_failure(text, uuid, text, text) from public, anon, authenticated;

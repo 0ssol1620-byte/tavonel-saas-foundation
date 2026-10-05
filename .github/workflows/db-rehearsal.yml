@@ -130,6 +130,75 @@ jobs:
           echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
           echo "version=$acl_version" >> "$GITHUB_OUTPUT"
 
+      # The refresh queue is an unregistered draft that depends on the verified ACL boundary
+      # schema. It is copied only into the throwaway database chain after that boundary.
+      - name: Stage the reviewed Google Drive ACL refresh after ACL boundary
+        id: acl-refresh-draft
+        run: |
+          set -euo pipefail
+          boundary_draft=supabase/drafts/google-viewer-principal-boundary.sql
+          draft=supabase/drafts/google-drive-acl-refresh/queue.sql
+          test_source=supabase/drafts/google-drive-acl-refresh/tests/google_drive_acl_refresh_queue.sql
+          test_target=supabase/tests/google_drive_acl_refresh_queue.sql
+          if [[ ! -e "$draft" && ! -e "$test_source" ]]; then
+            echo "Neither Google Drive ACL refresh draft nor its pgTAP test is present; no temporary migration needed."
+            echo "state=absent" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test -f "$boundary_draft"
+          test -f "$draft"
+          test -f "$test_source"
+          boundary_state='${{ steps.acl-draft.outputs.state }}'
+          boundary_version='${{ steps.acl-draft.outputs.version }}'
+          if [[ "$boundary_state" == absent || ! "$boundary_version" =~ ^[0-9]{14}$ ]]; then
+            echo "ACL refresh draft requires the ACL boundary draft to be staged first." >&2
+            exit 1
+          fi
+
+          expected_boundary_sha256=8aad3ffaf8d3062c764988029a1235db4e04ab181e0211524677f9f213e306bc
+          expected_queue_sha256=04b75937e204db4da659352c6f9194c110018cd45715c72553ee0e2e41e8c4a8
+          expected_test_sha256=ecc2b851051b7bbccaed09b231e44a9dcc4fabf6483f6b572fafe3488c1177e2
+          test "$(sha256sum "$boundary_draft" | cut -d ' ' -f 1)" = "$expected_boundary_sha256"
+          test "$(sha256sum "$draft" | cut -d ' ' -f 1)" = "$expected_queue_sha256"
+          test "$(sha256sum "$test_source" | cut -d ' ' -f 1)" = "$expected_test_sha256"
+          printf '%s  %s\n' "$expected_boundary_sha256" "$boundary_draft" | sha256sum --check
+          printf '%s  %s\n' "$expected_queue_sha256" "$draft" | sha256sum --check
+          printf '%s  %s\n' "$expected_test_sha256" "$test_source" | sha256sum --check
+
+          shopt -s nullglob
+          existing=(supabase/migrations/*_google_drive_acl_refresh_queue.sql)
+          if (("${#existing[@]}" > 0)); then
+            echo "The Google Drive ACL refresh SQL must remain an unregistered draft during this phase." >&2
+            exit 1
+          fi
+          test ! -e "$test_target"
+
+          # Create a runner-local successor to the ACL boundary migration.
+          now_version="$(date -u +%Y%m%d%H%M%S)"
+          if [[ "$boundary_version" > "$now_version" ]]; then
+            echo "ACL boundary migration version is in the future; cannot generate a later ACL refresh migration now." >&2
+            exit 1
+          fi
+          while [[ ! "$now_version" > "$boundary_version" ]]; do
+            sleep 1
+            now_version="$(date -u +%Y%m%d%H%M%S)"
+          done
+          supabase migration new google_drive_acl_refresh_queue
+          generated=(supabase/migrations/*_google_drive_acl_refresh_queue.sql)
+          test "${#generated[@]}" -eq 1
+          [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_google_drive_acl_refresh_queue\.sql$ ]]
+          refresh_version="${BASH_REMATCH[1]}"
+          [[ "$refresh_version" > "$boundary_version" ]]
+          cp -- "$draft" "${generated[0]}"
+          cmp -- "$draft" "${generated[0]}"
+          printf '%s  %s\n' "$expected_queue_sha256" "$draft" "$expected_queue_sha256" "${generated[0]}" | sha256sum --check
+          cp -- "$test_source" "$test_target"
+          cmp -- "$test_source" "$test_target"
+          printf '%s  %s\n' "$expected_test_sha256" "$test_source" "$expected_test_sha256" "$test_target" | sha256sum --check
+          echo "state=ephemeral" >> "$GITHUB_OUTPUT"
+          echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
+          echo "version=$refresh_version" >> "$GITHUB_OUTPUT"
+
       # Keep the async authority SQL a draft in the repository. This ordered runner-local copy
       # exercises it only after the ACL35 schema/helper draft; the version assertion makes that
       # dependency visible in the exact disposable migration chain. No production migration is
@@ -149,7 +218,20 @@ jobs:
           test -f "$test_file"
           acl_state='${{ steps.acl-draft.outputs.state }}'
           acl_version='${{ steps.acl-draft.outputs.version }}'
-          if [[ "$acl_state" == absent || ! "$acl_version" =~ ^[0-9]{14}$ ]]; then
+          refresh_state='${{ steps.acl-refresh-draft.outputs.state }}'
+          refresh_version='${{ steps.acl-refresh-draft.outputs.version }}'
+          order_version="$acl_version"
+          if [[ "$refresh_state" == ephemeral ]]; then
+            if [[ ! "$refresh_version" =~ ^[0-9]{14}$ ]]; then
+              echo "ACL refresh stage returned no ordered migration version." >&2
+              exit 1
+            fi
+            order_version="$refresh_version"
+          elif [[ "$refresh_state" != absent ]]; then
+            echo "ACL refresh stage returned an unexpected state." >&2
+            exit 1
+          fi
+          if [[ "$acl_state" == absent || ! "$order_version" =~ ^[0-9]{14}$ ]]; then
             echo "Async authority draft requires the ACL draft migration to be present first." >&2
             exit 1
           fi
@@ -161,14 +243,14 @@ jobs:
             exit 1
           fi
 
-          # The CLI versions migrations to the current UTC second. Wait for the ACL version's
-          # successor second so equal-version artifacts can never reverse the dependency order.
+          # The CLI versions migrations to the current UTC second. Wait for the last staged
+          # ACL dependency's successor second so equal-version artifacts cannot reverse order.
           now_version="$(date -u +%Y%m%d%H%M%S)"
-          if [[ "$acl_version" > "$now_version" ]]; then
-            echo "ACL migration version is in the future; cannot generate a later disposable migration now." >&2
+          if [[ "$order_version" > "$now_version" ]]; then
+            echo "ACL dependency version is in the future; cannot generate a later disposable migration now." >&2
             exit 1
           fi
-          while [[ ! "$now_version" > "$acl_version" ]]; do
+          while [[ ! "$now_version" > "$order_version" ]]; do
             sleep 1
             now_version="$(date -u +%Y%m%d%H%M%S)"
           done
@@ -177,13 +259,72 @@ jobs:
           test "${#generated[@]}" -eq 1
           [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_compile_job_viewer_authority\.sql$ ]]
           async_version="${BASH_REMATCH[1]}"
-          [[ "$async_version" > "$acl_version" ]]
+          [[ "$async_version" > "$order_version" ]]
           cp -- "$draft" "${generated[0]}"
           cmp -- "$draft" "${generated[0]}"
           sha256sum "$draft" "${generated[0]}"
           echo "state=ephemeral" >> "$GITHUB_OUTPUT"
           echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
           echo "version=$async_version" >> "$GITHUB_OUTPUT"
+
+      # The intake triage schema stays in drafts. Copy it only into this GitHub-hosted,
+      # throwaway Postgres rehearsal, after the existing ACL and async authority drafts.
+      # The named constraint and schema objects must be exercised after their prerequisites.
+      - name: Stage the reviewed intake triage draft after async authority
+        id: intake-triage-draft
+        run: |
+          set -euo pipefail
+          draft=supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql
+          test_source=supabase/drafts/tests/foundation_intake_triage_binding.sql
+          test_target=supabase/tests/foundation_intake_triage_binding.sql
+          if [[ ! -e "$draft" && ! -e "$test_source" ]]; then
+            echo "Neither intake triage draft nor its pgTAP test is present; no temporary migration needed."
+            echo "state=absent" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test -f "$draft"
+          test -f "$test_source"
+          test ! -e "$test_target"
+          async_state='${{ steps.async-authority-draft.outputs.state }}'
+          async_version='${{ steps.async-authority-draft.outputs.version }}'
+          if [[ "$async_state" == absent || ! "$async_version" =~ ^[0-9]{14}$ ]]; then
+            echo "Intake triage rehearsal requires ACL and async authority staging first." >&2
+            exit 1
+          fi
+
+          expected_migration_sha256=bbbb8e815a900b913a9982f1b0bf408a25dcdf563b2cbd963eb9f897db9c3cfd
+          expected_test_sha256=5c1576721a779cdd334938f5c5f9cb643cfea5af97f0ea6f3c09eb77fc77ef90
+          test "$(sha256sum "$draft" | cut -d ' ' -f 1)" = "$expected_migration_sha256"
+          test "$(sha256sum "$test_source" | cut -d ' ' -f 1)" = "$expected_test_sha256"
+          printf '%s  %s\n' "$expected_test_sha256" "$test_source" | sha256sum --check
+
+          shopt -s nullglob
+          existing=(supabase/migrations/*_foundation_intake_triage_v3.sql)
+          test "${#existing[@]}" -eq 0
+          now_version="$(date -u +%Y%m%d%H%M%S)"
+          if [[ "$async_version" > "$now_version" ]]; then
+            echo "Async authority migration version is in the future; cannot generate a later intake migration now." >&2
+            exit 1
+          fi
+          while [[ ! "$now_version" > "$async_version" ]]; do
+            sleep 1
+            now_version="$(date -u +%Y%m%d%H%M%S)"
+          done
+          supabase migration new foundation_intake_triage_v3
+          generated=(supabase/migrations/*_foundation_intake_triage_v3.sql)
+          test "${#generated[@]}" -eq 1
+          [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_foundation_intake_triage_v3\.sql$ ]]
+          intake_version="${BASH_REMATCH[1]}"
+          [[ "$intake_version" > "$async_version" ]]
+          cp -- "$draft" "${generated[0]}"
+          cmp -- "$draft" "${generated[0]}"
+          printf '%s  %s\n' "$expected_migration_sha256" "$draft" "$expected_migration_sha256" "${generated[0]}" | sha256sum --check
+          cp -- "$test_source" "$test_target"
+          cmp -- "$test_source" "$test_target"
+          printf '%s  %s\n' "$expected_test_sha256" "$test_source" "$expected_test_sha256" "$test_target" | sha256sum --check
+          echo "state=ephemeral" >> "$GITHUB_OUTPUT"
+          echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
+          echo "version=$intake_version" >> "$GITHUB_OUTPUT"
 
       # Artifact names are derived from the post-staging migration folder, so the schema
       # artifact is named by the exact temporary head that db reset will apply.

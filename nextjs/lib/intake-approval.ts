@@ -140,6 +140,11 @@ export type ApprovalPayload = {
   clientManifestDigest: string;
   scopeDigest: string;
   pricingFingerprint: string;
+  /** Null only for legacy approvals; never promotes an old attempt to reviewed. */
+  triageReceiptId: string | null;
+  triageVersion: string | null;
+  triageInventoryDigest: string | null;
+  configurationRevision: string | null;
   state: "approved" | "cancelled";
   expiresAt: string;
   expired: boolean;
@@ -202,6 +207,13 @@ export function readApprovalFilePayload(value: unknown): ApprovalFilePayload | n
 export function readApprovalPayload(value: unknown): ApprovalPayload | null {
   if (!value || typeof value !== "object") return null;
   const approval = value as Record<string, unknown>;
+  const triageFields = [approval.triageReceiptId, approval.triageVersion,
+    approval.triageInventoryDigest, approval.configurationRevision];
+  const legacyTriage = triageFields.every((field) => field === null || field === undefined);
+  const completeTriage = typeof approval.triageReceiptId === "string" && UUID.test(approval.triageReceiptId)
+    && approval.triageVersion === "tavonel-intake-triage-v1"
+    && typeof approval.triageInventoryDigest === "string" && SHA256_DIGEST_PATTERN.test(approval.triageInventoryDigest)
+    && typeof approval.configurationRevision === "string" && approval.configurationRevision.length > 0;
   if (typeof approval.approvalId !== "string" || !UUID.test(approval.approvalId)
     || typeof approval.attemptKey !== "string" || !ATTEMPT_KEY_PATTERN.test(approval.attemptKey)
     || typeof approval.clientManifestDigest !== "string" || !SHA256_DIGEST_PATTERN.test(approval.clientManifestDigest)
@@ -212,7 +224,7 @@ export function readApprovalPayload(value: unknown): ApprovalPayload | null {
     || typeof approval.expired !== "boolean" || typeof approval.compilable !== "boolean"
     || !count(approval.fileCount) || !count(approval.aggregateMaximumPages)
     || !count(approval.aggregateReservedCredits) || !count(approval.aggregateMaximumCredits)
-    || !Array.isArray(approval.files)) {
+    || !Array.isArray(approval.files) || (!legacyTriage && !completeTriage)) {
     return null;
   }
   const files = approval.files.map(readApprovalFilePayload);
@@ -225,6 +237,10 @@ export function readApprovalPayload(value: unknown): ApprovalPayload | null {
     clientManifestDigest: approval.clientManifestDigest,
     scopeDigest: approval.scopeDigest,
     pricingFingerprint: approval.pricingFingerprint,
+    triageReceiptId: completeTriage ? approval.triageReceiptId as string : null,
+    triageVersion: completeTriage ? approval.triageVersion as string : null,
+    triageInventoryDigest: completeTriage ? approval.triageInventoryDigest as string : null,
+    configurationRevision: completeTriage ? approval.configurationRevision as string : null,
     state: approval.state,
     expiresAt: approval.expiresAt,
     expired: approval.expired,
@@ -302,6 +318,7 @@ export type IntakeAttemptRecord = {
   scopeDigest: string;
   pricingFingerprint: string;
   clientManifestDigest: string;
+  triageReceiptId?: string | null;
   aggregateMaximumCredits: number;
   expiresAt: string;
   files: Array<{
@@ -330,6 +347,8 @@ export function readIntakeAttemptRecord(value: unknown): IntakeAttemptRecord | n
     || typeof record.pricingFingerprint !== "string" || !SHA256_DIGEST_PATTERN.test(record.pricingFingerprint)
     || typeof record.clientManifestDigest !== "string" || !SHA256_DIGEST_PATTERN.test(record.clientManifestDigest)
     || !count(record.aggregateMaximumCredits)
+    || !(record.triageReceiptId === undefined || record.triageReceiptId === null
+      || (typeof record.triageReceiptId === "string" && UUID.test(record.triageReceiptId)))
     || typeof record.expiresAt !== "string" || !Array.isArray(record.files)
     || record.files.length < 1 || record.files.length > MAX_APPROVAL_FILES) {
     return null;
@@ -365,6 +384,7 @@ export function readIntakeAttemptRecord(value: unknown): IntakeAttemptRecord | n
     scopeDigest: record.scopeDigest,
     pricingFingerprint: record.pricingFingerprint,
     clientManifestDigest: record.clientManifestDigest,
+    triageReceiptId: record.triageReceiptId as string | null | undefined,
     aggregateMaximumCredits: record.aggregateMaximumCredits as number,
     expiresAt: record.expiresAt,
     files,
@@ -446,7 +466,7 @@ export type ApprovedMember = {
   approvedMaximumCredits: number;
 };
 
-export type ApprovedAttempt = { attemptKey: string; scopeDigest: string; pricingFingerprint: string };
+export type ApprovedAttempt = { attemptKey: string; scopeDigest: string; pricingFingerprint: string; triageReceiptId?: string | null };
 
 type Reply = { kind: "answer"; status: number; json: Record<string, unknown> } | { kind: "lost" };
 
@@ -474,11 +494,78 @@ async function send(deps: ApprovedUploadDeps, path: string, init: { method: "GET
   }
 }
 
-/** The authoritative state of an attempt, or null when it could not be read. */
-export async function readApprovalStatus(deps: Pick<ApprovedUploadDeps, "fetch" | "token">, attemptKey: string) {
+export type ApprovalStatusRead =
+  | { kind: "found"; approval: ApprovalPayload }
+  | { kind: "not_found" }
+  | { kind: "unavailable" };
+
+/** Distinguishes an authoritative absence from a failed or ambiguous status read. */
+export async function readApprovalStatusResult(
+  deps: Pick<ApprovedUploadDeps, "fetch" | "token">,
+  attemptKey: string,
+): Promise<ApprovalStatusRead> {
   const reply = await send(deps as ApprovedUploadDeps, `/api/uploads/approval?attemptKey=${encodeURIComponent(attemptKey)}`, { method: "GET" });
-  if (reply.kind !== "answer" || reply.status !== 200) return null;
-  return readApprovalPayload(reply.json.approval);
+  if (reply.kind !== "answer") return { kind: "unavailable" };
+  if (reply.status === 404 && reply.json.code === "INTAKE_APPROVAL_NOT_FOUND") return { kind: "not_found" };
+  if (reply.status !== 200) return { kind: "unavailable" };
+  const approval = readApprovalPayload(reply.json.approval);
+  return approval ? { kind: "found", approval } : { kind: "unavailable" };
+}
+
+export type ApprovalPostResult =
+  | { kind: "approved"; approval: ApprovalPayload }
+  | { kind: "not_found" }
+  | { kind: "unavailable" }
+  | { kind: "rejected"; status: number; code: string | null; quote: Record<string, unknown> | null };
+
+/** Submit/replay the same attempt identity and reconcile every ambiguous reply by status. */
+export async function postApprovalAndReconcile(
+  deps: Pick<ApprovedUploadDeps, "fetch" | "token">,
+  attemptKey: string,
+  approvalBody: Record<string, unknown>,
+  maxAttempts = 3,
+): Promise<ApprovalPostResult> {
+  for (let attempt = 0; attempt < Math.max(1, maxAttempts); attempt += 1) {
+    const reply = await send(deps as ApprovedUploadDeps, "/api/uploads/approval", { method: "POST", body: approvalBody });
+    if (reply.kind === "answer" && reply.status < 500 && (reply.status < 200 || reply.status >= 300)) {
+      return {
+        kind: "rejected", status: reply.status,
+        code: typeof reply.json.code === "string" ? reply.json.code : null,
+        quote: reply.json.quote && typeof reply.json.quote === "object" && !Array.isArray(reply.json.quote)
+          ? reply.json.quote as Record<string, unknown> : null,
+      };
+    }
+    if (reply.kind === "answer" && reply.status >= 200 && reply.status < 300) {
+      const approval = readApprovalPayload(reply.json.approval);
+      if (approval) return { kind: "approved", approval };
+    }
+
+    const status = await readApprovalStatusResult(deps, attemptKey);
+    if (status.kind === "found") return { kind: "approved", approval: status.approval };
+    if (status.kind === "unavailable") return { kind: "unavailable" };
+    // Only a definite 404 permits a replay, always with this same attempt key/body.
+  }
+  return { kind: "not_found" };
+}
+
+export async function reconcilePriorAttemptForNewLineage(
+  deps: Pick<ApprovedUploadDeps, "fetch" | "token">,
+  attemptKey: string,
+): Promise<{ kind: "safe_to_replace"; prior: "not_found" | "cancelled" } | { kind: "blocked"; reason: "unavailable" | "active" }> {
+  const result = await readApprovalStatusResult(deps, attemptKey);
+  if (result.kind === "not_found") return { kind: "safe_to_replace", prior: "not_found" };
+  if (result.kind === "unavailable") return { kind: "blocked", reason: "unavailable" };
+  if (result.approval.state === "cancelled" && result.approval.files.length > 0
+    && result.approval.files.every((file) => file.fileState === "cancelled")) {
+    return { kind: "safe_to_replace", prior: "cancelled" };
+  }
+  return { kind: "blocked", reason: "active" };
+}
+
+/** Compatibility helper for callers that only need the approved payload. */
+export async function readApprovalStatus(deps: Pick<ApprovedUploadDeps, "fetch" | "token">, attemptKey: string) {
+  const result = await readApprovalStatusResult(deps, attemptKey);
+  return result.kind === "found" ? result.approval : null;
 }
 
 export async function cancelFailedIntakeSetMember(
@@ -538,10 +625,21 @@ export async function uploadApprovedMember(
       if (held?.fileState === "confirmed") return { status: "confirmed", documentId: held.documentId };
       return { status: "uncertain", code, documentId: held?.documentId ?? null };
     }
-    if (reply.status !== 200 || typeof reply.json.uploadUrl !== "string" || typeof reply.json.documentId !== "string") {
+    const isTriageObjectReady = reply.json.code === "TRIAGE_OBJECT_READY"
+      && reply.json.uploadUrl === null
+      && typeof attempt.triageReceiptId === "string"
+      && reply.json.triageReceiptId === attempt.triageReceiptId
+      && reply.json.contentSha256 === member.contentSha256
+      && typeof reply.json.objectVersion === "string"
+      && reply.json.objectVersion.length > 0;
+    const hasUploadUrl = typeof reply.json.uploadUrl === "string";
+    if (attempt.triageReceiptId && !isTriageObjectReady) {
+      return { status: "failed", code: "TRIAGE_OBJECT_READY_REQUIRED", documentId: null };
+    }
+    if (reply.status !== 200 || (!hasUploadUrl && !isTriageObjectReady) || typeof reply.json.documentId !== "string") {
       return { status: "failed", code, documentId: null };
     }
-    capability = reply.json;
+    capability = { ...reply.json, __triagePresealed: isTriageObjectReady };
   }
   if (!capability) {
     const held = await lookup();
@@ -567,11 +665,16 @@ export async function uploadApprovedMember(
   deps.onPhase?.("reserved", documentId, null);
 
   // 2. The PUT, straight to quarantine. Same URL, same bytes on retry.
-  let put: PutOutcome = { ok: false, reason: "network", status: 0 };
-  for (let attemptIndex = 0; attemptIndex < tries; attemptIndex += 1) {
-    deps.onPhase?.("put_sent", documentId, null);
-    put = await deps.put(capability.uploadUrl as string, String(capability.declaredMimeType ?? member.mimeType));
-    if (put.ok || put.reason === "aborted" || (put.reason === "http" && put.status >= 400 && put.status < 500)) break;
+  const presealedByTriage = capability.__triagePresealed === true;
+  let put: PutOutcome = presealedByTriage
+    ? { ok: true, sourceSha256: member.contentSha256 }
+    : { ok: false, reason: "network", status: 0 };
+  if (!presealedByTriage) {
+    for (let attemptIndex = 0; attemptIndex < tries; attemptIndex += 1) {
+      deps.onPhase?.("put_sent", documentId, null);
+      put = await deps.put(capability.uploadUrl as string, String(capability.declaredMimeType ?? member.mimeType));
+      if (put.ok || put.reason === "aborted" || (put.reason === "http" && put.status >= 400 && put.status < 500)) break;
+    }
   }
   if (put.ok && put.sourceSha256 !== null && put.sourceSha256 !== member.contentSha256) {
     // The bytes sent are not the bytes approved. Never confirm them.

@@ -16,6 +16,8 @@ export default defineConfig({
     include: [
       ...inheritedIncludes,
       "components/compile-stage.test.tsx",
+      "components/intake-triage-review.interaction.test.ts",
+      "components/intake-triage-review.test.tsx",
       "app/api/documents/**/route.test.ts",
       "app/api/compile-jobs/route.test.ts",
     ],

@@ -13,8 +13,10 @@ import {
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "@/lib/supabase-admin";
 import { assessTrialSourceReuse } from "@/lib/trial-source-risk";
 import { readFoundationIntakeApproval } from "@/lib/compute-reservation";
+import { readReadyUploadTriage } from "@/lib/intake-triage-server";
 import { ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
 import { intakePricingFingerprint } from "@/lib/usage-pricing";
+import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -127,6 +129,16 @@ export async function POST(request: Request) {
     workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, attemptKey,
   });
   if (!approval.ok) return NextResponse.json({ code: approval.code }, { status: approval.status, headers });
+  const hasTriageLineage = [approval.result.triageReceiptId, approval.result.triageVersion,
+    approval.result.triageInventoryDigest, approval.result.configurationRevision]
+    .some((value) => value !== null && value !== undefined);
+  if (hasTriageLineage && !INTAKE_TRIAGE_ROLLOUT_ENABLED) {
+    return NextResponse.json({ code: "INTAKE_TRIAGE_ROLLOUT_DISABLED" }, { status: 503, headers });
+  }
+  if (INTAKE_TRIAGE_ROLLOUT_ENABLED && (!approval.result.triageReceiptId || approval.result.triageVersion !== "tavonel-intake-triage-v1"
+    || !approval.result.triageInventoryDigest || !approval.result.configurationRevision)) {
+    return NextResponse.json({ code: "INTAKE_RETRIAGE_REQUIRED" }, { status: 409, headers });
+  }
   if (approval.result.pricingFingerprint !== await intakePricingFingerprint()) {
     return NextResponse.json({ code: "INTAKE_PRICE_STALE" }, { status: 409, headers });
   }
@@ -134,6 +146,27 @@ export async function POST(request: Request) {
   if (!approvedFile || approvedFile.documentId !== documentId || approval.result.scopeDigest !== scopeDigest
     || approvedFile.contentSha256 !== sourceSha256) {
     return NextResponse.json({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" }, { status: 409, headers });
+  }
+  let sourceEntry: { byteLength: number; mimeType: string; contentSha256: string } = approvedFile;
+  let objectVersion: string | null = null;
+  if (INTAKE_TRIAGE_ROLLOUT_ENABLED) {
+    const triage = await readReadyUploadTriage({
+      workspaceKey: auth.principal.workspaceKey,
+      userId: auth.principal.userId,
+      receiptId: approval.result.triageReceiptId!,
+    });
+    if (!triage.ok) return NextResponse.json({ code: triage.code }, { status: triage.status, headers });
+    const observed = triage.result.entries.find((entry) => entry.fileKey === fileKey);
+    const binding = triage.result.receipt.fileBindings.find((item) => item.fileKey === fileKey);
+    if (triage.result.receipt.inventoryDigest !== approval.result.triageInventoryDigest
+      || triage.result.receipt.configurationRevision !== approval.result.configurationRevision
+      || !observed || observed.contentSha256 !== approvedFile.contentSha256
+      || !binding || binding.documentId !== documentId || typeof binding.objectVersion !== "string"
+      || binding.objectVersion.length < 1) {
+      return NextResponse.json({ code: "INTAKE_RETRIAGE_REQUIRED" }, { status: 409, headers });
+    }
+    sourceEntry = observed;
+    objectVersion = binding.objectVersion;
   }
 
   // Approval may be revoked after a short-lived capability was issued.
@@ -146,6 +179,10 @@ export async function POST(request: Request) {
   const object = await headFoundationQuarantineObject(signer, auth.principal.workspaceKey, documentId);
   if (!object.ok) return NextResponse.json({ code: object.code }, { status: 503, headers });
   if (!object.exists) return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+  if (object.sizeBytes !== sourceEntry.byteLength || object.contentType !== sourceEntry.mimeType
+    || (objectVersion !== null && object.etag !== objectVersion)) {
+    return NextResponse.json({ code: "INTAKE_TRIAGE_OBJECT_CHANGED" }, { status: 409, headers });
+  }
 
   /*
    * What arrived, checked against what was claimed (blueprint §36, S-66).

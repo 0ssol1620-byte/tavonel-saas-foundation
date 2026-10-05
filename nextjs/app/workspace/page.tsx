@@ -31,13 +31,17 @@ import {
   cancelFailedIntakeSetMember,
   saveIntakeAttempt,
   loadIntakeAttempt,
+  clearIntakeAttempt,
   readApprovalStatus,
-  readApprovalPayload,
+  readApprovalStatusResult,
+  postApprovalAndReconcile,
+  reconcilePriorAttemptForNewLineage,
   matchReselection,
   shouldReuseAttemptKey,
   compilableDocumentIds as approvedCompilableDocumentIds,
   type IntakeAttemptRecord,
 } from "@/lib/intake-approval";
+import type { TriageProcessingQuote } from "@/lib/intake-triage-client";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
 import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
@@ -54,6 +58,7 @@ import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
+import IntakeTriageReview from "@/components/intake-triage-review";
 import workspaceStateStyles from "./workspace-states.module.css";
 import {
   deriveAttentionItems,
@@ -344,6 +349,7 @@ export default function WorkspacePage() {
   */
   const followRef = useRef<AbortController | null>(null);
   const [stagedSelection, setStagedSelection] = useState<WorkspaceSelection | null>(null);
+  const [stagedSelectionRevision, setStagedSelectionRevision] = useState("");
   /*
     Real page counts for the staged selection, measured before anything is uploaded.
 
@@ -1523,7 +1529,7 @@ export default function WorkspacePage() {
    * failure and silently abandoned the rest; the ones already in the bucket are still there and
    * still being read, so the report now names the failure and keeps going.
    */
-  const uploadDocuments = async (files: File[], measured = stagedPageCounts) => {
+  const uploadDocuments = async (files: File[], measured = stagedPageCounts, triageApproval?: { quote: TriageProcessingQuote }): Promise<true | "stale" | "uncertain" | undefined> => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
@@ -1543,7 +1549,7 @@ export default function WorkspacePage() {
         const mimeType = declared && validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: declared }).valid
           ? declared
           : Object.keys(qualifiedDocumentInputs).find((candidate) => validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: candidate }).valid) ?? "";
-        const measuredFile = measured?.[index];
+        const measuredFile = triageApproval ? null : measured?.[index];
         const claimedPages = measuredFile?.pages ?? null;
         const claimedBasis = measuredFile && "basis" in measuredFile ? measuredFile.basis : null;
         return {
@@ -1561,19 +1567,62 @@ export default function WorkspacePage() {
         setNotice("A selected file has no supported filename and MIME pairing. Nothing was approved or uploaded.");
         return;
       }
-      const quote = quoteIntakeManifest(manifest.map((entry) => ({
+      let processingManifest = manifest;
+      if (triageApproval) {
+        const expectedKeys = triageApproval.quote.files.map((entry) => entry.fileKey);
+        if (new Set(expectedKeys).size !== expectedKeys.length) {
+          setNotice("The server quote contains duplicate sources. Nothing was approved or processed.");
+          return;
+        }
+        const expected = new Set(expectedKeys);
+        processingManifest = manifest.filter((entry) => expected.has(entry.fileKey));
+        if (processingManifest.length !== expectedKeys.length) {
+          setNotice("The selected browser files no longer match the server-qualified receipt. Refresh source review before approving.");
+          return;
+        }
+      }
+      const localQuote = triageApproval ? null : quoteIntakeManifest(processingManifest.map((entry) => ({
         bytes: entry.byteLength, mimeType: entry.mimeType,
         claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
       })));
-      if (!quote.ok) { setNotice(`This selected set cannot be approved (${quote.code}). Nothing was uploaded.`); return; }
-      const clientManifestDigest = await intakeManifestDigest(manifest);
+      if (localQuote && !localQuote.ok) { setNotice(`This selected set cannot be approved (${localQuote.code}). Nothing was uploaded.`); return; }
+      const clientManifestDigest = await intakeManifestDigest(processingManifest);
       const pricingFingerprint = await intakePricingFingerprint();
+      if (triageApproval && (clientManifestDigest !== triageApproval.quote.clientManifestDigest
+        || pricingFingerprint !== triageApproval.quote.pricingFingerprint)) {
+        setNotice("The selected source bytes or published pricing changed after the quote. No processing approval was submitted; review and quote again.");
+        return "stale";
+      }
+      const maximumCredits = triageApproval?.quote.quote.maximumCredits
+        ?? (localQuote?.ok ? localQuote.quote.maximumCredits : 0);
       const previous = loadIntakeAttempt(window.localStorage);
-      const fileKeys = manifest.map((entry) => entry.fileKey);
-      const sameCandidate = previous ? matchReselection(previous, fileKeys).ok && Date.parse(previous.expiresAt) > Date.now() : false;
-      const previousApproval = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
-        && previous!.pricingFingerprint === pricingFingerprint
-        ? await readApprovalStatus({ fetch, token: async () => token }, previous!.attemptKey) : null;
+      const fileKeys = processingManifest.map((entry) => entry.fileKey);
+      const lineageMatches = triageApproval
+        ? previous?.triageReceiptId === triageApproval.quote.triageReceiptId
+        : previous?.triageReceiptId == null;
+      if (previous && !lineageMatches && matchReselection(previous, fileKeys).ok) {
+        const prior = await reconcilePriorAttemptForNewLineage({ fetch, token: async () => token }, previous.attemptKey);
+        if (prior.kind === "safe_to_replace") {
+          clearIntakeAttempt(window.localStorage);
+        } else {
+          setNotice(prior.reason === "unavailable"
+            ? "The saved approval status could not be checked. The prior attempt is preserved; retry only after status is available. No new approval was submitted."
+            : "A saved approval for these exact source bytes belongs to another receipt or intake path. Reconcile that attempt before creating a new approval; this prevents duplicate reservations or charges.");
+          return "uncertain";
+        }
+      }
+      const sameCandidate = !!previous && lineageMatches && matchReselection(previous, fileKeys).ok
+        && Date.parse(previous.expiresAt) > Date.now();
+      const needsPreviousRead = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint;
+      const previousRead = needsPreviousRead
+        ? await readApprovalStatusResult({ fetch, token: async () => token }, previous!.attemptKey)
+        : { kind: "not_found" as const };
+      if (previousRead.kind === "unavailable") {
+        setNotice("The saved approval status is temporarily unavailable. The attempt is preserved; no duplicate approval was submitted.");
+        return "uncertain";
+      }
+      const previousApproval = previousRead.kind === "found" ? previousRead.approval : null;
       const sameReselection = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
         && previous!.pricingFingerprint === pricingFingerprint
         && shouldReuseAttemptKey(previousApproval);
@@ -1582,9 +1631,10 @@ export default function WorkspacePage() {
       const pendingRecord: IntakeAttemptRecord = {
         version: 1, attemptKey, approvalId: sameReselection ? previous!.approvalId : crypto.randomUUID(),
         scopeDigest: sameReselection ? previous!.scopeDigest : `sha256:${"0".repeat(64)}`,
-        pricingFingerprint, clientManifestDigest, aggregateMaximumCredits: quote.quote.maximumCredits,
+        pricingFingerprint, clientManifestDigest, triageReceiptId: triageApproval?.quote.triageReceiptId ?? null,
+        aggregateMaximumCredits: maximumCredits,
         expiresAt: sameReselection ? previous!.expiresAt : new Date(Date.now() + 10 * 60_000).toISOString(),
-        files: manifest.map((entry) => ({
+        files: processingManifest.map((entry) => ({
           fileKey: entry.fileKey, relativePath: entry.relativePath, contentSha256: entry.contentSha256,
           byteLength: entry.byteLength, mimeType: entry.mimeType,
           documentId: sameReselection ? previous!.files.find((file) => file.fileKey === entry.fileKey)?.documentId ?? null : null,
@@ -1599,48 +1649,57 @@ export default function WorkspacePage() {
       }
       const approvalBody = {
         attemptKey, clientManifestDigest, pricingFingerprint,
-        aggregateMaximumCredits: quote.quote.maximumCredits,
-        files: manifest.map((entry) => ({
+        aggregateMaximumCredits: maximumCredits,
+        ...(triageApproval ? { triageReceiptId: triageApproval.quote.triageReceiptId } : {}),
+        ...(!triageApproval ? { files: processingManifest.map((entry) => ({
           fileKey: entry.fileKey, contentSha256: entry.contentSha256, byteLength: entry.byteLength,
           mimeType: entry.mimeType, claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
           originalFilename: entry.file.name,
-        })),
+        })) } : {}),
       };
-      let approval = sameReselection
-        ? await readApprovalStatus({ fetch, token: async () => token }, attemptKey)
-        : null;
-      if (approval && (approval.clientManifestDigest !== clientManifestDigest || approval.pricingFingerprint !== pricingFingerprint)) {
+      let approval = sameReselection ? previousApproval : null;
+      if (approval && (approval.clientManifestDigest !== clientManifestDigest || approval.pricingFingerprint !== pricingFingerprint
+        || approval.triageReceiptId !== (triageApproval?.quote.triageReceiptId ?? null))) {
         setNotice("The saved attempt no longer matches this content or pricing. Review and approve the current selection again.");
         return;
       }
-      for (let n = 0; n < 3 && !approval; n += 1) {
-        try {
-          const response = await fetch("/api/uploads/approval", {
-            method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-            body: JSON.stringify(approvalBody), cache: "no-store",
-          });
-          const result = await response.json().catch(() => null) as { approval?: unknown; code?: string; quote?: { maximumUsd?: number } } | null;
-          if (response.ok) approval = readApprovalPayload(result?.approval);
-          else if (response.status < 500) {
-            setNotice(result?.code === "INTAKE_PRICE_STALE"
-              ? "Pricing changed since this estimate. Review the refreshed maximum and approve again. Nothing was uploaded."
-              : result?.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
-                ? `The server recalculated this set's maximum as ${formatUsd(result.quote?.maximumUsd ?? Number.NaN)}. Review and approve the refreshed quote again. Nothing was uploaded.`
-                : "The complete set was not approved. Nothing was uploaded. Review the reason and retry the complete set.");
-            return;
+      if (!approval) {
+        const submitted = await postApprovalAndReconcile({ fetch, token: async () => token }, attemptKey, approvalBody);
+        if (submitted.kind === "approved") approval = submitted.approval;
+        else if (submitted.kind === "unavailable") {
+          setNotice("Approval status is unavailable after the request. The pending attempt is preserved; retry the same receipt and quote after status can be reconciled.");
+          return "uncertain";
+        } else if (submitted.kind === "rejected") {
+          if (triageApproval && (submitted.code === "INTAKE_PRICE_STALE"
+            || submitted.code === "INTAKE_RETRIAGE_REQUIRED" || submitted.code === "INTAKE_TRIAGE_RECEIPT_STALE")) {
+            const prior = await readApprovalStatusResult({ fetch, token: async () => token }, attemptKey);
+            if (prior.kind === "not_found") {
+              clearIntakeAttempt(window.localStorage);
+              setNotice("The quote or receipt is stale and no approval was created. Start source review again to get a fresh receipt and quote.");
+              return "stale";
+            }
+            setNotice("The quote or receipt was rejected, but the saved attempt could not be safely cleared. Keep it for reconciliation; do not submit another approval until status is confirmed.");
+            return "uncertain";
           }
-        } catch { /* repeat the same attempt identity, then look it up */ }
-        if (!approval) approval = await readApprovalStatus({ fetch, token: async () => token }, attemptKey);
+          setNotice(submitted.code === "INTAKE_PRICE_STALE"
+            ? "Pricing changed since this estimate. Review the refreshed maximum and approve again. Nothing was uploaded."
+            : submitted.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
+              ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. Review and approve the refreshed quote again. Nothing was uploaded.`
+              : "The complete set was not approved. Nothing was uploaded. Review the reason and retry the complete set.");
+          return;
+        }
       }
-      if (!approval || approval.files.length !== manifest.length) {
+      if (!approval || approval.files.length !== processingManifest.length
+        || approval.triageReceiptId !== (triageApproval?.quote.triageReceiptId ?? null)) {
         setNotice("Approval result is uncertain. Recover this same attempt after reload; nothing compiles until every member is confirmed.");
         return;
       }
       const record: IntakeAttemptRecord = {
         version: 1, attemptKey, approvalId: approval.approvalId, scopeDigest: approval.scopeDigest,
         pricingFingerprint: approval.pricingFingerprint, clientManifestDigest,
+        triageReceiptId: triageApproval?.quote.triageReceiptId ?? null,
         aggregateMaximumCredits: approval.aggregateMaximumCredits, expiresAt: approval.expiresAt,
-        files: manifest.map((entry) => ({
+        files: processingManifest.map((entry) => ({
           fileKey: entry.fileKey, relativePath: entry.relativePath, contentSha256: entry.contentSha256,
           byteLength: entry.byteLength, mimeType: entry.mimeType,
           documentId: approval!.files.find((member) => member.fileKey === entry.fileKey)?.documentId ?? null,
@@ -1648,8 +1707,10 @@ export default function WorkspacePage() {
         })),
       };
       saveIntakeAttempt(window.localStorage, record);
-      setNotice(`Approved maximum ${formatUsd(approval.aggregateMaximumCredits / 100)} for all ${manifest.length} files. Uploading the complete set.`);
-      const settled = await runBounded(manifest, UPLOAD_CEILING, async (entry) => {
+      setNotice(triageApproval
+        ? `Approved maximum ${formatUsd(approval.aggregateMaximumCredits / 100)} for ${processingManifest.length} qualified sources. Reusing the server-sealed objects; no second upload is sent.`
+        : `Approved maximum ${formatUsd(approval.aggregateMaximumCredits / 100)} for all ${processingManifest.length} files. Uploading the complete set.`);
+      const settled = await runBounded(processingManifest, UPLOAD_CEILING, async (entry) => {
         const localId = `approved-${entry.fileKey}`;
         const approvedFile = approval!.files.find((member) => member.fileKey === entry.fileKey);
         if (!approvedFile) return { status: "failed" as const, code: "INTAKE_APPROVAL_FILE_MISSING", documentId: null };
@@ -1657,7 +1718,8 @@ export default function WorkspacePage() {
           ...current, { localId, filename: entry.relativePath, bytes: entry.byteLength, documentId: null, phase: "issuing", loaded: 0 },
         ]);
         const result = await uploadApprovedMember({
-          attempt: { attemptKey, scopeDigest: approval!.scopeDigest, pricingFingerprint },
+          attempt: { attemptKey, scopeDigest: approval!.scopeDigest, pricingFingerprint,
+            triageReceiptId: triageApproval?.quote.triageReceiptId ?? null },
           member: {
             fileKey: entry.fileKey, originalFilename: entry.file.name, contentSha256: entry.contentSha256,
             byteLength: entry.byteLength, mimeType: entry.mimeType,
@@ -1691,14 +1753,14 @@ export default function WorkspacePage() {
       });
       settled.forEach((item, index) => {
         if (item.ok) return;
-        const entry = manifest[index];
+        const entry = processingManifest[index];
         const saved = record.files.find((file) => file.fileKey === entry?.fileKey);
         if (saved) { saved.phase = "uncertain"; saved.code = "CLIENT_REQUEST_INTERRUPTED"; saveIntakeAttempt(window.localStorage, record); }
         if (entry) patchUpload(`approved-${entry.fileKey}`, { phase: "uncertain", reason: "CLIENT_REQUEST_INTERRUPTED" });
       });
       const failedMemberIndex = settled.findIndex((item) => item.ok && item.value.status === "failed");
       if (failedMemberIndex >= 0) {
-        const failedEntry = manifest[failedMemberIndex]!;
+        const failedEntry = processingManifest[failedMemberIndex]!;
         const cancelled = await cancelFailedIntakeSetMember(
           { attemptKey, scopeDigest: approval.scopeDigest, fileKey: failedEntry.fileKey },
           { fetch, token: async () => token },
@@ -1712,7 +1774,7 @@ export default function WorkspacePage() {
           file.code = cancelled.reconciliationRequired ? "BILLING_RECONCILIATION_REQUIRED" : "DEPENDENT_MEMBER_FAILED";
         });
         saveIntakeAttempt(window.localStorage, record);
-        manifest.forEach((entry) => patchUpload(`approved-${entry.fileKey}`, {
+        processingManifest.forEach((entry) => patchUpload(`approved-${entry.fileKey}`, {
           phase: "failed", reason: "DEPENDENT_MEMBER_FAILED",
         }));
         setNotice(cancelled.reconciliationRequired
@@ -1720,7 +1782,7 @@ export default function WorkspacePage() {
           : "One member failed. The approved set was cancelled, safe active holds were returned, and any completed charges were preserved; approve a fresh complete set to retry.");
         return;
       }
-      const complete = settled.length === manifest.length && settled.every((item) => item.ok && item.value.status === "confirmed");
+      const complete = settled.length === processingManifest.length && settled.every((item) => item.ok && item.value.status === "confirmed");
       if (!complete) {
         const uncertain = settled.some((item) => item.ok && item.value.status === "uncertain");
         setNotice(uncertain
@@ -1730,11 +1792,12 @@ export default function WorkspacePage() {
       }
       const final = await readApprovalStatus({ fetch, token: async () => token }, attemptKey);
       const ids = approvedCompilableDocumentIds(final, fileKeys);
-      if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok) {
+      if (!ids || ids.length !== processingManifest.length || !judgeCorpusSet(ids.length).ok) {
         setNotice("The server has not confirmed the complete approved set. Nothing was compiled.");
         return;
       }
       await startDurableCompile(ids);
+      return true;
     } catch {
       setNotice("Intake stopped before a verified complete result. Re-select the exact same files to recover the server's attempt status; nothing compiles while status is uncertain.");
     } finally {
@@ -1743,8 +1806,11 @@ export default function WorkspacePage() {
   };
 
   const stageWorkspaceFiles = async (files: File[]) => {
-    if (files.length === 0) return;
+    if (files.length === 0 || busy) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
+    // Invalidate triage state as soon as a new selection starts preparing.
+    setStagedSelection(null);
+    setStagedSelectionRevision(crypto.randomUUID());
     // A prior selection's measurements cannot price this newly chosen file set.
     setStagedPageCounts(null);
     expanderRef.current ??= createArchiveExpander();
@@ -1760,22 +1826,28 @@ export default function WorkspacePage() {
       if (controller.signal.aborted) return;
       if (prepared.files.length === 0) {
         setStagedSelection(prepared);
+        setStagedSelectionRevision(crypto.randomUUID());
         setNotice("No supported files were found. Nothing was uploaded or processed.");
         return;
       }
       setStagedSelection(prepared);
+      setStagedSelectionRevision(crypto.randomUUID());
       setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} ready for preflight. Nothing has been uploaded or processed yet.`);
     } catch (error) {
+      if (controller.signal.aborted) return;
       setStagedSelection(null);
+      setStagedSelectionRevision("");
       const reason = error instanceof Error ? error.message : "INVALID_SELECTION";
       // Cancelling is something the visitor did, not something that went wrong.
       setNotice(reason === "ARCHIVE_CANCELLED" || reason === "SELECTION_CANCELLED"
         ? "Selection cancelled. Nothing was uploaded."
         : `Preflight blocked this selection (${reason}). Nothing was uploaded.`);
     } finally {
-      setStaging(null);
-      if (fileRef.current) fileRef.current.value = "";
-      if (folderRef.current) folderRef.current.value = "";
+      if (stagingAbortRef.current === controller) {
+        setStaging(null);
+        if (fileRef.current) fileRef.current.value = "";
+        if (folderRef.current) folderRef.current.value = "";
+      }
     }
   };
 
@@ -1926,6 +1998,7 @@ export default function WorkspacePage() {
     // The counts the accepted quote was formed from. Clearing the selection resets the state.
     const counts = stagedPageCounts;
     setStagedSelection(null);
+    setStagedSelectionRevision("");
 
     /*
       Make the product experience match the promise the visitor just saw on the landing page.
@@ -1942,6 +2015,20 @@ export default function WorkspacePage() {
     navigateSurface("sources");
 
     await uploadDocuments(files, counts);
+  };
+
+  const startTriageCompile = async (quote: TriageProcessingQuote): Promise<"completed" | "stale" | "uncertain" | "blocked"> => {
+    if (!stagedSelection?.files.length || quote.triageReceiptId === "") return "blocked";
+    const files = stagedSelection.files.map((entry) => entry.file);
+    const completed = await uploadDocuments(files, null, { quote });
+    if (completed === true) {
+      setStagedSelection(null);
+      setStagedSelectionRevision("");
+      navigateSurface("sources");
+      return "completed";
+    }
+    if (completed === "stale" || completed === "uncertain") return completed;
+    return "blocked";
   };
 
   const uploadPublicProof = async () => {
@@ -2787,7 +2874,7 @@ export default function WorkspacePage() {
                   <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
                     <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
-                    Nothing has been uploaded yet. The maximum covers every selected file, including files whose pages are unknown. This action approves the displayed maximum for the complete set.
+                    Nothing has been uploaded yet. The preliminary maximum covers every selected file, including files whose pages are unknown. Continue to server inventory review before any full-processing approval; the bounded preflight does not authorize OCR, parsing, or compile.
                   </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
@@ -2863,8 +2950,28 @@ export default function WorkspacePage() {
                       blocks is a corpus the compile step would refuse and a count still in
                       flight, both of which are answers rather than the absence of one.
                     */}
-                    <button type="button" disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Approve maximum & upload"}</button>
-                    <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
+                    <IntakeTriageReview
+                      files={stagedSelection.files.map(({ file }) => ({
+                        file,
+                        relativePath: (file as WorkspaceUploadFile).tavonelRelativePath || file.webkitRelativePath || file.name,
+                        mimeType: (() => {
+                          const declared = normalizeDocumentMimeType(file.type);
+                          if (declared && validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: declared }).valid) return declared;
+                          return Object.keys(qualifiedDocumentInputs).find((candidate) => validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: candidate }).valid) ?? "";
+                        })(),
+                      }))}
+                      initialEstimate={stagedQuote ? { minimumUsd: stagedQuote.estimatedUsd, maximumUsd: stagedQuote.maximumUsd } : null}
+                      selectionRevision={stagedSelectionRevision}
+                      disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen}
+                      getToken={async () => {
+                        const client = getSupabaseBrowserClient();
+                        const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+                        return data.session?.access_token ?? null;
+                      }}
+                      onLegacyFallback={() => void startStagedCompile()}
+                      onProcessingApproval={startTriageCompile}
+                    />
+                    <button type="button" disabled={busy} onClick={() => { setStagedSelection(null); setStagedSelectionRevision(""); }}>Clear</button>
                   </div>
                 </div>
               ) : null}

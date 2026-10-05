@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
@@ -10,8 +10,11 @@ const registeredUnitTestPaths = new Set([
   'app/api/documents/[id]/progress/route.test.ts',
   'app/api/compile-jobs/route.test.ts',
   'components/compile-stage.test.tsx',
+  'components/intake-triage-review.interaction.test.ts',
+  'components/intake-triage-review.test.tsx',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -30,7 +33,7 @@ export function validateSelectedPath(value, kind, rootPath = repoRoot) {
   const pattern = kind === 'unit'
     ? /^lib\/(?:[A-Za-z0-9_\[\]-]+\/)*[A-Za-z0-9_.\[\]-]+\.test\.ts$/
     : /^e2e\/(?:[A-Za-z0-9_\[\]-]+\/)*[A-Za-z0-9_.\[\]-]+\.spec\.ts$/;
-  const registeredUnit = kind === 'unit' && registeredUnitTestPaths.has(value);
+  const registeredUnit = kind === 'unit' && (registeredUnitTestPaths.has(value) || nodeUnitTestPaths.has(value));
   if (!(pattern.test(value) || registeredUnit)) throw new Error(`Unsupported ${kind} path: ${JSON.stringify(value)}`);
 
   const root = realpathSync(rootPath);
@@ -77,6 +80,7 @@ const browserProjectsByFile = new Map([
   ['e2e/landing-hero-mobile.spec.ts', ['360', '390']],
   ['e2e/landing-hero-film-loading.spec.ts', ['390']],
   ['e2e/marketing-consent.spec.ts', ['1440', '390']],
+  ['e2e/workspace-intake-triage.spec.ts', ['1440']],
 ]);
 
 export function planBrowserRuns(files, runDetailIntegrity) {
@@ -114,8 +118,32 @@ export function requireUnitFiles(files) {
   return files;
 }
 
+export function buildNodeTestArgs(files) {
+  requireUnitFiles(files);
+  const unsupported = files.filter(file => !nodeUnitTestPaths.has(file));
+  if (unsupported.length) throw new Error('No reviewed Node test runner is registered for: ' + unsupported.join(', '));
+  return ['--test', '--test-reporter=tap', ...files];
+}
+
+export function validateNodeTapReport(output, selectedFiles) {
+  requireUnitFiles(selectedFiles);
+  if (selectedFiles.some(file => !nodeUnitTestPaths.has(file))) throw new Error('Node TAP report selection contains an unregistered test file.');
+  if (typeof output !== 'string' || !output.includes('TAP version 13')) throw new Error('Node TAP report is missing its protocol header.');
+  const plan = [...output.matchAll(/^\s*1\.\.(\d+)\s*$/gm)].at(-1)?.[1];
+  const count = pattern => Number(output.match(pattern)?.[1] ?? -1);
+  const tests = count(/^# tests (\d+)$/m);
+  const passed = count(/^# pass (\d+)$/m);
+  const failed = count(/^# fail (\d+)$/m);
+  const skipped = count(/^# skipped (\d+)$/m);
+  const todo = count(/^# todo (\d+)$/m);
+  if (plan === undefined || Number(plan) !== tests || tests < 1 || passed !== tests || failed !== 0 || skipped !== 0 || todo !== 0) {
+    throw new Error('Node TAP report must show executed passing tests for every selected Node test file.');
+  }
+  return { files: selectedFiles.length, tests, passed, failed, skipped, todo };
+}
 export function buildUnitArgs(files, reportPath) {
   requireUnitFiles(files);
+  if (files.some(file => file.endsWith('.mjs'))) throw new Error('Node test files must use the reviewed Node runner, not Vitest.');
   if (typeof reportPath !== 'string' || !reportPath) throw new Error('Vitest report path is required.');
   const args = ['exec', 'vitest', 'run'];
   if (files.includes(asyncRouteUnitTestPath)) args.push('--config', 'vitest.repair-scope.async.config.ts');
@@ -145,23 +173,48 @@ async function waitForServer(child, url) {
   throw new Error('Next server did not become ready within 120 seconds.');
 }
 
+async function runNodeUnit(files, reportPath) {
+  const args = buildNodeTestArgs(files);
+  const child = spawn(process.execPath, args, { cwd: repoRoot, env: process.env, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  const exitCode = await new Promise((resolveExit, rejectExit) => {
+    child.once('error', rejectExit);
+    child.once('close', resolveExit);
+  });
+  writeFileSync(reportPath, output);
+  const summary = validateNodeTapReport(output, files);
+  console.log('Node TAP report: ' + summary.passed + ' passed, ' + summary.failed + ' failed across ' + summary.files + ' selected files.');
+  if (exitCode !== 0) throw new Error('Node test runner exited with ' + exitCode + '.');
+}
+
 async function runUnit() {
   const plan = readPlan();
   const files = requireUnitFiles(plan.unitFiles.map(file => validateSelectedPath(file, 'unit')));
-  const reportPath = resolve(repoRoot, 'node_modules/.cache/repair-scope-reports/vitest.json');
-  mkdirSync(dirname(reportPath), { recursive: true });
+  const nodeFiles = files.filter(file => file.endsWith('.mjs'));
+  const unregisteredNodeFiles = nodeFiles.filter(file => !nodeUnitTestPaths.has(file));
+  if (unregisteredNodeFiles.length) throw new Error('Unregistered Node unit test files: ' + unregisteredNodeFiles.join(', '));
+  const vitestFiles = files.filter(file => !nodeUnitTestPaths.has(file));
+  const reportDir = resolve(repoRoot, 'node_modules/.cache/repair-scope-reports');
+  mkdirSync(reportDir, { recursive: true });
+  if (nodeFiles.length) {
+    const nodeReportPath = resolve(reportDir, 'node-tap.txt');
+    rmSync(nodeReportPath, { force: true });
+    await runNodeUnit(nodeFiles, nodeReportPath);
+  }
+  if (!vitestFiles.length) return;
+  const reportPath = resolve(reportDir, 'vitest.json');
   rmSync(reportPath, { force: true });
   let runError;
-  try {
-    await run('pnpm', buildUnitArgs(files, reportPath));
-  } catch (error) {
-    runError = error;
-  }
-  const summary = readAndValidateVitestReport(reportPath, files);
-  console.log(`Vitest report: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.failed} failed across ${summary.files} selected files.`);
+  try { await run('pnpm', buildUnitArgs(vitestFiles, reportPath)); }
+  catch (error) { runError = error; }
+  const summary = readAndValidateVitestReport(reportPath, vitestFiles);
+  console.log('Vitest report: ' + summary.passed + ' passed, ' + summary.skipped + ' skipped, ' + summary.failed + ' failed across ' + summary.files + ' selected files.');
   if (runError) throw runError;
 }
-
 async function runBrowser() {
   const plan = readPlan();
   const files = plan.browserFiles.map(file => validateSelectedPath(file, 'browser'));

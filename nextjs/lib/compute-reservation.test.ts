@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { reserveFoundationCompute, settleFoundationCompute } from "./compute-reservation";
+import { readFoundationIntakeApproval, reserveFoundationCompute, settleFoundationCompute } from "./compute-reservation";
 
 const base = {
   workspaceKey: "pilot-4444444444444444",
@@ -223,5 +223,67 @@ describe("Foundation compute ledger", () => {
       reasonCode: "OCR_TIMEOUT_OR_NETWORK",
     })).resolves.toMatchObject({ ok: true });
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining("settle_foundation_compute_v3"), expect.any(Object));
+  });
+
+  describe("lineage-aware approval reads while rollout is off", () => {
+    const attemptKey = "attempt_0123456789abcdef";
+    const legacyPayload = {
+      approvalId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", attemptKey,
+      clientManifestDigest: `sha256:${"a".repeat(64)}`, scopeDigest: `sha256:${"b".repeat(64)}`,
+      pricingFingerprint: `sha256:${"c".repeat(64)}`, state: "approved",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(), expired: false,
+      fileCount: 1, aggregateMaximumPages: 1, aggregateReservedCredits: 1, aggregateMaximumCredits: 1,
+      compilable: false, idempotentReplay: false,
+      files: [{ fileKey: "fk_12345678", documentId: base.documentId, fileState: "approved",
+        contentSha256: `sha256:${"d".repeat(64)}`, byteLength: 100, mimeType: "application/pdf",
+        pageBasis: "measured", approvedMaxPages: 1, approvedReservedCredits: 1,
+        approvedMaximumCredits: 1, reservationId: null, reservationState: null, reservationExpiresAt: null }],
+    };
+    const call = () => readFoundationIntakeApproval({
+      workspaceKey: base.workspaceKey, userId: base.userId, attemptKey,
+    });
+
+    it("reads actual triage lineage from the v2 RPC even when the rollout flag is off", async () => {
+      configure();
+      const triageReceiptId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        ...legacyPayload, triageLineageVersion: 1, triageReceiptId,
+        triageVersion: "tavonel-intake-triage-v1", triageInventoryDigest: `sha256:${"e".repeat(64)}`,
+        configurationRevision: "triage-config-1",
+      }), { status: 200 })));
+      await expect(call()).resolves.toMatchObject({ ok: true, result: { triageReceiptId } });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("read_foundation_intake_approval_v2"), expect.any(Object));
+    });
+
+    it("fails closed on a legacy-shaped response from the v2 RPC instead of fabricating legacy lineage", async () => {
+      configure();
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(legacyPayload), { status: 200 })));
+      await expect(call()).resolves.toEqual({ ok: false, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("read_foundation_intake_approval_v2"), expect.any(Object));
+    });
+
+    it("keeps a lineage-complete legacy approval readable when v2 explicitly proves null lineage", async () => {
+      configure();
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        ...legacyPayload, triageLineageVersion: 1, triageReceiptId: null, triageVersion: null,
+        triageInventoryDigest: null, configurationRevision: null,
+      }), { status: 200 })));
+      await expect(call()).resolves.toMatchObject({ ok: true, result: { triageReceiptId: null } });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("read_foundation_intake_approval_v2"), expect.any(Object));
+    });
+
+    it("fails closed when the lineage reader is unavailable instead of falling back to a legacy projection", async () => {
+      configure();
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => String(input).includes("read_foundation_intake_approval_v2")
+        ? new Response(JSON.stringify({ code: "PGRST202", message: "function read_foundation_intake_approval_v2 does not exist" }), { status: 404 })
+        : new Response(JSON.stringify(legacyPayload), { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(call()).resolves.toEqual({ ok: false, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0]?.[0]).toContain("read_foundation_intake_approval_v2");
+    });
   });
 });

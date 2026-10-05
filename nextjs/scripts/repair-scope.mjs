@@ -230,6 +230,44 @@ export const GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze([
   "lib/world-promotion-current-source.test.ts",
 ]);
 
+export const GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA = '1e1d46ad428aa04081bef359d7dd8012d0d87834';
+export const GOOGLE_DRIVE_ACL_REFRESH_BOUNDARY_PATH = 'supabase/drafts/google-viewer-principal-boundary.sql';
+export const GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS = new Set([
+  'lib/google-drive-acl-capture.ts',
+  GOOGLE_DRIVE_ACL_REFRESH_BOUNDARY_PATH,
+]);
+export const GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS = Object.freeze({
+  'app/api/internal/jobs/acl-refresh/route.ts': { predecessor: null, candidate: '515550b2e3f1a233d7e556556d5f82f3e43d33d3' },
+  'app/api/internal/jobs/run/route.ts': { predecessor: '9fa4e666ad79ea2f63f2bc4c06993f3e926dd170', candidate: '5f3f522a774ba2b8cae70e3b9e741e3f80863f48' },
+  'lib/acl-refresh-core.d.mts': { predecessor: null, candidate: 'fb5beb635d6a1e96a2dd4de16ad5862990e22ca4' },
+  'lib/acl-refresh-core.mjs': { predecessor: null, candidate: '642e86e62797e38b23fe5642068360d7315e6f2a' },
+  'lib/acl-refresh-core.test.mjs': { predecessor: null, candidate: 'ead351a2e2fc6bd80e9f21b4f0c8ec52d648bf3e' },
+  'lib/google-drive-acl-capture.ts': { predecessor: '489500dd94fce18950e2f1845e442a6bbe4b9404', candidate: 'd0889c42500f2904a8f222ca62db9478391420bd' },
+  'lib/google-drive-acl-refresh.test.ts': { predecessor: null, candidate: '090a8710d9641d80169899961c07b07dad002939' },
+  'lib/google-drive-acl-refresh.ts': { predecessor: null, candidate: '86103ec8da2facb984b464cf50245567cbd014df' },
+  'lib/internal-worker-auth.test.ts': { predecessor: null, candidate: '47a08a84b671f59a8d8078cd109d7f1fc9fe7cec' },
+  'lib/internal-worker-auth.ts': { predecessor: null, candidate: 'e0bea7bc42b4e843acd5fbfc1b10744afb5f5516' },
+  'lib/safe-url.test.ts': { predecessor: '02de32e66e9aa6a7aa57d1f8a5effcc3f4b2a03e', candidate: '7b744f4529b2d3ee8bbe5f99488478e639dd3edf' },
+  'lib/safe-url.ts': { predecessor: '9ad9392b05ccb854a084c61dd125774ff8bf4cdd', candidate: 'ba3e960af889be0ee33d37105040fe98988ab4f9' },
+  'supabase/drafts/google-drive-acl-refresh/README.md': { predecessor: null, candidate: 'c5fe1c4c5efa74ff4b001c111f4c6f11d2257412' },
+  'supabase/drafts/google-drive-acl-refresh/queue.sql': { predecessor: null, candidate: '61b9f81e6c0254d344f2761ed0a9551a6cebfea7' },
+  'supabase/drafts/google-drive-acl-refresh/tests/google_drive_acl_refresh_queue.sql': { predecessor: null, candidate: 'd2c721a0499c18a9b494e4abcd9ed06c2857d615' },
+  'supabase/drafts/google-viewer-principal-boundary.sql': { predecessor: 'd1cb532b646742cade16407e64da07dcda0499f2', candidate: '3a38a855d1c37bd23784fe5a98f4edfda4dd0f95' },
+});
+export const GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS = Object.freeze(Object.keys(GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS).sort());
+export const GOOGLE_DRIVE_ACL_REFRESH_TRIGGER_PATHS = Object.freeze(
+  GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS.filter(path => !GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path)),
+);
+export const GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS = Object.freeze([
+  'lib/acl-refresh-core.test.mjs',
+  'lib/google-drive-acl-capture.test.ts',
+  'lib/google-drive-acl-refresh.test.ts',
+  'lib/google-drive-viewer-principal.test.ts',
+  'lib/internal-worker-auth.test.ts',
+  'lib/pgtap-fixtures.test.ts',
+  'lib/safe-url.test.ts',
+]);
+
 export const ASYNC_COMPILE_JOB_AUTHORITY_PREDECESSOR_SHA = '2ff7c521233064915123dfbccb7680716d39cc28';
 export const ASYNC_COMPILE_JOB_AUTHORITY_PATHS = Object.freeze([
   'app/api/compile-jobs/route.test.ts',
@@ -277,6 +315,236 @@ export const ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS = Object.freeze([
   'lib/google-drive-viewer-link-request.test.ts',
   'lib/google-drive-viewer-principal.test.ts',
 ]);
+
+export const INTAKE_TRIAGE_PREDECESSOR_SHA = '8944cbfb0335f3120c71dc823b4106da5de4a6af';
+export const INTAKE_TRIAGE_REPAIR_CONFIG_BLOB = '6ae26121a08e403d45a05387901ce59c41cc0f12';
+export const INTAKE_TRIAGE_SOURCE_BLOBS = Object.freeze({
+  'app/api/uploads/approval/route.ts': {
+    predecessor: "cc645ca51f92610f52ab6e957e0485323ff9da56",
+    candidate: "a5943ee40741cf114a61a85286056d977e2fd886"
+  },
+  'app/api/uploads/capability/route.ts': {
+    predecessor: "419f132a6916bd67796dfbeebc5e3d5e1ff62f72",
+    candidate: "c242d9756d1761da98767b71dacf0710a2ff755a"
+  },
+  'app/api/uploads/confirm/route.ts': {
+    predecessor: "5e5e08ef67a3c98dccff62531833db697bca235f",
+    candidate: "97911e0dcd98d1bccb839af8e1fa70120079cf10"
+  },
+  'app/api/v1/uploads/quote/route.ts': {
+    predecessor: "8a47fbcdbb04e4111c33e1da6ee67701fc34ef8c",
+    candidate: "b57ea6ebaf1c0ff7f1e0679bd23e033ee9a56941"
+  },
+  'app/api/v1/uploads/triage/complete/route.ts': {
+    predecessor: null,
+    candidate: "8ad45c0212028d2d6e6eb1b1c8b27f83ca36446c"
+  },
+  'app/api/v1/uploads/triage/preflight/route.ts': {
+    predecessor: null,
+    candidate: "dc52896a81b97c988ac252345fdf7396df5d69a5"
+  },
+  'app/api/v1/uploads/triage/receipt/route.ts': {
+    predecessor: null,
+    candidate: "3e1e3ca0209a0979793bb49d91283a9c8f43966b"
+  },
+  'app/api/v1/uploads/triage/stage/route.ts': {
+    predecessor: null,
+    candidate: "2045df8d8f3633d9651b6a9aec8c8ecdb8958032"
+  },
+  'app/workspace/page.tsx': {
+    predecessor: "922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0",
+    candidate: "e9df90d1ef58006e4268d703917fed84be1bd5e8"
+  },
+  'components/intake-triage-review.interaction.test.ts': {
+    predecessor: null,
+    candidate: "4dd927224df839b7c9ef1624e0cbd47ad8bd3b04"
+  },
+  'components/intake-triage-review.test.tsx': {
+    predecessor: null,
+    candidate: "be27ee739c48ea0286f4d5b71f0f414fa3b336c6"
+  },
+  'components/intake-triage-review.tsx': {
+    predecessor: null,
+    candidate: "a77d49c5cb58563de34523888b5523245b022ec5"
+  },
+  'e2e/workspace-intake-triage.spec.ts': {
+    predecessor: null,
+    candidate: "0e78bd577e479648b71f49af145f1de709cf24a6"
+  },
+  'lib/compute-reservation.ts': {
+    predecessor: "792885c3b366b6df91f0583e9599540cc7f0509a",
+    candidate: "8f5fdb40d2fb3f5002cdd60518338c8ef1f63162"
+  },
+  'lib/compute-reservation.test.ts': {
+    predecessor: "79f42356c585d438b5c58a916f48e47dbb09ab44",
+    candidate: "f07e2e8620fe5041a3f99098a9d1accf689219f3"
+  },
+  'lib/intake-approval-route.test.ts': {
+    predecessor: "ab16bdf3128e8e8064c39ee96e566947e11cee79",
+    candidate: "a344ab60131bd87bb6028429511e912cbcf237a1"
+  },
+  'lib/intake-approval.test.ts': {
+    predecessor: "34732cf5c4b487538f3d46b7b50e277b3fc162ea",
+    candidate: "ac9efef5f367b46ede67094025bc333a6ddd4211"
+  },
+  'lib/intake-approval.ts': {
+    predecessor: "dd1d0368828d460baa3a0a0ada15f0f00a85294b",
+    candidate: "dfecbfa78f8553faa5f003f8f7c567d543b3c13c"
+  },
+  'lib/intake-capability-sealed-version.test.ts': {
+    predecessor: null,
+    candidate: "b7f65405feb0645f1cf5b1f484df4d527ed25368"
+  },
+  'lib/intake-rollout-compatibility.test.ts': {
+    predecessor: null,
+    candidate: "c43b494636a3bcd7c3dc2694bf661a0a999f8933"
+  },
+  'lib/intake-rollout-compile-compatibility.test.ts': {
+    predecessor: null,
+    candidate: "265da87b43235ca030963094aa176fa9ef58a7b1"
+  },
+  'lib/intake-rollout-server-db-mismatch.test.ts': {
+    predecessor: null,
+    candidate: "9dd44a2518ed2296977591e811a25493db843677"
+  },
+  'lib/intake-seal-fencing.test.ts': {
+    predecessor: null,
+    candidate: "df633d73c8879499265652f5212c007ac2b6e3ce"
+  },
+  'lib/intake-seal-fencing.ts': {
+    predecessor: null,
+    candidate: "d61863b965ed352c7e9b11d0c6b9e593d0470dff"
+  },
+  'lib/intake-triage-client.test.ts': {
+    predecessor: null,
+    candidate: "436177dc3c61d6b8e9019a859990daa1eb88da60"
+  },
+  'lib/intake-triage-client.ts': {
+    predecessor: null,
+    candidate: "ea1e3f2c436291fa32940622bd5909587ed35945"
+  },
+  'lib/intake-triage-paid-flow.test.ts': {
+    predecessor: null,
+    candidate: "0b21721aa3d86fb3aa943833b7a83fd27f235cb6"
+  },
+  'lib/intake-triage-rollout.ts': {
+    predecessor: null,
+    candidate: "3d15512574d4ef3e8e47c3b9dbe3cd77c20cef4c"
+  },
+  'lib/intake-triage-processing-quote.test.ts': {
+    predecessor: null,
+    candidate: "741222388918067eb1d081f734d7045df8ecf11a"
+  },
+  'lib/intake-triage-routes.test.ts': {
+    predecessor: null,
+    candidate: "553ae50234b2ad8857f0481d25b298dc6276c619"
+  },
+  'lib/intake-triage-server.test.ts': {
+    predecessor: null,
+    candidate: "715990a34255c5662cd611bd6a32ba3c40a2bb17"
+  },
+  'lib/intake-triage-server.ts': {
+    predecessor: null,
+    candidate: "f51bdeecd6e44c98f4eef108736ac8272e5b8df5"
+  },
+  'lib/intake-triage-stream.test.ts': {
+    predecessor: null,
+    candidate: "9faa5dc727171697b4efc376942f5dc0f002e2e8"
+  },
+  'lib/intake-triage-stream.ts': {
+    predecessor: null,
+    candidate: "8dc95cc99754fafbdaaac0a0f325a3691525a21d"
+  },
+  'lib/intake-triage.test.ts': {
+    predecessor: null,
+    candidate: "f5042559265429b6713737289009c544636a1ac8"
+  },
+  'lib/intake-triage.ts': {
+    predecessor: null,
+    candidate: "03860a9ef328ef70bd41de089af4216e06ae2164"
+  },
+  'lib/r2-presign.ts': {
+    predecessor: "5a2ec86af6a631f26f416f0b023c7a9270b6250a",
+    candidate: "cce02d44c7b13fab1fd352c02659ae1caf347ee8"
+  },
+  'lib/r2-synthetic-canary.ts': {
+    predecessor: "a935209ccdd54a98f5e3889699f796f5f8fc78e4",
+    candidate: "2c8a781c2a0e00c6870c88a82bcf4364a01c9871"
+  },
+  'lib/r2-triage-seal.test.ts': {
+    predecessor: null,
+    candidate: "35c3944c0ab700f6815d31c7eb1ca8e4e6679897"
+  },
+  'playwright.config.ts': {
+    predecessor: "d963db6f7f32b730fd16031549b3335ddbce65bc",
+    candidate: "714b979d42627a61aa32610880bd7dcd248e1a0a"
+  },
+  'supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql': {
+    predecessor: null,
+    candidate: "3c8a5fead7cce12e8a374105a70280c6bb33d5b1"
+  },
+  'supabase/drafts/tests/foundation_intake_triage_binding.sql': {
+    predecessor: null,
+    candidate: "3a6fb190c444d32286d36d5a31627a78d0d857e7"
+  }
+});
+export const INTAKE_TRIAGE_FEATURE_PATHS = Object.freeze(Object.keys(INTAKE_TRIAGE_SOURCE_BLOBS).sort());
+export const INTAKE_TRIAGE_TRIGGER_PATHS = Object.freeze([
+  'app/api/v1/uploads/triage/complete/route.ts',
+  'app/api/v1/uploads/triage/preflight/route.ts',
+  'app/api/v1/uploads/triage/receipt/route.ts',
+  'app/api/v1/uploads/triage/stage/route.ts',
+  'components/intake-triage-review.interaction.test.ts',
+  'components/intake-triage-review.test.tsx',
+  'components/intake-triage-review.tsx',
+  'e2e/workspace-intake-triage.spec.ts',
+  'lib/intake-triage-client.ts',
+  'lib/intake-triage-paid-flow.test.ts',
+  'lib/intake-triage-rollout.ts',
+  'lib/intake-triage-processing-quote.test.ts',
+  'lib/intake-triage-routes.test.ts',
+  'lib/intake-triage-server.ts',
+  'lib/intake-triage-stream.test.ts',
+  'lib/intake-triage-stream.ts',
+  'lib/intake-triage.test.ts',
+  'lib/intake-triage.ts',
+  'supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql',
+  'supabase/drafts/tests/foundation_intake_triage_binding.sql',
+]);
+export const INTAKE_TRIAGE_UNIT_TESTS = Object.freeze([
+  'components/intake-triage-review.interaction.test.ts',
+  'components/intake-triage-review.test.tsx',
+  'lib/intake-approval-route.test.ts',
+  'lib/intake-approval.test.ts',
+  'lib/compute-reservation.test.ts',
+  'lib/intake-triage-paid-flow.test.ts',
+  'lib/intake-capability-sealed-version.test.ts',
+  'lib/intake-rollout-compatibility.test.ts',
+  'lib/intake-rollout-compile-compatibility.test.ts',
+  'lib/intake-rollout-server-db-mismatch.test.ts',
+  'lib/intake-seal-fencing.test.ts',
+  'lib/intake-triage-client.test.ts',
+  'lib/intake-triage-processing-quote.test.ts',
+  'lib/intake-triage-routes.test.ts',
+  'lib/intake-triage-server.test.ts',
+  'lib/intake-triage-stream.test.ts',
+  'lib/intake-triage.test.ts',
+  'lib/r2-triage-seal.test.ts',
+]);
+export const INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS = Object.freeze([
+  'lib/api-error-codes.test.ts',
+  'lib/customer-data-admission-routes.test.ts',
+  'lib/intake-approval-route.test.ts',
+  'lib/intake-approval.test.ts',
+  'lib/upload-confirm-route.test.ts',
+  'lib/upload-release-route.test.ts',
+  'lib/source-intake.test.ts',
+  'lib/compute-reservation.test.ts',
+  'lib/r2-presign.test.ts',
+  'lib/r2-synthetic-canary.test.ts',
+]);
+export const INTAKE_TRIAGE_BROWSER_FILE = 'e2e/workspace-intake-triage.spec.ts';
+
 
 const uploadTests = [
   'lib/api-error-codes.test.ts', 'lib/customer-data-admission-routes.test.ts',
@@ -410,19 +678,31 @@ export function selectorRepositoryPath(rawPath) {
   return path.startsWith('supabase/') ? path : `nextjs/${path}`;
 }
 
-export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification = null, exec = execFileSync }) {
+export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification = null, intakeTriageVerification = null, exec = execFileSync }) {
   const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => WORKSPACE_SOURCE_FEATURE_PATHS.includes(path)))].sort();
   const reasons = [];
   if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('source feature is not anchored to the audited 6401 baseline');
   if (JSON.stringify(featurePaths) !== JSON.stringify([...WORKSPACE_SOURCE_FEATURE_PATHS].sort())) reasons.push('workspace source feature path set differs from reviewed candidate');
   const pageBase = readPathBlob(repairAnchorSha, 'app/workspace/page.tsx', repoRoot, exec);
   const pageResult = readPathBlob(headSha, 'app/workspace/page.tsx', repoRoot, exec);
-  if (pageBase !== reviewedWorkspacePageBlobs.base || pageResult !== reviewedWorkspacePageBlobs.result) reasons.push('workspace page blob pair differs from reviewed candidate');
+  const acceptedPageResults = [reviewedWorkspacePageBlobs.result];
+  if (intakeTriageVerification?.eligible) acceptedPageResults.push(INTAKE_TRIAGE_SOURCE_BLOBS['app/workspace/page.tsx'].candidate);
+  if (pageBase !== reviewedWorkspacePageBlobs.base || !acceptedPageResults.includes(pageResult)) reasons.push('workspace page blob pair differs from reviewed candidate');
   const browserBlob = readPathBlob(headSha, WORKSPACE_SOURCE_BROWSER_FILE, repoRoot, exec);
   if (browserBlob !== reviewedWorkspaceBrowserBlob) reasons.push('workspace browser test blob differs from reviewed candidate');
   const featureBlobVariants = googleViewerAclVerification?.eligible
     ? [WORKSPACE_SOURCE_FEATURE_BLOBS, { ...WORKSPACE_SOURCE_FEATURE_BLOBS, ...WORKSPACE_SOURCE_ACL_VARIANT_BLOBS }]
     : [WORKSPACE_SOURCE_FEATURE_BLOBS];
+  if (intakeTriageVerification?.eligible) {
+    featureBlobVariants.push({ ...WORKSPACE_SOURCE_FEATURE_BLOBS, 'app/workspace/page.tsx': INTAKE_TRIAGE_SOURCE_BLOBS['app/workspace/page.tsx'].candidate });
+  }
+  if (googleViewerAclVerification?.eligible && intakeTriageVerification?.eligible) {
+    featureBlobVariants.push({
+      ...WORKSPACE_SOURCE_FEATURE_BLOBS,
+      ...WORKSPACE_SOURCE_ACL_VARIANT_BLOBS,
+      'app/workspace/page.tsx': INTAKE_TRIAGE_SOURCE_BLOBS['app/workspace/page.tsx'].candidate,
+    });
+  }
   const featureBlobMismatches = featureBlobVariants.map(variant => Object.entries(variant)
     .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
     .map(([path]) => path));
@@ -434,7 +714,9 @@ export function verifyWorkspaceSourceScopeEvidence({ repairAnchorSha, headSha, c
     .map(([path]) => path);
   if (fixtureBaseBlobMismatches.length) reasons.push(`workspace source fixture preimages differ from reviewed patch: ${fixtureBaseBlobMismatches.join(', ')}`);
   const scopedConfigBlob = readPathBlob(headSha, WORKSPACE_SOURCE_REPAIR_CONFIG, repoRoot, exec);
-  if (scopedConfigBlob !== reviewedScopedConfigBlob) reasons.push('repair-only Vitest config blob differs from reviewed candidate');
+  const acceptedScopedConfigBlobs = [reviewedScopedConfigBlob];
+  if (intakeTriageVerification?.eligible) acceptedScopedConfigBlobs.push(INTAKE_TRIAGE_REPAIR_CONFIG_BLOB);
+  if (!acceptedScopedConfigBlobs.includes(scopedConfigBlob)) reasons.push('repair-only Vitest config blob differs from reviewed candidate');
   const globalConfigBase = readPathBlob(repairAnchorSha, 'vitest.config.ts', repoRoot, exec);
   const globalConfigHead = readPathBlob(headSha, 'vitest.config.ts', repoRoot, exec);
   if (globalConfigBase !== reviewedScopedConfigGlobalBlob || globalConfigHead !== reviewedScopedConfigGlobalBlob) reasons.push('global Vitest config changed from the reviewed blob');
@@ -483,7 +765,7 @@ export function verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, chan
   return { eligible: reasons.length === 0, reasons, featurePaths, anchorMismatches, predecessorMismatches, candidateMismatches };
 }
 
-export function verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+export function verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, googleDriveAclRefreshVerification = null, exec = execFileSync }) {
   const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path)))].sort();
   const expectedPaths = [...GOOGLE_VIEWER_ACL_FEATURE_PATHS].sort();
   const reasons = [];
@@ -502,12 +784,41 @@ export function verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, c
     .map(([path]) => path);
   if (predecessorMismatches.length) reasons.push(`Google Viewer ACL predecessor blobs differ from reviewed preimages: ${predecessorMismatches.join(', ')}`);
   const candidateMismatches = Object.entries(GOOGLE_VIEWER_ACL_FINAL_BLOBS)
-    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected)
+    .filter(([path, expected]) => {
+      const actual = readPathBlob(headSha, path, repoRoot, exec);
+      const exactRefreshVariant = googleDriveAclRefreshVerification?.eligible &&
+        GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path) &&
+        actual === GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS[path]?.candidate;
+      return actual !== expected && !exactRefreshVariant;
+    })
     .map(([path]) => path);
   if (candidateMismatches.length) reasons.push(`Google Viewer ACL candidate blobs differ from reviewed patch: ${candidateMismatches.join(', ')}`);
   const registeredAclMigration = changedPaths.map(normalizePath)
     .filter(path => /^supabase\/migrations\/[^/]*google[^/]*viewer[^/]*\.sql$/i.test(path));
   if (registeredAclMigration.length) reasons.push('Google Viewer ACL SQL must remain an unregistered draft during this phase');
+  return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
+}
+
+export function verifyGoogleDriveAclRefreshScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS.includes(path)))].sort();
+  const expectedPaths = [...GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('Google Drive ACL refresh is not anchored to the authenticated 6401 baseline');
+  if (headSha === GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA) reasons.push('Google Drive ACL refresh head is not newer than its exact predecessor');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(expectedPaths)) reasons.push('Google Drive ACL refresh path set differs from the exact reviewed patch chain');
+  try {
+    exec('git', ['merge-base', '--is-ancestor', GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA, headSha], { cwd: repoRoot, stdio: 'pipe', shell: false });
+  } catch { reasons.push('Google Drive ACL refresh predecessor is not an ancestor of the candidate head'); }
+  const predecessorMismatches = Object.entries(GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA, path, repoRoot, exec) !== expected.predecessor)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push('Google Drive ACL refresh preimages differ from the reviewed predecessor: ' + predecessorMismatches.join(', '));
+  const candidateMismatches = Object.entries(GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push('Google Drive ACL refresh candidates differ from the reviewed patch chain: ' + candidateMismatches.join(', '));
+  const registeredArtifacts = changedPaths.map(normalizePath).filter(path => /^supabase\/migrations\/[^/]*google_drive_acl_refresh_queue\.sql$/i.test(path) || path === 'supabase/tests/google_drive_acl_refresh_queue.sql');
+  if (registeredArtifacts.length) reasons.push('Google Drive ACL refresh SQL must remain an unregistered draft');
   return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
 }
 
@@ -535,7 +846,31 @@ export function verifyAsyncCompileJobAuthorityScopeEvidence({ repairAnchorSha, h
   return { eligible: reasons.length === 0, reasons, featurePaths, candidateMismatches, registeredMigrations };
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null, asyncCompileJobAuthorityVerification = null }) {
+export function verifyIntakeTriageScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => INTAKE_TRIAGE_FEATURE_PATHS.includes(path)))].sort();
+  const expectedPaths = [...INTAKE_TRIAGE_FEATURE_PATHS].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('intake triage is not anchored to the authenticated 6401 full-pass baseline');
+  if (headSha === INTAKE_TRIAGE_PREDECESSOR_SHA) reasons.push('intake triage head is not newer than its exact reviewed predecessor');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(expectedPaths)) reasons.push('intake triage path set differs from the exact reviewed 39-file candidate');
+  try {
+    exec('git', ['merge-base', '--is-ancestor', INTAKE_TRIAGE_PREDECESSOR_SHA, headSha], { cwd: repoRoot, stdio: 'pipe', shell: false });
+  } catch { reasons.push('intake triage predecessor is not an ancestor of the candidate head'); }
+  const predecessorMismatches = Object.entries(INTAKE_TRIAGE_SOURCE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(INTAKE_TRIAGE_PREDECESSOR_SHA, path, repoRoot, exec) !== expected.predecessor)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push('intake triage predecessor blobs differ from reviewed preimages: ' + predecessorMismatches.join(', '));
+  const candidateMismatches = Object.entries(INTAKE_TRIAGE_SOURCE_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push('intake triage candidate blobs differ from reviewed patch: ' + candidateMismatches.join(', '));
+  const registeredMigrations = changedPaths.map(normalizePath)
+    .filter(path => /^supabase\/migrations\/[^/]*intake[_-]triage[^/]*\.sql$/i.test(path));
+  if (registeredMigrations.length) reasons.push('intake triage SQL must remain an unregistered draft for disposable rehearsal');
+  return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches, registeredMigrations };
+}
+
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null, googleDriveAclRefreshVerification = null, asyncCompileJobAuthorityVerification = null, intakeTriageVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -562,7 +897,9 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   }
 
   const googleViewerAclChanged = paths.some(path =>
-    GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path) && !GOOGLE_VIEWER_ACL_WORKSPACE_OVERLAP_PATHS.has(path));
+    GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path) &&
+    !GOOGLE_VIEWER_ACL_WORKSPACE_OVERLAP_PATHS.has(path) &&
+    !(googleDriveAclRefreshVerification?.eligible && GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path)));
   if (googleViewerAclChanged) {
     groups.add('google-viewer-acl');
     for (const file of GOOGLE_VIEWER_ACL_UNIT_TESTS) unitFiles.add(file);
@@ -571,6 +908,33 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       qualificationReasons.add('Google Viewer ACL candidate did not match its exact reviewed predecessor/blob/path policy');
     }
   }
+  const googleDriveAclRefreshChanged = paths.some(path => GOOGLE_DRIVE_ACL_REFRESH_TRIGGER_PATHS.includes(path));
+  if (googleDriveAclRefreshChanged) {
+    groups.add('google-drive-acl-refresh');
+    groups.add('database-contract');
+    for (const file of GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS) unitFiles.add(file);
+    unitFiles.add('lib/pgtap-fixtures.test.ts');
+    databaseEvidenceInvalidated = true;
+    if (!googleDriveAclRefreshVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('Google Drive ACL refresh candidate did not match its exact predecessor/blob/path policy');
+    }
+  }
+  const intakeTriageChanged = paths.some(path => INTAKE_TRIAGE_TRIGGER_PATHS.includes(path));
+  if (intakeTriageChanged) {
+    groups.add('intake-triage');
+    groups.add('database-contract');
+    for (const file of INTAKE_TRIAGE_UNIT_TESTS) unitFiles.add(file);
+    for (const file of INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS) unitFiles.add(file);
+    unitFiles.add('lib/pgtap-fixtures.test.ts');
+    browserFiles.add(INTAKE_TRIAGE_BROWSER_FILE);
+    databaseEvidenceInvalidated = true;
+    if (!intakeTriageVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('intake triage candidate did not match its exact reviewed predecessor/blob/path policy');
+    }
+  }
+
   const asyncCompileJobAuthorityChanged = paths.some(path => ASYNC_COMPILE_JOB_AUTHORITY_PATHS.includes(path));
   if (asyncCompileJobAuthorityChanged) {
     groups.add('async-compile-job-authority');
@@ -603,6 +967,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   }
   for (const path of paths) {
     let matched = false;
+    if (intakeTriageChanged && INTAKE_TRIAGE_FEATURE_PATHS.includes(path)) continue;
     if (/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/i.test(path)) {
       groups.add('workflow-static');
       workflowConfigChanged = true;
@@ -627,7 +992,13 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       groups.add('docs-pricing-layout');
       matched = true;
     }
-    if (GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path)) {
+    if (GOOGLE_DRIVE_ACL_REFRESH_TRIGGER_PATHS.includes(path) ||
+      (googleDriveAclRefreshVerification?.eligible && GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path))) {
+      groups.add('google-drive-acl-refresh');
+      matched = true;
+    }
+    if (GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path) &&
+      !(googleDriveAclRefreshVerification?.eligible && GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path))) {
       groups.add('google-viewer-acl');
       matched = true;
     }
@@ -811,8 +1182,14 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     googleViewerAclSelection: googleViewerAclChanged
       ? { unitFiles: [...GOOGLE_VIEWER_ACL_UNIT_TESTS], evidence: googleViewerAclVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
       : null,
+    googleDriveAclRefreshSelection: googleDriveAclRefreshChanged
+      ? { unitFiles: [...new Set([...GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS, 'lib/pgtap-fixtures.test.ts'])].sort(), evidence: googleDriveAclRefreshVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
+      : null,
     asyncCompileJobAuthoritySelection: asyncCompileJobAuthorityChanged
       ? { unitFiles: [...ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS], evidence: asyncCompileJobAuthorityVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
+      : null,
+    intakeTriageSelection: intakeTriageChanged
+      ? { unitFiles: [...new Set([...INTAKE_TRIAGE_UNIT_TESTS, ...INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS, 'lib/pgtap-fixtures.test.ts'])].sort(), browserFiles: [INTAKE_TRIAGE_BROWSER_FILE], evidence: intakeTriageVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
       : null,
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
@@ -854,16 +1231,26 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   if (checkoutHead !== headSha) throw new Error(`checkout SHA ${checkoutHead} does not equal PR head ${headSha}`);
   const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
   const changedPaths = collectChangedPaths({ repairAnchorSha, headSha, repoRoot });
-  const googleViewerAclRelevant = changedPaths.map(normalizePath).some(path => GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path));
+  const googleDriveAclRefreshRelevant = changedPaths.map(normalizePath).some(path => GOOGLE_DRIVE_ACL_REFRESH_TRIGGER_PATHS.includes(path));
+  const googleDriveAclRefreshVerification = googleDriveAclRefreshRelevant
+    ? verifyGoogleDriveAclRefreshScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
+  const googleViewerAclRelevant = changedPaths.map(normalizePath).some(path =>
+    GOOGLE_VIEWER_ACL_FEATURE_PATHS.includes(path) &&
+    !(googleDriveAclRefreshVerification?.eligible && GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path)));
   const googleViewerAclVerification = googleViewerAclRelevant
-    ? verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    ? verifyGoogleViewerAclScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, googleDriveAclRefreshVerification })
     : null;
   const asyncCompileJobAuthorityRelevant = changedPaths.map(normalizePath).some(path => ASYNC_COMPILE_JOB_AUTHORITY_PATHS.includes(path));
   const asyncCompileJobAuthorityVerification = asyncCompileJobAuthorityRelevant
     ? verifyAsyncCompileJobAuthorityScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
     : null;
+  const intakeTriageRelevant = changedPaths.map(normalizePath).some(path => INTAKE_TRIAGE_TRIGGER_PATHS.includes(path));
+  const intakeTriageVerification = intakeTriageRelevant
+    ? verifyIntakeTriageScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
   const workspaceSourceVerification = verifyWorkspaceSourceScopeEvidence({
-    repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification,
+    repairAnchorSha, headSha, changedPaths, repoRoot, googleViewerAclVerification, intakeTriageVerification,
   });
   const docsPricingChanged = changedPaths.map(normalizePath).some(path => DOCS_PRICING_TRIGGER_PATHS.includes(path));
   const docsPricingVerification = docsPricingChanged
@@ -873,7 +1260,7 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const mobileNavVerification = mobileNavContrastChanged
     ? verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
     : null;
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification, asyncCompileJobAuthorityVerification });
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification, googleDriveAclRefreshVerification, asyncCompileJobAuthorityVerification, intakeTriageVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {

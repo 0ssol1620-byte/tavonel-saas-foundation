@@ -7,6 +7,9 @@ import {
   memberStatus,
   readIntakeAttemptRecord,
   readApprovalPayload,
+  readApprovalStatusResult,
+  postApprovalAndReconcile,
+  reconcilePriorAttemptForNewLineage,
   saveIntakeAttempt,
   shouldReuseAttemptKey,
   uploadApprovedMember,
@@ -27,6 +30,78 @@ describe("attempt identity after terminal approval states", () => {
     expect(shouldReuseAttemptKey({ state: "approved", expired: false })).toBe(true);
     expect(shouldReuseAttemptKey({ state: "cancelled", expired: false })).toBe(false);
     expect(shouldReuseAttemptKey({ state: "approved", expired: true })).toBe(false);
+  });
+});
+
+describe("approval status read certainty", () => {
+  const deps = (response: Response) => ({
+    fetch: vi.fn(async () => response),
+    token: async () => "test-token",
+  });
+
+  it("distinguishes authoritative not-found from unavailable status reads", async () => {
+    await expect(readApprovalStatusResult(deps(new Response(JSON.stringify({ code: "INTAKE_APPROVAL_NOT_FOUND" }), { status: 404 })), attemptKey))
+      .resolves.toEqual({ kind: "not_found" });
+    await expect(readApprovalStatusResult(deps(new Response(JSON.stringify({ code: "INTAKE_APPROVAL_LEDGER_FAILED" }), { status: 503 })), attemptKey))
+      .resolves.toEqual({ kind: "unavailable" });
+    await expect(readApprovalStatusResult(deps(new Response(JSON.stringify({ code: "NOT_SIGNED_IN" }), { status: 401 })), attemptKey))
+      .resolves.toEqual({ kind: "unavailable" });
+  });
+
+  it("returns a found approval only when the response parses as the complete stored receipt", async () => {
+    await expect(readApprovalStatusResult(deps(new Response(JSON.stringify({ approval: status("reserved") }), { status: 200 })), attemptKey))
+      .resolves.toMatchObject({ kind: "found", approval: { attemptKey, state: "approved" } });
+    await expect(readApprovalStatusResult(deps(new Response(JSON.stringify({ approval: { attemptKey } }), { status: 200 })), attemptKey))
+      .resolves.toEqual({ kind: "unavailable" });
+  });
+
+  it("allows a new receipt only after authoritative absence or fully cancelled prior state", async () => {
+    const notFound = { fetch: vi.fn(async () => new Response(JSON.stringify({ code: "INTAKE_APPROVAL_NOT_FOUND" }), { status: 404 })), token: async () => "test-token" };
+    const unavailable = { fetch: vi.fn(async () => new Response(JSON.stringify({ code: "INTAKE_APPROVAL_LEDGER_FAILED" }), { status: 503 })), token: async () => "test-token" };
+    const active = { fetch: vi.fn(async () => new Response(JSON.stringify({ approval: status("reserved") }), { status: 200 })), token: async () => "test-token" };
+    const cancelledApproval = status("cancelled");
+    cancelledApproval.state = "cancelled";
+    cancelledApproval.files[0]!.fileState = "cancelled";
+    const cancelled = { fetch: vi.fn(async () => new Response(JSON.stringify({ approval: cancelledApproval }), { status: 200 })), token: async () => "test-token" };
+
+    await expect(reconcilePriorAttemptForNewLineage(notFound, attemptKey)).resolves.toEqual({ kind: "safe_to_replace", prior: "not_found" });
+    await expect(reconcilePriorAttemptForNewLineage(cancelled, attemptKey)).resolves.toEqual({ kind: "safe_to_replace", prior: "cancelled" });
+    await expect(reconcilePriorAttemptForNewLineage(unavailable, attemptKey)).resolves.toEqual({ kind: "blocked", reason: "unavailable" });
+    await expect(reconcilePriorAttemptForNewLineage(active, attemptKey)).resolves.toEqual({ kind: "blocked", reason: "active" });
+    expect(unavailable.fetch).toHaveBeenCalledTimes(1); // The caller must stop before another approval POST.
+  });
+
+  it("replays the same approval POST after an authoritative GET 404 and accepts the idempotent result", async () => {
+    const requests: Array<{ method: string; url: string; body?: string }> = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input), method = String(init?.method ?? "GET");
+      requests.push({ url, method, body: typeof init?.body === "string" ? init.body : undefined });
+      if (method === "POST") return requests.filter((request) => request.method === "POST").length === 1
+        ? ok({ code: "INTAKE_APPROVAL_LEDGER_FAILED" }, 503)
+        : ok({ approval: status("reserved") });
+      return ok({ code: "INTAKE_APPROVAL_NOT_FOUND" }, 404);
+    });
+    const body = { attemptKey, triageReceiptId: "receipt-same" };
+
+    await expect(postApprovalAndReconcile({ fetch, token: async () => "test-token" }, attemptKey, body))
+      .resolves.toMatchObject({ kind: "approved", approval: { attemptKey, state: "approved" } });
+    expect(requests.map(({ method }) => method)).toEqual(["POST", "GET", "POST"]);
+    expect(requests[1]!.url).toContain(encodeURIComponent(attemptKey));
+    expect(JSON.parse(requests[0]!.body!)).toEqual(body);
+    expect(JSON.parse(requests[2]!.body!)).toEqual(body);
+  });
+
+  it("preserves an ambiguous POST when its actual status GET returns 503", async () => {
+    const requests: string[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(String(init?.method ?? "GET"));
+      return String(init?.method) === "POST"
+        ? ok({ code: "INTAKE_APPROVAL_LEDGER_FAILED" }, 503)
+        : ok({ code: "INTAKE_APPROVAL_LEDGER_FAILED" }, 503);
+    });
+    await expect(postApprovalAndReconcile({ fetch, token: async () => "test-token" }, attemptKey, { attemptKey }))
+      .resolves.toEqual({ kind: "unavailable" });
+    expect(requests).toEqual(["POST", "GET"]);
   });
 });
 
@@ -194,6 +269,81 @@ describe("approved intake identity and recovery", () => {
     }, { fetch: fetchMock, token: async () => "test-token", put: async () => { putCalled = true; return { ok: true, sourceSha256: digest }; } });
     expect(result).toMatchObject({ status: "failed", code: "INTAKE_APPROVAL_RECEIPT_MISMATCH" });
     expect(putCalled).toBe(false);
+  });
+  it("confirms a version-bound triage-sealed object without issuing a second PUT", async () => {
+    const calls: string[] = [];
+    const phases: string[] = [];
+    const triageReceiptId = "11111111-1111-4111-8111-111111111111";
+    let putCalled = false;
+    const fetchMock: ApprovedUploadDeps["fetch"] = async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith("/api/uploads/capability")) return ok({
+        ...capabilityReply,
+        code: "TRIAGE_OBJECT_READY",
+        uploadUrl: null,
+        triageReceiptId,
+        contentSha256: digest,
+        objectVersion: "immutable-object-version",
+      });
+      if (url.endsWith("/api/uploads/confirm")) return ok({ code: "UPLOAD_CONFIRMED", approvedFile: { fileState: "confirmed", documentId } });
+      return ok({ approval: status("reserved") });
+    };
+    const result = await uploadApprovedMember({
+      attempt: { attemptKey, scopeDigest: otherDigest, pricingFingerprint: digest, triageReceiptId }, member: approvedMember,
+    }, {
+      fetch: fetchMock,
+      token: async () => "test-token",
+      put: async () => { putCalled = true; return { ok: true, sourceSha256: digest }; },
+      onPhase: (phase) => phases.push(phase),
+    });
+    expect(result).toEqual({ status: "confirmed", documentId });
+    expect(putCalled).toBe(false);
+    expect(calls.some((url) => url.endsWith("/api/uploads/confirm"))).toBe(true);
+    expect(phases).not.toContain("put_sent");
+    expect(phases).toContain("stored");
+  });
+  it("refuses a presealed object from a different receipt without PUT or confirm", async () => {
+    const calls: string[] = [];
+    let putCalled = false;
+    const triageReceiptId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock: ApprovedUploadDeps["fetch"] = async (input) => {
+      calls.push(String(input));
+      return ok({
+        ...capabilityReply, code: "TRIAGE_OBJECT_READY", uploadUrl: null,
+        triageReceiptId: "22222222-2222-4222-8222-222222222222",
+        contentSha256: digest, objectVersion: "immutable-object-version",
+      });
+    };
+    const result = await uploadApprovedMember({
+      attempt: { attemptKey, scopeDigest: otherDigest, pricingFingerprint: digest, triageReceiptId },
+      member: approvedMember,
+    }, { fetch: fetchMock, token: async () => "test-token", put: async () => {
+      putCalled = true; return { ok: true, sourceSha256: digest };
+    } });
+    expect(result).toMatchObject({ status: "failed", code: "TRIAGE_OBJECT_READY_REQUIRED" });
+    expect(putCalled).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/\/api\/uploads\/capability$/);
+  });
+  it("refuses a legacy writable URL for a triage approval without PUT or confirm", async () => {
+    const calls: string[] = [];
+    let putCalled = false;
+    const triageReceiptId = "11111111-1111-4111-8111-111111111111";
+    const fetchMock: ApprovedUploadDeps["fetch"] = async (input) => {
+      calls.push(String(input));
+      return ok({ ...capabilityReply, code: "QUALIFIED", uploadUrl: "https://upload.invalid/legacy" });
+    };
+    const result = await uploadApprovedMember({
+      attempt: { attemptKey, scopeDigest: otherDigest, pricingFingerprint: digest, triageReceiptId },
+      member: approvedMember,
+    }, { fetch: fetchMock, token: async () => "test-token", put: async () => {
+      putCalled = true; return { ok: true, sourceSha256: digest };
+    } });
+    expect(result).toMatchObject({ status: "failed", code: "TRIAGE_OBJECT_READY_REQUIRED" });
+    expect(putCalled).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/\/api\/uploads\/capability$/);
   });
   it("reconciles set cancellation from server state and preserves uncertainty on a lost reply", async () => {
     let calls = 0;

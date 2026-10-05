@@ -11,6 +11,8 @@ import {
   readManifestEntry,
   type IntakeManifestEntry,
 } from "@/lib/intake-approval";
+import { readReadyUploadTriage } from "@/lib/intake-triage-server";
+import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
 import {
   FOUNDATION_INTAKE_MAX_BYTES,
@@ -27,6 +29,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 // The page maximum an uncounted member is approved at. The approval POST refuses a deployment
 // whose ceiling drifted from it, so a quote must not show a number that approval would refuse.
 const UNKNOWN_MEMBER_PAGES = 80;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function refuse(code: string, status: number, extra: Record<string, unknown> = {}) {
   return NextResponse.json(
@@ -68,25 +71,36 @@ export async function POST(request: Request) {
       : refuse("INTAKE_APPROVAL_INVALID", 400);
   }
   const body = (parsed.value && typeof parsed.value === "object" && !Array.isArray(parsed.value) ? parsed.value : {}) as {
+    triageReceiptId?: unknown;
     clientManifestDigest?: unknown;
     files?: unknown;
   };
-  const clientManifestDigest = typeof body.clientManifestDigest === "string" ? body.clientManifestDigest : "";
-  if (!SHA256_DIGEST_PATTERN.test(clientManifestDigest)
-    || !Array.isArray(body.files) || body.files.length < 1 || body.files.length > MAX_APPROVAL_FILES) {
-    return refuse("INTAKE_APPROVAL_INVALID", 400);
+  let triage: Awaited<ReturnType<typeof readReadyUploadTriage>> | null = null;
+  let entries: IntakeManifestEntry[];
+  let clientManifestDigest: string;
+  if (INTAKE_TRIAGE_ROLLOUT_ENABLED) {
+    const triageReceiptId = typeof body.triageReceiptId === "string" ? body.triageReceiptId : "";
+    if (!UUID.test(triageReceiptId)) return refuse("INTAKE_TRIAGE_REQUIRED", 409);
+    triage = await readReadyUploadTriage({
+      workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, receiptId: triageReceiptId,
+    });
+    if (!triage.ok) return refuse(triage.code, triage.status);
+    entries = triage.result.entries;
+    clientManifestDigest = triage.result.clientManifestDigest;
+  } else {
+    clientManifestDigest = typeof body.clientManifestDigest === "string" ? body.clientManifestDigest : "";
+    if (!SHA256_DIGEST_PATTERN.test(clientManifestDigest) || !Array.isArray(body.files)
+      || body.files.length < 1 || body.files.length > MAX_APPROVAL_FILES) return refuse("INTAKE_APPROVAL_INVALID", 400);
+    entries = [];
+    for (const [index, value] of body.files.entries()) {
+      const entry = readManifestEntry(value);
+      if (!entry) return refuse("INTAKE_APPROVAL_INVALID", 400, { index });
+      entries.push(entry);
+    }
+    if (new Set(entries.map((entry) => entry.fileKey)).size !== entries.length
+      || await intakeManifestDigest(entries) !== clientManifestDigest) return refuse("INTAKE_APPROVAL_MANIFEST_MISMATCH", 400);
   }
-
-  // Every member well formed, or no quote. A half-described member never reaches the pricing.
-  const entries: IntakeManifestEntry[] = [];
-  for (const [index, raw] of body.files.entries()) {
-    const entry = readManifestEntry(raw);
-    if (!entry) return refuse("INTAKE_APPROVAL_INVALID", 400, { index });
-    entries.push(entry);
-  }
-  if (new Set(entries.map((entry) => entry.fileKey)).size !== entries.length) {
-    return refuse("INTAKE_APPROVAL_DUPLICATE_FILE", 400);
-  }
+  if (entries.length < 1 || entries.length > MAX_APPROVAL_FILES) return refuse("INTAKE_APPROVAL_INVALID", 400);
 
   const trial = auth.principal.accessSource === "trial";
   for (const [index, entry] of entries.entries()) {
@@ -108,13 +122,14 @@ export async function POST(request: Request) {
     if (trial && /\.zip$/i.test(entry.originalFilename)) return refuse("TRIAL_ARCHIVE_NOT_INCLUDED", 402, { index });
   }
 
-  if (await intakeManifestDigest(entries) !== clientManifestDigest) return refuse("INTAKE_APPROVAL_MANIFEST_MISMATCH", 400);
-
   if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "direct_upload")) {
     return refuse("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", 403);
   }
 
   const pricingFingerprint = await intakePricingFingerprint();
+  if (triage && pricingFingerprint !== triage.result.receipt.pricingFingerprint) {
+    return refuse("INTAKE_PRICE_STALE", 409, { pricingFingerprint });
+  }
   const quoted = quoteIntakeManifest(entries.map((entry) => ({
     bytes: entry.byteLength,
     mimeType: entry.mimeType,
@@ -138,6 +153,13 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     code: "INTAKE_QUOTE",
+    ...(triage ? {
+      triageReceiptId: triage.result.receipt.receiptId,
+      triageVersion: triage.result.receipt.triageVersion,
+      triageInventoryDigest: triage.result.receipt.inventoryDigest,
+      configurationRevision: triage.result.receipt.configurationRevision,
+      estimate: triage.result.receipt.estimate,
+    } : {}),
     clientManifestDigest,
     pricingFingerprint,
     metadataLimitBytes: MAX_APPROVAL_METADATA_BYTES,

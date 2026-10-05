@@ -237,7 +237,9 @@ export async function safeFetch(
         ...init,
         redirect: "manual",
         cache: "no-store",
-        signal: AbortSignal.timeout(policy.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: init.signal
+          ? AbortSignal.any([init.signal, AbortSignal.timeout(policy.timeoutMs ?? DEFAULT_TIMEOUT_MS)])
+          : AbortSignal.timeout(policy.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
     } catch {
       return { ok: false, code: "EGRESS_REQUEST_FAILED" };

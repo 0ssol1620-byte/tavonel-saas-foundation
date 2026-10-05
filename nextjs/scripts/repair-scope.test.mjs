@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -30,20 +31,67 @@ import {
   GOOGLE_VIEWER_ACL_FINAL_BLOBS,
   GOOGLE_VIEWER_ACL_UNIT_TESTS,
   verifyGoogleViewerAclScopeEvidence,
+  GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA,
+  GOOGLE_DRIVE_ACL_REFRESH_BOUNDARY_PATH,
+  GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS,
+  GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS,
+  GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS,
+  GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS,
+  verifyGoogleDriveAclRefreshScopeEvidence,
   ASYNC_COMPILE_JOB_AUTHORITY_PREDECESSOR_SHA,
   ASYNC_COMPILE_JOB_AUTHORITY_PATHS,
   ASYNC_COMPILE_JOB_AUTHORITY_FINAL_BLOBS,
   ASYNC_COMPILE_JOB_AUTHORITY_UNIT_TESTS,
   selectorRepositoryPath,
   verifyAsyncCompileJobAuthorityScopeEvidence,
+  INTAKE_TRIAGE_PREDECESSOR_SHA,
+  INTAKE_TRIAGE_REPAIR_CONFIG_BLOB,
+  INTAKE_TRIAGE_SOURCE_BLOBS,
+  INTAKE_TRIAGE_FEATURE_PATHS,
+  INTAKE_TRIAGE_UNIT_TESTS,
+  INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS,
+  INTAKE_TRIAGE_BROWSER_FILE,
+  verifyIntakeTriageScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
-import { auditBrowserFiles, browserRunOutputDir, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateSelectedPath } from './run-repair-check.mjs';
+import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
 const testHeadSha = 'b'.repeat(40);
+
+test('intake draft staging renders and checks both two-line checksum lists without a database', () => {
+  const workflow = readFileSync(resolve(process.cwd(), '..', '.github/workflows/db-rehearsal.yml'), 'utf8');
+  const start = workflow.indexOf('- name: Stage the reviewed intake triage draft after async authority');
+  const end = workflow.indexOf('\n      # Artifact names are derived', start);
+  assert.ok(start >= 0 && end > start, 'intake draft staging step is present');
+  const step = workflow.slice(start, end);
+  assert.ok(step.includes('printf \'%s  %s\\n\' "$expected_migration_sha256" "$draft" "$expected_migration_sha256" "${generated[0]}" | sha256sum --check'));
+  assert.ok(step.includes('printf \'%s  %s\\n\' "$expected_test_sha256" "$test_source" "$expected_test_sha256" "$test_target" | sha256sum --check'));
+  const futureGuard = step.indexOf('if [[ "$async_version" > "$now_version" ]]');
+  const waitLoop = step.indexOf('while [[ ! "$now_version" > "$async_version" ]]');
+  assert.ok(futureGuard >= 0 && waitLoop > futureGuard, 'future async versions fail before the ordered-version wait');
+
+  const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+  const renderChecksumList = (expected, source, target) =>
+    `${expected}  ${source.path}\n${expected}  ${target.path}\n`;
+  const assertChecksumList = (list, expected, source, target) => {
+    const lines = list.trimEnd().split('\n');
+    assert.equal(lines.length, 2);
+    assert.deepEqual(lines, [source, target].map(file => `${expected}  ${file.path}`));
+    for (const file of [source, target]) assert.equal(sha256(file.bytes), expected);
+  };
+  for (const [sourceName, targetName, content] of [
+    ['intake.sql', '20261005120001_intake.sql', 'CREATE TABLE rehearsal_fixture (id integer);\n'],
+    ['intake.pgtap.sql', 'foundation_intake_triage_binding.sql', 'SELECT plan(1); SELECT pass(\'fixture\');\n'],
+  ]) {
+    const expected = sha256(Buffer.from(content));
+    const source = { path: sourceName, bytes: Buffer.from(content) };
+    const target = { path: targetName, bytes: Buffer.from(content) };
+    assertChecksumList(renderChecksumList(expected, source, target), expected, source, target);
+  }
+});
 
 function planFor(paths, overrides = {}) {
   const normalizedPaths = paths.map(normalizePath);
@@ -127,6 +175,215 @@ test('runGate CLI enforces browser requirements and writes failure receipts', ()
   assert.equal(failedUnit.status, 1);
   assert.equal(failedUnit.receipt.gate, 'failed');
   assert.ok(failedUnit.receipt.gateFailures.includes('targeted Vitest: failure'));
+});
+
+test('intake triage source evidence selects only its exact tests and browser check', () => {
+  const headSha = 'a'.repeat(40);
+  const changedPaths = [...new Set([...WORKSPACE_SOURCE_FEATURE_PATHS, ...INTAKE_TRIAGE_FEATURE_PATHS])]
+    .map(p => p.startsWith('supabase/') ? p : 'nextjs/' + p);
+  const evidence = intakeTriageEvidence(headSha, {}, changedPaths);
+  assert.equal(evidence.eligible, true, evidence.reasons.join('; '));
+  assert.equal(INTAKE_TRIAGE_FEATURE_PATHS.length, 42);
+  assert.equal(INTAKE_TRIAGE_UNIT_TESTS.length, 18);
+  const workspaceEvidence = workspaceSourceEvidence(headSha, {}, WORKSPACE_SOURCE_FEATURE_PATHS, null, evidence);
+  assert.equal(workspaceEvidence.eligible, true, workspaceEvidence.reasons.join('; '));
+  const plan = planFor(changedPaths, { headSha, intakeTriageVerification: evidence, workspaceSourceVerification: workspaceEvidence });
+  const expectedUnits = [...new Set([...INTAKE_TRIAGE_UNIT_TESTS, ...INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS, 'lib/pgtap-fixtures.test.ts', ...WORKSPACE_SOURCE_UNIT_FILES])].sort();
+  assert.deepEqual(plan.unitFiles, expectedUnits);
+  assert.equal(plan.unitFiles.length, 40);
+  assert.deepEqual(plan.browserFiles, [INTAKE_TRIAGE_BROWSER_FILE, WORKSPACE_SOURCE_BROWSER_FILE].sort());
+  assert.ok(plan.groups.includes('intake-triage'));
+  assert.ok(plan.groups.includes('database-contract'));
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.deferredGroups, ['database-contract']);
+  assert.deepEqual(plan.pendingQualificationDebt, ['database-contract']);
+  assert.equal(plan.intakeTriageSelection.sqlStatus, 'unregistered-draft-pending-disposable-pgtap');
+  const args=buildUnitArgs(plan.unitFiles, 'repair-scope-reports/vitest.json');
+  assert.ok(args.includes('--config'));
+  assert.ok(args.includes('components/intake-triage-review.test.tsx'));
+  assert.ok(args.includes('components/intake-triage-review.interaction.test.ts'));
+  assert.ok(args.includes('lib/intake-triage-processing-quote.test.ts'));
+  assert.ok(args.includes('lib/compute-reservation.test.ts'));
+  assert.ok(args.includes('lib/intake-triage-paid-flow.test.ts'));
+  const invalid = intakeTriageEvidence(headSha, { [headSha + ":nextjs/lib/intake-triage.ts"]: 'f'.repeat(40) }, changedPaths);
+  assert.equal(invalid.eligible, false);
+  assert.ok(invalid.candidateMismatches.includes('lib/intake-triage.ts'));
+  const invalidQuote = intakeTriageEvidence(headSha, { [headSha + ':nextjs/lib/intake-triage-processing-quote.test.ts']: 'f'.repeat(40) }, changedPaths);
+  assert.equal(invalidQuote.eligible, false);
+  assert.ok(invalidQuote.candidateMismatches.includes('lib/intake-triage-processing-quote.test.ts'));
+  const invalidPaidFlow = intakeTriageEvidence(headSha, { [headSha + ':nextjs/lib/intake-triage-paid-flow.test.ts']: 'f'.repeat(40) }, changedPaths);
+  assert.equal(invalidPaidFlow.eligible, false);
+  assert.ok(invalidPaidFlow.candidateMismatches.includes('lib/intake-triage-paid-flow.test.ts'));
+  const partial = intakeTriageEvidence(headSha, {}, changedPaths.filter(p => p !== 'nextjs/lib/intake-triage.ts'));
+  assert.equal(partial.eligible, false);
+  assert.ok(partial.reasons.some(reason => reason.includes('path set')));
+  const registered = intakeTriageEvidence(headSha, {}, [...changedPaths, 'supabase/migrations/20261004120000_foundation_intake_triage_v3.sql']);
+  assert.equal(registered.eligible, false);
+  assert.ok(registered.reasons.some(reason => reason.includes('unregistered draft')));
+});
+
+test('qualified ACL, async, intake, workspace and visual scopes compose without broadening', () => {
+  const headSha = '9'.repeat(40);
+  const paths = [...new Set([
+    ...WORKSPACE_SOURCE_FEATURE_PATHS,
+    WORKSPACE_SOURCE_REPAIR_CONFIG,
+    ...GOOGLE_VIEWER_ACL_FEATURE_PATHS,
+    ...GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS,
+    ...ASYNC_COMPILE_JOB_AUTHORITY_PATHS,
+    ...INTAKE_TRIAGE_FEATURE_PATHS,
+    ...DOCS_PRICING_FEATURE_PATHS,
+    ...MOBILE_NAV_CONTRAST_PATHS,
+    ...fixture.pairedPublicUiCaptureCandidate.paths,
+    '.github/workflows/repair-scope.yml',
+    'app/landing-v2.css',
+    'components/landing-v2/hero-film-disclosure.tsx',
+    'components/landing-v2/hero-film.tsx',
+    'components/landing-v2/landing-page.tsx',
+    'components/marketing-consent.module.css',
+    'components/marketing-consent.tsx',
+    'e2e/landing-hero-film-loading.spec.ts',
+    'e2e/landing-hero-mobile.spec.ts',
+    'e2e/site-nav.spec.ts',
+    'lib/one-path-contract.test.ts',
+    'lib/site-nav-model.test.ts',
+    'lib/site-navigation.ts',
+    'scripts/repair-scope.mjs',
+    'scripts/repair-scope.test.mjs',
+    'scripts/run-repair-check.mjs',
+    'scripts/verify-repair-workflows.mjs',
+    '.github/workflows/db-rehearsal.yml',
+  ])];
+  const changedPaths = paths.map(path => path.startsWith('nextjs/') || path.startsWith('supabase/') || path.startsWith('.github/')
+    ? path
+    : `nextjs/${path}`);
+  assert.equal(changedPaths.length, 155);
+  const aclRefresh = googleDriveAclRefreshEvidence(headSha, {}, changedPaths);
+  const acl = googleViewerAclEvidence(headSha, {}, changedPaths, aclRefresh);
+  const asyncAuthority = asyncCompileJobAuthorityEvidence(headSha, {}, changedPaths);
+  const intake = intakeTriageEvidence(headSha, {}, changedPaths);
+  const docs = docsPricingEvidence(headSha, {}, changedPaths);
+  const mobile = mobileNavContrastEvidence(headSha, {}, changedPaths);
+  const workspace = workspaceSourceEvidence(headSha, {}, changedPaths, acl, intake);
+
+  for (const [name, evidence] of Object.entries({ aclRefresh, acl, asyncAuthority, intake, docs, mobile, workspace })) {
+    assert.equal(evidence.eligible, true, `${name}: ${evidence.reasons.join('; ')}`);
+  }
+
+  const plan = planFor(changedPaths, {
+    headSha,
+    googleViewerAclVerification: acl,
+    googleDriveAclRefreshVerification: aclRefresh,
+    asyncCompileJobAuthorityVerification: asyncAuthority,
+    intakeTriageVerification: intake,
+    docsPricingVerification: docs,
+    mobileNavVerification: mobile,
+    workspaceSourceVerification: workspace,
+  });
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.ok(plan.unitFiles.length > 0);
+  for (const group of ['google-viewer-acl', 'google-drive-acl-refresh', 'async-compile-job-authority', 'intake-triage', 'workspace-source-observation', 'docs-pricing-layout', 'mobile-nav-contrast']) {
+    assert.ok(plan.groups.includes(group), `combined plan omitted ${group}`);
+  }
+  assert.ok(plan.browserFiles.includes(INTAKE_TRIAGE_BROWSER_FILE));
+  assert.ok(plan.browserFiles.includes(WORKSPACE_SOURCE_BROWSER_FILE));
+  assert.deepEqual(plan.unitFiles, [
+    'app/api/compile-jobs/route.test.ts', 'app/api/documents/[id]/progress/route.test.ts',
+    'components/compile-stage.test.tsx', 'components/intake-triage-review.interaction.test.ts',
+    'components/intake-triage-review.test.tsx', 'lib/acl-refresh-core.test.mjs', 'lib/api-error-codes.test.ts',
+    'lib/brand-copy.test.ts', 'lib/collection-compile-run.test.ts', 'lib/compile-job-authority.test.ts',
+    'lib/compile-job-idempotency.test.ts', 'lib/compile-job-migration.test.ts', 'lib/compile-job-scheduling.test.ts',
+    'lib/compile-job-worker.test.ts', 'lib/compile-stage-view.test.ts', 'lib/compute-reservation.test.ts',
+    'lib/connector-oauth-callback-route.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/connector-oauth-store.test.ts',
+    'lib/connector-oauth.test.ts', 'lib/connector-source-access.test.ts', 'lib/connector-source-identity.test.ts',
+    'lib/customer-data-admission-routes.test.ts', 'lib/customer-source-lifecycle-route.test.ts', 'lib/design-tokens.test.ts',
+    'lib/docs-navigation.test.ts', 'lib/document-derived-route-access.test.ts', 'lib/document-source-route.test.ts',
+    'lib/documents-route.test.ts', 'lib/film-motion-control.test.ts', 'lib/global-collection-compile.test.ts',
+    'lib/google-drive-acl-capture.test.ts', 'lib/google-drive-acl-refresh.test.ts', 'lib/google-drive-viewer-link-request.test.ts',
+    'lib/google-drive-viewer-principal.test.ts', 'lib/intake-approval-route.test.ts', 'lib/intake-approval.test.ts',
+    'lib/intake-capability-sealed-version.test.ts', 'lib/intake-rollout-compatibility.test.ts',
+    'lib/intake-rollout-compile-compatibility.test.ts', 'lib/intake-rollout-server-db-mismatch.test.ts',
+    'lib/intake-seal-fencing.test.ts', 'lib/intake-triage-client.test.ts', 'lib/intake-triage-paid-flow.test.ts',
+    'lib/intake-triage-processing-quote.test.ts', 'lib/intake-triage-routes.test.ts', 'lib/intake-triage-server.test.ts',
+    'lib/intake-triage-stream.test.ts', 'lib/intake-triage.test.ts', 'lib/internal-worker-auth.test.ts',
+    'lib/landing-v2-page.test.ts', 'lib/landing-v2-recompile.test.ts', 'lib/landing-v2-tokens.test.ts',
+    'lib/landing-v2-traceability.test.ts', 'lib/marketing-analytics.test.ts', 'lib/ocr-progress.test.ts',
+    'lib/one-path-contract.test.ts', 'lib/pgtap-fixtures.test.ts', 'lib/production-hardening.test.ts',
+    'lib/progress-poll.test.ts', 'lib/progress-route.test.ts', 'lib/r2-presign.test.ts',
+    'lib/r2-progress-capability.test.ts', 'lib/r2-source-pdf.test.ts', 'lib/r2-synthetic-canary.test.ts',
+    'lib/r2-triage-seal.test.ts', 'lib/safe-url.test.ts', 'lib/site-nav-model.test.ts', 'lib/source-import.test.ts',
+    'lib/source-intake.test.ts', 'lib/source-version-guard.test.ts', 'lib/upload-confirm-route.test.ts',
+    'lib/upload-release-route.test.ts', 'lib/visual-refinement.test.ts', 'lib/workspace-compile-floor-and-ceiling.test.ts',
+    'lib/world-promotion-current-source.test.ts',
+  ]);
+  assert.deepEqual(plan.browserFiles, [
+    'e2e/contrast-zoom-audit.spec.ts', 'e2e/docs-reading-layout.spec.ts', 'e2e/landing-hero-film-loading.spec.ts',
+    'e2e/landing-hero-mobile.spec.ts', 'e2e/launch-qa-mobile-nav.spec.ts', 'e2e/marketing-consent.spec.ts',
+    'e2e/premium-craft.spec.ts', 'e2e/public-layout-balance.spec.ts', 'e2e/site-nav.spec.ts',
+    'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts',
+  ]);
+
+  const runnerRoot = mkdtempSync(resolve(tmpdir(), 'repair-scope-runner-selection-'));
+  try {
+    for (const file of [...plan.unitFiles, ...plan.browserFiles]) {
+      const fullPath = resolve(runnerRoot, file);
+      mkdirSync(dirname(fullPath), { recursive: true });
+      writeFileSync(fullPath, 'runner selection fixture\n');
+    }
+    for (const file of plan.unitFiles) assert.equal(validateSelectedPath(file, 'unit', runnerRoot), file);
+    for (const file of plan.browserFiles) assert.equal(validateSelectedPath(file, 'browser', runnerRoot), file);
+    const nodeFiles = plan.unitFiles.filter(file => file.endsWith('.mjs'));
+    assert.deepEqual(nodeFiles, ['lib/acl-refresh-core.test.mjs']);
+    assert.deepEqual(buildNodeTestArgs(nodeFiles), ['--test', '--test-reporter=tap', ...nodeFiles]);
+    assert.deepEqual(
+      [...new Set(planBrowserRuns(plan.browserFiles, false).flatMap(run => run.files))].sort(),
+      [...plan.browserFiles].sort(),
+    );
+    assert.deepEqual(
+      planBrowserRuns([INTAKE_TRIAGE_BROWSER_FILE], false),
+      [{ kind: 'project', project: '1440', files: [INTAKE_TRIAGE_BROWSER_FILE] }],
+    );
+    assert.throws(() => validateSelectedPath('lib/unreviewed.test.mjs', 'unit', runnerRoot), /Unsupported unit path/);
+    assert.throws(() => buildNodeTestArgs(['lib/unreviewed.test.mjs']), /No reviewed Node test runner/);
+    assert.throws(() => planBrowserRuns(['e2e/unreviewed.spec.ts'], false), /No reviewed Playwright project mapping/);
+  } finally {
+    rmSync(runnerRoot, { recursive: true, force: true });
+  }
+
+  const wrongIntakePage = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/app/workspace/page.tsx`]: 'f'.repeat(40),
+  }, changedPaths, acl, intake);
+  const wrongAclRoute = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/app/api/documents/[id]/progress/route.ts`]: 'e'.repeat(40),
+  }, changedPaths, acl, intake);
+  const wrongRepairConfig = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/vitest.repair-scope.config.ts`]: 'd'.repeat(40),
+  }, changedPaths, acl, intake);
+  for (const evidence of [wrongIntakePage, wrongAclRoute, wrongRepairConfig]) {
+    assert.equal(evidence.eligible, false, 'combined workspace scope must reject any unpinned blob mutation');
+  }
+
+  const alteredIntake = intakeTriageEvidence(headSha, {
+    [`${headSha}:nextjs/lib/intake-triage.ts`]: 'c'.repeat(40),
+  }, changedPaths);
+  const alteredWorkspace = workspaceSourceEvidence(headSha, {
+    [`${headSha}:nextjs/app/workspace/page.tsx`]: INTAKE_TRIAGE_SOURCE_BLOBS['app/workspace/page.tsx'].candidate,
+    [`${headSha}:nextjs/vitest.repair-scope.config.ts`]: INTAKE_TRIAGE_REPAIR_CONFIG_BLOB,
+  }, changedPaths, acl, alteredIntake);
+  assert.equal(alteredIntake.eligible, false);
+  assert.equal(alteredWorkspace.eligible, false, 'an ineligible intake group must not unlock its page or config variants');
+  const failedPlan = planFor(changedPaths, {
+    headSha,
+    googleViewerAclVerification: acl,
+    asyncCompileJobAuthorityVerification: asyncAuthority,
+    intakeTriageVerification: alteredIntake,
+    docsPricingVerification: docs,
+    mobileNavVerification: mobile,
+    workspaceSourceVerification: alteredWorkspace,
+  });
+  assert.equal(failedPlan.runFullHermeticVitest, true);
+  assert.deepEqual(failedPlan.unitFiles, [], 'failed evidence cannot retain a narrow unit selection');
 });
 
 test('6401 anchor excludes historical developer-store changes from the current delta', () => {
@@ -247,25 +504,43 @@ function docsPricingEvidence(headSha, overrides = {}, changedPaths = DOCS_PRICIN
   });
 }
 
-function googleViewerAclEvidence(headSha, overrides = {}, changedPaths = GOOGLE_VIEWER_ACL_FEATURE_PATHS) {
+function googleViewerAclEvidence(headSha, overrides = {}, changedPaths = GOOGLE_VIEWER_ACL_FEATURE_PATHS, googleDriveAclRefreshVerification = null) {
   const blobs = new Map();
   for (const [path, blob] of Object.entries(GOOGLE_VIEWER_ACL_PREIMAGE_BLOBS)) {
-    if (blob) blobs.set(`${GOOGLE_VIEWER_ACL_PREDECESSOR_SHA}:${path.startsWith('supabase/') ? path : `nextjs/${path}`}`, blob);
+    if (blob) blobs.set(GOOGLE_VIEWER_ACL_PREDECESSOR_SHA + ':' + (path.startsWith('supabase/') ? path : 'nextjs/' + path), blob);
   }
   for (const [path, blob] of Object.entries(GOOGLE_VIEWER_ACL_FINAL_BLOBS)) {
-    blobs.set(`${headSha}:${path.startsWith('supabase/') ? path : `nextjs/${path}`}`, blob);
+    const exactRefreshVariant = googleDriveAclRefreshVerification?.eligible && GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path);
+    const candidate = exactRefreshVariant ? GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS[path].candidate : blob;
+    if (candidate !== null) blobs.set(headSha + ':' + (path.startsWith('supabase/') ? path : 'nextjs/' + path), candidate);
   }
   for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
   return verifyGoogleViewerAclScopeEvidence({
-    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
-    headSha,
-    changedPaths,
-    repoRoot: 'fixture-root',
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA, headSha, changedPaths, repoRoot: 'fixture-root', googleDriveAclRefreshVerification,
     exec: (_command, args) => {
       if (args[0] === 'merge-base') return '';
       const blob = blobs.get(args[1]);
-      if (!blob) throw new Error(`missing Google Viewer ACL blob fixture: ${args[1]}`);
-      return `${blob}\n`;
+      if (!blob) throw new Error('missing Google Viewer ACL blob fixture: ' + args[1]);
+      return blob + '\n';
+    },
+  });
+}
+
+function googleDriveAclRefreshEvidence(headSha, overrides = {}, changedPaths = GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS)) {
+    const key = (revision, name) => revision + ':' + selectorRepositoryPath(name);
+    if (expected.predecessor !== null) blobs.set(key(GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA, path), expected.predecessor);
+    if (expected.candidate !== null) blobs.set(key(headSha, path), expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyGoogleDriveAclRefreshScopeEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA, headSha, changedPaths, repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      if (args[0] === 'merge-base') return '';
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error('missing Google Drive ACL refresh blob fixture: ' + args[1]);
+      return blob + '\n';
     },
   });
 }
@@ -291,16 +566,46 @@ function asyncCompileJobAuthorityEvidence(headSha, overrides = {}, changedPaths 
   return { ...evidence, calls };
 }
 
-function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS, googleViewerAclVerification = null) {
+function intakeTriageEvidence(headSha, overrides = {}, changedPaths = INTAKE_TRIAGE_FEATURE_PATHS) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(INTAKE_TRIAGE_SOURCE_BLOBS)) {
+    blobs.set(INTAKE_TRIAGE_PREDECESSOR_SHA + ":" + selectorRepositoryPath(path), expected.predecessor);
+    blobs.set(headSha + ":" + selectorRepositoryPath(path), expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  const calls = [];
+  const evidence = verifyIntakeTriageScopeEvidence({
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA, headSha, changedPaths, repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      calls.push(args);
+      if (args[0] === 'merge-base') return '';
+      const blob = blobs.get(args[1]);
+      if (blob === null) throw new Error('missing predecessor file expected');
+      if (!blob) throw new Error("missing intake triage blob fixture: " + args[1]);
+      return blob + "\n";
+    },
+  });
+  return { ...evidence, calls };
+}
+
+function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPACE_SOURCE_FEATURE_PATHS, googleViewerAclVerification = null, intakeTriageVerification = null) {
   const blobs = new Map([
     [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/app/workspace/page.tsx`, '3e4c6b5f9227cbbff7238c28bcd8d25770006eb3'],
     ...Object.entries(WORKSPACE_SOURCE_FIXTURE_BASE_BLOBS).map(([path, blob]) => [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/${path}`, blob]),
-    [`${headSha}:nextjs/vitest.repair-scope.config.ts`, 'f2065bec72452aa1c80b29afb2768339b7397db8'],
+    [`${headSha}:nextjs/vitest.repair-scope.config.ts`, intakeTriageVerification?.eligible
+      ? INTAKE_TRIAGE_REPAIR_CONFIG_BLOB
+      : 'f2065bec72452aa1c80b29afb2768339b7397db8'],
     [`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/vitest.config.ts`, '91bb009bae9930952594c8fb8164b714a43e8686'],
     [`${headSha}:nextjs/vitest.config.ts`, '91bb009bae9930952594c8fb8164b714a43e8686'],
   ]);
   for (const [path, blob] of Object.entries(WORKSPACE_SOURCE_FEATURE_BLOBS)) blobs.set(`${headSha}:nextjs/${path}`, blob);
-  blobs.set(`${headSha}:nextjs/app/workspace/page.tsx`, '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0');
+  blobs.set(`${headSha}:nextjs/app/workspace/page.tsx`, intakeTriageVerification?.eligible
+    ? INTAKE_TRIAGE_SOURCE_BLOBS['app/workspace/page.tsx'].candidate
+    : '922c4f2b676661bfbcfcaabf1b7cc27cd6461ee0');
+  if (googleViewerAclVerification?.eligible) {
+    blobs.set(`${headSha}:nextjs/app/api/documents/[id]/progress/route.test.ts`, GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.test.ts']);
+    blobs.set(`${headSha}:nextjs/app/api/documents/[id]/progress/route.ts`, GOOGLE_VIEWER_ACL_FINAL_BLOBS['app/api/documents/[id]/progress/route.ts']);
+  }
   for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
   return verifyWorkspaceSourceScopeEvidence({
     repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA,
@@ -308,6 +613,7 @@ function workspaceSourceEvidence(headSha, overrides = {}, changedPaths = WORKSPA
     changedPaths,
     repoRoot: 'fixture-root',
     googleViewerAclVerification,
+    intakeTriageVerification,
     exec: (_command, args) => {
       const blob = blobs.get(args[1]);
       if (!blob) throw new Error(`missing blob fixture: ${args[1]}`);
@@ -890,6 +1196,84 @@ test('reviewed Docs/pricing patch preserves exact CSS blobs and selects layout r
   const partial = docsPricingEvidence(headSha, {}, docsPaths.slice(0, -1));
   assert.equal(partial.eligible, false);
   assert.ok(partial.reasons.some(reason => reason.includes('path set')));
+});
+
+test('Google Drive ACL refresh pins exact sources, separates Node TAP from Vitest, and composes boundary blobs only with proof', () => {
+  const headSha = 'c'.repeat(40);
+  const refreshPaths = GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS.map(selectorRepositoryPath);
+  const refresh = googleDriveAclRefreshEvidence(headSha, {}, refreshPaths);
+  assert.equal(GOOGLE_DRIVE_ACL_REFRESH_PREDECESSOR_SHA, '1e1d46ad428aa04081bef359d7dd8012d0d87834');
+  assert.equal(GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS.length, 16);
+  assert.equal(Object.keys(GOOGLE_DRIVE_ACL_REFRESH_SOURCE_BLOBS).length, 16);
+  assert.equal(refresh.eligible, true, refresh.reasons.join('; '));
+  assert.ok(GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has('lib/google-drive-acl-capture.ts'));
+  assert.ok(GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(GOOGLE_DRIVE_ACL_REFRESH_BOUNDARY_PATH));
+
+  const plan = planFor(refreshPaths, { headSha, googleDriveAclRefreshVerification: refresh });
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.ok(plan.groups.includes('google-drive-acl-refresh'));
+  assert.ok(plan.groups.includes('database-contract'));
+  assert.ok(!plan.groups.includes('google-viewer-acl'), 'the boundary overlap alone must not impersonate a complete prior ACL scope');
+  assert.equal(plan.databaseRehearsalStatus, 'invalidated-pending-rehearsal');
+  assert.deepEqual(plan.pendingQualificationDebt, ['database-contract']);
+  assert.equal(plan.googleDriveAclRefreshSelection.sqlStatus, 'unregistered-draft-pending-disposable-pgtap');
+  for (const file of GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS) assert.ok(plan.unitFiles.includes(file), 'ACL refresh selection omitted ' + file);
+
+  const nodeFile = 'lib/acl-refresh-core.test.mjs';
+  assert.deepEqual(buildNodeTestArgs([nodeFile]), ['--test', '--test-reporter=tap', nodeFile]);
+  assert.throws(() => buildUnitArgs([nodeFile], 'repair-scope-reports/vitest.json'), /Node test files must use the reviewed Node runner/);
+  const vitestArgs = buildUnitArgs(plan.unitFiles.filter(file => file !== nodeFile), 'repair-scope-reports/vitest.json');
+  assert.ok(vitestArgs.includes('lib/google-drive-acl-refresh.test.ts'));
+  assert.ok(vitestArgs.includes('lib/safe-url.test.ts'));
+  assert.ok(vitestArgs.includes('lib/google-drive-acl-capture.test.ts'));
+  const passingTap = 'TAP version 13\n# Subtest: selected test\nok 1 - selected test\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+  assert.deepEqual(validateNodeTapReport(passingTap, [nodeFile]), { files: 1, tests: 1, passed: 1, failed: 0, skipped: 0, todo: 0 });
+  assert.throws(() => validateNodeTapReport(passingTap.replace('# pass 1', '# pass 0').replace('# fail 0', '# fail 1'), [nodeFile]), /executed passing tests/);
+  assert.throws(() => validateNodeTapReport(passingTap.replace('# skipped 0', '# skipped 1'), [nodeFile]), /executed passing tests/);
+  assert.throws(() => buildNodeTestArgs(['lib/unreviewed.test.mjs']), /No reviewed Node test runner/);
+
+  const originalAcl = googleViewerAclEvidence(headSha, {}, GOOGLE_VIEWER_ACL_FEATURE_PATHS);
+  assert.equal(originalAcl.eligible, true, 'the prior ACL blob variant remains accepted without refresh proof');
+  const combinedPaths = [...new Set([...WORKSPACE_SOURCE_FEATURE_PATHS, ...GOOGLE_VIEWER_ACL_FEATURE_PATHS, ...GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS])].map(selectorRepositoryPath);
+  const combinedRefresh = googleDriveAclRefreshEvidence(headSha, {}, combinedPaths);
+  const combinedAcl = googleViewerAclEvidence(headSha, {}, combinedPaths, combinedRefresh);
+  const combinedWorkspace = workspaceSourceEvidence(headSha, {}, combinedPaths, combinedAcl);
+  assert.equal(combinedRefresh.eligible, true, combinedRefresh.reasons.join('; '));
+  assert.equal(combinedAcl.eligible, true, combinedAcl.reasons.join('; '));
+  const combinedPlan = planFor(combinedPaths, { headSha, googleDriveAclRefreshVerification: combinedRefresh, googleViewerAclVerification: combinedAcl, workspaceSourceVerification: combinedWorkspace });
+  assert.equal(combinedPlan.runFullHermeticVitest, false, combinedPlan.qualificationReasons.join('; '));
+  assert.deepEqual(combinedPlan.unknownPaths, []);
+  assert.ok(combinedPlan.groups.includes('google-viewer-acl'));
+  assert.ok(combinedPlan.groups.includes('google-drive-acl-refresh'));
+  assert.ok(combinedPlan.unitFiles.includes(nodeFile));
+
+  const badCandidate = googleDriveAclRefreshEvidence(headSha, { [headSha + ':nextjs/lib/safe-url.ts']: 'f'.repeat(40) }, refreshPaths);
+  assert.equal(badCandidate.eligible, false);
+  assert.ok(badCandidate.candidateMismatches.includes('lib/safe-url.ts'));
+  const partial = googleDriveAclRefreshEvidence(headSha, {}, refreshPaths.filter(path => path !== 'nextjs/lib/safe-url.test.ts'));
+  assert.equal(partial.eligible, false);
+  assert.ok(partial.reasons.some(reason => reason.includes('path set')));
+  const badPlan = planFor(refreshPaths, { headSha, googleDriveAclRefreshVerification: badCandidate });
+  assert.equal(badPlan.runFullHermeticVitest, true);
+  assert.deepEqual(badPlan.unitFiles, [], 'ineligible evidence must not return a partial focused plan');
+
+  const badBoundaryAcl = googleViewerAclEvidence(headSha, { [headSha + ':supabase/drafts/google-viewer-principal-boundary.sql']: 'e'.repeat(40) }, combinedPaths, combinedRefresh);
+  assert.equal(badBoundaryAcl.eligible, false);
+  assert.ok(badBoundaryAcl.candidateMismatches.includes('supabase/drafts/google-viewer-principal-boundary.sql'));
+  const badCaptureAcl = googleViewerAclEvidence(headSha, { [headSha + ':nextjs/lib/google-drive-acl-capture.ts']: 'd'.repeat(40) }, combinedPaths, combinedRefresh);
+  assert.equal(badCaptureAcl.eligible, false);
+  assert.ok(badCaptureAcl.candidateMismatches.includes('lib/google-drive-acl-capture.ts'));
+  const badCapturePlan = planFor(combinedPaths, { headSha, googleDriveAclRefreshVerification: combinedRefresh, googleViewerAclVerification: badCaptureAcl });
+  assert.equal(badCapturePlan.runFullHermeticVitest, true);
+  const badCombined = planFor(combinedPaths, { headSha, googleDriveAclRefreshVerification: combinedRefresh, googleViewerAclVerification: badBoundaryAcl });
+  assert.equal(badCombined.runFullHermeticVitest, true);
+  assert.deepEqual(badCombined.unitFiles, []);
+
+  const registeredPath = 'nextjs/supabase/migrations/20261005120000_google_drive_acl_refresh_queue.sql';
+  const registered = googleDriveAclRefreshEvidence(headSha, {}, [...refreshPaths, registeredPath]);
+  assert.equal(registered.eligible, false);
+  assert.ok(registered.reasons.some(reason => reason.includes('unregistered draft')));
 });
 
 test('reviewed Google Viewer ACL patch selects direct and helper suites while preserving Docs/pricing and workspace checks', () => {

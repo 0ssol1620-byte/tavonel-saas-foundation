@@ -5,6 +5,19 @@ const ORIGIN = "https://www.googleapis.com";
 const MAX_PAGES = 20;
 const MAX_PRINCIPALS = 2_000;
 
+export class GoogleDriveAclCaptureError extends Error {
+  readonly status?: number;
+  readonly retryAfter?: string;
+  readonly definitiveIncomplete: boolean;
+  constructor(input: { status?: number; retryAfter?: string | null; definitiveIncomplete?: boolean } = {}) {
+    super("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+    this.name = "GoogleDriveAclCaptureError";
+    this.status = input.status;
+    this.retryAfter = input.retryAfter ?? undefined;
+    this.definitiveIncomplete = input.definitiveIncomplete === true;
+  }
+}
+
 export type GoogleDriveAclPrincipal = {
   kind: "user";
   principalId: string;
@@ -19,19 +32,19 @@ function drivePermission(value: unknown): GoogleDriveAclPrincipal | null {
   if (!isRecord(value) || (value.deleted !== undefined && typeof value.deleted !== "boolean") ||
       typeof value.type !== "string" || !["user", "group", "domain", "anyone"].includes(value.type) ||
       typeof value.role !== "string") {
-    throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+    throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
   }
   if (value.deleted === true) return null;
   // Group, domain, anyone, and unknown grants are not expanded to individual viewers.
   if (value.type !== "user") return null;
   const principalId = value.id;
   if (typeof principalId !== "string" || principalId.length < 1 || principalId.length > 512 || /[\u0000-\u001f\u007f]/.test(principalId)) {
-    throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+    throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
   }
   const permission = value.role === "owner" ? "owner"
     : ["writer", "fileOrganizer", "organizer", "contentManager"].includes(value.role) ? "write"
       : ["reader", "commenter"].includes(value.role) ? "read" : null;
-  if (!permission) throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+  if (!permission) throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
   return { kind: "user", principalId, permission };
 }
 
@@ -42,6 +55,7 @@ function drivePermission(value: unknown): GoogleDriveAclPrincipal | null {
 export async function captureGoogleDriveUserAcl(input: {
   fileId: string;
   accessToken: string;
+  signal?: AbortSignal;
   fetcher?: typeof fetch;
 }): Promise<{ principals: GoogleDriveAclPrincipal[]; snapshotSha256: string; capturedAt: string }> {
   if (!/^[A-Za-z0-9_-]{1,512}$/.test(input.fileId) || typeof input.accessToken !== "string" ||
@@ -53,7 +67,7 @@ export async function captureGoogleDriveUserAcl(input: {
   let pageToken: string | null = null;
   let pages = 0;
   do {
-    if (++pages > MAX_PAGES) throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+    if (++pages > MAX_PAGES) throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
     const url = new URL(`/drive/v3/files/${encodeURIComponent(input.fileId)}/permissions`, ORIGIN);
     url.searchParams.set("pageSize", "100");
     url.searchParams.set("supportsAllDrives", "true");
@@ -62,28 +76,34 @@ export async function captureGoogleDriveUserAcl(input: {
     const result = await safeFetch(url.toString(), {
       headers: { authorization: `Bearer ${input.accessToken}`, accept: "application/json" },
       redirect: "error",
+      signal: input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000),
     }, { origins: [ORIGIN], pathPrefix: "/drive/v3/", maxUrlLength: 4_096, timeoutMs: 10_000 }, fetcher);
-    if (!result.ok || result.status < 200 || result.status > 299) {
-      throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+    if (!result.ok) {
+      throw new GoogleDriveAclCaptureError();
+    }
+    if (result.status < 200 || result.status > 299) {
+      // Preserve provider throttling metadata for the durable queue; never sleep here.
+      throw new GoogleDriveAclCaptureError({ status: result.status >= 400 ? result.status : undefined,
+        retryAfter: result.headers.get("retry-after") });
     }
     let body: unknown;
-    try { body = JSON.parse(result.text); } catch { throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE"); }
+    try { body = JSON.parse(result.text); } catch { throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true }); }
     if (!isRecord(body) || !Array.isArray(body.permissions) || body.permissions.length > 100 ||
         (body.nextPageToken !== undefined && (typeof body.nextPageToken !== "string" ||
           body.nextPageToken.length < 1 || body.nextPageToken.length > 4_096 || body.nextPageToken === pageToken))) {
-      throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+      throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
     }
     for (const row of body.permissions) {
       const principal = drivePermission(row);
       if (principal) {
         const previous = principals.get(principal.principalId);
         if (previous && previous.permission !== principal.permission) {
-          throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+          throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
         }
         principals.set(principal.principalId, principal);
       }
     }
-    if (principals.size > MAX_PRINCIPALS) throw new Error("GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE");
+    if (principals.size > MAX_PRINCIPALS) throw new GoogleDriveAclCaptureError({ definitiveIncomplete: true });
     pageToken = typeof body.nextPageToken === "string" ? body.nextPageToken : null;
   } while (pageToken !== null);
 

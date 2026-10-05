@@ -187,6 +187,28 @@ describe("safeFetch", () => {
       .resolves.toEqual({ ok: false, code: "EGRESS_REQUEST_FAILED" });
   });
 
+  it("propagates caller abort while retaining the bounded per-request timeout", async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }));
+    const result = safeFetch("https://api.example.com/v1/list", { signal: controller.signal },
+      { ...pinned, timeoutMs: 10_000 }, fetcher as never);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0]?.[1]?.signal).not.toBe(controller.signal);
+    controller.abort(new Error("caller deadline"));
+    await expect(result).resolves.toEqual({ ok: false, code: "EGRESS_REQUEST_FAILED" });
+  });
+
+  it("still aborts an unbounded caller request at its policy timeout", async () => {
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("timed out")), { once: true });
+    }));
+    await expect(safeFetch("https://api.example.com/v1/list", {}, { ...pinned, timeoutMs: 5 }, fetcher as never))
+      .resolves.toEqual({ ok: false, code: "EGRESS_REQUEST_FAILED" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("returns the body when everything holds", async () => {
     const fetcher = vi.fn(async () => Response.json({ ok: true }));
     const result = await safeFetch("https://api.example.com/v1/list", {}, pinned, fetcher as never);
