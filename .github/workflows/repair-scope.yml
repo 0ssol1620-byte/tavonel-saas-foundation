@@ -62,6 +62,18 @@ jobs:
         id: check
         run: pnpm check
         continue-on-error: true
+      - name: Run the normal CDR worker unit suite and types for reviewed OCR safety
+        id: cdr-worker
+        if: >-
+          steps.plan.outputs.cdr_worker == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success'
+        working-directory: quarantine-sidecar/foundation-cdr-worker
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          node node_modules/typescript/bin/tsc --noEmit
       - name: Run Foundation focused unit checks
         id: targeted-vitest
         if: steps.plan.outputs.broader != 'true' && steps.plan.outputs.unit == 'true'
@@ -88,6 +100,7 @@ jobs:
            (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
           (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
+          (steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         run: pnpm exec playwright install --with-deps chromium
         continue-on-error: true
@@ -102,6 +115,7 @@ jobs:
            (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
           (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
+          (steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         env:
           COMMERCIAL_MODE: live
@@ -148,6 +162,18 @@ jobs:
           path: nextjs/test-results/**/public-ui-*.png
           if-no-files-found: warn
           retention-days: 3
+      # Only the local intake fixture's rendered failure context and screenshots.
+      # Exclude traces, auth/storage state, uploads, reports and other workspace files.
+      - name: Upload bounded synthetic intake browser failure diagnostics
+        if: always() && steps.browser.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intake-browser-failure-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/error-context.md
+            nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/test-failed-*.png
+          if-no-files-found: warn
+          retention-days: 3
       - name: Fail closed on missing or failed scoped checks
         id: gate
         if: always()
@@ -158,6 +184,7 @@ jobs:
           VITEST_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome || (steps.plan.outputs.unit == 'true' && steps.targeted-vitest.outcome) || 'success' }}
           AUX_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-scripts.outcome || 'success' }}
           WORKFLOW_RESULT: ${{ steps.plan.outputs.workflow_static == 'true' && steps.workflow-static.outcome || 'success' }}
+          CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}
           SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
           BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}
           BROWSER_INSTALL_RESULT: ${{ steps.browser-install.outcome }}

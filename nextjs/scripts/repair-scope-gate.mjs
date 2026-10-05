@@ -52,6 +52,7 @@ function runGate() {
     [plan.runFullHermeticVitest ? 'hermetic Vitest' : (plan.unitFiles.length ? 'targeted Vitest' : 'selected unit tests'), env.VITEST_RESULT],
     [plan.runFullHermeticVitest ? 'test:scripts' : 'alias auth/contract tests', env.AUX_RESULT],
     ['workflow static gates', plan.runWorkflowStaticGate ? env.WORKFLOW_RESULT : 'success'],
+    ['CDR worker tests and types', plan.runCdrWorkerChecks ? env.CDR_WORKER_RESULT : 'success'],
     ['Chromium install', browserRequired ? env.BROWSER_INSTALL_RESULT : 'success'],
     ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],

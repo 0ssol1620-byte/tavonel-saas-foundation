@@ -1,8 +1,9 @@
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
 import { ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
+import { RetryableError } from "./errors";
 
 type OcrR2Bucket = {
-  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+  get(key: string): Promise<{ size?: number; arrayBuffer(): Promise<ArrayBuffer> } | null>;
   put(
     key: string,
     value: ArrayBuffer | Uint8Array,
@@ -24,6 +25,7 @@ export type OcrFailureCode =
   | "OCR_HTTP_REJECTED"
   | "OCR_RESPONSE_NOT_JSON"
   | "OCR_RESPONSE_INVALID"
+  | "OCR_PERSISTED_RESULT_INVALID"
   | "OCR_RESULT_WRITE_FAILED";
 
 /**
@@ -57,6 +59,7 @@ export const OCR_FAILURE_CATEGORY: Record<OcrFailureCode, { kind: OcrFailureKind
   OCR_SOURCE_EMPTY: { kind: "semantic", retryCategory: "unsupported_file" },
   OCR_RESPONSE_NOT_JSON: { kind: "semantic", retryCategory: "invalid_output" },
   OCR_RESPONSE_INVALID: { kind: "semantic", retryCategory: "invalid_output" },
+  OCR_PERSISTED_RESULT_INVALID: { kind: "semantic", retryCategory: "invalid_output" },
   OCR_REVIEW_ALREADY_EXISTS: { kind: "semantic", retryCategory: "invalid_output" },
 };
 
@@ -72,6 +75,8 @@ export type OcrDispatchResult = {
   reasonCode?: OcrFailureCode;
   requestId?: string;
   inputSha256?: string;
+  outputSha256?: string;
+  observedPageCount?: number;
   computeCredits: 0 | 2;
 };
 
@@ -83,6 +88,43 @@ export type OcrDispatchEnv = {
   RUNPOD_API_KEY?: string;
   FOUNDATION_R2_BUCKET: string;
 };
+
+/** Storage read failures must stay retryable after the cold-start retry budget. */
+export class OcrEvidenceRetryableError extends RetryableError {}
+const MAX_PERSISTED_OCR_BYTES = 24 * 1024 * 1024;
+
+async function inspectPersistedOcr(
+  env: OcrDispatchEnv, immutablePdfKey: string, inputSha256: string, status: "exists" | "written",
+): Promise<OcrDispatchResult> {
+  const key = ocrSiblingKey(immutablePdfKey);
+  let object: Awaited<ReturnType<OcrR2Bucket["get"]>>;
+  let bytes: ArrayBuffer;
+  try {
+    object = await env.FOUNDATION_QUARANTINE.get(key);
+    if (!object) throw new Error("missing");
+    if (object.size !== undefined && (object.size < 1 || object.size > MAX_PERSISTED_OCR_BYTES)) {
+      return { status: "failed", key, inputSha256, reasonCode: "OCR_PERSISTED_RESULT_INVALID", computeCredits: 2 };
+    }
+    bytes = await object.arrayBuffer();
+  } catch {
+    throw new OcrEvidenceRetryableError("persisted OCR cannot be read; retry required");
+  }
+  try {
+    if (bytes.byteLength < 1 || bytes.byteLength > MAX_PERSISTED_OCR_BYTES
+      || (object.size !== undefined && bytes.byteLength !== object.size)) throw new Error("size");
+    const payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    const result = qualifyOcrResult(payload, inputSha256);
+    if (!result || payload.sourceImmutableKey !== immutablePdfKey) throw new Error("contract");
+    const outputSha256 = await sha256DigestHeader(bytes);
+    const facts: OcrDispatchResult = { status, key, inputSha256, outputSha256,
+      observedPageCount: result.pageCount, computeCredits: 2 };
+    return facts;
+  } catch (error) {
+    if (error instanceof OcrEvidenceRetryableError) throw error;
+    return { status: "failed", key, inputSha256, reasonCode: "OCR_PERSISTED_RESULT_INVALID",
+      reason: "persisted OCR does not match the sanitized source", computeCredits: 2 };
+  }
+}
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
@@ -189,6 +231,7 @@ export async function readOcrStream(
   const decoder = new TextDecoder();
   let buffered = "";
   let last: unknown = null;
+  let receivedBytes = 0;
 
   const consume = async (line: string) => {
     const trimmed = line.trim();
@@ -212,6 +255,11 @@ export async function readOcrStream(
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
+    receivedBytes += value.byteLength;
+    if (receivedBytes > MAX_PERSISTED_OCR_BYTES) {
+      await reader.cancel();
+      throw new Error("OCR stream exceeds the result bound");
+    }
     buffered += decoder.decode(value, { stream: true });
     let newline = buffered.indexOf(LINE_SEPARATOR);
     while (newline >= 0) {
@@ -223,6 +271,22 @@ export async function readOcrStream(
   buffered += decoder.decode();
   await consume(buffered);
   return last;
+}
+
+async function readBoundedOcrJson(response: Response): Promise<unknown> {
+  if (!response.body) throw new Error("missing OCR body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let size = 0;
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_PERSISTED_OCR_BYTES) { await reader.cancel(); throw new Error("OCR response exceeds the result bound"); }
+    text += decoder.decode(value, { stream: true });
+  }
+  return JSON.parse(text + decoder.decode());
 }
 
 
@@ -363,19 +427,30 @@ export async function dispatchOcrAfterSanitize(
   }
 
   const ocrKey = ocrSiblingKey(immutablePdfKey);
-  const existingOcr = await env.FOUNDATION_QUARANTINE.get(ocrKey);
-  if (existingOcr) return { status: "exists", key: ocrKey, computeCredits: 2 };
-  const pdf = await env.FOUNDATION_QUARANTINE.get(immutablePdfKey);
+  let existingOcr: Awaited<ReturnType<OcrR2Bucket["get"]>>;
+  let pdf: Awaited<ReturnType<OcrR2Bucket["get"]>>;
+  try {
+    existingOcr = await env.FOUNDATION_QUARANTINE.get(ocrKey);
+    pdf = await env.FOUNDATION_QUARANTINE.get(immutablePdfKey);
+  } catch {
+    throw new OcrEvidenceRetryableError("OCR source or existence lookup cannot be read; retry required");
+  }
   if (!pdf) {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_MISSING", reason: "immutable PDF is not readable for OCR", computeCredits: 0 };
   }
 
-  const bytes = await pdf.arrayBuffer();
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await pdf.arrayBuffer();
+  } catch {
+    throw new OcrEvidenceRetryableError("OCR source body cannot be read; retry required");
+  }
   if (bytes.byteLength < 1) {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_SOURCE_EMPTY", reason: "immutable PDF is empty", computeCredits: 0 };
   }
 
   const inputSha256 = await sha256DigestHeader(bytes);
+  if (existingOcr) return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
   const timestamp = now().toISOString();
   const requestId = newRequestId();
   const hmac = (env.TAVONEL_OCR_HMAC || env.TAVONEL_CDR_HMAC || "").trim();
@@ -469,7 +544,7 @@ export async function dispatchOcrAfterSanitize(
     await writeProgress();
   } else {
     try {
-      payload = (await response.json()) as typeof payload;
+      payload = await readBoundedOcrJson(response);
     } catch {
       return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_NOT_JSON", reason: "OCR response is not JSON", requestId, inputSha256, computeCredits: 2 };
     }
@@ -488,9 +563,13 @@ export async function dispatchOcrAfterSanitize(
     sourceImmutableKey: immutablePdfKey,
     inputSha256: qualified.inputSha256,
   });
+  const persistedBytes = new TextEncoder().encode(body);
+  if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
+    return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", computeCredits: 2 };
+  }
 
   try {
-    await env.FOUNDATION_QUARANTINE.put(ocrKey, new TextEncoder().encode(body), {
+    await env.FOUNDATION_QUARANTINE.put(ocrKey, persistedBytes, {
       httpMetadata: { contentType: "application/json" },
       customMetadata: { stage: "ocr-json" },
       onlyIf: { etagDoesNotMatch: "*" },
@@ -498,9 +577,11 @@ export async function dispatchOcrAfterSanitize(
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/precondition|already exists|conflict/iu.test(message)) {
-      return { status: "exists", key: ocrKey, computeCredits: 2 };
+      return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
     }
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256, computeCredits: 0 };
   }
-  return { status: "written", key: ocrKey, requestId, inputSha256, computeCredits: 2 };
+  // R2 may return null on a failed condition instead of throwing. Read the durable winner on
+  // every path; the response candidate and its serialization are never the receipt digest.
+  return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "written");
 }

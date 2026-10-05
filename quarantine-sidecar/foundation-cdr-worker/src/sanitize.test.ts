@@ -748,6 +748,70 @@ describe("Worker HTTP and queue surface", () => {
     assert.equal(r2.objects.has(reviewKey), false);
   });
 
+  for (const stage of ["review-get", "existence-get", "source-get", "source-body", "persisted-get", "persisted-body"] as const) {
+    it(`attempt 3 retries ${stage} storage evidence failure without review receipt or settlement`, async () => {
+      const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+      const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
+      const ocrKey = ocrSiblingKey(immutableKey);
+      const reviewKey = ocrReviewSiblingKey(immutableKey);
+      const get = r2.get.bind(r2);
+      let ocrGets = 0;
+      r2.get = async key => {
+        if (stage === "review-get" && key === reviewKey) throw new Error("synthetic review evidence GET failure");
+        if (key === ocrKey) {
+          ocrGets += 1;
+          if (stage === "existence-get" && ocrGets === 1 || stage === "persisted-get" && ocrGets === 2) {
+            throw new Error("synthetic storage GET failure");
+          }
+        }
+        if (key === immutableKey && ocrGets > 0 && stage === "source-get") throw new Error("synthetic source GET failure");
+        const object = await get(key);
+        if (object && (key === immutableKey && ocrGets > 0 && stage === "source-body"
+          || key === ocrKey && ocrGets === 2 && stage === "persisted-body")) {
+          return { ...object, arrayBuffer: async () => { throw new Error("synthetic storage body failure"); } };
+        }
+        return object;
+      };
+      let acknowledgements = 0; let retries = 0; const settlements: unknown[] = []; let providerCalls = 0;
+      await handleQueue({ messages: [{ body: { object: { key: SOURCE_KEY } }, attempts: 3,
+        ack: () => { acknowledgements++; }, retry: () => { retries++; } }] },
+      envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }), async (url, init) => {
+        if (String(url) === SETTLEMENT_URL) { settlements.push(init?.body); return Response.json({ code: "SETTLEMENT_APPLIED" }); }
+        if (String(url) === FOUNDATION_OCR) {
+          providerCalls++;
+          const inputSha256 = new Headers(init?.headers).get("x-tavonel-input-sha256");
+          return Response.json({ schemaVersion: "tavonel.ocr_result.v2", status: "ok", text: "synthetic", pageCount: 1,
+            inputSha256, regions: [{ regionId: "p1", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+              text: "synthetic", bbox1000: [0, 0, 100, 100], confidence: 1, authority: "unknown" }] });
+        }
+        return cleanCdrFetch(url, init);
+      });
+      assert.equal(acknowledgements, 0); assert.equal(retries, 1);
+      assert.deepEqual(settlements, []); assert.equal(r2.objects.has(reviewKey), false);
+      assert.equal(providerCalls, stage.startsWith("persisted-") ? 1 : 0);
+    });
+  }
+
+  for (const invalid of ["malformed", "wrong-source"] as const) {
+    it(`attempt 3 preserves terminal operator review for ${invalid} persisted evidence`, async () => {
+      const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+      const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
+      const payload = invalid === "malformed" ? {} : {
+        schemaVersion: "tavonel.ocr_result.v2", status: "ok", text: "synthetic", pageCount: 1,
+        inputSha256: outputSha256(), sourceImmutableKey: "foreign/source/sanitized.pdf",
+        regions: [{ regionId: "p1", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+          text: "synthetic", bbox1000: [0, 0, 100, 100], confidence: 1, authority: "unknown" }],
+      };
+      r2.objects.set(ocrSiblingKey(immutableKey), { bytes: new TextEncoder().encode(JSON.stringify(payload)), contentType: "application/json" });
+      const run = await runQueueAttempt(r2, 3, async () => { throw new Error("provider must not run"); });
+      assert.equal(run.acks, 1); assert.deepEqual(run.retries, []); assert.equal(run.ocrCalls, 0);
+      assert.equal(run.settlements.length, 1); assert.equal(run.settlements[0]?.outcome, "operator_review");
+      assert.equal(run.settlements[0]?.actualCredits, 2);
+      assert.equal(run.settlements[0]?.reasonCode, "OCR_PERSISTED_RESULT_INVALID");
+      assert.equal(r2.objects.has(ocrReviewSiblingKey(immutableKey)), true);
+    });
+  }
+
   it("records the failure when the OCR timeout outlives the retry bound, still charging nothing", async () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
     const run = await runQueueAttempt(r2, 3, ocrTimeout);

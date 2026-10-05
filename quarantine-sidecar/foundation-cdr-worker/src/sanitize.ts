@@ -12,7 +12,7 @@ import {
   parseQuarantineSourceKey,
   sourcePartFromR2Object,
 } from "./keys";
-import { dispatchOcrAfterSanitize, ocrFailureKind, type OcrDispatchResult } from "./ocr";
+import { OcrEvidenceRetryableError, dispatchOcrAfterSanitize, ocrFailureKind, type OcrDispatchResult } from "./ocr";
 
 export type SanitizeResult = {
   sourceKey: string;
@@ -540,7 +540,12 @@ export async function sanitizeObject(
 
   let ocr: OcrDispatchResult;
   try {
-    const existingReview = await env.FOUNDATION_QUARANTINE.get(ocrReviewSiblingKey(immutableKey));
+    let existingReview: R2ObjectLike | null;
+    try {
+      existingReview = await env.FOUNDATION_QUARANTINE.get(ocrReviewSiblingKey(immutableKey));
+    } catch {
+      throw new OcrEvidenceRetryableError("OCR review evidence cannot be read; retry required");
+    }
     ocr = existingReview
       ? {
           status: "failed",
@@ -549,7 +554,8 @@ export async function sanitizeObject(
           computeCredits: 2,
         }
       : await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
-  } catch {
+  } catch (error) {
+    if (error instanceof OcrEvidenceRetryableError) throw error;
     ocr = {
       status: "failed",
       reasonCode: "OCR_TIMEOUT_OR_NETWORK",

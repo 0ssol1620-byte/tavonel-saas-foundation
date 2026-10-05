@@ -57,6 +57,14 @@ import {
   PUBLIC_EDITORIAL_SOURCE_BLOBS,
   PUBLIC_EDITORIAL_FEATURE_PATHS,
   verifyPublicEditorialScopeEvidence,
+  LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA,
+  LEGACY_PUBLIC_BROWSER_BLOBS,
+  LEGACY_PUBLIC_BROWSER_PATHS,
+  verifyLegacyPublicBrowserScopeEvidence,
+  PERSISTED_OCR_SAFETY_PREDECESSOR_SHA,
+  PERSISTED_OCR_SAFETY_BLOBS,
+  PERSISTED_OCR_SAFETY_PATHS,
+  verifyPersistedOcrSafetyScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -111,7 +119,7 @@ function planFor(paths, overrides = {}) {
   });
 }
 
-function runGateCli({ browserFiles = [], overrides = {} } = {}) {
+function runGateCli({ browserFiles = [], overrides = {}, planOverrides = {} } = {}) {
   const repoRoot = mkdtempSync(resolve(tmpdir(), 'repair-gate-cli-'));
   const headSha = 'c'.repeat(40);
   const plan = {
@@ -128,6 +136,7 @@ function runGateCli({ browserFiles = [], overrides = {} } = {}) {
     runDetailIntegrity: false,
     runFullHermeticVitest: false,
     runWorkflowStaticGate: false,
+    ...planOverrides,
   };
   writeFileSync(resolve(repoRoot, 'repair-plan.json'), JSON.stringify(plan));
   const env = {
@@ -137,7 +146,7 @@ function runGateCli({ browserFiles = [], overrides = {} } = {}) {
     HEAD_SHA: headSha,
     ...overrides,
   };
-  for (const key of ['BROWSER_INSTALL_RESULT', 'BROWSER_BUILD_RESULT', 'BROWSER_RESULT']) {
+  for (const key of ['BROWSER_INSTALL_RESULT', 'BROWSER_BUILD_RESULT', 'BROWSER_RESULT', 'CDR_WORKER_RESULT']) {
     if (Object.hasOwn(overrides, key)) env[key] = overrides[key];
     else delete env[key];
   }
@@ -1685,11 +1694,11 @@ test('root-reviewed intake browser fixture correction retains the exact predeces
   assert.equal(INTAKE_TRIAGE_PREDECESSOR_SHA, '8944cbfb0335f3120c71dc823b4106da5de4a6af');
   assert.deepEqual(INTAKE_TRIAGE_SOURCE_BLOBS[INTAKE_TRIAGE_BROWSER_FILE], {
     predecessor: null,
-    candidate: 'f27e04ba8db721a5ec38f861ef32838ceb10ec3c',
+    candidate: '6013f5dbcad1cf27ac1755e66dbb0b9bfcfae36c',
   });
   const verification = intakeTriageEvidence(testHeadSha);
   assert.equal(verification.eligible, true);
-  for (const candidate of ['0e78bd577e479648b71f49af145f1de709cf24a6', 'f'.repeat(40), null]) {
+  for (const candidate of ['0e78bd577e479648b71f49af145f1de709cf24a6', 'f27e04ba8db721a5ec38f861ef32838ceb10ec3c', 'f2258a1d572c62a2268a77978417a3e4397b2823', 'f'.repeat(40), null]) {
     const rejected = intakeTriageEvidence(testHeadSha, { [`${testHeadSha}:nextjs/${INTAKE_TRIAGE_BROWSER_FILE}`]: candidate });
     assert.equal(rejected.eligible, false);
     assert.ok(rejected.candidateMismatches.includes(INTAKE_TRIAGE_BROWSER_FILE));
@@ -1808,4 +1817,225 @@ test('public editorial docs, nav and headline tests use configured projects and 
   assert.ok(workflow.includes("steps.plan.outputs.public_ui_capture == 'true'"));
   assert.ok(workflow.includes('${#screenshots[@]} != ${#expected[@]}'));
   assert.ok(workflow.includes('diff -u'));
+});
+function legacyPublicBrowserEvidence({ overrides = {}, changedPaths = LEGACY_PUBLIC_BROWSER_PATHS, ancestor = true, repairAnchorSha = AUDITED_REPAIR_ANCHOR_SHA, headSha = testHeadSha } = {}) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(LEGACY_PUBLIC_BROWSER_BLOBS)) {
+    blobs.set(`${LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA}:nextjs/${path}`, expected.predecessor);
+    blobs.set(`${testHeadSha}:nextjs/${path}`, expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyLegacyPublicBrowserScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot: 'fixture-root',
+    exec: (command, args, options) => {
+      assert.equal(command, 'git');
+      assert.equal(options.shell, false);
+      if (args[0] === 'merge-base') {
+        assert.deepEqual(args, ['merge-base', '--is-ancestor', LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA, headSha]);
+        if (!ancestor) throw new Error('non-ancestor');
+        return '';
+      }
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error('missing blob');
+      return blob + '\n';
+    },
+  });
+}
+
+test('legacy public browser admission rejects altered hashes, partial paths, missing blobs and non-ancestors', () => {
+  assert.equal(LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA, 'e9bd49461fcb790d8110584551c16474ce387fa0');
+  assert.deepEqual(LEGACY_PUBLIC_BROWSER_BLOBS, {
+    'e2e/mobile-landing.spec.ts': { predecessor: '28460e5e01cc53f244be593254b4df6241d40857', candidate: '1ca9dd75cc6fa806ab853d9a25c3ab9f5bb8777e' },
+    'e2e/site-chrome-v2.spec.ts': { predecessor: 'e6e82af9586c1916a472f0c519d4924682853a61', candidate: 'ba3c2da0b9acba965658768beec680f1673c079d' },
+  });
+  assert.equal(legacyPublicBrowserEvidence().eligible, true);
+  for (const path of LEGACY_PUBLIC_BROWSER_PATHS) {
+    for (const candidate of ['f'.repeat(40), LEGACY_PUBLIC_BROWSER_BLOBS[path].predecessor, null]) {
+      const evidence = legacyPublicBrowserEvidence({ overrides: { [`${testHeadSha}:nextjs/${path}`]: candidate } });
+      assert.equal(evidence.eligible, false);
+      assert.deepEqual(evidence.candidateMismatches, [path]);
+      assert.equal(planFor(LEGACY_PUBLIC_BROWSER_PATHS, { legacyPublicBrowserVerification: evidence }).runFullHermeticVitest, true);
+    }
+    assert.equal(legacyPublicBrowserEvidence({ overrides: { [`${LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA}:nextjs/${path}`]: 'f'.repeat(40) } }).eligible, false);
+    assert.equal(legacyPublicBrowserEvidence({ changedPaths: [path] }).eligible, false);
+  }
+  assert.equal(legacyPublicBrowserEvidence({ ancestor: false }).eligible, false);
+  assert.equal(legacyPublicBrowserEvidence({ repairAnchorSha: 'a'.repeat(40) }).eligible, false);
+  assert.equal(legacyPublicBrowserEvidence({ headSha: LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA }).eligible, false);
+});
+
+test('legacy browser pair is narrowly admitted and retains release debt and other source gates', () => {
+  const verification = legacyPublicBrowserEvidence();
+  const isolated = planFor(LEGACY_PUBLIC_BROWSER_PATHS, { legacyPublicBrowserVerification: verification });
+  assert.equal(isolated.runFullHermeticVitest, false);
+  assert.deepEqual(isolated.unknownPaths, []);
+  assert.deepEqual(isolated.browserFiles, LEGACY_PUBLIC_BROWSER_PATHS);
+  assert.equal(isolated.fullQualification, 'pending');
+  assert.ok(isolated.pendingFullDebt.includes('PR-base full CI'));
+  assert.ok(isolated.pendingFullDebt.includes('PR-base full Launch QA'));
+  const unreviewed = planFor([...LEGACY_PUBLIC_BROWSER_PATHS, 'e2e/other-mobile-landing.spec.ts'], { legacyPublicBrowserVerification: verification });
+  assert.equal(unreviewed.runFullHermeticVitest, true);
+  assert.deepEqual(unreviewed.unknownPaths, ['e2e/other-mobile-landing.spec.ts']);
+  const missing = planFor(LEGACY_PUBLIC_BROWSER_PATHS);
+  assert.equal(missing.runFullHermeticVitest, true);
+  assert.deepEqual(missing.unknownPaths, LEGACY_PUBLIC_BROWSER_PATHS);
+  const paths = [...PUBLIC_EDITORIAL_FEATURE_PATHS, ...DOCS_PRICING_FEATURE_PATHS, ...INTAKE_TRIAGE_FEATURE_PATHS, ...WORKSPACE_SOURCE_FEATURE_PATHS, ...LEGACY_PUBLIC_BROWSER_PATHS];
+  const failedIntake = planFor(paths, { legacyPublicBrowserVerification: verification, publicEditorialVerification: editorialEvidence(), docsPricingVerification: { eligible: true }, mobileNavVerification: { eligible: true } });
+  assert.equal(failedIntake.runFullHermeticVitest, true);
+  assert.equal(failedIntake.requirePublicUiScreenshots, true);
+  assert.deepEqual(failedIntake.pendingQualificationDebt, ['database-contract']);
+  assert.equal(failedIntake.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
+  assert.equal(failedIntake.intakeTriageSelection.evidence, null);
+});
+
+test('legacy public browser runs retain the required numeric tablet project and configured discovery', () => {
+  const mobile = 'e2e/mobile-landing.spec.ts';
+  const chrome = 'e2e/site-chrome-v2.spec.ts';
+  const expected = [
+    { kind: 'project', project: '1440', files: [chrome] },
+    { kind: 'project', project: '390', files: [mobile, chrome] },
+    { kind: 'project', project: '360', files: [mobile] },
+    { kind: 'project', project: '768', files: [mobile] },
+  ];
+  assert.deepEqual(planBrowserRuns([mobile, chrome, mobile], false), expected);
+  assert.deepEqual(planBrowserRuns([mobile], false).map(run => run.project), ['390', '360', '768']);
+  assert.deepEqual(planBrowserRuns([chrome], false).map(run => run.project), ['1440', '390']);
+  const combined = planBrowserRuns([mobile, chrome, 'e2e/docs-reading-layout.spec.ts', 'e2e/workspace-intake-triage.spec.ts'], false);
+  assert.deepEqual(combined.find(run => run.project === '768'), expected[3]);
+  assert.throws(() => planBrowserRuns(['e2e/other-mobile-landing.spec.ts'], false), /No reviewed Playwright project mapping/);
+  const config = readFileSync(new URL('../playwright.config.ts', import.meta.url), 'utf8');
+  assert.match(config, /const widths\s*=\s*\[[^\]]*\b1440\b[^\]]*\b768\b[^\]]*\b390\b[^\]]*\b360\b[^\]]*\]/);
+  const auditPattern = config.match(/const auditSpecs = \/(.+)\//)?.[1];
+  assert.ok(auditPattern);
+  for (const file of [mobile, chrome]) {
+    assert.equal(new RegExp(auditPattern).test(file), false);
+    assert.equal(/launch-qa.*\.spec\.ts/.test(file), false);
+  }
+  const mobileSource = readFileSync(new URL('../e2e/mobile-landing.spec.ts', import.meta.url), 'utf8');
+  assert.match(mobileSource, /const NARROW = \["360", "390", "768"\]/);
+  assert.match(mobileSource, /const PHONE = \["360", "390"\]/);
+  assert.match(mobileSource, /test\.skip\(!NARROW\.includes\(testInfo\.project\.name\)/);
+  assert.match(mobileSource, /test\.skip\(!PHONE\.includes\(testInfo\.project\.name\)/);
+  const chromeSource = readFileSync(new URL('../e2e/site-chrome-v2.spec.ts', import.meta.url), 'utf8');
+  for (const project of ['1440', '390']) assert.ok(chromeSource.includes(`testInfo.project.name !== "${project}"`));
+});
+
+test('failure diagnostics upload is limited to synthetic intake rendered context and screenshots for three days', () => {
+  const workflow = readFileSync(resolve(process.cwd(), '..', '.github/workflows/repair-scope.yml'), 'utf8');
+  const start = workflow.indexOf('      - name: Upload bounded synthetic intake browser failure diagnostics');
+  const end = workflow.indexOf('      - name: Fail closed on missing or failed scoped checks', start);
+  assert.ok(start >= 0 && end > start);
+  const step = workflow.slice(start, end);
+  assert.ok(step.includes("if: always() && steps.browser.outcome == 'failure'"));
+  assert.ok(step.includes('uses: actions/upload-artifact@v4'));
+  assert.ok(step.includes('retention-days: 3'));
+  assert.ok(!step.includes('continue-on-error'));
+  assert.ok(!step.includes('trace.zip'));
+  const paths = step.match(/path: \|\n([\s\S]*?)\n          if-no-files-found:/)?.[1].trim().split(/\s+/);
+  assert.deepEqual(paths, [
+    'nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/error-context.md',
+    'nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/test-failed-*.png',
+  ]);
+  assert.ok(workflow.includes('BROWSER_RESULT: ${{ steps.browser.outcome }}'));
+  assert.ok(workflow.includes('run: node scripts/repair-scope-gate.mjs'));
+});
+function persistedOcrSafetyEvidence({ overrides = {}, changedPaths = PERSISTED_OCR_SAFETY_PATHS, ancestor = true, repairAnchorSha = AUDITED_REPAIR_ANCHOR_SHA, headSha = testHeadSha } = {}) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(PERSISTED_OCR_SAFETY_BLOBS)) {
+    assert.equal(selectorRepositoryPath(path), path);
+    blobs.set(`${PERSISTED_OCR_SAFETY_PREDECESSOR_SHA}:${path}`, expected.predecessor);
+    blobs.set(`${testHeadSha}:${path}`, expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyPersistedOcrSafetyScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot: 'fixture-root',
+    exec: (command, args, options) => {
+      assert.equal(command, 'git');
+      assert.equal(options.shell, false);
+      if (args[0] === 'merge-base') {
+        assert.deepEqual(args, ['merge-base', '--is-ancestor', PERSISTED_OCR_SAFETY_PREDECESSOR_SHA, headSha]);
+        if (!ancestor) throw new Error('non-ancestor');
+        return '';
+      }
+      assert.ok(!args[1].includes(':nextjs/'));
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error('missing blob');
+      return blob + '\n';
+    },
+  });
+}
+
+test('persisted OCR safety uses exact root-worker source hashes without selecting unrelated full Vitest', () => {
+  assert.equal(PERSISTED_OCR_SAFETY_PREDECESSOR_SHA, 'e9bd49461fcb790d8110584551c16474ce387fa0');
+  assert.equal(PERSISTED_OCR_SAFETY_PATHS.length, 4);
+  const evidence = persistedOcrSafetyEvidence();
+  assert.equal(evidence.eligible, true);
+  const plan = planFor(PERSISTED_OCR_SAFETY_PATHS, { persistedOcrSafetyVerification: evidence });
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.runCdrWorkerChecks, true);
+  assert.deepEqual(plan.unitFiles, []);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.fullQualification, 'pending');
+  assert.ok(plan.persistedOcrSafetySelection.verification.includes('source admission is not runtime qualification'));
+  for (const path of PERSISTED_OCR_SAFETY_PATHS) {
+    for (const candidate of ['f'.repeat(40), PERSISTED_OCR_SAFETY_BLOBS[path].predecessor, null]) {
+      const rejected = persistedOcrSafetyEvidence({ overrides: { [`${testHeadSha}:${path}`]: candidate } });
+      assert.equal(rejected.eligible, false);
+      assert.deepEqual(rejected.candidateMismatches, [path]);
+      const fallback = planFor(PERSISTED_OCR_SAFETY_PATHS, { persistedOcrSafetyVerification: rejected });
+      assert.equal(fallback.runFullHermeticVitest, true);
+      assert.equal(fallback.runCdrWorkerChecks, true);
+      assert.deepEqual(fallback.unknownPaths, PERSISTED_OCR_SAFETY_PATHS);
+    }
+    assert.equal(persistedOcrSafetyEvidence({ changedPaths: PERSISTED_OCR_SAFETY_PATHS.filter(value => value !== path) }).eligible, false);
+    assert.equal(persistedOcrSafetyEvidence({ overrides: { [`${PERSISTED_OCR_SAFETY_PREDECESSOR_SHA}:${path}`]: 'f'.repeat(40) } }).eligible, false);
+  }
+  assert.equal(persistedOcrSafetyEvidence({ ancestor: false }).eligible, false);
+  assert.equal(persistedOcrSafetyEvidence({ repairAnchorSha: 'a'.repeat(40) }).eligible, false);
+  assert.equal(persistedOcrSafetyEvidence({ headSha: PERSISTED_OCR_SAFETY_PREDECESSOR_SHA }).eligible, false);
+  assert.equal(persistedOcrSafetyEvidence({ changedPaths: [...PERSISTED_OCR_SAFETY_PATHS, 'nextjs/' + PERSISTED_OCR_SAFETY_PATHS[0]] }).eligible, false);
+  for (const unknown of ['quarantine-sidecar/foundation-cdr-worker/src/settlement.ts', 'quarantine-sidecar/foundation-cdr-worker/package.json', 'supabase/migrations/20261006120000_read_proof.sql']) {
+    const fallback = planFor([...PERSISTED_OCR_SAFETY_PATHS, unknown], { persistedOcrSafetyVerification: evidence });
+    if (unknown.endsWith('.sql')) assert.deepEqual(fallback.pendingQualificationDebt, ['database-contract']);
+    else assert.equal(fallback.runFullHermeticVitest, true);
+  }
+});
+
+test('persisted OCR safety receipt fails when actual worker execution is missing, skipped or failed', () => {
+  const planOverrides = { runCdrWorkerChecks: true, groups: ['unit-regression', 'persisted-ocr-safety'] };
+  for (const outcome of [undefined, 'skipped', 'failure', 'cancelled']) {
+    const run = runGateCli({ planOverrides, overrides: outcome ? { CDR_WORKER_RESULT: outcome } : {} });
+    assert.equal(run.status, 1);
+    assert.equal(run.receipt.gate, 'failed');
+    assert.equal(run.receipt.runResults['persisted-ocr-safety'], 'unqualified');
+    assert.ok(run.receipt.gateFailures.some(reason => reason.startsWith('CDR worker tests and types:')));
+  }
+  // This is a gate-contract fixture, not evidence that the real worker tests executed.
+  const run = runGateCli({ planOverrides, overrides: { CDR_WORKER_RESULT: 'success' } });
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.receipt.fullQualification, 'pending');
+});
+
+test('reviewed OCR safety runs the existing normal eight-file worker suite and types in automatic Repair', () => {
+  const ci = readFileSync(resolve(process.cwd(), '..', '.github/workflows/ci.yml'), 'utf8');
+  assert.ok(ci.includes('types: [ready_for_review]'));
+  assert.ok(!ci.includes('codex/masterplan-checkpoint-2026-09-30'));
+  const workflow = readFileSync(resolve(process.cwd(), '..', '.github/workflows/repair-scope.yml'), 'utf8');
+  const start = workflow.indexOf('      - name: Run the normal CDR worker unit suite and types for reviewed OCR safety');
+  const end = workflow.indexOf('      - name: Run Foundation focused unit checks', start);
+  assert.ok(start >= 0 && end > start);
+  const step = workflow.slice(start, end);
+  assert.ok(step.includes("steps.plan.outputs.cdr_worker == 'true'"));
+  assert.ok(step.includes("steps.plan.outcome == 'success'"));
+  assert.ok(step.includes("steps.secrets.outcome == 'success'"));
+  assert.ok(step.includes("steps.check.outcome == 'success'"));
+  assert.ok(step.includes('working-directory: quarantine-sidecar/foundation-cdr-worker'));
+  const commands = step.slice(step.indexOf('        run: |') + '        run: |'.length).trim().split('\n').map(line => line.trim());
+  assert.deepEqual(commands, ['npm ci --ignore-scripts --no-audit --no-fund', 'npm test', 'node node_modules/typescript/bin/tsc --noEmit']);
+  for (const command of commands) assert.ok(ci.includes(command));
+  assert.ok(!step.includes('continue-on-error'));
+  assert.ok(workflow.includes('CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}'));
+  assert.equal(workflow.split("(steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success')").length - 1, 2);
+  const pkg = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'quarantine-sidecar/foundation-cdr-worker/package.json'), 'utf8'));
+  assert.deepEqual(pkg.scripts.test.split(' '), ['node', '--import', 'tsx', '--test',
+    'src/hmac.test.ts', 'src/keys.test.ts', 'src/guards.test.ts', 'src/ocr.test.ts', 'src/sanitize.test.ts',
+    'src/settlement.test.ts', 'src/identity.test.ts', 'src/local-fixture-event-adapter.test.ts']);
 });

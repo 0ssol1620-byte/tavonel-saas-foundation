@@ -4,6 +4,8 @@ import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/worksp
 const PREFLIGHT_ID = "00000000-0000-4000-8000-000000000001";
 const RECEIPT_ID = "00000000-0000-4000-8000-000000000002";
 const DIGEST = `sha256:${"a".repeat(64)}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const STAGE_UPLOAD_ORIGIN = "https://progress.fixture.r2.cloudflarestorage.com";
 
 function syntheticPdf(text: string): Buffer {
   const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET`;
@@ -105,52 +107,162 @@ async function installReadyStageFlow(
   page: Page,
   onFinalChoices?: (choices: Record<string, string>) => { status: number; json: Record<string, unknown> },
 ) {
+  const trace: string[] = [];
+  const stageIds = new Set<string>();
   await page.route("**/api/v1/uploads/triage/stage", async route => {
-    const body = route.request().postDataJSON() as { files: Array<{ relativePath: string; requestedBytes: number }> };
+    const body = route.request().postDataJSON() as {
+      batchId?: unknown;
+      files?: Array<{ relativePath?: unknown; idempotencyKey?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown }>;
+    };
+    trace.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+    if (typeof body.batchId !== "string" || !UUID.test(body.batchId) || !Array.isArray(body.files)
+      || body.files.length === 0 || body.files.some(file => !file || typeof file.relativePath !== "string"
+        || typeof file.idempotencyKey !== "string" || !UUID.test(file.idempotencyKey)
+        || file.declaredMimeType !== "application/pdf" || typeof file.requestedBytes !== "number"
+        || !Number.isSafeInteger(file.requestedBytes) || file.requestedBytes < 1)) {
+      trace.push("400 TRIAGE_STAGE_BODY_INVALID");
+      return route.fulfill({ status: 400, json: { code: "TRIAGE_STAGE_BODY_INVALID" } });
+    }
+    const staged = body.files.map((file, index) => {
+      const stageId = `00000000-0000-4000-8000-${String(index + 101).padStart(12, "0")}`;
+      stageIds.add(stageId);
+      const relativePath = file.relativePath as string;
+      return {
+        index,
+        stageId,
+        relativePath,
+        originalFilename: relativePath.replaceAll("\\", "/").split("/").at(-1) ?? relativePath,
+        declaredMimeType: file.declaredMimeType,
+        requestedBytes: file.requestedBytes,
+        stagingKey: `quarantine/pilot-triage01/triage-staging/${stageId}/upload`,
+        uploadUrl: `${STAGE_UPLOAD_ORIGIN}/${stageId}`,
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        triageExpiresAt: "2099-01-01T00:00:00.000Z",
+      };
+    });
+    trace.push("200 TRIAGE_STAGE_READY");
     await route.fulfill({ status: 200, json: {
       code: "TRIAGE_STAGE_READY",
-      staged: body.files.map((file, index) => ({
-        index,
-        stageId: `stage-${index + 1}`,
-        relativePath: file.relativePath,
-        requestedBytes: file.requestedBytes,
-        uploadUrl: `https://upload.fixture.invalid/stage-${index + 1}`,
-      })),
+      batchId: body.batchId,
+      staged,
+      errors: [],
     } });
   });
-  await page.route("**/api/v1/uploads/triage/preflight", route => route.fulfill({ status: 200, json: {
-    code: "TRIAGE_PREFLIGHT_APPROVED",
-    approval: { preflightApprovalId: PREFLIGHT_ID },
-    providerCalls: 0,
-    monetaryCostStatus: "not_priced",
-  } }));
-  await page.route("https://upload.fixture.invalid/**", async route => {
+  await page.route("**/api/v1/uploads/triage/preflight", async route => {
+    trace.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+    const body = route.request().postDataJSON() as { batchId?: unknown; choices?: unknown };
+    const choices = Array.isArray(body.choices) ? body.choices as Array<{ stageId?: unknown; choice?: unknown }> : [];
+    if (typeof body.batchId !== "string" || !UUID.test(body.batchId) || choices.length !== stageIds.size
+      || choices.some(item => typeof item.stageId !== "string" || !stageIds.has(item.stageId) || item.choice !== "preflight")) {
+      trace.push("400 TRIAGE_PREFLIGHT_BODY_INVALID");
+      return route.fulfill({ status: 400, json: { code: "TRIAGE_PREFLIGHT_BODY_INVALID" } });
+    }
+    trace.push("200 TRIAGE_PREFLIGHT_APPROVED");
+    return route.fulfill({ status: 200, json: {
+      code: "TRIAGE_PREFLIGHT_APPROVED",
+      approval: { preflightApprovalId: PREFLIGHT_ID },
+      approvalStage: "preflight",
+      budgetScope: "bounded_bytes_and_file_count",
+      providerCalls: 0,
+      monetaryCostStatus: "not_priced",
+    } });
+  });
+  // The enforced production connect-src only admits the R2 host pattern. This fake
+  // subdomain remains fully intercepted here and cannot reach a real object store.
+  await page.route(`${STAGE_UPLOAD_ORIGIN}/**`, async route => {
+    const method = route.request().method();
+    const uploadUrl = new URL(route.request().url());
+    const pathname = uploadUrl.pathname;
     const origin = route.request().headers().origin;
-    if (!origin) return route.abort();
-    if (route.request().method() === "OPTIONS") {
+    if (!origin) {
+      trace.push(`upload ${method} ${uploadUrl.origin}${pathname}: missing Origin, aborted`);
+      return route.abort();
+    }
+    if (method === "OPTIONS") {
+      const requestedHeaders = route.request().headers()["access-control-request-headers"]
+        ?.split(",").map(header => header.trim().toLowerCase()) ?? [];
+      if (!stageIds.has(pathname.slice(1))
+        || route.request().headers()["access-control-request-method"] !== "PUT"
+        || !requestedHeaders.includes("content-type")) {
+        trace.push(`upload OPTIONS ${uploadUrl.origin}${pathname}: invalid preflight`);
+        return route.fulfill({ status: 400, headers: { "access-control-allow-origin": origin } });
+      }
+      trace.push(`upload OPTIONS ${uploadUrl.origin}${pathname}: 204`);
       return route.fulfill({ status: 204, headers: {
         "access-control-allow-origin": origin,
         "access-control-allow-methods": "PUT, OPTIONS",
         "access-control-allow-headers": "content-type",
       } });
     }
+    if (method !== "PUT" || !stageIds.has(pathname.slice(1))
+      || route.request().headers()["content-type"] !== "application/pdf") {
+      trace.push(`upload ${method} ${uploadUrl.origin}${pathname}: 405`);
+      return route.fulfill({ status: 405, headers: { "access-control-allow-origin": origin } });
+    }
+    trace.push(`upload PUT ${uploadUrl.origin}${pathname}: 200`);
     return route.fulfill({ status: 200, headers: { "access-control-allow-origin": origin } });
   });
-  await page.route("**/api/v1/uploads/triage/complete", route => route.fulfill({ status: 200, json: { code: "TRIAGE_FILE_SEALED" } }));
+  await page.route("**/api/v1/uploads/triage/complete", async route => {
+    trace.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+    const body = route.request().postDataJSON() as { stageId?: unknown; preflightApprovalId?: unknown };
+    if (typeof body.stageId !== "string" || !stageIds.has(body.stageId) || body.preflightApprovalId !== PREFLIGHT_ID) {
+      trace.push("400 TRIAGE_COMPLETE_BODY_INVALID");
+      return route.fulfill({ status: 400, json: { code: "TRIAGE_COMPLETE_BODY_INVALID" } });
+    }
+    trace.push("200 TRIAGE_FILE_SEALED");
+    return route.fulfill({ status: 200, json: {
+      code: "TRIAGE_FILE_SEALED",
+      stage: { stageId: body.stageId, state: "sealed" },
+      observation: { signature: "valid", encryption: "unknown", corruption: "unknown", archiveExpansion: "unknown" },
+    } });
+  });
   await page.route("**/api/v1/uploads/triage/receipt", async route => {
-    const body = route.request().postDataJSON() as { choices: Record<string, string> };
-    if (Object.keys(body.choices).length === 0) {
+    trace.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+    const body = route.request().postDataJSON() as {
+      batchId?: unknown; preflightApprovalId?: unknown; choices?: unknown;
+    };
+    const choices = body.choices && typeof body.choices === "object" && !Array.isArray(body.choices)
+      ? body.choices as Record<string, string> : null;
+    if (typeof body.batchId !== "string" || !UUID.test(body.batchId) || body.preflightApprovalId !== PREFLIGHT_ID || !choices
+      || Object.entries(choices).some(([fileKey, choice]) => fileKey !== "file-1" || (choice !== "include" && choice !== "exclude"))) {
+      trace.push("400 TRIAGE_RECEIPT_BODY_INVALID");
+      return route.fulfill({ status: 400, json: { code: "TRIAGE_RECEIPT_BODY_INVALID" } });
+    }
+    if (Object.keys(choices).length === 0) {
+      trace.push("409 TRIAGE_CHOICES_REQUIRED");
       return route.fulfill({ status: 409, json: {
         code: "TRIAGE_CHOICES_REQUIRED",
         review: [{ fileKey: "file-1", relativePath: "scan.pdf", choice: null }],
       } });
     }
     if (onFinalChoices) {
-      const reply = onFinalChoices(body.choices);
+      const reply = onFinalChoices(choices);
+      trace.push(`${reply.status} ${String(reply.json.code ?? "receipt response")}`);
       return route.fulfill({ status: reply.status, json: reply.json });
     }
+    trace.push("200 TRIAGE_REVIEW_REQUIRED");
     return route.fulfill({ status: 200, json: readyReceipt(false) });
   });
+  page.on("pageerror", error => trace.push(`pageerror ${error.message}`));
+  page.on("requestfailed", request => {
+    const url = new URL(request.url());
+    if (url.origin === STAGE_UPLOAD_ORIGIN || url.pathname.startsWith("/api/v1/uploads/triage/")) {
+      trace.push(`requestfailed ${request.method()} ${url.pathname}`);
+    }
+  });
+  const expectedApiPaths = new Set([
+    "/api/v1/uploads/triage/stage",
+    "/api/v1/uploads/triage/preflight",
+    "/api/v1/uploads/triage/complete",
+    "/api/v1/uploads/triage/receipt",
+  ]);
+  page.on("request", request => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/v1/uploads/") && !expectedApiPaths.has(url.pathname)) {
+      trace.push(`unexpected ${request.method()} ${url.pathname}`);
+    }
+  });
+  return trace;
 }
 
 test("disabled triage keeps review-only separate from upload or processing", async ({ page }) => {
@@ -174,7 +286,7 @@ test("disabled triage keeps review-only separate from upload or processing", asy
   await expect(page.getByRole("button", { name: "Approve bounded source preflight" })).toHaveCount(0);
 });
 
-test("legacy fallback requires explicit maximum approval and a double click approves only once", async ({ page }) => {
+test("legacy fallback requires explicit maximum approval and ignores repeated activation before unmount", async ({ page }) => {
   let approvalCalls = 0;
   let approvedMaximum: unknown;
   let puts = 0;
@@ -183,6 +295,9 @@ test("legacy fallback requires explicit maximum approval and a double click appr
   const approvalGate = new Promise<void>(resolve => { releaseApproval = resolve; });
   const approvalStartedGate = new Promise<void>(resolve => { approvalStarted = resolve; });
   await openWorkspace(page);
+  page.on("request", request => {
+    if (request.method() === "PUT") puts += 1;
+  });
   await page.route("**/api/uploads/approval", async route => {
     approvalCalls += 1;
     approvedMaximum = (route.request().postDataJSON() as { aggregateMaximumCredits?: unknown }).aggregateMaximumCredits;
@@ -191,10 +306,12 @@ test("legacy fallback requires explicit maximum approval and a double click appr
     return route.fulfill({ status: 409, json: { code: "INTAKE_APPROVAL_REJECTED" } });
   });
   await disabledTriage(page);
-  await page.route("https://upload.fixture.invalid/**", route => { puts += 1; return route.fulfill({ status: 200 }); });
   await selectPdf(page, "scan.pdf");
   await page.getByRole("button", { name: "Review sources before processing" }).click();
-  const approve = page.getByRole("button", { name: "Approve maximum & upload" });
+  const fallbackAlert = page.getByRole("alert").filter({ hasText: /Full-scope legacy approval/ });
+  const approve = fallbackAlert.getByRole("button");
+  await expect(fallbackAlert).toHaveCount(1);
+  await expect(approve).toHaveCount(1);
   await expect(approve).toContainText("Approve maximum & upload");
   const maximumTerm = page.getByRole("term").filter({ hasText: /^Maximum$/ });
   await expect(maximumTerm).toHaveCount(1);
@@ -202,13 +319,24 @@ test("legacy fallback requires explicit maximum approval and a double click appr
   await expect(maximumPrice).toHaveCount(1);
   await expect(maximumPrice).toHaveText("$0.06");
   expect(approvalCalls).toBe(0);
-  await approve.click();
+  await approve.evaluate(button => {
+    const click = () => button.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+    }));
+    click();
+    click();
+  });
   await approvalStartedGate;
-  await expect(approve).toBeDisabled();
-  await approve.click({ force: true });
-  expect(approvalCalls).toBe(1);
+  await expect(page.getByRole("region", { name: "Server source triage" })).toHaveCount(0);
+  await expect(fallbackAlert).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve maximum & upload" })).toHaveCount(0);
   releaseApproval();
-  await expect.poll(() => approvalCalls).toBe(1);
+  await expect(page.getByRole("status").filter({
+    hasText: "The complete set was not approved. Nothing was uploaded. Review the reason and retry the complete set.",
+  })).toBeVisible();
+  expect(approvalCalls).toBe(1);
   expect(approvedMaximum).toBe(6);
   expect(puts).toBe(0);
 });
@@ -216,7 +344,7 @@ test("legacy fallback requires explicit maximum approval and a double click appr
 test("exclude-all 409 leaves choices editable so the customer can retry", async ({ page }) => {
   let finalCalls = 0;
   await openWorkspace(page);
-  await installReadyStageFlow(page, choices => {
+  const flow = await installReadyStageFlow(page, choices => {
     finalCalls += 1;
     if (Object.values(choices).every(choice => choice === "exclude")) {
       return { status: 409, json: { code: "TRIAGE_NO_FILES_SELECTED" } };
@@ -226,6 +354,32 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
   await selectPdf(page, "scan.pdf");
   await page.getByRole("button", { name: "Review sources before processing" }).click();
   await page.getByRole("button", { name: "Approve bounded source preflight" }).click();
+  const triageRegion = page.getByRole("region", { name: "Server source triage" });
+  const triageStatus = triageRegion.getByRole("status").last();
+  await expect.poll(async () => ({
+    events: flow.filter(event => !event.startsWith("upload OPTIONS ")),
+    status: (await triageStatus.textContent())?.trim() ?? "",
+  })).toEqual({
+    events: [
+      "POST /api/v1/uploads/triage/stage",
+      "200 TRIAGE_STAGE_READY",
+      "POST /api/v1/uploads/triage/preflight",
+      "200 TRIAGE_PREFLIGHT_APPROVED",
+      "upload PUT https://progress.fixture.r2.cloudflarestorage.com/00000000-0000-4000-8000-000000000101: 200",
+      "POST /api/v1/uploads/triage/complete",
+      "200 TRIAGE_FILE_SEALED",
+      "POST /api/v1/uploads/triage/receipt",
+      "409 TRIAGE_CHOICES_REQUIRED",
+    ],
+    status: "Server verified the sealed sources. Choose include or exclude for every row; identical bytes remain separate reviewable sources.",
+  });
+  const options = flow.filter(event => event.startsWith("upload OPTIONS "));
+  expect(options.length).toBeLessThanOrEqual(1);
+  if (options.length === 1) {
+    expect(options[0]).toMatch(/^upload OPTIONS https:\/\/progress\.fixture\.r2\.cloudflarestorage\.com\/[0-9a-f-]+: 204$/i);
+    expect(flow.indexOf(options[0])).toBe(flow.indexOf("200 TRIAGE_PREFLIGHT_APPROVED") + 1);
+    expect(flow.indexOf(options[0])).toBe(flow.findIndex(event => event.startsWith("upload PUT ")) - 1);
+  }
   const choice = page.getByLabel("Review scan.pdf");
   await expect(choice).toBeVisible();
   await choice.selectOption("exclude");

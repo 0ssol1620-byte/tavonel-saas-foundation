@@ -100,6 +100,24 @@ const publicEditorialBrowserTests = [
   'e2e/launch-qa-mobile-nav.spec.ts', 'e2e/site-nav.spec.ts',
 ];
 
+// Root-reviewed legacy browser corrections; production UI and its existing bindings are unchanged.
+export const LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA = 'e9bd49461fcb790d8110584551c16474ce387fa0';
+export const LEGACY_PUBLIC_BROWSER_BLOBS = Object.freeze({
+  'e2e/mobile-landing.spec.ts': { predecessor: '28460e5e01cc53f244be593254b4df6241d40857', candidate: '1ca9dd75cc6fa806ab853d9a25c3ab9f5bb8777e' },
+  'e2e/site-chrome-v2.spec.ts': { predecessor: 'e6e82af9586c1916a472f0c519d4924682853a61', candidate: 'ba3c2da0b9acba965658768beec680f1673c079d' },
+});
+export const LEGACY_PUBLIC_BROWSER_PATHS = Object.freeze(Object.keys(LEGACY_PUBLIC_BROWSER_BLOBS).sort());
+
+// Persisted-OCR storage safety only; no read-proof SQL or settlement producer admission.
+export const PERSISTED_OCR_SAFETY_PREDECESSOR_SHA = 'e9bd49461fcb790d8110584551c16474ce387fa0';
+export const PERSISTED_OCR_SAFETY_BLOBS = Object.freeze({
+  'quarantine-sidecar/foundation-cdr-worker/src/ocr.ts': { predecessor: 'b39d1a08978df8d9a8f4ae8730926c7ad6cc62a6', candidate: '213c2f9803affc5748377bf95c77c108874b9f0d' },
+  'quarantine-sidecar/foundation-cdr-worker/src/ocr.test.ts': { predecessor: '6276ebb6f4a555c22ad67e2f825bc2599648280f', candidate: '6352e2d99f91e819063573a7ebc90b1894fbe4d9' },
+  'quarantine-sidecar/foundation-cdr-worker/src/sanitize.ts': { predecessor: '151286bc74107bea316e1fc026e20258deeb7ef9', candidate: 'e12fac0d6f0c5e1a7cdcda002ca8124b24852934' },
+  'quarantine-sidecar/foundation-cdr-worker/src/sanitize.test.ts': { predecessor: '35e0236299cff5fca045ff9d8fcfdf86bc4d53a8', candidate: 'db46bbe1e86834c834f7cd84e0c45b4ff4bcbe9d' },
+});
+export const PERSISTED_OCR_SAFETY_PATHS = Object.freeze(Object.keys(PERSISTED_OCR_SAFETY_BLOBS).sort());
+
 export const MOBILE_NAV_CONTRAST_PREDECESSOR_SHA = '2ff7c521233064915123dfbccb7680716d39cc28';
 export const MOBILE_NAV_CONTRAST_PATHS = Object.freeze([
   'app/chrome-v2.css',
@@ -401,7 +419,7 @@ export const INTAKE_TRIAGE_SOURCE_BLOBS = Object.freeze({
   },
   'e2e/workspace-intake-triage.spec.ts': {
     predecessor: null,
-    candidate: "f27e04ba8db721a5ec38f861ef32838ceb10ec3c"
+    candidate: "6013f5dbcad1cf27ac1755e66dbb0b9bfcfae36c"
   },
   'lib/compute-reservation.ts': {
     predecessor: "792885c3b366b6df91f0583e9599540cc7f0509a",
@@ -707,6 +725,7 @@ function readPathBlob(revision, path, repoRoot, exec) {
 
 export function selectorRepositoryPath(rawPath) {
   const path = normalizePath(rawPath);
+  if (PERSISTED_OCR_SAFETY_PATHS.includes(path)) return path;
   return path.startsWith('supabase/') ? path : `nextjs/${path}`;
 }
 
@@ -772,6 +791,47 @@ export function verifyPublicEditorialScopeEvidence({ repairAnchorSha, headSha, c
     .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
     .map(([path]) => path);
   if (candidateMismatches.length) reasons.push('public editorial UI candidates differ from the root-reviewed stack: ' + candidateMismatches.join(', '));
+  return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
+}
+
+export function verifyPersistedOcrSafetyScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => PERSISTED_OCR_SAFETY_PATHS.includes(path)))].sort();
+  const reasons = [];
+  if (changedPaths.some(path => path.startsWith('nextjs/quarantine-sidecar/'))) reasons.push('persisted OCR worker paths must use root repository ownership');
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('persisted OCR safety is not anchored to the authenticated 6401 baseline');
+  if (headSha === PERSISTED_OCR_SAFETY_PREDECESSOR_SHA) reasons.push('persisted OCR safety head is not newer than its exact predecessor');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(PERSISTED_OCR_SAFETY_PATHS)) reasons.push('persisted OCR safety path set differs from the reviewed four-file patch');
+  try {
+    exec('git', ['merge-base', '--is-ancestor', PERSISTED_OCR_SAFETY_PREDECESSOR_SHA, headSha], { cwd: repoRoot, stdio: 'pipe', shell: false });
+  } catch { reasons.push('persisted OCR safety predecessor is not an ancestor of the candidate head'); }
+  const predecessorMismatches = Object.entries(PERSISTED_OCR_SAFETY_BLOBS)
+    .filter(([path, expected]) => readPathBlob(PERSISTED_OCR_SAFETY_PREDECESSOR_SHA, path, repoRoot, exec) !== expected.predecessor)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push('persisted OCR safety preimages differ from the reviewed predecessor: ' + predecessorMismatches.join(', '));
+  const candidateMismatches = Object.entries(PERSISTED_OCR_SAFETY_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push('persisted OCR safety candidates differ from the root-reviewed patch: ' + candidateMismatches.join(', '));
+  return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
+}
+
+export function verifyLegacyPublicBrowserScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, exec = execFileSync }) {
+  const featurePaths = [...new Set(changedPaths.map(normalizePath).filter(path => LEGACY_PUBLIC_BROWSER_PATHS.includes(path)))].sort();
+  const reasons = [];
+  if (repairAnchorSha !== AUDITED_REPAIR_ANCHOR_SHA) reasons.push('legacy public browser corrections are not anchored to the authenticated 6401 baseline');
+  if (headSha === LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA) reasons.push('legacy public browser head is not newer than its exact predecessor');
+  if (JSON.stringify(featurePaths) !== JSON.stringify(LEGACY_PUBLIC_BROWSER_PATHS)) reasons.push('legacy public browser path set differs from the reviewed two-test patch');
+  try {
+    exec('git', ['merge-base', '--is-ancestor', LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA, headSha], { cwd: repoRoot, stdio: 'pipe', shell: false });
+  } catch { reasons.push('legacy public browser predecessor is not an ancestor of the candidate head'); }
+  const predecessorMismatches = Object.entries(LEGACY_PUBLIC_BROWSER_BLOBS)
+    .filter(([path, expected]) => readPathBlob(LEGACY_PUBLIC_BROWSER_PREDECESSOR_SHA, path, repoRoot, exec) !== expected.predecessor)
+    .map(([path]) => path);
+  if (predecessorMismatches.length) reasons.push('legacy public browser preimages differ from the reviewed predecessor: ' + predecessorMismatches.join(', '));
+  const candidateMismatches = Object.entries(LEGACY_PUBLIC_BROWSER_BLOBS)
+    .filter(([path, expected]) => readPathBlob(headSha, path, repoRoot, exec) !== expected.candidate)
+    .map(([path]) => path);
+  if (candidateMismatches.length) reasons.push('legacy public browser candidates differ from the root-reviewed corrections: ' + candidateMismatches.join(', '));
   return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches };
 }
 
@@ -932,7 +992,7 @@ export function verifyIntakeTriageScopeEvidence({ repairAnchorSha, headSha, chan
   return { eligible: reasons.length === 0, reasons, featurePaths, predecessorMismatches, candidateMismatches, registeredMigrations };
 }
 
-export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null, googleDriveAclRefreshVerification = null, asyncCompileJobAuthorityVerification = null, intakeTriageVerification = null, publicEditorialVerification = null }) {
+export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest, changedPaths, workspaceSourceVerification = null, docsPricingVerification = null, mobileNavVerification = null, googleViewerAclVerification = null, googleDriveAclRefreshVerification = null, asyncCompileJobAuthorityVerification = null, intakeTriageVerification = null, publicEditorialVerification = null, legacyPublicBrowserVerification = null, persistedOcrSafetyVerification = null }) {
   if (!sha(pullRequestBaseSha) || !sha(repairAnchorSha) || !sha(headSha)) {
     throw new Error('Repair scope requires exact PR base, audited anchor, and head SHAs.');
   }
@@ -948,6 +1008,25 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   let selectorChanged = false;
   let runDetailIntegrity = false;
   let databaseEvidenceInvalidated = false;
+
+  const persistedOcrSafetyChanged = paths.some(path => PERSISTED_OCR_SAFETY_PATHS.includes(path));
+  if (persistedOcrSafetyChanged) {
+    groups.add('persisted-ocr-safety');
+    if (!persistedOcrSafetyVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('persisted OCR safety did not match its exact reviewed predecessor/blob/path policy');
+    }
+  }
+
+  const legacyPublicBrowserChanged = paths.some(path => LEGACY_PUBLIC_BROWSER_PATHS.includes(path));
+  if (legacyPublicBrowserChanged) {
+    groups.add('legacy-public-browser-contracts');
+    for (const file of LEGACY_PUBLIC_BROWSER_PATHS) browserFiles.add(file);
+    if (!legacyPublicBrowserVerification?.eligible) {
+      broader = true;
+      qualificationReasons.add('legacy public browser corrections did not match their exact reviewed predecessor/blob/path policy');
+    }
+  }
 
   const publicEditorialChanged = paths.some(path => PUBLIC_EDITORIAL_TRIGGER_PATHS.includes(path));
   if (publicEditorialChanged) {
@@ -1040,6 +1119,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   }
   for (const path of paths) {
     let matched = false;
+    if (persistedOcrSafetyVerification?.eligible && PERSISTED_OCR_SAFETY_PATHS.includes(path)) matched = true;
     if (publicEditorialChanged && PUBLIC_EDITORIAL_TRIGGER_PATHS.includes(path)) matched = true;
     if (intakeTriageChanged && INTAKE_TRIAGE_FEATURE_PATHS.includes(path)) continue;
     if (/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/i.test(path)) {
@@ -1190,7 +1270,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     if (/^e2e\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.spec\.ts$/i.test(path)) {
       groups.add('browser-regression');
       browserFiles.add(path);
-      if (!reviewedBrowserFiles.has(path)) {
+      if (!reviewedBrowserFiles.has(path) && !(legacyPublicBrowserVerification?.eligible && LEGACY_PUBLIC_BROWSER_PATHS.includes(path))) {
         groups.add('unknown');
         unknownPaths.push(path);
         broader = true;
@@ -1268,6 +1348,13 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     publicEditorialSelection: publicEditorialChanged
       ? { unitFiles: publicEditorialUnitTests, browserFiles: publicEditorialBrowserTests, evidence: publicEditorialVerification }
       : null,
+    legacyPublicBrowserSelection: legacyPublicBrowserChanged
+      ? { browserFiles: [...LEGACY_PUBLIC_BROWSER_PATHS], evidence: legacyPublicBrowserVerification }
+      : null,
+    persistedOcrSafetySelection: persistedOcrSafetyChanged
+      ? { evidence: persistedOcrSafetyVerification, verification: 'normal eight-file worker npm test plus tsc --noEmit; source admission is not runtime qualification' }
+      : null,
+    runCdrWorkerChecks: persistedOcrSafetyChanged,
     unknownPaths,
     unitFiles: broader ? [] : [...unitFiles].sort(),
     browserFiles: [...browserFiles].sort(),
@@ -1341,13 +1428,22 @@ if (process.env.RUN_REPAIR_SCOPE === '1') {
   const mobileNavVerification = mobileNavContrastChanged
     ? verifyMobileNavContrastEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot, publicEditorialVerification })
     : null;
-  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification, googleDriveAclRefreshVerification, asyncCompileJobAuthorityVerification, intakeTriageVerification, publicEditorialVerification });
+  const legacyPublicBrowserRelevant = changedPaths.map(normalizePath).some(path => LEGACY_PUBLIC_BROWSER_PATHS.includes(path));
+  const legacyPublicBrowserVerification = legacyPublicBrowserRelevant
+    ? verifyLegacyPublicBrowserScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
+  const persistedOcrSafetyRelevant = changedPaths.map(normalizePath).some(path => PERSISTED_OCR_SAFETY_PATHS.includes(path));
+  const persistedOcrSafetyVerification = persistedOcrSafetyRelevant
+    ? verifyPersistedOcrSafetyScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot })
+    : null;
+  const plan = buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, pullRequest: process.env.PR_NUMBER, changedPaths, workspaceSourceVerification, docsPricingVerification, mobileNavVerification, googleViewerAclVerification, googleDriveAclRefreshVerification, asyncCompileJobAuthorityVerification, intakeTriageVerification, publicEditorialVerification, legacyPublicBrowserVerification, persistedOcrSafetyVerification });
   writeFileSync('repair-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {
     const values = {
       broader: String(plan.runFullHermeticVitest),
       unit: String(plan.unitFiles.length > 0),
+      cdr_worker: String(plan.runCdrWorkerChecks),
       browser: String(plan.runDetailIntegrity || plan.browserFiles.length > 0),
       public_ui_capture: String(plan.requirePublicUiScreenshots),
       workflow_static: String(plan.runWorkflowStaticGate),

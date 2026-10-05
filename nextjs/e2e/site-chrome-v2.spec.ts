@@ -2,10 +2,10 @@
  * The V2 site chrome (blueprint 2026-09-19 §8, §29; contract D2, D9), measured in a browser.
  *
  * Everything here is a geometric or compositional fact that no unit test can see:
- * `lib/one-path-contract.test.ts` knows the bar declares five destinations, and
+ * `lib/one-path-contract.test.ts` knows the bar declares four destinations, and
  * `lib/site-nav-model.test.ts` knows each one is a published route with a Korean label, but
- * neither can tell whether the bar is 64px tall, whether it is transparent before the reader
- * scrolls, whether the access action is the only filled control in it, or whether five labels
+ * neither can tell whether the bar is 64px tall, whether its paper ground stays legible as the reader
+ * scrolls, whether the access action is the only filled control in it, or whether three section labels
  * plus an action plus a sign-in link still fit inside 1440.
  *
  * The header is site-wide, so these run against `/product` as well as `/` -- the landing is the
@@ -19,12 +19,11 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-/** The four section links; Pricing is the separate emphasized header control. */
+/** Three section links; Pricing is the separate emphasized header control. */
 const CUSTOMER_NAV = [
   { href: "/product", label: "Product" },
-  { href: "/knowledge-compiler", label: "How it works" },
-  { href: "/resources", label: "Resources" },
-  { href: "/docs", label: "Docs" },
+  { href: "/explore", label: "Explore" },
+  { href: "/developers", label: "Developers" },
 ] as const;
 
 const HEADER = "header.nav";
@@ -45,7 +44,7 @@ test.describe("at 1440", () => {
     test.skip(testInfo.project.name !== "1440", "the desktop bar is measured at the width it is drawn for");
   });
 
-  test("is a 64px bar carrying the five destinations in order", async ({ page }) => {
+  test("is a 64px bar carrying the three section destinations in order", async ({ page }) => {
     await page.goto("/product");
     const box = await page.locator(HEADER).boundingBox();
     expect(box, "the header has no box").not.toBeNull();
@@ -120,33 +119,26 @@ test.describe("at 1440", () => {
   });
 
   /*
-    Transparent over the page, opaque after 40px. The threshold is asserted from both sides:
+    Paper at the top and after 40px. The scroll threshold is asserted from both sides:
     a listener that fires but reads the wrong number is the failure mode worth catching, and an
     attribute that is simply always "1" passes a one-sided check.
   */
-  test("is transparent at the top of the page and gains its ground after 40px of scroll", async ({ page }) => {
+  test("keeps its paper ground while scroll state changes after 40px", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
-    const background = () => header.evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(await background(), "the bar paints a ground before the reader has moved").toMatch(/,\s*0\)$|^transparent$/);
+    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
 
     await page.evaluate(() => window.scrollTo(0, 20));
     await expect(header).toHaveAttribute("data-scrolled", "0");
 
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
-    /*
-      `toHaveCSS` retries; a bare read does not.
-
-      The ground arrives through a `background-color` transition, so a single sample taken the
-      instant the attribute flips reads whatever alpha the interpolation is at -- 0.75, then 0.76
-      on the retry, then 0.77. The threshold and the toggle were never the flake; the stopwatch
-      was. This waits for the transition to land on the declared value instead.
-    */
-    await expect(header).toHaveCSS("background-color", "rgba(9, 13, 20, 0.94)");
+    // Scroll state changes the context, while the published paper ground remains constant.
+    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(header).toHaveAttribute("data-scrolled", "0");
+    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
   });
 
   /*
@@ -159,7 +151,7 @@ test.describe("at 1440", () => {
   test("aligns the wordmark and footer on the shared fluid content edge", async ({ page }) => {
     await page.goto("/product");
     const width = page.viewportSize()!.width;
-    const edge = Math.max(Math.min(Math.max(width * .03, 20), 64), (width - 1600) / 2);
+    const edge = Math.max(Math.min(Math.max(width * .025, 20), 32), (width - 1280) / 2);
     const wordmark = await page.locator(`${HEADER} .wordmark`).first().boundingBox();
     expect(wordmark).not.toBeNull();
     expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);
@@ -191,7 +183,7 @@ test.describe("at 390", () => {
     test.skip(testInfo.project.name !== "390", "the phone sheet is measured at a phone width");
   });
 
-  test("opens a sheet of the five destinations plus Sign in, with the action still in the row", async ({ page }) => {
+  test("opens a sheet of three section destinations plus Sign in, with the action still in the row", async ({ page }) => {
     await page.goto("/product");
     // The action is reachable without opening anything: §29's commercial CTA may not be behind a
     // disclosure, which is the whole reason the sheet does not carry a second copy of it.
@@ -239,13 +231,13 @@ test.describe("at 390", () => {
     expect(short, `chrome controls under 44px or outside the viewport: ${JSON.stringify(short)}`).toEqual([]);
   });
 
-  test("gains its ground after 40px of scroll on a phone too", async ({ page }) => {
+  test("keeps its paper ground after 40px of scroll on a phone too", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
-    // Retried, for the transition reason in the desktop test above.
-    await expect(header).toHaveCSS("background-color", "rgba(9, 13, 20, 0.94)");
+    // The same paper ground remains legible on the phone after scrolling.
+    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
   });
 
   test("does not scroll sideways with the sheet open", async ({ page }) => {

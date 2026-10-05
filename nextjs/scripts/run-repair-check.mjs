@@ -76,6 +76,8 @@ const browserProjectsByFile = new Map([
   ['e2e/workspace-source-observation.spec.ts', ['1440']],
   ['e2e/failure-states-audit.spec.ts', ['audit']],
   ['e2e/site-nav.spec.ts', ['1440']],
+  ['e2e/site-chrome-v2.spec.ts', ['1440', '390']],
+  ['e2e/mobile-landing.spec.ts', ['360', '390', '768']],
   ['e2e/launch-qa-mobile-nav.spec.ts', ['launch-chromium']],
   ['e2e/landing-hero-mobile.spec.ts', ['360', '390']],
   ['e2e/landing-hero-film-loading.spec.ts', ['390']],
@@ -106,7 +108,7 @@ export function planBrowserRuns(files, runDetailIntegrity) {
       filesByProject.get(project).push(file);
     }
   }
-  for (const project of ['audit', 'audit-768', 'audit-1280', '1440', '390', '360', 'reduced-motion', 'launch-chromium']) {
+  for (const project of ['audit', 'audit-768', 'audit-1280', '1440', '390', '360', '768', 'reduced-motion', 'launch-chromium']) {
     const projectFiles = filesByProject.get(project);
     if (projectFiles) runs.push({ kind: 'project', project, files: [...new Set(projectFiles)].sort() });
   }
