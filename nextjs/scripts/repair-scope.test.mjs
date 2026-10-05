@@ -2430,7 +2430,7 @@ test('mounted collector accepts the production file attachment after Playwright 
     const sourceBytes = readFileSync(new URL('../e2e/workspace-intake-triage.spec.ts', import.meta.url));
     const sourceBlob = createHash('sha1').update(`blob ${sourceBytes.length}\0`).update(sourceBytes).digest('hex');
     // Preserve the historical mounted fix and bind only the reviewed copy follow-on.
-    assert.ok([WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate, 'd5f6e38f6c60f5b476014b90678680b5df0b6204'].includes(sourceBlob));
+    assert.ok([WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate, 'd5f6e38f6c60f5b476014b90678680b5df0b6204', '72f68ba25ea4c01571d1752584638ade859115a7'].includes(sourceBlob));
     const source = sourceBytes.toString('utf8');
     assert.match(source, /import \{ writeFile \} from "node:fs\/promises";/);
     const start = source.indexOf('        const name = `intake-mounted-${phase}-${viewport.width}x${viewport.height}`;');

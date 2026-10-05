@@ -42,11 +42,11 @@ export const CONFIG_PATHS = Object.freeze([
 // are normalized in this verifier's hash; all declaration tokens remain covered.
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
-  ".github/workflows/db-rehearsal.yml": "d8b15a718987b4ac7a22a5270462e679438b1fb2ecc474f5a483c9b0180465b7",
+  ".github/workflows/db-rehearsal.yml": "65952869fb893636e93e13ff60e975da12cfb8e9a07d14585bcf0a5180aed9db",
   ".github/workflows/repair-scope.yml": "27a7c4732b77d27f931e1c033ee5db9317b60c2c5d460b4dcd14d4f0d59e75c1",
-  "nextjs/scripts/repair-collector-only.mjs": "153da3166a0d4ee6bb7dc43ea3abae26e6b0703b07bde48ae7d478a54fbddc5e",
+  "nextjs/scripts/repair-collector-only.mjs": "2e807c8834c19dadb48a4efb29d76babcf3c9d369690d1a25303e59b4e492b39",
   "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-scope-gate.mjs": "2a0de0d146fd80e11885b0320123ce6a81983e85111fd25e0f533b3671a28964",
+  "nextjs/scripts/repair-scope-gate.mjs": "d4c8e8f32eaa4ee5194a9efffe56e6b9017a19f7df2a1d30df975fc02c568a0d",
   "nextjs/scripts/verify-repair-workflows.mjs": "8d97852224a5697ce3d2142a833779c75892fc1baf2309095493e03e9f00cff6"
 });
 // collector-seal:end
@@ -226,7 +226,7 @@ export function failedCollectorPlan({ headSha, reason, intent }) {
   };
   // A failed new admission cannot revoke the parent's actual historical repair.
   // Evidence remains unaccepted for this head until its independent proof passes.
-  return intent?.parent === repair.INTAKE_PARENT ? { ...plan,
+  return [repair.INTAKE_PARENT, repair.INTAKE_GEOMETRY_PARENT].includes(intent?.parent) ? { ...plan,
     knownRegressionObservations: [KNOWN_REGRESSION],
     historicalRegressionResolution: { sourceHead: repair.INTAKE_PARENT, status: 'historical resolution retained; evidence unaccepted for current head' },
     pendingQualificationDebt: [...plan.pendingQualificationDebt, 'intake-presentation-eligibility'],

@@ -78,9 +78,9 @@ function runGate() {
   if (plan.intakePresentation || plan.groups.includes('intake-presentation')) {
     const proof = verifyIntakePresentationEligibility({ headSha: env.HEAD_SHA });
     for (const reason of intakePresentationLineageFailures(plan, proof)) requirements.push([reason, 'failure']);
-    requirements.push(['actual ten-suite intake unit outcome', env.TARGETED_REPAIR_UNIT_RESULT]);
+    requirements.push(['actual selected intake unit outcome', env.TARGETED_REPAIR_UNIT_RESULT]);
     requirements.push(['intake browser/report contracts', env.TRANSITIVE_TEST_RESULT]);
-    try { intakeExecution = readIntakePresentationExecution(); }
+    try { intakeExecution = readIntakePresentationExecution(process.cwd(), plan.intakePresentation?.source?.parent); }
     catch (error) { requirements.push(['fresh intake execution evidence: ' + error.message, 'failure']); }
   }
   if (plan.knownRegressionRepair || plan.groups.includes('known-unit-regression-repair')) {

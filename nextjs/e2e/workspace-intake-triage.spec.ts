@@ -353,18 +353,64 @@ async function captureMountedTriageLayout(page: Page, testInfo: TestInfo, phase:
         }
 
         if (viewport.width === 390) {
-          const estimated = await preflight.locator(":scope > dl > div").filter({ has: page.getByText("Estimated", { exact: true }) }).boundingBox();
-          const maximum = await preflight.locator(":scope > dl > div").filter({ has: page.getByText("Maximum", { exact: true }) }).boundingBox();
+          const statisticCards = preflight.locator(":scope > dl > div");
+          const estimatedCard = statisticCards.filter({ has: page.getByText("Estimated", { exact: true }) });
+          const maximumCard = statisticCards.filter({ has: page.getByText("Maximum", { exact: true }) });
+          await expect(estimatedCard).toHaveCount(1);
+          await expect(maximumCard).toHaveCount(1);
+          await expect(estimatedCard).toBeVisible();
+          await expect(maximumCard).toBeVisible();
+          // Global smooth scrolling can advance between awaited boundingBox calls.
+          // Sample this same-row pair in one browser turn so both use the same viewport origin.
+          const statBoxes = await preflight.evaluate(region => {
+            const cards = [...region.querySelectorAll<HTMLElement>(":scope > dl > div")];
+            const boxFor = (label: string) => {
+              const matches = cards.filter(element => element.querySelector("dt")?.textContent?.trim() === label);
+              if (matches.length === 0) return null;
+              if (matches.length !== 1) throw new Error(`Expected exactly one ${label} statistic card, found ${matches.length}.`);
+              const card = matches[0];
+              if (!card) return null;
+              const style = getComputedStyle(card);
+              if (style.visibility === "hidden" || style.visibility === "collapse" || style.display === "none") return null;
+              const box = card.getBoundingClientRect();
+              if (box.width <= 0 || box.height <= 0) return null;
+              return { x: box.x, y: box.y, width: box.width, height: box.height };
+            };
+            return { estimated: boxFor("Estimated"), maximum: boxFor("Maximum") };
+          });
+          const { estimated, maximum } = statBoxes;
           expect(estimated).not.toBeNull();
           expect(maximum).not.toBeNull();
           expect(Math.abs(estimated!.y - maximum!.y)).toBeLessThanOrEqual(1);
           expect(maximum!.x).toBeGreaterThan(estimated!.x);
         }
 
-        const clearBox = await clear.boundingBox();
-        const triageBox = await triage.boundingBox();
-        const inventoryBox = await inventory.boundingBox();
-        const selectBox = await select.boundingBox();
+        // Keep each compared rectangle and label range in the same browser turn.
+        const { clearBox, triageBox, inventoryBox, selectBox, labelTextBottom } = await preflight.evaluate(region => {
+          const triageElement = region.querySelector<HTMLElement>(':scope > .workspace-intake-actions > [aria-label="Server source triage"]');
+          const clearElement = region.querySelector<HTMLElement>(":scope > .workspace-intake-actions > button");
+          const inventoryElement = region.querySelector<HTMLElement>(':scope > ul[aria-label="What each staged file will carry"]');
+          const selectElement = triageElement?.querySelector<HTMLElement>('select[aria-label="Review scan.pdf"]') ?? null;
+          const boxFor = (element: HTMLElement | null) => {
+            if (!element) return null;
+            const box = element.getBoundingClientRect();
+            if (box.width <= 0 || box.height <= 0) return null;
+            return { x: box.x, y: box.y, width: box.width, height: box.height };
+          };
+          const label = selectElement?.parentElement;
+          if (!label) throw new Error("The source selector has no label element.");
+          const textNodes = [...label.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+          if (!textNodes.length) throw new Error("The source selector has no visible label text.");
+          const labelTextBottom = Math.max(...textNodes.map(node => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return range.getBoundingClientRect().bottom;
+          }));
+          return {
+            clearBox: boxFor(clearElement), triageBox: boxFor(triageElement),
+            inventoryBox: boxFor(inventoryElement), selectBox: boxFor(selectElement), labelTextBottom,
+          };
+        });
         expect(clearBox).not.toBeNull();
         expect(triageBox).not.toBeNull();
         expect(inventoryBox).not.toBeNull();
@@ -377,15 +423,6 @@ async function captureMountedTriageLayout(page: Page, testInfo: TestInfo, phase:
         expect(Math.abs(triageBox!.width - inventoryBox!.width)).toBeLessThanOrEqual(1);
         expect(selectBox!.height).toBeGreaterThanOrEqual(44);
         expect(selectBox!.width).toBeGreaterThanOrEqual(140);
-        const labelTextBottom = await select.locator("xpath=..").evaluate(label => {
-          const textNodes = [...label.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
-          if (!textNodes.length) throw new Error("The source selector has no visible label text.");
-          return Math.max(...textNodes.map(node => {
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            return range.getBoundingClientRect().bottom;
-          }));
-        });
         expect(selectBox!.y).toBeGreaterThanOrEqual(labelTextBottom + 4);
 
         const escaped = await preflight.evaluate(region => [...region.querySelectorAll<HTMLElement>("*")]
