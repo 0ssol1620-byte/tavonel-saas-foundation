@@ -34,16 +34,19 @@ describe("approved one-path experience", () => {
     expect(customerNavOwns("/pricing", "/privacy")).toBe(false);
   });
   /*
-    Developers is the visible entry for docs, API and changelog routes. Explore owns its own
-    public sample only; the research and trust pages remain reachable from the footer.
+    Product owns its related source and solution routes; Developers owns docs, API and changelog.
+    Explore owns its public sample. Research and trust remain reachable from the footer.
   */
-  it("marks developer pages from the shared bar and leaves unrelated pages unowned", () => {
+  it("marks Product and developer pages from the shared bar and leaves unrelated pages unowned", () => {
     for (const path of ["/developers", "/docs", "/docs/mcp", "/api", "/changelog"]) {
       expect(customerNavOwns("/developers", path), path).toBe(true);
     }
-    for (const href of CUSTOMER_NAV.map((item) => item.href)) {
-      expect(customerNavOwns(href, "/sources"), `${href} claims /sources`).toBe(false);
-      expect(customerNavOwns(href, "/integrations"), `${href} claims /integrations`).toBe(false);
+    for (const path of ["/sources", "/integrations", "/solutions", "/knowledge-compiler"]) {
+      expect(CUSTOMER_NAV.filter(({ href }) => customerNavOwns(href, path)).map(({ href }) => href), path)
+        .toEqual(["/product"]);
+    }
+    for (const path of ["/research", "/trust", "/contact", "/privacy", "/sources-extra", "/integrations-old", "/solutions-extra", "/knowledge-compiler-extra"]) {
+      expect(CUSTOMER_NAV.filter(({ href }) => customerNavOwns(href, path)), path).toEqual([]);
     }
     expect(customerNavOwns("/explore", "/research")).toBe(false);
     expect(customerNavOwns("/explore", "/api")).toBe(false);

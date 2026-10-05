@@ -1662,6 +1662,25 @@ function editorialEvidence({ overrides = {}, changedPaths = PUBLIC_EDITORIAL_FEA
   });
 }
 
+test('reviewed one-path nav assertion correction stays selected without altering intake source admission', () => {
+  const path = 'lib/one-path-contract.test.ts';
+  assert.equal(Object.hasOwn(INTAKE_TRIAGE_SOURCE_BLOBS, path), false);
+  const changedPaths = [...new Set([...WORKSPACE_SOURCE_FEATURE_PATHS, ...INTAKE_TRIAGE_FEATURE_PATHS, path])];
+  const intake = intakeTriageEvidence(testHeadSha, {
+    [`${testHeadSha}:nextjs/${path}`]: '8e075c1b221bed2bb2b1f62606bd68a337849fdb',
+  }, changedPaths);
+  assert.equal(intake.eligible, true, intake.reasons.join('; '));
+  assert.ok(!intake.calls.some(args => args[0] === 'rev-parse' && args[1].endsWith(':' + 'nextjs/' + path)));
+  const workspace = workspaceSourceEvidence(testHeadSha, {}, changedPaths, null, intake);
+  const plan = planFor(changedPaths, { intakeTriageVerification: intake, workspaceSourceVerification: workspace });
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.ok(plan.unitFiles.includes(path));
+  assert.equal(plan.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
+  assert.deepEqual(plan.pendingQualificationDebt, ['database-contract']);
+  assert.ok(buildUnitArgs(plan.unitFiles, 'repair-scope-reports/vitest.json').includes(path));
+});
+
 test('root-reviewed intake browser fixture correction retains the exact predecessor and fail-closed admission', () => {
   assert.equal(INTAKE_TRIAGE_PREDECESSOR_SHA, '8944cbfb0335f3120c71dc823b4106da5de4a6af');
   assert.deepEqual(INTAKE_TRIAGE_SOURCE_BLOBS[INTAKE_TRIAGE_BROWSER_FILE], {
