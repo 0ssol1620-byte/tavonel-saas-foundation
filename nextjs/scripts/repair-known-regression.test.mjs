@@ -518,6 +518,12 @@ test('historical API cache captures bounded JSON and ZIP once, returns isolated 
 });
 import { COORDINATED_UI_SOURCE_BLOBS, COORDINATED_UI_CONFIG_PATHS, COORDINATED_UI_PARENT_BLOBS, COORDINATED_UI_UNIT_FILES, COORDINATED_UI_BROWSER_FILES } from './repair-known-regression.mjs';
 import { collectHomePricingCaptures, HOME_PRICING_CAPTURE_BINDINGS, validateSelectedPath } from './run-repair-check.mjs';
+function frozenCoordinatedBytes(path) {
+  if(path!=='nextjs/app/paper-product.css')return readFileSync(resolve(root,path));
+  const archive=process.env.COORDINATED_UI_PARENT_ARCHIVE?JSON.parse(gunzipSync(readFileSync(process.env.COORDINATED_UI_PARENT_ARCHIVE))):null;
+  const bytes=archive?Buffer.from(archive[path],'base64'):execFileSync('git',['show','203d14c615a99617e9073bfea3b2a281952f9b8f:'+path]);
+  assert.equal(blob(bytes),COORDINATED_UI_SOURCE_BLOBS[path].after);assert.equal(createHash('sha256').update(bytes).digest('hex'),COORDINATED_UI_SOURCE_BLOBS[path].sha256);return bytes;
+}
 function coordinatedSourceFixture(options = {}) {
   return (_command, original) => {
     const args=original[0]==='-C'?original.slice(2):original;
@@ -530,7 +536,7 @@ function coordinatedSourceFixture(options = {}) {
       const oid=pin?pin[ref===INTAKE_FRESH_PARENT?'before':'after']:INTAKE_GEOMETRY_SOURCE_BLOBS[p]?.after??(ref===INTAKE_FRESH_PARENT?COORDINATED_UI_PARENT_BLOBS[p]:COORDINATED_UI_CONFIG_PATHS.includes(p)?blob(readFileSync(resolve(root,p))):COORDINATED_UI_PARENT_BLOBS[p]);
       return oid?`100644 blob ${options.badBlob===p?'f'.repeat(40):oid}\t${p}`:'';
     }
-    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(root,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
+    if(args[0]==='show'){const p=args[1].slice(41),b=frozenCoordinatedBytes(p);return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
     throw Error('Unexpected coordinated source query');
   };
 }
@@ -647,4 +653,42 @@ test('public collector qualifies the last source before creating any destination
     attachCaptureFixture(f);const binding=HOME_PRICING_CAPTURE_BINDINGS.at(-1),index=f.runs.findIndex(run=>run.project===binding.project&&run.files.includes(binding.file)),spec=f.reports[index].suites[0].specs.find(value=>value.file.replaceAll('\\','/').endsWith(binding.file)),attachment=spec.tests[0].results[0].attachments.find(value=>value.name===binding.name);
     writeFileSync(attachment.path,Buffer.alloc(24));assert.throws(()=>collectHomePricingCaptures(f.temp,f.plan),/PNG identity or viewport mismatch/);assert.equal(existsSync(resolve(f.temp,'test-results/repair-scope-home-pricing')),false);
   }finally{rmSync(f.temp,{recursive:true,force:true});}
+});
+
+import { INTAKE_FOLD_PARENT, INTAKE_FOLD_CONFIG_PATHS, INTAKE_FOLD_SOURCE_BLOB, INTAKE_FOLD_PARENT_BLOBS, INTAKE_FOLD_FAILURE } from './repair-known-regression.mjs';
+function foldSourceFixture(options={}) {
+  return (_command,original)=>{
+    const args=original[0]==='-C'?original.slice(2):original;
+    if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'fold-fixture':head;
+    if(args[0]==='rev-list')return args.at(-1)===INTAKE_FOLD_PARENT?`${INTAKE_FOLD_PARENT} ${options.parent??INTAKE_FRESH_PARENT}`:`${head} ${INTAKE_FOLD_PARENT}`;
+    if(args[0]==='merge-base')return '';
+    if(args[0]==='diff')return args[1]==='--raw'?'':(options.paths??['nextjs/app/paper-product.css',...INTAKE_FOLD_CONFIG_PATHS]).join('\0')+'\0';
+    if(args[0]==='ls-tree'){
+      const ref=args[2],p=args.at(-1),pin=p==='nextjs/app/paper-product.css'?INTAKE_FOLD_SOURCE_BLOB:null,oid=pin?pin[ref===INTAKE_FOLD_PARENT?'before':'after']:COORDINATED_UI_SOURCE_BLOBS[p]?.after??INTAKE_GEOMETRY_SOURCE_BLOBS[p]?.after??(ref===INTAKE_FOLD_PARENT?INTAKE_FOLD_PARENT_BLOBS[p]:INTAKE_FOLD_CONFIG_PATHS.includes(p)?blob(readFileSync(resolve(root,p))):INTAKE_FOLD_PARENT_BLOBS[p]);
+      return oid?`${options.unsafe===p?'120000':'100644'} blob ${options.badBlob===p?'f'.repeat(40):oid}\t${p}`:'';
+    }
+    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(root,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
+    throw Error('Unexpected fold source query');
+  };
+}
+function foldProof(){return verifyIntakePresentationEligibility({headSha:head,exec:foldSourceFixture(),api:intakeApiFixture(intakeEvidenceFixture())});}
+test('phone-fold admission binds the exact203d parent, one CSS source and four CI paths before evidence lookup',()=>{
+  const proof=foldProof();assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.source.parent,INTAKE_FOLD_PARENT);assert.equal(proof.source.coordinatedUi,true);assert.equal(proof.source.exactChangedPaths.length,5);
+  for(const options of [{badBlob:'nextjs/app/paper-product.css'},{mutated:'nextjs/app/paper-product.css'},{badBlob:'nextjs/e2e/premium-craft.spec.ts'},{badBlob:'nextjs/scripts/run-repair-check.mjs'},{unsafe:'nextjs/app/paper-product.css'},{parent:'f'.repeat(40)},{paths:['nextjs/app/paper-product.css',...INTAKE_FOLD_CONFIG_PATHS.slice(1)]},{paths:['nextjs/app/paper-product.css',...INTAKE_FOLD_CONFIG_PATHS,'nextjs/lib/auth.ts']}]){
+    let reads=0;const result=verifyIntakePresentationEligibility({headSha:head,exec:foldSourceFixture(options),api:()=>{reads++;throw Error('Unexpected API');}});assert.equal(result.eligible,false);assert.equal(reads,0);
+  }
+});
+test('phone-fold plan keeps the existing22/11/eight-group lane and captures with failed203d observation',()=>{
+  const proof=foldProof(),plan=intakePresentationPlan(normal(),proof),previous=intakePresentationPlan(normal(),coordinatedProof());
+  assert.deepEqual(plan.unitFiles,previous.unitFiles);assert.deepEqual(plan.browserFiles,previous.browserFiles);assert.equal(plan.unitFiles.length,22);assert.equal(plan.browserFiles.length,11);assert.equal(planBrowserRuns(plan.browserFiles,false).length,8);assert.equal(plan.expectedIntakeTestCount,95);
+  for(const name of ['requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures'])assert.equal(plan[name],true);
+  for(const name of ['runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDatabaseRehearsal'])assert.equal(plan[name],false);
+  assert.equal(plan.inheritedChecks.unaffectedBrowsers,undefined);assert.equal(plan.inheritedChecks.publicScreenshots,undefined);assert.ok(plan.inheritedChecks.worker);assert.ok(plan.inheritedChecks.database);assert.ok(plan.inheritedChecks.storageTransport);assert.equal(plan.knownRegressionResolution.passed,433);
+  assert.deepEqual(plan.historicalUiFailure,INTAKE_FOLD_FAILURE);assert.equal(plan.historicalUiFailure.minimumVisibleExcerpt,48);assert.equal(plan.fullQualification,'pending');assert.deepEqual(plan.pendingFullDebt,previous.pendingFullDebt);assert.deepEqual(intakePresentationLineageFailures(plan,proof),[]);assert.ok(intakePresentationLineageFailures({...plan,historicalUiFailure:undefined},proof).length);
+});
+test('failed phone-fold admission retains historical895 resolution without accepting current-head UI evidence',()=>{
+  const exec=foldSourceFixture({mutated:'nextjs/app/paper-product.css'}),intent=classifyIntakePresentationIntent({headSha:head,exec}),initial=failedCollectorReceipt(failedCollectorPlan({headSha:head,reason:'source mismatch',intent}));
+  assert.equal(intent.classification,'intended');assert.ok(!initial.pendingDebt.includes(REGRESSION_DEBT));
+  const receipt=authenticateFailedIntakeResolution(initial,{headSha:head,intendedResult:'true',eligibleResult:'false',exec,api:intakeApiFixture(intakeEvidenceFixture())});assert.equal(receipt.gate,'failed');assert.equal(receipt.knownRegressionResolution.passed,433);assert.deepEqual(receipt.inheritedChecks,{});assert.ok(!receipt.pendingDebt.includes(REGRESSION_DEBT));assert.equal(receipt.fullQualification,'pending');
+  const db=readFileSync(resolve(root,'.github/workflows/db-rehearsal.yml'),'utf8');assert.ok(db.includes("'203d14c615a99617e9073bfea3b2a281952f9b8f'].includes(receipt.collectorOnlyFailure?.intent?.parent)"));
 });

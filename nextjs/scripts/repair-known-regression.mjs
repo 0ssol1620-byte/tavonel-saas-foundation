@@ -165,15 +165,15 @@ export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
   ".github/workflows/repair-scope.yml": "9f6f610ed7074612eaf3b93b34b9b26a69f657164e086a124b3a3a57e2e1d701",
-  "nextjs/scripts/repair-collector-only.mjs": "3ee841f6b7e866fb516a6e55c8884b01b6646b41f50128731f9b4d1b596ede83",
+  "nextjs/scripts/repair-collector-only.mjs": "c2feb4291e63c06945e93ff506f805c3710844603d06256f9e662f6faf865706",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
   "nextjs/scripts/repair-scope.test.mjs": "ab5d1c9e8461e0afc3e7928be2b1f225eeabc58612ed3b100180b87566cac9d7",
   "nextjs/scripts/repair-scope-gate.mjs": "dc0ba27b742c9bf82f93f3150a5eb73e1f5fa20e2a3e50b3ec29d7139b185939",
   "nextjs/scripts/verify-repair-workflows.mjs": "e2654679bb59645d1d5b00f73277aefcc33589e21479f945eecdb4826790bc96",
   "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-known-regression.mjs": "59563fb51f0029e90c24a9170178a14c3ffaffb3682a83bfdcb060f1982acc69",
-  "nextjs/scripts/repair-known-regression.test.mjs": "f0690d8f5e2663f9f2e008d105d2c3bfe026d1e3574b5be4cc72d83001c848aa",
-  ".github/workflows/db-rehearsal.yml": "8c5e6e4935dc78d30682ea43c3f4f8dbb3698795d9df7a3dbbb8442a0faccbd7",
+  "nextjs/scripts/repair-known-regression.mjs": "a34c2f9bae4e295e8935767eb6be0f6a232665e939b0916c2118aef376b4647f",
+  "nextjs/scripts/repair-known-regression.test.mjs": "0e9ca66fd95a46325b0112140491bbe0d3eac11cde7ac78a1b95c002f0bac623",
+  ".github/workflows/db-rehearsal.yml": "f02257b45c4c6b2e9743da2c51a5fd204e323c9f8ee54f47f260031d1de1902a",
   "nextjs/scripts/run-repair-check.mjs": "08e5a181264faf7accf220554dfa8db6edee8385d7685509e1fef40e80a0288f",
   "nextjs/scripts/repair-test-report.mjs": "5dd9b98ffa8aa6b67aa5034567e00857246073a0d8c94dc5df3eea60096e741f",
   "nextjs/vitest.repair-scope.config.ts": "229623b695037e9e8173e74107dd252a77182ad068ab195d2a9710e0100c8742"
@@ -781,7 +781,34 @@ export const COORDINATED_UI_BROWSER_FILES = Object.freeze([
   "e2e/docs-reading-layout.spec.ts",
   "e2e/public-layout-balance.spec.ts"
 ]);
+export const INTAKE_FOLD_PARENT = '203d14c615a99617e9073bfea3b2a281952f9b8f';
+export const INTAKE_FOLD_CONFIG_PATHS = Object.freeze([
+  "nextjs/scripts/repair-known-regression.mjs",
+  "nextjs/scripts/repair-known-regression.test.mjs",
+  "nextjs/scripts/repair-collector-only.mjs",
+  ".github/workflows/db-rehearsal.yml"
+]);
+export const INTAKE_FOLD_SOURCE_BLOB = Object.freeze({
+  "before": "aa0636bd8ab6b9914dde8f188d36794163cc0131",
+  "after": "0edf1c25b56e2867e66b3f2ae719d710012cc247",
+  "bytes": 12252,
+  "sha256": "51c74acebc535022b3a56c185d43d5e27ef0aca2cd769fe2501c4a311372d653"
+});
+export const INTAKE_FOLD_PARENT_BLOBS = Object.freeze({ ...COORDINATED_UI_PARENT_BLOBS, ...{
+  ".github/workflows/repair-scope.yml": "ec4fa893358d3376d4520f0c156aee7cb12694a3",
+  "nextjs/scripts/repair-collector-only.mjs": "9fb12d5ae730a6943a21c47d5e79ed0c43d065e8",
+  "nextjs/scripts/repair-scope-gate.mjs": "83ca37eac0e6ccfc7d5a288997a40ca8da3746a5",
+  "nextjs/scripts/verify-repair-workflows.mjs": "5dc79a7393ea30386fb4ee5c92735ba5539b7a65",
+  "nextjs/scripts/repair-known-regression.mjs": "f63d17e4dff5e9a7111482ea6f44b05e9208dbd5",
+  "nextjs/scripts/repair-known-regression.test.mjs": "7fc63bc0d75096996d5704bef497fc4b411130e5",
+  ".github/workflows/db-rehearsal.yml": "fc1da556a03db173d9a1f4b19f58a37d067d872d",
+  "nextjs/scripts/run-repair-check.mjs": "57b1617fce020b9fce8ddc744b72962cd06e4e01",
+  "nextjs/vitest.repair-scope.config.ts": "67844b0446fb9e1e94d17ec235c1423faac535b6",
+  "nextjs/scripts/repair-test-report.mjs": "4e3878f8b6311f06879415d6fa87ad25de0d7254"
+} });
+export const INTAKE_FOLD_FAILURE = Object.freeze({ headSha: INTAKE_FOLD_PARENT, runId: 37383383529, jobId: 112010648453, file: 'e2e/premium-craft.spec.ts', project: '390', observedVisibleExcerpt: 41.875, minimumVisibleExcerpt: 48, attempts: 2, gate: 'failed', status: 'historical UI failure; no current-head evidence accepted' });
 function intakeSourceProfile(parent, coordinatedUi = false) {
+  if (parent === INTAKE_FOLD_PARENT) return { parent, coordinatedUi: true, sources: { ...Object.fromEntries(Object.entries({ ...INTAKE_GEOMETRY_SOURCE_BLOBS, ...COORDINATED_UI_SOURCE_BLOBS }).map(([path,pin])=>[path,{...pin,before:pin.after}])), 'nextjs/app/paper-product.css': INTAKE_FOLD_SOURCE_BLOB }, changedSources: ['nextjs/app/paper-product.css'], configs: INTAKE_FOLD_CONFIG_PATHS, parentBlobs: INTAKE_FOLD_PARENT_BLOBS };
   if (parent === INTAKE_FRESH_PARENT && coordinatedUi) return { parent, coordinatedUi: true, sources: { ...Object.fromEntries(Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS).map(([path,pin]) => [path,{...pin,before:pin.after}])), ...COORDINATED_UI_SOURCE_BLOBS }, changedSources: Object.keys(COORDINATED_UI_SOURCE_BLOBS), configs: COORDINATED_UI_CONFIG_PATHS, parentBlobs: COORDINATED_UI_PARENT_BLOBS };
   if (parent === INTAKE_FRESH_PARENT) return { parent, sources: Object.fromEntries(Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS).map(([path,pin]) => [path, { ...pin, before: pin.after }])), changedSources: [], configs: INTAKE_FRESH_CONFIG_PATHS, parentBlobs: INTAKE_FRESH_PARENT_BLOBS };
   if (parent === INTAKE_LOG_PARENT) return { parent, sources: Object.fromEntries(Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS).map(([path, pin]) => [path, { ...pin, before: pin.after }])), changedSources: [], configs: INTAKE_LOG_CONFIG_PATHS, parentBlobs: INTAKE_LOG_PARENT_BLOBS };
@@ -798,6 +825,7 @@ export function classifyIntakePresentationIntent({ headSha, exec = execFileSync 
     if (parents[0] !== headSha || parents.some(sha => !/^[a-f0-9]{40}$/.test(sha))) throw Error('Unreadable intake parent metadata.');
     let profile = parents.length === 2 ? intakeSourceProfile(parents[1]) : null;
     if (!profile) return { classification: 'normal', intended: false, reason: 'Outside the exact frozen intake parents.' };
+    if (profile.parent === INTAKE_FOLD_PARENT && git(['rev-list','--parents','-n','1',INTAKE_FOLD_PARENT]) !== `${INTAKE_FOLD_PARENT} ${INTAKE_FRESH_PARENT}`) throw Error('Phone-fold parent must be the exact published203d child of7d.');
     if (profile.parent === INTAKE_FRESH_PARENT && git(['rev-list','--parents','-n','1',INTAKE_FRESH_PARENT]) !== `${INTAKE_FRESH_PARENT} ${INTAKE_LOG_PARENT}`) throw Error('Fresh-suite parent must be the exact published7d child.');
     if ([INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT].includes(profile.parent) && git(['rev-list', '--parents', '-n', '1', INTAKE_GEOMETRY_PARENT]) !== `${INTAKE_GEOMETRY_PARENT} ${INTAKE_PARENT}`) throw Error('868 must be the exact direct895 child.');
     if (profile.parent === INTAKE_LOG_PARENT && git(['rev-list', '--parents', '-n', '1', INTAKE_LOG_PARENT]) !== `${INTAKE_LOG_PARENT} ${INTAKE_GEOMETRY_PARENT}`) throw Error('2d678 must be the exact direct868 child.');
@@ -950,7 +978,7 @@ export function authenticateFailedIntakeResolution(receipt, { headSha, intendedR
 
 export function intakePresentationPlan(normal, proof) {
   if (!proof?.eligible || proof.source.headSha !== normal.headSha || !intakeSourceProfile(proof.source.parent) || normal.repairAnchorSha !== FULL_ANCHOR) throw Error('Intake presentation plan requires exact source and qualified 895 evidence.');
-  const geometry = [INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT, INTAKE_FRESH_PARENT].includes(proof.source.parent);
+  const geometry = [INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT, INTAKE_FRESH_PARENT, INTAKE_FOLD_PARENT].includes(proof.source.parent);
   const coordinatedUi = proof.source.coordinatedUi === true;
   const inherited = Object.fromEntries(Object.entries(proof.evidence.checks)
     .filter(([name]) => !coordinatedUi || !['unaffectedBrowsers', 'publicScreenshots'].includes(name))
@@ -958,6 +986,7 @@ export function intakePresentationPlan(normal, proof) {
   for (const [name, scope] of [['knownRegressionUnits', '433 passing tests across 17 files, zero skips'], ['apiCatalogue', '13 passing tests across 3 files, zero skips']]) inherited[name] = { sourceHead: INTAKE_PARENT, runId: proof.evidence.parentRunId, jobId: proof.evidence.parentJobId, artifact: INTAKE_PARENT_ARTIFACT, scope, status: 'historical qualified 895 evidence; not executed at current head' };
   return { ...normal, source: geometry ? 'exact frozen intake sources; all 95 owning unit tests and both browser projects run fresh' : 'exact nine-file intake presentation/copy over qualified 895; prior regression resolution inherited',
     ...(coordinatedUi ? { expectedSelectedTestCount: undefined, expectedIntakeTestCount: INTAKE_EXPECTED_TESTS, requireHomePricingCaptures: true } : geometry ? { expectedSelectedTestCount: INTAKE_EXPECTED_TESTS } : {}),
+    ...(proof.source.parent === INTAKE_FOLD_PARENT ? { historicalUiFailure: INTAKE_FOLD_FAILURE } : {}),
     normalSelection: { groups: normal.groups, unitFiles: normal.unitFiles, browserFiles: normal.browserFiles, unknownPaths: normal.unknownPaths },
     groups: ['selector-config', 'workflow-static', 'intake-presentation', ...(coordinatedUi ? ['home-pricing-ui'] : [])], unitFiles: [...new Set([...INTAKE_UNIT_FILES, ...(coordinatedUi ? COORDINATED_UI_UNIT_FILES : [])])], browserFiles: [...new Set([...Object.keys(INTAKE_BROWSER_CASES), ...(coordinatedUi ? COORDINATED_UI_BROWSER_FILES : [])])], unknownPaths: [],
     catalogueFiles: [], runApiCatalogueChecks: false, runFullHermeticVitest: false, runScriptContracts: false, runCdrWorkerChecks: false, runDetailIntegrity: false,
@@ -974,7 +1003,7 @@ export function intakePresentationLineageFailures(plan, proof) {
   if (!proof?.eligible) return ['intake presentation eligibility: ' + (proof?.reason ?? 'missing')];
   try {
     const expected = intakePresentationPlan({ ...plan, qualificationReasons: [] }, proof);
-    const fields = ['intakePresentation', 'expectedSelectedTestCount', 'expectedIntakeTestCount', 'requireHomePricingCaptures', 'groups', 'unitFiles', 'browserFiles', 'catalogueFiles', 'unknownPaths', 'inheritedChecks', 'knownRegressionObservations', 'knownRegressionResolution', 'resolvedQualificationDebt', 'runFullHermeticVitest', 'runScriptContracts', 'runCdrWorkerChecks', 'runDetailIntegrity', 'runWorkflowStaticGate', 'requireWorkspaceIntakeCapture', 'requirePublicUiScreenshots', 'runDatabaseRehearsal', 'runApiCatalogueChecks', 'deferredGroups', 'databaseRehearsalStatus', 'fullQualification'];
+    const fields = ['historicalUiFailure', 'intakePresentation', 'expectedSelectedTestCount', 'expectedIntakeTestCount', 'requireHomePricingCaptures', 'groups', 'unitFiles', 'browserFiles', 'catalogueFiles', 'unknownPaths', 'inheritedChecks', 'knownRegressionObservations', 'knownRegressionResolution', 'resolvedQualificationDebt', 'runFullHermeticVitest', 'runScriptContracts', 'runCdrWorkerChecks', 'runDetailIntegrity', 'runWorkflowStaticGate', 'requireWorkspaceIntakeCapture', 'requirePublicUiScreenshots', 'runDatabaseRehearsal', 'runApiCatalogueChecks', 'deferredGroups', 'databaseRehearsalStatus', 'fullQualification'];
     const failures = fields.filter(field => JSON.stringify(plan[field]) !== JSON.stringify(expected[field])).map(field => 'Intake presentation plan changed: ' + field);
     for (const debt of proof.evidence.pendingFullDebt) if (!plan.pendingFullDebt?.includes(debt)) failures.push('Intake presentation full-release debt removed: ' + debt);
     for (const debt of proof.evidence.pendingQualificationDebt) if (!plan.pendingQualificationDebt?.includes(debt)) failures.push('Intake presentation DB debt removed: ' + debt);
@@ -1003,7 +1032,7 @@ export function validateIntakeBrowserReport(report, file, root) {
 }
 export function readIntakePresentationExecution(root = process.cwd(), parent = INTAKE_PARENT, selection) {
   if (!intakeSourceProfile(parent)) throw Error('Unknown exact intake execution parent.');
-  const geometry = [INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT, INTAKE_FRESH_PARENT].includes(parent);
+  const geometry = [INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT, INTAKE_FRESH_PARENT, INTAKE_FOLD_PARENT].includes(parent);
   const read = name => JSON.parse(readFileSync(resolve(root, 'node_modules/.cache/repair-scope-reports', name), 'utf8'));
   if (!selection) return { units: validateKnownRepairReport(read('vitest.json'), INTAKE_UNIT_FILES, root, geometry ? INTAKE_EXPECTED_TESTS : undefined), browsers: Object.keys(INTAKE_BROWSER_CASES).map((file,index) => validateIntakeBrowserReport(read(`playwright-${index+1}.json`),file,root)) };
   // Validate the complete selected unit run and each configured browser group first.
