@@ -342,7 +342,7 @@ test('qualified ACL, async, intake, workspace and visual scopes compose without 
     );
     assert.deepEqual(
       planBrowserRuns([INTAKE_TRIAGE_BROWSER_FILE], false),
-      [{ kind: 'project', project: '1440', files: [INTAKE_TRIAGE_BROWSER_FILE] }],
+      [{ kind: 'project', project: 'audit', files: [INTAKE_TRIAGE_BROWSER_FILE] }],
     );
     assert.throws(() => validateSelectedPath('lib/unreviewed.test.mjs', 'unit', runnerRoot), /Unsupported unit path/);
     assert.throws(() => buildNodeTestArgs(['lib/unreviewed.test.mjs']), /No reviewed Node test runner/);
@@ -1498,12 +1498,22 @@ test('Docs/pricing browser plan uses real projects for mobile, desktop, motion, 
 });
 test('reviewed Playwright projects discover selected specs and avoid project-level skips', () => {
   const config = readFileSync(new URL('../playwright.config.ts', import.meta.url), 'utf8');
+  const intakeSpec = 'e2e/workspace-intake-triage.spec.ts';
   const mobileNav = readFileSync(new URL('../e2e/launch-qa-mobile-nav.spec.ts', import.meta.url), 'utf8');
   const landingHero = readFileSync(new URL('../e2e/landing-hero-mobile.spec.ts', import.meta.url), 'utf8');
   assert.match(config, /const widths\s*=\s*\[[^\]]*\b1440\b[^\]]*\b390\b[^\]]*\b360\b[^\]]*\]/);
   assert.match(config, /name:\s*`\$\{width\}`/);
   assert.match(config, /name:\s*`launch-\$\{browserName\}`[\s\S]*?testMatch:\s*\/launch-qa/);
   assert.match(config, /failure-states-audit/);
+  const auditSpecs = config.split(/\r?\n/).find(line => line.includes('const auditSpecs'));
+  assert.ok(auditSpecs?.includes('workspace-intake-triage'));
+  const widthProjects = config.slice(config.indexOf('...widths.map'), config.indexOf('name: "reduced-motion"'));
+  assert.match(widthProjects, /testIgnore:\s*\[[^\]]*auditSpecs/);
+  const auditProject = config.slice(config.indexOf('name: "audit"'));
+  assert.match(auditProject, /testMatch:\s*auditSpecs/);
+  assert.deepEqual(planBrowserRuns([intakeSpec], false), [
+    { kind: 'project', project: 'audit', files: [intakeSpec] },
+  ]);
   assert.match(mobileNav, /test\.use\(\{\s*viewport:\s*\{\s*width:\s*390,\s*height:\s*844/);
   assert.match(landingHero, /PHONE_PROJECTS\s*=\s*new Set\(\["360",\s*"390"\]\)/);
   assert.match(landingHero, /test\.skip\(!PHONE_PROJECTS\.has\(info\.project\.name\)/);

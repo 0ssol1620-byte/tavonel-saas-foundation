@@ -80,7 +80,7 @@ const browserProjectsByFile = new Map([
   ['e2e/landing-hero-mobile.spec.ts', ['360', '390']],
   ['e2e/landing-hero-film-loading.spec.ts', ['390']],
   ['e2e/marketing-consent.spec.ts', ['1440', '390']],
-  ['e2e/workspace-intake-triage.spec.ts', ['1440']],
+  ['e2e/workspace-intake-triage.spec.ts', ['audit']],
 ]);
 
 export function planBrowserRuns(files, runDetailIntegrity) {
