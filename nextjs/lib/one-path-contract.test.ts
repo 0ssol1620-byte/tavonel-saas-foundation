@@ -227,7 +227,7 @@ describe("approved one-path experience", () => {
     const page = text("app/workspace/page.tsx");
     expect(page).toContain("stagedSelection");
     expect(page).toContain("const ids = approvedCompilableDocumentIds(final, fileKeys)");
-    expect(page).toContain("if (!ids || ids.length !== files.length || !judgeCorpusSet(ids.length).ok)");
+    expect(page).toContain("if (!ids || ids.length !== processingManifest.length || !judgeCorpusSet(ids.length).ok)");
     expect(page).toContain("await startDurableCompile(ids)");
     expect(page).toContain("activationPolicy.customerIntake.enabled");
     expect(page).toContain("promoteCandidate");

@@ -2,7 +2,7 @@
 -- Apply only in a disposable DB after the draft has been reviewed and registered.
 begin;
 set local role postgres;
-select plan(24);
+select plan(34);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -271,10 +271,58 @@ select throws_ok($$select public.create_foundation_intake_approval_v2(
     'reservedCredits',1,'maximumCredits',1)),
   '88880051-8888-4888-8888-888888888851')$$,
   'foundation_intake_triage_receipt_stale','expired receipt cannot create a new approval');
+-- The production caller runs the baseline compile-set assertion first, then this
+-- triage assertion only when the application rollout flag is enabled. An
+-- unbound document is therefore the intentional no-intake-approval path.
+select is((public.assert_foundation_intake_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880021-8888-4888-8888-888888888821'::uuid])->>'allowed'),
+  'true','baseline compile guard allows an unrelated document');
+select is((public.assert_foundation_intake_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880021-8888-4888-8888-888888888821'::uuid])->>'approvalRequired'),
+  'false','baseline reports that no intake approval applies');
+select is((public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880021-8888-4888-8888-888888888821'::uuid])->>'allowed'),
+  'true','triage guard preserves the unrelated-document path');
+select is((public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880021-8888-4888-8888-888888888821'::uuid])->>'triageRequired'),
+  'false','unrelated compile is explicitly marked as not requiring triage');
+select throws_ok($$select public.assert_foundation_intake_compile_set(
+  'pilot-triage02','88880011-8888-4888-8888-888888888811',
+  array['88880032-8888-4888-8888-888888888832'::uuid])$$,
+  'foundation_intake_approval_compile_set_principal',
+  'composed caller baseline rejects a linked document from another workspace');
 select throws_ok($$select public.assert_foundation_intake_triage_compile_set(
   'pilot-triage02','88880011-8888-4888-8888-888888888811',
-  array['88880021-8888-4888-8888-888888888821'::uuid])$$,
-  'foundation_intake_triage_compile_scope','compile set remains workspace scoped');
+  array['88880032-8888-4888-8888-888888888832'::uuid])$$,
+  'foundation_intake_approval_compile_set_principal',
+  'standalone triage guard reuses baseline principal validation');
+select throws_ok($$select public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880032-8888-4888-8888-888888888832'::uuid,
+        '88880021-8888-4888-8888-888888888821'::uuid])$$,
+  'foundation_intake_approval_compile_set_incomplete',
+  'an unbound extra document cannot ride along with an approved intake document');
+select throws_ok($$select public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880032-8888-4888-8888-888888888832'::uuid,
+        '88880034-8888-4888-8888-888888888834'::uuid])$$,
+  'foundation_intake_approval_compile_set_mixed',
+  'documents from two approvals cannot be combined in one compile set');
+select throws_ok($$select public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',null::uuid[])$$,
+  'foundation_intake_approval_compile_set_invalid','null document list is rejected');
+select throws_ok($$select public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',array[]::uuid[])$$,
+  'foundation_intake_approval_compile_set_invalid','empty document list is rejected');
+select throws_ok($$select public.assert_foundation_intake_triage_compile_set(
+  'pilot-triage01','88880011-8888-4888-8888-888888888811',
+  array['88880021-8888-4888-8888-888888888821'::uuid,
+        '88880021-8888-4888-8888-888888888821'::uuid])$$,
+  'foundation_intake_approval_compile_set_invalid','duplicate document IDs are rejected');
 
 select * from finish();
 rollback;

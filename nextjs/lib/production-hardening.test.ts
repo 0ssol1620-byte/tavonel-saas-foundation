@@ -34,7 +34,11 @@ describe("2026-09-05 production hardening", () => {
     expect(workspace).not.toContain("!activeWorld && !candidateNeedsDecision ? (");
     expect(workspace).toContain("Add more files while your published knowledge stays available.");
     expect(workspace).toContain("Add more files while the prepared version waits for your review.");
-    expect(workspace).toContain("Approve maximum & upload");
+    const triageReview = workspace.replace(/\/\*[\s\S]*?\*\//g, "").match(/<IntakeTriageReview\b[\s\S]*?\n\s*\/>/)?.[0];
+    expect(triageReview).toBeDefined();
+    expect(triageReview).toContain("disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen}");
+    expect(triageReview).toContain("onLegacyFallback={() => void startStagedCompile()}");
+    expect(triageReview).toContain("onProcessingApproval={startTriageCompile}");
     expect(workspace).toContain("Compile one or more ready sources");
     expect(workspace).not.toContain("Compile at least two ready sources");
     expect(workspace).toContain('navigateSurface("connections")');

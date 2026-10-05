@@ -1087,9 +1087,26 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare v_approval public.foundation_intake_approvals%rowtype;
+declare
+  v_approval public.foundation_intake_approvals%rowtype;
+  v_compile_set jsonb;
 begin
   if not public.foundation_intake_triage_rollout_enabled() then raise exception 'foundation_intake_triage_rollout_disabled'; end if;
+  -- Keep the service-only triage guard aligned with the established compile-set
+  -- contract. In particular, unrelated documents have no intake approval and
+  -- remain eligible for the legacy/non-intake path; malformed, mixed, incomplete,
+  -- or cross-principal approval sets are rejected by the baseline guard.
+  v_compile_set := public.assert_foundation_intake_compile_set(
+    p_workspace_key, p_user_id, p_document_ids);
+  if v_compile_set->>'allowed' is distinct from 'true' then
+    raise exception 'foundation_intake_approval_compile_set_invalid';
+  end if;
+  if v_compile_set->>'approvalRequired' = 'false' then
+    return pg_catalog.jsonb_build_object('allowed', true, 'triageRequired', false);
+  end if;
+  if v_compile_set->>'approvalRequired' is distinct from 'true' then
+    raise exception 'foundation_intake_approval_compile_set_invalid';
+  end if;
   for v_approval in
     select distinct a.* from public.foundation_intake_approvals a
       join public.foundation_intake_approval_files f using (approval_id)
@@ -1113,7 +1130,7 @@ begin
       raise exception 'foundation_intake_triage_receipt_stale';
     end if;
   end loop;
-  return pg_catalog.jsonb_build_object('allowed', true);
+  return pg_catalog.jsonb_build_object('allowed', true, 'triageRequired', true);
 end;
 $$;
 

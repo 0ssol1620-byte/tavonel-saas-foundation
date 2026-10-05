@@ -75,6 +75,12 @@ function request(body?: Record<string, unknown>) {
   });
 }
 
+function approveMember(mimeType = "application/pdf", lineage: Record<string, unknown> = {}) {
+  readApproval.mockResolvedValue({ ok: true, result: {
+    pricingFingerprint: sourceSha256, scopeDigest, ...lineage,
+    files: [{ fileKey, documentId, contentSha256: sourceSha256, byteLength: 4096, mimeType }],
+  } });
+}
 function rpcBody() {
   const call = adminRequest.mock.calls.at(-1) as [unknown, string, RequestInit] | undefined;
   return call ? JSON.parse(String(call[2].body)) as Record<string, unknown> : null;
@@ -107,10 +113,8 @@ beforeEach(() => {
   headSignature.mockReset().mockResolvedValue({ ok: true, exists: true, bytes: LEADING.pdf });
   assessSource.mockReset().mockResolvedValue({ ok: true, status: "allow" });
   adminConfig.mockReset().mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "sb_secret_x" });
-  readApproval.mockReset().mockResolvedValue({ ok: true, result: {
-    pricingFingerprint: sourceSha256, scopeDigest,
-    files: [{ fileKey, documentId, contentSha256: sourceSha256 }],
-  } });
+  readApproval.mockReset();
+  approveMember();
   fingerprint.mockReset().mockResolvedValue(sourceSha256);
   adminRequest.mockReset().mockResolvedValue(new Response(JSON.stringify({
     admission: { status: "confirmed", documentId, confirmedAt: "2026-09-01T12:00:00.000Z" },
@@ -163,6 +167,14 @@ describe("upload confirmation route", () => {
     expect(adminRequest).not.toHaveBeenCalled();
   });
 
+  it("refuses triage lineage that is not enabled for this approval path", async () => {
+    approveMember("application/pdf", { triageReceiptId: "untrusted-receipt" });
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_TRIAGE_ROLLOUT_DISABLED" });
+    expect(head).not.toHaveBeenCalled();
+    expect(adminRequest).not.toHaveBeenCalled();
+  });
   it("rejects a malformed digest instead of dropping it", async () => {
     const response = await POST(request({ documentId, sourceSha256: "sha256:nope" }));
     expect(response.status).toBe(400);
@@ -223,6 +235,7 @@ describe("upload confirmation route", () => {
 describe("magic-byte validation at confirmation", () => {
   function stored(contentType: string) {
     head.mockResolvedValue({ ok: true, exists: true, key: "k", sizeBytes: 4096, contentType, etag: "etag" });
+    approveMember(contentType);
   }
 
   it("confirms a file whose leading bytes are the type it was admitted as", async () => {

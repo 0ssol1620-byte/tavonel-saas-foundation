@@ -292,8 +292,8 @@ jobs:
             exit 1
           fi
 
-          expected_migration_sha256=031ac5569c673a915d963cc3c6c33d51fbe4b66f0bdf27b569d76198729367d9
-          expected_test_sha256=5c1576721a779cdd334938f5c5f9cb643cfea5af97f0ea6f3c09eb77fc77ef90
+          expected_migration_sha256=092247c80b04e861471cb04edf7ba22699ebc7bbf81cb067b6840724ebb7a00e
+          expected_test_sha256=f142517c4432668cc291abf7ed3942976a373149c3842dfc45a1ead534cefda0
           test "$(sha256sum "$draft" | cut -d ' ' -f 1)" = "$expected_migration_sha256"
           test "$(sha256sum "$test_source" | cut -d ' ' -f 1)" = "$expected_test_sha256"
           printf '%s  %s\n' "$expected_test_sha256" "$test_source" | sha256sum --check

@@ -481,11 +481,11 @@ export const INTAKE_TRIAGE_SOURCE_BLOBS = Object.freeze({
   },
   'supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql': {
     predecessor: null,
-    candidate: "140b9f410d33a8dfa2ebd1c33421f88e2856877d"
+    candidate: "5894d007544fc4584e4aca4896a7cc10fb8083ab"
   },
   'supabase/drafts/tests/foundation_intake_triage_binding.sql': {
     predecessor: null,
-    candidate: "3a6fb190c444d32286d36d5a31627a78d0d857e7"
+    candidate: "dd65bbee72aafa7f0439827bfdc1df83aa842a53"
   }
 });
 export const INTAKE_TRIAGE_FEATURE_PATHS = Object.freeze(Object.keys(INTAKE_TRIAGE_SOURCE_BLOBS).sort());
