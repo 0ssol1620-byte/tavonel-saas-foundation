@@ -21,6 +21,7 @@ export default defineConfig({
       "components/compile-stage.test.tsx",
       "components/intake-triage-review.interaction.test.ts",
       "components/intake-triage-review.test.tsx",
+      "components/landing-v2/hero-source-card.test.tsx",
       "app/api/documents/**/route.test.ts",
     ],
   },

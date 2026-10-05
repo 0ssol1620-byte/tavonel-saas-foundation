@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "./pricing-plan-overview";
 import tableStyles from "@/components/docs/docs-table.module.css";
 import { useCheckout } from "@/lib/use-checkout";
 import { loginUrlForOffer } from "@/lib/checkout-intent";
@@ -859,9 +860,13 @@ export default function PricingPageClient({
                 </nav>
               </aside>
             </div>
+            <PricingPlanOverview plans={PLANS.map(plan => ({
+              name: plan.name, price: plan.price,
+              unit: plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit,
+            }))} />
             <div className="plans" ref={plansRef} data-visual>
-              {PLANS.map((plan) => (
-                <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
+              {PLANS.map((plan, index) => (
+                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
                   {/*
                     BQ-027. Four cards, four shared baselines.
 

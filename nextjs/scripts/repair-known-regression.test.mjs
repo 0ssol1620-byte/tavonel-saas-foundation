@@ -1,7 +1,7 @@
 import test, { after } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, linkSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -446,123 +446,205 @@ test('actual intake gate CLI cannot turn missing raw unit/build/browser/capture 
   }finally{rmSync(temp,{recursive:true,force:true});}
 });
 
-import { INTAKE_GEOMETRY_PARENT, INTAKE_GEOMETRY_CONFIG_PATHS, INTAKE_GEOMETRY_SOURCE_BLOBS, INTAKE_GEOMETRY_PARENT_BLOBS, INTAKE_GEOMETRY_UNIT_FILES, INTAKE_GEOMETRY_EXPECTED_TESTS, INTAKE_868_UNIT_COUNTS, INTAKE_868_ARTIFACT, verifyIntakeGeometryParentEvidence } from './repair-known-regression.mjs';
-const archive868=Buffer.from('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','base64');
-function geometrySourceFixture(options={}) {
-  return (_command,original)=>{
-    const args=original[0]==='-C'?original.slice(2):original;
-    if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'geometry-fixture-root':head;
-    if(args[0]==='rev-list')return args.at(-1)===INTAKE_GEOMETRY_PARENT?`${INTAKE_GEOMETRY_PARENT} ${options.bridge??INTAKE_PARENT}`:`${head} ${options.parent??INTAKE_GEOMETRY_PARENT}`;
-    if(args[0]==='merge-base'){if(options.ancestor===false)throw Error('missing ancestry');return '';}
-    if(args[0]==='diff'&&args[1]==='--raw'){if(options.dirty)throw Error('dirty bytes');return '';}
-    if(args[0]==='diff')return (options.paths??[...Object.keys(INTAKE_GEOMETRY_SOURCE_BLOBS),...INTAKE_GEOMETRY_CONFIG_PATHS]).join('\0')+'\0';
-    if(args[0]==='ls-tree'){
-      const ref=args[2],path=args.at(-1);
-      let oid=Object.hasOwn(INTAKE_GEOMETRY_SOURCE_BLOBS,path)?INTAKE_GEOMETRY_SOURCE_BLOBS[path][ref===INTAKE_GEOMETRY_PARENT?'before':'after']:ref===INTAKE_GEOMETRY_PARENT?INTAKE_GEOMETRY_PARENT_BLOBS[path]:INTAKE_GEOMETRY_CONFIG_PATHS.includes(path)?blob(readFileSync(resolve(root,path))):INTAKE_GEOMETRY_PARENT_BLOBS[path];
-      if(options.badBlob===`${ref}:${path}`)oid='f'.repeat(40);if(!oid)return '';
-      return `${options.unsafe===path?'120000':'100644'} blob ${oid}\t${path}`;
-    }
-    if(args[0]==='show'){const path=args[1].slice(41),bytes=readFileSync(resolve(root,path));return options.mutated===path?Buffer.concat([bytes,Buffer.from('\n// mutation\n')]):bytes;}
-    throw Error('Unexpected geometry source command: '+args.join(' '));
-  };
-}
-function geometryEvidenceFixture(){
-  const historical=verifyIntakePresentationEvidence(intakeEvidenceFixture());
-  const run=(id,path,conclusion)=>({id,path,head_sha:INTAKE_GEOMETRY_PARENT,event:'pull_request',run_attempt:1,status:'completed',conclusion});
-  const job=(id,run_id,name,conclusion)=>({id,run_id,name,head_sha:INTAKE_GEOMETRY_PARENT,status:'completed',conclusion});
-  const passed=['Plan changes since the authenticated full-pass anchor','Verify workflow and selector contracts','Run selector regression tests','Run browser report and screenshot regressions','Scan repository secrets','Run TypeScript and lint checks','Run Foundation focused unit checks','Install Chromium for detail-integrity coverage','Build the isolated live-commerce test bundle after scoped checks','Publish exact-head scope receipt'];
-  const skipped=['Run the normal CDR worker unit suite and types for reviewed OCR safety','Run hermetic full Vitest for shared or unknown changes','Run script contract suite for shared or unknown changes','Run the exact repair API catalogue readers separately','Require screenshots for the exact paired public UI candidate'];
-  return {historical,parentRun:run(37356109193,'.github/workflows/repair-scope.yml','failure'),parentJob:{...job(111918797906,37356109193,'Repair scope validation','failure'),steps:[...passed.map(name=>({name,status:'completed',conclusion:'success'})),...skipped.map(name=>({name,status:'completed',conclusion:'skipped'})),...['Require the four synthetic mounted intake preflight capture pairs','Fail closed on missing or failed scoped checks'].map(name=>({name,status:'completed',conclusion:'failure'}))]},dbRun:run(37356109344,'.github/workflows/db-rehearsal.yml','success'),dbJobs:{jobs:[{...job(111918798738,37356109344,'Verify exact collector-only DB evidence reuse','success'),steps:['Independently verify unchanged DB source and prior evidence','Require an explicit collector classifier decision'].map(name=>({name,status:'completed',conclusion:'success'}))},job(111918987680,37356109344,'db-rehearsal','skipped'),job(111918988074,37356109344,'Local Chromium signed-storage transport','skipped')]},artifact:{...INTAKE_868_ARTIFACT,expired:false,workflow_run:{id:37356109193,head_sha:INTAKE_GEOMETRY_PARENT}},archive:Buffer.from(archive868),jobLog:Object.entries(INTAKE_868_UNIT_COUNTS).map(([file,count])=>`2026-10-05T18:28:55.000Z  ✓ ${file} (${count} tests)`).join('\n')+'\n2026-10-05T18:28:56.000Z Vitest report: 93 passed, 0 skipped, 0 failed across 10 selected files.\n'};
-}
-function geometryProof(){const historical=verifyIntakePresentationEvidence(intakeEvidenceFixture()),geometryParent=verifyIntakeGeometryParentEvidence(geometryEvidenceFixture());return {eligible:true,source:{eligible:true,headSha:head,parent:INTAKE_GEOMETRY_PARENT,fullAnchor:FULL_ANCHOR},evidence:{...historical,geometryParent}};}
-function geometryApiFixture(data){const old=intakeApiFixture(intakeEvidenceFixture()),records={'actions/runs/37356109193':data.parentRun,'actions/jobs/111918797906':data.parentJob,'actions/runs/37356109344':data.dbRun,'actions/runs/37356109344/jobs':data.dbJobs,'actions/jobs/111918798738':data.dbJobs.jobs[0],'actions/artifacts/11365195888':data.artifact,'actions/artifacts/11365195888/zip':data.archive,'actions/jobs/111918797906/logs':data.jobLog};return endpoint=>{if(!Object.hasOwn(records,endpoint))return old(endpoint);const value=records[endpoint];return Buffer.isBuffer(value)?Buffer.from(value):structuredClone(value);};}
-
-test('measurement correction admits only the two exact final files plus six configuration owners directly over868',()=>{
-  assert.equal(INTAKE_GEOMETRY_CONFIG_PATHS.length,6);assert.equal(Object.keys(INTAKE_GEOMETRY_SOURCE_BLOBS).length,2);
-  const result=verifyIntakePresentationSource({headSha:head,exec:geometrySourceFixture()});assert.equal(result.eligible,true,result.reason);assert.equal(result.exactChangedPaths.length,8);assert.equal(result.parent,INTAKE_GEOMETRY_PARENT);
-  assert.equal(INTAKE_GEOMETRY_SOURCE_BLOBS['nextjs/e2e/workspace-intake-triage.spec.ts'].after,'72f68ba25ea4c01571d1752584638ade859115a7');assert.equal(INTAKE_GEOMETRY_SOURCE_BLOBS['nextjs/lib/intake-triage-layout.test.ts'].after,'4baa34be94b4773e1acfbbb62ec330ea76ce2a9c');
-  assert.deepEqual(INTAKE_GEOMETRY_UNIT_FILES,['lib/intake-triage-layout.test.ts']);assert.equal(INTAKE_GEOMETRY_EXPECTED_TESTS,4);assert.ok(!buildUnitArgs(INTAKE_GEOMETRY_UNIT_FILES,'report.json').includes('--config'));assert.ok(readFileSync(resolve(root,'nextjs/vitest.config.ts'),'utf8').includes('lib/**/*.test.ts'));
-});
-test('measurement source proof rejects bad bytes, every preimage/config binding, dirty checkout and wrong895 bridge',()=>{
-  for(const path of Object.keys(INTAKE_GEOMETRY_SOURCE_BLOBS)){for(const ref of [INTAKE_GEOMETRY_PARENT,head]){const result=verifyIntakePresentationSource({headSha:head,exec:geometrySourceFixture({badBlob:`${ref}:${path}`})});assert.equal(result.eligible,false);assert.ok(result.reason.includes(path),result.reason);}for(const option of [{mutated:path},{unsafe:path}])assert.equal(verifyIntakePresentationSource({headSha:head,exec:geometrySourceFixture(option)}).eligible,false);}
-  for(const path of Object.keys(INTAKE_GEOMETRY_PARENT_BLOBS)){const result=verifyIntakePresentationSource({headSha:head,exec:geometrySourceFixture({badBlob:`${INTAKE_GEOMETRY_PARENT}:${path}`})});assert.equal(result.eligible,false,path);assert.ok(result.reason.includes(path),result.reason);}
-  for(const path of INTAKE_GEOMETRY_CONFIG_PATHS)assert.equal(verifyIntakePresentationSource({headSha:head,exec:geometrySourceFixture({mutated:path})}).eligible,false,path);
-  for(const options of [{dirty:true},{ancestor:false},{bridge:head}])assert.equal(verifyIntakePresentationSource({headSha:head,exec:geometrySourceFixture(options)}).eligible,false);
-  const paths=[...Object.keys(INTAKE_GEOMETRY_SOURCE_BLOBS),...INTAKE_GEOMETRY_CONFIG_PATHS];const missing=geometrySourceFixture({paths:paths.slice(1)});assert.equal(classifyIntakePresentationIntent({headSha:head,exec:missing}).classification,'intended');let calls=0;assert.equal(verifyIntakePresentationEligibility({headSha:head,exec:missing,api:()=>{calls++;}}).eligible,false);assert.equal(calls,0);
-  assert.equal(classifyIntakePresentationIntent({headSha:head,exec:geometrySourceFixture({paths:[...paths,'nextjs/app/unrelated.tsx']})}).classification,'normal');
-});
-test('868 failed receipt authenticates93 passing units and only91 unchanged tests while preserving failed browsers',()=>{
-  const data=geometryEvidenceFixture(),result=verifyIntakeGeometryParentEvidence(data);assert.equal(result.eligible,true,result.reason);assert.equal(result.units.passed,93);assert.equal(result.units.files,10);assert.equal(result.unchangedUnits.passed,91);assert.equal(result.unchangedUnits.files,9);assert.equal(result.unchangedUnits.counts['lib/copy-trust-guard.test.ts'],24);assert.equal(result.unchangedUnits.counts['lib/intake-triage-layout.test.ts'],undefined);assert.ok(result.previousUiQualification.startsWith('failed'));assert.equal(result.fullQualification,'pending');
-  for(const field of ['parentRun','parentJob','dbRun'])for(const [key,value]of [['head_sha',head],['id',1],['status','in_progress']]){const bad=geometryEvidenceFixture();bad[field][key]=value;assert.equal(verifyIntakeGeometryParentEvidence(bad).eligible,false,`${field}.${key}`);}
-  const promoted=geometryEvidenceFixture();promoted.parentRun.conclusion='success';assert.equal(verifyIntakeGeometryParentEvidence(promoted).eligible,false);
-  for(const change of [d=>{d.archive[100]^=1;},d=>{d.artifact.digest='sha256:'+'a'.repeat(64);},d=>{d.historical.eligible=false;},d=>{d.dbJobs.jobs[1].conclusion='success';},d=>{d.jobLog=d.jobLog.replace('(24 tests)','(23 tests)');},d=>{d.jobLog=d.jobLog.replace('0 skipped','1 skipped');},d=>{d.jobLog+='2026-10-05T00:00:00.000Z  ✓ lib/copy-trust-guard.test.ts (24 tests)\n';}]){const bad=geometryEvidenceFixture();change(bad);assert.equal(verifyIntakeGeometryParentEvidence(bad).eligible,false);}
-  const qualified=verifyIntakePresentationEligibility({headSha:head,exec:geometrySourceFixture(),api:geometryApiFixture(data)});assert.equal(qualified.eligible,true,qualified.reason);assert.equal(qualified.evidence.geometryParent.units.passed,93);
-});
-test('measurement plan requires four fresh owning tests and both browser projects while all other checks stay scoped',()=>{
-  const proof=geometryProof(),plan=intakePresentationPlan(normal(),proof);assert.equal(plan.unitFiles.length,1);assert.equal(plan.expectedSelectedTestCount,4);assert.equal(plan.inheritedChecks.unchangedIntakeUnits.passed,91);assert.equal(plan.geometryParentObservation.units.passed,93);assert.ok(plan.geometryParentObservation.previousUiQualification.startsWith('failed'));assert.equal(plan.requireWorkspaceIntakeCapture,true);assert.equal(plan.knownRegressionResolution.headSha,INTAKE_PARENT);assert.equal(plan.knownRegressionResolution.passed,433);
-  assert.deepEqual(planBrowserRuns(plan.browserFiles,false).map(value=>value.project),['audit','1440']);for(const field of ['runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runDatabaseRehearsal','requirePublicUiScreenshots'])assert.equal(plan[field],false,field);assert.deepEqual(intakePresentationLineageFailures(plan,proof),[]);
-  for(const [field,value]of [['unitFiles',[]],['expectedSelectedTestCount',3],['geometryParentObservation',{}],['requireWorkspaceIntakeCapture',false],['browserFiles',[]],['pendingFullDebt',[]],['pendingQualificationDebt',[]]])assert.ok(intakePresentationLineageFailures({...plan,[field]:value},proof).length,field);
-  const failed=buildRepairReceipt(plan,{headSha:head,failures:['new measurement browser failed']});assert.equal(failed.gate,'failed');assert.ok(!failed.pendingDebt.includes(REGRESSION_DEBT));assert.equal(failed.knownRegressionResolution.headSha,INTAKE_PARENT);assert.ok(Object.values(failed.inheritedChecks).every(value=>value.status==='not accepted for current head'));
-});
-test('measurement execution report must contain all four changed-suite tests and fresh eight audit cases plus layout',()=>{
-  const temp=mkdtempSync(resolve(tmpdir(),'geometry-report-'));assert.ok(isInsideWorkspace(resolve(tmpdir()),temp));
-  try{const cache=resolve(temp,'node_modules/.cache/repair-scope-reports');mkdirSync(cache,{recursive:true});const units=reportFixture(INTAKE_GEOMETRY_UNIT_FILES,4);units.testResults[0].name=resolve(temp,INTAKE_GEOMETRY_UNIT_FILES[0]);writeFileSync(resolve(cache,'vitest.json'),JSON.stringify(units));Object.keys(INTAKE_BROWSER_CASES).forEach((file,index)=>writeFileSync(resolve(cache,`playwright-${index+1}.json`),JSON.stringify(intakeBrowserFixture(file,temp))));const execution=readIntakePresentationExecution(temp,INTAKE_GEOMETRY_PARENT);assert.deepEqual(execution.units,{files:1,passed:4,skipped:0,failed:0});assert.deepEqual(execution.browsers.map(value=>value.executed),[8,1]);units.numPassedTests=units.numTotalTests=3;units.testResults[0].assertionResults.pop();writeFileSync(resolve(cache,'vitest.json'),JSON.stringify(units));assert.throws(()=>readIntakePresentationExecution(temp,INTAKE_GEOMETRY_PARENT));assert.throws(()=>readIntakePresentationExecution(temp,head));}finally{rmSync(temp,{recursive:true,force:true});}
-});
-test('868 intended failures retain authenticated895 resolution while missing or forged decisions stay conservative',()=>{
-  const exec=geometrySourceFixture({paths:[...Object.keys(INTAKE_GEOMETRY_SOURCE_BLOBS),...INTAKE_GEOMETRY_CONFIG_PATHS].slice(1)}),intent=classifyIntakePresentationIntent({headSha:head,exec});assert.equal(intent.parent,INTAKE_GEOMETRY_PARENT);
-  const failed=failedCollectorReceipt(failedCollectorPlan({headSha:head,reason:'changed source proof missing',intent}));assert.ok(!failed.pendingDebt.includes(REGRESSION_DEBT));
-  const conservative={...failed,pendingDebt:[...failed.pendingDebt,REGRESSION_DEBT]},settings={headSha:head,intendedResult:'true',eligibleResult:'false',exec,api:intakeApiFixture(intakeEvidenceFixture())};
-  const authenticated=authenticateFailedIntakeResolution(conservative,settings);assert.equal(authenticated.gate,'failed');assert.equal(authenticated.knownRegressionResolution.headSha,INTAKE_PARENT);assert.ok(!authenticated.pendingDebt.includes(REGRESSION_DEBT));assert.deepEqual(authenticated.inheritedChecks,{});
-  for(const changed of [{intendedResult:undefined},{api:()=>{throw Error('API unavailable');}},{exec:geometrySourceFixture({bridge:head})}])assert.ok(authenticateFailedIntakeResolution(conservative,{...settings,...changed}).pendingDebt.includes(REGRESSION_DEBT));
-});
-
-import { INTAKE_LOG_PARENT, INTAKE_LOG_CONFIG_PATHS, INTAKE_LOG_PARENT_BLOBS, readIntakeUnitJobLog } from './repair-known-regression.mjs';
-// Actual ANSI-colored unit rows and summary from authenticated job111918797906.
-// Full source log SHA256: f810aecadd9cc95d29153906e328c31bc2025db43cead0f3e8b0479998f4f6d6. Excerpt SHA256: da21335fd84d606aa2065256cdec0c9138224b7bfd9789ab41bd65293b0e4121.
-const actual868UnitLogExcerpt = "2026-10-05T18:28:55.2667000Z  \u001b[32m✓\u001b[39m lib/intake-triage-client.test.ts \u001b[2m(\u001b[22m\u001b[2m17 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 43\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.3580874Z  \u001b[32m✓\u001b[39m lib/intake-triage-paid-flow.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 95\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.6187398Z  \u001b[32m✓\u001b[39m lib/preflight-report.test.ts \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 40\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.7808124Z  \u001b[32m✓\u001b[39m lib/workspace-compile-floor-and-ceiling.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.8423387Z  \u001b[32m✓\u001b[39m lib/copy-trust-guard.test.ts \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 223\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.9990596Z  \u001b[32m✓\u001b[39m lib/workspace-mobile-layout.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.2362651Z  \u001b[32m✓\u001b[39m components/intake-triage-review.test.tsx \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 24\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.2447895Z  \u001b[32m✓\u001b[39m lib/intake-triage-layout.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.4336423Z  \u001b[32m✓\u001b[39m lib/workspace-intake.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 14\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.5857523Z  \u001b[32m✓\u001b[39m components/intake-triage-review.interaction.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.7383102Z Vitest report: 93 passed, 0 skipped, 0 failed across 10 selected files.\n";
-function logCorrectionSourceFixture(options = {}) {
-  const paths = options.paths ?? INTAKE_LOG_CONFIG_PATHS;
+import { INTAKE_FRESH_PARENT, INTAKE_FRESH_CONFIG_PATHS, INTAKE_FRESH_PARENT_BLOBS, INTAKE_LOG_PARENT, INTAKE_GEOMETRY_SOURCE_BLOBS, INTAKE_EXPECTED_TESTS, createIntakeEvidenceApi } from './repair-known-regression.mjs';
+function freshSourceFixture(options = {}) {
   return (_command, original) => {
     const args = original[0] === '-C' ? original.slice(2) : original;
-    if (args[0] === 'rev-parse') return args[1] === '--show-toplevel' ? root : head;
-    if (args[0] === 'rev-list') return args.at(-1) === INTAKE_LOG_PARENT ? INTAKE_LOG_PARENT + ' ' + (options.bridge ?? INTAKE_GEOMETRY_PARENT) : args.at(-1) === INTAKE_GEOMETRY_PARENT ? INTAKE_GEOMETRY_PARENT + ' ' + INTAKE_PARENT : head + ' ' + (options.parent ?? INTAKE_LOG_PARENT);
-    if (args[0] === 'merge-base') { if (options.ancestor === false) throw Error('Not an ancestor'); return ''; }
-    if (args[0] === 'diff') return args[1] === '--raw' ? options.dirty ? ': dirty' : '' : paths.join('\0') + '\0';
-    if (args[0] === 'ls-tree') { const ref = args[2], path = args.at(-1); let oid = ref === INTAKE_LOG_PARENT ? INTAKE_LOG_PARENT_BLOBS[path] : INTAKE_LOG_CONFIG_PATHS.includes(path) ? blob(readFileSync(resolve(root,path))) : INTAKE_LOG_PARENT_BLOBS[path]; if (options.badBlob === ref + ':' + path) oid = 'f'.repeat(40); return oid ? '100644 blob ' + oid + '\t' + path : ''; }
-    if (args[0] === 'show') { const path = args[1].slice(41), bytes = readFileSync(resolve(root,path)); return options.mutated === path ? Buffer.concat([bytes,Buffer.from('\n// altered\n')]) : bytes; }
-    throw Error('Unexpected exact-parent metadata query');
+    if (args[0] === 'rev-parse') return args[1] === '--show-toplevel' ? 'fresh-fixture-root' : head;
+    if (args[0] === 'rev-list') return args.at(-1) === INTAKE_FRESH_PARENT ? `${INTAKE_FRESH_PARENT} ${options.ancestor ?? INTAKE_LOG_PARENT}` : `${head} ${INTAKE_FRESH_PARENT}`;
+    if (args[0] === 'merge-base') return '';
+    if (args[0] === 'diff') return args[1] === '--raw' ? '' : (options.paths ?? INTAKE_FRESH_CONFIG_PATHS).join('\0') + '\0';
+    if (args[0] === 'ls-tree') {
+      const ref = args[2], path = args.at(-1);
+      const oid = INTAKE_GEOMETRY_SOURCE_BLOBS[path]?.after ?? (ref === INTAKE_FRESH_PARENT ? INTAKE_FRESH_PARENT_BLOBS[path] : INTAKE_FRESH_CONFIG_PATHS.includes(path) ? blob(readFileSync(resolve(root, path))) : INTAKE_FRESH_PARENT_BLOBS[path]);
+      return oid ? `100644 blob ${options.badBlob === path ? 'f'.repeat(40) : oid}\t${path}` : '';
+    }
+    if (args[0] === 'show') return readFileSync(resolve(root, args[1].slice(41)));
+    throw Error('Unexpected fresh source query: ' + args.join(' '));
   };
 }
-test('captured exact job-log helper strips actual ANSI unit rows without rendering raw response bytes',()=>{
-  assert.equal(createHash('sha256').update(actual868UnitLogExcerpt).digest('hex'),'da21335fd84d606aa2065256cdec0c9138224b7bfd9789ab41bd65293b0e4121');
-  let calls=0;const log=readIntakeUnitJobLog({exec:(command,args,settings)=>{calls++;assert.equal(command,'gh');assert.deepEqual(args,['api','repos/0ssol1620-byte/tavonel-saas-foundation/actions/jobs/111918797906/logs','--allow-escape-sequences']);assert.deepEqual(settings.stdio,['ignore','pipe','pipe']);assert.equal(settings.maxBuffer,2*1024*1024);assert.equal(settings.timeout,20000);return Buffer.from(actual868UnitLogExcerpt);}});
-  assert.equal(calls,1);assert.ok(actual868UnitLogExcerpt.includes('\x1b'));assert.ok(!log.includes('\x1b'));
-  const data=geometryEvidenceFixture();data.jobLog=log;const proof=verifyIntakeGeometryParentEvidence(data);assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.units.passed,93);assert.equal(proof.unchangedUnits.passed,91);assert.ok(proof.previousUiQualification.startsWith('failed'));
-  data.jobLog=log.replace('(24 tests)','(23 tests)');assert.equal(verifyIntakeGeometryParentEvidence(data).eligible,false);
-});
-test('raw job-log failures and non-SGR controls produce only fixed safe errors',()=>{
-  const payload='\x1b]8;;https://untrusted.invalid\x07private response\x1b[31m';
-  for(const exec of [()=>{const error=Error(payload);error.stdout=Buffer.from(payload);error.stderr=Buffer.from(payload);throw error;},()=>undefined,()=>Buffer.alloc(0),()=>Buffer.alloc(2*1024*1024+1),()=>Buffer.from([0xff]),()=>Buffer.from(payload),()=>Buffer.from('bad\0log'),()=>Buffer.from('bad\x1b[2Jlog')]){
-    assert.throws(()=>readIntakeUnitJobLog({exec}),error=>error.message==='Unable to retrieve or decode the exact868 unit job log.'&&!error.message.includes('private')&&!error.message.includes('\x1b'));
+
+test('fresh-suite profile admits only the four configuration paths over exact published7d and unchanged final sources', () => {
+  assert.equal(verifyIntakePresentationSource({ headSha: head, exec: freshSourceFixture() }).eligible, true);
+  for (const options of [{ badBlob: 'nextjs/e2e/workspace-intake-triage.spec.ts' }, { badBlob: 'nextjs/lib/intake-triage-layout.test.ts' }, { paths: INTAKE_FRESH_CONFIG_PATHS.slice(1) }, { paths: [...INTAKE_FRESH_CONFIG_PATHS, 'nextjs/app/page.tsx'] }, { ancestor: 'f'.repeat(40) }]) {
+    let reads = 0;
+    const proof = verifyIntakePresentationEligibility({ headSha: head, exec: freshSourceFixture(options), api: () => { reads++; throw Error('unexpected evidence'); } });
+    assert.equal(proof.eligible, false); assert.equal(reads, 0);
   }
 });
-test('log correction admits only four sealed configuration paths directly over published2d678 with unchanged final sources',()=>{
-  assert.equal(INTAKE_LOG_PARENT,'2d678803af9fe0c6ee49ebe3065265696a726ca2');assert.equal(INTAKE_LOG_CONFIG_PATHS.length,4);
-  const source=verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture()});assert.equal(source.eligible,true,source.reason);assert.equal(source.parent,INTAKE_LOG_PARENT);assert.deepEqual(source.exactChangedPaths,[...INTAKE_LOG_CONFIG_PATHS].sort());assert.deepEqual(source.finalSourceBlobs,Object.fromEntries(Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS).map(([path,pin])=>[path,pin.after])));
-  for(const [path,pin]of Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS))assert.equal(INTAKE_LOG_PARENT_BLOBS[path],pin.after);
-  for(const options of [{dirty:true},{ancestor:false},{bridge:head},{paths:INTAKE_LOG_CONFIG_PATHS.slice(1)},{paths:[...INTAKE_LOG_CONFIG_PATHS,'nextjs/e2e/workspace-intake-triage.spec.ts']}])assert.equal(verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture(options)}).eligible,false);
-  for(const path of Object.keys(INTAKE_LOG_PARENT_BLOBS)){assert.equal(verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture({badBlob:INTAKE_LOG_PARENT+':'+path})}).eligible,false,path);}
-  for(const path of INTAKE_LOG_CONFIG_PATHS)assert.equal(verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture({mutated:path})}).eligible,false,path);
+
+test('fresh-suite eligibility reads qualified historical evidence without868 jobs, unit logs or partial-unit inheritance', () => {
+  const endpoints = [], api = intakeApiFixture(intakeEvidenceFixture());
+  const proof = verifyIntakePresentationEligibility({ headSha: head, exec: freshSourceFixture(), api: endpoint => { endpoints.push(endpoint); return api(endpoint); } });
+  assert.equal(proof.eligible, true);
+  assert.ok(endpoints.every(endpoint => !endpoint.includes('/logs') && !endpoint.includes('37356201336')));
+  const plan = intakePresentationPlan(normal(), proof);
+  assert.deepEqual(plan.unitFiles, INTAKE_UNIT_FILES); assert.equal(plan.expectedSelectedTestCount, 95); assert.equal(INTAKE_EXPECTED_TESTS, 95);
+  assert.equal(plan.inheritedChecks.unchangedIntakeUnits, undefined); assert.equal(plan.geometryParentObservation, undefined);
+  assert.equal(plan.requireWorkspaceIntakeCapture, true); assert.deepEqual(plan.browserFiles, Object.keys(INTAKE_BROWSER_CASES));
+  assert.equal(plan.fullQualification, 'pending'); assert.deepEqual(plan.pendingFullDebt, normal().pendingFullDebt);
+  assert.deepEqual(intakePresentationLineageFailures(plan, proof), []);
+  assert.ok(intakePresentationLineageFailures({ ...plan, expectedSelectedTestCount: 91 }, proof).length);
+  const failed = buildRepairReceipt(plan, { headSha: head, failures: ['fresh browser failed'] });
+  assert.equal(failed.gate, 'failed'); assert.equal(failed.knownRegressionResolution.passed, 433);
+  assert.ok(Object.values(failed.inheritedChecks).every(value => value.status === 'not accepted for current head'));
 });
-test('direct2d678 log correction requires unchanged authenticated868 counts and fresh geometry checks; failed retrieval stays ineligible',()=>{
-  const data=geometryEvidenceFixture();data.jobLog=readIntakeUnitJobLog({exec:()=>Buffer.from(actual868UnitLogExcerpt)});
-  const qualified=verifyIntakePresentationEligibility({headSha:head,exec:logCorrectionSourceFixture(),api:geometryApiFixture(data)});assert.equal(qualified.eligible,true,qualified.reason);
-  const plan=intakePresentationPlan(normal(),qualified);assert.equal(plan.expectedSelectedTestCount,4);assert.deepEqual(plan.unitFiles,INTAKE_GEOMETRY_UNIT_FILES);assert.equal(plan.requireWorkspaceIntakeCapture,true);assert.deepEqual(plan.browserFiles,Object.keys(INTAKE_BROWSER_CASES));assert.equal(plan.inheritedChecks.unchangedIntakeUnits.passed,91);assert.deepEqual(intakePresentationLineageFailures(plan,qualified),[]);
-  const api=geometryApiFixture(data);for(const mode of ['missing','failed']){const result=verifyIntakePresentationEligibility({headSha:head,exec:logCorrectionSourceFixture(),api:endpoint=>endpoint.endsWith('/logs')?mode==='missing'?undefined:(()=>{throw Error('Unable to retrieve or decode the exact868 unit job log.');})():api(endpoint)});assert.equal(result.eligible,false);assert.ok(result.reason.includes('log'));}
+
+test('fresh-suite execution requires95 passing assertions across all ten files and both browser projects', () => {
+  const temp = mkdtempSync(resolve(tmpdir(), 'intake-fresh-suite-')); assert.ok(isInsideWorkspace(resolve(tmpdir()), temp));
+  try {
+    const cache = resolve(temp, 'node_modules/.cache/repair-scope-reports'); mkdirSync(cache, { recursive: true });
+    const report = reportFixture(INTAKE_UNIT_FILES, 95); report.testResults.forEach((value, index) => value.name = resolve(temp, INTAKE_UNIT_FILES[index]));
+    Object.keys(INTAKE_BROWSER_CASES).forEach((file, index) => writeFileSync(resolve(cache, `playwright-${index + 1}.json`), JSON.stringify(intakeBrowserFixture(file, temp))));
+    for (const kind of ['valid', 'missing', 'failed', 'skipped', '93-tests']) {
+      const changed = structuredClone(report);
+      if (kind === 'missing') changed.testResults.pop();
+      if (kind === 'failed' || kind === 'skipped') changed.testResults[0].assertionResults[0].status = kind;
+      if (kind === '93-tests') changed.numTotalTests = 93;
+      writeFileSync(resolve(cache, 'vitest.json'), JSON.stringify(changed));
+      if (kind === 'valid') { const result = readIntakePresentationExecution(temp, INTAKE_FRESH_PARENT); assert.equal(result.units.passed, 95); assert.equal(result.units.files, 10); assert.deepEqual(result.browsers.map(value => value.executed), [8, 1]); }
+      else assert.throws(() => readIntakePresentationExecution(temp, INTAKE_FRESH_PARENT), undefined, kind);
+    }
+    rmSync(resolve(cache, 'vitest.json')); assert.throws(() => readIntakePresentationExecution(temp, INTAKE_FRESH_PARENT));
+  } finally { rmSync(temp, { recursive: true, force: true }); }
 });
-test('intended2d678 ingestion failures retain only authenticated historical895 resolution and keep DB execution blocked',()=>{
-  const exec=logCorrectionSourceFixture(),intent=classifyIntakePresentationIntent({headSha:head,exec}),conservative={gate:'failed',headSha:head,pendingDebt:[REGRESSION_DEBT,'database-contract'],pendingQualificationDebt:[REGRESSION_DEBT],pendingFullDebt:['full-release'],collectorOnlyFailure:{intent}};
-  const receipt=authenticateFailedIntakeResolution(conservative,{headSha:head,intendedResult:'true',eligibleResult:'false',exec,api:intakeApiFixture(intakeEvidenceFixture())});assert.equal(receipt.gate,'failed');assert.equal(receipt.fullQualification,'pending');assert.deepEqual(receipt.inheritedChecks,{});assert.ok(!receipt.pendingDebt.includes(REGRESSION_DEBT));assert.ok(receipt.pendingDebt.includes('database-contract'));assert.equal(receipt.knownRegressionResolution.headSha,INTAKE_PARENT);
-  assert.ok(readFileSync(resolve(root,'.github/workflows/db-rehearsal.yml'),'utf8').includes(INTAKE_LOG_PARENT));
-  assert.ok(authenticateFailedIntakeResolution(conservative,{headSha:head,intendedResult:'true',eligibleResult:'false',exec,api:()=>{throw Error('Missing historical proof');}}).pendingDebt.includes(REGRESSION_DEBT));
+
+test('historical API cache captures bounded JSON and ZIP once, returns isolated copies and retries failures', () => {
+  const calls = [], api = createIntakeEvidenceApi((command, args, options) => { calls.push(args.at(-1)); assert.equal(command, 'gh'); assert.equal(options.timeout, 20000); assert.equal(options.maxBuffer, 2 * 1024 * 1024); assert.deepEqual(options.stdio, ['ignore', 'pipe', 'pipe']); return args.at(-1).endsWith('/zip') ? Buffer.from('receipt') : Buffer.from('{"value":1}'); });
+  const first = api('actions/runs/1'); first.value = 2; assert.equal(api('actions/runs/1').value, 1);
+  api('actions/artifacts/1/zip')[0] = 0; assert.equal(api('actions/artifacts/1/zip').toString(), 'receipt'); assert.equal(calls.length, 2);
+  let attempts = 0; const retry = createIntakeEvidenceApi(() => { attempts++; throw Error('provider unavailable'); });
+  assert.throws(() => retry('actions/runs/1')); assert.throws(() => retry('actions/runs/1')); assert.equal(attempts, 2);
+});
+import { COORDINATED_UI_SOURCE_BLOBS, COORDINATED_UI_CONFIG_PATHS, COORDINATED_UI_PARENT_BLOBS, COORDINATED_UI_UNIT_FILES, COORDINATED_UI_BROWSER_FILES } from './repair-known-regression.mjs';
+import { collectHomePricingCaptures, HOME_PRICING_CAPTURE_BINDINGS, validateSelectedPath } from './run-repair-check.mjs';
+function coordinatedSourceFixture(options = {}) {
+  return (_command, original) => {
+    const args=original[0]==='-C'?original.slice(2):original;
+    if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'coordinated-fixture':head;
+    if(args[0]==='rev-list')return args.at(-1)===INTAKE_FRESH_PARENT?`${INTAKE_FRESH_PARENT} ${INTAKE_LOG_PARENT}`:`${head} ${INTAKE_FRESH_PARENT}`;
+    if(args[0]==='merge-base')return '';
+    if(args[0]==='diff')return args[1]==='--raw'?'':(options.paths??[...Object.keys(COORDINATED_UI_SOURCE_BLOBS),...COORDINATED_UI_CONFIG_PATHS]).join('\0')+'\0';
+    if(args[0]==='ls-tree'){
+      const ref=args[2],p=args.at(-1),pin=COORDINATED_UI_SOURCE_BLOBS[p];
+      const oid=pin?pin[ref===INTAKE_FRESH_PARENT?'before':'after']:INTAKE_GEOMETRY_SOURCE_BLOBS[p]?.after??(ref===INTAKE_FRESH_PARENT?COORDINATED_UI_PARENT_BLOBS[p]:COORDINATED_UI_CONFIG_PATHS.includes(p)?blob(readFileSync(resolve(root,p))):COORDINATED_UI_PARENT_BLOBS[p]);
+      return oid?`100644 blob ${options.badBlob===p?'f'.repeat(40):oid}\t${p}`:'';
+    }
+    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(root,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
+    throw Error('Unexpected coordinated source query');
+  };
+}
+function coordinatedProof(){return verifyIntakePresentationEligibility({headSha:head,exec:coordinatedSourceFixture(),api:intakeApiFixture(intakeEvidenceFixture())});}
+function combinedUnitFixture(temp) {
+  const report=reportFixture(INTAKE_UNIT_FILES,95);report.testResults.forEach((value,index)=>value.name=resolve(temp,INTAKE_UNIT_FILES[index]));
+  for(const file of COORDINATED_UI_UNIT_FILES)report.testResults.push({name:resolve(temp,file),status:'passed',assertionResults:[{status:'passed',title:'synthetic selected-owner contract'}]});
+  report.numTotalTests=report.numPassedTests=107;return report;
+}
+function combinedBrowserFixture(run,temp) {
+  const specs=[];
+  for(const file of run.files){
+    if(INTAKE_BROWSER_CASES[file]){specs.push(...intakeBrowserFixture(file,temp).suites[0].specs);continue;}
+    const bindings=HOME_PRICING_CAPTURE_BINDINGS.filter(value=>value.file===file&&value.project===run.project),title=bindings[0]?.title??'synthetic selected-owner contract';
+    specs.push({file:resolve(temp,file),title,tests:[{projectName:run.project,status:'expected',results:[{status:'passed',attachments:[]}]}]});
+  }
+  return {config:{rootDir:temp},suites:[{specs}],stats:{expected:specs.length,skipped:0,unexpected:0,flaky:0}};
+}
+function combinedReportWorkspace() {
+  const temp=mkdtempSync(resolve(tmpdir(),'coordinated-ui-reports-'));assert.ok(isInsideWorkspace(resolve(tmpdir()),temp));
+  const proof=coordinatedProof();assert.equal(proof.eligible,true,proof.reason);const plan=intakePresentationPlan(normal(),proof),cache=resolve(temp,'node_modules/.cache/repair-scope-reports');mkdirSync(cache,{recursive:true});
+  writeFileSync(resolve(cache,'vitest.json'),JSON.stringify(combinedUnitFixture(temp)));
+  const runs=planBrowserRuns(plan.browserFiles,false),reports=runs.map(run=>combinedBrowserFixture(run,temp));reports.forEach((report,index)=>writeFileSync(resolve(cache,`playwright-${index+1}.json`),JSON.stringify(report)));
+  return {temp,cache,proof,plan,runs,reports};
+}
+test('combined frozen source stack binds11 UI paths, exact parent, sealed configuration and unchanged owners',()=>{
+  const proof=coordinatedProof();assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.source.coordinatedUi,true);assert.equal(Object.keys(COORDINATED_UI_SOURCE_BLOBS).length,11);
+  for(const options of [{badBlob:'nextjs/components/landing-v2/hero-source-card.tsx'},{badBlob:'nextjs/components/landing-v2/hero-source-card.test.tsx'},{mutated:'nextjs/e2e/pricing-plan-overview.spec.ts'},{paths:[...Object.keys(COORDINATED_UI_SOURCE_BLOBS),...COORDINATED_UI_CONFIG_PATHS,'nextjs/lib/auth.ts']},{paths:[...Object.keys(COORDINATED_UI_SOURCE_BLOBS),...COORDINATED_UI_CONFIG_PATHS.slice(1)]}]){
+    let reads=0;const result=verifyIntakePresentationEligibility({headSha:head,exec:coordinatedSourceFixture(options),api:()=>{reads++;throw Error('unexpected API');}});assert.equal(result.eligible,false);assert.equal(reads,0);
+  }
+});
+test('combined plan selects22 unique unit owners, explicit pricing projects, existing public owners and all required captures',()=>{
+  const proof=coordinatedProof(),plan=intakePresentationPlan(normal(),proof);
+  assert.equal(plan.unitFiles.length,22);assert.equal(new Set(plan.unitFiles).size,22);assert.equal(plan.unitFiles.filter(p=>p==='lib/copy-trust-guard.test.ts').length,1);
+  assert.ok(COORDINATED_UI_UNIT_FILES.every(file=>plan.unitFiles.includes(file)));assert.ok(COORDINATED_UI_BROWSER_FILES.every(file=>plan.browserFiles.includes(file)));
+  assert.equal(plan.requireWorkspaceIntakeCapture,true);assert.equal(plan.requirePublicUiScreenshots,true);assert.equal(plan.requireHomePricingCaptures,true);assert.equal(plan.expectedIntakeTestCount,95);assert.equal(plan.expectedSelectedTestCount,undefined);
+  for(const name of ['unaffectedBrowsers','publicScreenshots'])assert.equal(plan.inheritedChecks[name],undefined,name);
+  for(const [name,evidence] of Object.entries(proof.evidence.checks)) if(!['unaffectedBrowsers','publicScreenshots'].includes(name)) assert.deepEqual(plan.inheritedChecks[name],{...evidence,sourceHead:evidence.sourceHead??COLLECTOR_BASE,status:'inherited-source-evidence; not executed at current head'},name);
+  assert.equal(plan.knownRegressionResolution.passed,433);assert.equal(plan.inheritedChecks.apiCatalogue.sourceHead,INTAKE_PARENT);
+  assert.deepEqual(planBrowserRuns(['e2e/pricing-plan-overview.spec.ts'],false).map(run=>run.project),['1440','390']);
+  assert.equal(validateSelectedPath('components/landing-v2/hero-source-card.test.tsx','unit',resolve(root,'nextjs')),'components/landing-v2/hero-source-card.test.tsx');
+  assert.ok(buildUnitArgs(plan.unitFiles,'report.json').includes('vitest.repair-scope.config.ts'));
+  for(const key of ['runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDatabaseRehearsal','runApiCatalogueChecks'])assert.equal(plan[key],false,key);
+  assert.deepEqual(intakePresentationLineageFailures(plan,proof),[]);assert.deepEqual(plan.pendingFullDebt,normal().pendingFullDebt);
+  for(const key of ['requirePublicUiScreenshots','requireHomePricingCaptures','requireWorkspaceIntakeCapture'])assert.ok(intakePresentationLineageFailures({...plan,[key]:false},proof).length,key);
+});
+test('mixed aggregate reports validate every selected owner/project before the strict95 intake and8 audit subsets',()=>{
+  const f=combinedReportWorkspace();try{
+    const result=readIntakePresentationExecution(f.temp,INTAKE_FRESH_PARENT,f.plan);assert.equal(result.units.files,22);assert.equal(result.units.passed,107);assert.equal(result.intakeUnits.passed,95);assert.equal(result.intakeUnits.files,10);assert.deepEqual(result.browsers.map(value=>value.executed),[8,1]);assert.equal(result.selectedBrowsers.length,f.runs.length);
+    const changed=combinedUnitFixture(f.temp);changed.testResults.find(value=>value.name.endsWith('hero-source-card.test.tsx')).assertionResults[0].status='failed';writeFileSync(resolve(f.cache,'vitest.json'),JSON.stringify(changed));assert.throws(()=>readIntakePresentationExecution(f.temp,INTAKE_FRESH_PARENT,f.plan));
+    writeFileSync(resolve(f.cache,'vitest.json'),JSON.stringify(combinedUnitFixture(f.temp)));const index=f.runs.findIndex(run=>run.project==='1440'),report=structuredClone(f.reports[index]);report.suites[0].specs=report.suites[0].specs.filter(spec=>!spec.file.endsWith('pricing-plan-overview.spec.ts'));writeFileSync(resolve(f.cache,`playwright-${index+1}.json`),JSON.stringify(report));assert.throws(()=>readIntakePresentationExecution(f.temp,INTAKE_FRESH_PARENT,f.plan));
+  }finally{rmSync(f.temp,{recursive:true,force:true});}
+});
+test('mixed selected reports reject missing, failed, wholly skipped, wrong-project and intake count/case drift',()=>{
+  const f=combinedReportWorkspace();try{
+    for(const kind of ['missing','failed','skipped','wrong-project','intake-case']){
+      const index=f.runs.findIndex(run=>run.project==='audit'),report=structuredClone(f.reports[index]),spec=report.suites[0].specs.find(value=>value.file.endsWith('contrast-zoom-audit.spec.ts'));
+      if(kind==='missing')report.suites[0].specs=report.suites[0].specs.filter(value=>value!==spec);
+      if(kind==='failed'){spec.tests[0].status='unexpected';spec.tests[0].results[0].status='failed';}
+      if(kind==='skipped')spec.tests[0].status='skipped';if(kind==='wrong-project')spec.tests[0].projectName='390';
+      if(kind==='intake-case')report.suites[0].specs.find(value=>value.file.endsWith('workspace-intake-triage.spec.ts')).title='wrong named case';
+      writeFileSync(resolve(f.cache,`playwright-${index+1}.json`),JSON.stringify(report));assert.throws(()=>readIntakePresentationExecution(f.temp,INTAKE_FRESH_PARENT,f.plan),undefined,kind);writeFileSync(resolve(f.cache,`playwright-${index+1}.json`),JSON.stringify(f.reports[index]));
+    }
+    const units=combinedUnitFixture(f.temp);units.testResults.find(value=>value.name.endsWith('intake-triage-layout.test.ts')).assertionResults.push({status:'passed'});units.numTotalTests++;units.numPassedTests++;writeFileSync(resolve(f.cache,'vitest.json'),JSON.stringify(units));assert.throws(()=>readIntakePresentationExecution(f.temp,INTAKE_FRESH_PARENT,f.plan));
+  }finally{rmSync(f.temp,{recursive:true,force:true});}
+});
+function attachCaptureFixture(f) {
+  for(const binding of HOME_PRICING_CAPTURE_BINDINGS){
+    const index=f.runs.findIndex(run=>run.project===binding.project&&run.files.includes(binding.file)),report=f.reports[index],spec=report.suites[0].specs.find(value=>value.file.replaceAll('\\','/').endsWith(binding.file)),test=spec.tests[0],stem=binding.file.slice(4,-8),file=resolve(f.temp,`test-results/repair-scope-playwright-${index+1}/${stem}-synthetic/attachments/${binding.name}.png`);
+    const png=Buffer.alloc(24);Buffer.from([137,80,78,71,13,10,26,10]).copy(png);png.write('IHDR',12,'ascii');png.writeUInt32BE(binding.width,16);png.writeUInt32BE(binding.height,20);mkdirSync(resolve(file,'..'),{recursive:true});writeFileSync(file,png);
+    test.results[0].attachments.push({name:binding.name,contentType:'image/png',path:file});
+  }
+  f.reports.forEach((report,index)=>writeFileSync(resolve(f.cache,`playwright-${index+1}.json`),JSON.stringify(report)));
+}
+test('bounded capture collector accepts only ten canonical file-backed PNGs from successful exact public cases',()=>{
+  const f=combinedReportWorkspace();try{attachCaptureFixture(f);assert.equal(collectHomePricingCaptures(f.temp,f.plan).length,10);for(const binding of HOME_PRICING_CAPTURE_BINDINGS)assert.equal(readFileSync(resolve(f.temp,'test-results/repair-scope-home-pricing',binding.name+'.png')).length,24);}finally{rmSync(f.temp,{recursive:true,force:true});}
+});
+test('public capture collector rejects missing/duplicate/inline/wrong-type/outside/corrupt/wrong-dimension PNGs',()=>{
+  for(const kind of ['missing','duplicate','inline','wrong-type','outside','corrupt','wrong-dimensions','wrong-title','skipped-case','failed-case','wrong-project','noncanonical']){
+    const f=combinedReportWorkspace();try{attachCaptureFixture(f);const index=f.runs.findIndex(run=>run.project==='360'),report=f.reports[index],spec=report.suites[0].specs.find(value=>value.file.endsWith('landing-hero-mobile.spec.ts')),attachments=spec.tests[0].results[0].attachments,attachment=attachments[0];
+      if(kind==='missing')attachments.pop();if(kind==='duplicate')attachments.push(structuredClone(attachment));if(kind==='inline'){attachment.body='PNG';delete attachment.path;}if(kind==='wrong-type')attachment.contentType='text/plain';if(kind==='outside')attachment.path=resolve(f.temp,'outside.png');
+      if(kind==='corrupt')writeFileSync(attachment.path,Buffer.alloc(24));if(kind==='wrong-dimensions'){const png=readFileSync(attachment.path);png.writeUInt32BE(1,16);writeFileSync(attachment.path,png);}
+      if(kind==='wrong-title')spec.title='unrelated public case';if(kind==='skipped-case')spec.tests[0].status='skipped';if(kind==='failed-case'){spec.tests[0].status='unexpected';spec.tests[0].results[0].status='failed';}if(kind==='wrong-project')spec.tests[0].projectName='1440';
+      if(kind==='noncanonical'){const file=resolve(f.temp,'test-results/repair-scope-playwright-1/unrelated-spec/attachments/capture.png');mkdirSync(resolve(file,'..'),{recursive:true});writeFileSync(file,readFileSync(attachment.path));attachment.path=file;}
+      writeFileSync(resolve(f.cache,`playwright-${index+1}.json`),JSON.stringify(report));assert.throws(()=>collectHomePricingCaptures(f.temp,f.plan),undefined,kind);
+      assert.equal(existsSync(resolve(f.temp,'test-results/repair-scope-home-pricing')),false,'validation precedes destination mutation');
+    }finally{rmSync(f.temp,{recursive:true,force:true});}
+  }
+});
+
+test('actual combined gate cannot accept missing or skipped public/intake capture outcomes',()=>{
+  const f=combinedReportWorkspace();try{
+    writeFileSync(resolve(f.temp,'repair-plan.json'),JSON.stringify(f.plan));
+    const env={...process.env,HEAD_SHA:head,PLAN_RESULT:'success',SECRET_RESULT:'success',CHECK_RESULT:'success',VITEST_RESULT:'success',TARGETED_REPAIR_UNIT_RESULT:'success',TRANSITIVE_TEST_RESULT:'success',AUX_RESULT:'success',WORKFLOW_RESULT:'success',SELECTOR_TEST_RESULT:'success',BROWSER_INSTALL_RESULT:'success',BROWSER_BUILD_RESULT:'success',BROWSER_RESULT:'success',PUBLIC_UI_CAPTURE_RESULT:'skipped',HOME_PRICING_CAPTURE_RESULT:'skipped',WORKSPACE_INTAKE_CAPTURE_RESULT:'skipped'};
+    const result=spawnSync(process.execPath,[fileURLToPath(new URL('./repair-scope-gate.mjs',import.meta.url))],{cwd:f.temp,env,encoding:'utf8'});assert.equal(result.status,1,result.stderr);
+    const receipt=JSON.parse(readFileSync(resolve(f.temp,'repair-receipt.json')));for(const name of ['six paired public UI screenshots','exact Home and Pricing captures','mounted workspace intake artifacts'])assert.ok(receipt.gateFailures.some(reason=>reason.startsWith(name)),name);assert.equal(receipt.gate,'failed');assert.equal(receipt.fullQualification,'pending');assert.equal(receipt.knownRegressionResolution.passed,433);assert.ok(Object.values(receipt.inheritedChecks).every(value=>value.status==='not accepted for current head'));
+  }finally{rmSync(f.temp,{recursive:true,force:true});}
+});
+
+test('public collector rejects pre-existing regular and hard-linked destinations without any output mutation',()=>{
+  for(const kind of ['regular','hard-link']){
+    const f=combinedReportWorkspace();try{
+      attachCaptureFixture(f);const destination=resolve(f.temp,'test-results/repair-scope-home-pricing'),name=HOME_PRICING_CAPTURE_BINDINGS.at(-1).name+'.png',target=resolve(destination,name),outside=resolve(f.temp,'outside-output.png'),sentinel=Buffer.from('existing outside-output bytes');
+      mkdirSync(destination,{recursive:true});writeFileSync(outside,sentinel);
+      if(kind==='hard-link')linkSync(outside,target);else writeFileSync(target,sentinel);
+      assert.throws(()=>collectHomePricingCaptures(f.temp,f.plan),/destination already exists/,kind);
+      assert.deepEqual(readFileSync(target),sentinel);assert.deepEqual(readFileSync(outside),sentinel);assert.deepEqual(readdirSync(destination),[name],'no earlier capture may be written before destination preflight completes');
+    }finally{rmSync(f.temp,{recursive:true,force:true});}
+  }
+});
+
+test('public collector qualifies the last source before creating any destination',()=>{
+  const f=combinedReportWorkspace();try{
+    attachCaptureFixture(f);const binding=HOME_PRICING_CAPTURE_BINDINGS.at(-1),index=f.runs.findIndex(run=>run.project===binding.project&&run.files.includes(binding.file)),spec=f.reports[index].suites[0].specs.find(value=>value.file.replaceAll('\\','/').endsWith(binding.file)),attachment=spec.tests[0].results[0].attachments.find(value=>value.name===binding.name);
+    writeFileSync(attachment.path,Buffer.alloc(24));assert.throws(()=>collectHomePricingCaptures(f.temp,f.plan),/PNG identity or viewport mismatch/);assert.equal(existsSync(resolve(f.temp,'test-results/repair-scope-home-pricing')),false);
+  }finally{rmSync(f.temp,{recursive:true,force:true});}
 });

@@ -69,6 +69,8 @@ function runGate() {
     ['workflow static gates', plan.runWorkflowStaticGate ? env.WORKFLOW_RESULT : 'success'],
     ['CDR worker tests and types', plan.runCdrWorkerChecks ? env.CDR_WORKER_RESULT : 'success'],
     ['mounted workspace intake artifacts', plan.requireWorkspaceIntakeCapture ? env.WORKSPACE_INTAKE_CAPTURE_RESULT : 'success'],
+    ['six paired public UI screenshots', plan.requirePublicUiScreenshots ? env.PUBLIC_UI_CAPTURE_RESULT : 'success'],
+    ['exact Home and Pricing captures', plan.requireHomePricingCaptures ? env.HOME_PRICING_CAPTURE_RESULT : 'success'],
     ['Chromium install', browserRequired ? env.BROWSER_INSTALL_RESULT : 'success'],
     ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
@@ -80,7 +82,7 @@ function runGate() {
     for (const reason of intakePresentationLineageFailures(plan, proof)) requirements.push([reason, 'failure']);
     requirements.push(['actual selected intake unit outcome', env.TARGETED_REPAIR_UNIT_RESULT]);
     requirements.push(['intake browser/report contracts', env.TRANSITIVE_TEST_RESULT]);
-    try { intakeExecution = readIntakePresentationExecution(process.cwd(), plan.intakePresentation?.source?.parent); }
+    try { intakeExecution = readIntakePresentationExecution(process.cwd(), plan.intakePresentation?.source?.parent, plan.requireHomePricingCaptures ? plan : undefined); }
     catch (error) { requirements.push(['fresh intake execution evidence: ' + error.message, 'failure']); }
   }
   if (plan.knownRegressionRepair || plan.groups.includes('known-unit-regression-repair')) {
@@ -112,10 +114,13 @@ function runGate() {
       ...(plan.runFullHermeticVitest ? { scripts: env.AUX_RESULT } : {}),
       ...(browserRequired ? { browserInstall: env.BROWSER_INSTALL_RESULT, browserBuild: env.BROWSER_BUILD_RESULT, selectedBrowsers: env.BROWSER_RESULT } : {}),
       ...(plan.requireWorkspaceIntakeCapture ? { mountedCaptures: env.WORKSPACE_INTAKE_CAPTURE_RESULT } : {}),
+      ...(plan.requirePublicUiScreenshots ? { publicUiCaptures: env.PUBLIC_UI_CAPTURE_RESULT } : {}),
+      ...(plan.requireHomePricingCaptures ? { homePricingCaptures: env.HOME_PRICING_CAPTURE_RESULT } : {}),
     },
   });
   if (plan.intakePresentation && receipt.gate === 'passed-scoped-only') receipt.executedChecks = { ...receipt.executedChecks,
-    units: { status: 'success', ...intakeExecution.units }, intakeBrowsers: { status: 'success', reports: intakeExecution.browsers } };
+    units: { status: 'success', ...intakeExecution.units }, intakeBrowsers: { status: 'success', reports: intakeExecution.browsers },
+    ...(intakeExecution.intakeUnits ? { intakeUnits: { status: 'success', ...intakeExecution.intakeUnits }, selectedBrowserReports: { status: 'success', reports: intakeExecution.selectedBrowsers } } : {}) };
   if (plan.knownRegressionRepair) receipt = resolveKnownRepairDebt(receipt, plan, repairProof, repairExecution);
   writeFileSync('repair-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(`Scoped group results: ${JSON.stringify(receipt.runResults)}`);

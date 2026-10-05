@@ -42,12 +42,12 @@ export const CONFIG_PATHS = Object.freeze([
 // are normalized in this verifier's hash; all declaration tokens remain covered.
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
-  ".github/workflows/db-rehearsal.yml": "1bc9db12d4f7ce2f8c952d7e69d302dad0a07ec47e42fac21bcff4fc95df0c4d",
-  ".github/workflows/repair-scope.yml": "27a7c4732b77d27f931e1c033ee5db9317b60c2c5d460b4dcd14d4f0d59e75c1",
-  "nextjs/scripts/repair-collector-only.mjs": "72da192c8f90c4116742c134ee78153703f64c6cc2b779e09a2514809e5c53e2",
+  ".github/workflows/db-rehearsal.yml": "8c5e6e4935dc78d30682ea43c3f4f8dbb3698795d9df7a3dbbb8442a0faccbd7",
+  ".github/workflows/repair-scope.yml": "9f6f610ed7074612eaf3b93b34b9b26a69f657164e086a124b3a3a57e2e1d701",
+  "nextjs/scripts/repair-collector-only.mjs": "3ee841f6b7e866fb516a6e55c8884b01b6646b41f50128731f9b4d1b596ede83",
   "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-scope-gate.mjs": "d4c8e8f32eaa4ee5194a9efffe56e6b9017a19f7df2a1d30df975fc02c568a0d",
-  "nextjs/scripts/verify-repair-workflows.mjs": "8d97852224a5697ce3d2142a833779c75892fc1baf2309095493e03e9f00cff6"
+  "nextjs/scripts/repair-scope-gate.mjs": "dc0ba27b742c9bf82f93f3150a5eb73e1f5fa20e2a3e50b3ec29d7139b185939",
+  "nextjs/scripts/verify-repair-workflows.mjs": "e2654679bb59645d1d5b00f73277aefcc33589e21479f945eecdb4826790bc96"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -226,7 +226,7 @@ export function failedCollectorPlan({ headSha, reason, intent }) {
   };
   // A failed new admission cannot revoke the parent's actual historical repair.
   // Evidence remains unaccepted for this head until its independent proof passes.
-  return [repair.INTAKE_PARENT, repair.INTAKE_GEOMETRY_PARENT, repair.INTAKE_LOG_PARENT].includes(intent?.parent) ? { ...plan,
+  return [repair.INTAKE_PARENT, repair.INTAKE_GEOMETRY_PARENT, repair.INTAKE_LOG_PARENT, repair.INTAKE_FRESH_PARENT].includes(intent?.parent) ? { ...plan,
     knownRegressionObservations: [KNOWN_REGRESSION],
     historicalRegressionResolution: { sourceHead: repair.INTAKE_PARENT, status: 'historical resolution retained; evidence unaccepted for current head' },
     pendingQualificationDebt: [...plan.pendingQualificationDebt, 'intake-presentation-eligibility'],
@@ -255,7 +255,7 @@ export function collectorLineageFailures(plan, verified) {
 
 function emit(plan) {
   writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
-  const values = { broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
+  const values = { broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, home_pricing_capture: Boolean(plan.requireHomePricingCaptures), workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
   if (process.env.GITHUB_OUTPUT) for (const [key, value] of Object.entries(values)) writeFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`, { flag: 'a' });
 }
 

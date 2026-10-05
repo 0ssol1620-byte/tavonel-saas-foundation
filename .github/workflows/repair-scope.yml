@@ -182,7 +182,7 @@ jobs:
           retention-days: 3
       - name: Require screenshots for the exact paired public UI candidate
         id: public-ui-screenshots
-        if: always() && steps.plan.outputs.public_ui_capture == 'true' && steps.browser.outcome != 'skipped'
+        if: always() && steps.plan.outputs.public_ui_capture == 'true'
         shell: bash
         run: |
           mapfile -t screenshots < <(find test-results/repair-scope-playwright-* -type f -name 'public-ui-*.png' -printf '%f\n' 2>/dev/null | sort)
@@ -218,6 +218,28 @@ jobs:
             nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/test-failed-*.png
           if-no-files-found: warn
           retention-days: 3
+      - name: Require exact file-backed Home and Pricing captures
+        id: home-pricing-captures
+        if: always() && steps.plan.outputs.home_pricing_capture == 'true'
+        run: node scripts/run-repair-check.mjs home-pricing-captures
+      - name: Upload only the ten named public Home and Pricing captures
+        if: always() && steps.home-pricing-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-pricing-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-home-pricing/home-source-phone-360.png
+            nextjs/test-results/repair-scope-home-pricing/home-source-phone-390.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-1440-consent-visible.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-1440-consent-dismissed.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-390-consent-visible.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-390-consent-dismissed.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-en-390.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-en-1440.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-ko-390.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-ko-1440.png
+          if-no-files-found: error
+          retention-days: 3
       - name: Fail closed on missing or failed scoped checks
         id: gate
         if: always()
@@ -234,6 +256,8 @@ jobs:
           WORKFLOW_RESULT: ${{ steps.plan.outputs.workflow_static == 'true' && steps.workflow-static.outcome || 'success' }}
           CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}
           WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}
+          PUBLIC_UI_CAPTURE_RESULT: ${{ steps.public-ui-screenshots.outcome }}
+          HOME_PRICING_CAPTURE_RESULT: ${{ steps.home-pricing-captures.outcome }}
           SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
           BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}
           BROWSER_INSTALL_RESULT: ${{ steps.browser-install.outcome }}

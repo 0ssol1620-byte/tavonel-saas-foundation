@@ -14,6 +14,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 import LandingPage from "../components/landing-v2/landing-page";
+import HeroSourceCard, { selectHeroPreparedSample } from "../components/landing-v2/hero-source-card";
+import { buildHeroView, buildProofTabs } from "./landing-v2-runtime";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
 import { landingV2HeroExtra } from "./landing-v2-hero-copy";
 import {
@@ -93,6 +95,60 @@ const attr = (open: string, name: string): string | undefined =>
 
 /** The 2026-09-30 approved masterplan supersedes historical scene ground names. */
 const PAPER_CSS = readFileSync(new URL("../app/paper-product.css", import.meta.url), "utf8");
+
+describe("home prepared source sample", () => {
+  it("binds the committed question to its complete quotation, page, box and inspector", () => {
+    const prepared = selectHeroPreparedSample(buildHeroView(), buildProofTabs());
+    expect(prepared).not.toBeNull();
+    expect(prepared!.sample.question).toBe("What were operating expenses for research and development?");
+    expect(prepared!.sample.answerExcerpt).toBe("Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443");
+    expect(prepared!.sample.source).toMatchObject({
+      digest: "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
+      filename: "apple-2026-q1-10-q-reference.pdf", page: 4,
+    });
+    expect(prepared!.region.id).toBe("evidence-274e80464ffc891ce2ed3077e7d67934:chunk-80ce9cad00306cf5d7cb85c911bdff20");
+    expect(prepared!.region.bbox1000).toEqual([64, 476, 932, 538]);
+    expect(prepared!.sample.openHref).toBe(prepared!.region.href);
+    expect(new URL(prepared!.region.href, "https://example.test").searchParams.get("evidence")).toBe(prepared!.region.id);
+  });
+
+  it.each(LOCALES)("%s renders a labelled prepared sample and unchanged English quotation", locale => {
+    const { sample, region } = selectHeroPreparedSample(buildHeroView(), buildProofTabs())!;
+    const html = renderToStaticMarkup(createElement(HeroSourceCard, { korean: locale === "ko" }));
+    expect(html).toContain(locale === "ko" ? "준비된 샘플 · 읽기 전용" : "Prepared sample · read only");
+    expect(html).toContain(locale === "ko" ? "원문 인용" : "Source quotation");
+    expect(html).toContain(`<p class="paper-source-question" lang="en" data-derived="1">${sample.question}</p>`);
+    expect(html).toContain(`<blockquote lang="en" data-derived="1">${sample.answerExcerpt}</blockquote>`);
+    expect(html).toContain(`data-source-digest="${sample.source.digest}"`);
+    expect(html).toContain(`data-source-page="4"`);
+    expect(html).toContain(`data-region-id="${region.id}"`);
+    expect(html).toContain('style="left:6.4%;top:47.6%;width:86.8%;height:6.2%"');
+    expect(html).toContain(`href="${region.href.replace(/&/g, "&amp;")}"`);
+    expect(html).toContain(sample.source.filename);
+    expect(html).toContain(locale === "ko" ? "기준 렌더" : "reference render");
+    expect(html).not.toContain("CONDENSED CONSOLIDATED STATEMENTS");
+  });
+
+  it("does not substitute a heading when no prepared question matches the source", () => {
+    expect(selectHeroPreparedSample(buildHeroView(), [])).toBeNull();
+    const original = buildProofTabs()[0];
+    const mismatches = [
+      { ...original, source: { ...original.source, digest: "sha256:different" } },
+      { ...original, source: { ...original.source, page: 5 } },
+      { ...original, source: { ...original.source, filename: "different.pdf" } },
+      { ...original, region: { ...original.region, id: "missing" } },
+      { ...original, region: { ...original.region, bbox1000: [64, 475, 932, 538] } },
+      { ...original, openHref: "/explore" },
+      { ...original, answerExcerpt: "An invented answer" },
+      { ...original, answerTruncated: true },
+      { ...original, question: " " },
+    ];
+    for (const sample of mismatches) expect(selectHeroPreparedSample(buildHeroView(), [sample])).toBeNull();
+    const view = buildHeroView();
+    const truncated = { ...view, regions: view.regions.map(region => ({ ...region, excerptTruncated: true })) };
+    expect(selectHeroPreparedSample(truncated, [original])).toBeNull();
+  });
+});
 
 describe("landing v2 -- the composition", () => {
   it.each(LOCALES)(

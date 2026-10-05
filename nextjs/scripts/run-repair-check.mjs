@@ -12,6 +12,7 @@ const registeredUnitTestPaths = new Set([
   'components/compile-stage.test.tsx',
   'components/intake-triage-review.interaction.test.ts',
   'components/intake-triage-review.test.tsx',
+  'components/landing-v2/hero-source-card.test.tsx',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs']);
@@ -72,6 +73,12 @@ export const WORKSPACE_INTAKE_CAPTURE_NAMES = Object.freeze([
   'intake-mounted-review-1440x900', 'intake-mounted-review-390x844',
   'intake-mounted-receipt-1440x900', 'intake-mounted-receipt-390x844',
 ]);
+
+export const HOME_PRICING_CAPTURE_BINDINGS = Object.freeze([
+  ...['360', '390'].map(project => ({ name: `home-source-phone-${project}`, file: 'e2e/landing-hero-mobile.spec.ts', project, title: 'fits the original source page and preserves its route to the inspector', width: Number(project), height: 844 })),
+  ...['1440', '390'].flatMap(project => ['visible', 'dismissed'].map(state => ({ name: `home-first-screen-${project}-consent-${state}`, file: 'e2e/premium-craft.spec.ts', project, title: 'the home first screen shows source evidence without colliding with public chrome', width: Number(project), height: project === '1440' ? 900 : 844 }))),
+  ...['en', 'ko'].flatMap(locale => [390, 1440].map(width => ({ name: `pricing-overview-${locale}-${width}`, file: 'e2e/pricing-plan-overview.spec.ts', project: '1440', title: 'all plan prices fit in the compact phone comparison before detailed plan content', width, height: 844 }))),
+].map(value => Object.freeze(value)));
 
 function protectedCapturePath(root, path, kind, allowMissing = false) {
   const target = resolve(path);
@@ -187,11 +194,63 @@ const browserProjectsByFile = new Map([
   ['e2e/mobile-landing.spec.ts', ['360', '390', '768']],
   ['e2e/launch-qa-mobile-nav.spec.ts', ['launch-chromium']],
   ['e2e/landing-hero-mobile.spec.ts', ['360', '390']],
+  ['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],
   ['e2e/landing-hero-film-loading.spec.ts', ['390']],
   ['e2e/marketing-consent.spec.ts', ['1440', '390']],
   ['e2e/workspace-intake-triage.spec.ts', ['audit']],
   ['e2e/workspace-intake-layout.spec.ts', ['1440']],
 ]);
+
+export function collectHomePricingCaptures(workspaceRoot = repoRoot, plan = readPlan()) {
+  const supplied = resolve(workspaceRoot);
+  if (lstatSync(supplied).isSymbolicLink() || !lstatSync(supplied).isDirectory()) throw Error('Capture workspace root must be a regular directory.');
+  const root = realpathSync(supplied), destination = resolve(root, 'test-results/repair-scope-home-pricing');
+  protectedCapturePath(root, destination, 'directory', true);
+  for (const binding of HOME_PRICING_CAPTURE_BINDINGS) {
+    if (protectedCapturePath(root, resolve(destination, binding.name + '.png'), 'file', true)) throw Error('Home/Pricing capture destination already exists: ' + binding.name);
+  }
+  const matches = new Map(HOME_PRICING_CAPTURE_BINDINGS.map(binding => [binding.name, []]));
+  for (const [index, run] of planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).entries()) {
+    const reportPath = resolve(root, `node_modules/.cache/repair-scope-reports/playwright-${index + 1}.json`);
+    protectedCapturePath(root, reportPath, 'file');
+    readAndValidatePlaywrightReport(reportPath, run.files, root, run.projects ?? [run.project]);
+    const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+    const visit = suites => { for (const suite of suites ?? []) {
+      for (const spec of suite.specs ?? []) for (const test of spec.tests ?? []) {
+        const last = test.results?.at(-1);
+        if (!['expected', 'flaky'].includes(test.status) || last?.status !== 'passed') continue;
+        for (const binding of HOME_PRICING_CAPTURE_BINDINGS) {
+          if (test.projectName !== binding.project || spec.title !== binding.title || !playwrightReportContainsPath(spec.file ?? suite.file, binding.file, root, report.config?.rootDir)) continue;
+          for (const attachment of last.attachments ?? []) if (attachment.name === binding.name) matches.get(binding.name).push(attachment);
+        }
+      }
+      visit(suite.suites);
+    } };
+    visit(report.suites);
+  }
+  const prepared = HOME_PRICING_CAPTURE_BINDINGS.map(binding => {
+    const values = matches.get(binding.name);
+    if (values.length !== 1) throw Error(`Expected exactly one successful Home/Pricing attachment: ${binding.name}; found ${values.length}.`);
+    const attachment = values[0];
+    if (attachment.contentType !== 'image/png' || typeof attachment.path !== 'string' || attachment.body !== undefined) throw Error('Capture must be a file-backed PNG: ' + binding.name);
+    const file = resolve(root, attachment.path), entry = protectedCapturePath(root, file, 'file');
+    validateMountedPngMetadata(entry);
+    const relativePath = relative(root, file).replaceAll('\\', '/'), stem = binding.file.slice(4, -8);
+    const canonical = new RegExp(`^test-results/repair-scope-playwright-[1-9][0-9]*/${stem}-[^/]+/attachments/[^/]+\\.png$`);
+    if (!canonical.test(relativePath)) throw Error('Capture escaped its canonical public spec output: ' + binding.name);
+    const png = readFileSync(file);
+    if (png.length < 24 || png.length > MAX_MOUNTED_PNG_BYTES || !png.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) || png.toString('ascii',12,16) !== 'IHDR' || png.readUInt32BE(16) !== binding.width || png.readUInt32BE(20) !== binding.height) throw Error('Capture PNG identity or viewport mismatch: ' + binding.name);
+    return { name: binding.name, png };
+  });
+  // Validate all source files and destination ancestry before writing exact named copies.
+  mkdirSync(destination, { recursive: true });
+  for (const value of prepared) {
+    const target = resolve(destination, value.name + '.png');
+    protectedCapturePath(root, target, 'file', true);
+    writeFileSync(target, value.png, { flag: 'wx' });
+  }
+  return prepared.map(value => value.name + '.png');
+}
 
 export function planBrowserRuns(files, runDetailIntegrity) {
   const selected = [...new Set(files)].sort();
@@ -377,7 +436,7 @@ async function runBrowser() {
         if (planned.project) args.push(`--project=${planned.project}`);
         await run('pnpm', args, { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath });
       },
-      readReport: (planned, index) => readAndValidatePlaywrightReport(reportPathFor(index), planned.files, repoRoot),
+      readReport: (planned, index) => readAndValidatePlaywrightReport(reportPathFor(index), planned.files, repoRoot, planned.projects ?? [planned.project]),
       onSummary: (planned, summary) => {
         console.log(`Playwright report ${planned.kind}${planned.project ? `/${planned.project}` : ''}: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.flaky} flaky, ${summary.failed} failed across ${summary.files} selected files.`);
       },
@@ -392,5 +451,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   if (mode === 'unit') await runUnit();
   else if (mode === 'browser') await runBrowser();
   else if (mode === 'intake-captures') console.log(`Collected ${collectWorkspaceIntakeCaptures().length} exact synthetic mounted intake files.`);
+  else if (mode === 'home-pricing-captures') console.log(`Collected ${collectHomePricingCaptures().length} exact public Home/Pricing PNGs.`);
   else throw new Error('Usage: node scripts/run-repair-check.mjs <unit|browser>');
 }

@@ -114,7 +114,7 @@ function collectPlaywrightTests(suites, output = []) {
   return output;
 }
 
-export function validatePlaywrightReport(report, selectedFiles, workspaceRoot = process.cwd()) {
+export function validatePlaywrightReport(report, selectedFiles, workspaceRoot = process.cwd(), selectedProjects) {
   requireObject(report, 'Playwright JSON report');
   if (!Array.isArray(report.suites) || selectedFiles.length === 0) throw new Error('Playwright JSON report is missing required suite data.');
   requireObject(report.stats, 'Playwright report stats');
@@ -153,6 +153,13 @@ export function validatePlaywrightReport(report, selectedFiles, workspaceRoot = 
       else failed += 1;
     }
     if (filePassed === 0) throw new Error(`Selected Playwright file had no executed passing test: ${file}`);
+    if (selectedProjects !== undefined) {
+      if (!Array.isArray(selectedProjects) || selectedProjects.length === 0 || new Set(selectedProjects).size !== selectedProjects.length) throw new Error('Selected Playwright projects are malformed.');
+      if (matches.some(({test}) => !selectedProjects.includes(test.projectName))) throw new Error(`Selected Playwright file ran in an unconfigured project: ${file}`);
+      for (const project of selectedProjects) {
+        if (!matches.some(({test}) => test.projectName === project && ['expected', 'flaky'].includes(test.status) && test.results.at(-1)?.status === 'passed')) throw new Error(`Selected Playwright file/project had no executed passing test: ${file}/${project}`);
+      }
+    }
   }
   if (missing.length) throw new Error(`Playwright report omitted selected file(s): ${missing.join(', ')}`);
   if (failed > 0 || report.stats.unexpected > 0) throw new Error(`Playwright report contains ${Math.max(failed, report.stats.unexpected)} failed test(s).`);
@@ -168,4 +175,4 @@ function readJsonReport(path, label) {
 }
 
 export const readAndValidateVitestReport = (path, selectedFiles) => validateVitestReport(readJsonReport(path, 'Vitest'), selectedFiles);
-export const readAndValidatePlaywrightReport = (path, selectedFiles, workspaceRoot = process.cwd()) => validatePlaywrightReport(readJsonReport(path, 'Playwright'), selectedFiles, workspaceRoot);
+export const readAndValidatePlaywrightReport = (path, selectedFiles, workspaceRoot = process.cwd(), selectedProjects) => validatePlaywrightReport(readJsonReport(path, 'Playwright'), selectedFiles, workspaceRoot, selectedProjects);

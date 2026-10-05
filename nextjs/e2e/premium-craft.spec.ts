@@ -178,6 +178,7 @@ test("the home first screen shows source evidence without colliding with public 
         availability: rect(".paper-availability"),
         action: rect(".paper-hero-copy a.lv2-cta"),
         source: rect(".paper-source"),
+        question: rect(".paper-source-question"),
         sourcePage: rect(".paper-source-page img"),
         excerpt: rect(".paper-source-result blockquote"),
         excerptLineHeight: Number.parseFloat(getComputedStyle(excerpt).lineHeight),
@@ -196,6 +197,9 @@ test("the home first screen shows source evidence without colliding with public 
     expect(layout.action.bottom).toBeLessThanOrEqual(layout.height);
     expect(hasVisibleArea(layout.source)).toBe(true);
     expect(hasVisibleArea(layout.sourcePage)).toBe(true);
+    expect(layout.question.top).toBeGreaterThanOrEqual(0);
+    expect(layout.question.bottom, "the full prepared question is visible before the source quotation").toBeLessThanOrEqual(layout.height);
+    expect(layout.question.bottom).toBeLessThanOrEqual(layout.excerpt.top);
     expect(hasVisibleArea(layout.excerpt)).toBe(true);
     expect(layout.image.naturalWidth).toBeGreaterThan(0);
     expect(layout.image.naturalHeight).toBeGreaterThan(0);
@@ -209,19 +213,100 @@ test("the home first screen shows source evidence without colliding with public 
       expect(doesNotOverlap(layout.banner, layout.header)).toBe(true);
       expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
     }
-    for (const content of [layout.availability, layout.action, layout.source, layout.sourcePage, layout.excerpt]) {
+    for (const content of [layout.availability, layout.action, layout.source, layout.question, layout.sourcePage, layout.excerpt]) {
       expect(content.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
       if (consentVisible && layout.banner) expect(content.top).toBeGreaterThanOrEqual(layout.banner.bottom - 1);
     }
     if (layout.width <= 600) expect(layout.source.top).toBeGreaterThanOrEqual(layout.action.bottom - 1);
 
-    await test.info().attach(consentVisible ? "home-first-screen-consent-visible" : "home-first-screen-consent-dismissed", {
-      body: await page.screenshot({ animations: "disabled" }),
-      contentType: "image/png",
-    });
+    if (["1440", "390"].includes(test.info().project.name)) {
+      const captureName = `home-first-screen-${test.info().project.name}-consent-${consentVisible ? "visible" : "dismissed"}`;
+      const capturePath = test.info().outputPath(captureName + ".png");
+      await page.screenshot({ path: capturePath, animations: "disabled" });
+      await test.info().attach(captureName, { path: capturePath, contentType: "image/png" });
+    }
   };
 
   await expectFirstScreen(true);
   await dismissConsent(page);
   await expectFirstScreen(false);
+});
+
+test("the prepared home question and full quotation reflow at narrow widths and 200% zoom", async ({ browser, page }) => {
+  test.skip(page.viewportSize()?.width !== 1440, "Run this explicit viewport matrix once on the desktop project.");
+  const profiles = [320, 360, 390, 768, 1440].map(width => ({ width, height: 844, deviceScaleFactor: 1, name: `${width}px` }));
+  // Match the existing contrast/zoom audit: 1440 physical pixels at 200% = 720 CSS pixels at DPR 2.
+  profiles.push({ width: 720, height: 450, deviceScaleFactor: 2, name: "1440px-at-200-percent" });
+  for (const profile of profiles) {
+    const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height }, deviceScaleFactor: profile.deviceScaleFactor });
+    const proof = await context.newPage();
+    try {
+      for (const route of ["/", "/ko"]) {
+        await proof.goto(route);
+        if (route === "/") await dismissConsent(proof);
+        const source = proof.locator("#s1 .paper-source");
+        await expect(source.locator(".paper-source-question")).toHaveText("What were operating expenses for research and development?");
+        await expect(source.locator("blockquote")).toHaveText("Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443");
+        await expect(source.locator("img")).toBeVisible();
+        await expect.poll(() => source.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+        const geometry = await source.evaluate(element => {
+          const box = (selector: string) => {
+            const target = element.querySelector<HTMLElement>(selector);
+            if (!target) throw new Error(`Missing prepared proof element: ${selector}`);
+            const rect = target.getBoundingClientRect();
+            const style = getComputedStyle(target);
+            const range = document.createRange();
+            range.selectNodeContents(target);
+            const text = range.getBoundingClientRect();
+            return {
+              left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              width: rect.width, height: rect.height, font: parseFloat(style.fontSize),
+              clamp: style.webkitLineClamp, clipped: target.scrollHeight > target.clientHeight + 1,
+              textLeft: text.left, textRight: text.right, textBottom: text.bottom,
+            };
+          };
+          const image = element.querySelector<HTMLImageElement>("img")!;
+          return {
+            overflow: document.documentElement.scrollWidth - innerWidth, width: innerWidth,
+            question: box(".paper-source-question"), quote: box("blockquote"),
+            page: box("img"), link: box(".paper-source-result a"),
+            naturalRatio: image.naturalWidth / image.naturalHeight,
+          };
+        });
+        expect(geometry.overflow, `${route} ${profile.name}`).toBeLessThanOrEqual(1);
+        for (const text of [geometry.question, geometry.quote]) {
+          expect(text.font).toBeGreaterThanOrEqual(15);
+          expect(text.clamp).toBe("none");
+          expect(text.clipped).toBe(false);
+          expect(text.textLeft).toBeGreaterThanOrEqual(text.left - 1);
+          expect(text.textRight).toBeLessThanOrEqual(text.right + 1);
+          expect(text.textBottom).toBeLessThanOrEqual(text.bottom + 1);
+        }
+        for (const box of [geometry.question, geometry.quote, geometry.page, geometry.link]) {
+          expect(box.left).toBeGreaterThanOrEqual(-1);
+          expect(box.right).toBeLessThanOrEqual(geometry.width + 1);
+        }
+        expect(geometry.question.bottom).toBeLessThanOrEqual(Math.min(geometry.quote.top, geometry.page.top));
+        expect(geometry.page.right).toBeLessThanOrEqual(geometry.quote.left);
+        expect(geometry.quote.bottom).toBeLessThanOrEqual(geometry.link.top);
+        expect(geometry.page.width / geometry.page.height).toBeCloseTo(geometry.naturalRatio, 2);
+        expect(geometry.link.height).toBeGreaterThanOrEqual(44);
+        expect(geometry.link.width).toBeGreaterThanOrEqual(44);
+        const action = source.locator(".paper-source-result a");
+        await action.scrollIntoViewIfNeeded();
+        expect(await action.evaluate(link => {
+          const box = link.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return hit === link || (hit !== null && link.contains(hit));
+        })).toBe(true);
+        await action.focus();
+        await expect(action).toBeFocused();
+        await test.info().attach(`home-prepared-proof-${route === "/ko" ? "ko" : "en"}-${profile.name}`, {
+          body: await proof.screenshot({ animations: "disabled" }), contentType: "image/png",
+        });
+      }
+    } finally {
+      await context.close();
+    }
+  }
 });
