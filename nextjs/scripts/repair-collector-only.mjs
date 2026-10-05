@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as repair from './repair-known-regression.mjs';
 
 export const COLLECTOR_BASE = 'f082847ccd0eb5e65676f357d86a8025d143377b';
 export const FULL_ANCHOR = '6401c3524b5294f3a395acede35e4632eb89c0fb';
@@ -42,11 +43,11 @@ export const CONFIG_PATHS = Object.freeze([
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
   ".github/workflows/db-rehearsal.yml": "bf3de8c724ea76991921caa14900c1aacab2047404cb549b14fcdde306ec8fed",
-  ".github/workflows/repair-scope.yml": "dd695e17f6e8e7e173a2e2552eba3201d7f621356a3e281b2a58c83b4d5883d9",
-  "nextjs/scripts/repair-collector-only.mjs": "a23f92a51acf837cd37bd992d562c455fa5161aa1f02e18581fc0ab05dbfd74c",
-  "nextjs/scripts/repair-collector-only.test.mjs": "c0b9cf0a4bec4cf6edf4fbdee736e628465f1509ce22e62560ff38514ce0ac62",
-  "nextjs/scripts/repair-scope-gate.mjs": "15fb98ec917620b8964a2a2a40efbe53d5136104d391b42a74422b5a846a7bf9",
-  "nextjs/scripts/verify-repair-workflows.mjs": "a6acb461eda4484321d31a83e1a36b6d17e078a9acab7e311d0502b9191f93dd"
+  ".github/workflows/repair-scope.yml": "443c7ea67311fe0f1d1e4c014c9eca7e48dfe18df3f8af3791436020e9306bca",
+  "nextjs/scripts/repair-collector-only.mjs": "d6b1aad9bcf656e1f124f8708e0becb38ca8f14bdf0758ddd63325cffb02d945",
+  "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
+  "nextjs/scripts/repair-scope-gate.mjs": "fac917e37fc7bbd826e6fbef2091452403b90d2b95035b22654697c9abbf32d7",
+  "nextjs/scripts/verify-repair-workflows.mjs": "b580f26535af3d45d9d955d40bbefae0302ebd7af4e99b3d98148fe717d61ba3"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -247,7 +248,7 @@ export function collectorLineageFailures(plan, verified) {
 
 function emit(plan) {
   writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
-  const values = { broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), head: plan.headSha, groups: plan.groups.join(', ') };
+  const values = { broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
   if (process.env.GITHUB_OUTPUT) for (const [key, value] of Object.entries(values)) writeFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`, { flag: 'a' });
 }
 
@@ -255,10 +256,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const mode = process.argv[2];
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
-  const intent = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request'
+  const nonPr = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request';
+  const repairIntent = nonPr ? { classification: 'normal' } : repair.classifyKnownRepairIntent({ headSha });
+  const knownRepair = repairIntent.classification !== 'normal';
+  const intent = knownRepair ? repairIntent : nonPr
     ? { classification: 'normal', intended: false, reason: 'Non-PR events retain normal DB execution.' }
     : classifyCollectorIntent({ headSha });
-  const proof = intent.intended ? verifyCollectorEligibility({ headSha }) : { eligible: false, reason: intent.reason };
+  const proof = intent.intended ? knownRepair ? repair.verifyKnownRepairEligibility({ headSha }) : verifyCollectorEligibility({ headSha }) : { eligible: false, reason: intent.reason };
   if (mode === 'eligibility') {
     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `intended=${intent.intended ?? 'unknown'}\neligible=${proof.eligible}\n`, { flag: 'a' });
     if (intent.classification !== 'normal' && !proof.eligible) {
@@ -273,7 +277,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       const plan = failedCollectorPlan({ headSha, reason: proof.reason, intent });
       writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
       writeFileSync('repair-receipt.json', JSON.stringify(failedCollectorReceipt(plan), null, 2) + '\n');
-      console.error(`Collector correction is unqualified; expensive checks are blocked: ${proof.reason}`);
+      console.error(`Scoped correction is unqualified; expensive checks are blocked: ${proof.reason}`);
       process.exit(1);
     }
     // The unchanged normal selector always computes release debt and is the fallback.
@@ -281,8 +285,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     const result = spawnSync(process.execPath, ['scripts/repair-scope.mjs'], { env: { ...process.env, GITHUB_OUTPUT: '' }, encoding: 'utf8' });
     if (result.status !== 0) { process.stderr.write(result.stderr ?? 'Normal selector failed.'); process.exit(result.status ?? 1); }
     const normal = JSON.parse(readFileSync('repair-plan.json', 'utf8'));
-    emit(proof.eligible ? collectorOnlyPlan(normal, proof) : withRegressionDebt(normal));
+    emit(proof.eligible ? knownRepair ? repair.knownRepairPlan(normal, proof) : collectorOnlyPlan(normal, proof) : withRegressionDebt(normal));
     if (!proof.eligible) console.log(`Collector-only ineligible; normal selection retained: ${proof.reason}`);
-    console.log(proof.eligible ? 'Affected-only: intake audit and four capture pairs; unaffected checks retain f082 lineage, full release pending.' : 'Normal full-anchor plan selected.');
+    console.log(proof.eligible ? knownRepair ? 'Affected-only: 17 regression suites and separate API catalogue checks; 433 tests required, full qualification pending.' : 'Affected-only: intake audit and four capture pairs; unaffected checks retain f082 lineage, full release pending.' : 'Normal full-anchor plan selected.');
   }
 }

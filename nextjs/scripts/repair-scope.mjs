@@ -37,6 +37,7 @@ const baselineVitest = [
   'lib/route-classification.test.ts', 'lib/production-route-surface.test.ts',
 ];
 const baselineAuth = ['lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts'];
+export const SHARED_AUTH_BILLING_UNIT_TESTS = Object.freeze(['lib/durable-compile-orchestration.test.ts', 'lib/job-worker-route.test.ts']);
 const docsContractTests = [
   'lib/docs-content.test.ts', 'lib/docs-highlight.test.ts', 'lib/docs-navigation.test.ts',
   'lib/retrieval-docs-parity.test.ts', 'lib/openapi-compile-jobs.test.ts',
@@ -380,6 +381,16 @@ export const GOOGLE_VIEWER_ACL_FINAL_BLOBS = Object.freeze({
   "supabase/tests/google_viewer_principal_boundary.sql": "144d3262ee2f2208fe96281283bcb8f0dc0aab9d",
 });
 export const GOOGLE_VIEWER_ACL_UNIT_TESTS = Object.freeze([
+  "lib/ask-route-limits.test.ts",
+  "lib/collection-candidate-breakdown.test.ts",
+  "lib/consumer-context/consumer-context-parity.test.ts",
+  "lib/corpus-batching.test.ts",
+  "lib/derived-data-admission.test.ts",
+  "lib/export-route-authorization.test.ts",
+  "lib/retrieval-compile-wiring.test.ts",
+  "lib/synthetic-customer-journey.test.ts",
+  "lib/world-discovery-routes.test.ts",
+  "lib/world-source-access.test.ts",
   "app/api/documents/[id]/progress/route.test.ts",
   "lib/connector-oauth-callback-route.test.ts",
   "lib/connector-oauth-route.test.ts",
@@ -428,6 +439,8 @@ export const GOOGLE_DRIVE_ACL_REFRESH_TRIGGER_PATHS = Object.freeze(
   GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS.filter(path => !GOOGLE_DRIVE_ACL_REFRESH_ACL_OVERLAP_PATHS.has(path)),
 );
 export const GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS = Object.freeze([
+  'lib/durable-compile-orchestration.test.ts',
+  'lib/job-worker-route.test.ts',
   'lib/acl-refresh-core.test.mjs',
   'lib/google-drive-acl-capture.test.ts',
   'lib/google-drive-acl-refresh.test.ts',
@@ -1500,6 +1513,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     // and use the dedicated static checker; they do not fan out all 6k tests.
     if (/(^|\/)(auth|billing|middleware|session|entitlement)(\/|\.)|(^|\/)(auth|billing)[^/]*\.(ts|tsx)$/i.test(path)) {
       groups.add('shared-auth-billing'); broader = true; matched = true;
+      for (const file of SHARED_AUTH_BILLING_UNIT_TESTS) unitFiles.add(file);
     }
     if (/(^|\/)(schema|schemas|parser|parsers|compiler)(\/|\.)|openapi\.(json|ya?ml)$/i.test(path)) {
       groups.add('schema-parser'); broader = true; matched = true;
@@ -1531,6 +1545,9 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
       : null,
     googleViewerAclSelection: googleViewerAclChanged
       ? { unitFiles: [...GOOGLE_VIEWER_ACL_UNIT_TESTS], evidence: googleViewerAclVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }
+      : null,
+    sharedAuthBillingSelection: groups.has('shared-auth-billing')
+      ? { unitFiles: [...SHARED_AUTH_BILLING_UNIT_TESTS], execution: 'existing hermetic full Vitest includes both lib suites' }
       : null,
     googleDriveAclRefreshSelection: googleDriveAclRefreshChanged
       ? { unitFiles: [...new Set([...GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS, 'lib/pgtap-fixtures.test.ts'])].sort(), evidence: googleDriveAclRefreshVerification, sqlStatus: 'unregistered-draft-pending-disposable-pgtap' }

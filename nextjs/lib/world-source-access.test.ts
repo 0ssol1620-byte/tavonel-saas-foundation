@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { compileCollectionCandidate } from "./collection-compiler";
 const mocks = vi.hoisted(() => ({ load: vi.fn(), access: vi.fn(), active: vi.fn(), freshness: vi.fn() }));
 vi.mock("./collection-storage", () => ({ loadPreferredCollectionCandidate: mocks.load }));
-vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access }));
+vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access, checkConnectorSourceAccessForViewer: mocks.access }));
 vi.mock("./world-store", async (importOriginal) => ({
   // Partial, so the freshness block's own constants stay real. The World read model gained a
   // getWorldFreshness call (audit TM04); stubbing it keeps this file about source access, and
@@ -13,7 +13,7 @@ vi.mock("./world-store", async (importOriginal) => ({
   getWorldFreshness: mocks.freshness,
 }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "fixture" }) }));
-vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: "pilot-acme01" } }) }));
+vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: "pilot-acme01", userId: "969dc192-daa2-4119-a5d9-9a7621f171a1" } }) }));
 import { loadWorldReadModel } from "./world-read-model";
 import { EMPTY_WORLD_FRESHNESS } from "./world-store";
 import { GET as collectionGet } from "../app/api/collections/[id]/route";
@@ -50,6 +50,7 @@ it.each([true, false])("raw collection JSON respects source access %s", async al
   const response = await collectionGet(new Request(`https://tavonel.test/api/collections/${compiled.collectionId}`),
     { params: Promise.resolve({ id: compiled.collectionId }) });
   expect(response.status).toBe(allowed ? 200 : 403);
+  expect(mocks.access).toHaveBeenCalledWith("pilot-acme01", ["source-access-fixture"], "969dc192-daa2-4119-a5d9-9a7621f171a1");
   const body = await response.json();
   if (allowed) expect(body.artifact).toBeDefined();
   else expect(body).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });

@@ -117,7 +117,7 @@ vi.mock("@/lib/source-intake", async (importOriginal) => ({
   deterministicSourceDocumentId: deterministicId,
 }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: sourceIds }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 
 import { GET as openApi } from "../app/api/openapi/route";
 import { GET as capabilities } from "../app/api/v1/capabilities/route";
@@ -540,6 +540,7 @@ describe("documented response shapes", () => {
     const payload = await response.json() as Record<string, unknown>;
     expect(response.status, JSON.stringify(payload)).toBe(200);
     expect(payload.code).toBe("SEARCH_RESULTS");
+    expect(sourceAccess).toHaveBeenCalledWith(WORKSPACE, [DOCUMENT], "user-shape");
     for (const field of ["activeWorld", "contextPacket", "retrieval"]) {
       expect(payload, `the documented field ${field} is gone from the 200 body`).toHaveProperty(field);
     }
@@ -576,6 +577,7 @@ describe("documented response shapes", () => {
     const payload = await response.json() as Record<string, unknown>;
     expect(response.status, JSON.stringify(payload)).toBe(200);
     expect(payload.code).toBe("GROUNDED_ANSWER");
+    expect(sourceAccess).toHaveBeenCalledWith(WORKSPACE, [DOCUMENT], "user-shape");
     expect(["compiled-retrieval-v1", "excerpt-concatenation-fallback"]).toContain(payload.retrievalPath);
     for (const field of ["activeWorld", "retrievalPath"]) {
       expect(payload, `the documented field ${field} is gone from the 200 body`).toHaveProperty(field);

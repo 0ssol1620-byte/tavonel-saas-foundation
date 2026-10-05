@@ -221,6 +221,15 @@
       "credential": "bearer:shared-secret",
       "note": "FOUNDATION_WORKER_SECRET / CRON_SECRET, constant-time compare, closed when unset. Cross-tenant by design; advances at most one legal-hold-cleared source object per invocation."
     },
+    "app/api/internal/jobs/acl-refresh/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:shared-secret",
+      "note": "isInternalWorkerAuthorized requires a Bearer FOUNDATION_WORKER_SECRET or CRON_SECRET configured with at least 32 characters before the bounded ACL refresh turn. Cross-tenant infrastructure worker; no cookie authority."
+    },
     "app/api/internal/jobs/run/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -441,6 +450,14 @@
       ],
       "credential": "bearer:supabase-jwt"
     },
+    "app/api/v1/oauth-connectors/viewer-links/revoke/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "requireFoundationSession with studio plan authenticates the Bearer session before revoking Google Drive viewer principals for that workspace, user and authorization revision. No cookie authority."
+    },
     "app/api/v1/reviews/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -497,6 +514,38 @@
       ],
       "credential": "bearer:api-key-or-supabase-jwt",
       "note": "Re-export."
+    },
+    "app/api/v1/uploads/triage/complete/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Requires documents:intake Bearer authorization, customer-data admission and the triage rollout gate before claiming and sealing a staged source. The seal claim is bound to workspace, actor, stage, preflight approval and seal token; the returned sealed identity is checked."
+    },
+    "app/api/v1/uploads/triage/preflight/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Requires documents:intake Bearer authorization, customer-data admission and the triage rollout gate before creating workspace- and actor-bound whole-batch preflight approval. File count and declared bytes only; no OCR, parsing or compile authority."
+    },
+    "app/api/v1/uploads/triage/receipt/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Requires documents:intake Bearer authorization, customer-data admission and the triage rollout gate before creating the triage receipt. Staged rows must match workspace, actor and preflight approval; every preflight member must be sealed and the complete include/exclude choices are checked."
+    },
+    "app/api/v1/uploads/triage/stage/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:api-key-or-supabase-jwt",
+      "note": "Requires documents:intake Bearer authorization, customer-data admission and the triage rollout gate before recording a workspace- and actor-bound batch member and issuing its bounded staging PUT capability. Validates the returned stage identity, quarantine path and expiry. No cookie authority."
     },
     "app/api/v1/world/[id]/ask/route.ts": {
       "type": "A-bearer",

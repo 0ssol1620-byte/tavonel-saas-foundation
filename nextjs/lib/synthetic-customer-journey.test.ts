@@ -20,7 +20,7 @@ const io = vi.hoisted(() => ({
 }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "synthetic-only" }) }));
 vi.mock("./r2-objects", () => ({ getWorkspaceCollectionCandidate: io.get, listImmutableWorkspaceObjects: io.list }));
-vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: io.access }));
+vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: io.access, checkConnectorSourceAccessForViewer: io.access }));
 vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: io.auth,
   requireFoundationSession: io.session, revalidateFoundationAuthorization: io.auth }));
 vi.mock("./foundation-pilot", () => ({ getRequestUser: async () => ({ id: "969dc192-daa2-4119-a5d9-9a7621f171a1" }),
@@ -285,6 +285,7 @@ describe("same synthetic customer across revisions and consumers", () => {
     expect(denied.status).toBe(403);
     expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     expect(io.pipeline).toHaveBeenCalledOnce();
+    expect(io.access).toHaveBeenCalledWith(workspace, [source], actor);
   });
 
   it("resumes after a transient source-store outage without poisoning the answer cache", async () => {

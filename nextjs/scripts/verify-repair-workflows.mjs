@@ -13,6 +13,7 @@ const asyncScopedVitest = readFileSync(resolve(repo, 'nextjs/vitest.repair-scope
 const globalVitest = readFileSync(resolve(repo, 'nextjs/vitest.config.ts'), 'utf8');
 const reportValidator = readFileSync(resolve(repo, 'nextjs/scripts/repair-test-report.mjs'), 'utf8');
 const collectorVerifier = readFileSync(resolve(repo, 'nextjs/scripts/repair-collector-only.mjs'), 'utf8');
+const knownRepair = readFileSync(resolve(repo, 'nextjs/scripts/repair-known-regression.mjs'), 'utf8');
 const repairFixture = JSON.parse(readFileSync(resolve(repo, 'nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json'), 'utf8'));
 const branches = [
   'main',
@@ -72,6 +73,13 @@ assert(dbRehearsal.includes("if: always() && github.event_name == 'pull_request'
 assert(dbRehearsal.includes('Require an explicit collector classifier decision') && dbRehearsal.includes('path: collector-only-failure-receipt.json'), 'classifier protocol failures must retain an explicit failed/unqualified receipt');
 assert(dbRehearsal.includes('receipt.pendingFullDebt') && dbRehearsal.includes("receipt.databaseObservation = 'not executed; inherited evidence unaccepted'") && dbRehearsal.includes('receipt.inheritedChecks = {}'), 'failed or missing classifier outputs must preserve release debt and reject inheritance');
 assert(collectorVerifier.includes('REGRESSION_DEBT') && collectorVerifier.includes('37330362300') && collectorVerifier.includes('failed: 71'), 'latest observed 71-failure debt must remain explicit');
+assert(knownRepair.includes("REPAIR_PARENT = '6a32dbbe2afeaa7d0c4c446becfe8994b913fcc1'") && knownRepair.includes('REPAIR_SOURCE_BLOBS = Object.freeze(') && knownRepair.includes('REPAIR_SEAL = Object.freeze('), 'targeted repair must bind the exact qualified parent, source preimages and sealed configuration');
+for (const file of ['lib/copy-trust-guard.test.ts', 'lib/page-metadata.test.ts', 'lib/resources-hub.test.ts', 'lib/route-classification.test.ts']) assert(knownRepair.includes(`'${file}'`), 'targeted repair omitted an actual regression suite: ' + file);
+assert(knownRepair.includes('EXPECTED_REPAIR_TESTS = 433') && knownRepair.includes('readKnownRepairExecution') && knownRepair.includes('resolveKnownRepairDebt'), '71-failure debt may clear only after the exact 17-suite report, separately from full qualification');
+assert(repair.includes('node --test scripts/repair-known-regression.test.mjs') && repair.includes("--test-name-pattern='targeted regression transitive'"), 'targeted repair must execute the new source/evidence tests and actual transitive selection regression');
+assert(repair.includes("if: steps.plan.outputs.known_regression_repair == 'true'") && repair.includes('node scripts/repair-known-regression.mjs catalogue') && repair.includes('API_CATALOGUE_RESULT: ${{ steps.known-repair-catalogue.outcome }}') && repair.includes('TRANSITIVE_TEST_RESULT: ${{ steps.browser-report-tests.outcome }}'), 'catalogue and transitive selector outcomes must be required without expensive fallback');
+assert(repair.includes('TARGETED_REPAIR_UNIT_RESULT: ${{ steps.targeted-vitest.outcome }}'), 'targeted repair must require the actual 17-suite outcome without a success fallback');
+assert(collectorVerifier.includes('classifyKnownRepairIntent') && collectorVerifier.includes('verifyKnownRepairEligibility') && collectorVerifier.includes('repair.knownRepairPlan(normal, proof)'), 'both planning and independent DB classification must qualify the exact targeted source and evidence');
 for (const workflow of [repair, dbRehearsal]) {
   assert(workflow.includes('actions: read') && workflow.includes('GH_TOKEN: ${{ github.token }}'), 'prior run evidence must use the read-only authenticated Actions API');
   assert(workflow.includes('fetch-depth: 0'), 'collector ancestry and complete source diff require full checkout history');

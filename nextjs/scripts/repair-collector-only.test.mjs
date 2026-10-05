@@ -1,20 +1,51 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
-import { COLLECTOR_BASE, FULL_ANCHOR, CORRECTION_PARENT, CORRECTION_PATHS, PUBLISHED_CONFIG_BLOBS, FIX_BLOBS, CONFIG_PATHS, CONFIG_SEAL, REGRESSION_DEBT, KNOWN_REGRESSION, sealHash, verifyTrackedCheckout, classifyCollectorIntent, verifyCollectorSource, verifyPriorEvidence, verifyCollectorEligibility, collectorOnlyPlan, collectorLineageFailures, collectorJobDecision, failedCollectorPlan, failedCollectorReceipt } from './repair-collector-only.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
 import { isInsideWorkspace, planBrowserRuns, WORKSPACE_INTAKE_CAPTURE_NAMES } from './run-repair-check.mjs';
 
 const head = 'e'.repeat(40);
-const fixParent = CORRECTION_PARENT;
 const gitBlob = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+const historicalHead = '6a32dbbe2afeaa7d0c4c446becfe8994b913fcc1';
+const historicalBlobs = Object.freeze({
+  '.github/workflows/db-rehearsal.yml': '7cb726d57e1f75fcfc64cd180ee0313186a3e133',
+  '.github/workflows/repair-scope.yml': '8a55cc2118dac8afa98e9b179c5bd72a513baef0',
+  'nextjs/scripts/repair-collector-only.mjs': '48a24437810a1857fccdca43ac8e247cd54915b8',
+  'nextjs/scripts/repair-collector-only.test.mjs': '29fa082b8308a10fe6b4dc7ec55099c9658f7859',
+  'nextjs/scripts/repair-scope-gate.mjs': '661349149abbb129abbf38c037e06af3e5f2d1b7',
+  'nextjs/scripts/verify-repair-workflows.mjs': '88d04559c7721be6be29d0616f021c797dcadc87',
+  'nextjs/e2e/workspace-intake-triage.spec.ts': '0d24a1c185cb05f931aa61413e8eb6da604c7113',
+  'nextjs/scripts/repair-scope.mjs': '9cc2d96094675468671602da60943ffa5eb5c1c4',
+  'nextjs/scripts/repair-scope.test.mjs': 'c978599b44621801142cd81a5f3dfbb9802f27d0',
+});
+const historicalCache = new Map();
+function historicalBytes(path) {
+  assert.ok(Object.hasOwn(historicalBlobs, path), 'Unowned historical fixture: ' + path);
+  if (!historicalCache.has(path)) {
+    const bytes = process.env.COLLECTOR_HISTORICAL_FIXTURE_DIR
+      ? readFileSync(resolve(process.env.COLLECTOR_HISTORICAL_FIXTURE_DIR, path))
+      : execFileSync('git', ['show', `${historicalHead}:${path}`], { stdio: 'pipe' });
+    assert.equal(gitBlob(bytes), historicalBlobs[path], 'Historical 6a32 byte identity: ' + path);
+    historicalCache.set(path, bytes);
+  }
+  return historicalCache.get(path);
+}
+// Historical eligibility is tested with its immutable verifier and source bytes.
+// Current shared infrastructure is sealed and tested by the new repair profile.
+const historicalModuleRoot = mkdtempSync(resolve(tmpdir(), 'repair-collector-historical-module-'));
+assert.ok(isInsideWorkspace(resolve(tmpdir()), historicalModuleRoot));
+after(() => rmSync(historicalModuleRoot, { recursive: true, force: true }));
+const historicalModulePath = resolve(historicalModuleRoot, 'repair-collector-only.mjs');
+writeFileSync(historicalModulePath, historicalBytes('nextjs/scripts/repair-collector-only.mjs'));
+const { COLLECTOR_BASE, FULL_ANCHOR, CORRECTION_PARENT, CORRECTION_PATHS, PUBLISHED_CONFIG_BLOBS, FIX_BLOBS, CONFIG_PATHS, CONFIG_SEAL, REGRESSION_DEBT, KNOWN_REGRESSION, sealHash, verifyTrackedCheckout, classifyCollectorIntent, verifyCollectorSource, verifyPriorEvidence, verifyCollectorEligibility, collectorOnlyPlan, collectorLineageFailures, collectorJobDecision, failedCollectorPlan, failedCollectorReceipt } = await import(pathToFileURL(historicalModulePath).href);
+const fixParent = CORRECTION_PARENT;
 function gitFixture(options = {}) {
-  const config = Object.fromEntries(CONFIG_PATHS.map(path => [path, readFileSync(resolve(process.cwd(), '..', path))]));
+  const config = Object.fromEntries(CONFIG_PATHS.map(path => [path, historicalBytes(path)]));
   const all = [...Object.keys(FIX_BLOBS), ...CONFIG_PATHS];
   return (_command, args) => {
     if (args[0] === '-C') { assert.equal(args[1], 'fixture-root'); args = args.slice(2); }
@@ -68,14 +99,14 @@ function proofFixture() { return { eligible: true, source: verifyCollectorSource
 
 test('collector source proof seals all infrastructure and preserves the three immutable fix blobs', () => {
   assert.deepEqual(Object.keys(CONFIG_SEAL).sort(), [...CONFIG_PATHS].sort());
-  for (const [path, expected] of Object.entries(CONFIG_SEAL)) assert.equal(sealHash(path, readFileSync(resolve(process.cwd(), '..', path))), expected, path);
-  for (const [path, [, expected]] of Object.entries(FIX_BLOBS)) assert.equal(gitBlob(readFileSync(resolve(process.cwd(), '..', path))), expected, path);
+  for (const [path, expected] of Object.entries(CONFIG_SEAL)) assert.equal(sealHash(path, historicalBytes(path)), expected, path);
+  for (const [path, [, expected]] of Object.entries(FIX_BLOBS)) assert.equal(gitBlob(historicalBytes(path)), expected, path);
   assert.equal(verifyCollectorSource({ headSha: head, exec: gitFixture() }).eligible, true);
 });
 
 test('self seal rejects executable text and any noncanonical declaration while normalizing only six digest values', () => {
   const path = 'nextjs/scripts/repair-collector-only.mjs';
-  const source = readFileSync(resolve(process.cwd(), '..', path), 'utf8');
+  const source = historicalBytes(path).toString('utf8');
   const originalHash = sealHash(path, Buffer.from(source));
   const block = /^\/\/ collector-seal:start\n[\s\S]*?^\/\/ collector-seal:end$/m.exec(source)[0];
   const replace = altered => Buffer.from(source.replace(block, altered));
@@ -183,13 +214,14 @@ test('real Git source proof works from repository root and nested nextjs cwd wit
       mkdirSync(dirname(target), { recursive: true });
       const bytes = CORRECTION_PATHS.includes(path)
         ? process.env.COLLECTOR_PARENT_FIXTURE_DIR ? readFileSync(resolve(process.env.COLLECTOR_PARENT_FIXTURE_DIR, path)) : execFileSync('git', ['show', `${CORRECTION_PARENT}:${path}`])
-        : readFileSync(resolve(process.cwd(), '..', path));
+        : historicalBytes(path);
+      if (CORRECTION_PATHS.includes(path)) assert.equal(gitBlob(bytes), PUBLISHED_CONFIG_BLOBS[path], 'Exact e402 fixture preimage: ' + path);
       writeFileSync(target, bytes);
     }
     git(['add', '--', ...paths]);
     git(['-c', 'user.name=Collector fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'published e402 fixture']);
     const published = git(['rev-parse', 'HEAD']).trim();
-    for (const path of CORRECTION_PATHS) writeFileSync(resolve(root, path), readFileSync(resolve(process.cwd(), '..', path)));
+    for (const path of CORRECTION_PATHS) writeFileSync(resolve(root, path), historicalBytes(path));
     git(['add', '--', ...CORRECTION_PATHS]);
     git(['-c', 'user.name=Collector fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'exact correction fixture']);
     const candidate = git(['rev-parse', 'HEAD']).trim();

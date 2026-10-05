@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectorLineageFailures, verifyCollectorEligibility } from './repair-collector-only.mjs';
+import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt } from './repair-known-regression.mjs';
 
 export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
   const deferred = new Set(plan.deferredGroups ?? []);
@@ -36,11 +37,11 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
     ...plan,
     completedHeadSha: headSha,
     runResults,
-    databaseObservation: plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
+    databaseObservation: plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
     pendingDebt: [...pendingDebt].sort(),
     passedGroupAnchors,
     executedChecks,
-    inheritedChecks: plan.collectorOnly ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
+    inheritedChecks: plan.collectorOnly || plan.knownRegressionRepair ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
     fullQualification: 'pending',
     gate: failed ? 'failed' : 'passed-scoped-only',
     gateFailures,
@@ -73,6 +74,16 @@ function runGate() {
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
   if (plan.collectorOnlyFailure) requirements.push([`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`, 'failure']);
+  let repairProof, repairExecution;
+  if (plan.knownRegressionRepair || plan.groups.includes('known-unit-regression-repair')) {
+    repairProof = verifyKnownRepairEligibility({ headSha: env.HEAD_SHA });
+    for (const reason of knownRepairLineageFailures(plan, repairProof)) requirements.push([reason, 'failure']);
+    requirements.push(['targeted API catalogue checks', env.API_CATALOGUE_RESULT]);
+    requirements.push(['actual targeted 17-suite step outcome', env.TARGETED_REPAIR_UNIT_RESULT]);
+    requirements.push(['transitive selector regression', env.TRANSITIVE_TEST_RESULT]);
+    try { repairExecution = readKnownRepairExecution(); }
+    catch (error) { requirements.push(['targeted 17-file execution evidence: ' + error.message, 'failure']); }
+  }
   if (plan.collectorOnly || plan.groups.includes('mounted-intake-attachment')) {
     // Revalidate at the final gate; a planning claim cannot authorize inherited evidence.
     const verified = verifyCollectorEligibility({ headSha: env.HEAD_SHA });
@@ -80,7 +91,7 @@ function runGate() {
   }
   if (plan.groups.includes('selector-config')) requirements.push(['selector regression tests', env.SELECTOR_TEST_RESULT]);
   const failures = requirements.filter(([, result]) => result !== 'success').map(([name, result]) => `${name}: ${result ?? 'not run'}`);
-  const receipt = buildRepairReceipt(plan, {
+  let receipt = buildRepairReceipt(plan, {
     headSha: env.HEAD_SHA,
     failures,
     databaseResult: env.DATABASE_REHEARSAL_RESULT ?? 'unrun',
@@ -95,6 +106,7 @@ function runGate() {
       ...(plan.requireWorkspaceIntakeCapture ? { mountedCaptures: env.WORKSPACE_INTAKE_CAPTURE_RESULT } : {}),
     },
   });
+  if (plan.knownRegressionRepair) receipt = resolveKnownRepairDebt(receipt, plan, repairProof, repairExecution);
   writeFileSync('repair-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(`Scoped group results: ${JSON.stringify(receipt.runResults)}`);
   console.log(`Scoped gate: ${receipt.gate === 'failed' ? 'FAIL' : 'PASS'}; full qualification remains PENDING.`);

@@ -51,7 +51,9 @@ jobs:
         id: selector-tests
         if: steps.plan.outputs.selector_tests == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
+          if [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+            node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs
           else
             node --test scripts/repair-scope.test.mjs
@@ -60,7 +62,9 @@ jobs:
         id: browser-report-tests
         if: steps.plan.outputs.workflow_static == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
+          if [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+            node --test --test-name-pattern='targeted regression transitive' scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test --test-name-pattern='mounted|collector|report|browser project|browser groups|Playwright' scripts/repair-scope.test.mjs
           else
             node --test scripts/repair-scope.test.mjs
@@ -98,6 +102,11 @@ jobs:
         id: full-vitest
         if: steps.plan.outputs.broader == 'true'
         run: node scripts/run-hermetic-vitest.mjs
+        continue-on-error: true
+      - name: Run the exact repair API catalogue readers separately
+        id: known-repair-catalogue
+        if: steps.plan.outputs.known_regression_repair == 'true'
+        run: node scripts/repair-known-regression.mjs catalogue
         continue-on-error: true
       - name: Run script contract suite for shared or unknown changes
         id: full-scripts
@@ -212,6 +221,9 @@ jobs:
         if: always()
         env:
           PLAN_RESULT: ${{ steps.plan.outcome }}
+          API_CATALOGUE_RESULT: ${{ steps.known-repair-catalogue.outcome }}
+          TARGETED_REPAIR_UNIT_RESULT: ${{ steps.targeted-vitest.outcome }}
+          TRANSITIVE_TEST_RESULT: ${{ steps.browser-report-tests.outcome }}
           GH_TOKEN: ${{ github.token }}
           SECRET_RESULT: ${{ steps.secrets.outcome }}
           CHECK_RESULT: ${{ steps.check.outcome }}

@@ -345,7 +345,13 @@ test('qualified ACL, async, intake, workspace and visual scopes compose without 
     'lib/source-intake.test.ts', 'lib/source-version-guard.test.ts', 'lib/upload-confirm-route.test.ts',
     'lib/upload-release-route.test.ts', 'lib/visual-refinement.test.ts', 'lib/workspace-compile-floor-and-ceiling.test.ts',
     'lib/world-promotion-current-source.test.ts',
-  ]);
+    'lib/ask-route-limits.test.ts', 'lib/collection-candidate-breakdown.test.ts',
+    'lib/consumer-context/consumer-context-parity.test.ts', 'lib/corpus-batching.test.ts',
+    'lib/derived-data-admission.test.ts', 'lib/durable-compile-orchestration.test.ts',
+    'lib/export-route-authorization.test.ts', 'lib/job-worker-route.test.ts',
+    'lib/retrieval-compile-wiring.test.ts', 'lib/synthetic-customer-journey.test.ts',
+    'lib/world-discovery-routes.test.ts', 'lib/world-source-access.test.ts',
+  ].sort());
   assert.deepEqual(plan.browserFiles, [
     'e2e/contrast-zoom-audit.spec.ts', 'e2e/docs-reading-layout.spec.ts', 'e2e/landing-hero-film-loading.spec.ts',
     'e2e/landing-hero-mobile.spec.ts', 'e2e/launch-qa-mobile-nav.spec.ts', 'e2e/marketing-consent.spec.ts',
@@ -1303,6 +1309,23 @@ test('Google Drive ACL refresh pins exact sources, separates Node TAP from Vites
   const registered = googleDriveAclRefreshEvidence(headSha, {}, [...refreshPaths, registeredPath]);
   assert.equal(registered.eligible, false);
   assert.ok(registered.reasons.some(reason => reason.includes('unregistered draft')));
+});
+
+test('targeted regression transitive viewer, ACL refresh and shared auth selection includes the twelve repaired consumers', () => {
+  const viewers = ['lib/ask-route-limits.test.ts', 'lib/collection-candidate-breakdown.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/corpus-batching.test.ts', 'lib/derived-data-admission.test.ts', 'lib/export-route-authorization.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-discovery-routes.test.ts', 'lib/world-source-access.test.ts'];
+  for (const file of viewers) assert.ok(GOOGLE_VIEWER_ACL_UNIT_TESTS.includes(file), file);
+  const headSha = 'e'.repeat(40), paths = GOOGLE_VIEWER_ACL_FEATURE_PATHS.map(selectorRepositoryPath);
+  const viewer = planFor(paths, { headSha, googleViewerAclVerification: googleViewerAclEvidence(headSha, {}, paths) });
+  for (const file of viewers) assert.ok(viewer.googleViewerAclSelection.unitFiles.includes(file), 'viewer transitive omission: ' + file);
+  const refreshPaths = GOOGLE_DRIVE_ACL_REFRESH_FEATURE_PATHS.map(selectorRepositoryPath);
+  const refresh = planFor(refreshPaths, { headSha, googleDriveAclRefreshVerification: googleDriveAclRefreshEvidence(headSha, {}, refreshPaths) });
+  const shared = planFor(['nextjs/lib/auth.ts']);
+  for (const file of ['lib/durable-compile-orchestration.test.ts', 'lib/job-worker-route.test.ts']) {
+    assert.ok(GOOGLE_DRIVE_ACL_REFRESH_UNIT_TESTS.includes(file), file);
+    assert.ok(refresh.unitFiles.includes(file), 'refresh transitive omission: ' + file);
+    assert.ok(shared.sharedAuthBillingSelection.unitFiles.includes(file), 'shared auth transitive omission: ' + file);
+  }
+  assert.equal(shared.runFullHermeticVitest, true, 'unrelated shared auth retains its existing full fallback');
 });
 
 test('reviewed Google Viewer ACL patch selects direct and helper suites while preserving Docs/pricing and workspace checks', () => {

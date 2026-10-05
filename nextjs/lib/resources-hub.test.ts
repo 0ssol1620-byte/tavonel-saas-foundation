@@ -2,10 +2,21 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  ACCESS_CTA,
+  CUSTOMER_NAV,
+  EXPLORE_CTA,
+  FOOTER_GROUPS,
+  FOOTER_LEGAL_ROW,
+  HEADER_NAV,
+  NAV_GROUPS,
+  NAV_PRICING,
+  PRIMARY_NAV,
   RESOURCE_LINKS,
   RESOURCE_PURPOSES,
   RESOURCE_TAG_LABELS,
   RESOURCE_WORKFLOWS,
+  SELF_SERVE_CTA,
+  navHrefs,
   resourceFilterHref,
 } from "./site-navigation";
 import { COOKBOOKS } from "./cookbook-content";
@@ -115,8 +126,9 @@ describe("a solution page hands the reader on to the hub and the docs", () => {
   `site-navigation.ts` -- `RESOURCE_LINKS` is one of several arrays in that file, and the footer and
   the nav are the other ways a page gets linked from everywhere at once.
 
-  So the check is the file text with its comments removed, because all three files discuss
-  `/cookbooks/*` in prose on purpose and a prose mention is not a link. It is conditioned on the
+  Page and CSS source retains the comment-stripped route ban, and navigation is checked through the exported
+  destination records. NAV_ALSO_OWNS only maps active states; it does not offer a link.
+  The check is conditioned on the
   records: the day one is approved this fails, and failing is correct -- approval is a deliberate
   edit in three places (the record, the sitemap's ROUTES, and this test), not a silent unlocking.
 */
@@ -128,8 +140,14 @@ describe("nothing links a draft cookbook", () => {
     "../app/resources/page.tsx",
     "../app/resources/resources.module.css",
     "../app/solutions/[slug]/page.tsx",
-    "./site-navigation.ts",
   ];
+
+  const destinations = [
+    ...CUSTOMER_NAV, ...HEADER_NAV, ...PRIMARY_NAV, ...RESOURCE_LINKS,
+    ...FOOTER_GROUPS.flatMap((group) => group.links),
+    FOOTER_LEGAL_ROW.language, FOOTER_LEGAL_ROW.languageBack,
+    ACCESS_CTA, SELF_SERVE_CTA, EXPLORE_CTA, NAV_PRICING,
+  ].map((link) => link.href).concat([...navHrefs()], NAV_GROUPS.map((group) => group.overviewHref));
 
   it("holds only while every record is a draft", () => {
     expect(COOKBOOKS.map((record) => record.publication)).toEqual(Array(6).fill("draft"));
@@ -141,5 +159,27 @@ describe("nothing links a draft cookbook", () => {
     // The stripper has to be doing something, or this test is vacuous on the two files that
     // discuss the route in prose.
     if (file.endsWith("page.tsx")) expect(source.length).toBeLessThan(read(file).length);
+  });
+
+  it("offers no draft cookbook through customer navigation or calls to action", () => {
+    expect(destinations.length).toBeGreaterThan(0);
+    for (const href of destinations) {
+      expect(href, "customer navigation links a draft cookbook").not.toContain("/cookbooks");
+    }
+  });
+
+  it("guards both footer language switch destinations", () => {
+    for (const link of [FOOTER_LEGAL_ROW.language, FOOTER_LEGAL_ROW.languageBack]) {
+      expect(destinations, "footer language switch is missing from the destination inventory").toContain(link.href);
+      expect(link.href, "footer language switch links a draft cookbook").not.toContain("/cookbooks");
+    }
+  });
+
+  it("guards every navigation panel overview destination", () => {
+    expect(NAV_GROUPS.length).toBeGreaterThan(0);
+    for (const group of NAV_GROUPS) {
+      expect(destinations, `${group.section} overview is missing from the destination inventory`).toContain(group.overviewHref);
+      expect(group.overviewHref, `${group.section} overview links a draft cookbook`).not.toContain("/cookbooks");
+    }
   });
 });

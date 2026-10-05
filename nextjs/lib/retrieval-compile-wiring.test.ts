@@ -60,7 +60,7 @@ vi.mock("@/lib/world-store", async (importOriginal) => ({
   getFoundationActiveWorld: activeWorld,
   getWorldFreshness: freshness,
 }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
   authorizeFoundationRequest: async () => ({
@@ -320,6 +320,7 @@ describe("promotion compiles the retrieval index", () => {
     const askBody = await asked.json();
     expect(askBody.retrievalPath).toBe("compiled-retrieval-v1");
     expect(askBody.code).toBe("GROUNDED_ANSWER");
+    expect(sourceAccess).toHaveBeenCalledWith(WORKSPACE, ["doc-one", "doc-two"], USER);
     // R4-02: the compiled path used to return citations with no answer text at all.
     expect(askBody.answerMode).toBe("evidence_excerpts");
     expect(typeof askBody.answer).toBe("string");

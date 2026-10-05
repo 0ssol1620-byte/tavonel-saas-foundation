@@ -99,7 +99,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "TRIAGE_STAGE_FILE_INVALID", meaning: "A file in the triage staging request failed its identity, type or size checks.", whatToDo: "Review that file's reported error and select a supported file before retrying." },
       { code: "TRIAGE_STAGE_PARTIAL", meaning: "At least one requested file failed staging; the response may also identify files that were staged successfully.", whatToDo: "Inspect every per-file result and reselect any member that did not stage." },
       { code: "TRIAGE_CHOICES_REQUIRED", status: 409, meaning: "The triage receipt did not include one supported include or exclude choice for every reviewed file.", whatToDo: "Review every listed item and submit an include or exclude choice for the complete set." },
-      { code: "INTAKE_TRIAGE_ROLLOUT_DISABLED", status: 503, meaning: "The coordinated server triage workflow is not enabled on this deployment.", whatToDo: "Retry only after the triage client, server and versioned storage contract are deployed together." },
+      { code: "INTAKE_TRIAGE_ROLLOUT_DISABLED", status: 503, meaning: "The coordinated file triage workflow is not enabled.", whatToDo: "Retry only after the triage client, server and versioned storage contract are deployed together." },
       { code: "INTAKE_RETRIAGE_REQUIRED", status: 409, meaning: "The saved triage receipt is missing, stale or inconsistent with the approved member and current configuration.", whatToDo: "Review and approve a fresh complete-set triage receipt before continuing." },
       { code: "INTAKE_TRIAGE_OBJECT_NOT_SEALED", status: 409, meaning: "The server cannot prove the triage upload was sealed into the required immutable quarantine object.", whatToDo: "Reconcile the same member and retry only after the server confirms its sealed state." },
       { code: "INTAKE_TRIAGE_OBJECT_CHANGED", status: 409, meaning: "The quarantine object no longer matches the approved triage member's size, type or immutable version.", whatToDo: "Do not confirm this object; reconcile the approved member or review a fresh intake." },
@@ -447,7 +447,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
     title: "Connections and connectors",
     summary: "Durable cursors, and the refusals that keep two syncs from disagreeing.",
     codes: [
-      { code: "GOOGLE_VIEWER_LINK_NOT_ENABLED", status: 503, meaning: "Google Viewer Link authorization is unavailable on this deployment.", whatToDo: "Use an enabled connector or retry after this integration is configured." },
+      { code: "GOOGLE_VIEWER_LINK_NOT_ENABLED", status: 503, meaning: "Google Drive identity linking is not enabled.", whatToDo: "Use an enabled connector or retry after this integration is configured." },
       { code: "GOOGLE_VIEWER_LINK_CONSENT_INVALID", meaning: "The Google consent response did not prove the requested viewer-only access and consent state.", whatToDo: "Restart authorization and grant the requested viewer-only permission." },
       { code: "OAUTH_REFRESH_TOKEN_MISSING", meaning: "The OAuth provider returned no refresh token for a connector that requires persistent access.", whatToDo: "Re-authorize the connector with the provider's offline access consent enabled." },
       { code: "CONNECTION_NOT_FOUND", status: 404, meaning: "No such connection in this workspace.", whatToDo: "List `GET /connections`." },

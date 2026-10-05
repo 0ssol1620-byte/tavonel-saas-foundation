@@ -25,7 +25,7 @@ const { authorize, revalidate, activeWorld, pipeline, sourceIds, sourceAccess } 
   sourceIds: vi.fn(), sourceAccess: vi.fn(),
 }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: sourceIds }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
@@ -182,6 +182,7 @@ describe("idempotency", () => {
     expect(denied.status).toBe(403);
     expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     expect(sourceAccess).toHaveBeenCalledTimes(3);
+    expect(sourceAccess.mock.calls).toEqual(Array.from({ length: 3 }, () => [WORKSPACE, ["source-fixture"], "user-1"]));
   });
   it("does not run either answer path when the source binding cannot be resolved", async () => {
     sourceIds.mockResolvedValue({ ok: false, code: "COLLECTION_SOURCE_BINDING_INVALID" });

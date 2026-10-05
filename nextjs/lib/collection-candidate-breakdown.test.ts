@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(), access: vi.fn(), active: vi.fn(), jobs: vi.fn(), decisions: vi.fn(),
 }));
 vi.mock("./collection-storage", () => ({ loadPreferredCollectionCandidate: mocks.load }));
-vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access }));
+vi.mock("./connector-source-access", () => ({ checkConnectorSourceAccess: mocks.access, checkConnectorSourceAccessForViewer: mocks.access }));
 // Partial: world-read-model imports EMPTY_WORLD_FRESHNESS from here, and only the two reads need stubbing.
 vi.mock("./world-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./world-store")>()),
@@ -22,7 +22,7 @@ vi.mock("./world-store", async (importOriginal) => ({
   listFoundationWorldVersions: vi.fn(),
 }));
 vi.mock("./r2-synthetic-canary", () => ({ readR2SignerEnv: () => ({ bucket: "fixture" }) }));
-vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: "pilot-acme01" } }) }));
+vi.mock("./developer-auth", () => ({ authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: "pilot-acme01", userId: "969dc192-daa2-4119-a5d9-9a7621f171a1" } }) }));
 vi.mock("./compile-job-store", () => ({ listWorkspaceCompileJobs: mocks.jobs }));
 vi.mock("./review-store", () => ({ listFoundationReviewDecisions: mocks.decisions }));
 
@@ -156,4 +156,5 @@ it("does not attach a breakdown to a denied read", async () => {
   const { response, body } = await read();
   expect(response.status).toBe(403);
   expect(body).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+  expect(mocks.access).toHaveBeenCalledWith("pilot-acme01", ["breakdown-read"], "969dc192-daa2-4119-a5d9-9a7621f171a1");
 });

@@ -114,7 +114,10 @@ describe("something other than a browser turns the crank", () => {
   it("advances compiles from the scheduled worker", () => {
     const worker = read("app/api/internal/jobs/run/route.ts");
     expect(worker).toContain("runCompileJobBatch()");
-    expect(worker).toContain("authorized(request)");
+    expect(worker).toContain('import { isInternalWorkerAuthorized } from "@/lib/internal-worker-auth"');
+    const handler = worker.slice(worker.indexOf("async function runOneBatch"));
+    expect(handler).toMatch(/if \(!isInternalWorkerAuthorized\(request\)\) \{\s*return NextResponse\.json\([\s\S]*?status: 401[\s\S]*?\}\);\s*\}/);
+    expect(handler.indexOf("isInternalWorkerAuthorized(request)")).toBeLessThan(handler.indexOf("await runCompileJobBatch()"));
   });
 
   it("is actually scheduled", () => {

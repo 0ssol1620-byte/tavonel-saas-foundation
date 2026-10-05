@@ -58,7 +58,7 @@ vi.mock("@/lib/world-store", () => ({
 }));
 vi.mock("@/lib/world-read-model", () => ({ loadWorldReadModel: fx.readModel }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: fx.sourceIds }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: fx.sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: fx.sourceAccess, checkConnectorSourceAccessForViewer: fx.sourceAccess }));
 vi.mock("@/lib/derived-data-admission", () => ({
   admitsDerivedCustomerData: fx.admits,
   // lib/derived-data-admission.ts: DERIVED_DATA_REFUSED.
@@ -1567,6 +1567,8 @@ describe("consumer context: wired route handlers over owned synthetic fixtures",
     expect(fx.revalidate.mock.calls.every((call) => (call[1] as FoundationPrincipal).keyId === KEY_ID)).toBe(true);
     // The bound World read is the resolved digest, never the preferred candidate.
     expect(fx.readModel.mock.calls.map((call) => call[2])).toEqual([ALPHA_V7, ALPHA_V7]);
+    expect(fx.sourceAccess).toHaveBeenCalledWith(WORKSPACE, ["doc-alpha-1"], USER_ID);
+    expect(fx.sourceAccess.mock.calls.filter((call) => call.length === 3).every((call) => call[2] === USER_ID)).toBe(true);
 
     // A browser session is bound by its user id, and holds only the route's own scope.
     const session = sessionContext();
