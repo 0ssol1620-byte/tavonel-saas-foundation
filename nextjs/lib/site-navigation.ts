@@ -34,19 +34,25 @@ export const CUSTOMER_NAV: readonly SiteLink[] = [
 export const HEADER_NAV: readonly SiteLink[] = CUSTOMER_NAV.filter((link) => link.href !== "/pricing");
 
 /*
-  A bar item also owns the pages nested under its section. Developers carries its documentation,
-  API reference and changelog; the remaining research and trust routes stay in the footer directory.
-  /sources has no direct owner in this row, so it is never marked as another section.
+  A bar item also owns the pages nested under its section. Product carries its use cases and
+  source routes; Developers carries its documentation, API reference, changelog and cookbooks.
+  Research and trust routes stay in the footer directory.
 */
 const NAV_ALSO_OWNS: Readonly<Record<string, readonly string[]>> = {
-  "/developers": ["/docs", "/api", "/changelog"],
+  "/product": ["/solutions", "/sources", "/integrations", "/knowledge-compiler"],
+  "/developers": ["/docs", "/api", "/changelog", "/cookbooks"],
 };
 
-export function customerNavOwns(href: string, pathname: string): boolean {
+export function customerNavCurrent(href: string, pathname: string): "page" | "location" | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
   // A prefix is only a prefix at a segment boundary: /productivity is not under /product.
   const under = (prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
-  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href);
+  if (path === href) return "page";
+  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href) ? "location" : undefined;
+}
+
+export function customerNavOwns(href: string, pathname: string): boolean {
+  return customerNavCurrent(href, pathname) !== undefined;
 }
 
 /* ==================================================================== BA-232 / BA-252: vocabulary

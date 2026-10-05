@@ -147,6 +147,20 @@ describe("landing v2 -- the composition", () => {
   );
 
   it.each(LOCALES)(
+    "%s renders headline sentences targeted by the mounted paper stylesheet",
+    locale => {
+      const heading = mainOf(render(locale)).match(/<h1 id="lv2-hero-title">([\s\S]*?)<\/h1>/)?.[1] ?? "";
+      const sentences = [...heading.matchAll(/<span class="paper-hero-sentence">([^<]*)<\/span>/g)].map(match => match[1]);
+      expect(sentences).toEqual(locale === "ko"
+        ? ["문서에서 찾은 지식,", "원문에서 확인하세요"]
+        : ["Knowledge from your documents.", "Evidence you can inspect."]);
+      expect(PAPER_CSS).toMatch(/\.paper-product \.paper-hero-copy h1 \.paper-hero-sentence\s*\{[^}]*display:\s*block/);
+      expect(PAPER_CSS).toContain(".paper-product .paper-hero-copy h1 .paper-hero-sentence + .paper-hero-sentence");
+      expect(heading).not.toContain("aria-hidden");
+    }
+  );
+
+  it.each(LOCALES)(
     "%s gives each scene below the hero its own h2, and skips no level",
     locale => {
       const main = mainOf(render(locale));

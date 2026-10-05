@@ -61,14 +61,17 @@
 
 /* The phone disclosure stays legible on paper, scrolled, and unscrolled public headers. */
 .nav.chrome-v2-header .one-path-mobile-nav > summary {
-  border-color: #111519;
-  background: #111519;
-  color: #f7f5ef;
+  min-height: 44px;
+  border-radius: 6px;
+  border-color: #88928d;
+  background: #f7f5ef;
+  color: #111519;
+  transition: color .15s ease, border-color .15s ease;
 }
 @media (max-width: 400px) {
   .nav.chrome-v2-header .one-path-mobile-nav > summary::before,
   .nav.chrome-v2-header .one-path-mobile-nav > summary::after {
-    color: #f7f5ef;
+    color: #111519;
     background: currentColor;
   }
 }
@@ -99,7 +102,8 @@
 @media (hover: hover) and (pointer: fine) {
   .one-path-primary-nav .site-nav-direct:hover { color: var(--text-hi); }
 }
-.one-path-primary-nav .site-nav-direct[aria-current="page"] {
+.one-path-primary-nav .site-nav-direct[aria-current="page"],
+.one-path-primary-nav .site-nav-direct[aria-current="location"] {
   color: var(--text-hi);
   text-decoration: underline;
   text-decoration-color: #2447b3;
@@ -115,9 +119,11 @@
   font-size: 15px;
   letter-spacing: 0;
 }
-.one-path-mobile-nav .mobile-nav-direct[aria-current="page"] {
+/* Section ownership uses the same blue selection cue on phone as the desktop underline. */
+.one-path-mobile-nav .mobile-nav-direct[aria-current="page"],
+.one-path-mobile-nav .mobile-nav-direct[aria-current="location"] {
   color: var(--text-hi);
-  box-shadow: inset 2px 0 0 var(--verified);
+  box-shadow: inset 2px 0 0 #2447b3;
 }
 .one-path-mobile-nav .mobile-nav-signin {
   border-top: 1px solid var(--border-dark, var(--hairline));
@@ -160,7 +166,7 @@
     margin: 0;
     background: currentColor;
     color: var(--text-hi);
-    transition: transform .18s ease, box-shadow .18s ease;
+    transition: none;
   }
   .one-path-mobile-nav > summary::before { transform: translateY(-5.5px); box-shadow: 0 5px 0 currentColor; }
   .one-path-mobile-nav > summary::after { transform: translateY(4.5px); }

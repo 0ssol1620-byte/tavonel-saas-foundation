@@ -126,11 +126,31 @@ test("Developers owns its documentation routes", async ({ page }) => {
   await page.goto("/docs/mcp");
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
-  await expect(panel.getByRole("link", { name: "Developers", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(panel.getByRole("link", { name: "Developers", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
+  await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
+});
+
+for (const item of CUSTOMER_LINKS) {
+  test(`the exact ${item.label} destination is the current page`, async ({ page }) => {
+    await page.goto(item.href);
+    const { panel } = await openMenu(page);
+    await expect(panel.getByRole("link", { name: item.label, exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
+    await expect(panel.locator('a.mobile-nav-direct[aria-current="location"]')).toHaveCount(0);
+  });
+}
+
+test("Product owns its source page as a section", async ({ page }) => {
+  await page.goto("/sources");
+  const { panel } = await openMenu(page);
+  await expect(panel.getByRole("link", { name: "Product", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
+  await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
 });
 
 test("no customer choice claims a page the bar does not own", async ({ page }) => {
-  await page.goto("/sources");
+  await page.goto("/contact");
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
 });
@@ -191,15 +211,25 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
 const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product", "/ko", "/ko/pricing"] as const;
 
 for (const route of PUBLIC_HEADER_ROUTES) {
-  test(`the mobile menu has a high-contrast ink surface on ${route}`, async ({ page }) => {
+  test(`the mobile menu has a high-contrast paper surface on ${route}`, async ({ page }) => {
     await page.addInitScript(() => window.localStorage.clear());
     await page.goto(route);
     const summary = page.locator("header.nav details.mobile-primary-nav > summary");
     await expect(summary).toBeVisible();
-    await expect(summary).toHaveCSS("background-color", "rgb(17, 21, 25)");
-    await expect(summary).toHaveCSS("color", "rgb(247, 245, 239)");
-    const glyphColor = await summary.evaluate((element) => getComputedStyle(element, "::before").color);
-    expect(glyphColor).toBe("rgb(247, 245, 239)");
+    await expect(summary).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    await expect(summary).toHaveCSS("color", "rgb(17, 21, 25)");
+    await expect(summary).toHaveCSS("border-radius", "6px");
+    const style = await summary.evaluate((element) => ({
+      background: getComputedStyle(element).backgroundColor,
+      color: getComputedStyle(element).color,
+      glyph: getComputedStyle(element, "::before").color,
+    }));
+    expect(style.glyph).toBe("rgb(17, 21, 25)");
+    expect(contrastRatio(style.color, style.background), "Menu label contrast").toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(style.glyph, style.background), "Menu glyph contrast").toBeGreaterThanOrEqual(4.5);
+    const bounds = await summary.boundingBox();
+    expect(bounds!.width, "Menu target width").toBeGreaterThanOrEqual(44);
+    expect(bounds!.height, "Menu target height").toBeGreaterThanOrEqual(44);
   });
 }
 

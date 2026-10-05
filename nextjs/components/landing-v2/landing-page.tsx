@@ -134,7 +134,10 @@ export default function LandingPage({
             <div className="paper-hero-copy">
               <p className="paper-availability"><span aria-hidden="true">●</span> {korean ? "공개 샘플 이용 가능 · 내 문서는 상담 후 평가" : "Public sample available · Your documents by agreement"}</p>
               <p className="paper-label">{korean ? "근거를 가진 AI 지식" : "Knowledge with a source"}</p>
-              <h1 id="lv2-hero-title">{korean ? <>문서에서 찾은 지식,<br />원문에서 확인하세요</> : <>Knowledge from your documents.<br /><span>Evidence you can inspect.</span></>}</h1>
+              <h1 id="lv2-hero-title">
+                <span className="paper-hero-sentence">{korean ? "문서에서 찾은 지식," : "Knowledge from your documents."}</span>{" "}
+                <span className="paper-hero-sentence">{korean ? "원문에서 확인하세요" : "Evidence you can inspect."}</span>
+              </h1>
               <p className="paper-hero-description">{korean ? "흩어진 내용을 근거와 함께 살펴보고, 어떤 문서와 버전에서 나왔는지 확인하세요. 사용할 AI에 연결하는 경로도 함께 제공합니다." : "Explore what your documents say, trace it to the original passage, and understand which version your AI is using."}</p>
               <HeroActions exploreLabel={korean ? "공개 샘플 열기" : "Open the public sample"} exploreHref={heroActions.exploreHref} pricingLabel={access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : startActions.accessLabel} pricingHref={access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref} scene="1" />
             </div>

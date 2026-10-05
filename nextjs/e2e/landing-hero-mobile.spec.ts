@@ -16,6 +16,21 @@ test("fits the original source page and preserves its route to the inspector", a
   const bounds = await image.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(bounds!.y, "the source page begins in the initial phone viewport").toBeLessThan(page.viewportSize()!.height);
+  const overlay = source.locator(".paper-source-box");
+  await expect(overlay).toHaveCount(1);
+  const alignment = await overlay.evaluate(element => {
+    const box = element as HTMLElement;
+    const image = box.parentElement!.querySelector("img")!.getBoundingClientRect();
+    const actual = box.getBoundingClientRect();
+    return [
+      Math.abs(actual.left - (image.left + Number.parseFloat(box.style.left) / 100 * image.width)),
+      Math.abs(actual.top - (image.top + Number.parseFloat(box.style.top) / 100 * image.height)),
+      Math.abs(actual.width - Number.parseFloat(box.style.width) / 100 * image.width),
+      Math.abs(actual.height - Number.parseFloat(box.style.height) / 100 * image.height),
+    ];
+  });
+  for (const error of alignment) expect(error, "source overlay stays aligned with its document coordinates").toBeLessThanOrEqual(2);
   const aspect = await image.evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight);
   expect(Math.abs(bounds!.width / bounds!.height - aspect)).toBeLessThan(0.01);
   await expect(source.locator("blockquote")).not.toBeEmpty();
@@ -43,4 +58,23 @@ test("reduced motion retains the exact source and its evidence action", async ({
   await expect(source.locator("blockquote")).not.toBeEmpty();
   await expect(page.locator("#s1 video")).toHaveCount(0);
   await expect(source.getByRole("link", { name: "Inspect this evidence" })).toBeVisible();
+});
+
+
+test("the mounted headline applies distinct sentence styles in English and Korean", async ({ page }) => {
+  for (const route of ["/", "/ko"]) {
+    await page.goto(route);
+    const sentences = page.locator("#lv2-hero-title > .paper-hero-sentence");
+    await expect(sentences).toHaveCount(2);
+    await expect(sentences.nth(0)).toHaveText(route === "/ko" ? "문서에서 찾은 지식," : "Knowledge from your documents.");
+    await expect(sentences.nth(1)).toHaveText(route === "/ko" ? "원문에서 확인하세요" : "Evidence you can inspect.");
+    await expect(sentences.nth(0)).toHaveCSS("font-size", "36px");
+    await expect(sentences.nth(0)).toHaveCSS("font-weight", "550");
+    await expect(sentences.nth(1)).toHaveCSS("font-size", "32px");
+    await expect(sentences.nth(1)).toHaveCSS("font-weight", "450");
+    for (const sentence of [sentences.nth(0), sentences.nth(1)]) {
+      await expect(sentence).toHaveCSS("display", "block");
+      await expect(sentence).toHaveCSS("color", "rgb(23, 28, 32)");
+    }
+  }
 });

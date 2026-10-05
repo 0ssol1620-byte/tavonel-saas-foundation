@@ -5,6 +5,8 @@ import sitemap from "@/app/sitemap";
 import { exploreSampleDocuments } from "./explore-sample";
 import {
   CUSTOMER_NAV,
+  customerNavCurrent,
+  customerNavOwns,
   EXPLORE_CTA,
   FOOTER_GROUPS,
   FOOTER_LEGAL_ROW,
@@ -321,5 +323,43 @@ describe("which bar item owns the page being read", () => {
   it("reads a trailing slash as the same page", () => {
     expect(navSectionForPath("/docs/mcp/")).toBe("developers");
     expect(navSectionForPath("/pricing/")).toBe("pricing");
+  });
+});
+
+describe("the customer navigation's current page and section", () => {
+  it.each(CUSTOMER_NAV)("marks the exact $href destination as the current page", ({ href }) => {
+    expect(customerNavCurrent(href, href)).toBe("page");
+    expect(customerNavCurrent(href, `${href}/`)).toBe("page");
+    expect(customerNavOwns(href, href)).toBe(true);
+  });
+
+  it.each([
+    ["/product/compiled-world", "/product"],
+    ["/solutions", "/product"],
+    ["/solutions/source-grounded-assistants", "/product"],
+    ["/sources", "/product"],
+    ["/integrations", "/product"],
+    ["/knowledge-compiler", "/product"],
+    ["/docs", "/developers"],
+    ["/docs/mcp", "/developers"],
+    ["/api", "/developers"],
+    ["/changelog", "/developers"],
+    ["/cookbooks", "/developers"],
+  ])("marks %s as a location within %s, with one owner", (path, owner) => {
+    expect(customerNavCurrent(owner, path)).toBe("location");
+    expect(customerNavCurrent(owner, `${path}/`)).toBe("location");
+    expect(CUSTOMER_NAV.filter(({ href }) => customerNavOwns(href, path)).map(({ href }) => href)).toEqual([owner]);
+  });
+
+  it.each([
+    "/", "/research", "/trust", "/contact", "/privacy", "/workspace",
+    "/productivity", "/solutions-extra", "/sources-extra", "/integrations-old",
+    "/knowledge-compiler-extra", "/developers-guide", "/docs-old", "/apidocs",
+    "/changelog-extra", "/cookbookshelf", "/explorers", "/pricing-extra",
+  ])("gives %s no false page or section owner", (path) => {
+    for (const { href } of CUSTOMER_NAV) {
+      expect(customerNavCurrent(href, path)).toBeUndefined();
+      expect(customerNavOwns(href, path)).toBe(false);
+    }
   });
 });

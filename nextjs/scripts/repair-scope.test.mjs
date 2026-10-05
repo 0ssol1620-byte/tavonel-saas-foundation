@@ -53,6 +53,10 @@ import {
   INTAKE_TRIAGE_BROWSER_FILE,
   verifyIntakeTriageScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
+  PUBLIC_EDITORIAL_PREDECESSOR_SHA,
+  PUBLIC_EDITORIAL_SOURCE_BLOBS,
+  PUBLIC_EDITORIAL_FEATURE_PATHS,
+  verifyPublicEditorialScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
 import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
@@ -1633,4 +1637,156 @@ test('unknown paths and non-ancestor anchor inputs fail closed', () => {
   assert.throws(() => collectChangedPaths({
     repairAnchorSha: 'f'.repeat(40), headSha: testHeadSha, repoRoot: process.cwd(),
   }), /Command failed|not a commit|Not a valid object/);
+});
+function editorialEvidence({ overrides = {}, changedPaths = PUBLIC_EDITORIAL_FEATURE_PATHS, ancestor = true, repairAnchorSha = AUDITED_REPAIR_ANCHOR_SHA, headSha = testHeadSha } = {}) {
+  const blobs = new Map();
+  for (const [path, expected] of Object.entries(PUBLIC_EDITORIAL_SOURCE_BLOBS)) {
+    blobs.set(`${PUBLIC_EDITORIAL_PREDECESSOR_SHA}:nextjs/${path}`, expected.predecessor);
+    blobs.set(`${testHeadSha}:nextjs/${path}`, expected.candidate);
+  }
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifyPublicEditorialScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot: 'fixture-root',
+    exec: (command, args, options) => {
+      assert.equal(command, 'git');
+      assert.equal(options.shell, false);
+      if (args[0] === 'merge-base') {
+        assert.deepEqual(args, ['merge-base', '--is-ancestor', PUBLIC_EDITORIAL_PREDECESSOR_SHA, headSha]);
+        if (!ancestor) throw new Error('non-ancestor');
+        return '';
+      }
+      assert.equal(args[0], 'rev-parse');
+      const blob = blobs.get(args[1]);
+      if (!blob) throw new Error('missing blob');
+      return blob + '\n';
+    },
+  });
+}
+
+test('root-reviewed intake browser fixture correction retains the exact predecessor and fail-closed admission', () => {
+  assert.equal(INTAKE_TRIAGE_PREDECESSOR_SHA, '8944cbfb0335f3120c71dc823b4106da5de4a6af');
+  assert.deepEqual(INTAKE_TRIAGE_SOURCE_BLOBS[INTAKE_TRIAGE_BROWSER_FILE], {
+    predecessor: null,
+    candidate: 'f27e04ba8db721a5ec38f861ef32838ceb10ec3c',
+  });
+  const verification = intakeTriageEvidence(testHeadSha);
+  assert.equal(verification.eligible, true);
+  for (const candidate of ['0e78bd577e479648b71f49af145f1de709cf24a6', 'f'.repeat(40), null]) {
+    const rejected = intakeTriageEvidence(testHeadSha, { [`${testHeadSha}:nextjs/${INTAKE_TRIAGE_BROWSER_FILE}`]: candidate });
+    assert.equal(rejected.eligible, false);
+    assert.ok(rejected.candidateMismatches.includes(INTAKE_TRIAGE_BROWSER_FILE));
+    const plan = planFor(INTAKE_TRIAGE_FEATURE_PATHS, { intakeTriageVerification: rejected });
+    assert.equal(plan.runFullHermeticVitest, true);
+    assert.equal(plan.databaseRehearsalStatus, 'invalidated-pending-rehearsal');
+    assert.ok(plan.pendingQualificationDebt.includes('database-contract'));
+    assert.ok(plan.browserFiles.includes(INTAKE_TRIAGE_BROWSER_FILE));
+  }
+  assert.deepEqual(planBrowserRuns([INTAKE_TRIAGE_BROWSER_FILE], false), [
+    { kind: 'project', project: 'audit', files: [INTAKE_TRIAGE_BROWSER_FILE] },
+  ]);
+});
+
+test('public editorial admission rejects every altered preimage, final blob, missing path and non-ancestor', () => {
+  assert.equal(PUBLIC_EDITORIAL_PREDECESSOR_SHA, 'b1a69fc631ad381bd386a57f44aee2668b71a03d');
+  assert.equal(PUBLIC_EDITORIAL_FEATURE_PATHS.length, 15);
+  assert.equal(editorialEvidence().eligible, true);
+  for (const path of PUBLIC_EDITORIAL_FEATURE_PATHS) {
+    const wrongFinal = editorialEvidence({ overrides: { [`${testHeadSha}:nextjs/${path}`]: 'f'.repeat(40) } });
+    assert.equal(wrongFinal.eligible, false, path);
+    assert.deepEqual(wrongFinal.candidateMismatches, [path]);
+    const wrongBase = editorialEvidence({ overrides: { [`${PUBLIC_EDITORIAL_PREDECESSOR_SHA}:nextjs/${path}`]: 'f'.repeat(40) } });
+    assert.equal(wrongBase.eligible, false, path);
+    assert.deepEqual(wrongBase.predecessorMismatches, [path]);
+    assert.equal(editorialEvidence({ changedPaths: PUBLIC_EDITORIAL_FEATURE_PATHS.filter(value => value !== path) }).eligible, false, path);
+    assert.equal(editorialEvidence({ overrides: { [`${testHeadSha}:nextjs/${path}`]: null } }).eligible, false, path);
+  }
+  assert.equal(editorialEvidence({ ancestor: false }).eligible, false);
+  assert.equal(editorialEvidence({ repairAnchorSha: 'a'.repeat(40) }).eligible, false);
+  assert.equal(editorialEvidence({ headSha: PUBLIC_EDITORIAL_PREDECESSOR_SHA }).eligible, false);
+});
+
+test('public editorial overlap hashes require the complete reviewed stack and preserve old admissions', () => {
+  const blobs = new Map();
+  for (const [paths, predecessor] of [[DOCS_PRICING_EXPECTED_BLOBS, DOCS_PRICING_PREDECESSOR_SHA], [MOBILE_NAV_CONTRAST_BLOBS, MOBILE_NAV_CONTRAST_PREDECESSOR_SHA]]) {
+    for (const [path, expected] of Object.entries(paths)) {
+      blobs.set(`${AUDITED_REPAIR_ANCHOR_SHA}:nextjs/${path}`, expected.anchor);
+      blobs.set(`${predecessor}:nextjs/${path}`, expected.predecessor);
+      blobs.set(`${testHeadSha}:nextjs/${path}`, PUBLIC_EDITORIAL_SOURCE_BLOBS[path]?.candidate ?? expected.candidate);
+    }
+  }
+  const args = { repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA, headSha: testHeadSha,
+    changedPaths: [...PUBLIC_EDITORIAL_FEATURE_PATHS, ...DOCS_PRICING_FEATURE_PATHS], repoRoot: 'fixture-root',
+    exec: (_command, args) => { const value = blobs.get(args[1]); if (!value) throw new Error('missing'); return value + '\n'; },
+  };
+  for (const verify of [verifyDocsPricingScopeEvidence, verifyMobileNavContrastEvidence]) {
+    assert.equal(verify(args).eligible, false);
+    assert.equal(verify({ ...args, publicEditorialVerification: editorialEvidence({ ancestor: false }) }).eligible, false);
+    assert.equal(verify({ ...args, publicEditorialVerification: editorialEvidence() }).eligible, true);
+  }
+  assert.equal(docsPricingEvidence(testHeadSha).eligible, true);
+  assert.equal(mobileNavContrastEvidence(testHeadSha).eligible, true);
+});
+
+test('public editorial ownership stays narrow, retains screenshot and release debt, and fails closed', () => {
+  const changedPaths = [...PUBLIC_EDITORIAL_FEATURE_PATHS, ...DOCS_PRICING_FEATURE_PATHS];
+  const args = { publicEditorialVerification: editorialEvidence(), docsPricingVerification: { eligible: true }, mobileNavVerification: { eligible: true } };
+  const plan = planFor(changedPaths, args);
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.deepEqual(plan.unknownPaths, []);
+  assert.equal(plan.requirePublicUiScreenshots, true);
+  assert.equal(plan.repairAnchorSha, AUDITED_REPAIR_ANCHOR_SHA);
+  assert.equal(plan.testedBaseline.commit, AUDITED_REPAIR_ANCHOR_SHA);
+  assert.equal(plan.fullQualification, 'pending');
+  assert.ok(plan.pendingFullDebt.includes('PR-base full CI'));
+  assert.ok(plan.pendingFullDebt.includes('PR-base full Launch QA'));
+  for (const file of ['lib/docs-navigation.test.ts', 'lib/landing-v2-page.test.ts', 'lib/site-nav-model.test.ts']) assert.ok(plan.unitFiles.includes(file));
+  for (const evidence of [null, editorialEvidence({ ancestor: false })]) {
+    const rejected = planFor(changedPaths, { ...args, publicEditorialVerification: evidence });
+    assert.equal(rejected.runFullHermeticVitest, true);
+    assert.deepEqual(rejected.unitFiles, []);
+    assert.equal(rejected.requirePublicUiScreenshots, true);
+  }
+  for (const unknown of ['components/site-nav/other-nav.tsx', 'components/docs/other-toc.module.css', 'components/other-pricing-page-client.tsx']) {
+    const rejected = planFor([...changedPaths, unknown], args);
+    assert.equal(rejected.runFullHermeticVitest, true);
+    assert.deepEqual(rejected.unknownPaths, [unknown]);
+  }
+});
+
+test('public editorial docs, nav and headline tests use configured projects and retain six required screenshots', () => {
+  const plan = planFor([...PUBLIC_EDITORIAL_FEATURE_PATHS, ...DOCS_PRICING_FEATURE_PATHS], {
+    publicEditorialVerification: editorialEvidence(), docsPricingVerification: { eligible: true }, mobileNavVerification: { eligible: true },
+  });
+  const runs = planBrowserRuns(plan.browserFiles, false);
+  const projects = file => runs.filter(run => run.files.includes(file)).map(run => run.project);
+  assert.deepEqual(projects('e2e/docs-reading-layout.spec.ts'), ['1440', '390', 'reduced-motion']);
+  assert.deepEqual(projects('e2e/site-nav.spec.ts'), ['1440']);
+  assert.deepEqual(projects('e2e/launch-qa-mobile-nav.spec.ts'), ['launch-chromium']);
+  assert.deepEqual(projects('e2e/landing-hero-mobile.spec.ts'), ['390', '360']);
+  const config = readFileSync(new URL('../playwright.config.ts', import.meta.url), 'utf8');
+  assert.match(config, /const widths\s*=\s*\[[^\]]*\b1440\b[^\]]*\b390\b[^\]]*\b360\b[^\]]*\]/);
+  assert.match(config, /name:\s*"reduced-motion"/);
+  assert.match(config, /name:\s*`launch-\$\{browserName\}`[\s\S]*?testMatch:\s*\/launch-qa/);
+  const auditPattern = config.match(/const auditSpecs = \/(.+)\//)?.[1];
+  assert.ok(auditPattern);
+  for (const file of plan.publicEditorialSelection.browserFiles.filter(file => !file.includes('launch-qa'))) assert.equal(new RegExp(auditPattern).test(file), false);
+  const global = readFileSync(new URL('../vitest.config.ts', import.meta.url), 'utf8');
+  assert.ok(global.includes('"lib/**/*.test.ts"'));
+  for (const configName of ['vitest.repair-scope.config.ts', 'vitest.repair-scope.async.config.ts']) {
+    assert.ok(readFileSync(new URL('../' + configName, import.meta.url), 'utf8').includes('...inheritedIncludes'));
+  }
+  const scopedArgs = buildUnitArgs([...plan.unitFiles, 'components/intake-triage-review.test.tsx'], '/reports/editorial.json');
+  assert.ok(scopedArgs.includes('vitest.repair-scope.config.ts'));
+  for (const file of plan.publicEditorialSelection.unitFiles) assert.ok(scopedArgs.includes(file));
+  const asyncArgs = buildUnitArgs([...plan.unitFiles, 'app/api/compile-jobs/route.test.ts'], '/reports/editorial-async.json');
+  assert.ok(asyncArgs.includes('vitest.repair-scope.async.config.ts'));
+  for (const file of plan.publicEditorialSelection.unitFiles) assert.ok(asyncArgs.includes(file));
+  const workflow = readFileSync(resolve(process.cwd(), '..', '.github/workflows/repair-scope.yml'), 'utf8');
+  const expected = workflow.match(/expected=\(([\s\S]*?)\)/)?.[1].trim().split(/\s+/);
+  assert.deepEqual(expected, [
+    'public-ui-desktop-1440x900-docs-mcp.png', 'public-ui-desktop-1440x900-home.png', 'public-ui-desktop-1440x900-pricing.png',
+    'public-ui-mobile-390x844-docs-mcp.png', 'public-ui-mobile-390x844-home.png', 'public-ui-mobile-390x844-pricing.png',
+  ]);
+  assert.ok(workflow.includes("steps.plan.outputs.public_ui_capture == 'true'"));
+  assert.ok(workflow.includes('${#screenshots[@]} != ${#expected[@]}'));
+  assert.ok(workflow.includes('diff -u'));
 });

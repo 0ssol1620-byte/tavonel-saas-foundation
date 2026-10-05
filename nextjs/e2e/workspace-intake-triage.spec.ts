@@ -124,7 +124,18 @@ async function installReadyStageFlow(
     providerCalls: 0,
     monetaryCostStatus: "not_priced",
   } }));
-  await page.route("https://upload.fixture.invalid/**", route => route.fulfill({ status: 200 }));
+  await page.route("https://upload.fixture.invalid/**", async route => {
+    const origin = route.request().headers().origin;
+    if (!origin) return route.abort();
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: {
+        "access-control-allow-origin": origin,
+        "access-control-allow-methods": "PUT, OPTIONS",
+        "access-control-allow-headers": "content-type",
+      } });
+    }
+    return route.fulfill({ status: 200, headers: { "access-control-allow-origin": origin } });
+  });
   await page.route("**/api/v1/uploads/triage/complete", route => route.fulfill({ status: 200, json: { code: "TRIAGE_FILE_SEALED" } }));
   await page.route("**/api/v1/uploads/triage/receipt", async route => {
     const body = route.request().postDataJSON() as { choices: Record<string, string> };
@@ -185,7 +196,11 @@ test("legacy fallback requires explicit maximum approval and a double click appr
   await page.getByRole("button", { name: "Review sources before processing" }).click();
   const approve = page.getByRole("button", { name: "Approve maximum & upload" });
   await expect(approve).toContainText("Approve maximum & upload");
-  await expect(page.getByText(/\$0\.06/)).toBeVisible();
+  const maximumTerm = page.getByRole("term").filter({ hasText: /^Maximum$/ });
+  await expect(maximumTerm).toHaveCount(1);
+  const maximumPrice = maximumTerm.locator("xpath=following-sibling::dd");
+  await expect(maximumPrice).toHaveCount(1);
+  await expect(maximumPrice).toHaveText("$0.06");
   expect(approvalCalls).toBe(0);
   await approve.click();
   await approvalStartedGate;

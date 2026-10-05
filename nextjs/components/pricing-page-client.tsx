@@ -831,28 +831,34 @@ export default function PricingPageClient({
               a paragraph of prose is a heading pretending to be emphasis, and this paragraph is
               two sentences long -- there is nothing in it a reader has to be steered past.
             */}
-            <p className="lede">
-              Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
-              pages each month; Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
-              Additional pages are {formatUsd(STANDARD_PAGE_USD)} each, with complex processing
-              capped at {formatUsd(MAXIMUM_PAGE_USD)} per page and confirmed before a run.
-            </p>
-            {/*
-              BA-119. Audit M04's disclosure stays -- both gates are still read from
-              `activationPolicy` on the server and printed in the policy's own words -- but not as
-              two identical grey notices between the price and the plans.
+            <div className="pricing-context">
+              <p className="lede">
+                Developer includes {BILLING_OFFERS.observer_access.includedPages.toLocaleString("en-US")} standard
+                pages each month; Team includes {BILLING_OFFERS.studio_access.includedPages.toLocaleString("en-US")}.
+                Additional pages are {formatUsd(STANDARD_PAGE_USD)} each, with complex processing
+                capped at {formatUsd(MAXIMUM_PAGE_USD)} per page and confirmed before a run.
+              </p>
+              {/*
+                BA-119. Audit M04's disclosure stays -- both gates are still read from
+                `activationPolicy` on the server and printed in the policy's own words -- but not as
+                two identical grey notices between the price and the plans.
 
-              The intake gate is fine print under the grid (below). The promotion gate is a feature
-              tile in "How your plan works": it is closed on purpose, it is one of the things this
-              product is sold on, and rendering it in `.notice.static` beside a closed gate made a
-              designed property read as a defect.
-            */}
-            <aside className="paper-purchase-boundary" aria-label="Before choosing a plan">
-              <h2>{selfService ? "Check the scope before choosing a plan" : "Start with the sample. Agree on your evaluation."}</h2>
-              {!ownFilesOpen ? <p>{gates.find(gate => gate.id === "customerData")?.reason}</p> : null}
-              <p>Developer and Team are currently single-member workspaces. The Team name does not include team invitations, shared roles, or organization administration.</p>
-              <p><Link href="/evaluation">Discuss an evaluation</Link> · <Link href="/sources">Read processing limits</Link> · <Link href="/status">Check current availability</Link></p>
-            </aside>
+                The intake gate is fine print under the grid (below). The promotion gate is a feature
+                tile in "How your plan works": it is closed on purpose, it is one of the things this
+                product is sold on, and rendering it in `.notice.static` beside a closed gate made a
+                designed property read as a defect.
+              */}
+              <aside className="paper-purchase-boundary" aria-label="Before choosing a plan">
+                <h2>{selfService ? "Check the scope before choosing a plan" : "Start with the sample. Agree on your evaluation."}</h2>
+                {!ownFilesOpen ? <p>{gates.find(gate => gate.id === "customerData")?.reason}</p> : null}
+                <p>Developer and Team are currently single-member workspaces. The Team name does not include team invitations, shared roles, or organization administration.</p>
+                <nav className="pricing-utility-links" aria-label="Pricing resources">
+                  <Link href="/evaluation">Discuss an evaluation</Link>
+                  <Link href="/sources">Read processing limits</Link>
+                  <Link href="/status">Check current availability</Link>
+                </nav>
+              </aside>
+            </div>
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan) => (
                 <article className="plan" key={plan.name} data-featured={plan.name === "Developer" ? 1 : 0}>
@@ -871,20 +877,18 @@ export default function PricingPageClient({
                     and "TRY IT FREE" on two of four cards, shouted in caps above a heading that
                     already names the plan, and it was the element whose presence on two cards
                     and absence on two was half of the misalignment. The featured plan is still
-                    marked -- `data-featured` fills its ground and its button.
+                    marked -- `data-featured` supplies a blue top rule and its button.
 
                     BA-131 stands: every card carries a unit under its price, so "$0" and
                     "Custom" line up with the two that have one.
                   */}
                   <div className="plan-head">
                     <h2>{plan.name}</h2>
-                    {/*
-                      G2-009 and G2-039. The currency is part of the price and the qualifier is a
-                      block under it. As a trailing `<small>` the Enterprise card's "/ scoped with
-                      you" wrapped mid-phrase and left "you" alone on its own line.
-                    */}
-                    <span className="price">{plan.price}</span>
-                    <p className="fine">{plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit}</p>
+                    <span className="price">
+                      <span>{plan.price.endsWith(" USD") ? plan.price.slice(0, -4) : plan.price}</span>
+                      {plan.price.endsWith(" USD") ? <>{" "}<small className="price-currency">USD</small></> : null}
+                    </span>
+                    <p className="fine price-period">{plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit}</p>
                   </div>
                   {/*
                     SD-01 (G1-001 on this page). The Evaluation card promised "your own files"

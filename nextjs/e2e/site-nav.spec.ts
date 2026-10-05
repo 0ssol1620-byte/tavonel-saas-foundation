@@ -163,36 +163,29 @@ const DESKTOP: Scenario[] = [
     },
   },
   {
-    /*
-      The old file pinned `aria-current="true"` on a trigger. `customerNavOwns` sets "page" -- the
-      value assistive technology acts on, and the reason the two CSS rules that styled "true"
-      never matched anything.
-
-      /docs/mcp is the case worth measuring: Developers owns the existing documentation route even
-       though its URL is nested. Research is still reachable from the shared footer, but no direct
-       primary item claims it. The second half is /sources, which remains unowned as well.
-    */
+    // Exact destinations identify a page; nested or related destinations identify the section.
     name: "the link that owns the page being read is marked, and no other is",
     width: 1440,
     run: async (page) => {
-      await page.goto("/docs/mcp");
-      await expect(page.locator(`${BAR} a[href="/developers"]`)).toHaveAttribute("aria-current", "page");
-      await expect(page.locator(`${BAR} a[href="/explore"]`)).not.toHaveAttribute("aria-current", "page");
-      expect(
-        await page.locator(`${BAR} a[aria-current]`).count(),
-        "more than one bar link claims to be the page being read",
-      ).toBe(1);
+      for (const entry of [
+        { path: "/product", owner: "/product", current: "page" },
+        { path: "/explore", owner: "/explore", current: "page" },
+        { path: "/developers", owner: "/developers", current: "page" },
+        { path: "/docs/mcp", owner: "/developers", current: "location" },
+        { path: "/sources", owner: "/product", current: "location" },
+      ]) {
+        await page.goto(entry.path);
+        await expect(page.locator(`${BAR} a[href="${entry.owner}"]`)).toHaveAttribute("aria-current", entry.current);
+        expect(await page.locator(`${BAR} a[aria-current]`).count(), entry.path).toBe(1);
+        expect(await page.locator(`${BAR} a[aria-current="page"]`).count(), entry.path)
+          .toBe(entry.current === "page" ? 1 : 0);
+      }
       await page.goto("/research");
       expect(
         await page.locator(`${BAR} a[aria-current]`).count(),
         "Research must stay unowned by a different primary section",
       ).toBe(0);
       await expect(page.locator('footer.site a[href="/research"]').first()).toHaveAttribute("href", "/research");
-      await page.goto("/sources");
-      expect(
-        await page.locator(`${BAR} a[aria-current]`).count(),
-        "a bar link claims /sources, which no visible section owns",
-      ).toBe(0);
     },
   },
   {
@@ -346,6 +339,13 @@ for (const review of PUBLIC_UI_REVIEW_VIEWPORTS) {
         await expect(page).toHaveURL(arrivedAt(route.path));
         await expect(page.locator("header.nav")).toBeVisible();
         await expect(page.locator("main h1").first()).toBeVisible();
+        if (route.path === "/pricing") {
+          const prices = page.locator(".plans .plan .price");
+          await expect(prices).toHaveCount(4);
+          for (const text of await prices.allTextContents()) {
+            if (text.includes("USD")) expect(text.trim(), "amount and USD remain separate readable words").toMatch(/^\$\d+(?:\.\d+)? USD$/);
+          }
+        }
         await page.screenshot({
           path: testInfo.outputPath(`public-ui-${review.name}-${route.name}.png`),
         });
