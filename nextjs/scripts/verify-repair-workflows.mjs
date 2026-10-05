@@ -12,6 +12,7 @@ const scopedVitest = readFileSync(resolve(repo, 'nextjs/vitest.repair-scope.conf
 const asyncScopedVitest = readFileSync(resolve(repo, 'nextjs/vitest.repair-scope.async.config.ts'), 'utf8');
 const globalVitest = readFileSync(resolve(repo, 'nextjs/vitest.config.ts'), 'utf8');
 const reportValidator = readFileSync(resolve(repo, 'nextjs/scripts/repair-test-report.mjs'), 'utf8');
+const collectorVerifier = readFileSync(resolve(repo, 'nextjs/scripts/repair-collector-only.mjs'), 'utf8');
 const repairFixture = JSON.parse(readFileSync(resolve(repo, 'nextjs/scripts/fixtures/current-foundation-residual-workflow-paths.json'), 'utf8'));
 const branches = [
   'main',
@@ -64,6 +65,16 @@ for (const result of ['needs.preflight.result', 'needs.browser-qa.result', 'need
 }
 assert(/pull_request:\n\s+types: \[opened, synchronize, reopened\]/.test(repair), 'repair event set changed');
 assert(repair.includes('name: Repair scope validation'), 'repair check must remain distinct');
+assert(repair.includes('run: node scripts/repair-collector-only.mjs plan'), 'Repair must independently verify collector eligibility before narrowing');
+assert(dbRehearsal.includes('run: node nextjs/scripts/repair-collector-only.mjs eligibility') && dbRehearsal.includes('needs: [collector-only-eligibility]'), 'DB must independently verify source and prior evidence');
+assert(dbRehearsal.includes("if: always() && (needs.collector-only-eligibility.result != 'success' || needs.collector-only-eligibility.outputs.eligible != 'true')"), 'DB must run normally on missing or failed collector eligibility');
+for (const workflow of [repair, dbRehearsal]) {
+  assert(workflow.includes('actions: read') && workflow.includes('GH_TOKEN: ${{ github.token }}'), 'prior run evidence must use the read-only authenticated Actions API');
+  assert(workflow.includes('fetch-depth: 0'), 'collector ancestry and complete source diff require full checkout history');
+}
+assert(repair.includes('node --test scripts/repair-collector-only.test.mjs') && repair.includes("--test-name-pattern='mounted|collector|report|browser project|browser groups|Playwright'"), 'collector-only must execute its selector/lineage and existing report/capture regressions');
+assert(collectorVerifier.includes("'0d24a1c185cb05f931aa61413e8eb6da604c7113'") && collectorVerifier.includes("'9cc2d96094675468671602da60943ffa5eb5c1c4'") && collectorVerifier.includes("'c978599b44621801142cd81a5f3dfbb9802f27d0'"), 'collector-only must require all three immutable fix blobs');
+assert(collectorVerifier.includes("'f082847ccd0eb5e65676f357d86a8025d143377b'") && collectorVerifier.includes('37320682454') && collectorVerifier.includes('111798647893') && collectorVerifier.includes('37320682223') && collectorVerifier.includes('111798647331'), 'collector-only must retain exact failed-Repair/successful-DB evidence lineage');
 assert(repair.includes('PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}'), 'PR base must be retained separately');
 assert(repair.includes('REPAIR_ANCHOR_SHA: 6401c3524b5294f3a395acede35e4632eb89c0fb'), 'authenticated full-pass repair anchor changed');
 assert(planner.includes("export const AUDITED_REPAIR_ANCHOR_SHA = '6401c3524b5294f3a395acede35e4632eb89c0fb'"), 'selector anchor must match the authenticated full-pass SHA');

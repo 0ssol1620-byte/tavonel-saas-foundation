@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: repair-scope-${{ github.event.pull_request.number }}
@@ -40,7 +41,8 @@ jobs:
         id: plan
         env:
           RUN_REPAIR_SCOPE: "1"
-        run: node scripts/repair-scope.mjs
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/repair-collector-only.mjs plan
       - name: Verify workflow and selector contracts
         id: workflow-static
         if: steps.plan.outputs.workflow_static == 'true'
@@ -48,11 +50,21 @@ jobs:
       - name: Run selector regression tests
         id: selector-tests
         if: steps.plan.outputs.selector_tests == 'true'
-        run: node --test scripts/repair-scope.test.mjs
+        run: |
+          if [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
+            node --test scripts/repair-collector-only.test.mjs
+          else
+            node --test scripts/repair-scope.test.mjs
+          fi
       - name: Run browser report and screenshot regressions
         id: browser-report-tests
         if: steps.plan.outputs.workflow_static == 'true'
-        run: node --test scripts/repair-scope.test.mjs
+        run: |
+          if [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
+            node --test --test-name-pattern='mounted|collector|report|browser project|browser groups|Playwright' scripts/repair-scope.test.mjs
+          else
+            node --test scripts/repair-scope.test.mjs
+          fi
       - run: pnpm install --frozen-lockfile
       - name: Scan repository secrets
         id: secrets
@@ -200,6 +212,7 @@ jobs:
         if: always()
         env:
           PLAN_RESULT: ${{ steps.plan.outcome }}
+          GH_TOKEN: ${{ github.token }}
           SECRET_RESULT: ${{ steps.secrets.outcome }}
           CHECK_RESULT: ${{ steps.check.outcome }}
           VITEST_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome || (steps.plan.outputs.unit == 'true' && steps.targeted-vitest.outcome) || 'success' }}

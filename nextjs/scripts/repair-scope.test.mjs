@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -2397,6 +2398,68 @@ function mountedCaptureFixture(root) {
   writeFileSync(reportPath, JSON.stringify(report));
   return { report, reportPath, output, destination: resolve(root, 'test-results/repair-scope-intake-mounted') };
 }
+
+test('mounted collector accepts the production file attachment after Playwright 1.62 normalization and JSON serialization', async () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'repair-capture-reporter-'));
+  assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+  try {
+    const fixture = mountedCaptureFixture(root);
+    const sourceBytes = readFileSync(new URL('../e2e/workspace-intake-triage.spec.ts', import.meta.url));
+    assert.equal(createHash('sha1').update(`blob ${sourceBytes.length}\0`).update(sourceBytes).digest('hex'), WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate);
+    const source = sourceBytes.toString('utf8');
+    assert.match(source, /import \{ writeFile \} from "node:fs\/promises";/);
+    const start = source.indexOf('        const name = `intake-mounted-${phase}-${viewport.width}x${viewport.height}`;');
+    const end = source.indexOf('        await preflight.screenshot', start);
+    assert.ok(start >= 0 && end > start);
+    // Execute the source's attachment block, then reproduce the pinned reporter boundary:
+    // util.ts normalizeAndSaveAttachment copies path inputs into attachments/name-SHA1.ext;
+    // reporters/json.ts emits { name, contentType, path, body: body?.toString('base64') }.
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+    const attachGeometry = new AsyncFunction('testInfo', 'writeFile', 'phase', 'viewport', 'clearBox', 'triageBox', 'inventoryBox', 'selectBox', 'labelTextBottom', 'escaped', source.slice(start, end));
+    const normalized = [];
+    const testInfo = {
+      outputPath: filename => resolve(fixture.output, filename),
+      attach: async (name, options) => {
+        assert.equal(Number(options.path !== undefined) + Number(options.body !== undefined), 1);
+        if (options.path !== undefined) {
+          const hash = createHash('sha1').update(options.path).digest('hex');
+          const path = resolve(fixture.output, 'attachments', `${name}-${hash}.json`);
+          await mkdir(dirname(path), { recursive: true });
+          await copyFile(options.path, path);
+          normalized.push({ name, contentType: options.contentType, path });
+        } else normalized.push({ name, contentType: options.contentType, body: options.body });
+      },
+    };
+    const box = { x: 0, y: 0, width: 140, height: 44 };
+    for (const name of WORKSPACE_INTAKE_CAPTURE_NAMES) {
+      const [width, height] = name.split('-').at(-1).split('x').map(Number);
+      await attachGeometry(testInfo, writeFile, name.split('-')[2], { width, height }, box, box, box, box, 1, []);
+    }
+    fixture.report.suites[0].specs[0].tests[0].results[0].attachments = normalized.map(attachment => ({
+      name: attachment.name, contentType: attachment.contentType, path: attachment.path, body: attachment.body?.toString('base64'),
+    }));
+    writeFileSync(fixture.reportPath, JSON.stringify(fixture.report));
+    const serialized = JSON.parse(readFileSync(fixture.reportPath, 'utf8')).suites[0].specs[0].tests[0].results[0].attachments;
+    assert.ok(serialized.every(attachment => typeof attachment.path === 'string' && !Object.hasOwn(attachment, 'body')));
+    const copied = collectWorkspaceIntakeCaptures(root);
+    assert.deepEqual(copied.sort(), WORKSPACE_INTAKE_CAPTURE_NAMES.flatMap(name => [`${name}.png`, `${name}.json`]).sort());
+    assert.deepEqual(readdirSync(fixture.destination).sort(), copied);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('mounted collector still rejects inline Buffer reporter bodies before destination writes', () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'repair-capture-inline-'));
+  assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+  try {
+    const fixture = mountedCaptureFixture(root);
+    fixture.report.suites[0].specs[0].tests[0].results[0].attachments = fixture.report.suites[0].specs[0].tests[0].results[0].attachments.map(attachment => ({
+      name: attachment.name, contentType: attachment.contentType, body: readFileSync(attachment.path).toString('base64'),
+    }));
+    writeFileSync(fixture.reportPath, JSON.stringify(fixture.report));
+    assert.throws(() => collectWorkspaceIntakeCaptures(root), /Invalid mounted geometry attachment/);
+    assert.equal(existsSync(fixture.destination), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test('collector rejects destination and test-results parent junctions before any outside-root mutation', () => {
   for (const position of ['parent', 'destination', 'leaf']) {

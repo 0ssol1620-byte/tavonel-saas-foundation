@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: db-rehearsal-${{ github.ref }}
@@ -34,8 +35,31 @@ env:
   HISTORY_BOUNDARY: "0048"
 
 jobs:
+  collector-only-eligibility:
+    name: Verify exact collector-only DB evidence reuse
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.scope.outputs.eligible }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Independently verify unchanged DB source and prior evidence
+        id: scope
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node nextjs/scripts/repair-collector-only.mjs eligibility
   db-rehearsal:
     name: db-rehearsal
+    needs: [collector-only-eligibility]
+    # Missing verifier, denied API access, altered paths or any classifier failure runs DB normally.
+    if: always() && (needs.collector-only-eligibility.result != 'success' || needs.collector-only-eligibility.outputs.eligible != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -649,7 +673,8 @@ jobs:
   # secret, no database credentials. The harness creates its own disposable keys and S3.
   browser-storage-transport:
     name: Local Chromium signed-storage transport
-    if: github.event_name == 'pull_request'
+    needs: [collector-only-eligibility]
+    if: always() && github.event_name == 'pull_request' && (needs.collector-only-eligibility.result != 'success' || needs.collector-only-eligibility.outputs.eligible != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
@@ -348,8 +349,11 @@ async function captureMountedTriageLayout(page: Page, testInfo: TestInfo, phase:
         expect(escaped).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
         const name = `intake-mounted-${phase}-${viewport.width}x${viewport.height}`;
+        // File attachments keep the reporter path bound to this test's output directory.
+        const geometryPath = testInfo.outputPath(`${name}-geometry.json`);
+        await writeFile(geometryPath, JSON.stringify({ viewport, clearBox, triageBox, inventoryBox, selectBox, labelTextBottom, escaped }, null, 2), "utf8");
         await testInfo.attach(`${name}-geometry`, {
-          body: Buffer.from(JSON.stringify({ viewport, clearBox, triageBox, inventoryBox, selectBox, labelTextBottom, escaped }, null, 2)),
+          path: geometryPath,
           contentType: "application/json",
         });
         await preflight.screenshot({ path: testInfo.outputPath(`${name}.png`), animations: "disabled" });

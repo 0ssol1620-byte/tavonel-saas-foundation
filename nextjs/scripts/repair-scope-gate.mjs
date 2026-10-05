@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectorLineageFailures, verifyCollectorEligibility } from './repair-collector-only.mjs';
 
-export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun' }) {
+export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
   const deferred = new Set(plan.deferredGroups ?? []);
   const failed = failures.length > 0 || headSha !== plan.headSha;
   const gateFailures = [...failures];
@@ -34,9 +35,11 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
     ...plan,
     completedHeadSha: headSha,
     runResults,
-    databaseObservation: deferred.has('database-contract') ? databaseResult : 'not-applicable',
+    databaseObservation: plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
     pendingDebt: [...pendingDebt].sort(),
     passedGroupAnchors,
+    executedChecks,
+    inheritedChecks: plan.collectorOnly ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
     fullQualification: 'pending',
     gate: failed ? 'failed' : 'passed-scoped-only',
     gateFailures,
@@ -68,12 +71,27 @@ function runGate() {
     ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
+  if (plan.collectorOnly || plan.groups.includes('mounted-intake-attachment')) {
+    // Revalidate at the final gate; a planning claim cannot authorize inherited evidence.
+    const verified = verifyCollectorEligibility({ headSha: env.HEAD_SHA });
+    for (const reason of collectorLineageFailures(plan, verified)) requirements.push([reason, 'failure']);
+  }
   if (plan.groups.includes('selector-config')) requirements.push(['selector regression tests', env.SELECTOR_TEST_RESULT]);
   const failures = requirements.filter(([, result]) => result !== 'success').map(([name, result]) => `${name}: ${result ?? 'not run'}`);
   const receipt = buildRepairReceipt(plan, {
     headSha: env.HEAD_SHA,
     failures,
     databaseResult: env.DATABASE_REHEARSAL_RESULT ?? 'unrun',
+    executedChecks: {
+      plan: env.PLAN_RESULT, secretScan: env.SECRET_RESULT, typesAndLint: env.CHECK_RESULT,
+      ...(plan.runWorkflowStaticGate ? { workflowStatic: env.WORKFLOW_RESULT } : {}),
+      ...(plan.groups.includes('selector-config') ? { selectorContracts: env.SELECTOR_TEST_RESULT } : {}),
+      ...(plan.runCdrWorkerChecks ? { worker: env.CDR_WORKER_RESULT } : {}),
+      ...(plan.runFullHermeticVitest || plan.unitFiles.length ? { units: env.VITEST_RESULT } : {}),
+      ...(plan.runFullHermeticVitest ? { scripts: env.AUX_RESULT } : {}),
+      ...(browserRequired ? { browserInstall: env.BROWSER_INSTALL_RESULT, browserBuild: env.BROWSER_BUILD_RESULT, selectedBrowsers: env.BROWSER_RESULT } : {}),
+      ...(plan.requireWorkspaceIntakeCapture ? { mountedCaptures: env.WORKSPACE_INTAKE_CAPTURE_RESULT } : {}),
+    },
   });
   writeFileSync('repair-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(`Scoped group results: ${JSON.stringify(receipt.runResults)}`);

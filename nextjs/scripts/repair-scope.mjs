@@ -130,7 +130,7 @@ export const WORKSPACE_INTAKE_LAYOUT_BLOBS = Object.freeze({
   },
   "e2e/workspace-intake-triage.spec.ts": {
     "predecessor": "108b6e76c78574c64b3ebbf4cb2035ee14df7f34",
-    "candidate": "4362fe002fcd7be6fff0da4dd1a3401307a7ea14"
+    "candidate": "0d24a1c185cb05f931aa61413e8eb6da604c7113"
   },
   "lib/intake-triage-layout.test.ts": {
     "predecessor": null,
