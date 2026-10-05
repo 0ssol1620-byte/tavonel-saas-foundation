@@ -829,7 +829,7 @@ alter table public.foundation_intake_approvals
       and triage_version = 'tavonel-intake-triage-v1'
       and triage_inventory_digest is not null
       and triage_inventory_digest ~ '^sha256:[a-f0-9]{64}$'
-      and configuration_revision is not null and char_length(configuration_revision) between 1 and 128),
+      and configuration_revision is not null and char_length(configuration_revision) between 1 and 128)),
   add constraint foundation_intake_approval_stage_scope_check check (
     (approval_stage is null and budget_scope is null)
     or (approval_stage = 'full_processing' and budget_scope = 'entire_affected_compile_request')

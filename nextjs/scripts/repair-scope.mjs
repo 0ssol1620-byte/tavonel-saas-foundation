@@ -481,7 +481,7 @@ export const INTAKE_TRIAGE_SOURCE_BLOBS = Object.freeze({
   },
   'supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql': {
     predecessor: null,
-    candidate: "3c8a5fead7cce12e8a374105a70280c6bb33d5b1"
+    candidate: "140b9f410d33a8dfa2ebd1c33421f88e2856877d"
   },
   'supabase/drafts/tests/foundation_intake_triage_binding.sql': {
     predecessor: null,
