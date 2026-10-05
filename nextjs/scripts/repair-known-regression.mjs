@@ -165,15 +165,15 @@ export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
   ".github/workflows/repair-scope.yml": "27a7c4732b77d27f931e1c033ee5db9317b60c2c5d460b4dcd14d4f0d59e75c1",
-  "nextjs/scripts/repair-collector-only.mjs": "2e807c8834c19dadb48a4efb29d76babcf3c9d369690d1a25303e59b4e492b39",
+  "nextjs/scripts/repair-collector-only.mjs": "72da192c8f90c4116742c134ee78153703f64c6cc2b779e09a2514809e5c53e2",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
   "nextjs/scripts/repair-scope.test.mjs": "ab5d1c9e8461e0afc3e7928be2b1f225eeabc58612ed3b100180b87566cac9d7",
   "nextjs/scripts/repair-scope-gate.mjs": "d4c8e8f32eaa4ee5194a9efffe56e6b9017a19f7df2a1d30df975fc02c568a0d",
   "nextjs/scripts/verify-repair-workflows.mjs": "8d97852224a5697ce3d2142a833779c75892fc1baf2309095493e03e9f00cff6",
   "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-known-regression.mjs": "bb138736fb67050e15106a69b97527695ec56201ec6f762ecde1faace13935f9",
-  "nextjs/scripts/repair-known-regression.test.mjs": "5738fd3f7b5f60135c551bcd8b39fbb728fb514a4bc718f0b3bdb3e3b70aac3f",
-  ".github/workflows/db-rehearsal.yml": "65952869fb893636e93e13ff60e975da12cfb8e9a07d14585bcf0a5180aed9db",
+  "nextjs/scripts/repair-known-regression.mjs": "12d6d4ef753d4c6340295f8f0cd56782f4a20e00d1f55029d580eaf628bd5cea",
+  "nextjs/scripts/repair-known-regression.test.mjs": "ad50abcc6ce5bd06b49f69110eb40ecf8ebe3b5efb5a6f5d08ba5f3cf6a81d01",
+  ".github/workflows/db-rehearsal.yml": "1bc9db12d4f7ce2f8c952d7e69d302dad0a07ec47e42fac21bcff4fc95df0c4d",
   "nextjs/scripts/run-repair-check.mjs": "d60f9881f94ba0792955ca7238e6540e087c5c12ef222d1af9e9319d5d468c3f"
 });
 // repair-seal:end
@@ -573,7 +573,52 @@ export const INTAKE_868_ARTIFACT = Object.freeze({ id: 11365195888,
   name: `repair-scope-141-${INTAKE_GEOMETRY_PARENT}`,
   digest: 'sha256:ceb1a12ce8b83362ff2b45775f2a564fc19a2e7cab82e1474514cc766cc82c3a',
 });
+export const INTAKE_LOG_PARENT = '2d678803af9fe0c6ee49ebe3065265696a726ca2';
+export const INTAKE_LOG_CONFIG_PATHS = Object.freeze([
+  "nextjs/scripts/repair-known-regression.mjs",
+  "nextjs/scripts/repair-known-regression.test.mjs",
+  "nextjs/scripts/repair-collector-only.mjs",
+  ".github/workflows/db-rehearsal.yml"
+]);
+export const INTAKE_LOG_PARENT_BLOBS = Object.freeze({
+  ".github/workflows/repair-scope.yml": "91d0b4dc9b05aa8f7228e1d74a64ecf9f6029f02",
+  "nextjs/scripts/repair-collector-only.mjs": "82c845fea6079f2272493fa1b1c64a724e259053",
+  "nextjs/scripts/repair-scope.mjs": "07b181b59bab2f636dafe9f1227b18e8113c452d",
+  "nextjs/scripts/repair-scope.test.mjs": "26f5ada994eb32cc1a33c0e9c6893673a8110d26",
+  "nextjs/scripts/repair-scope-gate.mjs": "ca5590e9a7fbc4c42e34d777be904a3580394bff",
+  "nextjs/scripts/verify-repair-workflows.mjs": "3b80ade16a2e70fe471d141090966baf883907e7",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0d663692d93fa562c15260db4b9941e1fda7deb4",
+  "nextjs/scripts/repair-known-regression.mjs": "6f9453dafcf8148059e98d88f9e661dbcaf2a2e6",
+  "nextjs/scripts/repair-known-regression.test.mjs": "c0c6011d18669de49a6c2e49e428761fecb60256",
+  ".github/workflows/db-rehearsal.yml": "577569c0ca40d4922c1209c4f9e35310bbd7cb37",
+  "nextjs/scripts/run-repair-check.mjs": "a591b0b1a975cf8162bcce6ea5ce47d427ca5089",
+  "nextjs/vitest.config.ts": "91bb009bae9930952594c8fb8164b714a43e8686",
+  "nextjs/vitest.repair-scope.config.ts": "6ae26121a08e403d45a05387901ce59c41cc0f12",
+  "nextjs/vitest.repair-scope.async.config.ts": "bc2b6ea23ab4a011c985490f36904ff827ef8c71",
+  "nextjs/playwright.config.ts": "714b979d42627a61aa32610880bd7dcd248e1a0a",
+  "nextjs/scripts/repair-test-report.mjs": "1062af93c3a69dc16d6c89a3ff5f32bf65e6a6d2",
+  "nextjs/package.json": "1c4612f4032f79dc4277a3db06c1b5e78902377c",
+  "nextjs/pnpm-lock.yaml": "58ead4e268de3717f1438eec9d1d59af9b119e1d",
+  "nextjs/e2e/workspace-intake-layout.spec.ts": "a8fe356d750250e1dffca97fab39126a678ba029",
+  "nextjs/app/workspace/page.tsx": "ef5ef3cf8a8b1ccabd33d60de84770cf7dfdb8da",
+  "nextjs/app/workspace-no1.css": "af7a97aaa3dab8fc748cf7fdf9f3511c4e3926a0",
+  "nextjs/components/intake-triage-review.test.tsx": "d1f13f33cd4457ce7b8c4211e1e75892a8f089eb",
+  "nextjs/components/intake-triage-review.tsx": "2144d39f94178ed9d82b33f5b9dafbbf14989aa9",
+  "nextjs/lib/intake-triage-client.test.ts": "82f7fbf663dd7f5a2e8bca68340ec890803b2e1a",
+  "nextjs/lib/intake-triage-copy.ts": "66f5488c1e10644b8e7121fedb6136f68cfa2eb3",
+  "nextjs/lib/preflight-report.test.ts": "52e8e1633b80fc43a986925836d25121b28779d2",
+  "nextjs/lib/preflight-report.ts": "bcbc6b3b1ed4005541de9425941055ef78d29572",
+  "nextjs/components/intake-triage-review.interaction.test.ts": "4dd927224df839b7c9ef1624e0cbd47ad8bd3b04",
+  "nextjs/lib/intake-triage-paid-flow.test.ts": "0b21721aa3d86fb3aa943833b7a83fd27f235cb6",
+  "nextjs/lib/workspace-mobile-layout.test.ts": "74d44e4d05140a750b4e4f9e2a3fb501ad935c7a",
+  "nextjs/lib/workspace-intake.test.ts": "ffa9595ea0f7c3c06e5c0bc8f431080940d22caf",
+  "nextjs/lib/workspace-compile-floor-and-ceiling.test.ts": "18af61c718dd57cf539a06b2f02af6c35fd6a41c",
+  "nextjs/lib/copy-trust-guard.test.ts": "fe652cc6f5e918b92f5326a7c518c677bd8ec0c5",
+  "nextjs/e2e/workspace-intake-triage.spec.ts": "72f68ba25ea4c01571d1752584638ade859115a7",
+  "nextjs/lib/intake-triage-layout.test.ts": "4baa34be94b4773e1acfbbb62ec330ea76ce2a9c"
+});
 function intakeSourceProfile(parent) {
+  if (parent === INTAKE_LOG_PARENT) return { parent, sources: Object.fromEntries(Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS).map(([path, pin]) => [path, { ...pin, before: pin.after }])), changedSources: [], configs: INTAKE_LOG_CONFIG_PATHS, parentBlobs: INTAKE_LOG_PARENT_BLOBS };
   if (parent === INTAKE_PARENT) return { parent, sources: INTAKE_SOURCE_BLOBS, configs: INTAKE_CONFIG_PATHS, parentBlobs: INTAKE_PARENT_BLOBS };
   if (parent === INTAKE_GEOMETRY_PARENT) return { parent, sources: INTAKE_GEOMETRY_SOURCE_BLOBS, configs: INTAKE_GEOMETRY_CONFIG_PATHS, parentBlobs: INTAKE_GEOMETRY_PARENT_BLOBS };
   return null;
@@ -629,7 +674,8 @@ export function classifyIntakePresentationIntent({ headSha, exec = execFileSync 
     if (parents[0] !== headSha || parents.some(sha => !/^[a-f0-9]{40}$/.test(sha))) throw Error('Unreadable intake parent metadata.');
     const profile = parents.length === 2 ? intakeSourceProfile(parents[1]) : null;
     if (!profile) return { classification: 'normal', intended: false, reason: 'Outside the exact895/868 intake parents.' };
-    if (profile.parent === INTAKE_GEOMETRY_PARENT && git(['rev-list', '--parents', '-n', '1', profile.parent]) !== `${INTAKE_GEOMETRY_PARENT} ${INTAKE_PARENT}`) throw Error('868 must be the exact direct895 child.');
+    if ([INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT].includes(profile.parent) && git(['rev-list', '--parents', '-n', '1', INTAKE_GEOMETRY_PARENT]) !== `${INTAKE_GEOMETRY_PARENT} ${INTAKE_PARENT}`) throw Error('868 must be the exact direct895 child.');
+    if (profile.parent === INTAKE_LOG_PARENT && git(['rev-list', '--parents', '-n', '1', INTAKE_LOG_PARENT]) !== `${INTAKE_LOG_PARENT} ${INTAKE_GEOMETRY_PARENT}`) throw Error('2d678 must be the exact direct868 child.');
     const paths = git(['-C', repoRoot, 'diff', '--name-only', '--no-relative', '--no-renames', '-z', `${profile.parent}..${headSha}`]).split('\0').filter(Boolean).sort();
     const allowed = [...Object.keys(profile.sources), ...profile.configs];
     const attempted = paths.some(path => /^nextjs\/scripts\/repair-known-regression(?:\.test)?\.mjs$/.test(path));
@@ -651,7 +697,7 @@ export function verifyIntakePresentationSource({ headSha, exec = execFileSync })
       if (!match || match[2] !== path) throw Error('Not an exact regular intake source: ' + path);
       return match[1];
     };
-    const expected = [...Object.keys(profile.sources), ...profile.configs].sort();
+    const expected = [...(profile.changedSources ?? Object.keys(profile.sources)), ...profile.configs].sort();
     if (JSON.stringify(intent.paths) !== JSON.stringify(expected)) throw Error('Missing or extra source/configuration paths for the exact intake presentation/measurement source.');
     for (const [before, after] of [[FULL_ANCHOR, COLLECTOR_BASE], [COLLECTOR_BASE, REPAIR_PARENT], [REPAIR_PARENT, INTAKE_PARENT], [INTAKE_PARENT, profile.parent], [profile.parent, headSha]]) git(['merge-base', '--is-ancestor', before, after]);
     verifyTrackedCheckout({ repoRoot: intent.repoRoot, headSha, exec });
@@ -729,7 +775,19 @@ export function verifyIntakePresentationEvidence({ previous, parentRun, parentJo
   } catch (error) { return { eligible: false, reason: error.message }; }
 }
 
+// The sole raw-log request is data ingestion into captured pipes, never a terminal.
+// Do not expose child stdout/stderr or exceptions containing untrusted log bytes.
+export function readIntakeUnitJobLog({ exec = execFileSync } = {}) {
+  try {
+    const bytes = exec('gh', ['api', 'repos/0ssol1620-byte/tavonel-saas-foundation/actions/jobs/111918797906/logs', '--allow-escape-sequences'], { timeout: 20000, maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > 2 * 1024 * 1024) throw Error('Invalid log bytes.');
+    const log = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\x1b\[[0-9;]*m/g, '');
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(log)) throw Error('Unexpected log controls.');
+    return log;
+  } catch { throw Error('Unable to retrieve or decode the exact868 unit job log.'); }
+}
 const intakeEvidenceApi = endpoint => {
+  if (endpoint === 'actions/jobs/111918797906/logs') return readIntakeUnitJobLog();
   const bytes = execFileSync('gh', ['api', `repos/0ssol1620-byte/tavonel-saas-foundation/${endpoint}`], { timeout: 20000, maxBuffer: 2 * 1024 * 1024 });
   return endpoint.endsWith('/zip') ? bytes : endpoint.endsWith('/logs') ? bytes.toString('utf8') : JSON.parse(bytes.toString('utf8'));
 };
@@ -749,7 +807,7 @@ export function verifyIntakePresentationEligibility({ headSha, exec = execFileSy
   const source = verifyIntakePresentationSource({ headSha, exec });
   if (!source.eligible) return source;
   const evidence = verifyIntakePresentationHistoricalEvidence({ api });
-  if (!evidence.eligible || source.parent !== INTAKE_GEOMETRY_PARENT) return evidence.eligible ? { eligible: true, source, evidence } : evidence;
+  if (!evidence.eligible || ![INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT].includes(source.parent)) return evidence.eligible ? { eligible: true, source, evidence } : evidence;
   try {
     const dbJobs = api('actions/runs/37356109344/jobs'), classifier = api('actions/jobs/111918798738');
     dbJobs.jobs = dbJobs.jobs?.map(job => job.id === classifier.id ? classifier : job);
@@ -777,7 +835,7 @@ export function authenticateFailedIntakeResolution(receipt, { headSha, intendedR
 
 export function intakePresentationPlan(normal, proof) {
   if (!proof?.eligible || proof.source.headSha !== normal.headSha || !intakeSourceProfile(proof.source.parent) || normal.repairAnchorSha !== FULL_ANCHOR) throw Error('Intake presentation plan requires exact source and qualified 895 evidence.');
-  const geometry = proof.source.parent === INTAKE_GEOMETRY_PARENT;
+  const geometry = [INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT].includes(proof.source.parent);
   if (geometry && !proof.evidence.geometryParent?.eligible) throw Error('Missing authenticated868 partial-pass evidence.');
   const inherited = Object.fromEntries(Object.entries(proof.evidence.checks).map(([name, evidence]) => [name, { ...evidence, sourceHead: evidence.sourceHead ?? COLLECTOR_BASE, status: 'inherited-source-evidence; not executed at current head' }]));
   for (const [name, scope] of [['knownRegressionUnits', '433 passing tests across 17 files, zero skips'], ['apiCatalogue', '13 passing tests across 3 files, zero skips']]) inherited[name] = { sourceHead: INTAKE_PARENT, runId: proof.evidence.parentRunId, jobId: proof.evidence.parentJobId, artifact: INTAKE_PARENT_ARTIFACT, scope, status: 'historical qualified 895 evidence; not executed at current head' };
@@ -829,7 +887,7 @@ export function validateIntakeBrowserReport(report, file, root) {
 }
 export function readIntakePresentationExecution(root = process.cwd(), parent = INTAKE_PARENT) {
   if (!intakeSourceProfile(parent)) throw Error('Unknown exact intake execution parent.');
-  const geometry = parent === INTAKE_GEOMETRY_PARENT;
+  const geometry = [INTAKE_GEOMETRY_PARENT, INTAKE_LOG_PARENT].includes(parent);
   const read = name => JSON.parse(readFileSync(resolve(root, 'node_modules/.cache/repair-scope-reports', name), 'utf8'));
   return { units: validateKnownRepairReport(read('vitest.json'), geometry ? INTAKE_GEOMETRY_UNIT_FILES : INTAKE_UNIT_FILES, root, geometry ? INTAKE_GEOMETRY_EXPECTED_TESTS : undefined),
     browsers: Object.keys(INTAKE_BROWSER_CASES).map((file, index) => validateIntakeBrowserReport(read(`playwright-${index + 1}.json`), file, root)) };

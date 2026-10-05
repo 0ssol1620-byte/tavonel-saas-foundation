@@ -515,3 +515,54 @@ test('868 intended failures retain authenticated895 resolution while missing or 
   const authenticated=authenticateFailedIntakeResolution(conservative,settings);assert.equal(authenticated.gate,'failed');assert.equal(authenticated.knownRegressionResolution.headSha,INTAKE_PARENT);assert.ok(!authenticated.pendingDebt.includes(REGRESSION_DEBT));assert.deepEqual(authenticated.inheritedChecks,{});
   for(const changed of [{intendedResult:undefined},{api:()=>{throw Error('API unavailable');}},{exec:geometrySourceFixture({bridge:head})}])assert.ok(authenticateFailedIntakeResolution(conservative,{...settings,...changed}).pendingDebt.includes(REGRESSION_DEBT));
 });
+
+import { INTAKE_LOG_PARENT, INTAKE_LOG_CONFIG_PATHS, INTAKE_LOG_PARENT_BLOBS, readIntakeUnitJobLog } from './repair-known-regression.mjs';
+// Actual ANSI-colored unit rows and summary from authenticated job111918797906.
+// Full source log SHA256: f810aecadd9cc95d29153906e328c31bc2025db43cead0f3e8b0479998f4f6d6. Excerpt SHA256: da21335fd84d606aa2065256cdec0c9138224b7bfd9789ab41bd65293b0e4121.
+const actual868UnitLogExcerpt = "2026-10-05T18:28:55.2667000Z  \u001b[32m✓\u001b[39m lib/intake-triage-client.test.ts \u001b[2m(\u001b[22m\u001b[2m17 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 43\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.3580874Z  \u001b[32m✓\u001b[39m lib/intake-triage-paid-flow.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 95\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.6187398Z  \u001b[32m✓\u001b[39m lib/preflight-report.test.ts \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 40\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.7808124Z  \u001b[32m✓\u001b[39m lib/workspace-compile-floor-and-ceiling.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.8423387Z  \u001b[32m✓\u001b[39m lib/copy-trust-guard.test.ts \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 223\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:55.9990596Z  \u001b[32m✓\u001b[39m lib/workspace-mobile-layout.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.2362651Z  \u001b[32m✓\u001b[39m components/intake-triage-review.test.tsx \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 24\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.2447895Z  \u001b[32m✓\u001b[39m lib/intake-triage-layout.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.4336423Z  \u001b[32m✓\u001b[39m lib/workspace-intake.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 14\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.5857523Z  \u001b[32m✓\u001b[39m components/intake-triage-review.interaction.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n2026-10-05T18:28:56.7383102Z Vitest report: 93 passed, 0 skipped, 0 failed across 10 selected files.\n";
+function logCorrectionSourceFixture(options = {}) {
+  const paths = options.paths ?? INTAKE_LOG_CONFIG_PATHS;
+  return (_command, original) => {
+    const args = original[0] === '-C' ? original.slice(2) : original;
+    if (args[0] === 'rev-parse') return args[1] === '--show-toplevel' ? root : head;
+    if (args[0] === 'rev-list') return args.at(-1) === INTAKE_LOG_PARENT ? INTAKE_LOG_PARENT + ' ' + (options.bridge ?? INTAKE_GEOMETRY_PARENT) : args.at(-1) === INTAKE_GEOMETRY_PARENT ? INTAKE_GEOMETRY_PARENT + ' ' + INTAKE_PARENT : head + ' ' + (options.parent ?? INTAKE_LOG_PARENT);
+    if (args[0] === 'merge-base') { if (options.ancestor === false) throw Error('Not an ancestor'); return ''; }
+    if (args[0] === 'diff') return args[1] === '--raw' ? options.dirty ? ': dirty' : '' : paths.join('\0') + '\0';
+    if (args[0] === 'ls-tree') { const ref = args[2], path = args.at(-1); let oid = ref === INTAKE_LOG_PARENT ? INTAKE_LOG_PARENT_BLOBS[path] : INTAKE_LOG_CONFIG_PATHS.includes(path) ? blob(readFileSync(resolve(root,path))) : INTAKE_LOG_PARENT_BLOBS[path]; if (options.badBlob === ref + ':' + path) oid = 'f'.repeat(40); return oid ? '100644 blob ' + oid + '\t' + path : ''; }
+    if (args[0] === 'show') { const path = args[1].slice(41), bytes = readFileSync(resolve(root,path)); return options.mutated === path ? Buffer.concat([bytes,Buffer.from('\n// altered\n')]) : bytes; }
+    throw Error('Unexpected exact-parent metadata query');
+  };
+}
+test('captured exact job-log helper strips actual ANSI unit rows without rendering raw response bytes',()=>{
+  assert.equal(createHash('sha256').update(actual868UnitLogExcerpt).digest('hex'),'da21335fd84d606aa2065256cdec0c9138224b7bfd9789ab41bd65293b0e4121');
+  let calls=0;const log=readIntakeUnitJobLog({exec:(command,args,settings)=>{calls++;assert.equal(command,'gh');assert.deepEqual(args,['api','repos/0ssol1620-byte/tavonel-saas-foundation/actions/jobs/111918797906/logs','--allow-escape-sequences']);assert.deepEqual(settings.stdio,['ignore','pipe','pipe']);assert.equal(settings.maxBuffer,2*1024*1024);assert.equal(settings.timeout,20000);return Buffer.from(actual868UnitLogExcerpt);}});
+  assert.equal(calls,1);assert.ok(actual868UnitLogExcerpt.includes('\x1b'));assert.ok(!log.includes('\x1b'));
+  const data=geometryEvidenceFixture();data.jobLog=log;const proof=verifyIntakeGeometryParentEvidence(data);assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.units.passed,93);assert.equal(proof.unchangedUnits.passed,91);assert.ok(proof.previousUiQualification.startsWith('failed'));
+  data.jobLog=log.replace('(24 tests)','(23 tests)');assert.equal(verifyIntakeGeometryParentEvidence(data).eligible,false);
+});
+test('raw job-log failures and non-SGR controls produce only fixed safe errors',()=>{
+  const payload='\x1b]8;;https://untrusted.invalid\x07private response\x1b[31m';
+  for(const exec of [()=>{const error=Error(payload);error.stdout=Buffer.from(payload);error.stderr=Buffer.from(payload);throw error;},()=>undefined,()=>Buffer.alloc(0),()=>Buffer.alloc(2*1024*1024+1),()=>Buffer.from([0xff]),()=>Buffer.from(payload),()=>Buffer.from('bad\0log'),()=>Buffer.from('bad\x1b[2Jlog')]){
+    assert.throws(()=>readIntakeUnitJobLog({exec}),error=>error.message==='Unable to retrieve or decode the exact868 unit job log.'&&!error.message.includes('private')&&!error.message.includes('\x1b'));
+  }
+});
+test('log correction admits only four sealed configuration paths directly over published2d678 with unchanged final sources',()=>{
+  assert.equal(INTAKE_LOG_PARENT,'2d678803af9fe0c6ee49ebe3065265696a726ca2');assert.equal(INTAKE_LOG_CONFIG_PATHS.length,4);
+  const source=verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture()});assert.equal(source.eligible,true,source.reason);assert.equal(source.parent,INTAKE_LOG_PARENT);assert.deepEqual(source.exactChangedPaths,[...INTAKE_LOG_CONFIG_PATHS].sort());assert.deepEqual(source.finalSourceBlobs,Object.fromEntries(Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS).map(([path,pin])=>[path,pin.after])));
+  for(const [path,pin]of Object.entries(INTAKE_GEOMETRY_SOURCE_BLOBS))assert.equal(INTAKE_LOG_PARENT_BLOBS[path],pin.after);
+  for(const options of [{dirty:true},{ancestor:false},{bridge:head},{paths:INTAKE_LOG_CONFIG_PATHS.slice(1)},{paths:[...INTAKE_LOG_CONFIG_PATHS,'nextjs/e2e/workspace-intake-triage.spec.ts']}])assert.equal(verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture(options)}).eligible,false);
+  for(const path of Object.keys(INTAKE_LOG_PARENT_BLOBS)){assert.equal(verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture({badBlob:INTAKE_LOG_PARENT+':'+path})}).eligible,false,path);}
+  for(const path of INTAKE_LOG_CONFIG_PATHS)assert.equal(verifyIntakePresentationSource({headSha:head,exec:logCorrectionSourceFixture({mutated:path})}).eligible,false,path);
+});
+test('direct2d678 log correction requires unchanged authenticated868 counts and fresh geometry checks; failed retrieval stays ineligible',()=>{
+  const data=geometryEvidenceFixture();data.jobLog=readIntakeUnitJobLog({exec:()=>Buffer.from(actual868UnitLogExcerpt)});
+  const qualified=verifyIntakePresentationEligibility({headSha:head,exec:logCorrectionSourceFixture(),api:geometryApiFixture(data)});assert.equal(qualified.eligible,true,qualified.reason);
+  const plan=intakePresentationPlan(normal(),qualified);assert.equal(plan.expectedSelectedTestCount,4);assert.deepEqual(plan.unitFiles,INTAKE_GEOMETRY_UNIT_FILES);assert.equal(plan.requireWorkspaceIntakeCapture,true);assert.deepEqual(plan.browserFiles,Object.keys(INTAKE_BROWSER_CASES));assert.equal(plan.inheritedChecks.unchangedIntakeUnits.passed,91);assert.deepEqual(intakePresentationLineageFailures(plan,qualified),[]);
+  const api=geometryApiFixture(data);for(const mode of ['missing','failed']){const result=verifyIntakePresentationEligibility({headSha:head,exec:logCorrectionSourceFixture(),api:endpoint=>endpoint.endsWith('/logs')?mode==='missing'?undefined:(()=>{throw Error('Unable to retrieve or decode the exact868 unit job log.');})():api(endpoint)});assert.equal(result.eligible,false);assert.ok(result.reason.includes('log'));}
+});
+test('intended2d678 ingestion failures retain only authenticated historical895 resolution and keep DB execution blocked',()=>{
+  const exec=logCorrectionSourceFixture(),intent=classifyIntakePresentationIntent({headSha:head,exec}),conservative={gate:'failed',headSha:head,pendingDebt:[REGRESSION_DEBT,'database-contract'],pendingQualificationDebt:[REGRESSION_DEBT],pendingFullDebt:['full-release'],collectorOnlyFailure:{intent}};
+  const receipt=authenticateFailedIntakeResolution(conservative,{headSha:head,intendedResult:'true',eligibleResult:'false',exec,api:intakeApiFixture(intakeEvidenceFixture())});assert.equal(receipt.gate,'failed');assert.equal(receipt.fullQualification,'pending');assert.deepEqual(receipt.inheritedChecks,{});assert.ok(!receipt.pendingDebt.includes(REGRESSION_DEBT));assert.ok(receipt.pendingDebt.includes('database-contract'));assert.equal(receipt.knownRegressionResolution.headSha,INTAKE_PARENT);
+  assert.ok(readFileSync(resolve(root,'.github/workflows/db-rehearsal.yml'),'utf8').includes(INTAKE_LOG_PARENT));
+  assert.ok(authenticateFailedIntakeResolution(conservative,{headSha:head,intendedResult:'true',eligibleResult:'false',exec,api:()=>{throw Error('Missing historical proof');}}).pendingDebt.includes(REGRESSION_DEBT));
+});

@@ -78,7 +78,7 @@ jobs:
             receipt.pendingDebt = [...new Set([...(receipt.pendingDebt ?? []), 'database-contract', 'hermetic-vitest-71-failures-triage'])];
             receipt.databaseObservation = 'not executed; inherited evidence unaccepted';
             receipt.inheritedChecks = {};
-            if (env.INTENDED_RESULT === 'true' && env.ELIGIBLE_RESULT === 'false' && ['8956734a6675ae79d5081e77f551e0cb49cf8a39', '8682045bce5ad550abe2ad7d5376130b95651972'].includes(receipt.collectorOnlyFailure?.intent?.parent)) {
+            if (env.INTENDED_RESULT === 'true' && env.ELIGIBLE_RESULT === 'false' && ['8956734a6675ae79d5081e77f551e0cb49cf8a39', '8682045bce5ad550abe2ad7d5376130b95651972', '2d678803af9fe0c6ee49ebe3065265696a726ca2'].includes(receipt.collectorOnlyFailure?.intent?.parent)) {
               const { authenticateFailedIntakeResolution } = await import('./nextjs/scripts/repair-known-regression.mjs');
               receipt = authenticateFailedIntakeResolution(receipt, { headSha: env.REPAIR_HEAD_SHA, intendedResult: env.INTENDED_RESULT, eligibleResult: env.ELIGIBLE_RESULT });
             }
