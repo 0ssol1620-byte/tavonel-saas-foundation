@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -65,9 +65,24 @@ import {
   PERSISTED_OCR_SAFETY_BLOBS,
   PERSISTED_OCR_SAFETY_PATHS,
   verifyPersistedOcrSafetyScopeEvidence,
+  WORKSPACE_INTAKE_LAYOUT_PREDECESSOR_SHA,
+  WORKSPACE_INTAKE_LAYOUT_BLOBS,
+  WORKSPACE_INTAKE_LAYOUT_PATHS,
+  WORKSPACE_INTAKE_LAYOUT_UNIT_FILES,
+  WORKSPACE_INTAKE_LAYOUT_BROWSER_FILE,
+  verifyWorkspaceIntakeLayoutScopeEvidence,
+  COMPLETED_READ_PRODUCER_PREDECESSOR_SHA,
+  COMPLETED_READ_PRODUCER_BLOBS,
+  COMPLETED_READ_PRODUCER_PATHS,
+  COMPLETED_READ_PRODUCER_UNIT_FILES,
+  verifyCompletedReadProducerScopeEvidence,
+  PUBLIC_UI_REPAIR_PREDECESSOR_SHA,
+  PUBLIC_UI_REPAIR_BLOBS,
+  PUBLIC_UI_REPAIR_PATHS,
+  verifyPublicUiRepairScopeEvidence,
 } from './repair-scope.mjs';
-import { buildRepairReceipt } from './repair-scope-gate.mjs';
-import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
+import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
+import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
@@ -579,7 +594,7 @@ function asyncCompileJobAuthorityEvidence(headSha, overrides = {}, changedPaths 
   return { ...evidence, calls };
 }
 
-function intakeTriageEvidence(headSha, overrides = {}, changedPaths = INTAKE_TRIAGE_FEATURE_PATHS) {
+function intakeTriageEvidence(headSha, overrides = {}, changedPaths = INTAKE_TRIAGE_FEATURE_PATHS, workspaceIntakeLayoutVerification = null, completedReadProducerVerification = null) {
   const blobs = new Map();
   for (const [path, expected] of Object.entries(INTAKE_TRIAGE_SOURCE_BLOBS)) {
     blobs.set(INTAKE_TRIAGE_PREDECESSOR_SHA + ":" + selectorRepositoryPath(path), expected.predecessor);
@@ -588,7 +603,7 @@ function intakeTriageEvidence(headSha, overrides = {}, changedPaths = INTAKE_TRI
   for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
   const calls = [];
   const evidence = verifyIntakeTriageScopeEvidence({
-    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA, headSha, changedPaths, repoRoot: 'fixture-root',
+    repairAnchorSha: AUDITED_REPAIR_ANCHOR_SHA, headSha, changedPaths, repoRoot: 'fixture-root', workspaceIntakeLayoutVerification, completedReadProducerVerification,
     exec: (_command, args) => {
       calls.push(args);
       if (args[0] === 'merge-base') return '';
@@ -1647,14 +1662,14 @@ test('unknown paths and non-ancestor anchor inputs fail closed', () => {
     repairAnchorSha: 'f'.repeat(40), headSha: testHeadSha, repoRoot: process.cwd(),
   }), /Command failed|not a commit|Not a valid object/);
 });
-function editorialEvidence({ overrides = {}, changedPaths = PUBLIC_EDITORIAL_FEATURE_PATHS, ancestor = true, repairAnchorSha = AUDITED_REPAIR_ANCHOR_SHA, headSha = testHeadSha } = {}) {
+function editorialEvidence({ overrides = {}, changedPaths = PUBLIC_EDITORIAL_FEATURE_PATHS, ancestor = true, repairAnchorSha = AUDITED_REPAIR_ANCHOR_SHA, headSha = testHeadSha, publicUiRepairVerification = null } = {}) {
   const blobs = new Map();
   for (const [path, expected] of Object.entries(PUBLIC_EDITORIAL_SOURCE_BLOBS)) {
     blobs.set(`${PUBLIC_EDITORIAL_PREDECESSOR_SHA}:nextjs/${path}`, expected.predecessor);
     blobs.set(`${testHeadSha}:nextjs/${path}`, expected.candidate);
   }
   for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
-  return verifyPublicEditorialScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot: 'fixture-root',
+  return verifyPublicEditorialScopeEvidence({ repairAnchorSha, headSha, changedPaths, repoRoot: 'fixture-root', publicUiRepairVerification,
     exec: (command, args, options) => {
       assert.equal(command, 'git');
       assert.equal(options.shell, false);
@@ -2044,12 +2059,18 @@ test('reviewed OCR safety runs the existing normal eight-file worker suite and t
       "steps.browser-report-tests.outcome == 'success'", "steps.selector-tests.outcome == 'success'",
     ]) assert.ok(conditional.includes(prerequisite), `${id} preserves ${prerequisite}`);
   }
-  const pkg = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'quarantine-sidecar/foundation-cdr-worker/package.json'), 'utf8'));
-  assert.deepEqual(pkg.scripts.test.split(' '), ['node', '--import', 'tsx', '--test',
+  const packageBytes = readFileSync(resolve(process.cwd(), '..', 'quarantine-sidecar/foundation-cdr-worker/package.json'));
+  const packageBlob = createHash('sha1').update(`blob ${packageBytes.length}\0`).update(packageBytes).digest('hex');
+  assert.ok(packageBlob === '27623f918991a17ddc309c94a43c48115100829e' || packageBlob === COMPLETED_READ_PRODUCER_BLOBS['quarantine-sidecar/foundation-cdr-worker/package.json'].candidate, 'worker package must be the exact eight-suite predecessor or exact nine-suite producer candidate');
+  const pkg = JSON.parse(packageBytes);
+  assert.deepEqual(pkg.scripts.test.split(' ').slice(0, 4), ['node', '--import', 'tsx', '--test']);
+  assert.deepEqual(pkg.scripts.test.split(' ').slice(4).sort(), [
     'src/hmac.test.ts', 'src/keys.test.ts', 'src/guards.test.ts', 'src/ocr.test.ts', 'src/sanitize.test.ts',
-    'src/settlement.test.ts', 'src/identity.test.ts', 'src/local-fixture-event-adapter.test.ts']);
+    'src/settlement.test.ts', 'src/identity.test.ts', 'src/local-fixture-event-adapter.test.ts',
+    ...(packageBlob === COMPLETED_READ_PRODUCER_BLOBS['quarantine-sidecar/foundation-cdr-worker/package.json'].candidate ? ['src/completed-read.test.ts'] : [])].sort());
 });
 
+const mountedPngFixture = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB9sAAAAASUVORK5CYII=', 'base64');
 function browserGroupReport(file, workspaceRoot, status = 'expected') {
   return { config: { rootDir: workspaceRoot }, stats: { expected: status === 'expected' ? 1 : 0, skipped: status === 'skipped' ? 1 : 0, unexpected: status === 'unexpected' ? 1 : 0, flaky: 0 },
     suites: [{ specs: [{ file, tests: [{ status, results: [{ status: status === 'expected' ? 'passed' : status === 'skipped' ? 'skipped' : 'failed' }] }] }] }] };
@@ -2122,5 +2143,328 @@ test('independent successful browser checks cannot hide a missing or failed work
     assert.equal(run.receipt.gate, 'failed');
     assert.deepEqual(run.receipt.gateFailures, [`CDR worker tests and types: ${outcome ?? 'not run'}`]);
     assert.equal(run.receipt.fullQualification, 'pending');
+  }
+});
+
+function exactStackEvidence(verifier, predecessor, bindings, { changedPaths = Object.keys(bindings), overrides = {}, ancestor = true, anchor = AUDITED_REPAIR_ANCHOR_SHA } = {}) {
+  const blobs = new Map(Object.entries(bindings).flatMap(([path, expected]) => [
+    [`${predecessor}:${selectorRepositoryPath(path)}`, expected.predecessor],
+    [`${testHeadSha}:${selectorRepositoryPath(path)}`, expected.candidate],
+  ]));
+  for (const [key, value] of Object.entries(overrides)) blobs.set(key, value);
+  return verifier({ repairAnchorSha: anchor, headSha: testHeadSha, changedPaths, repoRoot: 'fixture-root',
+    exec: (_command, args) => {
+      if (args[0] === 'merge-base') { if (!ancestor) throw Error('not an ancestor'); return ''; }
+      const value = blobs.get(args[1]);
+      if (!value) throw Error('missing exact source blob');
+      return `${value}\n`;
+    },
+  });
+}
+
+test('workspace intake layout requires all four exact paths, preimages, candidate blobs and ancestry', () => {
+  const verify = options => exactStackEvidence(verifyWorkspaceIntakeLayoutScopeEvidence, WORKSPACE_INTAKE_LAYOUT_PREDECESSOR_SHA, WORKSPACE_INTAKE_LAYOUT_BLOBS, options);
+  assert.equal(WORKSPACE_INTAKE_LAYOUT_PREDECESSOR_SHA, '3a5be63e0901f9f1972f6793cac7891bf064af9e');
+  assert.equal(WORKSPACE_INTAKE_LAYOUT_PATHS.length, 4);
+  assert.equal(verify().eligible, true);
+  for (const path of WORKSPACE_INTAKE_LAYOUT_PATHS) {
+    for (const value of [null, 'f'.repeat(40)]) assert.equal(verify({ overrides: { [`${testHeadSha}:${selectorRepositoryPath(path)}`]: value } }).eligible, false, path);
+    assert.equal(verify({ changedPaths: WORKSPACE_INTAKE_LAYOUT_PATHS.filter(other => other !== path) }).eligible, false, path);
+    assert.equal(verify({ overrides: { [`${WORKSPACE_INTAKE_LAYOUT_PREDECESSOR_SHA}:${selectorRepositoryPath(path)}`]: 'f'.repeat(40) } }).eligible, false, path);
+  }
+  assert.equal(verify({ ancestor: false }).eligible, false);
+  assert.equal(verify({ anchor: 'f'.repeat(40) }).eligible, false);
+});
+
+test('mounted intake audit override requires the complete layout proof and preserves isolated numeric 1440 selection', () => {
+  const layout = exactStackEvidence(verifyWorkspaceIntakeLayoutScopeEvidence, WORKSPACE_INTAKE_LAYOUT_PREDECESSOR_SHA, WORKSPACE_INTAKE_LAYOUT_BLOBS);
+  const overrides = { [`${testHeadSha}:nextjs/${INTAKE_TRIAGE_BROWSER_FILE}`]: WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate };
+  assert.equal(intakeTriageEvidence(testHeadSha, overrides).eligible, false);
+  assert.equal(intakeTriageEvidence(testHeadSha, overrides, INTAKE_TRIAGE_FEATURE_PATHS, { eligible: false }).eligible, false);
+  assert.equal(intakeTriageEvidence(testHeadSha, overrides, INTAKE_TRIAGE_FEATURE_PATHS, layout).eligible, true);
+  const plan = planFor([...WORKSPACE_INTAKE_LAYOUT_PATHS, ...INTAKE_TRIAGE_FEATURE_PATHS], {
+    workspaceIntakeLayoutVerification: layout, intakeTriageVerification: { eligible: true },
+    workspaceSourceVerification: { eligible: true }, googleViewerAclVerification: { eligible: true }, asyncCompileJobAuthorityVerification: { eligible: true },
+  });
+  for (const path of WORKSPACE_INTAKE_LAYOUT_UNIT_FILES) assert.ok(plan.unitFiles.includes(path), path);
+  assert.equal(plan.requireWorkspaceIntakeCapture, true);
+  assert.deepEqual(planBrowserRuns([WORKSPACE_INTAKE_LAYOUT_BROWSER_FILE, INTAKE_TRIAGE_BROWSER_FILE], false), [
+    { kind: 'project', project: 'audit', files: [INTAKE_TRIAGE_BROWSER_FILE] },
+    { kind: 'project', project: '1440', files: [WORKSPACE_INTAKE_LAYOUT_BROWSER_FILE] },
+  ]);
+  const partial = planFor(WORKSPACE_INTAKE_LAYOUT_PATHS, { workspaceIntakeLayoutVerification: { eligible: false } });
+  assert.equal(partial.runFullHermeticVitest, true);
+  assert.equal(partial.requireWorkspaceIntakeCapture, false);
+});
+
+test('mounted capture requirement fails closed without a successful capture result', () => {
+  for (const outcome of [undefined, 'failure', 'skipped', 'cancelled']) {
+    const result = runGateCli({ planOverrides: { requireWorkspaceIntakeCapture: true }, overrides: { WORKSPACE_INTAKE_CAPTURE_RESULT: outcome } });
+    assert.equal(result.status, 1);
+    assert.ok(result.receipt.gateFailures.some(reason => reason.startsWith('mounted workspace intake artifacts:')));
+    assert.equal(result.receipt.fullQualification, 'pending');
+  }
+  assert.equal(runGateCli({ planOverrides: { requireWorkspaceIntakeCapture: true }, overrides: { WORKSPACE_INTAKE_CAPTURE_RESULT: 'success' } }).status, 0);
+});
+
+test('mounted collector copies only four named capture pairs and rejects missing, duplicate or escaped geometry', () => {
+  for (const scenario of ['complete', 'missing', 'duplicate', 'escaped']) {
+    const root = mkdtempSync(resolve(tmpdir(), 'repair-mounted-captures-'));
+    assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+    try {
+      const reportDir = resolve(root, 'node_modules/.cache/repair-scope-reports');
+      const output = resolve(browserRunOutputDir(root, 0), 'workspace-intake-triage-exclude-all-409-audit');
+      mkdirSync(resolve(output, 'attachments'), { recursive: true });
+      mkdirSync(reportDir, { recursive: true });
+      const attachments = WORKSPACE_INTAKE_CAPTURE_NAMES.map(name => {
+        const [width, height] = name.split('-').at(-1).split('x').map(Number);
+        const path = resolve(output, 'attachments', `${name}-geometry.json`);
+        const box = { x: 0, y: 0, width: 140, height: 44, privateFixtureExtra: 'must not copy' };
+        writeFileSync(path, JSON.stringify({ viewport: { width, height }, clearBox: box, triageBox: box, inventoryBox: box, selectBox: box, labelTextBottom: 1, escaped: [], privateFixtureExtra: 'must not copy' }));
+        writeFileSync(resolve(output, `${name}.png`), mountedPngFixture);
+        return { name: `${name}-geometry`, path, contentType: 'application/json' };
+      });
+      attachments.push({ name: 'unrelated-private-attachment', path: resolve(root, 'private.json'), contentType: 'application/json' });
+      if (scenario === 'missing') attachments.shift();
+      if (scenario === 'duplicate') attachments.push(attachments[0]);
+      if (scenario === 'escaped') { attachments[0].path = resolve(root, 'private.json'); writeFileSync(attachments[0].path, '{}'); }
+      const report = browserGroupReport(INTAKE_TRIAGE_BROWSER_FILE, root);
+      report.suites[0].specs[0].tests[0].projectName = 'audit';
+      report.suites[0].specs[0].tests[0].results[0].attachments = attachments;
+      writeFileSync(resolve(reportDir, 'playwright-1.json'), JSON.stringify(report));
+      if (scenario !== 'complete') { assert.throws(() => collectWorkspaceIntakeCaptures(root)); continue; }
+      assert.equal(collectWorkspaceIntakeCaptures(root).length, 8);
+      const files = readdirSync(resolve(root, 'test-results/repair-scope-intake-mounted'));
+      assert.deepEqual(files.sort(), WORKSPACE_INTAKE_CAPTURE_NAMES.flatMap(name => [`${name}.png`, `${name}.json`]).sort());
+      for (const name of WORKSPACE_INTAKE_CAPTURE_NAMES) assert.ok(!readFileSync(resolve(root, 'test-results/repair-scope-intake-mounted', `${name}.json`), 'utf8').includes('privateFixtureExtra'));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+test('completed-read draft admission requires all fifteen exact files, root ownership and unregistered SQL', () => {
+  const verify = options => exactStackEvidence(verifyCompletedReadProducerScopeEvidence, COMPLETED_READ_PRODUCER_PREDECESSOR_SHA, COMPLETED_READ_PRODUCER_BLOBS, options);
+  assert.equal(COMPLETED_READ_PRODUCER_PATHS.length, 15);
+  assert.equal(COMPLETED_READ_PRODUCER_PREDECESSOR_SHA, '3a5be63e0901f9f1972f6793cac7891bf064af9e');
+  assert.equal(verify().eligible, true);
+  for (const path of COMPLETED_READ_PRODUCER_PATHS) {
+    for (const value of [null, 'f'.repeat(40)]) assert.equal(verify({ overrides: { [`${testHeadSha}:${selectorRepositoryPath(path)}`]: value } }).eligible, false, path);
+    assert.equal(verify({ changedPaths: COMPLETED_READ_PRODUCER_PATHS.filter(other => other !== path) }).eligible, false, path);
+    assert.equal(verify({ overrides: { [`${COMPLETED_READ_PRODUCER_PREDECESSOR_SHA}:${selectorRepositoryPath(path)}`]: 'f'.repeat(40) } }).eligible, false, path);
+  }
+  assert.equal(verify({ ancestor: false }).eligible, false);
+  assert.equal(verify({ anchor: 'f'.repeat(40) }).eligible, false);
+  for (const path of COMPLETED_READ_PRODUCER_PATHS.filter(path => path.startsWith('quarantine-sidecar/') || path.startsWith('shared/'))) {
+    assert.equal(selectorRepositoryPath(path), path);
+    assert.equal(verify({ changedPaths: COMPLETED_READ_PRODUCER_PATHS.map(other => other === path ? `nextjs/${path}` : other) }).eligible, false, path);
+  }
+  assert.equal(verify({ changedPaths: [...COMPLETED_READ_PRODUCER_PATHS, 'supabase/migrations/20261005130000_foundation_completed_read_proof.sql'] }).eligible, false);
+  assert.equal(selectorRepositoryPath('shared/unreviewed.ts'), 'nextjs/shared/unreviewed.ts');
+});
+
+test('only a complete producer proof permits the two OCR safety overrides and preserves intake bindings', () => {
+  const producer = exactStackEvidence(verifyCompletedReadProducerScopeEvidence, COMPLETED_READ_PRODUCER_PREDECESSOR_SHA, COMPLETED_READ_PRODUCER_BLOBS);
+  const overrides = Object.fromEntries(PERSISTED_OCR_SAFETY_PATHS.filter(path => Object.hasOwn(COMPLETED_READ_PRODUCER_BLOBS, path)).map(path => [`${testHeadSha}:${path}`, COMPLETED_READ_PRODUCER_BLOBS[path].candidate]));
+  assert.equal(Object.keys(overrides).length, 2);
+  for (const proof of [null, { eligible: false }, producer]) {
+    const evidence = exactStackEvidence(args => verifyPersistedOcrSafetyScopeEvidence({ ...args, completedReadProducerVerification: proof }), PERSISTED_OCR_SAFETY_PREDECESSOR_SHA, PERSISTED_OCR_SAFETY_BLOBS, { overrides });
+    assert.equal(evidence.eligible, proof === producer);
+  }
+  const mutatedTest = { ...overrides, [`${testHeadSha}:quarantine-sidecar/foundation-cdr-worker/src/ocr.test.ts`]: 'f'.repeat(40) };
+  assert.equal(exactStackEvidence(args => verifyPersistedOcrSafetyScopeEvidence({ ...args, completedReadProducerVerification: producer }), PERSISTED_OCR_SAFETY_PREDECESSOR_SHA, PERSISTED_OCR_SAFETY_BLOBS, { overrides: mutatedTest }).eligible, false);
+  assert.deepEqual(INTAKE_TRIAGE_FEATURE_PATHS.filter(path => Object.hasOwn(COMPLETED_READ_PRODUCER_BLOBS, path)), []);
+  assert.equal(intakeTriageEvidence(testHeadSha).eligible, true);
+});
+
+test('producer keeps normal worker checks, genuine Vitest helper/catalogue/settle tests and pending database debt', () => {
+  const plan = planFor([...COMPLETED_READ_PRODUCER_PATHS, ...PERSISTED_OCR_SAFETY_PATHS, ...INTAKE_TRIAGE_FEATURE_PATHS], {
+    completedReadProducerVerification: { eligible: true }, persistedOcrSafetyVerification: { eligible: true },
+    intakeTriageVerification: { eligible: true }, workspaceSourceVerification: { eligible: true },
+    googleViewerAclVerification: { eligible: true }, asyncCompileJobAuthorityVerification: { eligible: true },
+  });
+  assert.equal(plan.runFullHermeticVitest, false);
+  for (const file of COMPLETED_READ_PRODUCER_UNIT_FILES) assert.ok(plan.unitFiles.includes(file), file);
+  assert.equal(plan.runCdrWorkerChecks, true);
+  assert.equal(plan.runDatabaseRehearsal, false);
+  assert.equal(plan.completedReadProducerSelection.sqlStatus, 'unregistered-draft-pending-disposable-pgtap');
+  assert.ok(plan.deferredGroups.includes('database-contract'));
+  const receipt = buildRepairReceipt(plan, { headSha: plan.headSha });
+  assert.equal(receipt.runResults['database-contract'], 'pending-deferred');
+  assert.equal(receipt.databaseObservation, 'unrun');
+  assert.equal(receipt.fullQualification, 'pending');
+  for (const outcome of [undefined, 'failure', 'skipped']) assert.equal(runGateCli({ planOverrides: { runCdrWorkerChecks: true, completedReadProducerSelection: plan.completedReadProducerSelection }, overrides: { CDR_WORKER_RESULT: outcome } }).status, 1);
+});
+
+test('database-draft gate requires actual staging and two successful pgTAP executions, including its CLI', () => {
+  const successful = { stageResult: 'success', state: 'ephemeral', firstPgTapResult: 'success', secondPgTapResult: 'success' };
+  assert.doesNotThrow(() => requireCompletedReadRehearsal(successful));
+  const environmentKeys = { stageResult: 'COMPLETED_READ_STAGE_RESULT', state: 'COMPLETED_READ_STATE', firstPgTapResult: 'FIRST_PGTAP_RESULT', secondPgTapResult: 'SECOND_PGTAP_RESULT' };
+  const script = fileURLToPath(new URL('./repair-scope-gate.mjs', import.meta.url));
+  for (const key of Object.keys(successful)) {
+    for (const outcome of [undefined, 'skipped', 'failure', 'cancelled']) {
+      assert.throws(() => requireCompletedReadRehearsal({ ...successful, [key]: outcome }), AggregateError);
+      const env = { ...process.env };
+      for (const [field, variable] of Object.entries(environmentKeys)) env[variable] = successful[field];
+      if (outcome === undefined) delete env[environmentKeys[key]]; else env[environmentKeys[key]] = outcome;
+      const result = spawnSync(process.execPath, [script, 'database-draft'], { env, encoding: 'utf8' });
+      assert.equal(result.status, 1, `${key}: ${outcome}`);
+      assert.ok(!result.stdout.includes('exercised by both'));
+    }
+  }
+  const env = { ...process.env, COMPLETED_READ_STAGE_RESULT: 'success', COMPLETED_READ_STATE: 'ephemeral', FIRST_PGTAP_RESULT: 'success', SECOND_PGTAP_RESULT: 'success' };
+  const passed = spawnSync(process.execPath, [script, 'database-draft'], { env, encoding: 'utf8' });
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.ok(passed.stdout.includes('full qualification remains PENDING'));
+});
+
+test('completed-read SQL stages after intake, before chain reset, checks exact copies, and stays out of replay', () => {
+  const workflow = readFileSync(resolve(process.cwd(), '..', '.github/workflows/db-rehearsal.yml'), 'utf8');
+  const stageStart = workflow.indexOf('- name: Stage the exact completed-read producer draft after intake triage');
+  const chainStart = workflow.indexOf('- name: Read the head migration version out of the folder');
+  assert.ok(stageStart > workflow.indexOf('- name: Stage the reviewed intake triage draft after async authority'));
+  assert.ok(stageStart < chainStart && chainStart < workflow.indexOf('- name: Restore the rest of the chain and apply every migration from empty'));
+  const stage = workflow.slice(stageStart, chainStart);
+  for (const fragment of [
+    'c92a5656175ebac658af6e1246160bff462edac34dfa6534a304797f572c8163',
+    '3ef70e5c2d24aebaf67b06f89f86564e5b94d7154e8074dd2f8947693c129da1',
+    'test "$intake_state" = ephemeral', 'test "${#existing[@]}" -eq 0',
+    '[[ "$completed_read_version" > "$intake_version" ]]', 'cmp -- "$draft" "${generated[0]}"', 'cmp -- "$test_source" "$test_target"',
+    '"$expected_migration_sha256" "$draft" "$expected_migration_sha256" "${generated[0]}"',
+    '"$expected_test_sha256" "$test_source" "$expected_test_sha256" "$test_target"',
+  ]) assert.ok(stage.includes(fragment), fragment);
+  const replay = workflow.slice(workflow.indexOf('- name: Apply the repair migrations a second time'), workflow.indexOf('- name: Race model-provider settlement'));
+  assert.ok(!replay.includes('completed_read_proof') && !replay.includes('20261005') && !replay.includes('2026*'));
+  assert.ok(replay.includes('supabase test db'));
+  assert.equal((workflow.match(/supabase test db\n/g) ?? []).length, 2);
+  assert.ok(workflow.includes("if: always() && steps.completed-read-draft.outputs.state != 'absent'"));
+  for (const variable of ['steps.completed-read-draft.outcome', 'steps.pgtap-first.outcome', 'steps.pgtap-second.outcome']) assert.ok(workflow.includes(variable));
+  assert.ok(!stage.includes('supabase db push') && !stage.includes('continue-on-error'));
+});
+
+test('public repair admits only its complete exact four-file stack and preserves all original editorial pins', () => {
+  const verify = options => exactStackEvidence(verifyPublicUiRepairScopeEvidence, PUBLIC_UI_REPAIR_PREDECESSOR_SHA, PUBLIC_UI_REPAIR_BLOBS, options);
+  const repair = verify();
+  assert.equal(repair.eligible, true);
+  assert.equal(PUBLIC_UI_REPAIR_PREDECESSOR_SHA, '3a5be63e0901f9f1972f6793cac7891bf064af9e');
+  assert.equal(PUBLIC_UI_REPAIR_PATHS.length, 4);
+  assert.deepEqual(repair.changedFromPredecessor, PUBLIC_UI_REPAIR_PATHS);
+  for (const path of PUBLIC_UI_REPAIR_PATHS) {
+    for (const value of [null, 'f'.repeat(40)]) assert.equal(verify({ overrides: { [`${testHeadSha}:nextjs/${path}`]: value } }).eligible, false, path);
+    assert.equal(verify({ changedPaths: PUBLIC_UI_REPAIR_PATHS.filter(other => other !== path) }).eligible, false, path);
+    assert.equal(verify({ overrides: { [`${PUBLIC_UI_REPAIR_PREDECESSOR_SHA}:nextjs/${path}`]: 'f'.repeat(40) } }).eligible, false, path);
+  }
+  assert.equal(verify({ ancestor: false }).eligible, false);
+  const overrides = Object.fromEntries(PUBLIC_UI_REPAIR_PATHS.filter(path => Object.hasOwn(PUBLIC_EDITORIAL_SOURCE_BLOBS, path)).map(path => [`${testHeadSha}:nextjs/${path}`, PUBLIC_UI_REPAIR_BLOBS[path].candidate]));
+  assert.equal(Object.keys(overrides).length, 3);
+  assert.equal(editorialEvidence({ overrides }).eligible, false);
+  assert.equal(editorialEvidence({ overrides, publicUiRepairVerification: { eligible: false } }).eligible, false);
+  assert.equal(editorialEvidence({ overrides, publicUiRepairVerification: repair }).eligible, true);
+  assert.equal(editorialEvidence().eligible, true);
+  const original = verify({ overrides: Object.fromEntries(PUBLIC_UI_REPAIR_PATHS.map(path => [`${testHeadSha}:nextjs/${path}`, PUBLIC_UI_REPAIR_BLOBS[path].predecessor])) });
+  assert.deepEqual(original.changedFromPredecessor, []);
+});
+
+test('public repair selects each failing browser group and retains six screenshots with fail-closed partial proof', () => {
+  const repair = exactStackEvidence(verifyPublicUiRepairScopeEvidence, PUBLIC_UI_REPAIR_PREDECESSOR_SHA, PUBLIC_UI_REPAIR_BLOBS);
+  const paths = [...PUBLIC_UI_REPAIR_PATHS, ...PUBLIC_EDITORIAL_FEATURE_PATHS];
+  const plan = planFor(paths, { publicUiRepairVerification: repair, publicEditorialVerification: { eligible: true }, docsPricingVerification: { eligible: true }, mobileNavVerification: { eligible: true } });
+  assert.equal(plan.runFullHermeticVitest, false);
+  assert.equal(plan.requirePublicUiScreenshots, true);
+  for (const file of ['e2e/site-nav.spec.ts', 'e2e/launch-qa-mobile-nav.spec.ts', 'e2e/premium-craft.spec.ts']) assert.ok(plan.browserFiles.includes(file));
+  const runs = planBrowserRuns(plan.browserFiles, false);
+  assert.ok(runs.find(run => run.project === '1440').files.includes('e2e/site-nav.spec.ts'));
+  assert.ok(runs.find(run => run.project === 'launch-chromium').files.includes('e2e/launch-qa-mobile-nav.spec.ts'));
+  for (const project of ['1440', '390', 'reduced-motion']) assert.ok(runs.find(run => run.project === project).files.includes('e2e/premium-craft.spec.ts'));
+  assert.equal(planFor(paths, { publicUiRepairVerification: { eligible: false, changedFromPredecessor: PUBLIC_UI_REPAIR_PATHS }, publicEditorialVerification: { eligible: true }, docsPricingVerification: { eligible: true }, mobileNavVerification: { eligible: true } }).runFullHermeticVitest, true);
+});
+
+function mountedCaptureFixture(root) {
+  const reportDir = resolve(root, 'node_modules/.cache/repair-scope-reports');
+  const output = resolve(browserRunOutputDir(root, 0), 'workspace-intake-triage-exclude-all-409-audit');
+  mkdirSync(resolve(output, 'attachments'), { recursive: true });
+  mkdirSync(reportDir, { recursive: true });
+  const attachments = WORKSPACE_INTAKE_CAPTURE_NAMES.map(name => {
+    const [width, height] = name.split('-').at(-1).split('x').map(Number);
+    const path = resolve(output, 'attachments', `${name}-geometry.json`);
+    const box = { x: 0, y: 0, width: 140, height: 44 };
+    writeFileSync(path, JSON.stringify({ viewport: { width, height }, clearBox: box, triageBox: box, inventoryBox: box, selectBox: box, labelTextBottom: 1, escaped: [] }));
+    writeFileSync(resolve(output, `${name}.png`), mountedPngFixture);
+    return { name: `${name}-geometry`, path, contentType: 'application/json' };
+  });
+  const report = browserGroupReport(INTAKE_TRIAGE_BROWSER_FILE, root);
+  report.suites[0].specs[0].tests[0].projectName = 'audit';
+  report.suites[0].specs[0].tests[0].results[0].attachments = attachments;
+  const reportPath = resolve(reportDir, 'playwright-1.json');
+  writeFileSync(reportPath, JSON.stringify(report));
+  return { report, reportPath, output, destination: resolve(root, 'test-results/repair-scope-intake-mounted') };
+}
+
+test('collector rejects destination and test-results parent junctions before any outside-root mutation', () => {
+  for (const position of ['parent', 'destination', 'leaf']) {
+    const root = mkdtempSync(resolve(tmpdir(), 'repair-capture-boundary-'));
+    const outside = mkdtempSync(resolve(tmpdir(), 'repair-capture-outside-'));
+    assert.ok(isInsideWorkspace(resolve(tmpdir()), root) && isInsideWorkspace(resolve(tmpdir()), outside));
+    try {
+      const fixture = mountedCaptureFixture(root);
+      writeFileSync(resolve(outside, 'unchanged.txt'), 'synthetic outside marker');
+      if (position === 'parent') {
+        renameSync(resolve(root, 'test-results'), resolve(root, 'saved-results'));
+        symlinkSync(outside, resolve(root, 'test-results'), 'junction');
+      } else if (position === 'destination') symlinkSync(outside, fixture.destination, 'junction');
+      else {
+        mkdirSync(fixture.destination);
+        symlinkSync(outside, resolve(fixture.destination, `${WORKSPACE_INTAKE_CAPTURE_NAMES[0]}.png`), 'junction');
+      }
+      assert.throws(() => collectWorkspaceIntakeCaptures(root), /symlink/);
+      assert.deepEqual(readdirSync(outside), ['unchanged.txt']);
+      assert.equal(readFileSync(resolve(outside, 'unchanged.txt'), 'utf8'), 'synthetic outside marker');
+    } finally { rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
+  }
+});
+
+test('collector rejects trace-as-PNG, symbolic file metadata and oversized screenshots before destination writes', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'repair-capture-png-'));
+  assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+  try {
+    const fixture = mountedCaptureFixture(root);
+    const png = resolve(fixture.output, `${WORKSPACE_INTAKE_CAPTURE_NAMES[0]}.png`);
+    const trace = resolve(fixture.output, 'trace.zip');
+    writeFileSync(trace, Buffer.from('PK\x03\x04synthetic trace'));
+    rmSync(png);
+    try { symlinkSync(trace, png, 'file'); }
+    catch (error) {
+      if (error.code !== 'EPERM') throw error;
+      t.diagnostic('Windows file-symlink creation is unavailable; real trace signature rejection and symbolic metadata rejection are exercised without skipping.');
+      writeFileSync(png, readFileSync(trace));
+    }
+    assert.throws(() => collectWorkspaceIntakeCaptures(root), /symlink|PNG/);
+    assert.equal(existsSync(fixture.destination), false);
+    const regular = lstatSync(trace);
+    assert.throws(() => validateMountedPngMetadata({ size: regular.size, isFile: () => true, isSymbolicLink: () => true }), /non-symlink/);
+    assert.throws(() => validateMountedPngMetadata({ size: MAX_MOUNTED_PNG_BYTES + 1, isFile: () => true, isSymbolicLink: () => false }), /bounded/);
+    assert.throws(() => validateMountedPngMetadata({ size: 100, isFile: () => false, isSymbolicLink: () => false }), /regular/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('collector binds attachments to the exact canonical intake spec and its successful audit project', () => {
+  for (const scenario of ['wrong-spec', 'wrong-project', 'failed-result']) {
+    const root = mkdtempSync(resolve(tmpdir(), 'repair-capture-source-'));
+    assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+    try {
+      const fixture = mountedCaptureFixture(root);
+      const spec = fixture.report.suites[0].specs[0];
+      if (scenario === 'wrong-spec') {
+        const wrong = structuredClone(spec);
+        wrong.file = 'wrong/workspace-intake-triage.spec.ts';
+        spec.tests[0].results[0].attachments = [];
+        fixture.report.suites[0].specs.push(wrong);
+        fixture.report.stats.expected = 2;
+        assert.equal(readAndValidatePlaywrightReport(fixture.reportPath, [INTAKE_TRIAGE_BROWSER_FILE], root).passed, 1);
+      } else if (scenario === 'wrong-project') spec.tests[0].projectName = '1440';
+      else { spec.tests[0].status = 'unexpected'; spec.tests[0].results[0].status = 'failed'; fixture.report.stats.unexpected = 1; }
+      writeFileSync(fixture.reportPath, JSON.stringify(fixture.report));
+      if (scenario === 'wrong-spec') assert.equal(readAndValidatePlaywrightReport(fixture.reportPath, [INTAKE_TRIAGE_BROWSER_FILE], root).passed, 1);
+      assert.throws(() => collectWorkspaceIntakeCaptures(root));
+      assert.equal(existsSync(fixture.destination), false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

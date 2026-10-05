@@ -42,7 +42,7 @@ function reportContainsPath(reportPath, selectedPath) {
   return actual === selectedPath || actual.endsWith(`/${selectedPath}`);
 }
 
-function playwrightReportContainsPath(reportPath, selectedPath, workspaceRoot, reportRootDir) {
+export function playwrightReportContainsPath(reportPath, selectedPath, workspaceRoot, reportRootDir) {
   const selected = resolveReportPath(selectedPath, workspaceRoot);
   if (!selected || typeof reportPath !== 'string' || !reportPath) return false;
   const normalized = reportPath.replaceAll('\\', '/');

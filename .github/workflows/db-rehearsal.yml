@@ -326,6 +326,58 @@ jobs:
           echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
           echo "version=$intake_version" >> "$GITHUB_OUTPUT"
 
+      # Completed-read proof remains a create-once draft in this disposable checkout.
+      # Stage after all current schema/draft prerequisites; never add it to production discovery or replay.
+      - name: Stage the exact completed-read producer draft after intake triage
+        id: completed-read-draft
+        run: |
+          set -euo pipefail
+          draft=supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql
+          test_source=supabase/drafts/tests/foundation_completed_read_proof.sql
+          test_target=supabase/tests/foundation_completed_read_proof.sql
+          if [[ ! -e "$draft" && ! -e "$test_source" ]]; then
+            echo "state=absent" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test -f "$draft"
+          test -f "$test_source"
+          test ! -e "$test_target"
+          intake_state='${{ steps.intake-triage-draft.outputs.state }}'
+          intake_version='${{ steps.intake-triage-draft.outputs.version }}'
+          test "$intake_state" = ephemeral
+          [[ "$intake_version" =~ ^[0-9]{14}$ ]]
+          expected_migration_sha256=c92a5656175ebac658af6e1246160bff462edac34dfa6534a304797f572c8163
+          expected_test_sha256=3ef70e5c2d24aebaf67b06f89f86564e5b94d7154e8074dd2f8947693c129da1
+          printf '%s  %s\n' "$expected_migration_sha256" "$draft" "$expected_test_sha256" "$test_source" | sha256sum --check
+          shopt -s nullglob
+          existing=(supabase/migrations/*_foundation_completed_read_proof.sql)
+          test "${#existing[@]}" -eq 0
+          now_version="$(date -u +%Y%m%d%H%M%S)"
+          if [[ "$intake_version" > "$now_version" ]]; then
+            echo "Intake version is in the future; refusing an unordered completed-read draft." >&2
+            exit 1
+          fi
+          while [[ ! "$now_version" > "$intake_version" ]]; do
+            sleep 1
+            now_version="$(date -u +%Y%m%d%H%M%S)"
+          done
+          supabase migration new --help
+          supabase migration new foundation_completed_read_proof
+          generated=(supabase/migrations/*_foundation_completed_read_proof.sql)
+          test "${#generated[@]}" -eq 1
+          [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_foundation_completed_read_proof\.sql$ ]]
+          completed_read_version="${BASH_REMATCH[1]}"
+          [[ "$completed_read_version" > "$intake_version" ]]
+          cp -- "$draft" "${generated[0]}"
+          cmp -- "$draft" "${generated[0]}"
+          printf '%s  %s\n' "$expected_migration_sha256" "$draft" "$expected_migration_sha256" "${generated[0]}" | sha256sum --check
+          cp -- "$test_source" "$test_target"
+          cmp -- "$test_source" "$test_target"
+          printf '%s  %s\n' "$expected_test_sha256" "$test_source" "$expected_test_sha256" "$test_target" | sha256sum --check
+          echo "state=ephemeral" >> "$GITHUB_OUTPUT"
+          echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
+          echo "version=$completed_read_version" >> "$GITHUB_OUTPUT"
+
       # Artifact names are derived from the post-staging migration folder, so the schema
       # artifact is named by the exact temporary head that db reset will apply.
       - name: Read the head migration version out of the folder
@@ -427,6 +479,7 @@ jobs:
       # official docs never confirmed the local image ships it enabled, so this asks rather
       # than assumes -- and it is a CLI call, not a new dependency.
       - name: Run the pgTAP suite
+        id: pgtap-first
         run: |
           supabase db query --local "create extension if not exists pgtap with schema extensions;"
           supabase test db
@@ -456,6 +509,7 @@ jobs:
       # would silently restore connector-only inventory logic. The first pass and pgTAP suite still
       # exercise the complete migration chain.
       - name: Apply the repair migrations a second time and re-run the suite
+        id: pgtap-second
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
           for file in supabase/migrations/005[245]_*.sql supabase/migrations/20260911*_*.sql \
@@ -484,6 +538,15 @@ jobs:
             -c "create table tavonel_ci_fixture.disposable_marker (value text primary key);" \
             -c "insert into tavonel_ci_fixture.disposable_marker values ('$marker');"
           MODEL_PROVIDER_SPEND_RACE_MARKER="$marker" node nextjs/scripts/db/model-provider-spend-race.mjs
+
+      - name: Require both disposable pgTAP passes for the completed-read draft
+        if: always() && steps.completed-read-draft.outputs.state != 'absent'
+        env:
+          COMPLETED_READ_STAGE_RESULT: ${{ steps.completed-read-draft.outcome }}
+          COMPLETED_READ_STATE: ${{ steps.completed-read-draft.outputs.state }}
+          FIRST_PGTAP_RESULT: ${{ steps.pgtap-first.outcome }}
+          SECOND_PGTAP_RESULT: ${{ steps.pgtap-second.outcome }}
+        run: node nextjs/scripts/repair-scope-gate.mjs database-draft
 
   real-auth-journey:
     name: Real local Auth journey

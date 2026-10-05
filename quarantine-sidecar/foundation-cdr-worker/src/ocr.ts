@@ -1,6 +1,7 @@
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
 import { ocrProgressSiblingKey, ocrSiblingKey } from "./keys";
 import { RetryableError } from "./errors";
+import { parseReaderBinding, readerBindingSha256 } from "../../../shared/completedReadReceipt";
 
 type OcrR2Bucket = {
   get(key: string): Promise<{ size?: number; arrayBuffer(): Promise<ArrayBuffer> } | null>;
@@ -77,6 +78,8 @@ export type OcrDispatchResult = {
   inputSha256?: string;
   outputSha256?: string;
   observedPageCount?: number;
+  readerRevision?: string;
+  readerBindingSha256?: string;
   computeCredits: 0 | 2;
 };
 
@@ -87,9 +90,11 @@ export type OcrDispatchEnv = {
   TAVONEL_CDR_HMAC?: string;
   RUNPOD_API_KEY?: string;
   FOUNDATION_R2_BUCKET: string;
+  FOUNDATION_COMPLETED_READ_ENABLED?: string;
+  FOUNDATION_COMPLETED_READ_BINDING?: string;
 };
 
-/** Storage read failures must stay retryable after the cold-start retry budget. */
+/** Must stay retryable even after the queue's cold-start retry budget. */
 export class OcrEvidenceRetryableError extends RetryableError {}
 const MAX_PERSISTED_OCR_BYTES = 24 * 1024 * 1024;
 
@@ -118,6 +123,16 @@ async function inspectPersistedOcr(
     const outputSha256 = await sha256DigestHeader(bytes);
     const facts: OcrDispatchResult = { status, key, inputSha256, outputSha256,
       observedPageCount: result.pageCount, computeCredits: 2 };
+    // Legacy objects have no provenance. Never stamp them with today's configured revision.
+    if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true") {
+      const binding = parseReaderBinding(env.FOUNDATION_COMPLETED_READ_BINDING, (env.FOUNDATION_OCR_URL ?? "").trim());
+      if (!binding || payload.readerRevision !== binding.readerRevision
+        || payload.readerBindingSha256 !== await readerBindingSha256(binding)) {
+        throw new OcrEvidenceRetryableError("persisted OCR reader provenance is not qualified");
+      }
+      facts.readerRevision = payload.readerRevision;
+      facts.readerBindingSha256 = payload.readerBindingSha256;
+    }
     return facts;
   } catch (error) {
     if (error instanceof OcrEvidenceRetryableError) throw error;
@@ -451,6 +466,11 @@ export async function dispatchOcrAfterSanitize(
 
   const inputSha256 = await sha256DigestHeader(bytes);
   if (existingOcr) return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
+  const binding = env.FOUNDATION_COMPLETED_READ_ENABLED === "true"
+    ? parseReaderBinding(env.FOUNDATION_COMPLETED_READ_BINDING, url) : null;
+  if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true" && !binding) {
+    throw new OcrEvidenceRetryableError("qualified immutable OCR reader binding is missing");
+  }
   const timestamp = now().toISOString();
   const requestId = newRequestId();
   const hmac = (env.TAVONEL_OCR_HMAC || env.TAVONEL_CDR_HMAC || "").trim();
@@ -484,10 +504,24 @@ export async function dispatchOcrAfterSanitize(
       method: "POST",
       headers,
       body: form,
+      // A qualification attests this endpoint only; following a redirect invalidates attribution.
+      ...(binding ? { redirect: "error" as const } : {}),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_TIMEOUT_OR_NETWORK", reason: "OCR request timed out or failed", requestId, inputSha256, computeCredits: 0 };
+  }
+  let responseEndpointMatches = false;
+  if (binding) {
+    try { responseEndpointMatches = new URL(response.url).href === new URL(binding.endpoint).href; } catch { /* fail closed */ }
+  }
+  if (binding && (response.redirected || !responseEndpointMatches
+    || (response.status >= 300 && response.status < 400))) {
+    throw new OcrEvidenceRetryableError("OCR response endpoint provenance is not qualified");
+  }
+  const responseRevision = response.headers.get("x-tavonel-reader-revision");
+  if (binding && responseRevision !== null && responseRevision !== binding.readerRevision) {
+    throw new OcrEvidenceRetryableError("OCR response reader revision conflicts with qualification");
   }
   if (!response.ok) {
     // 5xx and 429 are the endpoint being unavailable, not an answer about this document.
@@ -554,6 +588,15 @@ export async function dispatchOcrAfterSanitize(
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256, computeCredits: 2 };
   }
 
+  if (binding) {
+    const provenance = payload as Record<string, unknown>;
+    if ((Object.hasOwn(provenance, "readerRevision") && provenance.readerRevision !== binding.readerRevision)
+      || (Object.hasOwn(provenance, "readerBindingSha256")
+        && provenance.readerBindingSha256 !== await readerBindingSha256(binding))) {
+      throw new OcrEvidenceRetryableError("OCR result reader provenance conflicts with qualification");
+    }
+  }
+
   const body = JSON.stringify({
     schemaVersion: qualified.schemaVersion,
     status: qualified.status,
@@ -562,6 +605,7 @@ export async function dispatchOcrAfterSanitize(
     regions: qualified.regions,
     sourceImmutableKey: immutablePdfKey,
     inputSha256: qualified.inputSha256,
+    ...(binding ? { readerRevision: binding.readerRevision, readerBindingSha256: await readerBindingSha256(binding) } : {}),
   });
   const persistedBytes = new TextEncoder().encode(body);
   if (persistedBytes.byteLength > MAX_PERSISTED_OCR_BYTES) {
@@ -578,6 +622,9 @@ export async function dispatchOcrAfterSanitize(
     const message = error instanceof Error ? error.message : "";
     if (/precondition|already exists|conflict/iu.test(message)) {
       return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
+    }
+    if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true") {
+      throw new OcrEvidenceRetryableError("OCR persistence is incomplete; retry required");
     }
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESULT_WRITE_FAILED", reason: "ocr.json write failed", requestId, inputSha256, computeCredits: 0 };
   }

@@ -166,6 +166,9 @@ test("the home first screen shows source evidence without colliding with public 
       };
       const banner = document.querySelector<HTMLElement>("[data-marketing-consent-panel]");
       const bannerBox = banner?.getBoundingClientRect();
+      const sourceImage = document.querySelector<HTMLImageElement>(".paper-source-page img")!;
+      const imageBox = sourceImage.getBoundingClientRect();
+      const excerpt = document.querySelector<HTMLElement>(".paper-source-result blockquote")!;
       return {
         width: innerWidth,
         height: innerHeight,
@@ -177,6 +180,8 @@ test("the home first screen shows source evidence without colliding with public 
         source: rect(".paper-source"),
         sourcePage: rect(".paper-source-page img"),
         excerpt: rect(".paper-source-result blockquote"),
+        excerptLineHeight: Number.parseFloat(getComputedStyle(excerpt).lineHeight),
+        image: { width: imageBox.width, height: imageBox.height, naturalWidth: sourceImage.naturalWidth, naturalHeight: sourceImage.naturalHeight },
       };
     });
 
@@ -192,6 +197,14 @@ test("the home first screen shows source evidence without colliding with public 
     expect(hasVisibleArea(layout.source)).toBe(true);
     expect(hasVisibleArea(layout.sourcePage)).toBe(true);
     expect(hasVisibleArea(layout.excerpt)).toBe(true);
+    expect(layout.image.naturalWidth).toBeGreaterThan(0);
+    expect(layout.image.naturalHeight).toBeGreaterThan(0);
+    expect(layout.image.width / layout.image.height).toBeCloseTo(layout.image.naturalWidth / layout.image.naturalHeight, 2);
+    if (layout.width <= 600) {
+      const visibleExcerpt = Math.max(0, Math.min(layout.height, layout.excerpt.bottom) - Math.max(0, layout.excerpt.top));
+      expect(visibleExcerpt, "at least two readable excerpt lines begin beside the complete source page")
+        .toBeGreaterThanOrEqual(layout.excerptLineHeight * 2);
+    }
     if (consentVisible && layout.banner) {
       expect(doesNotOverlap(layout.banner, layout.header)).toBe(true);
       expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);

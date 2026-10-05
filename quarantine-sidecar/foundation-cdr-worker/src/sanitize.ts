@@ -48,6 +48,8 @@ export type R2BucketLike = {
 };
 
 export type SanitizeEnv = {
+  FOUNDATION_COMPLETED_READ_ENABLED?: string;
+  FOUNDATION_COMPLETED_READ_BINDING?: string;
   FOUNDATION_QUARANTINE: R2BucketLike;
   TAVONEL_CDR_URL: string;
   TAVONEL_CDR_HMAC?: string;

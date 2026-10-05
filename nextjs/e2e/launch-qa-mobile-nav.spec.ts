@@ -131,7 +131,8 @@ test("Developers owns its documentation routes", async ({ page }) => {
   await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
 });
 
-for (const item of CUSTOMER_LINKS) {
+// Explore owns an immersive stage, so current-page header markers apply to the other destinations.
+for (const item of CUSTOMER_LINKS.filter(item => item.href !== "/explore")) {
   test(`the exact ${item.label} destination is the current page`, async ({ page }) => {
     await page.goto(item.href);
     const { panel } = await openMenu(page);
@@ -140,6 +141,30 @@ for (const item of CUSTOMER_LINKS) {
     await expect(panel.locator('a.mobile-nav-direct[aria-current="location"]')).toHaveCount(0);
   });
 }
+
+test("Explore opens its current sample surface and exits back to the mobile menu", async ({ page }) => {
+  await page.goto("/");
+  const { panel } = await openMenu(page);
+  await panel.getByRole("link", { name: "Explore", exact: true }).click();
+  await expect(page).toHaveURL(/\/explore$/);
+  const stage = page.locator('[data-visual-world="explore"]');
+  await expect(stage).toBeVisible();
+  await expect(stage).toHaveAttribute("data-world-act", "entry");
+  await expect(page.locator("header.nav")).toHaveCount(0);
+  await expect(stage.getByLabel("Selected sample answer").locator("blockquote")).not.toBeEmpty();
+  await stage.getByRole("button", { name: "Relations ↗", exact: true }).click();
+  await expect(stage).toHaveAttribute("data-world-act", "world");
+  const acts = stage.getByRole("navigation", { name: "Acts", exact: true });
+  await expect(acts.getByRole("button", { name: "WORLD", exact: true })).toHaveAttribute("aria-current", "step");
+  await expect(acts.locator("button[aria-current]")).toHaveCount(1);
+  const exit = page.locator("main > header").getByRole("link", { name: /Back to TAVONEL/ });
+  await expect(exit).toHaveAttribute("href", "/");
+  await exit.click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator("header.nav details.mobile-primary-nav")).not.toHaveAttribute("open", "");
+  const home = await openMenu(page);
+  await expect(home.panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+});
 
 test("Product owns its source page as a section", async ({ page }) => {
   await page.goto("/sources");

@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
+import { playwrightReportContainsPath, readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
 
 const repoRoot = realpathSync(process.cwd());
 const readPlan = () => JSON.parse(readFileSync(resolve(repoRoot, 'repair-plan.json'), 'utf8'));
@@ -68,6 +68,113 @@ export function browserRunOutputDir(workspaceRoot, index) {
   return resolve(workspaceRoot, 'test-results', `repair-scope-playwright-${index + 1}`);
 }
 
+export const WORKSPACE_INTAKE_CAPTURE_NAMES = Object.freeze([
+  'intake-mounted-review-1440x900', 'intake-mounted-review-390x844',
+  'intake-mounted-receipt-1440x900', 'intake-mounted-receipt-390x844',
+]);
+
+function protectedCapturePath(root, path, kind, allowMissing = false) {
+  const target = resolve(path);
+  if (!isInsideWorkspace(root, target)) throw new Error('Capture path escaped the workspace.');
+  const segments = relative(root, target).split(sep);
+  let current = root;
+  for (const [index, segment] of segments.entries()) {
+    current = resolve(current, segment);
+    let entry;
+    try { entry = lstatSync(current); }
+    catch (error) { if (allowMissing && error.code === 'ENOENT') return null; throw error; }
+    if (entry.isSymbolicLink()) throw new Error(`Capture path contains a symlink: ${current}`);
+    const expectedDirectory = index !== segments.length - 1 || kind === 'directory';
+    if (expectedDirectory ? !entry.isDirectory() : !entry.isFile()) throw new Error(`Capture path is not a regular ${expectedDirectory ? 'directory' : 'file'}: ${current}`);
+    if (!isInsideWorkspace(root, realpathSync(current))) throw new Error('Capture path ancestry escaped the workspace.');
+  }
+  return lstatSync(target);
+}
+
+export const MAX_MOUNTED_PNG_BYTES = 5 * 1024 * 1024;
+export function validateMountedPngMetadata(entry) {
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size < 8 || entry.size > MAX_MOUNTED_PNG_BYTES) {
+    throw new Error('Mounted PNG must be a bounded regular non-symlink file.');
+  }
+}
+
+export function collectWorkspaceIntakeCaptures(workspaceRoot = repoRoot) {
+  const suppliedRoot = resolve(workspaceRoot);
+  if (lstatSync(suppliedRoot).isSymbolicLink() || !lstatSync(suppliedRoot).isDirectory()) throw new Error('Capture workspace root must be a non-symlink directory.');
+  const root = realpathSync(suppliedRoot);
+  const destination = resolve(root, 'test-results/repair-scope-intake-mounted');
+  // Validate every destination ancestor and existing named leaf before any mutation.
+  protectedCapturePath(root, destination, 'directory', true);
+  for (const name of WORKSPACE_INTAKE_CAPTURE_NAMES) {
+    for (const extension of ['png', 'json']) protectedCapturePath(root, resolve(destination, `${name}.${extension}`), 'file', true);
+  }
+  const attachments = new Map(WORKSPACE_INTAKE_CAPTURE_NAMES.map(name => [`${name}-geometry`, []]));
+  const reports = resolve(root, 'node_modules/.cache/repair-scope-reports');
+  protectedCapturePath(root, reports, 'directory');
+  for (const file of readdirSync(reports).filter(name => /^playwright-[1-9][0-9]*\.json$/.test(name))) {
+    const reportPath = resolve(reports, file);
+    protectedCapturePath(root, reportPath, 'file');
+    const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+    const visit = suites => {
+      for (const suite of suites ?? []) {
+        for (const spec of suite.specs ?? []) {
+          if (!playwrightReportContainsPath(spec.file ?? suite.file, 'e2e/workspace-intake-triage.spec.ts', root, report.config?.rootDir)) continue;
+          readAndValidatePlaywrightReport(reportPath, ['e2e/workspace-intake-triage.spec.ts'], root);
+          for (const test of spec.tests ?? []) {
+            const last = test.results?.at(-1);
+            if (test.projectName !== 'audit' || !['expected', 'flaky'].includes(test.status) || last?.status !== 'passed') continue;
+            for (const attachment of last.attachments ?? []) {
+              if (attachments.has(attachment.name)) attachments.get(attachment.name).push(attachment);
+            }
+          }
+        }
+        visit(suite.suites);
+      }
+    };
+    visit(report.suites);
+  }
+  const prepared = [];
+  for (const name of WORKSPACE_INTAKE_CAPTURE_NAMES) {
+    const matches = attachments.get(`${name}-geometry`);
+    if (matches.length !== 1) throw new Error(`Expected exactly one mounted geometry attachment for ${name}; found ${matches.length}.`);
+    const attachment = matches[0];
+    if (attachment.contentType !== 'application/json' || typeof attachment.path !== 'string') throw new Error(`Invalid mounted geometry attachment: ${name}`);
+    const geometryPath = resolve(root, attachment.path);
+    const geometryEntry = protectedCapturePath(root, geometryPath, 'file');
+    if (geometryEntry.size > 64 * 1024) throw new Error(`Mounted geometry is oversized: ${name}`);
+    const fromRoot = relative(root, geometryPath).replaceAll('\\', '/');
+    if (!/^test-results\/repair-scope-playwright-[1-9][0-9]*\/workspace-intake-triage-[^/]+\/attachments\/[^/]+\.json$/.test(fromRoot)) throw new Error(`Mounted geometry attachment escaped its synthetic intake output: ${name}`);
+    const geometry = JSON.parse(readFileSync(geometryPath, 'utf8'));
+    const [width, height] = name.split('-').at(-1).split('x').map(Number);
+    if (geometry.viewport?.width !== width || geometry.viewport?.height !== height) throw new Error(`Wrong mounted capture viewport: ${name}`);
+    const screenshotPath = resolve(dirname(dirname(geometryPath)), `${name}.png`);
+    validateMountedPngMetadata(protectedCapturePath(root, screenshotPath, 'file'));
+    const png = readFileSync(screenshotPath);
+    if (png.length > MAX_MOUNTED_PNG_BYTES || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error(`Mounted screenshot is not a bounded PNG: ${name}`);
+    // Copy only source-defined geometry fields, never the complete report or arbitrary attachments.
+    const { viewport, clearBox, triageBox, inventoryBox, selectBox, labelTextBottom, escaped } = geometry;
+    const box = value => {
+      if (!value || !['x', 'y', 'width', 'height'].every(key => Number.isFinite(value[key]))) throw new Error(`Malformed mounted geometry: ${name}`);
+      return Object.fromEntries(['x', 'y', 'width', 'height'].map(key => [key, value[key]]));
+    };
+    if (!Number.isFinite(labelTextBottom) || !Array.isArray(escaped) || escaped.length !== 0) throw new Error(`Invalid mounted geometry assertions: ${name}`);
+    prepared.push({ name, png, json: JSON.stringify({ viewport: { width, height }, clearBox: box(clearBox), triageBox: box(triageBox), inventoryBox: box(inventoryBox), selectBox: box(selectBox), labelTextBottom, escaped: [] }, null, 2) + '\n' });
+  }
+  // Sources, signatures and report bindings all qualify before files are created or removed.
+  protectedCapturePath(root, destination, 'directory', true);
+  mkdirSync(destination, { recursive: true });
+  const copied = [];
+  for (const { name, png, json } of prepared) {
+    for (const [extension, bytes] of [['png', png], ['json', json]]) {
+      const target = resolve(destination, `${name}.${extension}`);
+      protectedCapturePath(root, target, 'file', true);
+      writeFileSync(target, bytes, { flag: 'wx' });
+      copied.push(`${name}.${extension}`);
+    }
+  }
+  return copied;
+}
+
 const browserProjectsByFile = new Map([
   ['e2e/contrast-zoom-audit.spec.ts', ['audit', 'audit-768', 'audit-1280']],
   ['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],
@@ -83,6 +190,7 @@ const browserProjectsByFile = new Map([
   ['e2e/landing-hero-film-loading.spec.ts', ['390']],
   ['e2e/marketing-consent.spec.ts', ['1440', '390']],
   ['e2e/workspace-intake-triage.spec.ts', ['audit']],
+  ['e2e/workspace-intake-layout.spec.ts', ['1440']],
 ]);
 
 export function planBrowserRuns(files, runDetailIntegrity) {
@@ -283,5 +391,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const mode = process.argv[2];
   if (mode === 'unit') await runUnit();
   else if (mode === 'browser') await runBrowser();
+  else if (mode === 'intake-captures') console.log(`Collected ${collectWorkspaceIntakeCaptures().length} exact synthetic mounted intake files.`);
   else throw new Error('Usage: node scripts/run-repair-check.mjs <unit|browser>');
 }

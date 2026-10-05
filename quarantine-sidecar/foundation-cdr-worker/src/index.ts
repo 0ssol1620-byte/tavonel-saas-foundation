@@ -4,6 +4,8 @@ import { extractObjectKey, isQuarantineSourceKey } from "./keys";
 import { ocrFailureKind } from "./ocr";
 import { asSourceRefusal, sanitizeObject, writeCdrRejectReceipt, type SanitizeResult } from "./sanitize";
 import { dispatchComputeSettlement } from "./settlement";
+import { COMPLETED_READ_SCHEMA, parseCompletedReadFacts } from "../../../shared/completedReadReceipt";
+import { RetryableError } from "./errors";
 
 export interface Env {
   FOUNDATION_QUARANTINE: R2Bucket;
@@ -14,6 +16,8 @@ export interface Env {
   TAVONEL_CDR_HMAC: string;
   FOUNDATION_CDR_IDENTITY_HMAC?: string;
   FOUNDATION_OCR_URL?: string;
+  FOUNDATION_COMPLETED_READ_ENABLED?: string;
+  FOUNDATION_COMPLETED_READ_BINDING?: string;
   TAVONEL_OCR_HMAC?: string;
   RUNPOD_API_KEY?: string;
   FOUNDATION_BILLING_SETTLEMENT_URL?: string;
@@ -70,6 +74,20 @@ async function settleSanitized(env: Env, objectKey: string, result: SanitizeResu
   const outcome = result.ocr.computeCredits === 0
     ? "released"
     : result.ocr.status === "failed" ? "operator_review" : "settled";
+  const completedRead = env.FOUNDATION_COMPLETED_READ_ENABLED === "true" && outcome === "settled"
+    ? parseCompletedReadFacts({
+      schemaVersion: COMPLETED_READ_SCHEMA,
+      workspaceKey: objectKey.split("/")[1], documentId: objectKey.split("/")[2],
+      originalKey: objectKey, originalSha256: result.inputSha256,
+      sanitizedKey: result.immutableKey, sanitizedSha256: result.outputSha256,
+      ocrKey: result.ocr.key, ocrSha256: result.ocr.outputSha256,
+      observedPageCount: result.ocr.observedPageCount,
+      readerRevision: result.ocr.readerRevision, readerBindingSha256: result.ocr.readerBindingSha256,
+    }) : null;
+  if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true" && outcome === "settled"
+    && (!completedRead || result.ocr.inputSha256 !== result.outputSha256)) {
+    throw new RetryableError("completed read facts are incomplete or conflicting");
+  }
   await dispatchComputeSettlement(
     env,
     objectKey,
@@ -81,7 +99,7 @@ async function settleSanitized(env: Env, objectKey: string, result: SanitizeResu
     undefined,
     // The digest over the bytes this worker read. The application server never reads them, so
     // this is the only place a source digest can come from without re-downloading the object.
-    { sourceSha256: result.inputSha256 },
+    { sourceSha256: result.inputSha256, ...(completedRead ? { completedRead } : {}) },
   );
 }
 

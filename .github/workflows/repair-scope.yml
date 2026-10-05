@@ -62,6 +62,7 @@ jobs:
         id: check
         run: pnpm check
         continue-on-error: true
+      # The exact producer package adds its ninth suite to this same normal npm test; no second install.
       - name: Run the normal CDR worker unit suite and types for reviewed OCR safety
         id: cdr-worker
         if: >-
@@ -136,6 +137,26 @@ jobs:
           PLAYWRIGHT_LOCAL_HTTP: "1"
         run: node scripts/run-repair-check.mjs browser
         continue-on-error: true
+      - name: Require the four synthetic mounted intake preflight capture pairs
+        id: workspace-intake-captures
+        if: always() && steps.plan.outputs.workspace_intake_capture == 'true'
+        run: node scripts/run-repair-check.mjs intake-captures
+      - name: Upload only the four named synthetic mounted intake preflight capture pairs
+        if: always() && steps.workspace-intake-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-mounted-intake-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-1440x900.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-1440x900.json
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-390x844.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-390x844.json
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-1440x900.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-1440x900.json
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-390x844.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-390x844.json
+          if-no-files-found: error
+          retention-days: 3
       - name: Require screenshots for the exact paired public UI candidate
         id: public-ui-screenshots
         if: always() && steps.plan.outputs.public_ui_capture == 'true' && steps.browser.outcome != 'skipped'
@@ -185,6 +206,7 @@ jobs:
           AUX_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-scripts.outcome || 'success' }}
           WORKFLOW_RESULT: ${{ steps.plan.outputs.workflow_static == 'true' && steps.workflow-static.outcome || 'success' }}
           CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}
+          WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}
           SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
           BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}
           BROWSER_INSTALL_RESULT: ${{ steps.browser-install.outcome }}

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { settleFoundationCompute } from "@/lib/compute-reservation";
+import { settleCompletedRead } from "@/lib/completed-read-proof";
+import { parseCompletedReadFacts } from "../../../../../../shared/completedReadReceipt";
 import { verifyComputeSettlementRequest } from "@/lib/compute-settlement-auth";
 import { appendServiceAuditEvent } from "@/lib/enterprise-store";
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "@/lib/immutable-keys";
@@ -108,7 +110,19 @@ export async function POST(request: Request) {
   const workspaceKey = typeof input.workspaceKey === "string" ? input.workspaceKey : "";
   const documentId = typeof input.documentId === "string" ? input.documentId : "";
   const reasonCode = typeof input.reasonCode === "string" ? input.reasonCode : "";
-  const result = await settleFoundationCompute({
+  const hasProof = Object.prototype.hasOwnProperty.call(input, "completedRead");
+  const completedRead = hasProof ? parseCompletedReadFacts(input.completedRead) : null;
+  if (hasProof && (process.env.FOUNDATION_COMPLETED_READ_ENABLED !== "true" || !completedRead
+    || completedRead.workspaceKey !== workspaceKey || completedRead.documentId !== documentId
+    || completedRead.originalSha256 !== input.sourceSha256
+    || input.outcome !== "settled" || input.actualCredits !== 2 || reasonCode !== "OCR_COMPLETED")) {
+    return NextResponse.json({ code: "COMPLETED_READ_INVALID_OR_DISABLED" }, { status: 503, headers });
+  }
+  if (!hasProof && process.env.FOUNDATION_COMPLETED_READ_ENABLED === "true"
+    && input.outcome === "settled" && reasonCode === "OCR_COMPLETED") {
+    return NextResponse.json({ code: "COMPLETED_READ_REQUIRED" }, { status: 503, headers });
+  }
+  const result = completedRead ? await settleCompletedRead(completedRead) : await settleFoundationCompute({
     workspaceKey,
     documentId,
     outcome: input.outcome as "settled" | "operator_review" | "released",

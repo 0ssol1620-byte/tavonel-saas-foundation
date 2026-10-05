@@ -169,7 +169,6 @@ const DESKTOP: Scenario[] = [
     run: async (page) => {
       for (const entry of [
         { path: "/product", owner: "/product", current: "page" },
-        { path: "/explore", owner: "/explore", current: "page" },
         { path: "/developers", owner: "/developers", current: "page" },
         { path: "/docs/mcp", owner: "/developers", current: "location" },
         { path: "/sources", owner: "/product", current: "location" },
@@ -186,6 +185,28 @@ const DESKTOP: Scenario[] = [
         "Research must stay unowned by a different primary section",
       ).toBe(0);
       await expect(page.locator('footer.site a[href="/research"]').first()).toHaveAttribute("href", "/research");
+
+      // Explore intentionally replaces public chrome with its immersive sample header.
+      // Follow the public entry, prove the current act, then use its named exit back home.
+      await page.goto("/");
+      await activateLink(page, page.locator(`${BAR} a[href="/explore"]`));
+      await expect(page).toHaveURL(arrivedAt("/explore"));
+      const stage = page.locator('[data-visual-world="explore"]');
+      await expect(stage).toBeVisible();
+      await expect(stage).toHaveAttribute("data-world-act", "entry");
+      await expect(page.locator("header.nav")).toHaveCount(0);
+      await expect(stage.getByLabel("Selected sample answer").locator("blockquote")).not.toBeEmpty();
+      await stage.getByRole("button", { name: "Relations ↗", exact: true }).click();
+      await expect(stage).toHaveAttribute("data-world-act", "world");
+      const acts = stage.getByRole("navigation", { name: "Acts", exact: true });
+      await expect(acts.getByRole("button", { name: "WORLD", exact: true })).toHaveAttribute("aria-current", "step");
+      await expect(acts.locator("button[aria-current]")).toHaveCount(1);
+      const exit = page.locator("main > header").getByRole("link", { name: /Back to TAVONEL/ });
+      await expect(exit).toHaveAttribute("href", "/");
+      await activateLink(page, exit);
+      await expect(page).toHaveURL(/\/$/);
+      await expect(page.locator(`${BAR} a[href="/explore"]`)).toBeVisible();
+      await expect(page.locator(`${BAR} a[aria-current]`)).toHaveCount(0);
     },
   },
   {

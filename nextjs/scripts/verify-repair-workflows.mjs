@@ -31,6 +31,20 @@ const conditionForStep = (workflow, name) => {
   assert(match, `${name}: expected a folded prerequisite condition`);
   return match[1].split(/\r?\n/).map(line => line.trim()).filter(Boolean).join(' ');
 };
+assert(planner.includes("PUBLIC_UI_REPAIR_PREDECESSOR_SHA = '3a5be63e0901f9f1972f6793cac7891bf064af9e'") && planner.includes('PUBLIC_UI_REPAIR_BLOBS = Object.freeze('), 'public repair must bind the exact four-file predecessor/candidate stack');
+assert(planner.includes('verifyPublicUiRepairScopeEvidence') && planner.includes('publicUiRepairVerification?.eligible && Object.hasOwn(PUBLIC_UI_REPAIR_BLOBS, path)'), 'public repair variants require a complete exact proof while original editorial pins remain unchanged');
+for (const digest of ['58761db3c41e01580f5f015544ce6d17a3900768', 'ab36bbc3203687bd0eca10043207f6557aaec228', 'b3fbdaf6643fe3f5e781d76fd4f5bbf903694a43', 'e1cc943ced58cb6a0a24f9ca2ad79a818f670281']) assert(planner.includes(digest), 'public repair missing exact source binding: ' + digest);
+assert(planner.includes("WORKSPACE_INTAKE_LAYOUT_PREDECESSOR_SHA = '3a5be63e0901f9f1972f6793cac7891bf064af9e'") && planner.includes('WORKSPACE_INTAKE_LAYOUT_BLOBS = Object.freeze('), 'workspace layout must bind the exact predecessor and all four reviewed source blobs');
+assert(planner.includes('workspaceIntakeLayoutVerification?.eligible') && planner.includes('WORKSPACE_INTAKE_LAYOUT_TRIGGER_PATHS'), 'workspace layout admission and mounted-audit override must require a complete exact proof');
+assert(runner.includes("['e2e/workspace-intake-layout.spec.ts', ['1440']]") && runner.includes("['e2e/workspace-intake-triage.spec.ts', ['audit']]"), 'isolated intake layout must use numeric 1440 while mounted intake stays in audit');
+assert(runner.includes('readAndValidatePlaywrightReport(reportPath') && runner.includes('matches.length !== 1'), 'mounted collection must validate the report and reject duplicate/missing exact attachments');
+const mountedUploadStart = repair.indexOf('- name: Upload only the four named synthetic mounted intake preflight capture pairs');
+const mountedUpload = repair.slice(mountedUploadStart, repair.indexOf('- name: Require screenshots for the exact paired public UI candidate', mountedUploadStart));
+assert(mountedUploadStart >= 0 && mountedUpload.includes('retention-days: 3') && mountedUpload.includes('if-no-files-found: error'), 'mounted capture upload must be bounded and required');
+const mountedPaths = [...mountedUpload.matchAll(/^            (nextjs\/test-results\/[^\n]+)$/gm)].map(match => match[1]);
+const mountedExpected = ['review-1440x900', 'review-390x844', 'receipt-1440x900', 'receipt-390x844'].flatMap(suffix => ['png', 'json'].map(extension => `nextjs/test-results/repair-scope-intake-mounted/intake-mounted-${suffix}.${extension}`));
+assert(JSON.stringify(mountedPaths.sort()) === JSON.stringify(mountedExpected.sort()), 'upload must include only the four explicit mounted PNG/geometry pairs; no isolated images or reports');
+assert(repair.includes('WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}'), 'mounted capture gate must consume the actual step outcome without a success fallback');
 const assertFullEvents = (workflow, name) => {
   assert(/pull_request:\n\s+types: \[ready_for_review\]/.test(workflow), `${name}: full PR run must be ready_for_review only`);
   assert(workflow.includes('workflow_dispatch:'), `${name}: manual full run is missing`);
@@ -115,6 +129,27 @@ assert(dbRehearsal.includes("supabase migration new compile_job_viewer_authority
 assert(dbRehearsal.includes('cp -- "$draft" "${generated[0]}"') && dbRehearsal.includes('cmp -- "$draft" "${generated[0]}"') && dbRehearsal.includes('sha256sum "$draft" "${generated[0]}"'), 'async migration staging must assert exact source copy and hashes');
 assert(dbRehearsal.includes('supabase/drafts/compile-job-viewer-authority.sql') && !dbRehearsal.includes('supabase db push'), 'async SQL must stay a runner-local draft and never use remote push');
 const intakeStage = dbRehearsal.indexOf('- name: Stage the reviewed intake triage draft after async authority');
+const completedReadStage = dbRehearsal.indexOf('- name: Stage the exact completed-read producer draft after intake triage');
+const completedReadChain = dbRehearsal.indexOf('- name: Read the head migration version out of the folder');
+assert(completedReadStage > intakeStage && completedReadStage < completedReadChain, 'completed-read create-once draft must stage after intake and before the disposable chain reset');
+const completedReadStep = dbRehearsal.slice(completedReadStage, completedReadChain);
+for (const value of [
+  'supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql', 'supabase/drafts/tests/foundation_completed_read_proof.sql',
+  'c92a5656175ebac658af6e1246160bff462edac34dfa6534a304797f572c8163', '3ef70e5c2d24aebaf67b06f89f86564e5b94d7154e8074dd2f8947693c129da1',
+  'test "$intake_state" = ephemeral', 'test "${#existing[@]}" -eq 0', '[[ "$completed_read_version" > "$intake_version" ]]',
+  '"$expected_migration_sha256" "$draft" "$expected_migration_sha256" "${generated[0]}"',
+  '"$expected_test_sha256" "$test_source" "$expected_test_sha256" "$test_target"',
+]) assert(completedReadStep.includes(value), 'completed-read staging is missing exact ordered/checksummed prerequisite: ' + value);
+const completedReadReplay = dbRehearsal.slice(dbRehearsal.indexOf('- name: Apply the repair migrations a second time'), dbRehearsal.indexOf('- name: Race model-provider settlement'));
+assert(!completedReadReplay.includes('completed_read_proof') && !completedReadReplay.includes('20261005') && !completedReadReplay.includes('2026*'), 'create-once completed-read draft must not enter the replay-safe loop');
+assert((dbRehearsal.match(/supabase test db\n/g) ?? []).length === 2, 'disposable protocol must retain both pgTAP executions');
+for (const result of ['steps.completed-read-draft.outcome', 'steps.pgtap-first.outcome', 'steps.pgtap-second.outcome']) assert(dbRehearsal.includes(result), 'completed-read final gate must require actual step outcome: ' + result);
+assert(dbRehearsal.includes("if: always() && steps.completed-read-draft.outputs.state != 'absent'") && dbRehearsal.includes('run: node nextjs/scripts/repair-scope-gate.mjs database-draft'), 'completed-read rehearsal must fail closed on missing or skipped staging/pgTAP');
+assert(planner.includes("COMPLETED_READ_PRODUCER_PREDECESSOR_SHA = '3a5be63e0901f9f1972f6793cac7891bf064af9e'") && planner.includes('COMPLETED_READ_PRODUCER_BLOBS = Object.freeze(') && planner.includes('verifyCompletedReadProducerScopeEvidence'), 'producer must bind all fifteen exact draft source files');
+assert(planner.includes('completedReadProducerVerification?.eligible && Object.hasOwn(COMPLETED_READ_PRODUCER_BLOBS, path)'), 'OCR safety overrides may require only complete producer evidence');
+for (const path of ['lib/api-error-codes.test.ts', 'lib/settle-route.test.ts', 'lib/completed-read-proof.test.ts']) assert(planner.includes(`'${path}'`), 'producer must select genuine Vitest tests: ' + path);
+assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
+assert((repair.match(/npm ci --ignore-scripts --no-audit --no-fund/g) ?? []).length === 1 && repair.includes('CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}'), 'producer must reuse one normal worker install/test/types step and its strict actual-outcome gate');
 assert(intakeStage > asyncStage, 'intake triage draft must stage only after ACL and async authority');
 assert(dbRehearsal.includes('supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql') && dbRehearsal.includes('supabase/drafts/tests/foundation_intake_triage_binding.sql'), 'intake rehearsal must source only the two reviewed drafts');
 assert(dbRehearsal.includes('[[ "$intake_version" > "$async_version" ]]') && dbRehearsal.includes('existing=(supabase/migrations/*_foundation_intake_triage_v3.sql)'), 'intake migration staging must use a unique strictly later temporary version');

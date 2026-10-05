@@ -43,6 +43,16 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
   };
 }
 
+export function requireCompletedReadRehearsal({ stageResult, state, firstPgTapResult, secondPgTapResult }) {
+  const failures = [
+    ['completed-read draft staging', stageResult, 'success'],
+    ['completed-read draft state', state, 'ephemeral'],
+    ['first disposable pgTAP execution', firstPgTapResult, 'success'],
+    ['second disposable pgTAP execution', secondPgTapResult, 'success'],
+  ].filter(([, actual, expected]) => actual !== expected).map(([name, actual]) => `${name}: ${actual ?? 'not run'}`);
+  if (failures.length) throw new AggregateError(failures.map(reason => new Error(reason)), 'Completed-read draft database evidence is missing or failed.');
+}
+
 function runGate() {
   const plan = JSON.parse(readFileSync('repair-plan.json', 'utf8'));
   const env = process.env;
@@ -53,6 +63,7 @@ function runGate() {
     [plan.runFullHermeticVitest ? 'test:scripts' : 'alias auth/contract tests', env.AUX_RESULT],
     ['workflow static gates', plan.runWorkflowStaticGate ? env.WORKFLOW_RESULT : 'success'],
     ['CDR worker tests and types', plan.runCdrWorkerChecks ? env.CDR_WORKER_RESULT : 'success'],
+    ['mounted workspace intake artifacts', plan.requireWorkspaceIntakeCapture ? env.WORKSPACE_INTAKE_CAPTURE_RESULT : 'success'],
     ['Chromium install', browserRequired ? env.BROWSER_INSTALL_RESULT : 'success'],
     ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
@@ -70,4 +81,10 @@ function runGate() {
   if (receipt.gateFailures.length) { console.error(receipt.gateFailures.join('\n')); process.exit(1); }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) runGate();
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  if (process.argv[2] === 'database-draft') {
+    requireCompletedReadRehearsal({ stageResult: process.env.COMPLETED_READ_STAGE_RESULT, state: process.env.COMPLETED_READ_STATE,
+      firstPgTapResult: process.env.FIRST_PGTAP_RESULT, secondPgTapResult: process.env.SECOND_PGTAP_RESULT });
+    console.log('Completed-read draft exercised by both disposable pgTAP passes; full qualification remains PENDING.');
+  } else runGate();
+}

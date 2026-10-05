@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
 const PREFLIGHT_ID = "00000000-0000-4000-8000-000000000001";
@@ -282,6 +282,84 @@ async function installReadyStageFlow(
   return { events: trace, putResponseStatuses, putFailures };
 }
 
+
+/* Measure the mounted authenticated fixture, after its protocol assertions have passed.
+   Resizing and capturing do not choose sources, fetch a quote, or approve processing. */
+async function captureMountedTriageLayout(page: Page, testInfo: TestInfo, phase: "review" | "receipt") {
+  const originalViewport = page.viewportSize();
+  try {
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await test.step(`mounted ${phase} layout at ${viewport.width}px`, async () => {
+        await page.setViewportSize(viewport);
+        const preflight = page.getByRole("region", { name: "Compile preflight", exact: true });
+        const triage = page.getByRole("region", { name: "Server source triage", exact: true });
+        const inventory = preflight.getByRole("list", { name: "What each staged file will carry", exact: true });
+        const clear = preflight.getByRole("button", { name: "Clear", exact: true });
+        const select = triage.getByRole("combobox", { name: "Review scan.pdf", exact: true });
+        await expect(preflight).toBeVisible();
+        await expect(inventory).toBeVisible();
+        await expect(triage.getByText("Customer page charge:", { exact: true })).toBeVisible();
+        await expect(triage.getByText("Operator infrastructure cost:", { exact: true })).toBeVisible();
+        await expect(triage.getByText(/Without trusted persisted read proof/)).toBeVisible();
+        await expect(select).toBeVisible();
+        await expect(clear).toBeVisible();
+        if (phase === "review") {
+          await expect(select).toBeEnabled();
+          await expect(triage.getByText(/encryption: unknown; corruption: unknown; archive expansion: unknown/)).toBeVisible();
+          await expect(triage.getByRole("button", { name: "Save choices and show estimate", exact: true })).toBeVisible();
+        } else {
+          await expect(triage.locator('[aria-label="Cost status"]')).toBeVisible();
+          await expect(triage.getByRole("button", { name: "Get full-processing quote", exact: true })).toBeVisible();
+          await expect(triage.getByText(/This separate approval authorizes the existing reservation and processing flow/)).toBeVisible();
+        }
+
+        const clearBox = await clear.boundingBox();
+        const triageBox = await triage.boundingBox();
+        const inventoryBox = await inventory.boundingBox();
+        const selectBox = await select.boundingBox();
+        expect(clearBox).not.toBeNull();
+        expect(triageBox).not.toBeNull();
+        expect(inventoryBox).not.toBeNull();
+        expect(selectBox).not.toBeNull();
+        expect(clearBox!.height).toBeGreaterThanOrEqual(44);
+        expect(clearBox!.height).toBeLessThanOrEqual(64);
+        expect(clearBox!.width).toBeGreaterThanOrEqual(44);
+        expect(clearBox!.y).toBeGreaterThanOrEqual(triageBox!.y + triageBox!.height - 1);
+        expect(Math.abs(triageBox!.x - inventoryBox!.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(triageBox!.width - inventoryBox!.width)).toBeLessThanOrEqual(1);
+        expect(selectBox!.height).toBeGreaterThanOrEqual(44);
+        expect(selectBox!.width).toBeGreaterThanOrEqual(140);
+        const labelTextBottom = await select.locator("xpath=..").evaluate(label => {
+          const textNodes = [...label.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+          if (!textNodes.length) throw new Error("The source selector has no visible label text.");
+          return Math.max(...textNodes.map(node => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return range.getBoundingClientRect().bottom;
+          }));
+        });
+        expect(selectBox!.y).toBeGreaterThanOrEqual(labelTextBottom + 4);
+
+        const escaped = await preflight.evaluate(region => [...region.querySelectorAll<HTMLElement>("*")]
+          .filter(element => {
+            const box = element.getBoundingClientRect();
+            return box.width > 0 && box.height > 0 && (box.left < -1 || box.right > innerWidth + 1);
+          }).map(element => `${element.tagName}.${element.className}`));
+        expect(escaped).toEqual([]);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+        const name = `intake-mounted-${phase}-${viewport.width}x${viewport.height}`;
+        await testInfo.attach(`${name}-geometry`, {
+          body: Buffer.from(JSON.stringify({ viewport, clearBox, triageBox, inventoryBox, selectBox, labelTextBottom, escaped }, null, 2)),
+          contentType: "application/json",
+        });
+        await preflight.screenshot({ path: testInfo.outputPath(`${name}.png`), animations: "disabled" });
+      });
+    }
+  } finally {
+    if (originalViewport) await page.setViewportSize(originalViewport);
+  }
+}
+
 test("disabled triage keeps review-only separate from upload or processing", async ({ page }) => {
   let stageCalls = 0;
   let approvalCalls = 0;
@@ -358,7 +436,7 @@ test("legacy fallback requires explicit maximum approval and ignores repeated ac
   expect(puts).toBe(0);
 });
 
-test("exclude-all 409 leaves choices editable so the customer can retry", async ({ page }) => {
+test("exclude-all 409 leaves choices editable so the customer can retry", async ({ page }, testInfo) => {
   let finalCalls = 0;
   await openWorkspace(page);
   const flow = await installReadyStageFlow(page, choices => {
@@ -413,6 +491,7 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
     ),
     `PUT failure is tolerated only as a post-200 cancellation after seal and receipt; diagnostics=${putFailureDiagnostics}`,
   ).toBe(true);
+  await captureMountedTriageLayout(page, testInfo, "review");
   await choice.selectOption("exclude");
   await page.getByRole("button", { name: "Save choices and show estimate" }).click();
   await expect(page.getByText(/TRIAGE_NO_FILES_SELECTED/)).toBeVisible();
@@ -426,6 +505,7 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
   await expect(costStatus).toContainText("This request is a new read; its page charge is shown in the initial estimate. No recompile quote is being made.");
   await expect(costStatus).not.toContainText("$0.00");
   expect(finalCalls).toBe(2);
+  await captureMountedTriageLayout(page, testInfo, "receipt");
 });
 
 test("changing the selected source while staging is delayed ignores the old response", async ({ page }) => {
