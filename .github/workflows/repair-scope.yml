@@ -70,6 +70,8 @@ jobs:
           steps.secrets.outcome == 'success' &&
           steps.check.outcome == 'success'
         working-directory: quarantine-sidecar/foundation-cdr-worker
+        # Preserve the actual failure for the final gate while independent browser checks continue.
+        continue-on-error: true
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
@@ -100,7 +102,6 @@ jobs:
            (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
           (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
-          (steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         run: pnpm exec playwright install --with-deps chromium
         continue-on-error: true
@@ -115,7 +116,6 @@ jobs:
            (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
           (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
           (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
-          (steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success') &&
           (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
         env:
           COMMERCIAL_MODE: live

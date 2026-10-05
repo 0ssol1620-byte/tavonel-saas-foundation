@@ -217,6 +217,28 @@ async function runUnit() {
   console.log('Vitest report: ' + summary.passed + ' passed, ' + summary.skipped + ' skipped, ' + summary.failed + ' failed across ' + summary.files + ' selected files.');
   if (runError) throw runError;
 }
+export async function runBrowserGroups(plannedRuns, { runGroup, readReport, onSummary = () => {} }) {
+  const failures = [];
+  const summaries = [];
+  for (const [index, planned] of plannedRuns.entries()) {
+    let runError;
+    let reportError;
+    try { await runGroup(planned, index); }
+    catch (error) { runError = error; }
+    try {
+      const summary = await readReport(planned, index);
+      onSummary(planned, summary);
+      summaries.push(summary);
+    } catch (error) { reportError = error; }
+    if (runError || reportError) {
+      failures.push(new AggregateError([runError, reportError].filter(Boolean),
+        `Playwright group ${index + 1} (${planned.project ?? planned.kind}) failed.`));
+    }
+  }
+  if (failures.length) throw new AggregateError(failures, `${failures.length} selected Playwright group(s) failed.`);
+  return summaries;
+}
+
 async function runBrowser() {
   const plan = readPlan();
   const files = plan.browserFiles.map(file => validateSelectedPath(file, 'browser'));
@@ -232,27 +254,26 @@ async function runBrowser() {
   try {
     await waitForServer(server, `${baseUrl}/workspace`);
     const browserEnv = { ...env, PLAYWRIGHT_EXTERNAL_SERVER: '1', PLAYWRIGHT_BASE_URL: baseUrl };
-    for (const [index, planned] of plannedRuns.entries()) {
-      const reportPath = resolve(repoRoot, `node_modules/.cache/repair-scope-reports/playwright-${index + 1}.json`);
-      const outputDir = browserRunOutputDir(repoRoot, index);
-      mkdirSync(dirname(reportPath), { recursive: true });
-      rmSync(reportPath, { force: true });
-      const args = ['exec', 'playwright', 'test', ...planned.files];
-      args.push('--output', outputDir);
-      args.push('--reporter=json');
-      if (planned.grep) args.push('--grep', planned.grep);
-      if (planned.projects) args.push(...planned.projects.map(project => `--project=${project}`));
-      if (planned.project) args.push(`--project=${planned.project}`);
-      let runError;
-      try {
+    const reportPathFor = index => resolve(repoRoot, `node_modules/.cache/repair-scope-reports/playwright-${index + 1}.json`);
+    await runBrowserGroups(plannedRuns, {
+      runGroup: async (planned, index) => {
+        const reportPath = reportPathFor(index);
+        const outputDir = browserRunOutputDir(repoRoot, index);
+        mkdirSync(dirname(reportPath), { recursive: true });
+        rmSync(reportPath, { force: true });
+        const args = ['exec', 'playwright', 'test', ...planned.files];
+        args.push('--output', outputDir);
+        args.push('--reporter=json');
+        if (planned.grep) args.push('--grep', planned.grep);
+        if (planned.projects) args.push(...planned.projects.map(project => `--project=${project}`));
+        if (planned.project) args.push(`--project=${planned.project}`);
         await run('pnpm', args, { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath });
-      } catch (error) {
-        runError = error;
-      }
-      const summary = readAndValidatePlaywrightReport(reportPath, planned.files, repoRoot);
-      console.log(`Playwright report ${planned.kind}${planned.project ? `/${planned.project}` : ''}: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.flaky} flaky, ${summary.failed} failed across ${summary.files} selected files.`);
-      if (runError) throw runError;
-    }
+      },
+      readReport: (planned, index) => readAndValidatePlaywrightReport(reportPathFor(index), planned.files, repoRoot),
+      onSummary: (planned, summary) => {
+        console.log(`Playwright report ${planned.kind}${planned.project ? `/${planned.project}` : ''}: ${summary.passed} passed, ${summary.skipped} skipped, ${summary.flaky} flaky, ${summary.failed} failed across ${summary.files} selected files.`);
+      },
+    });
   } finally {
     if (server.exitCode === null) server.kill('SIGTERM');
   }

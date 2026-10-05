@@ -67,7 +67,7 @@ import {
   verifyPersistedOcrSafetyScopeEvidence,
 } from './repair-scope.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
-import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
+import { auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
@@ -1694,11 +1694,11 @@ test('root-reviewed intake browser fixture correction retains the exact predeces
   assert.equal(INTAKE_TRIAGE_PREDECESSOR_SHA, '8944cbfb0335f3120c71dc823b4106da5de4a6af');
   assert.deepEqual(INTAKE_TRIAGE_SOURCE_BLOBS[INTAKE_TRIAGE_BROWSER_FILE], {
     predecessor: null,
-    candidate: '6013f5dbcad1cf27ac1755e66dbb0b9bfcfae36c',
+    candidate: '108b6e76c78574c64b3ebbf4cb2035ee14df7f34',
   });
   const verification = intakeTriageEvidence(testHeadSha);
   assert.equal(verification.eligible, true);
-  for (const candidate of ['0e78bd577e479648b71f49af145f1de709cf24a6', 'f27e04ba8db721a5ec38f861ef32838ceb10ec3c', 'f2258a1d572c62a2268a77978417a3e4397b2823', 'f'.repeat(40), null]) {
+  for (const candidate of ['0e78bd577e479648b71f49af145f1de709cf24a6', 'f27e04ba8db721a5ec38f861ef32838ceb10ec3c', 'f2258a1d572c62a2268a77978417a3e4397b2823', '6013f5dbcad1cf27ac1755e66dbb0b9bfcfae36c', 'f'.repeat(40), null]) {
     const rejected = intakeTriageEvidence(testHeadSha, { [`${testHeadSha}:nextjs/${INTAKE_TRIAGE_BROWSER_FILE}`]: candidate });
     assert.equal(rejected.eligible, false);
     assert.ok(rejected.candidateMismatches.includes(INTAKE_TRIAGE_BROWSER_FILE));
@@ -2031,11 +2031,96 @@ test('reviewed OCR safety runs the existing normal eight-file worker suite and t
   const commands = step.slice(step.indexOf('        run: |') + '        run: |'.length).trim().split('\n').map(line => line.trim());
   assert.deepEqual(commands, ['npm ci --ignore-scripts --no-audit --no-fund', 'npm test', 'node node_modules/typescript/bin/tsc --noEmit']);
   for (const command of commands) assert.ok(ci.includes(command));
-  assert.ok(!step.includes('continue-on-error'));
+  assert.ok(step.includes('continue-on-error: true'));
   assert.ok(workflow.includes('CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}'));
-  assert.equal(workflow.split("(steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success')").length - 1, 2);
+  assert.ok(!workflow.includes("(steps.plan.outputs.cdr_worker != 'true' || steps.cdr-worker.outcome == 'success')"));
+  for (const id of ['browser-install', 'browser-build']) {
+    const conditional = workflow.slice(workflow.indexOf(`        id: ${id}\n`)).split('        run:')[0];
+    for (const prerequisite of [
+      "steps.plan.outputs.browser == 'true'", "steps.plan.outcome == 'success'",
+      "steps.secrets.outcome == 'success'", "steps.check.outcome == 'success'",
+      "steps.full-vitest.outcome == 'success'", "steps.full-scripts.outcome == 'success'",
+      "steps.targeted-vitest.outcome == 'success'", "steps.workflow-static.outcome == 'success'",
+      "steps.browser-report-tests.outcome == 'success'", "steps.selector-tests.outcome == 'success'",
+    ]) assert.ok(conditional.includes(prerequisite), `${id} preserves ${prerequisite}`);
+  }
   const pkg = JSON.parse(readFileSync(resolve(process.cwd(), '..', 'quarantine-sidecar/foundation-cdr-worker/package.json'), 'utf8'));
   assert.deepEqual(pkg.scripts.test.split(' '), ['node', '--import', 'tsx', '--test',
     'src/hmac.test.ts', 'src/keys.test.ts', 'src/guards.test.ts', 'src/ocr.test.ts', 'src/sanitize.test.ts',
     'src/settlement.test.ts', 'src/identity.test.ts', 'src/local-fixture-event-adapter.test.ts']);
+});
+
+function browserGroupReport(file, workspaceRoot, status = 'expected') {
+  return { config: { rootDir: workspaceRoot }, stats: { expected: status === 'expected' ? 1 : 0, skipped: status === 'skipped' ? 1 : 0, unexpected: status === 'unexpected' ? 1 : 0, flaky: 0 },
+    suites: [{ specs: [{ file, tests: [{ status, results: [{ status: status === 'expected' ? 'passed' : status === 'skipped' ? 'skipped' : 'failed' }] }] }] }] };
+}
+
+test('browser project failure preserves its report and diagnostics while the next selected project executes', async () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'repair-browser-groups-'));
+  assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+  const runs = planBrowserRuns([INTAKE_TRIAGE_BROWSER_FILE, 'e2e/site-nav.spec.ts'], false);
+  assert.deepEqual(runs.map(run => run.project), ['audit', '1440']);
+  const reports = runs.map((_, index) => resolve(root, `playwright-${index + 1}.json`));
+  const executed = [];
+  const validated = [];
+  try {
+    await assert.rejects(runBrowserGroups(runs, {
+      runGroup: async (planned, index) => {
+        executed.push(planned.project);
+        const output = browserRunOutputDir(root, index);
+        mkdirSync(output, { recursive: true });
+        writeFileSync(reports[index], JSON.stringify(browserGroupReport(planned.files[0], root, index === 0 ? 'unexpected' : 'expected')));
+        writeFileSync(resolve(output, index === 0 ? 'error-context.md' : 'public-ui-desktop-1440x900-home.png'), 'group fixture');
+        if (index === 0) throw new Error('Playwright command exited 1');
+      },
+      readReport: (planned, index) => {
+        validated.push(planned.project);
+        return readAndValidatePlaywrightReport(reports[index], planned.files, root);
+      },
+    }), error => error instanceof AggregateError && error.errors.length === 1 && error.errors[0].errors.length === 2);
+    assert.deepEqual(executed, ['audit', '1440']);
+    assert.deepEqual(validated, executed);
+    assert.equal(JSON.parse(readFileSync(reports[0], 'utf8')).stats.unexpected, 1);
+    assert.equal(JSON.parse(readFileSync(reports[1], 'utf8')).stats.expected, 1);
+    assert.equal(readFileSync(resolve(browserRunOutputDir(root, 0), 'error-context.md'), 'utf8'), 'group fixture');
+    assert.equal(readFileSync(resolve(browserRunOutputDir(root, 1), 'public-ui-desktop-1440x900-home.png'), 'utf8'), 'group fixture');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('missing, malformed, all-skipped and nonzero browser groups still run later selections and fail overall', async () => {
+  const runs = planBrowserRuns([INTAKE_TRIAGE_BROWSER_FILE, 'e2e/site-nav.spec.ts'], false);
+  for (const firstOutcome of ['missing', 'malformed', 'all-skipped', 'nonzero-with-passing-report']) {
+    const root = mkdtempSync(resolve(tmpdir(), 'repair-browser-reports-'));
+    assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
+    const reports = runs.map((_, index) => resolve(root, `playwright-${index + 1}.json`));
+    const executed = [];
+    try {
+      await assert.rejects(runBrowserGroups(runs, {
+        runGroup: async (planned, index) => {
+          executed.push(planned.project);
+          if (index === 0 && firstOutcome === 'missing') return;
+          const report = browserGroupReport(planned.files[0], root, index === 0 && firstOutcome === 'all-skipped' ? 'skipped' : 'expected');
+          writeFileSync(reports[index], index === 0 && firstOutcome === 'malformed' ? '{' : JSON.stringify(report));
+          if (index === 0 && firstOutcome === 'nonzero-with-passing-report') throw new Error('Playwright command exited 1');
+        },
+        readReport: (planned, index) => readAndValidatePlaywrightReport(reports[index], planned.files, root),
+      }), error => error instanceof AggregateError && error.errors.length === 1);
+      assert.deepEqual(executed, ['audit', '1440'], firstOutcome);
+      assert.equal(readAndValidatePlaywrightReport(reports[1], runs[1].files, root).passed, 1);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+test('independent successful browser checks cannot hide a missing or failed worker result', () => {
+  for (const outcome of [undefined, 'failure', 'skipped']) {
+    const run = runGateCli({ browserFiles: ['e2e/site-nav.spec.ts'],
+      planOverrides: { runCdrWorkerChecks: true, groups: ['unit-regression', 'persisted-ocr-safety', 'browser-regression'] },
+      overrides: { BROWSER_INSTALL_RESULT: 'success', BROWSER_BUILD_RESULT: 'success', BROWSER_RESULT: 'success',
+        ...(outcome ? { CDR_WORKER_RESULT: outcome } : {}) },
+    });
+    assert.equal(run.status, 1);
+    assert.equal(run.receipt.gate, 'failed');
+    assert.deepEqual(run.receipt.gateFailures, [`CDR worker tests and types: ${outcome ?? 'not run'}`]);
+    assert.equal(run.receipt.fullQualification, 'pending');
+  }
 });

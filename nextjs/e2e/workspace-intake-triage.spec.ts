@@ -108,6 +108,9 @@ async function installReadyStageFlow(
   onFinalChoices?: (choices: Record<string, string>) => { status: number; json: Record<string, unknown> },
 ) {
   const trace: string[] = [];
+  const putResponseStatuses: number[] = [];
+  const putFailures: Array<{ pathname: string; errorText: string; responseStatus: number | null }> = [];
+  const responseStatusByRequest = new Map<object, number>();
   const stageIds = new Set<string>();
   await page.route("**/api/v1/uploads/triage/stage", async route => {
     const body = route.request().postDataJSON() as {
@@ -200,7 +203,7 @@ async function installReadyStageFlow(
       return route.fulfill({ status: 405, headers: { "access-control-allow-origin": origin } });
     }
     trace.push(`upload PUT ${uploadUrl.origin}${pathname}: 200`);
-    return route.fulfill({ status: 200, headers: { "access-control-allow-origin": origin } });
+    return route.fulfill({ status: 200, body: "", headers: { "access-control-allow-origin": origin } });
   });
   await page.route("**/api/v1/uploads/triage/complete", async route => {
     trace.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
@@ -244,10 +247,24 @@ async function installReadyStageFlow(
     return route.fulfill({ status: 200, json: readyReceipt(false) });
   });
   page.on("pageerror", error => trace.push(`pageerror ${error.message}`));
+  page.on("response", response => {
+    const request = response.request();
+    const url = new URL(request.url());
+    if (url.origin === STAGE_UPLOAD_ORIGIN && request.method() === "PUT") {
+      putResponseStatuses.push(response.status());
+      responseStatusByRequest.set(request, response.status());
+    }
+  });
   page.on("requestfailed", request => {
     const url = new URL(request.url());
-    if (url.origin === STAGE_UPLOAD_ORIGIN || url.pathname.startsWith("/api/v1/uploads/triage/")) {
-      trace.push(`requestfailed ${request.method()} ${url.pathname}`);
+    if (url.origin === STAGE_UPLOAD_ORIGIN && request.method() === "PUT") {
+      putFailures.push({
+        pathname: url.pathname,
+        errorText: request.failure()?.errorText ?? "unknown",
+        responseStatus: responseStatusByRequest.get(request) ?? null,
+      });
+    } else if (url.origin === STAGE_UPLOAD_ORIGIN || url.pathname.startsWith("/api/v1/uploads/triage/")) {
+      trace.push(`requestfailed ${request.method()} ${url.pathname}: ${request.failure()?.errorText ?? "unknown"}`);
     }
   });
   const expectedApiPaths = new Set([
@@ -262,7 +279,7 @@ async function installReadyStageFlow(
       trace.push(`unexpected ${request.method()} ${url.pathname}`);
     }
   });
-  return trace;
+  return { events: trace, putResponseStatuses, putFailures };
 }
 
 test("disabled triage keeps review-only separate from upload or processing", async ({ page }) => {
@@ -357,7 +374,8 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
   const triageRegion = page.getByRole("region", { name: "Server source triage" });
   const triageStatus = triageRegion.getByRole("status").last();
   await expect.poll(async () => ({
-    events: flow.filter(event => !event.startsWith("upload OPTIONS ")),
+    events: flow.events.filter(event => !event.startsWith("upload OPTIONS ")),
+    putResponseStatuses: [...flow.putResponseStatuses],
     status: (await triageStatus.textContent())?.trim() ?? "",
   })).toEqual({
     events: [
@@ -371,17 +389,30 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
       "POST /api/v1/uploads/triage/receipt",
       "409 TRIAGE_CHOICES_REQUIRED",
     ],
+    putResponseStatuses: [200],
     status: "Server verified the sealed sources. Choose include or exclude for every row; identical bytes remain separate reviewable sources.",
   });
-  const options = flow.filter(event => event.startsWith("upload OPTIONS "));
+  const options = flow.events.filter(event => event.startsWith("upload OPTIONS "));
   expect(options.length).toBeLessThanOrEqual(1);
   if (options.length === 1) {
     expect(options[0]).toMatch(/^upload OPTIONS https:\/\/progress\.fixture\.r2\.cloudflarestorage\.com\/[0-9a-f-]+: 204$/i);
-    expect(flow.indexOf(options[0])).toBe(flow.indexOf("200 TRIAGE_PREFLIGHT_APPROVED") + 1);
-    expect(flow.indexOf(options[0])).toBe(flow.findIndex(event => event.startsWith("upload PUT ")) - 1);
+    expect(flow.events.indexOf(options[0])).toBe(flow.events.indexOf("200 TRIAGE_PREFLIGHT_APPROVED") + 1);
+    expect(flow.events.indexOf(options[0])).toBe(flow.events.findIndex(event => event.startsWith("upload PUT ")) - 1);
   }
   const choice = page.getByLabel("Review scan.pdf");
   await expect(choice).toBeVisible();
+  const putFailureDiagnostics = JSON.stringify(flow.putFailures);
+  expect(
+    flow.putFailures.length === 0 || (
+      flow.putResponseStatuses.length === 1
+      && flow.putResponseStatuses[0] === 200
+      && flow.events.includes("200 TRIAGE_FILE_SEALED")
+      && flow.events.includes("409 TRIAGE_CHOICES_REQUIRED")
+      && flow.putFailures.every(failure => failure.pathname === "/00000000-0000-4000-8000-000000000101"
+        && failure.responseStatus === 200 && failure.errorText === "net::ERR_ABORTED")
+    ),
+    `PUT failure is tolerated only as a post-200 cancellation after seal and receipt; diagnostics=${putFailureDiagnostics}`,
+  ).toBe(true);
   await choice.selectOption("exclude");
   await page.getByRole("button", { name: "Save choices and show estimate" }).click();
   await expect(page.getByText(/TRIAGE_NO_FILES_SELECTED/)).toBeVisible();

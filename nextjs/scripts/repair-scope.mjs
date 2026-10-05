@@ -419,7 +419,7 @@ export const INTAKE_TRIAGE_SOURCE_BLOBS = Object.freeze({
   },
   'e2e/workspace-intake-triage.spec.ts': {
     predecessor: null,
-    candidate: "6013f5dbcad1cf27ac1755e66dbb0b9bfcfae36c"
+    candidate: "108b6e76c78574c64b3ebbf4cb2035ee14df7f34"
   },
   'lib/compute-reservation.ts': {
     predecessor: "792885c3b366b6df91f0583e9599540cc7f0509a",
