@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { intakeDisplayToken, triageUploadNotice } from "@/lib/intake-triage-copy";
 import {
   approveAndSealTriage,
   confirmLegacyFallback,
@@ -101,7 +102,7 @@ export function TriageCostStatus({ estimate, approvalBlockers }: {
       ) : (
         <p>This request is a new read; its page charge is shown in the initial estimate. No recompile quote is being made.</p>
       )}
-      <p>Quote scope: {estimate.customerChargeCoverage.scope}; pricing policy: published per-page admission, once per document.</p>
+      <p>Quote scope: {intakeDisplayToken(estimate.customerChargeCoverage.scope)}; pricing policy: published per-page admission, once per document.</p>
       <p className="fine">Operator infrastructure cost: {estimate.operatorCost.status === "priced" ? "priced separately" : "not priced; separate from this customer charge"}.</p>
       {estimate.operatorCost.unavailableProviders.map((provider) => <p className="fine" key={provider}>Operator cost unavailable: {provider.replaceAll("_", " ")}.</p>)}
       {approvalBlockers.filter((blocker) => blocker !== "READ_PROOF_REQUIRED").map((blocker) => <p className="fine workspace-preflight-blocked" role="alert" key={blocker}>{blocker.replaceAll("_", " ")}</p>)}
@@ -183,7 +184,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
   const stage = async () => {
     const operation = beginOperation();
     if (!operation) return;
-    setNotice("Checking the server triage route. No content is uploaded yet.");
+    setNotice("Checking the server triage route. This availability check does not upload file bytes.");
     try {
       const token = await getToken();
       if (!operationIsCurrent(operation)) return;
@@ -193,12 +194,12 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       if (result.kind === "disabled") {
         fallbackGateRef.current.markDisabled();
         setLegacyFallbackPending(true);
-        setNotice("Server triage is disabled. Review the full-scope maximum below; no upload has started.");
+        setNotice("Server triage is disabled. This availability check does not upload file bytes. Review the full-scope maximum below.");
         return;
       }
       if (result.kind === "blocked") { setNotice(`Triage is blocked (${result.error.code}). No legacy fallback was used.`); return; }
       setBatch(result);
-      setNotice("Inventory staged. No file bytes have been transferred. Review the bounded preflight consent below.");
+      setNotice(triageUploadNotice("inventory_staged"));
     } catch {
       if (operationIsCurrent(operation)) setNotice("Triage could not be reached. No legacy fallback was used.");
     } finally {
@@ -225,13 +226,13 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       if (!token) { setNotice("Sign in again before approving bounded preflight."); return; }
       const result = await approveAndSealTriage(batch, files, token, fetch, operation.controller.signal);
       if (!operationIsCurrent(operation)) return;
-      if ("error" in result) { setNotice(`Preflight stopped (${result.error.code}). No parsing or processing approval was requested.`); return; }
+      if ("error" in result) { setNotice(triageUploadNotice("upload_interrupted", result.error.code)); return; }
       setApprovalId(result.approvalId);
       setReview(result.review);
       setChoices({});
-      setNotice("Server verified the sealed sources. Choose include or exclude for every row; identical bytes remain separate reviewable sources.");
+      setNotice(triageUploadNotice("sealed_review"));
     } catch {
-      if (operationIsCurrent(operation)) setNotice("Preflight did not complete. Processing remains blocked.");
+      if (operationIsCurrent(operation)) setNotice(triageUploadNotice("upload_interrupted"));
     } finally {
       endOperation(operation);
     }
@@ -253,8 +254,8 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       setProcessingQuote(null);
       setProcessingConsent(false);
       setNotice(result.code === "TRIAGE_RECEIPT_READY"
-        ? "The receipt is ready for server-side full-processing quote and approval checks. No processing has started.":
-          "The server requires more qualification or pricing. Full processing approval is unavailable.");
+        ? triageUploadNotice("receipt_ready") :
+          "Files uploaded and sealed. The server requires more qualification or pricing. Full processing approval is unavailable.");
     } catch {
       if (operationIsCurrent(operation)) setNotice("Source review could not be finalized. Processing remains blocked.");
     } finally {
@@ -337,7 +338,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       {legacyFallbackPending ? (
         <div role="alert">
           <p><strong>Full-scope legacy approval</strong></p>
-          <p>This older path uploads and starts full processing for all {files.length} staged files. It includes unknown-page files and approves the displayed maximum of {initialEstimate ? money(initialEstimate.maximumUsd) : "the current quoted maximum"}. No bytes have been uploaded yet.</p>
+          <p>This older path uploads and starts full processing for all {files.length} staged files. It includes unknown-page files and approves the displayed maximum of {initialEstimate ? money(initialEstimate.maximumUsd) : "the current quoted maximum"}. The triage availability check does not upload file bytes.</p>
           <button type="button" disabled={disabled || busy} onClick={approveLegacyFallback}>Approve maximum &amp; upload</button>
         </div>
       ) : null}

@@ -1,11 +1,12 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { inflateRawSync } from 'node:zlib';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COLLECTOR_BASE, FULL_ANCHOR, REGRESSION_DEBT, KNOWN_REGRESSION, verifyTrackedCheckout, verifyPriorEvidence, sealHash, withRegressionDebt } from './repair-collector-only.mjs';
 import { buildUnitArgs, validateSelectedPath } from './run-repair-check.mjs';
-import { validateVitestReport } from './repair-test-report.mjs';
+import { validateVitestReport, validatePlaywrightReport, playwrightReportContainsPath } from './repair-test-report.mjs';
 
 export const REPAIR_PARENT = '6a32dbbe2afeaa7d0c4c446becfe8994b913fcc1';
 export const REPAIR_CONFIG_PATHS = Object.freeze([
@@ -163,16 +164,16 @@ export const REPAIR_CATALOGUE_FILES = Object.freeze([
 export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
-  ".github/workflows/repair-scope.yml": "443c7ea67311fe0f1d1e4c014c9eca7e48dfe18df3f8af3791436020e9306bca",
-  "nextjs/scripts/repair-collector-only.mjs": "d6b1aad9bcf656e1f124f8708e0becb38ca8f14bdf0758ddd63325cffb02d945",
+  ".github/workflows/repair-scope.yml": "27a7c4732b77d27f931e1c033ee5db9317b60c2c5d460b4dcd14d4f0d59e75c1",
+  "nextjs/scripts/repair-collector-only.mjs": "153da3166a0d4ee6bb7dc43ea3abae26e6b0703b07bde48ae7d478a54fbddc5e",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
-  "nextjs/scripts/repair-scope.test.mjs": "beaa7bba1aba188dd69fd4ea72450688c3b82056bee639748af56c91ece7b898",
-  "nextjs/scripts/repair-scope-gate.mjs": "fac917e37fc7bbd826e6fbef2091452403b90d2b95035b22654697c9abbf32d7",
-  "nextjs/scripts/verify-repair-workflows.mjs": "b580f26535af3d45d9d955d40bbefae0302ebd7af4e99b3d98148fe717d61ba3",
+  "nextjs/scripts/repair-scope.test.mjs": "9befcaa321663eb2d7554122bcc00450e7bb48f17cdad766dbeda13fa6ed5717",
+  "nextjs/scripts/repair-scope-gate.mjs": "2a0de0d146fd80e11885b0320123ce6a81983e85111fd25e0f533b3671a28964",
+  "nextjs/scripts/verify-repair-workflows.mjs": "8d97852224a5697ce3d2142a833779c75892fc1baf2309095493e03e9f00cff6",
   "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-known-regression.mjs": "4e4e993e17b98ef3ea587fd08a11b3eceddc07b51f633d5751cf63908ce0a28e",
-  "nextjs/scripts/repair-known-regression.test.mjs": "19f409304fc13e3a157bd9e5706085758bc4f481a52fc02d47ca5fdf2fe40650",
-  ".github/workflows/db-rehearsal.yml": "bf3de8c724ea76991921caa14900c1aacab2047404cb549b14fcdde306ec8fed",
+  "nextjs/scripts/repair-known-regression.mjs": "979546707cc72aed5245cc8068fc5dfe8cebb54f3d4d549988c99aa1d7849905",
+  "nextjs/scripts/repair-known-regression.test.mjs": "34017b772ff48cccf2c8e39e82215176b950b76f695af23c1412027dc27d0a6a",
+  ".github/workflows/db-rehearsal.yml": "d8b15a718987b4ac7a22a5270462e679438b1fb2ecc474f5a483c9b0180465b7",
   "nextjs/scripts/run-repair-check.mjs": "d60f9881f94ba0792955ca7238e6540e087c5c12ef222d1af9e9319d5d468c3f"
 });
 // repair-seal:end
@@ -375,4 +376,327 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const summary = validateKnownRepairReport(JSON.parse(readFileSync(reportPath, 'utf8')), files, process.cwd());
   console.log('Separate API catalogue report: ' + JSON.stringify(summary));
   if (result.status !== 0 || result.error) throw Error('API catalogue checks failed.');
+}
+
+// Presentation/copy admission extends this verifier; the configured runners,
+// Vitest discovery, capture collector and DB workflow are unchanged.
+export const INTAKE_PARENT = '8956734a6675ae79d5081e77f551e0cb49cf8a39';
+export const INTAKE_CONFIG_PATHS = Object.freeze([
+  ".github/workflows/repair-scope.yml",
+  "nextjs/scripts/repair-known-regression.mjs",
+  "nextjs/scripts/repair-known-regression.test.mjs",
+  "nextjs/scripts/repair-collector-only.mjs",
+  "nextjs/scripts/repair-scope-gate.mjs",
+  "nextjs/scripts/verify-repair-workflows.mjs",
+  "nextjs/scripts/repair-scope.test.mjs",
+  ".github/workflows/db-rehearsal.yml"
+]);
+export const INTAKE_SOURCE_BLOBS = Object.freeze({
+  "nextjs/app/workspace/page.tsx": {
+    "before": "e9df90d1ef58006e4268d703917fed84be1bd5e8",
+    "after": "ef5ef3cf8a8b1ccabd33d60de84770cf7dfdb8da",
+    "sha256": "0db9b9cfd0570817c5e3ee19f4dfbe0606c4c7ca39c11242a7dfd9cb905e6d66",
+    "bytes": 199220
+  },
+  "nextjs/app/workspace-no1.css": {
+    "before": "6ed67aece36305aeab741d036306016e627aacb0",
+    "after": "af7a97aaa3dab8fc748cf7fdf9f3511c4e3926a0",
+    "sha256": "6c0bf9a7ac312da15a585c6cbcff347bbf734f6f0a62afd0110c77bde9140528",
+    "bytes": 53013
+  },
+  "nextjs/components/intake-triage-review.test.tsx": {
+    "before": "be27ee739c48ea0286f4d5b71f0f414fa3b336c6",
+    "after": "d1f13f33cd4457ce7b8c4211e1e75892a8f089eb",
+    "sha256": "9e6c8bb8b5a09d92122382a934a1b7cfe14753e81e4672e352ed5fd31efc4707",
+    "bytes": 3599
+  },
+  "nextjs/components/intake-triage-review.tsx": {
+    "before": "a77d49c5cb58563de34523888b5523245b022ec5",
+    "after": "2144d39f94178ed9d82b33f5b9dafbbf14989aa9",
+    "sha256": "f64751121967323e9147efa22271bab32f4f6fa4433df2793badcfe6521f0832",
+    "bytes": 21356
+  },
+  "nextjs/e2e/workspace-intake-triage.spec.ts": {
+    "before": "0d24a1c185cb05f931aa61413e8eb6da604c7113",
+    "after": "d5f6e38f6c60f5b476014b90678680b5df0b6204",
+    "sha256": "5a8c1eb21cf102aea044d5f4e36897b004fa9eba535a253cc5d7e718206b406f",
+    "bytes": 42361
+  },
+  "nextjs/lib/intake-triage-client.test.ts": {
+    "before": "436177dc3c61d6b8e9019a859990daa1eb88da60",
+    "after": "82f7fbf663dd7f5a2e8bca68340ec890803b2e1a",
+    "sha256": "5a4307df5a1d016a5b869909100eb7294d05dc94afbb454547595142ab303ac2",
+    "bytes": 11643
+  },
+  "nextjs/lib/intake-triage-copy.ts": {
+    "before": null,
+    "after": "66f5488c1e10644b8e7121fedb6136f68cfa2eb3",
+    "sha256": "e78f9720bf3180730d4ddaddcb358509945d91d49c1b52be6726688746f081f4",
+    "bytes": 1554
+  },
+  "nextjs/lib/preflight-report.test.ts": {
+    "before": "181b6c444f54d2f9b07e3db8036c67f11c15458d",
+    "after": "52e8e1633b80fc43a986925836d25121b28779d2",
+    "sha256": "4d72e8ed0c4a20286abc4fba68968f38e744865306002d619fa443b895c00d94",
+    "bytes": 13948
+  },
+  "nextjs/lib/preflight-report.ts": {
+    "before": "22897323cbdb38816eb2d3dfdb6fbf0e08e28fef",
+    "after": "bcbc6b3b1ed4005541de9425941055ef78d29572",
+    "sha256": "d5e6725f5d6f17c3ad226a467fdaef795c12e6a25ae603ef3c39f8a19aebbe93",
+    "bytes": 11464
+  }
+});
+export const INTAKE_PARENT_BLOBS = Object.freeze({
+  ".github/workflows/repair-scope.yml": "f44ad3beff074240510e0b4e2c138e718161d7ac",
+  "nextjs/scripts/repair-known-regression.mjs": "5be6514f383a1da1aac017cafd1dc62d40b4bb17",
+  "nextjs/scripts/repair-known-regression.test.mjs": "6f9250136b809a1039eb4a9829ac46c09e4a65df",
+  "nextjs/scripts/repair-collector-only.mjs": "c31804999fde4e9ba6c86bac01034d21420f79bb",
+  "nextjs/scripts/repair-scope-gate.mjs": "0c6ef6721a3acd0d568ddc2c462f5666f20babf7",
+  "nextjs/scripts/verify-repair-workflows.mjs": "99f207d36823b127ad4204d9b1e12094156e8c9e",
+  ".github/workflows/db-rehearsal.yml": "7cb726d57e1f75fcfc64cd180ee0313186a3e133",
+  "nextjs/scripts/run-repair-check.mjs": "a591b0b1a975cf8162bcce6ea5ce47d427ca5089",
+  "nextjs/scripts/repair-test-report.mjs": "1062af93c3a69dc16d6c89a3ff5f32bf65e6a6d2",
+  "nextjs/scripts/repair-scope.mjs": "07b181b59bab2f636dafe9f1227b18e8113c452d",
+  "nextjs/scripts/repair-scope.test.mjs": "092bc3df3f58b08c81064614ea95b87f94788a4d",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0d663692d93fa562c15260db4b9941e1fda7deb4",
+  "nextjs/vitest.config.ts": "91bb009bae9930952594c8fb8164b714a43e8686",
+  "nextjs/vitest.repair-scope.config.ts": "6ae26121a08e403d45a05387901ce59c41cc0f12",
+  "nextjs/vitest.repair-scope.async.config.ts": "bc2b6ea23ab4a011c985490f36904ff827ef8c71",
+  "nextjs/playwright.config.ts": "714b979d42627a61aa32610880bd7dcd248e1a0a",
+  "nextjs/package.json": "1c4612f4032f79dc4277a3db06c1b5e78902377c",
+  "nextjs/pnpm-lock.yaml": "58ead4e268de3717f1438eec9d1d59af9b119e1d",
+  "nextjs/e2e/workspace-intake-layout.spec.ts": "a8fe356d750250e1dffca97fab39126a678ba029",
+  "nextjs/components/intake-triage-review.interaction.test.ts": "4dd927224df839b7c9ef1624e0cbd47ad8bd3b04",
+  "nextjs/lib/intake-triage-paid-flow.test.ts": "0b21721aa3d86fb3aa943833b7a83fd27f235cb6",
+  "nextjs/lib/intake-triage-layout.test.ts": "c533f7e61aaf4fb0aed7524fd5960581bdb7e8c4",
+  "nextjs/lib/workspace-mobile-layout.test.ts": "74d44e4d05140a750b4e4f9e2a3fb501ad935c7a",
+  "nextjs/lib/workspace-intake.test.ts": "ffa9595ea0f7c3c06e5c0bc8f431080940d22caf",
+  "nextjs/lib/workspace-compile-floor-and-ceiling.test.ts": "18af61c718dd57cf539a06b2f02af6c35fd6a41c",
+  "nextjs/lib/copy-trust-guard.test.ts": "fe652cc6f5e918b92f5326a7c518c677bd8ec0c5"
+});
+export const INTAKE_UNIT_FILES = Object.freeze([
+  'components/intake-triage-review.test.tsx', 'components/intake-triage-review.interaction.test.ts',
+  'lib/intake-triage-client.test.ts', 'lib/intake-triage-paid-flow.test.ts',
+  'lib/preflight-report.test.ts', 'lib/intake-triage-layout.test.ts',
+  'lib/workspace-mobile-layout.test.ts', 'lib/workspace-intake.test.ts',
+  'lib/workspace-compile-floor-and-ceiling.test.ts', 'lib/copy-trust-guard.test.ts',
+]);
+export const INTAKE_BROWSER_CASES = Object.freeze({
+  'e2e/workspace-intake-triage.spec.ts': { project: 'audit', titles: [
+    'disabled triage keeps review-only separate from upload or processing',
+    'legacy fallback requires explicit maximum approval and ignores repeated activation before unmount',
+    'exclude-all 409 leaves choices editable so the customer can retry',
+    'successful PUT followed by seal failure keeps upload uncertainty visible across the workspace',
+    'successful PUT followed by receipt failure keeps upload uncertainty visible across the workspace',
+    'processing approval preparation preserves the earlier upload status across the workspace',
+    'changing the selected source while staging is delayed ignores the old response',
+    'Clear unmounts triage and ignores a delayed stage response',
+  ] },
+  'e2e/workspace-intake-layout.spec.ts': { project: '1440', titles: [
+    'nested triage keeps the inventory edge, natural Clear height and usable source selectors',
+  ] },
+});
+export const INTAKE_PARENT_ARTIFACT = Object.freeze({ id: 11361791741,
+  name: `repair-scope-141-${INTAKE_PARENT}`,
+  digest: 'sha256:87ce07d11e5bfca7b2629e81a3737bf722999dd2f7709286bce8b1926d6c0281',
+});
+
+export function classifyIntakePresentationIntent({ headSha, exec = execFileSync }) {
+  try {
+    const git = args => exec('git', args, { encoding: 'utf8' }).trim();
+    const repoRoot = git(['rev-parse', '--show-toplevel']);
+    if (!/^[a-f0-9]{40}$/.test(headSha ?? '') || git(['rev-parse', 'HEAD']) !== headSha) throw Error('Unreadable or mismatched exact intake checkout.');
+    const parents = git(['rev-list', '--parents', '-n', '1', headSha]).split(' ');
+    if (parents[0] !== headSha || parents.some(sha => !/^[a-f0-9]{40}$/.test(sha))) throw Error('Unreadable intake parent metadata.');
+    if (parents.length !== 2 || parents[1] !== INTAKE_PARENT) return { classification: 'normal', intended: false, reason: 'Outside the exact qualified 895 parent.' };
+    const paths = git(['-C', repoRoot, 'diff', '--name-only', '--no-relative', '--no-renames', '-z', `${INTAKE_PARENT}..${headSha}`]).split('\0').filter(Boolean).sort();
+    const allowed = [...Object.keys(INTAKE_SOURCE_BLOBS), ...INTAKE_CONFIG_PATHS];
+    const attempted = paths.some(path => /^nextjs\/scripts\/repair-known-regression(?:\.test)?\.mjs$/.test(path));
+    if (!attempted || paths.some(path => !allowed.includes(path))) return { classification: 'normal', intended: false, reason: 'Unrelated change uses normal full-anchor selection.' };
+    return { classification: 'intended', intended: true, parent: INTAKE_PARENT, headSha, repoRoot, paths };
+  } catch (error) { return { classification: 'unavailable', intended: null, reason: error.message }; }
+}
+
+export function verifyIntakePresentationSource({ headSha, exec = execFileSync }) {
+  const intent = classifyIntakePresentationIntent({ headSha, exec });
+  if (!intent.intended) return { eligible: false, reason: intent.reason };
+  try {
+    const git = (args, encoding = 'utf8') => exec('git', ['-C', intent.repoRoot, ...args], { encoding });
+    const tree = (revision, path) => {
+      const entry = git(['ls-tree', '--full-tree', revision, '--', path]).trim();
+      if (!entry) return null;
+      const match = /^100644 blob ([a-f0-9]{40})\t(.+)$/.exec(entry);
+      if (!match || match[2] !== path) throw Error('Not an exact regular intake source: ' + path);
+      return match[1];
+    };
+    const expected = [...Object.keys(INTAKE_SOURCE_BLOBS), ...INTAKE_CONFIG_PATHS].sort();
+    if (JSON.stringify(intent.paths) !== JSON.stringify(expected)) throw Error('Missing or extra source/configuration paths for the nine-file intake presentation.');
+    for (const [before, after] of [[FULL_ANCHOR, COLLECTOR_BASE], [COLLECTOR_BASE, REPAIR_PARENT], [REPAIR_PARENT, INTAKE_PARENT], [INTAKE_PARENT, headSha]]) git(['merge-base', '--is-ancestor', before, after]);
+    verifyTrackedCheckout({ repoRoot: intent.repoRoot, headSha, exec });
+    for (const [path, binding] of Object.entries(INTAKE_SOURCE_BLOBS)) {
+      if (tree(INTAKE_PARENT, path) !== binding.before || tree(headSha, path) !== binding.after) throw Error('Intake preimage or final source blob mismatch: ' + path);
+      const bytes = git(['show', `${headSha}:${path}`], 'buffer');
+      if (bytes.length !== binding.bytes || createHash('sha256').update(bytes).digest('hex') !== binding.sha256) throw Error('Intake final byte identity mismatch: ' + path);
+    }
+    for (const [path, expectedBlob] of Object.entries(INTAKE_PARENT_BLOBS)) {
+      if (tree(INTAKE_PARENT, path) !== expectedBlob) throw Error('Qualified 895 parent binding mismatch: ' + path);
+      if (!INTAKE_CONFIG_PATHS.includes(path) && tree(headSha, path) !== expectedBlob) throw Error('Unchanged intake discovery, runner, DB or selected test modified: ' + path);
+    }
+    for (const [path, digest] of Object.entries(REPAIR_SEAL)) if (!tree(headSha, path) || repairSealHash(path, git(['show', `${headSha}:${path}`], 'buffer')) !== digest) throw Error('Intake infrastructure seal mismatch: ' + path);
+    return { eligible: true, headSha, parent: INTAKE_PARENT, fullAnchor: FULL_ANCHOR, exactChangedPaths: expected,
+      finalSourceBlobs: Object.fromEntries(Object.entries(INTAKE_SOURCE_BLOBS).map(([path, value]) => [path, value.after])) };
+  } catch (error) { return { eligible: false, reason: error.message }; }
+}
+
+// The archive is authenticated before decompression. Only the single bounded
+// receipt entry from that immutable archive is accepted; there are no disk writes.
+export function readIntakeParentReceipt(archive) {
+  if (!Buffer.isBuffer(archive) || archive.length !== 8239 || 'sha256:' + createHash('sha256').update(archive).digest('hex') !== INTAKE_PARENT_ARTIFACT.digest) throw Error('895 parent receipt archive digest or size mismatch.');
+  const end = archive.length - 22;
+  if (archive.readUInt32LE(end) !== 0x06054b50 || archive.readUInt16LE(end + 4) !== 0 || archive.readUInt16LE(end + 6) !== 0 || archive.readUInt16LE(end + 8) !== 1 || archive.readUInt16LE(end + 10) !== 1 || archive.readUInt16LE(end + 20) !== 0) throw Error('Unexpected parent receipt archive directory.');
+  const central = archive.readUInt32LE(end + 16);
+  if (archive.readUInt32LE(central) !== 0x02014b50) throw Error('Missing parent receipt archive entry.');
+  const nameLength = archive.readUInt16LE(central + 28), compressedSize = archive.readUInt32LE(central + 20), size = archive.readUInt32LE(central + 24), local = archive.readUInt32LE(central + 42);
+  if (archive.subarray(central + 46, central + 46 + nameLength).toString('utf8') !== 'repair-receipt.json' || archive.readUInt16LE(central + 10) !== 8 || size > 256 * 1024 || archive.readUInt32LE(local) !== 0x04034b50 || archive.readUInt16LE(local + 8) !== 8) throw Error('Unexpected or oversized parent receipt entry.');
+  const start = local + 30 + archive.readUInt16LE(local + 26) + archive.readUInt16LE(local + 28);
+  if (start + compressedSize > central) throw Error('Parent receipt archive bounds escaped.');
+  const bytes = inflateRawSync(archive.subarray(start, start + compressedSize), { maxOutputLength: 256 * 1024 });
+  if (bytes.length !== size) throw Error('Parent receipt archive length mismatch.');
+  return JSON.parse(bytes.toString('utf8'));
+}
+
+export function verifyIntakePresentationEvidence({ previous, parentRun, parentJob, dbRun, dbJobs, artifact, archive }) {
+  try {
+    const prior = verifyKnownRepairEvidence(previous);
+    if (!prior.eligible) throw Error(prior.reason);
+    const run = (value, id, path) => {
+      if (value?.id !== id || value.head_sha !== INTAKE_PARENT || value.path !== path || value.event !== 'pull_request' || value.run_attempt !== 1 || value.status !== 'completed' || value.conclusion !== 'success') throw Error('Unqualified 895 parent run identity or result.');
+    };
+    run(parentRun, 37348563827, '.github/workflows/repair-scope.yml'); run(dbRun, 37348564163, '.github/workflows/db-rehearsal.yml');
+    const job = (value, id, runId, name, conclusion) => {
+      if (value?.id !== id || value.run_id !== runId || value.head_sha !== INTAKE_PARENT || value.name !== name || value.status !== 'completed' || value.conclusion !== conclusion) throw Error('Unqualified 895 parent job identity or result.');
+    };
+    const step = (value, name, conclusion) => {
+      const matches = value.steps?.filter(item => item.name === name) ?? [];
+      if (matches.length !== 1 || matches[0].status !== 'completed' || matches[0].conclusion !== conclusion) throw Error('Unqualified 895 parent step: ' + name);
+    };
+    job(parentJob, 111893311039, parentRun.id, 'Repair scope validation', 'success');
+    for (const name of ['Plan changes since the authenticated full-pass anchor', 'Verify workflow and selector contracts', 'Run selector regression tests', 'Run browser report and screenshot regressions', 'Scan repository secrets', 'Run TypeScript and lint checks', 'Run Foundation focused unit checks', 'Run the exact repair API catalogue readers separately', 'Fail closed on missing or failed scoped checks', 'Publish exact-head scope receipt']) step(parentJob, name, 'success');
+    for (const name of ['Run the normal CDR worker unit suite and types for reviewed OCR safety', 'Run hermetic full Vitest for shared or unknown changes', 'Run script contract suite for shared or unknown changes', 'Install Chromium for detail-integrity coverage', 'Build the isolated live-commerce test bundle after scoped checks', 'Run selected browser checks against one production server', 'Require the four synthetic mounted intake preflight capture pairs', 'Require screenshots for the exact paired public UI candidate']) step(parentJob, name, 'skipped');
+    if (parentJob.steps.some(item => !['success', 'skipped'].includes(item.conclusion))) throw Error('895 parent Repair contains a failed step.');
+    const one = id => { const matches = dbJobs?.jobs?.filter(value => value.id === id) ?? []; if (matches.length !== 1) throw Error('Missing or duplicate 895 DB job.'); return matches[0]; };
+    const classifier = one(111893313963);
+    job(classifier, 111893313963, dbRun.id, 'Verify exact collector-only DB evidence reuse', 'success');
+    for (const name of ['Independently verify unchanged DB source and prior evidence', 'Require an explicit collector classifier decision']) step(classifier, name, 'success');
+    job(one(111893442839), 111893442839, dbRun.id, 'db-rehearsal', 'skipped');
+    job(one(111893443341), 111893443341, dbRun.id, 'Local Chromium signed-storage transport', 'skipped');
+    if (artifact?.id !== INTAKE_PARENT_ARTIFACT.id || artifact.name !== INTAKE_PARENT_ARTIFACT.name || artifact.digest !== INTAKE_PARENT_ARTIFACT.digest || artifact.expired !== false || artifact.workflow_run?.id !== parentRun.id || artifact.workflow_run?.head_sha !== INTAKE_PARENT) throw Error('895 parent artifact identity or digest mismatch.');
+    const receipt = readIntakeParentReceipt(archive), resolution = receipt.knownRegressionResolution;
+    if (receipt.headSha !== INTAKE_PARENT || receipt.completedHeadSha !== INTAKE_PARENT || receipt.repairAnchorSha !== FULL_ANCHOR || receipt.gate !== 'passed-scoped-only' || receipt.gateFailures?.length || receipt.fullQualification !== 'pending' || receipt.pendingDebt.includes(REGRESSION_DEBT) || receipt.pendingQualificationDebt.includes(REGRESSION_DEBT)) throw Error('895 parent receipt is not scoped-qualified with resolved regression debt.');
+    if (resolution?.headSha !== INTAKE_PARENT || resolution.debt !== REGRESSION_DEBT || resolution.files !== 17 || resolution.passed !== 433 || resolution.catalogue?.files !== 3 || resolution.catalogue.passed !== 13 || resolution.catalogue.skipped !== 0 || resolution.catalogue.failed !== 0 || JSON.stringify(receipt.resolvedQualificationDebt) !== JSON.stringify([resolution]) || JSON.stringify(receipt.knownRegressionObservations) !== JSON.stringify([KNOWN_REGRESSION])) throw Error('895 parent regression resolution or historical observation changed.');
+    for (const [name, files, passed] of [['units', 17, 433], ['apiCatalogue', 3, 13]]) {
+      const value = receipt.executedChecks[name];
+      if (value?.status !== 'success' || value.files !== files || value.passed !== passed || value.skipped !== 0 || value.failed !== 0) throw Error('895 parent executed report mismatch: ' + name);
+    }
+    return { eligible: true, parentHead: INTAKE_PARENT, parentRunId: parentRun.id, parentJobId: parentJob.id,
+      artifact: INTAKE_PARENT_ARTIFACT, resolution, resolvedQualificationDebt: receipt.resolvedQualificationDebt,
+      pendingQualificationDebt: receipt.pendingQualificationDebt, pendingFullDebt: receipt.pendingFullDebt,
+      checks: Object.fromEntries(Object.entries(prior.checks).filter(([name]) => !['units', 'intakeAuditAndCaptures'].includes(name))),
+      databaseLineage: { ...prior.databaseLineage, qualified895RunId: dbRun.id, qualified895ClassifierJobId: classifier.id, executionAt895: 'DB and transport skipped; historical f082 evidence only' }, fullQualification: 'pending' };
+  } catch (error) { return { eligible: false, reason: error.message }; }
+}
+
+const intakeEvidenceApi = endpoint => {
+  const bytes = execFileSync('gh', ['api', `repos/0ssol1620-byte/tavonel-saas-foundation/${endpoint}`], { timeout: 20000, maxBuffer: 2 * 1024 * 1024 });
+  return endpoint.endsWith('/zip') ? bytes : JSON.parse(bytes.toString('utf8'));
+};
+export function verifyIntakePresentationHistoricalEvidence({ api = intakeEvidenceApi } = {}) {
+  try {
+    const prior = { repairRun: api('actions/runs/37320682454'), repairJob: api('actions/jobs/111798647893'), databaseRun: api('actions/runs/37320682223'), databaseJob: api('actions/jobs/111798647331'), transportJob: api('actions/jobs/111798647200') };
+    const previousDbJobs = api('actions/runs/37338211486/jobs'), previousClassifier = api('actions/jobs/111858284546');
+    previousDbJobs.jobs = previousDbJobs.jobs?.map(job => job.id === previousClassifier.id ? previousClassifier : job);
+    const previous = { prior, parentRun: api('actions/runs/37338211115'), parentJob: api('actions/jobs/111858281578'), dbRun: api('actions/runs/37338211486'), dbJobs: previousDbJobs, artifacts: PARENT_ARTIFACTS.map(item => api(`actions/artifacts/${item.id}`)) };
+    const dbJobs = api('actions/runs/37348564163/jobs'), classifier = api('actions/jobs/111893313963');
+    dbJobs.jobs = dbJobs.jobs?.map(job => job.id === classifier.id ? classifier : job);
+    const evidence = verifyIntakePresentationEvidence({ previous, parentRun: api('actions/runs/37348563827'), parentJob: api('actions/jobs/111893311039'), dbRun: api('actions/runs/37348564163'), dbJobs, artifact: api('actions/artifacts/11361791741'), archive: api('actions/artifacts/11361791741/zip') });
+    return evidence;
+  } catch (error) { return { eligible: false, reason: 'Intake presentation evidence unavailable: ' + error.message }; }
+}
+export function verifyIntakePresentationEligibility({ headSha, exec = execFileSync, api = intakeEvidenceApi }) {
+  const source = verifyIntakePresentationSource({ headSha, exec });
+  if (!source.eligible) return source;
+  const evidence = verifyIntakePresentationHistoricalEvidence({ api });
+  return evidence.eligible ? { eligible: true, source, evidence } : evidence;
+}
+
+export function authenticateFailedIntakeResolution(receipt, { headSha, intendedResult, eligibleResult, exec = execFileSync, api = intakeEvidenceApi }) {
+  if (intendedResult !== 'true' || eligibleResult !== 'false' || receipt?.gate !== 'failed' || receipt.headSha !== headSha || receipt.collectorOnlyFailure?.intent?.parent !== INTAKE_PARENT) return receipt;
+  const intent = classifyIntakePresentationIntent({ headSha, exec });
+  if (intent.classification !== 'intended' || intent.parent !== INTAKE_PARENT) return receipt;
+  const evidence = verifyIntakePresentationHistoricalEvidence({ api });
+  if (!evidence.eligible) return { ...receipt, historicalRegressionResolution: { sourceHead: INTAKE_PARENT, status: 'historical evidence unaccepted for current head: ' + evidence.reason } };
+  const debt = values => [...new Set([...(values ?? []), ...evidence.pendingQualificationDebt, 'intake-presentation-eligibility'])].filter(value => value !== REGRESSION_DEBT);
+  return { ...receipt, gate: 'failed', fullQualification: 'pending', inheritedChecks: {},
+    databaseObservation: 'not executed; inherited evidence unaccepted',
+    pendingDebt: debt(receipt.pendingDebt), pendingQualificationDebt: debt(receipt.pendingQualificationDebt),
+    pendingFullDebt: [...new Set([...(receipt.pendingFullDebt ?? []), ...evidence.pendingFullDebt])],
+    knownRegressionObservations: [KNOWN_REGRESSION], knownRegressionResolution: evidence.resolution,
+    resolvedQualificationDebt: evidence.resolvedQualificationDebt,
+    historicalRegressionResolution: { sourceHead: INTAKE_PARENT, artifact: INTAKE_PARENT_ARTIFACT, status: 'authenticated historical resolution retained; current head remains failed and unqualified' },
+  };
+}
+
+export function intakePresentationPlan(normal, proof) {
+  if (!proof?.eligible || proof.source.headSha !== normal.headSha || proof.source.parent !== INTAKE_PARENT || normal.repairAnchorSha !== FULL_ANCHOR) throw Error('Intake presentation plan requires exact source and qualified 895 evidence.');
+  const inherited = Object.fromEntries(Object.entries(proof.evidence.checks).map(([name, evidence]) => [name, { ...evidence, sourceHead: evidence.sourceHead ?? COLLECTOR_BASE, status: 'inherited-source-evidence; not executed at current head' }]));
+  for (const [name, scope] of [['knownRegressionUnits', '433 passing tests across 17 files, zero skips'], ['apiCatalogue', '13 passing tests across 3 files, zero skips']]) inherited[name] = { sourceHead: INTAKE_PARENT, runId: proof.evidence.parentRunId, jobId: proof.evidence.parentJobId, artifact: INTAKE_PARENT_ARTIFACT, scope, status: 'historical qualified 895 evidence; not executed at current head' };
+  return { ...normal, source: 'exact nine-file intake presentation/copy over qualified 895; prior regression resolution inherited',
+    normalSelection: { groups: normal.groups, unitFiles: normal.unitFiles, browserFiles: normal.browserFiles, unknownPaths: normal.unknownPaths },
+    groups: ['selector-config', 'workflow-static', 'intake-presentation'], unitFiles: [...INTAKE_UNIT_FILES], browserFiles: Object.keys(INTAKE_BROWSER_CASES), unknownPaths: [],
+    catalogueFiles: [], runApiCatalogueChecks: false, runFullHermeticVitest: false, runScriptContracts: false, runCdrWorkerChecks: false, runDetailIntegrity: false,
+    runWorkflowStaticGate: true, requireWorkspaceIntakeCapture: true, requirePublicUiScreenshots: false, runDatabaseRehearsal: false, deferredGroups: [],
+    databaseRehearsalStatus: 'inherited-f082-via-qualified-6a32-and-895; not executed at current head', intakePresentation: proof, inheritedChecks: inherited,
+    knownRegressionObservations: [KNOWN_REGRESSION], knownRegressionResolution: proof.evidence.resolution, resolvedQualificationDebt: proof.evidence.resolvedQualificationDebt,
+    pendingQualificationDebt: [...new Set([...(normal.pendingQualificationDebt ?? []), ...proof.evidence.pendingQualificationDebt])].filter(debt => debt !== REGRESSION_DEBT),
+    pendingFullDebt: [...new Set([...(normal.pendingFullDebt ?? []), ...proof.evidence.pendingFullDebt])], fullQualification: 'pending',
+    qualificationReasons: [...normal.qualificationReasons, '895 resolved the 71-failure debt with 433 units and 13 catalogue tests; these are historical results, not a current rerun. Fresh intake units, both browser projects and four capture pairs are required; full release/native integration remains pending.'],
+  };
+}
+
+export function intakePresentationLineageFailures(plan, proof) {
+  if (!proof?.eligible) return ['intake presentation eligibility: ' + (proof?.reason ?? 'missing')];
+  try {
+    const expected = intakePresentationPlan({ ...plan, qualificationReasons: [] }, proof);
+    const fields = ['intakePresentation', 'groups', 'unitFiles', 'browserFiles', 'catalogueFiles', 'unknownPaths', 'inheritedChecks', 'knownRegressionObservations', 'knownRegressionResolution', 'resolvedQualificationDebt', 'runFullHermeticVitest', 'runScriptContracts', 'runCdrWorkerChecks', 'runDetailIntegrity', 'runWorkflowStaticGate', 'requireWorkspaceIntakeCapture', 'requirePublicUiScreenshots', 'runDatabaseRehearsal', 'runApiCatalogueChecks', 'deferredGroups', 'databaseRehearsalStatus', 'fullQualification'];
+    const failures = fields.filter(field => JSON.stringify(plan[field]) !== JSON.stringify(expected[field])).map(field => 'Intake presentation plan changed: ' + field);
+    for (const debt of proof.evidence.pendingFullDebt) if (!plan.pendingFullDebt?.includes(debt)) failures.push('Intake presentation full-release debt removed: ' + debt);
+    for (const debt of proof.evidence.pendingQualificationDebt) if (!plan.pendingQualificationDebt?.includes(debt)) failures.push('Intake presentation DB debt removed: ' + debt);
+    if (plan.pendingQualificationDebt?.includes(REGRESSION_DEBT) || plan.pendingDebt?.includes(REGRESSION_DEBT)) failures.push('Resolved 895 regression debt resurrected.');
+    if (plan.knownRegressionRepair || plan.collectorOnly || plan.repairAnchorSha !== FULL_ANCHOR) failures.push('Intake presentation profile or full-pass anchor changed.');
+    return failures;
+  } catch (error) { return ['Intake presentation lineage invalid: ' + error.message]; }
+}
+
+export function validateIntakeBrowserReport(report, file, root) {
+  const expected = INTAKE_BROWSER_CASES[file];
+  if (!expected) throw Error('Unknown intake browser selection.');
+  const summary = validatePlaywrightReport(report, [file], root), records = [];
+  const visit = suites => { for (const suite of suites) {
+    for (const spec of suite.specs ?? []) {
+      if (!playwrightReportContainsPath(spec.file ?? suite.file, file, root, report.config?.rootDir)) throw Error('Intake browser report contains another file.');
+      for (const test of spec.tests) records.push({ title: spec.title, test });
+    }
+    if (suite.suites) visit(suite.suites);
+  } };
+  visit(report.suites);
+  if (records.length !== expected.titles.length || JSON.stringify(records.map(value => value.title).sort()) !== JSON.stringify([...expected.titles].sort())) throw Error('Intake browser report omitted or duplicated a required case.');
+  for (const { test } of records) if (test.projectName !== expected.project || !['expected', 'flaky'].includes(test.status) || test.results.at(-1)?.status !== 'passed') throw Error('Intake browser case did not pass in its configured project.');
+  if (summary.skipped !== 0 || report.stats.skipped !== 0 || summary.passed + summary.flaky !== records.length || report.stats.expected + report.stats.flaky !== records.length) throw Error('Intake browser skips or totals are inconsistent.');
+  return { ...summary, executed: records.length, project: expected.project };
+}
+export function readIntakePresentationExecution(root = process.cwd()) {
+  const read = name => JSON.parse(readFileSync(resolve(root, 'node_modules/.cache/repair-scope-reports', name), 'utf8'));
+  return { units: validateKnownRepairReport(read('vitest.json'), INTAKE_UNIT_FILES, root),
+    browsers: Object.keys(INTAKE_BROWSER_CASES).map((file, index) => validateIntakeBrowserReport(read(`playwright-${index + 1}.json`), file, root)) };
 }

@@ -1540,8 +1540,8 @@ export default function WorkspacePage() {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) { setNotice("Sign in again before approving this intake. Nothing was uploaded."); return; }
-      setNotice(`Hashing all ${files.length} selected files and preparing the complete approval. Nothing is uploaded yet.`);
+      if (!token) { setNotice("Sign in again before approving this intake. This attempt has not submitted a new processing approval."); return; }
+      setNotice(`Hashing all ${files.length} selected files and preparing this processing approval. This preparation step does not upload file bytes.`);
       const manifest = await Promise.all(files.map(async (file, index) => {
         const contentSha256 = `sha256:${bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())))}`;
         const relativePath = (file as WorkspaceUploadFile).tavonelRelativePath || file.webkitRelativePath || file.name;
@@ -1564,14 +1564,14 @@ export default function WorkspacePage() {
         };
       }));
       if (manifest.some((entry) => !entry.mimeType)) {
-        setNotice("A selected file has no supported filename and MIME pairing. Nothing was approved or uploaded.");
+        setNotice("A selected file has no supported filename and MIME pairing. This attempt stopped before submitting a new processing approval.");
         return;
       }
       let processingManifest = manifest;
       if (triageApproval) {
         const expectedKeys = triageApproval.quote.files.map((entry) => entry.fileKey);
         if (new Set(expectedKeys).size !== expectedKeys.length) {
-          setNotice("The server quote contains duplicate sources. Nothing was approved or processed.");
+          setNotice("The server quote contains duplicate sources. This attempt stopped before submitting a new processing approval.");
           return;
         }
         const expected = new Set(expectedKeys);
@@ -1585,7 +1585,7 @@ export default function WorkspacePage() {
         bytes: entry.byteLength, mimeType: entry.mimeType,
         claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
       })));
-      if (localQuote && !localQuote.ok) { setNotice(`This selected set cannot be approved (${localQuote.code}). Nothing was uploaded.`); return; }
+      if (localQuote && !localQuote.ok) { setNotice(`This selected set cannot be approved (${localQuote.code}). This attempt stopped before submitting a new processing approval.`); return; }
       const clientManifestDigest = await intakeManifestDigest(processingManifest);
       const pricingFingerprint = await intakePricingFingerprint();
       if (triageApproval && (clientManifestDigest !== triageApproval.quote.clientManifestDigest
@@ -1644,7 +1644,7 @@ export default function WorkspacePage() {
       // Persist the stable attempt identity before the write. A reload after a lost approval
       // response can reselect, hash and replay this exact manifest under the same attempt key.
       if (!saveIntakeAttempt(window.localStorage, pendingRecord)) {
-        setNotice("This browser cannot save the approved attempt identity. Nothing was approved or uploaded.");
+        setNotice("This browser cannot save the attempt identity. This attempt stopped before submitting a new processing approval.");
         return;
       }
       const approvalBody = {
@@ -1682,10 +1682,10 @@ export default function WorkspacePage() {
             return "uncertain";
           }
           setNotice(submitted.code === "INTAKE_PRICE_STALE"
-            ? "Pricing changed since this estimate. Review the refreshed maximum and approve again. Nothing was uploaded."
+            ? "Pricing changed since this estimate. This approval request was rejected. Review the refreshed maximum and approve again."
             : submitted.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
-              ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. Review and approve the refreshed quote again. Nothing was uploaded.`
-              : "The complete set was not approved. Nothing was uploaded. Review the reason and retry the complete set.");
+              ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. This approval request was rejected. Review and approve the refreshed quote again.`
+              : "This approval request for the complete set was rejected. Review the reason and retry the complete set.");
           return;
         }
       }
@@ -1827,12 +1827,12 @@ export default function WorkspacePage() {
       if (prepared.files.length === 0) {
         setStagedSelection(prepared);
         setStagedSelectionRevision(crypto.randomUUID());
-        setNotice("No supported files were found. Nothing was uploaded or processed.");
+        setNotice("No supported files were found in this selection. File selection does not upload bytes or authorize processing.");
         return;
       }
       setStagedSelection(prepared);
       setStagedSelectionRevision(crypto.randomUUID());
-      setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} ready for preflight. Nothing has been uploaded or processed yet.`);
+      setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} selected for source review. Upload checks and full processing require separate approvals.`);
     } catch (error) {
       if (controller.signal.aborted) return;
       setStagedSelection(null);
@@ -1840,8 +1840,8 @@ export default function WorkspacePage() {
       const reason = error instanceof Error ? error.message : "INVALID_SELECTION";
       // Cancelling is something the visitor did, not something that went wrong.
       setNotice(reason === "ARCHIVE_CANCELLED" || reason === "SELECTION_CANCELLED"
-        ? "Selection cancelled. Nothing was uploaded."
-        : `Preflight blocked this selection (${reason}). Nothing was uploaded.`);
+        ? "File selection cancelled. Selection does not upload bytes or authorize processing."
+        : `File selection was blocked (${reason}). Selection does not upload bytes or authorize processing.`);
     } finally {
       if (stagingAbortRef.current === controller) {
         setStaging(null);
@@ -2752,7 +2752,7 @@ export default function WorkspacePage() {
                     ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : sourcePending === "terms_acceptance_required" ? "Start with your documents" : "See how a source becomes usable knowledge"}</h1>
                     : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p>{customerDataAccess === "checking"
-                    ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
+                    ? "We are checking whether this workspace can receive files. This access check does not upload file bytes."
                     : customerDataAccess === "closed"
                       ? sourcePending === "terms_acceptance_required"
                         ? "Your account is ready. To process your own files, review and accept the processing terms."
@@ -2865,7 +2865,7 @@ export default function WorkspacePage() {
                   <p className="eyebrow">Opening archive</p>
                   <p>{staging.archive}</p>
                   <progress max={staging.total} value={staging.done} aria-label={`${staging.done} of ${staging.total} entries expanded`} />
-                  <p className="fine">{staging.done} of {staging.total} entries. Nothing has been uploaded.</p>
+                  <p className="fine">{staging.done} of {staging.total} entries. This local expansion step does not upload file bytes.</p>
                   <button type="button" onClick={() => stagingAbortRef.current?.abort()}>Cancel</button>
                 </div>
               ) : null}
@@ -2873,8 +2873,8 @@ export default function WorkspacePage() {
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
                   <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
-                    <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
-                    Nothing has been uploaded yet. The preliminary maximum covers every selected file, including files whose pages are unknown. Continue to server inventory review before any full-processing approval; the bounded preflight does not authorize OCR, parsing, or compile.
+                    <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} selected.</strong>{" "}
+                    Review files and the preliminary estimate below. The preliminary maximum covers every selected file, including files whose pages are unknown. Upload checks and full processing require separate approvals; bounded upload checks do not authorize OCR, parsing, or compile.
                   </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
@@ -2883,13 +2883,13 @@ export default function WorkspacePage() {
                       <dd>{stagedCounted.length > 0 ? stagedPages : !stagedPageCounts ? "Counting…" : "Counted when read"}</dd>
                     </div>
                     <div><dt>Archives</dt><dd>{stagedSelection.archiveCount}</dd></div>
-                    <div><dt>Warnings</dt><dd>{stagedSelection.unsupported.length}</dd></div>
+                    <div><dt>Unsupported files</dt><dd>{stagedSelection.unsupported.length}</dd></div>
                     <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
                     <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
                   </dl>
                   <p className="fine" aria-live="polite">
                     {!stagedPageCounts
-                      ? "Counting the pages in these files. Nothing has been uploaded."
+                      ? "Counting pages in this browser. This page-count step does not upload file bytes."
                       : stagedCounted.length === 0
                         ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
                         : stagedConfidence === "verified"
@@ -2914,6 +2914,7 @@ export default function WorkspacePage() {
                   ) : null}
                   {stagedPreflight.files.length > 0 ? (
                     <>
+                      <h3>Format support and limitations</h3>
                       <p className="fine" role="status">{describePreflightSummary(stagedPreflight)}.</p>
                       <ul className="workspace-preflight-files" aria-label="What each staged file will carry">
                         {stagedPreflight.files.map((file, index) => (

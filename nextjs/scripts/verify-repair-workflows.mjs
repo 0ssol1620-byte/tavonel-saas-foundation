@@ -249,3 +249,9 @@ assert(runner.includes("delete env.VERCEL_ENV"), 'live browser runner must clear
 assert(runner.includes("file !== 'e2e/detail-integrity.spec.ts'"), 'detail-integrity must not be repeated in audit');
 assert(!repair.includes('skip-ci') && !repair.includes('skipdrafttests'), 'skip marker is forbidden');
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
+
+assert(knownRepair.includes("INTAKE_PARENT = '8956734a6675ae79d5081e77f551e0cb49cf8a39'") && knownRepair.includes('INTAKE_SOURCE_BLOBS = Object.freeze(') && knownRepair.includes('INTAKE_PARENT_BLOBS = Object.freeze('), 'presentation admission must pin the nine exact sources over qualified 895');
+assert(collectorVerifier.includes('classifyIntakePresentationIntent') && collectorVerifier.includes('verifyIntakePresentationEligibility') && collectorVerifier.includes('repair.intakePresentationPlan(normal, proof)'), 'Repair and DB classifier must share exact intake source and authenticated receipt proof');
+assert(knownRepair.includes('readIntakeParentReceipt') && knownRepair.includes('87ce07d11e5bfca7b2629e81a3737bf722999dd2f7709286bce8b1926d6c0281') && knownRepair.includes('resolution.passed !== 433') && knownRepair.includes('resolution.catalogue.passed !== 13'), '895 resolution requires authenticated archive bytes and actual historical counts');
+assert(repair.includes("steps.plan.outputs.intake_presentation") && knownRepair.includes('validateIntakeBrowserReport') && knownRepair.includes('readIntakePresentationExecution'), 'presentation must execute all source/report contracts and require actual selected reports');
+assert(knownRepair.includes("'components/intake-triage-review.test.tsx'") && knownRepair.includes("'lib/copy-trust-guard.test.ts'") && knownRepair.includes("project: 'audit'") && knownRepair.includes("project: '1440'"), 'presentation tests must remain in their owning configured projects');

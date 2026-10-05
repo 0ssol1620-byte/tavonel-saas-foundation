@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { intakeDisplayToken, triageUploadNotice } from "./intake-triage-copy";
 import { approveAndSealTriage, finalizeTriageReceipt, quoteTriageProcessing, stageTriage, type StageTriageResult, type TriageReceiptReply, type TriageUploadFile } from "./intake-triage-client";
 
 
@@ -41,6 +42,31 @@ const validReady = {
 };
 
 describe("triage receipt protocol validation", () => {
+  it("reports an interrupted check after uploaded bytes without requesting processing", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        code: "TRIAGE_PREFLIGHT_APPROVED",
+        approval: { preflightApprovalId: "00000000-0000-4000-8000-000000000001" },
+        providerCalls: 0,
+        monetaryCostStatus: "not_priced",
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: "INTAKE_TRIAGE_NETWORK_ERROR" }), { status: 503 }));
+    const result = await approveAndSealTriage(batch, files, "token", fetcher);
+    expect(result).toMatchObject({ error: { code: "INTAKE_TRIAGE_NETWORK_ERROR", status: 503 } });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls.map(([url, init]) => [url, init.method])).toEqual([
+      ["/api/v1/uploads/triage/preflight", "POST"],
+      ["https://upload.test/a", "PUT"],
+      ["/api/v1/uploads/triage/complete", "POST"],
+    ]);
+    if ("error" in result) {
+      const notice = triageUploadNotice("upload_interrupted", result.error.code);
+      expect(notice).toContain("Some file bytes may already have been uploaded");
+      expect(notice).toContain("INTAKE_TRIAGE_NETWORK_ERROR");
+      expect(notice).toContain("No parsing or full-processing approval was requested");
+    }
+  });
   it("rejects exclude-all 409 without freezing the client, then accepts a valid retry", async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ code: "TRIAGE_NO_FILES_SELECTED" }), { status: 409 }))
@@ -82,6 +108,34 @@ describe("triage receipt protocol validation", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ code: "TRIAGE_CHOICES_REQUIRED", review }), { status: 409 }));
     await approveAndSealTriage(batch, files, "token", fetcher, signal);
     expect(fetcher.mock.calls[3]?.[1]?.signal).toBe(signal);
+  });
+});
+
+describe("intake presentation boundaries", () => {
+  it("describes this inventory operation without asserting that a previous upload never happened", () => {
+    const notice = triageUploadNotice("inventory_staged");
+    expect(notice).toContain("This inventory step does not upload file bytes");
+    expect(notice).toContain("separate bounded upload-check approval");
+    expect(notice).toContain("full processing requires a later approval");
+    expect(notice).not.toContain("No file bytes have been transferred");
+  });
+
+  it.each(["sealed_review", "receipt_ready"] as const)("reports an explicit successful upload for %s without claiming processing started", (phase) => {
+    const notice = triageUploadNotice(phase);
+    expect(notice).toContain("Files uploaded and sealed");
+    expect(notice).toContain("Full processing has not started");
+    expect(notice).not.toContain("Nothing has been uploaded");
+  });
+
+  it("keeps upload uncertainty visible when the interrupted request has no error code", () => {
+    expect(triageUploadNotice("upload_interrupted")).toContain("Some file bytes may already have been uploaded");
+  });
+
+  it("translates only display values and leaves unrelated limitations readable", () => {
+    expect(intakeDisplayToken("BEST_EFFORT")).toBe("Supported with limitations");
+    expect(intakeDisplayToken("bbox1000")).toBe("Locations on the source page");
+    expect(intakeDisplayToken("entire_affected_source_version_set")).toBe("All affected files and versions");
+    expect(intakeDisplayToken("sheet_names")).toBe("sheet names");
   });
 });
 

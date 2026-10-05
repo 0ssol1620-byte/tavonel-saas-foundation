@@ -1,3 +1,4 @@
+import { intakeDisplayToken } from "./intake-triage-copy";
 import {
   CAPABILITY_MANIFEST,
   type CapabilityManifestEntry,
@@ -209,16 +210,17 @@ export function buildPreflightSummary(
 
 /** A manifest token as prose. The capability table on /sources renders its tokens the same way. */
 export function words(token: string): string {
-  return token.replaceAll("_", " ");
+  return intakeDisplayToken(token);
 }
 
 /** One line per file, with the vocabulary the audit asked for and no adjective of its own. */
 export function describePreflightFile(report: PreflightFileReport): string {
-  const parts = [report.status === "accepted" ? `accepted as ${report.tier}` : "refused"];
-  if (report.preserved.length > 0) parts.push(`preserved ${report.preserved.map(words).join(", ")}`);
-  if (report.converted) parts.push("converted to PDF before reading");
-  if (report.omitted.length > 0) parts.push(`omitted ${report.omitted.map(words).join(", ")}`);
-  parts.push(report.reviewRequired ? "review required" : "no review required");
+  const parts = [report.status === "accepted" ? `Format support: ${words(report.tier)}` : "refused by format checks"];
+  if (report.preserved.length > 0) parts.push(`Expected output: ${report.preserved.map(words).join(", ")}`);
+  if (report.converted) parts.push("Planned conversion to PDF before reading");
+  if (report.omitted.length > 0) parts.push(`Not extracted: ${report.omitted.map(words).join(", ")}`);
+  if (report.reviewRequired) parts.push("Source marked for review");
+  parts.push("Source safety not assessed by this format lookup");
   return parts.join(" · ");
 }
 
@@ -231,10 +233,11 @@ export function describePreflightFile(report: PreflightFileReport): string {
  */
 export function describePreflightSummary(summary: PreflightSummary): string {
   const parts = [
-    `${summary.acceptedCount} of ${summary.stagedCount} staged ${summary.stagedCount === 1 ? "file" : "files"} accepted`,
-    `${summary.convertedCount} converted to PDF before reading`,
-    `${summary.reviewRequiredCount} awaiting review`,
-    `${summary.qualifiedFormatCount} of ${summary.acceptedFormatCount} accepted formats carry a qualification receipt`,
+    `${summary.acceptedCount} of ${summary.stagedCount} selected ${summary.stagedCount === 1 ? "file" : "files"} supported by format checks`,
+    `${summary.convertedCount} would be converted to PDF before reading`,
+    summary.reviewRequiredCount > 0 ? `${summary.reviewRequiredCount} sources marked for review` : "Source safety checks are separate",
+    `${summary.qualifiedFormatCount} of ${summary.acceptedFormatCount} supported formats carry a qualification receipt`,
+    "Format lookup only; this report does not inspect file bytes or assess safety",
   ];
   if (summary.unreportedCount > 0) {
     parts.push(

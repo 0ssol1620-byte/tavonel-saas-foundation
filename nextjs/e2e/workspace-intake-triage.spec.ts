@@ -1,5 +1,8 @@
 import { writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
+import { deriveFileKey, intakeManifestDigest } from "../lib/intake-approval";
+import { intakePricingFingerprint } from "../lib/usage-pricing";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
 
 const PREFLIGHT_ID = "00000000-0000-4000-8000-000000000001";
@@ -51,6 +54,17 @@ async function selectPdf(page: Page, name: string) {
   const review = page.getByRole("button", { name: "Review sources before processing" });
   await expect(review).toBeVisible();
   await expect(review).toBeEnabled();
+  const preflight = page.getByRole("region", { name: "Compile preflight", exact: true });
+  await expect(preflight.locator(".workspace-staged-summary")).toContainText("1 file selected.");
+  await expect(preflight.locator(".workspace-staged-summary")).toContainText("Upload checks and full processing require separate approvals");
+  await expect(preflight.getByRole("heading", { name: "Format support and limitations", exact: true })).toBeVisible();
+  await expect(preflight).not.toContainText("Nothing has been uploaded yet");
+  await expect(preflight).not.toContainText("no review required");
+}
+
+async function expectNoGlobalUploadDenial(page: Page) {
+  // Include Activity and all parent/child content, not only the cropped preflight region.
+  await expect(page.locator("body")).not.toContainText(/Nothing (?:has been|was|is) uploaded|No (?:file )?bytes have been (?:uploaded|transferred)/i);
 }
 
 async function disabledTriage(page: Page, onRequest?: (route: Route) => void) {
@@ -304,6 +318,15 @@ async function captureMountedTriageLayout(page: Page, testInfo: TestInfo, phase:
         await expect(triage.getByText(/Without trusted persisted read proof/)).toBeVisible();
         await expect(select).toBeVisible();
         await expect(clear).toBeVisible();
+        await expectNoGlobalUploadDenial(page);
+        await expect(page.locator(".notice.static")).toContainText("selected for source review. Upload checks and full processing require separate approvals.");
+        await expect(preflight.locator(".workspace-staged-summary")).toContainText("1 file selected.");
+        await expect(preflight).not.toContainText("Nothing has been uploaded yet");
+        await expect(inventory).toContainText("Supported with limitations");
+        await expect(inventory).toContainText("Locations on the source page");
+        await expect(inventory).toContainText("Source safety not assessed by this format lookup");
+        await expect(inventory).not.toContainText("BEST_EFFORT");
+        await expect(inventory).not.toContainText("bbox1000");
         if (phase === "review") {
           await expect(select).toBeEnabled();
           await expect(triage.getByText(/encryption: unknown; corruption: unknown; archive expansion: unknown/)).toBeVisible();
@@ -312,6 +335,30 @@ async function captureMountedTriageLayout(page: Page, testInfo: TestInfo, phase:
           await expect(triage.locator('[aria-label="Cost status"]')).toBeVisible();
           await expect(triage.getByRole("button", { name: "Get full-processing quote", exact: true })).toBeVisible();
           await expect(triage.getByText(/This separate approval authorizes the existing reservation and processing flow/)).toBeVisible();
+          await expect(triage.locator('[aria-label="Cost status"]')).toContainText("All affected files and versions");
+          await expect(triage.locator('[aria-label="Cost status"]')).not.toContainText("entire_affected_source_version_set");
+        }
+
+        // Hit-test actual viewport centers after scrolling; cropped long captures cannot prove occlusion.
+        const controls = phase === "review" ? [select, clear] : [select, triage.getByRole("button", { name: "Get full-processing quote", exact: true }), clear];
+        for (const control of controls) {
+          await control.evaluate(element => element.scrollIntoView({ block: "center", inline: "nearest" }));
+          await expect.poll(() => control.evaluate(element => {
+            const box = element.getBoundingClientRect();
+            const x = box.left + box.width / 2;
+            const y = box.top + box.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            return x > 0 && x < innerWidth && y > 0 && y < innerHeight && !!hit && (hit === element || element.contains(hit));
+          })).toBe(true);
+        }
+
+        if (viewport.width === 390) {
+          const estimated = await preflight.locator(":scope > dl > div").filter({ has: page.getByText("Estimated", { exact: true }) }).boundingBox();
+          const maximum = await preflight.locator(":scope > dl > div").filter({ has: page.getByText("Maximum", { exact: true }) }).boundingBox();
+          expect(estimated).not.toBeNull();
+          expect(maximum).not.toBeNull();
+          expect(Math.abs(estimated!.y - maximum!.y)).toBeLessThanOrEqual(1);
+          expect(maximum!.x).toBeGreaterThan(estimated!.x);
         }
 
         const clearBox = await clear.boundingBox();
@@ -431,9 +478,11 @@ test("legacy fallback requires explicit maximum approval and ignores repeated ac
   await expect(page.getByRole("region", { name: "Server source triage" })).toHaveCount(0);
   await expect(fallbackAlert).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Approve maximum & upload" })).toHaveCount(0);
+  await expectNoGlobalUploadDenial(page);
+  await expect(page.locator(".notice.static")).toContainText("preparing this processing approval. This preparation step does not upload file bytes.");
   releaseApproval();
   await expect(page.getByRole("status").filter({
-    hasText: "The complete set was not approved. Nothing was uploaded. Review the reason and retry the complete set.",
+    hasText: "This approval request for the complete set was rejected. Review the reason and retry the complete set.",
   })).toBeVisible();
   expect(approvalCalls).toBe(1);
   expect(approvedMaximum).toBe(6);
@@ -472,7 +521,7 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
       "409 TRIAGE_CHOICES_REQUIRED",
     ],
     putResponseStatuses: [200],
-    status: "Server verified the sealed sources. Choose include or exclude for every row; identical bytes remain separate reviewable sources.",
+    status: "Files uploaded and sealed for checks. Full processing has not started. Choose include or exclude for every row; identical bytes remain separate reviewable sources.",
   });
   const options = flow.events.filter(event => event.startsWith("upload OPTIONS "));
   expect(options.length).toBeLessThanOrEqual(1);
@@ -508,8 +557,135 @@ test("exclude-all 409 leaves choices editable so the customer can retry", async 
   await expect(costStatus).toContainText("Initial customer page charge for this complete source/version set");
   await expect(costStatus).toContainText("This request is a new read; its page charge is shown in the initial estimate. No recompile quote is being made.");
   await expect(costStatus).not.toContainText("$0.00");
+  await expectNoGlobalUploadDenial(page);
   expect(finalCalls).toBe(2);
   await captureMountedTriageLayout(page, testInfo, "receipt");
+});
+
+for (const failure of ["seal", "receipt"] as const) {
+  test(`successful PUT followed by ${failure} failure keeps upload uncertainty visible across the workspace`, async ({ page }) => {
+    await openWorkspace(page);
+    const flow = await installReadyStageFlow(page);
+    const processingRequests: string[] = [];
+    page.on("request", request => {
+      const path = new URL(request.url()).pathname;
+      if (request.method() === "POST" && ["/api/v1/uploads/quote", "/api/uploads/approval", "/api/uploads/capability", "/api/uploads/confirm"].includes(path)) processingRequests.push(path);
+    });
+    const failedPath = failure === "seal" ? "/api/v1/uploads/triage/complete" : "/api/v1/uploads/triage/receipt";
+    await page.route(`**${failedPath}`, async route => {
+      const body = route.request().postDataJSON() as { stageId?: string; preflightApprovalId?: string; batchId?: string; choices?: unknown };
+      expect(route.request().method()).toBe("POST");
+      expect(body.preflightApprovalId).toBe(PREFLIGHT_ID);
+      if (failure === "seal") expect(body.stageId).toBe("00000000-0000-4000-8000-000000000101");
+      else {
+        expect(body.batchId).toMatch(UUID);
+        expect(body.choices).toEqual({});
+      }
+      flow.events.push(`POST ${failedPath}`, "503 INTAKE_TRIAGE_NETWORK_ERROR");
+      return route.fulfill({ status: 503, json: { code: "INTAKE_TRIAGE_NETWORK_ERROR" } });
+    });
+    await selectPdf(page, "scan.pdf");
+    await page.getByRole("button", { name: "Review sources before processing" }).click();
+    await page.getByRole("button", { name: "Approve bounded source preflight" }).click();
+    const triage = page.getByRole("region", { name: "Server source triage", exact: true });
+    await expect(triage.getByRole("status").last()).toHaveText("Upload checks did not complete (INTAKE_TRIAGE_NETWORK_ERROR). Some file bytes may already have been uploaded. No parsing or full-processing approval was requested; processing remains blocked.");
+    await expectNoGlobalUploadDenial(page);
+    await expect(page.locator(".notice.static")).toContainText("selected for source review");
+    expect(flow.putResponseStatuses).toEqual([200]);
+    expect(flow.events.filter(event => event.startsWith("upload PUT "))).toHaveLength(1);
+    expect(flow.events).toContain("503 INTAKE_TRIAGE_NETWORK_ERROR");
+    expect(flow.events.filter(event => event.startsWith("unexpected ") || event.startsWith("pageerror "))).toEqual([]);
+    if (failure === "receipt") expect(flow.events).toContain("200 TRIAGE_FILE_SEALED");
+    else expect(flow.events).not.toContain("200 TRIAGE_FILE_SEALED");
+    expect(processingRequests).toEqual([]);
+    await expect(triage.getByRole("button", { name: "Get full-processing quote", exact: true })).toHaveCount(0);
+    await expect(triage.getByRole("button", { name: "Approve maximum and process sources", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Clear", exact: true }).click();
+    await expect(triage).toHaveCount(0);
+    await expect(page.getByText(/Some file bytes may already have been uploaded/)).toHaveCount(0);
+    expect(processingRequests).toEqual([]);
+  });
+}
+
+test("processing approval preparation preserves the earlier upload status across the workspace", async ({ page }) => {
+  const source = pdfFile("scan.pdf");
+  const contentSha256 = `sha256:${createHash("sha256").update(source.buffer).digest("hex")}`;
+  const fileKey = await deriveFileKey({ relativePath: "scan.pdf", contentSha256, byteLength: source.buffer.length, mimeType: source.mimeType });
+  const clientManifestDigest = await intakeManifestDigest([{ fileKey, contentSha256, byteLength: source.buffer.length, mimeType: source.mimeType, claimedPages: null, claimedBasis: null }]);
+  const pricingFingerprint = await intakePricingFingerprint();
+  const receipt = readyReceipt(true);
+  receipt.receipt.inventory.selectedFileKeys = [fileKey];
+  receipt.receipt.inventory.pricingFingerprint = pricingFingerprint;
+  receipt.review[0].fileKey = fileKey;
+  receipt.estimate.customerChargeCoverage.pricingFingerprint = pricingFingerprint;
+  receipt.estimate.customerChargeCoverage.sourceVersions[0].fileKey = fileKey;
+  receipt.estimate.customerChargeCoverage.sourceVersions[0].contentSha256 = contentSha256;
+  let approvalStarted!: () => void;
+  let releaseApproval!: () => void;
+  const started = new Promise<void>(resolve => { approvalStarted = resolve; });
+  const held = new Promise<void>(resolve => { releaseApproval = resolve; });
+  let approvalCalls = 0;
+  let quoteCalls = 0;
+  await openWorkspace(page);
+  const flow = await installReadyStageFlow(page);
+  await page.route("**/api/v1/uploads/triage/receipt", async route => {
+    const body = route.request().postDataJSON() as { batchId?: string; preflightApprovalId?: string; choices?: Record<string, string> };
+    expect(body.batchId).toMatch(UUID);
+    expect(body.preflightApprovalId).toBe(PREFLIGHT_ID);
+    if (Object.keys(body.choices ?? {}).length === 0) {
+      return route.fulfill({ status: 409, json: { code: "TRIAGE_CHOICES_REQUIRED", review: [{ fileKey, relativePath: "scan.pdf", choice: null }] } });
+    }
+    expect(body.choices).toEqual({ [fileKey]: "include" });
+    return route.fulfill({ status: 200, json: receipt });
+  });
+  await page.route("**/api/v1/uploads/quote", async route => {
+    quoteCalls += 1;
+    expect(route.request().postDataJSON()).toEqual({ triageReceiptId: RECEIPT_ID });
+    return route.fulfill({ status: 200, json: {
+      code: "INTAKE_QUOTE", triageReceiptId: RECEIPT_ID, triageInventoryDigest: DIGEST,
+      clientManifestDigest, pricingFingerprint,
+      quote: { maximumPages: 1, reservedCredits: 4, maximumCredits: 6, estimatedUsd: 0.04, maximumUsd: 0.06 },
+      files: [{ fileKey }],
+    } });
+  });
+  await page.route("**/api/uploads/approval", async route => {
+    approvalCalls += 1;
+    const body = route.request().postDataJSON() as { triageReceiptId?: string; aggregateMaximumCredits?: number; clientManifestDigest?: string; pricingFingerprint?: string };
+    expect(body).toMatchObject({ triageReceiptId: RECEIPT_ID, aggregateMaximumCredits: 6, clientManifestDigest, pricingFingerprint });
+    approvalStarted();
+    await held;
+    return route.fulfill({ status: 409, json: { code: "INTAKE_APPROVAL_REJECTED" } });
+  });
+  await selectPdf(page, "scan.pdf");
+  await page.getByRole("button", { name: "Review sources before processing" }).click();
+  await page.getByRole("button", { name: "Approve bounded source preflight" }).click();
+  await expect(page.getByLabel("Review scan.pdf")).toBeVisible();
+  await expectNoGlobalUploadDenial(page);
+  await page.getByLabel("Review scan.pdf").selectOption("include");
+  await page.getByRole("button", { name: "Save choices and show estimate" }).click();
+  await page.getByRole("button", { name: "Get full-processing quote", exact: true }).click();
+  const consent = page.getByRole("checkbox", { name: "I approve full processing up to $0.06 for this complete selected source set." });
+  await expect(consent).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Approve maximum and process sources", exact: true })).toBeDisabled();
+  expect(approvalCalls).toBe(0);
+  await consent.check();
+  await page.getByRole("button", { name: "Approve maximum and process sources", exact: true }).click();
+  await started;
+  try {
+    await expectNoGlobalUploadDenial(page);
+    await expect(page.locator(".notice.static")).toContainText("Hashing all 1 selected files and preparing this processing approval. This preparation step does not upload file bytes.");
+    await expect(page.getByRole("region", { name: "Server source triage" }).getByRole("status").last()).toContainText("Submitting explicit approval for the quoted maximum of $0.06");
+    expect(flow.putResponseStatuses).toEqual([200]);
+    expect(flow.events.filter(event => event.startsWith("upload PUT "))).toHaveLength(1);
+    expect(flow.events).toContain("200 TRIAGE_FILE_SEALED");
+    expect(quoteCalls).toBe(1);
+    expect(approvalCalls).toBe(1);
+  } finally {
+    releaseApproval();
+  }
+  await expect(page.locator(".notice.static")).toContainText("This approval request for the complete set was rejected");
+  await expectNoGlobalUploadDenial(page);
+  expect(flow.putResponseStatuses).toEqual([200]);
 });
 
 test("changing the selected source while staging is delayed ignores the old response", async ({ page }) => {
@@ -574,5 +750,5 @@ test("Clear unmounts triage and ignores a delayed stage response", async ({ page
   releaseStage();
   await finishedGate;
   await expect(page.getByRole("region", { name: "Server source triage" })).toHaveCount(0);
-  await expect(page.getByText("Inventory staged.", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Source inventory staged.", { exact: false })).toHaveCount(0);
 });

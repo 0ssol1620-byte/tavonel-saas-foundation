@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectorLineageFailures, verifyCollectorEligibility } from './repair-collector-only.mjs';
-import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt } from './repair-known-regression.mjs';
+import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt, verifyIntakePresentationEligibility, intakePresentationLineageFailures, readIntakePresentationExecution } from './repair-known-regression.mjs';
 
 export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
   const deferred = new Set(plan.deferredGroups ?? []);
@@ -37,11 +37,11 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
     ...plan,
     completedHeadSha: headSha,
     runResults,
-    databaseObservation: plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
+    databaseObservation: plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.intakePresentation ? 'successful historical f082 DB evidence via qualified 6a32 and 895 classifiers; not executed at current head' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
     pendingDebt: [...pendingDebt].sort(),
     passedGroupAnchors,
     executedChecks,
-    inheritedChecks: plan.collectorOnly || plan.knownRegressionRepair ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
+    inheritedChecks: plan.collectorOnly || plan.knownRegressionRepair || plan.intakePresentation ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
     fullQualification: 'pending',
     gate: failed ? 'failed' : 'passed-scoped-only',
     gateFailures,
@@ -74,7 +74,15 @@ function runGate() {
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
   if (plan.collectorOnlyFailure) requirements.push([`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`, 'failure']);
-  let repairProof, repairExecution;
+  let repairProof, repairExecution, intakeExecution;
+  if (plan.intakePresentation || plan.groups.includes('intake-presentation')) {
+    const proof = verifyIntakePresentationEligibility({ headSha: env.HEAD_SHA });
+    for (const reason of intakePresentationLineageFailures(plan, proof)) requirements.push([reason, 'failure']);
+    requirements.push(['actual ten-suite intake unit outcome', env.TARGETED_REPAIR_UNIT_RESULT]);
+    requirements.push(['intake browser/report contracts', env.TRANSITIVE_TEST_RESULT]);
+    try { intakeExecution = readIntakePresentationExecution(); }
+    catch (error) { requirements.push(['fresh intake execution evidence: ' + error.message, 'failure']); }
+  }
   if (plan.knownRegressionRepair || plan.groups.includes('known-unit-regression-repair')) {
     repairProof = verifyKnownRepairEligibility({ headSha: env.HEAD_SHA });
     for (const reason of knownRepairLineageFailures(plan, repairProof)) requirements.push([reason, 'failure']);
@@ -106,6 +114,8 @@ function runGate() {
       ...(plan.requireWorkspaceIntakeCapture ? { mountedCaptures: env.WORKSPACE_INTAKE_CAPTURE_RESULT } : {}),
     },
   });
+  if (plan.intakePresentation && receipt.gate === 'passed-scoped-only') receipt.executedChecks = { ...receipt.executedChecks,
+    units: { status: 'success', ...intakeExecution.units }, intakeBrowsers: { status: 'success', reports: intakeExecution.browsers } };
   if (plan.knownRegressionRepair) receipt = resolveKnownRepairDebt(receipt, plan, repairProof, repairExecution);
   writeFileSync('repair-receipt.json', `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(`Scoped group results: ${JSON.stringify(receipt.runResults)}`);

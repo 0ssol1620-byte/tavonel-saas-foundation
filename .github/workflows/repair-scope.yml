@@ -51,7 +51,7 @@ jobs:
         id: selector-tests
         if: steps.plan.outputs.selector_tests == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+          if [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs
@@ -62,7 +62,9 @@ jobs:
         id: browser-report-tests
         if: steps.plan.outputs.workflow_static == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+          if [ '${{ steps.plan.outputs.intake_presentation }}' = true ]; then
+            node --test scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test --test-name-pattern='targeted regression transitive' scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test --test-name-pattern='mounted|collector|report|browser project|browser groups|Playwright' scripts/repair-scope.test.mjs

@@ -42,12 +42,12 @@ export const CONFIG_PATHS = Object.freeze([
 // are normalized in this verifier's hash; all declaration tokens remain covered.
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
-  ".github/workflows/db-rehearsal.yml": "bf3de8c724ea76991921caa14900c1aacab2047404cb549b14fcdde306ec8fed",
-  ".github/workflows/repair-scope.yml": "443c7ea67311fe0f1d1e4c014c9eca7e48dfe18df3f8af3791436020e9306bca",
-  "nextjs/scripts/repair-collector-only.mjs": "d6b1aad9bcf656e1f124f8708e0becb38ca8f14bdf0758ddd63325cffb02d945",
+  ".github/workflows/db-rehearsal.yml": "d8b15a718987b4ac7a22a5270462e679438b1fb2ecc474f5a483c9b0180465b7",
+  ".github/workflows/repair-scope.yml": "27a7c4732b77d27f931e1c033ee5db9317b60c2c5d460b4dcd14d4f0d59e75c1",
+  "nextjs/scripts/repair-collector-only.mjs": "153da3166a0d4ee6bb7dc43ea3abae26e6b0703b07bde48ae7d478a54fbddc5e",
   "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-scope-gate.mjs": "fac917e37fc7bbd826e6fbef2091452403b90d2b95035b22654697c9abbf32d7",
-  "nextjs/scripts/verify-repair-workflows.mjs": "b580f26535af3d45d9d955d40bbefae0302ebd7af4e99b3d98148fe717d61ba3"
+  "nextjs/scripts/repair-scope-gate.mjs": "2a0de0d146fd80e11885b0320123ce6a81983e85111fd25e0f533b3671a28964",
+  "nextjs/scripts/verify-repair-workflows.mjs": "8d97852224a5697ce3d2142a833779c75892fc1baf2309095493e03e9f00cff6"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -214,7 +214,7 @@ export function collectorJobDecision(classifierResult, intended, eligible) {
 }
 
 export function failedCollectorPlan({ headSha, reason, intent }) {
-  return withRegressionDebt({ schemaVersion: 1, repository: '0ssol1620-byte/tavonel-saas-foundation',
+  const plan = { schemaVersion: 1, repository: '0ssol1620-byte/tavonel-saas-foundation',
     headSha, repairAnchorSha: FULL_ANCHOR, pullRequestBaseSha: process.env.PR_BASE_SHA,
     groups: ['collector-only-eligibility'], unitFiles: [], browserFiles: [], unknownPaths: [],
     runFullHermeticVitest: false, runScriptContracts: false, runCdrWorkerChecks: false, runDetailIntegrity: false,
@@ -223,7 +223,14 @@ export function failedCollectorPlan({ headSha, reason, intent }) {
     pendingFullDebt: ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
     fullQualification: 'pending', inheritedChecks: {}, collectorOnlyFailure: { reason, intent },
     qualificationReasons: ['Collector eligibility failed; no expensive fallback is permitted for an intended or unavailable classification.'],
-  });
+  };
+  // A failed new admission cannot revoke the parent's actual historical repair.
+  // Evidence remains unaccepted for this head until its independent proof passes.
+  return intent?.parent === repair.INTAKE_PARENT ? { ...plan,
+    knownRegressionObservations: [KNOWN_REGRESSION],
+    historicalRegressionResolution: { sourceHead: repair.INTAKE_PARENT, status: 'historical resolution retained; evidence unaccepted for current head' },
+    pendingQualificationDebt: [...plan.pendingQualificationDebt, 'intake-presentation-eligibility'],
+  } : withRegressionDebt(plan);
 }
 
 export function failedCollectorReceipt(plan) {
@@ -248,7 +255,7 @@ export function collectorLineageFailures(plan, verified) {
 
 function emit(plan) {
   writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
-  const values = { broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
+  const values = { broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
   if (process.env.GITHUB_OUTPUT) for (const [key, value] of Object.entries(values)) writeFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`, { flag: 'a' });
 }
 
@@ -257,12 +264,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
   const nonPr = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request';
-  const repairIntent = nonPr ? { classification: 'normal' } : repair.classifyKnownRepairIntent({ headSha });
+  const intakeIntent = nonPr ? { classification: 'normal' } : repair.classifyIntakePresentationIntent({ headSha });
+  const intakePresentation = intakeIntent.classification !== 'normal';
+  const repairIntent = intakePresentation ? { classification: 'normal' } : nonPr ? { classification: 'normal' } : repair.classifyKnownRepairIntent({ headSha });
   const knownRepair = repairIntent.classification !== 'normal';
-  const intent = knownRepair ? repairIntent : nonPr
+  const intent = intakePresentation ? intakeIntent : knownRepair ? repairIntent : nonPr
     ? { classification: 'normal', intended: false, reason: 'Non-PR events retain normal DB execution.' }
     : classifyCollectorIntent({ headSha });
-  const proof = intent.intended ? knownRepair ? repair.verifyKnownRepairEligibility({ headSha }) : verifyCollectorEligibility({ headSha }) : { eligible: false, reason: intent.reason };
+  const proof = intent.intended ? intakePresentation ? repair.verifyIntakePresentationEligibility({ headSha }) : knownRepair ? repair.verifyKnownRepairEligibility({ headSha }) : verifyCollectorEligibility({ headSha }) : { eligible: false, reason: intent.reason };
   if (mode === 'eligibility') {
     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `intended=${intent.intended ?? 'unknown'}\neligible=${proof.eligible}\n`, { flag: 'a' });
     if (intent.classification !== 'normal' && !proof.eligible) {
@@ -285,8 +294,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     const result = spawnSync(process.execPath, ['scripts/repair-scope.mjs'], { env: { ...process.env, GITHUB_OUTPUT: '' }, encoding: 'utf8' });
     if (result.status !== 0) { process.stderr.write(result.stderr ?? 'Normal selector failed.'); process.exit(result.status ?? 1); }
     const normal = JSON.parse(readFileSync('repair-plan.json', 'utf8'));
-    emit(proof.eligible ? knownRepair ? repair.knownRepairPlan(normal, proof) : collectorOnlyPlan(normal, proof) : withRegressionDebt(normal));
+    emit(proof.eligible ? intakePresentation ? repair.intakePresentationPlan(normal, proof) : knownRepair ? repair.knownRepairPlan(normal, proof) : collectorOnlyPlan(normal, proof) : withRegressionDebt(normal));
     if (!proof.eligible) console.log(`Collector-only ineligible; normal selection retained: ${proof.reason}`);
-    console.log(proof.eligible ? knownRepair ? 'Affected-only: 17 regression suites and separate API catalogue checks; 433 tests required, full qualification pending.' : 'Affected-only: intake audit and four capture pairs; unaffected checks retain f082 lineage, full release pending.' : 'Normal full-anchor plan selected.');
+    console.log(proof.eligible ? intakePresentation ? 'Affected-only: ten intake/copy/layout suites, eight audit cases, the six-width layout sweep and four fresh capture pairs; 895 regression resolution inherited, full qualification pending.' : knownRepair ? 'Affected-only: 17 regression suites and separate API catalogue checks; 433 tests required, full qualification pending.' : 'Affected-only: intake audit and four capture pairs; unaffected checks retain f082 lineage, full release pending.' : 'Normal full-anchor plan selected.');
   }
 }

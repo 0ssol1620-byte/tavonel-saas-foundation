@@ -469,6 +469,10 @@
 @media (max-width: 420px) {
   .one-path-workspace .workspace-content { padding-inline: 14px; }
   .one-path-workspace .workspace-preflight dl { grid-template-columns: minmax(0, 1fr); }
+
+  .one-path-workspace .workspace-intake > .workspace-preflight > dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ---- flattening, 2026-09-17 ---------------------------------------------------------------

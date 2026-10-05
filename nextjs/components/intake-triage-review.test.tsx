@@ -42,6 +42,8 @@ describe("intake triage review surface", () => {
     expect(html).toContain("no trusted persisted proof that these unchanged source versions were already read and metered");
     expect(html).toContain("No incremental charge is quoted for this request.");
     expect(html).not.toContain("$0.00");
+    expect(html).toContain("Quote scope: All affected files and versions");
+    expect(html).not.toContain("entire_affected_source_version_set");
   });
   it("keeps exact duplicate paths separate and displays unresolved safety observations", () => {
     const html = renderToStaticMarkup(createElement(TriageReviewList, {

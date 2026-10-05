@@ -60,6 +60,7 @@ jobs:
         id: decision
         if: always()
         env:
+          GH_TOKEN: ${{ github.token }}
           CLASSIFIER_RESULT: ${{ steps.scope.outcome }}
           INTENDED_RESULT: ${{ steps.scope.outputs.intended }}
           ELIGIBLE_RESULT: ${{ steps.scope.outputs.eligible }}
@@ -72,11 +73,15 @@ jobs:
           if (!explicit) {
             const fullDebt = ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'];
             if (!existsSync('collector-only-failure-receipt.json')) writeFileSync('collector-only-failure-receipt.json', JSON.stringify({ headSha: env.REPAIR_HEAD_SHA, gate: 'failed', gateFailures: ['Missing, failed or unqualified collector classification'], fullQualification: 'pending', runResults: { 'collector-only-eligibility': 'unqualified' }, inheritedChecks: {}, pendingDebt: ['hermetic-vitest-71-failures-triage'], knownRegressionObservations: [{ sourceHead: 'e402e61c9ea7d2ecbabe8aeb35144055c2b7b540', runId: 37330362300, jobId: 111831591345, passed: 6407, failed: 71, skipped: 1, files: 442, failingFiles: 17, affectedness: 'pending independent log-only triage' }] }, null, 2) + '\n');
-            const receipt = JSON.parse(readFileSync('collector-only-failure-receipt.json', 'utf8'));
+            let receipt = JSON.parse(readFileSync('collector-only-failure-receipt.json', 'utf8'));
             receipt.pendingFullDebt = [...new Set([...(receipt.pendingFullDebt ?? []), ...fullDebt])];
             receipt.pendingDebt = [...new Set([...(receipt.pendingDebt ?? []), 'database-contract', 'hermetic-vitest-71-failures-triage'])];
             receipt.databaseObservation = 'not executed; inherited evidence unaccepted';
             receipt.inheritedChecks = {};
+            if (env.INTENDED_RESULT === 'true' && env.ELIGIBLE_RESULT === 'false' && receipt.collectorOnlyFailure?.intent?.parent === '8956734a6675ae79d5081e77f551e0cb49cf8a39') {
+              const { authenticateFailedIntakeResolution } = await import('./nextjs/scripts/repair-known-regression.mjs');
+              receipt = authenticateFailedIntakeResolution(receipt, { headSha: env.REPAIR_HEAD_SHA, intendedResult: env.INTENDED_RESULT, eligibleResult: env.ELIGIBLE_RESULT });
+            }
             writeFileSync('collector-only-failure-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
             process.exit(1);
           }
