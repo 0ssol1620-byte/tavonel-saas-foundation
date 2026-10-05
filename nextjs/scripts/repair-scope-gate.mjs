@@ -5,8 +5,9 @@ import { collectorLineageFailures, verifyCollectorEligibility } from './repair-c
 
 export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
   const deferred = new Set(plan.deferredGroups ?? []);
-  const failed = failures.length > 0 || headSha !== plan.headSha;
+  const failed = failures.length > 0 || headSha !== plan.headSha || Boolean(plan.collectorOnlyFailure);
   const gateFailures = [...failures];
+  if (plan.collectorOnlyFailure) gateFailures.push(`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`);
   if (headSha !== plan.headSha) gateFailures.push(`exact checkout SHA mismatch: ${headSha ?? 'missing'}`);
   const runResults = {};
   const pendingDebt = new Set(plan.pendingQualificationDebt ?? []);
@@ -35,7 +36,7 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
     ...plan,
     completedHeadSha: headSha,
     runResults,
-    databaseObservation: plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
+    databaseObservation: plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
     pendingDebt: [...pendingDebt].sort(),
     passedGroupAnchors,
     executedChecks,
@@ -71,6 +72,7 @@ function runGate() {
     ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
+  if (plan.collectorOnlyFailure) requirements.push([`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`, 'failure']);
   if (plan.collectorOnly || plan.groups.includes('mounted-intake-attachment')) {
     // Revalidate at the final gate; a planning claim cannot authorize inherited evidence.
     const verified = verifyCollectorEligibility({ headSha: env.HEAD_SHA });

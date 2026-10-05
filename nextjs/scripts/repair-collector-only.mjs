@@ -6,6 +6,27 @@ import { fileURLToPath } from 'node:url';
 
 export const COLLECTOR_BASE = 'f082847ccd0eb5e65676f357d86a8025d143377b';
 export const FULL_ANCHOR = '6401c3524b5294f3a395acede35e4632eb89c0fb';
+export const CORRECTION_PARENT = 'e402e61c9ea7d2ecbabe8aeb35144055c2b7b540';
+export const CORRECTION_PATHS = Object.freeze([
+  '.github/workflows/db-rehearsal.yml', 'nextjs/scripts/repair-collector-only.mjs',
+  'nextjs/scripts/repair-collector-only.test.mjs', 'nextjs/scripts/repair-scope-gate.mjs',
+  'nextjs/scripts/verify-repair-workflows.mjs',
+]);
+export const REGRESSION_DEBT = 'hermetic-vitest-71-failures-triage';
+export const KNOWN_REGRESSION = Object.freeze({
+  sourceHead: CORRECTION_PARENT, runId: 37330362300, jobId: 111831591345,
+  passed: 6407, failed: 71, skipped: 1, files: 442, failingFiles: 17,
+  runConclusion: 'cancelled', affectedness: 'pending independent log-only triage',
+  provenance: 'root-reviewed actual report counts; failures remain debt despite the step outcome reporting success',
+});
+export const PUBLISHED_CONFIG_BLOBS = Object.freeze({
+  '.github/workflows/db-rehearsal.yml': '693eb6d3f701528b5f78f34b314ebb1dab5f9089',
+  '.github/workflows/repair-scope.yml': '8a55cc2118dac8afa98e9b179c5bd72a513baef0',
+  'nextjs/scripts/repair-collector-only.mjs': '1ba941226bc39080ef9aec353b90aa4c4a2e0b9a',
+  'nextjs/scripts/repair-collector-only.test.mjs': '0b5f4e850c3563cc94a31805532f5552c4d9e480',
+  'nextjs/scripts/repair-scope-gate.mjs': 'b5cb0034a334636e600ba25c989daf891a196255',
+  'nextjs/scripts/verify-repair-workflows.mjs': '7221de4853cef3c70d6cda94f2fc57a0d8633177',
+});
 export const FIX_BLOBS = Object.freeze({
   'nextjs/e2e/workspace-intake-triage.spec.ts': ['4362fe002fcd7be6fff0da4dd1a3401307a7ea14', '0d24a1c185cb05f931aa61413e8eb6da604c7113'],
   'nextjs/scripts/repair-scope.mjs': ['a7d0cd35732514bae67f65c74951ca0214251a55', '9cc2d96094675468671602da60943ffa5eb5c1c4'],
@@ -20,12 +41,12 @@ export const CONFIG_PATHS = Object.freeze([
 // are normalized in this verifier's hash; all declaration tokens remain covered.
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
-  ".github/workflows/db-rehearsal.yml": "8527d140d25c32cbf03671454ec0524b2cfa325a0170ff09441870942fdd539b",
+  ".github/workflows/db-rehearsal.yml": "bf3de8c724ea76991921caa14900c1aacab2047404cb549b14fcdde306ec8fed",
   ".github/workflows/repair-scope.yml": "dd695e17f6e8e7e173a2e2552eba3201d7f621356a3e281b2a58c83b4d5883d9",
-  "nextjs/scripts/repair-collector-only.mjs": "0a91169b3717c0a450658bdb99c4585da0c5391acf873f955a9827fe0e87e576",
-  "nextjs/scripts/repair-collector-only.test.mjs": "3e56c17c5d4c3fa7974a49e1287d20c7680004757a01defe808e2e34411f3cc4",
-  "nextjs/scripts/repair-scope-gate.mjs": "ec0bafe665552ef9882ec5c6eda2f468826b095638a3a36b3aba8caf3ee8761d",
-  "nextjs/scripts/verify-repair-workflows.mjs": "776bfa39a51a77cab34ae6eb6a497783b58a0f2903dfd28a13ab797f34822a8b"
+  "nextjs/scripts/repair-collector-only.mjs": "a23f92a51acf837cd37bd992d562c455fa5161aa1f02e18581fc0ab05dbfd74c",
+  "nextjs/scripts/repair-collector-only.test.mjs": "c0b9cf0a4bec4cf6edf4fbdee736e628465f1509ce22e62560ff38514ce0ac62",
+  "nextjs/scripts/repair-scope-gate.mjs": "15fb98ec917620b8964a2a2a40efbe53d5136104d391b42a74422b5a846a7bf9",
+  "nextjs/scripts/verify-repair-workflows.mjs": "a6acb461eda4484321d31a83e1a36b6d17e078a9acab7e311d0502b9191f93dd"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -48,19 +69,39 @@ export function sealedBytes(path, bytes) {
 }
 export const sealHash = (path, bytes) => createHash('sha256').update(sealedBytes(path, bytes)).digest('hex');
 
-export function verifyCollectorSource({ headSha, exec = execFileSync }) {
+export function verifyTrackedCheckout({ repoRoot, headSha, exec = execFileSync }) {
+  const git = args => exec('git', ['-C', repoRoot, ...args], { encoding: 'utf8' }).trim();
+  // Git's stat/index comparison may clean-normalize a pre-existing CRLF HEAD blob
+  // and report a fresh, byte-identical checkout as modified. Keep Git's normal
+  // clean filters, but qualify every reported difference against immutable HEAD.
+  const records = git(['diff', '--raw', '--no-abbrev', '--no-renames', '--no-relative', '--no-ext-diff', '--no-textconv', '--ignore-submodules=none', '-z', headSha]).split('\0').filter(Boolean);
+  if (records.length % 2 !== 0) throw new Error('Malformed tracked checkout diff.');
+  for (let index = 0; index < records.length; index += 2) {
+    const [record, path] = [records[index], records[index + 1]];
+    const change = /^:(100644|100755) (100644|100755) ([a-f0-9]{40}) ([a-f0-9]{40}) M$/.exec(record);
+    if (!change || change[1] !== change[2]) throw new Error(`Tracked checkout mode, type, deletion or addition changed: ${path}`);
+    const entry = git(['ls-tree', '--full-tree', headSha, '--', path]);
+    if (entry !== `${change[1]} blob ${change[3]}\t${path}`) throw new Error(`Tracked checkout HEAD identity mismatch: ${path}`);
+    const rawBlob = git(['hash-object', '--no-filters', '--', path]);
+    if (rawBlob !== change[3]) throw new Error(`Tracked checkout content changed: ${path}`);
+  }
+  return true;
+}
+
+export function classifyCollectorIntent({ headSha, exec = execFileSync }) {
   try {
     const git = args => exec('git', args, { encoding: 'utf8' }).trim();
     const repoRoot = git(['rev-parse', '--show-toplevel']);
-    if (!/^[a-f0-9]{40}$/.test(headSha ?? '') || headSha === COLLECTOR_BASE) throw new Error('Collector head must be a new exact commit.');
+    if (!/^[a-f0-9]{40}$/.test(headSha ?? '') || [COLLECTOR_BASE, CORRECTION_PARENT].includes(headSha)) throw new Error('Collector head must be a new exact correction commit.');
     if (git(['rev-parse', 'HEAD']) !== headSha) throw new Error('Exact checkout head mismatch.');
+    const parents = git(['rev-list', '--parents', '-n', '1', headSha]).split(' ');
+    if (parents[0] !== headSha || parents.some(sha => !/^[a-f0-9]{40}$/.test(sha))) throw new Error('Unreadable collector checkout parent metadata.');
+    if (parents.length !== 2) return { classification: 'normal', intended: false, reason: 'Collector correction requires one parent.' };
+    const parent = parents[1];
+    if (parent !== CORRECTION_PARENT) return { classification: 'normal', intended: false, reason: 'PR is outside the exact published e402 correction parent.' };
     git(['merge-base', '--is-ancestor', FULL_ANCHOR, COLLECTOR_BASE]);
     git(['merge-base', '--is-ancestor', COLLECTOR_BASE, headSha]);
-    git(['-C', repoRoot, 'diff', '--quiet', 'HEAD']);
-    const parents = git(['rev-list', '--parents', '-n', '1', headSha]).split(' ');
-    if (parents.length !== 2 || parents[0] !== headSha) throw new Error('Collector head must have one parent.');
-    const parent = parents[1];
-    const changed = revision => git(['-C', repoRoot, 'diff', '--name-only', '--no-renames', '-z', `${COLLECTOR_BASE}..${revision}`]).split('\0').filter(Boolean).sort();
+    const changed = (revision, from = COLLECTOR_BASE) => git(['-C', repoRoot, 'diff', '--name-only', '--no-renames', '-z', `${from}..${revision}`]).split('\0').filter(Boolean).sort();
     const same = (actual, expected) => JSON.stringify(actual) === JSON.stringify([...expected].sort());
     const tree = (revision, path) => {
       const entry = git(['ls-tree', '--full-tree', revision, '--', path]);
@@ -69,22 +110,35 @@ export function verifyCollectorSource({ headSha, exec = execFileSync }) {
       return match[1];
     };
     const fixPaths = Object.keys(FIX_BLOBS);
-    const configPaths = Object.keys(CONFIG_SEAL);
-    if (!same(configPaths.sort(), CONFIG_PATHS)) throw new Error('Collector infrastructure seal is incomplete or broadened.');
+    const configPaths = CONFIG_PATHS;
+    if (!same(changed(headSha, CORRECTION_PARENT), CORRECTION_PATHS)) return { classification: 'normal', intended: false, reason: 'PR is outside the exact five-file collector correction delta.' };
     if (!same(changed(headSha), [...fixPaths, ...configPaths])) throw new Error('Additional, missing or renamed paths since f082.');
-    if (parent !== COLLECTOR_BASE) {
-      const grandparents = git(['rev-list', '--parents', '-n', '1', parent]).split(' ');
-      if (grandparents.length !== 2 || grandparents[0] !== parent || grandparents[1] !== COLLECTOR_BASE || !same(changed(parent), fixPaths)) throw new Error('Parent is not the exact attachment-fix commit over f082.');
-    }
+    const grandparents = git(['rev-list', '--parents', '-n', '1', parent]).split(' ');
+    if (grandparents.length !== 2 || grandparents[0] !== CORRECTION_PARENT || grandparents[1] !== COLLECTOR_BASE || !same(changed(parent), [...fixPaths, ...configPaths])) throw new Error('Published parent or cumulative f082 source diff mismatch.');
     for (const [path, [before, after]] of Object.entries(FIX_BLOBS)) {
-      if (tree(COLLECTOR_BASE, path) !== before || tree(headSha, path) !== after || (parent !== COLLECTOR_BASE && tree(parent, path) !== after)) throw new Error(`Attachment fix blob mismatch: ${path}`);
+      if (tree(COLLECTOR_BASE, path) !== before || tree(headSha, path) !== after || tree(parent, path) !== after) throw new Error(`Attachment fix blob mismatch: ${path}`);
     }
+    for (const path of CONFIG_PATHS) {
+      if (tree(parent, path) !== PUBLISHED_CONFIG_BLOBS[path]) throw new Error(`Published collector infrastructure mismatch: ${path}`);
+    }
+    return { classification: 'intended', intended: true, base: COLLECTOR_BASE, headSha, parent, fullAnchor: FULL_ANCHOR, exactChangedPaths: [...fixPaths, ...configPaths].sort(), fixBlobs: Object.fromEntries(Object.entries(FIX_BLOBS).map(([path, blobs]) => [path, blobs[1]])) };
+  } catch (error) { return { classification: 'unavailable', intended: null, reason: error.message }; }
+}
+
+export function verifyCollectorSource({ headSha, exec = execFileSync }) {
+  const intent = classifyCollectorIntent({ headSha, exec });
+  if (!intent.intended) return { eligible: false, reason: intent.reason };
+  try {
+    if (JSON.stringify(Object.keys(CONFIG_SEAL).sort()) !== JSON.stringify([...CONFIG_PATHS].sort())) throw new Error('Collector infrastructure seal is incomplete or broadened.');
+    const repoRoot = exec('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+    verifyTrackedCheckout({ repoRoot, headSha, exec });
     for (const [path, expected] of Object.entries(CONFIG_SEAL)) {
-      tree(headSha, path);
+      const entry = exec('git', ['ls-tree', '--full-tree', headSha, '--', path], { encoding: 'utf8' }).trim();
+      if (!/^100644 blob [a-f0-9]{40}\t/.test(entry) || entry.split('\t')[1] !== path) throw new Error(`Not an exact regular collector source blob: ${path}`);
       const bytes = exec('git', ['show', `${headSha}:${path}`], { encoding: 'buffer' });
       if (sealHash(path, bytes) !== expected) throw new Error(`Collector infrastructure mismatch: ${path}`);
     }
-    return { eligible: true, base: COLLECTOR_BASE, headSha, parent, fullAnchor: FULL_ANCHOR, exactChangedPaths: [...fixPaths, ...configPaths].sort(), fixBlobs: Object.fromEntries(Object.entries(FIX_BLOBS).map(([path, blobs]) => [path, blobs[1]])) };
+    return { eligible: true, ...intent };
   } catch (error) { return { eligible: false, reason: error.message }; }
 }
 
@@ -136,7 +190,7 @@ export function verifyCollectorEligibility({ headSha, exec = execFileSync, api =
 
 export function collectorOnlyPlan(normalPlan, proof) {
   if (!proof.eligible || proof.source.headSha !== normalPlan.headSha || normalPlan.repairAnchorSha !== FULL_ANCHOR) throw new Error('Narrow plan requires exact source-backed collector eligibility.');
-  return { ...normalPlan, source: 'exact attachment fix over f082; unaffected evidence inherited explicitly',
+  return { ...withRegressionDebt(normalPlan), source: 'exact attachment fix over f082; unaffected evidence inherited explicitly',
     normalSelection: { groups: normalPlan.groups, unitFiles: normalPlan.unitFiles, browserFiles: normalPlan.browserFiles, unknownPaths: normalPlan.unknownPaths },
     unknownPaths: [],
     groups: ['selector-config', 'workflow-static', 'mounted-intake-attachment'], unitFiles: [], browserFiles: ['e2e/workspace-intake-triage.spec.ts'],
@@ -148,6 +202,36 @@ export function collectorOnlyPlan(normalPlan, proof) {
   };
 }
 
+export function withRegressionDebt(plan) {
+  return { ...plan, knownRegressionObservations: [KNOWN_REGRESSION], pendingQualificationDebt: [...new Set([...(plan.pendingQualificationDebt ?? []), REGRESSION_DEBT])] };
+}
+
+export function collectorJobDecision(classifierResult, intended, eligible) {
+  if (classifierResult === 'success' && intended === 'false' && eligible === 'false') return 'normal';
+  if (classifierResult === 'success' && intended === 'true' && eligible === 'true') return 'reuse';
+  return 'blocked';
+}
+
+export function failedCollectorPlan({ headSha, reason, intent }) {
+  return withRegressionDebt({ schemaVersion: 1, repository: '0ssol1620-byte/tavonel-saas-foundation',
+    headSha, repairAnchorSha: FULL_ANCHOR, pullRequestBaseSha: process.env.PR_BASE_SHA,
+    groups: ['collector-only-eligibility'], unitFiles: [], browserFiles: [], unknownPaths: [],
+    runFullHermeticVitest: false, runScriptContracts: false, runCdrWorkerChecks: false, runDetailIntegrity: false,
+    runWorkflowStaticGate: false, requireWorkspaceIntakeCapture: false, requirePublicUiScreenshots: false,
+    runDatabaseRehearsal: false, deferredGroups: [], pendingQualificationDebt: ['database-contract'],
+    pendingFullDebt: ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
+    fullQualification: 'pending', inheritedChecks: {}, collectorOnlyFailure: { reason, intent },
+    qualificationReasons: ['Collector eligibility failed; no expensive fallback is permitted for an intended or unavailable classification.'],
+  });
+}
+
+export function failedCollectorReceipt(plan) {
+  return { ...plan, gate: 'failed', gateFailures: [plan.collectorOnlyFailure.reason],
+    runResults: { 'collector-only-eligibility': 'unqualified' }, passedGroupAnchors: {},
+    executedChecks: { collectorEligibility: 'failure' }, inheritedChecks: {},
+    pendingDebt: plan.pendingQualificationDebt, databaseObservation: 'not executed; inherited evidence unaccepted', fullQualification: 'pending' };
+}
+
 export function collectorLineageFailures(plan, verified) {
   if (!verified?.eligible) return [`collector eligibility: ${verified?.reason ?? 'missing'}`];
   try {
@@ -156,6 +240,7 @@ export function collectorLineageFailures(plan, verified) {
     const failures = keys.filter(key => JSON.stringify(plan[key]) !== JSON.stringify(expected[key])).map(key => `collector-only plan changed after verification: ${key}`);
     for (const debt of ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair']) if (!plan.pendingFullDebt?.includes(debt)) failures.push(`collector-only release debt removed: ${debt}`);
     if (!plan.pendingQualificationDebt?.includes('database-contract')) failures.push('collector-only database debt removed');
+    if (!plan.pendingQualificationDebt?.includes(REGRESSION_DEBT) || JSON.stringify(plan.knownRegressionObservations) !== JSON.stringify([KNOWN_REGRESSION])) failures.push('collector-only observed 71-failure debt removed');
     return failures;
   } catch (error) { return [`collector-only lineage invalid: ${error.message}`]; }
 }
@@ -169,17 +254,34 @@ function emit(plan) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const mode = process.argv[2];
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
-  const proof = verifyCollectorEligibility({ headSha: process.env.REPAIR_HEAD_SHA });
+  const headSha = process.env.REPAIR_HEAD_SHA;
+  const intent = mode === 'eligibility' && process.env.COLLECTOR_EVENT !== 'pull_request'
+    ? { classification: 'normal', intended: false, reason: 'Non-PR events retain normal DB execution.' }
+    : classifyCollectorIntent({ headSha });
+  const proof = intent.intended ? verifyCollectorEligibility({ headSha }) : { eligible: false, reason: intent.reason };
   if (mode === 'eligibility') {
-    if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `eligible=${proof.eligible}\n`, { flag: 'a' });
+    if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `intended=${intent.intended ?? 'unknown'}\neligible=${proof.eligible}\n`, { flag: 'a' });
+    if (intent.classification !== 'normal' && !proof.eligible) {
+      const receipt = failedCollectorReceipt(failedCollectorPlan({ headSha, reason: proof.reason, intent }));
+      writeFileSync('collector-only-failure-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
+      console.error(JSON.stringify(receipt));
+      process.exit(1);
+    }
     console.log(JSON.stringify(proof));
   } else {
+    if (intent.classification !== 'normal' && !proof.eligible) {
+      const plan = failedCollectorPlan({ headSha, reason: proof.reason, intent });
+      writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
+      writeFileSync('repair-receipt.json', JSON.stringify(failedCollectorReceipt(plan), null, 2) + '\n');
+      console.error(`Collector correction is unqualified; expensive checks are blocked: ${proof.reason}`);
+      process.exit(1);
+    }
     // The unchanged normal selector always computes release debt and is the fallback.
     // Buffer its outputs until eligibility is known; never emit conflicting step outputs.
     const result = spawnSync(process.execPath, ['scripts/repair-scope.mjs'], { env: { ...process.env, GITHUB_OUTPUT: '' }, encoding: 'utf8' });
     if (result.status !== 0) { process.stderr.write(result.stderr ?? 'Normal selector failed.'); process.exit(result.status ?? 1); }
     const normal = JSON.parse(readFileSync('repair-plan.json', 'utf8'));
-    emit(proof.eligible ? collectorOnlyPlan(normal, proof) : normal);
+    emit(proof.eligible ? collectorOnlyPlan(normal, proof) : withRegressionDebt(normal));
     if (!proof.eligible) console.log(`Collector-only ineligible; normal selection retained: ${proof.reason}`);
     console.log(proof.eligible ? 'Affected-only: intake audit and four capture pairs; unaffected checks retain f082 lineage, full release pending.' : 'Normal full-anchor plan selected.');
   }

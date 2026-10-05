@@ -40,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       eligible: ${{ steps.scope.outputs.eligible }}
+      intended: ${{ steps.scope.outputs.intended }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,16 +51,49 @@ jobs:
           node-version: 22
       - name: Independently verify unchanged DB source and prior evidence
         id: scope
-        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
+          COLLECTOR_EVENT: ${{ github.event_name }}
           REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node nextjs/scripts/repair-collector-only.mjs eligibility
+      - name: Require an explicit collector classifier decision
+        id: decision
+        if: always()
+        env:
+          CLASSIFIER_RESULT: ${{ steps.scope.outcome }}
+          INTENDED_RESULT: ${{ steps.scope.outputs.intended }}
+          ELIGIBLE_RESULT: ${{ steps.scope.outputs.eligible }}
+          REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          const env = process.env;
+          const explicit = env.CLASSIFIER_RESULT === 'success' && ((env.INTENDED_RESULT === 'false' && env.ELIGIBLE_RESULT === 'false') || (env.INTENDED_RESULT === 'true' && env.ELIGIBLE_RESULT === 'true'));
+          if (!explicit) {
+            const fullDebt = ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'];
+            if (!existsSync('collector-only-failure-receipt.json')) writeFileSync('collector-only-failure-receipt.json', JSON.stringify({ headSha: env.REPAIR_HEAD_SHA, gate: 'failed', gateFailures: ['Missing, failed or unqualified collector classification'], fullQualification: 'pending', runResults: { 'collector-only-eligibility': 'unqualified' }, inheritedChecks: {}, pendingDebt: ['hermetic-vitest-71-failures-triage'], knownRegressionObservations: [{ sourceHead: 'e402e61c9ea7d2ecbabe8aeb35144055c2b7b540', runId: 37330362300, jobId: 111831591345, passed: 6407, failed: 71, skipped: 1, files: 442, failingFiles: 17, affectedness: 'pending independent log-only triage' }] }, null, 2) + '\n');
+            const receipt = JSON.parse(readFileSync('collector-only-failure-receipt.json', 'utf8'));
+            receipt.pendingFullDebt = [...new Set([...(receipt.pendingFullDebt ?? []), ...fullDebt])];
+            receipt.pendingDebt = [...new Set([...(receipt.pendingDebt ?? []), 'database-contract', 'hermetic-vitest-71-failures-triage'])];
+            receipt.databaseObservation = 'not executed; inherited evidence unaccepted';
+            receipt.inheritedChecks = {};
+            writeFileSync('collector-only-failure-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
+            process.exit(1);
+          }
+          NODE
+      - name: Preserve the failed collector eligibility receipt
+        if: always() && steps.decision.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: collector-only-failure-${{ github.event.pull_request.head.sha || github.sha }}
+          path: collector-only-failure-receipt.json
+          if-no-files-found: error
+          retention-days: 30
   db-rehearsal:
     name: db-rehearsal
     needs: [collector-only-eligibility]
-    # Missing verifier, denied API access, altered paths or any classifier failure runs DB normally.
-    if: always() && (needs.collector-only-eligibility.result != 'success' || needs.collector-only-eligibility.outputs.eligible != 'true')
+    # Only an explicit unrelated/unknown decision runs normally; invalid intended corrections fail fast.
+    if: always() && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -674,7 +708,7 @@ jobs:
   browser-storage-transport:
     name: Local Chromium signed-storage transport
     needs: [collector-only-eligibility]
-    if: always() && github.event_name == 'pull_request' && (needs.collector-only-eligibility.result != 'success' || needs.collector-only-eligibility.outputs.eligible != 'true')
+    if: always() && github.event_name == 'pull_request' && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

@@ -67,7 +67,11 @@ assert(/pull_request:\n\s+types: \[opened, synchronize, reopened\]/.test(repair)
 assert(repair.includes('name: Repair scope validation'), 'repair check must remain distinct');
 assert(repair.includes('run: node scripts/repair-collector-only.mjs plan'), 'Repair must independently verify collector eligibility before narrowing');
 assert(dbRehearsal.includes('run: node nextjs/scripts/repair-collector-only.mjs eligibility') && dbRehearsal.includes('needs: [collector-only-eligibility]'), 'DB must independently verify source and prior evidence');
-assert(dbRehearsal.includes("if: always() && (needs.collector-only-eligibility.result != 'success' || needs.collector-only-eligibility.outputs.eligible != 'true')"), 'DB must run normally on missing or failed collector eligibility');
+assert(dbRehearsal.includes("if: always() && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'"), 'DB may run normally only after an explicit unrelated/unknown decision; intended or missing eligibility must block expensive jobs');
+assert(dbRehearsal.includes("if: always() && github.event_name == 'pull_request' && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'"), 'transport must use the same fail-fast classifier decision');
+assert(dbRehearsal.includes('Require an explicit collector classifier decision') && dbRehearsal.includes('path: collector-only-failure-receipt.json'), 'classifier protocol failures must retain an explicit failed/unqualified receipt');
+assert(dbRehearsal.includes('receipt.pendingFullDebt') && dbRehearsal.includes("receipt.databaseObservation = 'not executed; inherited evidence unaccepted'") && dbRehearsal.includes('receipt.inheritedChecks = {}'), 'failed or missing classifier outputs must preserve release debt and reject inheritance');
+assert(collectorVerifier.includes('REGRESSION_DEBT') && collectorVerifier.includes('37330362300') && collectorVerifier.includes('failed: 71'), 'latest observed 71-failure debt must remain explicit');
 for (const workflow of [repair, dbRehearsal]) {
   assert(workflow.includes('actions: read') && workflow.includes('GH_TOKEN: ${{ github.token }}'), 'prior run evidence must use the read-only authenticated Actions API');
   assert(workflow.includes('fetch-depth: 0'), 'collector ancestry and complete source diff require full checkout history');
