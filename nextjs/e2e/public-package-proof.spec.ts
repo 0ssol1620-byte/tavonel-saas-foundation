@@ -29,6 +29,26 @@ test("the actual sample package remains readable and keyboard usable at narrow w
       await expect(consent).toBeHidden();
       const proof = proofPage.locator("#public-package-proof");
       await expect(proof.getByRole("heading", { name: "One World. Files you can inspect." })).toBeVisible();
+      // The surrounding document uses light heading ink; this pale sample panel must supply its own.
+      const headingContrast = await proof.evaluate(element => {
+        const heading = element.querySelector<HTMLElement>("#public-package-proof-title")!;
+        const foreground = getComputedStyle(heading).color;
+        const background = getComputedStyle(element).backgroundColor;
+        const luminance = (color: string) => {
+          const values = color.match(/^rgba?\((.+)\)$/)?.[1].split(",").map(Number);
+          if (!values || values.length < 3 || values.some(value => !Number.isFinite(value)) ||
+              (values.length === 4 && values[3] !== 1)) throw new Error("package_heading_color_not_opaque_rgb: " + color);
+          const linear = values.slice(0, 3).map(value => {
+            const channel = value / 255;
+            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+          return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+        };
+        const text = luminance(foreground), panel = luminance(background);
+        return { foreground, background, ratio: (Math.max(text, panel) + 0.05) / (Math.min(text, panel) + 0.05) };
+      });
+      expect(headingContrast.ratio, profile.name + ": " + headingContrast.foreground + " on " + headingContrast.background)
+        .toBeGreaterThanOrEqual(4.5);
       await expect(proof).toContainText("candidate · not activated");
       await expect(proof).toContainText("external signer required");
       const groups = proof.locator('details:has([data-package-file])');
