@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         if: steps.plan.outputs.selector_tests == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.native_database }}' = true ]; then
+          if [ '${{ steps.plan.outputs.native_database }}' = true ] || [ '${{ steps.plan.outputs.public_pages }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs scripts/repair-known-regression.test.mjs
           elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
@@ -244,6 +244,34 @@ jobs:
             nextjs/test-results/repair-scope-home-pricing/pricing-overview-ko-1440.png
           if-no-files-found: error
           retention-days: 3
+      - name: Require sixteen exact file-backed public product captures
+        id: public-product-captures
+        if: always() && steps.plan.outputs.public_product_capture == 'true'
+        run: node scripts/run-repair-check.mjs public-product-captures
+      - name: Upload only sixteen named public product captures
+        if: steps.plan.outputs.public_product_capture == 'true' && steps.public-product-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-product-captures-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-320px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-320px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-360px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-360px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-390px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-390px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-768px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-768px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-1440px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-1440px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-1440px-at-200-percent.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-1440px-at-200-percent.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-default-390.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-expanded-390.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-default-1440.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-expanded-1440.png
+          if-no-files-found: error
+          retention-days: 3
       - name: Fail closed on missing or failed scoped checks
         id: gate
         if: always()
@@ -261,6 +289,7 @@ jobs:
           CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}
           WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}
           PUBLIC_UI_CAPTURE_RESULT: ${{ steps.public-ui-screenshots.outcome }}
+          PUBLIC_PRODUCT_CAPTURE_RESULT: ${{ steps.public-product-captures.outcome }}
           HOME_PRICING_CAPTURE_RESULT: ${{ steps.home-pricing-captures.outcome }}
           SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
           BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}

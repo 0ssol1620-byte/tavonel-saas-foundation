@@ -15,7 +15,7 @@
 
 .key { display: flex; flex-direction: column; gap: 8px; margin: 0; }
 .key div { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 14px; align-items: baseline; }
-.key dd { margin: 0; font-size: 12.5px; color: var(--text-lo); }
+.key dd { margin: 0; font-size: 14px; color: var(--text-lo); }
 
 /* ---------------------------------------------------------------- the clauses */
 
@@ -39,9 +39,9 @@
 [data-state="qualified"] .state { color: var(--verified); border-color: var(--verified-dim); }
 
 .promise { margin: 0; font-size: 14px; color: var(--text-hi); line-height: 1.5; }
-.explain { margin: 0; font-size: 13px; color: var(--text-lo); line-height: 1.68; }
+.explain { margin: 0; font-size: 14px; color: var(--text-lo); line-height: 1.68; }
 
-.check { margin: 2px 0 0; font-family: var(--f-mono); font-size: 12px; line-height: 1.62; color: var(--text-lo); overflow-wrap: anywhere; }
+.check { margin: 2px 0 0; font-family: var(--f-mono); font-size: 13px; line-height: 1.62; color: var(--text-lo); overflow-wrap: anywhere; }
 .check b { display: block; color: var(--text-lo); font-weight: 500; letter-spacing: 0.14em; }
 
 /* ---------------------------------------------------------------- the package */
@@ -83,4 +83,32 @@
   .head { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: 9px; align-items: baseline; }
   .head .index, .head h3 { grid-row: 1; }
   .head .state { grid-column: 1 / -1; justify-self: start; }
+}
+
+/* Business summary and native references belong only to this route. */
+.summary { min-width: 0; border-top: 1px solid var(--hairline-hi); padding-top: 18px; }
+.summary h2 { margin: 0 0 20px; font-size: clamp(21px, 2.1vw, 28px); line-height: 1.25; }
+.workflow { margin: 0; padding-left: 24px; display: grid; gap: 18px; }
+.workflow li { padding-left: 4px; }
+.workflow h3 { margin: 0 0 6px; font-size: 17px; line-height: 1.35; }
+.workflow p, .currentBoundary { margin: 0; color: var(--text-mid); font-size: 15px; line-height: 1.6; }
+.currentBoundary { margin-top: 20px; }
+.summaryActions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 16px; }
+.summaryActions a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; box-sizing: border-box; color: var(--source); font-size: 14px; line-height: 1.5; text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.summaryActions .changeLink { padding: 8px 12px; border: 1px solid var(--source); border-radius: var(--r-paper); text-decoration: none; }
+.detail, .reference { min-width: 0; }
+.detail summary, .reference summary { display: list-item; min-height: 44px; box-sizing: border-box; padding: 12px 4px; color: var(--text-hi); font-size: 14px; line-height: 1.5; cursor: pointer; overflow-wrap: anywhere; }
+.detail summary::marker, .reference summary::marker { color: var(--source); }
+.detailBody { display: grid; gap: 12px; padding: 4px 0 8px; }
+.reference { border-block: 1px solid var(--hairline-hi); }
+.referenceBody { display: flex; flex-direction: column; gap: 18px; min-width: 0; padding-block: 12px 20px; }
+.detail summary:focus-visible, .reference summary:focus-visible, .summaryActions a:focus-visible { outline: 3px solid var(--source); outline-offset: 3px; }
+
+/* Reading order is heading, operating summary, then the unchanged sample timeline. */
+.intro { grid-template-columns: minmax(0, 1fr); grid-template-areas: "heading" "summary" "timeline"; row-gap: 24px; }
+.introHeading { grid-area: heading; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.intro > .summary { grid-area: summary; }
+.timeline { grid-area: timeline; min-width: 0; }
+@media (min-width: 1321px) {
+  .intro { grid-template-columns: minmax(420px, 480px) minmax(0, 1fr); grid-template-areas: "heading summary" "timeline summary"; column-gap: clamp(36px, 4vw, 64px); row-gap: 18px; }
 }

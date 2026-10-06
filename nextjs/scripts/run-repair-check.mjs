@@ -183,6 +183,8 @@ export function collectWorkspaceIntakeCaptures(workspaceRoot = repoRoot) {
 }
 
 const browserProjectsByFile = new Map([
+  ['e2e/public-package-proof.spec.ts', ['1440']],
+  ['e2e/compiler-contract.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/contrast-zoom-audit.spec.ts', ['audit', 'audit-768', 'audit-1280']],
   ['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/premium-craft.spec.ts', ['1440', '390', 'reduced-motion']],
@@ -250,6 +252,68 @@ export function collectHomePricingCaptures(workspaceRoot = repoRoot, plan = read
     writeFileSync(target, value.png, { flag: 'wx' });
   }
   return prepared.map(value => value.name + '.png');
+}
+
+export const PUBLIC_PRODUCT_CAPTURE_BINDINGS = Object.freeze([
+  ...['320px','360px','390px','768px','1440px','1440px-at-200-percent'].flatMap(profile=>['initial-canonical-open','content-scrolled'].map(state=>({name:`package-proof-${state}-${profile}`,file:'e2e/public-package-proof.spec.ts',project:'1440',title:'the actual sample package remains readable and keyboard usable at narrow widths and zoom',width:parseInt(profile),height:profile.endsWith('percent')?900:844,element:state==='initial-canonical-open'}))),
+  ...['390','1440'].flatMap(project=>['default','expanded'].map(state=>({name:`continuous-knowledge-${state}-${project}`,attachmentName:`continuous-knowledge-${state}-${project}.png`,file:'e2e/compiler-contract.spec.ts',project,title:'keeps the summary first and supports keyboard reading and Change navigation',width:Number(project),fullPage:true,height:project==='390'?844:900}))),
+].map(Object.freeze));
+
+export function collectPublicProductCaptures(workspaceRoot=repoRoot,plan=readPlan(),copy=true) {
+  const supplied=resolve(workspaceRoot),entry=lstatSync(supplied);if(entry.isSymbolicLink()||!entry.isDirectory())throw Error('Public product workspace must be a regular directory.');
+  const root=realpathSync(supplied),destination=resolve(root,'test-results/repair-scope-public-product'),names=PUBLIC_PRODUCT_CAPTURE_BINDINGS.map(b=>b.name+'.png');
+  protectedCapturePath(root,destination,'directory',true);
+  if(existsSync(destination)&&readdirSync(destination).some(n=>!names.includes(n)))throw Error('Unexpected public product capture destination file.');
+  for(const name of names){const exists=protectedCapturePath(root,resolve(destination,name),'file',true);if(copy&&exists)throw Error('Public product capture destination already exists.');if(!copy&&!exists)throw Error('Curated public product capture missing.');}
+  const matches=new Map(PUBLIC_PRODUCT_CAPTURE_BINDINGS.map(b=>[b.name,[]]));
+  for(const[index,run]of planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity).entries()){
+    const path=resolve(root,`node_modules/.cache/repair-scope-reports/playwright-${index+1}.json`);protectedCapturePath(root,path,'file');
+    const outcome=readAndValidatePlaywrightReport(path,run.files,root,[run.project]);if(outcome.failed||outcome.flaky)throw Error('Public product browser failures/flakes are not capture evidence.');
+    const report=JSON.parse(readFileSync(path,'utf8'));
+    const visit=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[])for(const test of spec.tests??[]){const last=test.results?.at(-1);if(test.status!=='expected'||last?.status!=='passed')continue;for(const binding of PUBLIC_PRODUCT_CAPTURE_BINDINGS){if(binding.project!==test.projectName||binding.title!==spec.title||!playwrightReportContainsPath(spec.file??suite.file,binding.file,root,report.config?.rootDir))continue;for(const a of last.attachments??[])if(a.name===(binding.attachmentName??binding.name))matches.get(binding.name).push(a);}}visit(suite.suites);}};visit(report.suites);
+  }
+  const prepared=PUBLIC_PRODUCT_CAPTURE_BINDINGS.map(binding=>{
+    const values=matches.get(binding.name);if(values.length!==1)throw Error('Missing or duplicate exact public product attachment: '+binding.name);
+    const a=values[0];if(a.contentType!=='image/png'||typeof a.path!=='string'||a.body!==undefined)throw Error('Public product capture must be file-backed PNG.');
+    const path=resolve(root,a.path),fromRoot=relative(root,path).replaceAll('\\','/'),stem=binding.file.slice(4,-8);
+    if(!new RegExp(`^test-results/repair-scope-playwright-[1-9][0-9]*/${stem}-[^/]+/attachments/[^/]+\\.png$`).test(fromRoot))throw Error('Public product capture escaped its exact spec output.');
+    validateMountedPngMetadata(protectedCapturePath(root,path,'file'));const bytes=readFileSync(path);
+    if(bytes.length<33||!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||bytes.readUInt32BE(8)!==13||bytes.toString('ascii',12,16)!=='IHDR')throw Error('Public product capture PNG header invalid.');
+    const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);if(!width||!height||height>32768||(binding.element?width>binding.width:width!==binding.width)||(binding.fullPage?height<binding.height:!binding.element&&height!==binding.height))throw Error('Public product capture dimensions mismatch: '+binding.name);
+    const target=resolve(destination,binding.name+'.png');if(!copy&&!bytes.equals(readFileSync(target)))throw Error('Curated public product capture bytes changed.');return {target,bytes,name:binding.name+'.png'};
+  });
+  if(copy){protectedCapturePath(root,destination,'directory',true);mkdirSync(destination,{recursive:true});for(const p of prepared){protectedCapturePath(root,p.target,'file',true);writeFileSync(p.target,p.bytes,{flag:'wx'});}}
+  return prepared.map(p=>p.name);
+}
+
+export const PUBLIC_PRODUCT_BROWSER_TITLES = Object.freeze({
+  "e2e/compiler-contract.spec.ts": [
+    "publishes the eight clauses, each with a state a reader can see",
+    "grades no clause as qualified, because no receipt is published here",
+    "draws the whole source-change flow, and says which half of it runs here",
+    "leaves no orphan slot in the product surface grid",
+    "lists the nine interchange standards without implying all nine are emitted",
+    "never scrolls the document sideways, at any width",
+    "is reachable from the product index and names itself in the tab",
+    "leads with version comparison and keeps technical explanations optional",
+    "keeps the summary first and supports keyboard reading and Change navigation"
+  ],
+  "e2e/public-package-proof.spec.ts": [
+    "the actual sample package remains readable and keyboard usable at narrow widths and zoom"
+  ]
+});
+export function readPublicProductExecution(workspaceRoot,plan) {
+  const root=realpathSync(workspaceRoot),reportRoot=resolve(root,'node_modules/.cache/repair-scope-reports');
+  const unitPath=resolve(reportRoot,'vitest.json');protectedCapturePath(root,unitPath,'file');const units=readAndValidateVitestReport(unitPath,plan.unitFiles);
+  const unitReport=JSON.parse(readFileSync(unitPath,'utf8'));
+  if(units.failed||units.skipped||unitReport.numPendingTests||unitReport.numTodoTests||unitReport.testResults.length!==4||unitReport.numTotalTests!==units.passed||unitReport.numPassedTests!==units.passed)throw Error('Four exact public product unit owners must all execute without skips.');
+  const runs=planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity);if(runs.length!==3||runs.map(r=>r.project).join(',')!=='1440,390,reduced-motion')throw Error('Public product browser projects changed.');
+  const browsers=runs.map((run,index)=>{
+    const path=resolve(reportRoot,`playwright-${index+1}.json`);protectedCapturePath(root,path,'file');const outcome=readAndValidatePlaywrightReport(path,run.files,root,[run.project]),report=JSON.parse(readFileSync(path,'utf8')),seen=[];
+    const visit=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[])for(const test of spec.tests??[]){const file=run.files.find(f=>playwrightReportContainsPath(spec.file??suite.file,f,root,report.config?.rootDir));if(!file||test.projectName!==run.project||!PUBLIC_PRODUCT_BROWSER_TITLES[file].includes(spec.title))throw Error('Unowned public product browser case.');const key=file+'\0'+spec.title;if(seen.includes(key))throw Error('Duplicate public product browser case.');seen.push(key);const skip=run.project==='reduced-motion'&&spec.title==='keeps the summary first and supports keyboard reading and Change navigation';if(skip?test.status!=='skipped'||test.results.some(r=>r.status!=='skipped'):test.status!=='expected'||test.results.length!==1||test.results[0].status!=='passed')throw Error('Unexpected public product browser skip/retry/outcome.');}visit(suite.suites);}};visit(report.suites);
+    const expected=run.files.flatMap(f=>PUBLIC_PRODUCT_BROWSER_TITLES[f].map(t=>f+'\0'+t));if(JSON.stringify(seen.sort())!==JSON.stringify(expected.sort())||outcome.flaky||outcome.failed||outcome.skipped!==(run.project==='reduced-motion'?1:0)||report.stats.expected!==outcome.passed||report.stats.skipped!==outcome.skipped||report.stats.unexpected||report.stats.flaky)throw Error('Incomplete public product browser report.');return {project:run.project,...outcome};
+  });
+  const captures=collectPublicProductCaptures(root,plan,false);return {units,browsers,captures};
 }
 
 export function planBrowserRuns(files, runDetailIntegrity) {
@@ -451,6 +515,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   if (mode === 'unit') await runUnit();
   else if (mode === 'browser') await runBrowser();
   else if (mode === 'intake-captures') console.log(`Collected ${collectWorkspaceIntakeCaptures().length} exact synthetic mounted intake files.`);
+  else if (mode === 'public-product-captures') console.log(`Collected ${collectPublicProductCaptures().length} exact public product PNGs.`);
   else if (mode === 'home-pricing-captures') console.log(`Collected ${collectHomePricingCaptures().length} exact public Home/Pricing PNGs.`);
   else throw new Error('Usage: node scripts/run-repair-check.mjs <unit|browser>');
 }

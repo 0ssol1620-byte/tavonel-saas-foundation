@@ -164,17 +164,17 @@ export const REPAIR_CATALOGUE_FILES = Object.freeze([
 export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
-  ".github/workflows/repair-scope.yml": "67db363fe40c2f9d184d96ce90d040e77d70c21481b03701e38fa224e20849d2",
-  "nextjs/scripts/repair-collector-only.mjs": "733c24fa9984d5bbfd28856041dadb4d90f56b7a3bd1f18137f6b61ba5f4f6f8",
+  ".github/workflows/repair-scope.yml": "00d72e4acf9c6380f93ec5b411d24fcdd70919340cd8d73956ecfdb41904e28e",
+  "nextjs/scripts/repair-collector-only.mjs": "e07e95f0c39344e439db12fed67435090e646a354d47ab8b1f52696e018deb6f",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
-  "nextjs/scripts/repair-scope.test.mjs": "ab5d1c9e8461e0afc3e7928be2b1f225eeabc58612ed3b100180b87566cac9d7",
-  "nextjs/scripts/repair-scope-gate.mjs": "9fb33cf17827accb5e2ca944722b098e486c565b94d22606148103e57d1fed8f",
-  "nextjs/scripts/verify-repair-workflows.mjs": "8a4d7ad10001611d60e29a0ff68bc1a877fa3f0b47ebd23f0f749e5e7d5fc05c",
-  "nextjs/scripts/repair-collector-only.test.mjs": "12206bc38448ad4913c6769d161a89dae8e7fc45b698191623d2a31950c15c56",
-  "nextjs/scripts/repair-known-regression.mjs": "6c5d561d24f6f2dca2b11162cd0d841b31b3a36969c87aa6e03d38ef0719f685",
+  "nextjs/scripts/repair-scope.test.mjs": "e650852c6d173959fbbc1a22cf8de825cc209bec0002a7408217b8c99e710e3d",
+  "nextjs/scripts/repair-scope-gate.mjs": "db1fec0ba53b8421698693907a1d52b03e5b9e0845c7ff6958ae895902589978",
+  "nextjs/scripts/verify-repair-workflows.mjs": "171c799023d99d779f75fd30326e770f581c1729843c5926d16c28db4ec9d9d8",
+  "nextjs/scripts/repair-collector-only.test.mjs": "f47d75fc3344565029f28b1faac438285d855bef04da9c65d2fc714efbc1705e",
+  "nextjs/scripts/repair-known-regression.mjs": "8920b4abcc007674855aa70cabab02c9a6ea8872b34bed0ddcefa7f8b82c0951",
   "nextjs/scripts/repair-known-regression.test.mjs": "fde23e0dc80d19c53f2703489e851959238aa4c4fba55f6c18a3b967e226aec0",
   ".github/workflows/db-rehearsal.yml": "e9262d6f83b4494c7f8552af48b7e4b28f8ee1c7e8964ae2db0b895beece37ec",
-  "nextjs/scripts/run-repair-check.mjs": "08e5a181264faf7accf220554dfa8db6edee8385d7685509e1fef40e80a0288f",
+  "nextjs/scripts/run-repair-check.mjs": "b01ae995d8a1d5f84f23f5b9e510b003bd67919d37ae50c139966538c6679bc8",
   "nextjs/scripts/repair-test-report.mjs": "5dd9b98ffa8aa6b67aa5034567e00857246073a0d8c94dc5df3eea60096e741f",
   "nextjs/vitest.repair-scope.config.ts": "229623b695037e9e8173e74107dd252a77182ad068ab195d2a9710e0100c8742"
 });
@@ -873,14 +873,15 @@ export function verifyIntakePresentationSource({ headSha, exec = execFileSync })
 // The archive is authenticated before decompression. Only the single bounded
 // receipt entry from that immutable archive is accepted; there are no disk writes.
 export function readIntakeParentReceipt(archive) { return readBoundIntakeReceipt(archive, INTAKE_PARENT_ARTIFACT, 8239); }
-export function readBoundIntakeReceipt(archive, artifact, sizeBytes) {
+export function readBoundIntakeReceipt(archive, artifact, sizeBytes, expectedName = 'repair-receipt.json') {
+  if (!['repair-receipt.json', 'native-sql-rehearsal-receipt.json'].includes(expectedName)) throw Error('Unrecognized exact receipt entry.');
   if (!Buffer.isBuffer(archive) || archive.length !== sizeBytes || 'sha256:' + createHash('sha256').update(archive).digest('hex') !== artifact.digest) throw Error('Intake parent receipt archive digest or size mismatch.');
   const end = archive.length - 22;
   if (archive.readUInt32LE(end) !== 0x06054b50 || archive.readUInt16LE(end + 4) !== 0 || archive.readUInt16LE(end + 6) !== 0 || archive.readUInt16LE(end + 8) !== 1 || archive.readUInt16LE(end + 10) !== 1 || archive.readUInt16LE(end + 20) !== 0) throw Error('Unexpected parent receipt archive directory.');
   const central = archive.readUInt32LE(end + 16);
   if (archive.readUInt32LE(central) !== 0x02014b50) throw Error('Missing parent receipt archive entry.');
   const nameLength = archive.readUInt16LE(central + 28), compressedSize = archive.readUInt32LE(central + 20), size = archive.readUInt32LE(central + 24), local = archive.readUInt32LE(central + 42);
-  if (archive.subarray(central + 46, central + 46 + nameLength).toString('utf8') !== 'repair-receipt.json' || archive.readUInt16LE(central + 10) !== 8 || size > 256 * 1024 || archive.readUInt32LE(local) !== 0x04034b50 || archive.readUInt16LE(local + 8) !== 8) throw Error('Unexpected or oversized parent receipt entry.');
+  if (archive.subarray(central + 46, central + 46 + nameLength).toString('utf8') !== expectedName || archive.readUInt16LE(central + 10) !== 8 || size > 256 * 1024 || archive.readUInt32LE(local) !== 0x04034b50 || archive.readUInt16LE(local + 8) !== 8) throw Error('Unexpected or oversized parent receipt entry.');
   const start = local + 30 + archive.readUInt16LE(local + 26) + archive.readUInt16LE(local + 28);
   if (start + compressedSize > central) throw Error('Parent receipt archive bounds escaped.');
   const bytes = inflateRawSync(archive.subarray(start, start + compressedSize), { maxOutputLength: 256 * 1024 });

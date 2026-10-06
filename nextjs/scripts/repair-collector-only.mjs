@@ -43,11 +43,11 @@ export const CONFIG_PATHS = Object.freeze([
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
   ".github/workflows/db-rehearsal.yml": "e9262d6f83b4494c7f8552af48b7e4b28f8ee1c7e8964ae2db0b895beece37ec",
-  ".github/workflows/repair-scope.yml": "67db363fe40c2f9d184d96ce90d040e77d70c21481b03701e38fa224e20849d2",
-  "nextjs/scripts/repair-collector-only.mjs": "733c24fa9984d5bbfd28856041dadb4d90f56b7a3bd1f18137f6b61ba5f4f6f8",
-  "nextjs/scripts/repair-collector-only.test.mjs": "12206bc38448ad4913c6769d161a89dae8e7fc45b698191623d2a31950c15c56",
-  "nextjs/scripts/repair-scope-gate.mjs": "9fb33cf17827accb5e2ca944722b098e486c565b94d22606148103e57d1fed8f",
-  "nextjs/scripts/verify-repair-workflows.mjs": "8a4d7ad10001611d60e29a0ff68bc1a877fa3f0b47ebd23f0f749e5e7d5fc05c"
+  ".github/workflows/repair-scope.yml": "00d72e4acf9c6380f93ec5b411d24fcdd70919340cd8d73956ecfdb41904e28e",
+  "nextjs/scripts/repair-collector-only.mjs": "e07e95f0c39344e439db12fed67435090e646a354d47ab8b1f52696e018deb6f",
+  "nextjs/scripts/repair-collector-only.test.mjs": "f47d75fc3344565029f28b1faac438285d855bef04da9c65d2fc714efbc1705e",
+  "nextjs/scripts/repair-scope-gate.mjs": "db1fec0ba53b8421698693907a1d52b03e5b9e0845c7ff6958ae895902589978",
+  "nextjs/scripts/verify-repair-workflows.mjs": "171c799023d99d779f75fd30326e770f581c1729843c5926d16c28db4ec9d9d8"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -504,9 +504,386 @@ function runNativeDbMode(mode,headSha,intent) {
   else {const result=spawnSync(process.execPath,['scripts/repair-scope.mjs'],{env:{...process.env,GITHUB_OUTPUT:''},encoding:'utf8'});if(result.status!==0){process.stderr.write(result.stderr??'Normal selector failed.');process.exit(result.status??1);}emit(nativeDbPlan(JSON.parse(readFileSync('repair-plan.json','utf8')),proof));console.log('Exact native source: owning workflow and canonical pgTAP source tests only; fresh separate DB required; historical transport retained, full qualification pending.');}
 }
 
+export const PUBLIC_PAGES_PARENT = Object.freeze("28d675b2ed3f8bf93ba439caca61940d477423e5");
+export const PUBLIC_PAGES_SOURCE_BLOBS = Object.freeze({
+  "nextjs/app/product/compiled-world/page.tsx": {
+    "before": "7abc6116612c808e5e1baa2b95ec88a02d428808",
+    "after": "9c08497bee50875ca29c33597f4697525a587509",
+    "sha256": "53c2c8be31426bf16bac575055dc010c3637cbf3fc4e51ae5adba8f1af562404",
+    "bytes": 15159
+  },
+  "nextjs/app/product/continuous-knowledge/continuous-knowledge.module.css": {
+    "before": "a38855c75c39082cb774d9d77ed9851d4d8662c0",
+    "after": "6ef020bdb7c5f0f63b53ed18aaa396862fce8af6",
+    "sha256": "f66f6cd9fc28cc5f17b5530492665af03739364efabdf54aad43eabeb04afc87",
+    "bytes": 7949
+  },
+  "nextjs/app/product/continuous-knowledge/page.tsx": {
+    "before": "cb81d6991b601dbc80a82d5c81afcc5d4f700d1c",
+    "after": "5cca7928c2fa20390110a15dce951f0d07e5acab",
+    "sha256": "2f95638ce3efea87c78cd6bed86b4754fc48180b22df5be2ce9aa848b2b32687",
+    "bytes": 15094
+  },
+  "nextjs/components/public-package-proof.module.css": {
+    "before": null,
+    "after": "7b0d64fa009ad2552152860e61d9382742633f40",
+    "sha256": "40ef578b8957d1b52bb5ffdd9cce91631b7331537aafbc35877d785bd1217ac9",
+    "bytes": 3530
+  },
+  "nextjs/components/public-package-proof.tsx": {
+    "before": null,
+    "after": "ed1358fd3dfbcf5e987e4a8b32ee2b55ada8f570",
+    "sha256": "351ad67eec06c3c9d21a86c654c230e69a0ec33d7006183fc4e25f2e3b1059c5",
+    "bytes": 6953
+  },
+  "nextjs/e2e/compiler-contract.spec.ts": {
+    "before": "71341d2bf68bd4ba535a247bcddc9a567c2cfc76",
+    "after": "1fd3e098e4a0ef574d55faee2ac7314e033e3007",
+    "sha256": "dbeff0089dbdfe66636ad8589f70074f213c317d2c9b495044b5227742cd63b4",
+    "bytes": 17099
+  },
+  "nextjs/e2e/public-package-proof.spec.ts": {
+    "before": null,
+    "after": "37d5584f28696620a47a84ea79cb0a01ba505cd5",
+    "sha256": "50d297ea628521529349ce461a6f328e0d2989aca7846d87437b5f6d31131ee5",
+    "bytes": 10090
+  },
+  "nextjs/lib/continuous-knowledge-page.test.ts": {
+    "before": null,
+    "after": "6b8e08cbf5aa463d3554c0deeaa929684c135f39",
+    "sha256": "f24d5daff6b5f2808e7f50134b2df1059ea08b2a91b9b24f248fb6f3d130ac69",
+    "bytes": 5607
+  },
+  "nextjs/lib/public-package-proof.test.ts": {
+    "before": null,
+    "after": "6f1fa72efdb260f00efbbf98f286a431d6bc0ec1",
+    "sha256": "9a3a49c74d2c3fc7ec16f5b407953cfa288f61f10d88f881bfa2284bd174aeb7",
+    "bytes": 9428
+  }
+});
+export const PUBLIC_PAGES_CONFIG_PATHS = Object.freeze([
+  "nextjs/scripts/repair-collector-only.mjs",
+  "nextjs/scripts/repair-collector-only.test.mjs",
+  "nextjs/scripts/repair-known-regression.mjs",
+  "nextjs/scripts/repair-scope.test.mjs",
+  "nextjs/scripts/run-repair-check.mjs",
+  "nextjs/scripts/repair-scope-gate.mjs",
+  "nextjs/scripts/verify-repair-workflows.mjs",
+  ".github/workflows/repair-scope.yml"
+]);
+export const PUBLIC_PAGES_PARENT_CONFIG_BLOBS = Object.freeze({
+  "nextjs/scripts/repair-collector-only.mjs": "f13e370de7ca2692b53cbfa262cfd541de3fd633",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0e6198e86fd8d06ad27ff27617a67cc260b69750",
+  "nextjs/scripts/repair-known-regression.mjs": "9a98148ba2c5ab19fee8fbd5ec705732b33c04d9",
+  "nextjs/scripts/repair-scope.test.mjs": "26f5ada994eb32cc1a33c0e9c6893673a8110d26",
+  "nextjs/scripts/run-repair-check.mjs": "57b1617fce020b9fce8ddc744b72962cd06e4e01",
+  "nextjs/scripts/repair-scope-gate.mjs": "305f9f854f6e85c64a6410b712f73c396a13aae1",
+  "nextjs/scripts/verify-repair-workflows.mjs": "55a7f6ea85057a6cdb08ef9ac23e9ece552e1d01",
+  ".github/workflows/repair-scope.yml": "c7e8b90bd7ef52ba66d15bdd6c2ba896d769efee"
+});
+export const PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS = Object.freeze({
+  ".github/workflows/db-rehearsal.yml": "9c8a57e33b383387075d89bf7059a7b7ce148041",
+  ".github/workflows/repair-scope.yml": "c7e8b90bd7ef52ba66d15bdd6c2ba896d769efee",
+  "nextjs/lib/db-rehearsal-workflow.test.ts": "3e723a40e1bf09e8be44bb6de96b74d77663ff75",
+  "nextjs/scripts/repair-collector-only.mjs": "f13e370de7ca2692b53cbfa262cfd541de3fd633",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0e6198e86fd8d06ad27ff27617a67cc260b69750",
+  "nextjs/scripts/repair-known-regression.mjs": "9a98148ba2c5ab19fee8fbd5ec705732b33c04d9",
+  "nextjs/scripts/repair-known-regression.test.mjs": "0bf7d9a731c8111e1d0523ffee86050c0632dd33",
+  "nextjs/scripts/repair-scope-gate.mjs": "305f9f854f6e85c64a6410b712f73c396a13aae1",
+  "nextjs/scripts/verify-repair-workflows.mjs": "55a7f6ea85057a6cdb08ef9ac23e9ece552e1d01",
+  "supabase/drafts/native-purpose-authority-schema.sql": "8438442ca2870999faa5a24cf594aaec692d98d9",
+  "supabase/drafts/native-purpose-candidate-reader.sql": "6ab100f029290a4938535539a0cc0bb63e15ed63",
+  "supabase/drafts/native-source-ledger-snapshot.sql": "7a441d9c7212813c6c2cd1c29989cb12e1f6f8bd",
+  "supabase/drafts/tests/native-purpose-authority-schema.sql": "ab99e3e2f836afde4ac0a650c8559e230aba76ce",
+  "supabase/drafts/tests/native-purpose-candidate-reader-correction.sql": "01bed05d9bf3d06d8379448d83ab75231eae72d6",
+  "supabase/drafts/tests/native-purpose-candidate-reader.sql": "a743df5753b481267cf2b997805b6c3f8368aeba",
+  "supabase/drafts/tests/native-source-ledger-snapshot.sql": "a8dfe99a11e0a45f733f477b7a08eebadaa0fd7f"
+});
+export const PUBLIC_PAGES_DB_BLOBS = Object.freeze({
+  "supabase/drafts/compile-job-viewer-authority.sql": "f9221eda0a1eb1d1df578b6ec3aeed9ba187319c",
+  "supabase/drafts/google-drive-acl-refresh/README.md": "c5fe1c4c5efa74ff4b001c111f4c6f11d2257412",
+  "supabase/drafts/google-drive-acl-refresh/queue.sql": "61b9f81e6c0254d344f2761ed0a9551a6cebfea7",
+  "supabase/drafts/google-drive-acl-refresh/tests/google_drive_acl_refresh_queue.sql": "d2c721a0499c18a9b494e4abcd9ed06c2857d615",
+  "supabase/drafts/google-viewer-principal-boundary.sql": "3a38a855d1c37bd23784fe5a98f4edfda4dd0f95",
+  "supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql": "5894d007544fc4584e4aca4896a7cc10fb8083ab",
+  "supabase/drafts/migrations/20261005130000_foundation_completed_read_proof.sql": "563154f077e8a8f7e8a4fc03eea8bb9b3245ce2f",
+  "supabase/drafts/native-purpose-authority-schema.sql": "8438442ca2870999faa5a24cf594aaec692d98d9",
+  "supabase/drafts/native-purpose-candidate-reader.sql": "6ab100f029290a4938535539a0cc0bb63e15ed63",
+  "supabase/drafts/native-source-ledger-snapshot.sql": "7a441d9c7212813c6c2cd1c29989cb12e1f6f8bd",
+  "supabase/drafts/tests/foundation_completed_read_proof.sql": "9c143f743b4d960c6f5349ea6513b7375ecde058",
+  "supabase/drafts/tests/foundation_intake_triage_binding.sql": "dd65bbee72aafa7f0439827bfdc1df83aa842a53",
+  "supabase/drafts/tests/native-purpose-authority-schema.sql": "ab99e3e2f836afde4ac0a650c8559e230aba76ce",
+  "supabase/drafts/tests/native-purpose-candidate-reader-correction.sql": "01bed05d9bf3d06d8379448d83ab75231eae72d6",
+  "supabase/drafts/tests/native-purpose-candidate-reader.sql": "a743df5753b481267cf2b997805b6c3f8368aeba",
+  "supabase/drafts/tests/native-source-ledger-snapshot.sql": "a8dfe99a11e0a45f733f477b7a08eebadaa0fd7f",
+  "supabase/migrations/0001_tavonel_tenant_foundation.sql": "7f7bfa0e1d220caf91a1fbed2c037462d3e6849f",
+  "supabase/migrations/0002_credit_ledger_and_gpu_reservations.sql": "1bd3fc20c5bc548b4e3792b0d3bdc7fcd61bbf2c",
+  "supabase/migrations/0003_harden_rls_function_exposure.sql": "6cb94bfc4e353c2eacab6c0ceceea7e18794d821",
+  "supabase/migrations/0004_harden_credit_ledger_rls.sql": "0cd513b564b1068f790e02c8b692786ff82652af",
+  "supabase/migrations/0005_foundation_billing_projection.sql": "9369365c032cc4642386cf2689611c01cf698d78",
+  "supabase/migrations/0006_foundation_subscription_schedule.sql": "4f26e6098e3b5fbec444e94a12165f32b28bd799",
+  "supabase/migrations/0007_foundation_world_lifecycle.sql": "c7fd6d4ceeabdff81c287494183a97914e385e60",
+  "supabase/migrations/0008_foundation_intake_admission.sql": "7b557840023a4c6e8438a3b656e0e3d7dc2b080f",
+  "supabase/migrations/0009_foundation_billing_compute_reservations.sql": "a1eb4082c28a838691220eb2c3f6d424ece9eb94",
+  "supabase/migrations/0010_foundation_subscription_upgrade.sql": "186df306b344bd252258073eed632e58052d2c6b",
+  "supabase/migrations/0011_foundation_subscription_upgrade_replay.sql": "55fc1839db71d326529c80ea168a74da0941f745",
+  "supabase/migrations/0012_foundation_connections_and_api_keys.sql": "d94ea781ac6064c29f6b5feadb2bf7e04a312d22",
+  "supabase/migrations/0013_connector_oauth.sql": "96abcb6596fc8af58c0e96c31935ad168b8be69f",
+  "supabase/migrations/0014_enterprise_control_plane.sql": "2d46bc1b9231af96c5443d3d46e673bb413ed210",
+  "supabase/migrations/0015_enterprise_pilot_bootstrap.sql": "aaf17ff12080fdb150ac248bf3ba86da7e7ff5cb",
+  "supabase/migrations/0016_oauth_secret_vault.sql": "ddc407f063f6dd81966e0ff2ea23d6151973b9f4",
+  "supabase/migrations/0017_fix_oauth_redirect_constraint.sql": "a20b6031b50e4c2127eba294945785340b9f416c",
+  "supabase/migrations/0018_oauth_callback_state_binding.sql": "a76ee25388e36a50cd91b61670d8ca239f6c2614",
+  "supabase/migrations/0019_oauth_sync_audit_action.sql": "afbd49085da4ef99f16daf9808fec3d52ac10324",
+  "supabase/migrations/0020_retrieval_foundation.sql": "4a34134216568ff3b96348d714fef258289463d1",
+  "supabase/migrations/0021_retrieval_compile_run_active_world_guard.sql": "ca5f25736080142507f2ecacb3bc4f4c37c091ce",
+  "supabase/migrations/0022_retrieval_lexical_search.sql": "5e76ab8d8431732cb8c139a2b6b06d8101991d00",
+  "supabase/migrations/0023_retrieval_search_rpc.sql": "0c9763773d88ece8c73e7cf9affb7f51103e63c0",
+  "supabase/migrations/0024_foundation_jobs.sql": "29f00fc64e6cb3d7f9d88845843ce7a0936b4241",
+  "supabase/migrations/0025_foundation_job_rpc.sql": "8fb06136bc32e3e91ba3863dae727a236e14928c",
+  "supabase/migrations/0026_foundation_intake_replay.sql": "8cfb88f611cb8e3053308e2105a43c743fc8ee01",
+  "supabase/migrations/0027_foundation_job_progress_requeue.sql": "7b85e13d847eddb4f5019412962c152a2f7adca5",
+  "supabase/migrations/0028_foundation_job_attempt_reset.sql": "7fb21ac919c6ff1ffcc6f80543d603fef93b2034",
+  "supabase/migrations/0029_foundation_job_quota_deferral.sql": "7c2e51cd392742b780ef30bf124a0fce5a895a7d",
+  "supabase/migrations/0030_foundation_intake_pilot_quota.sql": "e577f71c265297da897fe06390a24501af336d56",
+  "supabase/migrations/0031_foundation_intake_qualification_quota.sql": "3be4f6d8224b87246bf5f66d8706a6329793d160",
+  "supabase/migrations/0032_foundation_intake_confirmation.sql": "81c172ad706db684ca534a03fe32379443016331",
+  "supabase/migrations/0033_page_based_compute_units.sql": "35416d369a8f1392b15a881215056debd33b248b",
+  "supabase/migrations/0034_foundation_job_event_ledger.sql": "7890056891f1f4900a577a7cddb26583e752263d",
+  "supabase/migrations/0035_subscription_allowance_ledger.sql": "c46b1bccaf28564a961f0620fc409851951ede4a",
+  "supabase/migrations/0036_maximum_reservation_and_overage.sql": "275eb03e049365f048934b2a0758a02952057f8e",
+  "supabase/migrations/0037_foundation_review_decisions.sql": "2e6f7f00715599a3df3c98fec36b55996173b8fb",
+  "supabase/migrations/0038_foundation_compile_jobs.sql": "11cccd74bc3b61f91996f34d3b68613f02575151",
+  "supabase/migrations/0039_foundation_review_patches.sql": "2dfb8b1dda2db3899e8592f97fe130dd5609d7ba",
+  "supabase/migrations/0040_foundation_corpus_compile.sql": "c103bb2814aaabffeffd01ef31777a2d3747a356",
+  "supabase/migrations/0041_corpus_slot_idempotency.sql": "00da0534622be8c3d86f1b4bd2ab9ac690e8c69b",
+  "supabase/migrations/0042_corpus_slot_race_revalidation.sql": "1a2d8f3b50a5eade30936e26fd3e041224ba2cdb",
+  "supabase/migrations/0043_foundation_security_hardening.sql": "3b46e4d8c95e7e53b22e8001cfd834e36af5214d",
+  "supabase/migrations/0044_foundation_trigger_hardening.sql": "901b718bc1d35f301ca0db8b68056cd014c29268",
+  "supabase/migrations/0045_self_service_trial_and_owner_access.sql": "ca875cbdc30e2a9018dd6e9cb5efaf6a20c14152",
+  "supabase/migrations/0046_trial_reservation_lifetime_guard.sql": "41f13b0beb1a446cda6128709118083af299938d",
+  "supabase/migrations/0047_trial_source_digest_guard.sql": "5aa0b10525e270e83b0ea261fd582d67f82880d0",
+  "supabase/migrations/0048_intake_size_and_experience_contract.sql": "06ef9e740875505ee872bbe17d715c802f5a0ab2",
+  "supabase/migrations/0049_universal_source_domain.sql": "f8d0d53c6f09297c8f98b3082e09cd82b148881f",
+  "supabase/migrations/0050_customer_data_gate_acl.sql": "79bc6fea147d3302c8cb3646caae622ff8b79fc9",
+  "supabase/migrations/0051_intake_ceiling_and_gate_evidence.sql": "eb8f83d1da476f5f413e34e2b3c442d1155f1a6c",
+  "supabase/migrations/0052_dense_search_operator_path.sql": "f2959d42d30e4f18e165eee3f11a31375131faf5",
+  "supabase/migrations/0053_service_role_grants_enforced.sql": "72a2e549e51495c44a73694c16e98826e723ced1",
+  "supabase/migrations/0054_audit_rpc_server_only.sql": "412de58c3c75b077cb1e18d2155e6d5fba0c9288",
+  "supabase/migrations/0055_workspace_operation_guards.sql": "3b38cac686cbaaac60432780e70b2282249a3b4b",
+  "supabase/migrations/20260909193323_connector_document_bindings.sql": "41ca81e6da1df65cc7c7e3bc008b272eafc0eaba",
+  "supabase/migrations/20260909194025_connector_source_suspensions.sql": "3232db9ef0266734f51bd46e8f3b4b23238eb670",
+  "supabase/migrations/20260909202224_connector_sync_page_snapshots.sql": "eaa68cac596699b1a7771e9bd908359b5854d2f9",
+  "supabase/migrations/20260909210203_connector_sync_checkpoints.sql": "9b520256a05c2904ec26177646a30ca7a3e3b76b",
+  "supabase/migrations/20260909215500_cdr_identity_requests.sql": "ede2ac7042a2749a4ae95dad75501a47f7658bd9",
+  "supabase/migrations/20260911120000_compute_settlement_expired_terminal.sql": "af3086fe650c09e5729c393e753e923ddbba4f62",
+  "supabase/migrations/20260911120100_oauth_reauthorization_audit_action.sql": "8cf9921b2e158fd9de73c2f21a6a6e1c72d06e8c",
+  "supabase/migrations/20260911120200_compile_job_candidate_manifest_digest.sql": "ef2f0c888ced418706a5d1190ca47ba024ce609e",
+  "supabase/migrations/20260911130000_included_page_expiry_at_renewal.sql": "4fa773c358b3306138b847c6c004addd69016537",
+  "supabase/migrations/20260920100000_source_tombstone_access_overlay.sql": "8dfb2a992c7bfefbc3abae689e48269e4a36febb",
+  "supabase/migrations/20260920110000_workspace_membership_control_plane.sql": "5e21543feb157139c8eee5462a4b1d4caf13b476",
+  "supabase/migrations/20260920110100_workspace_owner_invariant.sql": "7a2d6a94b0844d47eacbab2ac5a59639713a21d5",
+  "supabase/migrations/20260920110200_workspace_membership_concurrency_hardening.sql": "8d76d97e7883d7a822c25204110ea49748fce273",
+  "supabase/migrations/20260920120000_atomic_world_activation.sql": "b39ee5b5a96f3feb87bfb0fa846f843a9e4ed54f",
+  "supabase/migrations/20260920121000_workspace_authority_epoch.sql": "f527362cd9db6430e68c5c115a7f7358452aba7f",
+  "supabase/migrations/20260920130000_operational_sli_alert_evaluations.sql": "a55632c4203e1c8e9aa618bbaacd31bf5ce6cc5c",
+  "supabase/migrations/20260920131000_model_provider_spend_control.sql": "623444bdb4d5e876d618848a39636048131ae0d6",
+  "supabase/migrations/20260920131100_model_provider_spend_reconciliation.sql": "30063258e7014aa00e1e4d38731229ad406cd10e",
+  "supabase/migrations/20260920131200_model_provider_circuit.sql": "fba42c71e26816fcf21a7336656f74df1fa3fce1",
+  "supabase/migrations/20260920131300_model_attempt_receipts.sql": "91ff08df91149fc9cfd52058e8c9528b22eb30e7",
+  "supabase/migrations/20260920132000_legal_hold_deletion_sweeper.sql": "d3aecc4401f6c75f70827e6a9bcaa506b588266c",
+  "supabase/migrations/20260920132001_model_attempt_lineage.sql": "b4957af2f00ab6c7fda75096c63efc81eed9609d",
+  "supabase/migrations/20260920132100_adaptive_router_control_plane.sql": "d845a3dd8fcb21bf8895129a64c7c77bea30d936",
+  "supabase/migrations/20260920133000_founder_test_reset.sql": "9fdf05006f8588e491d22aafb5c1587295e7caa9",
+  "supabase/migrations/20260921100000_checkout_binding_consumption.sql": "1f1f3cd17318cc087284474e4ff7b2415951c8ec",
+  "supabase/migrations/20260921110000_source_deletion_inventory_attestation.sql": "1dafc7cd1fc58d371f78b7138dfbea39a22df430",
+  "supabase/migrations/20260921120000_source_deletion_inventory_document_id_type_fix.sql": "4de97c4436856a81aa64e02724e163ce7427d76c",
+  "supabase/migrations/20260923034853_founder_test_reset_prepared_default.sql": "d05934acd20cb7703b51eebd50d5a124f8f7d6d9",
+  "supabase/migrations/20260927101000_source_acl_admission.sql": "ce4a20f3ada199c753a2cc62b02d1aae28f9337d",
+  "supabase/migrations/20260927102000_customer_source_deletion.sql": "c76ba374eed70c1ada988698ebc8f75389c5fdbe",
+  "supabase/migrations/20260927103000_source_deletion_purge_failures.sql": "00d7ba627737ef981a9dcd05f27dc8014402ce3f",
+  "supabase/migrations/20260927104000_source_deletion_derived_closure.sql": "df672adf17eb32fa1d5871b21867660f008336ec",
+  "supabase/migrations/20260927105000_founder_test_reset_deletion_failures_and_operator_holds.sql": "0a70c2d2dd32004006e4c24b93d132af3cd8e71c",
+  "supabase/migrations/20260927120000_checkout_intent_reconciliation.sql": "6f33e1abcee9bac018b26ddf8bc6de8ffb9f328d",
+  "supabase/migrations/20260927130000_billing_rejection_review.sql": "9ec96960e599b4b147056f3035898d63496e1776",
+  "supabase/migrations/20260929075048_scoped_customer_data_gate_receipts.sql": "bb6336a1bde1c81a0106312f5496200721ec812c",
+  "supabase/migrations/20260929105143_fix_auth_owner_trigger_context.sql": "6fc7ebabccd0f7e3da5e78d368d0a41d58430617",
+  "supabase/migrations/20260929152100_customer_source_processing_scope.sql": "341dfe49b6001d9d4d452efa2e84f4a0018b2e4e",
+  "supabase/migrations/20260930010000_source_world_deletion_inventory.sql": "c09a0f0aed77b59cd74e6fe4d6abe9f2b0aff270",
+  "supabase/migrations/20260930011000_source_deletion_purge_backoff.sql": "e31e7c4edfd5735b17cc223a1d391d9b72edc567",
+  "supabase/migrations/20260930012000_compile_digest_immutability.sql": "d5376cfc58c94dde506fad11174302b5c02e75c2",
+  "supabase/migrations/20260930013000_compile_artifact_provenance.sql": "06b91bcc6b9572ae2bacf5ad5ce30490832428de",
+  "supabase/migrations/20260930020000_processing_terms_acceptance.sql": "bbc8706e1c97920cc6cf27b51df33bdb0620121a",
+  "supabase/migrations/20260930030000_processing_workspace_grant.sql": "80ff2a4bad5be6494bb2dcb2c6b6ba30b443077e",
+  "supabase/migrations/20260930040000_billing_gate_enforcement.sql": "9c7c7755131fd4a8b30a18e94374431405bfa0f7",
+  "supabase/migrations/20260930070000_processing_qualification_stage.sql": "25edfec8ec6865c31fe563e02703ac8d5df48148",
+  "supabase/migrations/20260930080000_connector_processing_qualification.sql": "5026b8a6efccbd07e6b6b04fc7cc6a08f90b1924",
+  "supabase/migrations/20260930100000_global_collection_compile.sql": "b1110ae5a5c2288eab40c8af45c7ac10c0b2872c",
+  "supabase/migrations/20261001090000_connector_binding_latest_cas.sql": "24e770e3c1b264e3a3e225e575541cd742b6082e",
+  "supabase/migrations/20261001120000_connector_binding_tie_recovery.sql": "b938d5c01beecab7c17b3342e82b53915904492e",
+  "supabase/migrations/20261001150000_connector_binding_write_boundary.sql": "9f37ed89ea4cac49500f59dce7d691d1a83f09b7",
+  "supabase/migrations/20261001170000_connector_replay_and_world_source_currency.sql": "f008d56f8fdadc9a618aef7d63a0f8b1c9f49289",
+  "supabase/migrations/20261002100000_connection_source_inventory_reconcile.sql": "8e9f5ac01ec35fb90c2a59c18bac7cd56d575dec",
+  "supabase/migrations/20261002110000_model_provider_queue_expiry_recovery.sql": "417a3bfbed400e2c969a8ad2ff61bd51c8ac79e8",
+  "supabase/migrations/20261002120000_founder_test_reset_connection_inventory.sql": "9ea804ca4f7fbdc7e942f94c5acc23445d4ae8b2",
+  "supabase/migrations/20261002130000_model_provider_dispatch_start_mark.sql": "a0be6571cb1c11940810b94931fce0296975eba6",
+  "supabase/migrations/20261002140000_connector_binding_guard_reset_allowance.sql": "bf03882c0ab5a8a72024c88268877837b61106ba",
+  "supabase/migrations/20261003120000_intake_approval_budget_invariants.sql": "009e40e1705527048f38399bc0d21bcfdcb184cf",
+  "supabase/migrations/20261003130000_intake_approval_file_cap.sql": "f9d2a5b87b1f16760a160a4129302924f8f92ba3",
+  "supabase/migrations/20261004100000_approved_intake_connection_batch_binding.sql": "bed67dac6783188a22ec421aa02ae54051f68e3e",
+  "supabase/rehearsal/foundation_intake_approval_concurrency.sql": "4d5bb58c5f789327920d4c88ebac4de8cda92c74",
+  "supabase/tests/auth_signup_workspace_bootstrap.sql": "b443b79e9f4eb047fc2baf20291a524c026e1df4",
+  "supabase/tests/billing_gate_enforcement.sql": "8c02d7aeac747fb30e7cda3fa9f5770d87fd294a",
+  "supabase/tests/billing_reconciliation.sql": "7a471e981c7185518ee522ad755e70e1a3544b54",
+  "supabase/tests/cdr_identity_requests.sql": "e16b86874a472ba290e534b14f918896cb52efc3",
+  "supabase/tests/checkout_binding_consumption.sql": "f6b006d82ce152233923e998ff7d8b5a5cd13724",
+  "supabase/tests/checkout_intent_reconciliation.sql": "5572d81eb0b56932bbccb52a72155d0534bd6530",
+  "supabase/tests/compile_artifact_provenance.sql": "807f8d6702d2fb223edb63d6fc9266cc17e82eb1",
+  "supabase/tests/compile_digest_immutability.sql": "75cff883299cfa2fc24374f08d825ca4d3d20548",
+  "supabase/tests/compile_job_viewer_authority.sql": "b2c9e95a51273b14cf809b83d6f96f964eddb2be",
+  "supabase/tests/connection_source_inventory_reconcile.sql": "f885f550bfe2d56ecbb532b1eb24b8f9359c159c",
+  "supabase/tests/connector_checkpoints.sql": "4bdbcbdf882590dcbec5a9c1ac48c01fccfa52d1",
+  "supabase/tests/connector_document_bindings.sql": "bb5172ae5fd64ae79543552824d5eb167dc5d6b8",
+  "supabase/tests/connector_processing_qualification.sql": "8350acaa4d983c2f6578dc8d48c44518721e296c",
+  "supabase/tests/connector_source_suspensions.sql": "512939489d4425e62ade3642cccffafe8da843ee",
+  "supabase/tests/connector_sync_page_snapshots.sql": "f50ddd14f8b71062b5a79e40c82a3b5562fdce11",
+  "supabase/tests/customer_source_deletion.sql": "bcf11318e30bb835a4a9c4b7e08d417c60606887",
+  "supabase/tests/customer_source_scope_grants.sql": "8dc2f4b56e30066d0f6563d58ae504379674c251",
+  "supabase/tests/foundation_approved_connection_batch_binding.sql": "45f8ef13c9769798e1d4c54e3e80c88094264ee3",
+  "supabase/tests/foundation_billing_projection.sql": "e2c10083397fd967f77cd2536770cf3ed4275bc6",
+  "supabase/tests/foundation_compile_candidate_digest.sql": "d60f5ccde081cf0652b8f2e16ee94214b265d43f",
+  "supabase/tests/foundation_corpus_slot_idempotency.sql": "287a50de12eb5de873e191ea904a607f233f5e12",
+  "supabase/tests/foundation_developer_audit_actions.sql": "d807a24578f97fd77e41875a0534c56b8f0137c6",
+  "supabase/tests/foundation_included_page_expiry.sql": "242f95d9a4a50147c4a5046ee35f2016bf878c47",
+  "supabase/tests/foundation_intake_admission.sql": "b819235157ac4e4fc235b6cb697ef558e6f10108",
+  "supabase/tests/foundation_intake_approval.sql": "41b64b72db8d05aa55b065e9997ad2993b125cdc",
+  "supabase/tests/foundation_intake_ceiling.sql": "c3dbb36ca83a68b5204c06cd868fd84c567fe7be",
+  "supabase/tests/foundation_jobs.sql": "71e11f92c7070f17b1358675aefa31854cb27d66",
+  "supabase/tests/foundation_retrieval_compile_run_active_world_guard.sql": "1444962241f3349de3ed1a314ffaa6761c3c215f",
+  "supabase/tests/foundation_retrieval_foundation.sql": "4856ae086100a6d92d7b3d4c550a8d0cfd1e3859",
+  "supabase/tests/foundation_retrieval_lexical_search.sql": "5c7860f6734713feb6e45972719c79dc0d334e04",
+  "supabase/tests/foundation_retrieval_search_rpc.sql": "8abbfeacf96529c517d996b4203d8800fbf34846",
+  "supabase/tests/foundation_world_lifecycle.sql": "c5fa6e7d1789bc1b467f1bca0dab2101da99f9ee",
+  "supabase/tests/founder_test_reset.sql": "875353fb91b9690e621979a11650c59d183539b8",
+  "supabase/tests/founder_test_reset_connection_inventory.sql": "a25fc46772df1c7ea139dc701d97a8bca7b9a178",
+  "supabase/tests/founder_test_reset_connector_bindings.sql": "509658454975ddb975fe7339cfc13534807b847d",
+  "supabase/tests/founder_test_reset_deletion_failures.sql": "fd481c322045b51c9a2f99717f8fcc653b1c39b2",
+  "supabase/tests/global_collection_compile.sql": "a973ade7ad199f59355853a5af60d4c312d4cbec",
+  "supabase/tests/google_viewer_principal_boundary.sql": "144d3262ee2f2208fe96281283bcb8f0dc0aab9d",
+  "supabase/tests/model_provider_dispatch_start_mark.sql": "b83dbb22cca8ca1f8a5b08d145096b065fbc02eb",
+  "supabase/tests/model_provider_spend_recovery.sql": "99015cb28866b6f030091f04e75d74dd0dfa8181",
+  "supabase/tests/processing_qualification_stage.sql": "1fa92e79320277bb3cccde0cdd9e618bb7898be7",
+  "supabase/tests/processing_terms_acceptance.sql": "d00b243bf8963a531e0e5ab3749a91a46a897394",
+  "supabase/tests/processing_workspace_grant.sql": "8789b73478ed608dc2ed8fb7690891c3ac793478",
+  "supabase/tests/scoped_customer_data_gate.sql": "4adad54c9a27683923e957cc27cd7c105076ef85",
+  "supabase/tests/service_role_grant_matrix.sql": "eb2dcf2bdfc25640df02fed6460eb470026f387a",
+  "supabase/tests/source_acl_admission.sql": "403fed96b00dcef7304219384694deb4e05bbfd8",
+  "supabase/tests/source_deletion_derived_closure.sql": "9442b1274b64f59dc64a41d05c9cd389e872de2b",
+  "supabase/tests/source_deletion_inventory_attestation.sql": "247c23c2d8bc16551dea941ad45192426d1216ea",
+  "supabase/tests/source_deletion_purge_backoff.sql": "ebdc587531e9f7f22a6faf20a20292f27a950ba5",
+  "supabase/tests/source_deletion_purge_failures.sql": "1d3575ea95b0b06b53038cb568e8e17c16a18c4d",
+  "supabase/tests/source_world_deletion_inventory.sql": "25bf82608a53483597fc2cbdc171121d7469d039",
+  "supabase/tests/tenant_rls.sql": "c30dd2f6eccd66d7a4d6d63f2c9675140fd48ada",
+  "supabase/tests/tenant_rls_deliberate_red.sql": "0cc585dc40d7ae0cd181b02a96a7c487589f07a5",
+  "supabase/tests/tenant_rls_matrix.sql": "13c97a1d5e18b58ce0f7cdafd4e86ee73347160c"
+});
+export const PUBLIC_PAGES_UNIT_FILES = Object.freeze([
+  "lib/compiler-contract.test.ts",
+  "lib/continuous-knowledge-page.test.ts",
+  "lib/explore-change.test.ts",
+  "lib/public-package-proof.test.ts"
+]);
+export const PUBLIC_PAGES_REPAIR_ARTIFACT = Object.freeze({
+  "id": 11382378932,
+  "name": "repair-scope-141-28d675b2ed3f8bf93ba439caca61940d477423e5",
+  "digest": "sha256:f7ed7951a5667d48aa32bb56264d175ae89c301df6e8a382cd5bfd623746611b",
+  "bytes": 8435
+});
+export const PUBLIC_PAGES_DB_ARTIFACT = Object.freeze({
+  "id": 11382619023,
+  "name": "native-sql-rehearsal-28d675b2ed3f8bf93ba439caca61940d477423e5",
+  "digest": "sha256:fe86fdf3c1b4f0bd7c140bfbf558ab1b58c22dc859d80c7a9b17f3918ef2f043",
+  "bytes": 1152
+});
+export function classifyPublicPagesIntent({headSha,exec=execFileSync}) {
+  let parent;
+  try {
+    if(!/^[a-f0-9]{40}$/.test(headSha??''))throw Error('Requested page head is missing.');
+    const repoRoot=exec('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),git=args=>exec('git',['-C',repoRoot,...args],{encoding:'utf8'}).trim();
+    if(git(['rev-parse','HEAD'])!==headSha)throw Error('Page checkout does not match requested head.');
+    const line=git(['rev-list','--parents','-n','1',headSha]).split(' ');parent=line[1];
+    const paths=git(['diff','--name-only','--no-renames','-z',parent,headSha]).split('\0').filter(Boolean).sort();
+    const intended=paths.some(p=>Object.hasOwn(PUBLIC_PAGES_SOURCE_BLOBS,p))||(parent===PUBLIC_PAGES_PARENT&&paths.some(p=>PUBLIC_PAGES_CONFIG_PATHS.includes(p)));
+    if(intended&&line.length!==2)throw Error('Page candidate requires one exact parent.');
+    return intended?{classification:'intended',intended:true,headSha,parent,repoRoot,paths}:{classification:'normal',intended:false};
+  }catch(error){return parent===PUBLIC_PAGES_PARENT?{classification:'unavailable',intended:true,headSha,parent,reason:error.message}:{classification:'normal',intended:false,reason:'Existing classifier must resolve unreadable/outside page metadata.'};}
+}
+export function verifyPublicPagesSource({headSha,exec=execFileSync}) {
+  const intent=classifyPublicPagesIntent({headSha,exec});if(intent.classification!=='intended')return {eligible:false,reason:intent.reason??'Not the exact page source increment.'};
+  try {
+    const git=(args,encoding='utf8')=>{const b=exec('git',['-C',intent.repoRoot,...args],{encoding});return encoding==='buffer'?b:b.trim();};
+    if(intent.parent!==PUBLIC_PAGES_PARENT||git(['rev-list','--parents','-n','1',PUBLIC_PAGES_PARENT])!==`${PUBLIC_PAGES_PARENT} ${NATIVE_DB_PARENT}`)throw Error('Pages must be the exact direct child of qualified28d.');
+    const expected=[...Object.keys(PUBLIC_PAGES_SOURCE_BLOBS),...PUBLIC_PAGES_CONFIG_PATHS].sort();if(JSON.stringify(intent.paths)!==JSON.stringify(expected))throw Error('Incomplete or extra coordinated page source/configuration delta.');
+    git(['merge-base','--is-ancestor',FULL_ANCHOR,PUBLIC_PAGES_PARENT]);git(['merge-base','--is-ancestor',PUBLIC_PAGES_PARENT,headSha]);verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});
+    const tree=(ref,p,optional=false)=>{const e=git(['ls-tree','--full-tree',ref,'--',p]);if(optional&&!e)return null;if(!/^100644 blob [a-f0-9]{40}\t/.test(e)||e.split('\t')[1]!==p)throw Error('Page source is not an exact regular tracked file: '+p);return e.split(' ')[2].split('\t')[0];};
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_SOURCE_BLOBS)){const b=git(['show',`${headSha}:${p}`],'buffer');if(tree(PUBLIC_PAGES_PARENT,p,true)!==pin.before||tree(headSha,p)!==pin.after||b.length!==pin.bytes||createHash('sha256').update(b).digest('hex')!==pin.sha256)throw Error('Frozen page source identity changed: '+p);}
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_PARENT_CONFIG_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin)throw Error('Page infrastructure preimage changed: '+p);
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin)throw Error('Qualified native parent checkpoint changed: '+p);
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_DB_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin||tree(headSha,p)!==pin)throw Error('Qualified database dependency changed: '+p);
+    for(const [p,pin]of Object.entries(NATIVE_DB_TRANSPORT_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin||tree(headSha,p)!==pin)throw Error('Historical transport dependency changed: '+p);
+    for(const [p,digest]of Object.entries(CONFIG_SEAL))if(sealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==digest)throw Error('Page collector seal changed: '+p);
+    for(const [p,digest]of Object.entries(repair.REPAIR_SEAL))if(repair.repairSealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==digest)throw Error('Page repair seal changed: '+p);
+    return {eligible:true,headSha,parent:PUBLIC_PAGES_PARENT,fullAnchor:FULL_ANCHOR,exactChangedPaths:expected,sourceBlobs:Object.fromEntries(Object.entries(PUBLIC_PAGES_SOURCE_BLOBS).map(([p,pin])=>[p,pin.after])),databaseDependencyBlobs:PUBLIC_PAGES_DB_BLOBS,transportDependencyBlobs:NATIVE_DB_TRANSPORT_BLOBS};
+  }catch(error){return {eligible:false,reason:error.message};}
+}
+export function verifyPublicPagesEvidence({repairRun,repairJob,repairArtifact,repairArchive,dbRun,dbJob,dbArtifact,dbArchive,priorUi}) {
+  try {
+    const prior=verifyNativeDbParentEvidence(priorUi);if(!prior.eligible)throw Error(prior.reason);
+    const run=(r,id,workflow)=>{if(r?.id!==id||r.head_sha!==PUBLIC_PAGES_PARENT||r.path!==workflow||r.event!=='pull_request'||r.run_attempt!==1||r.status!=='completed'||r.conclusion!=='success')throw Error('Unqualified exact28d run.');};run(repairRun,37396201379,'.github/workflows/repair-scope.yml');run(dbRun,37396201273,'.github/workflows/db-rehearsal.yml');
+    const job=(j,id,r,name)=>{if(j?.id!==id||j.run_id!==r.id||j.head_sha!==PUBLIC_PAGES_PARENT||j.name!==name||j.status!=='completed'||j.conclusion!=='success'||j.steps?.some(s=>!['success','skipped'].includes(s.conclusion)))throw Error('Unqualified exact28d job.');};job(repairJob,112052635651,repairRun,'Repair scope validation');job(dbJob,112052706651,dbRun,'db-rehearsal');
+    const step=(j,name,result='success')=>{const v=j.steps?.filter(s=>s.name===name)??[];if(v.length!==1||v[0].status!=='completed'||v[0].conclusion!==result)throw Error('Unqualified exact28d step: '+name);};
+    for(const n of ['Verify workflow and selector contracts','Run selector regression tests','Run browser report and screenshot regressions','Scan repository secrets','Run TypeScript and lint checks','Run Foundation focused unit checks','Fail closed on missing or failed scoped checks','Publish exact-head scope receipt'])step(repairJob,n);
+    for(const n of ['Run hermetic full Vitest for shared or unknown changes','Run selected browser checks against one production server','Run the normal CDR worker unit suite and types for reviewed OCR safety'])step(repairJob,n,'skipped');
+    for(const n of ['Revalidate exact native scope before disposable database setup','Stage the reviewed ACL draft as a runner-local migration','Stage the reviewed Google Drive ACL refresh after ACL boundary','Stage the reviewed async authority draft after ACL','Stage the reviewed intake triage draft after async authority','Stage the exact completed-read producer draft after intake triage','Stage exact native SQL drafts after completed-read','Run the pgTAP suite','Apply the repair migrations a second time and re-run the suite','Require both disposable pgTAP passes for exact native SQL','Race model-provider settlement against another tenant\'s reserve on the disposable database','Require both disposable pgTAP passes for the completed-read draft'])step(dbJob,n);
+    const archive=(a,pin,r,b,entry)=>{if(a?.id!==pin.id||a.name!==pin.name||a.digest!==pin.digest||a.size_in_bytes!==pin.bytes||a.expired!==false||a.workflow_run?.id!==r.id||a.workflow_run?.head_sha!==PUBLIC_PAGES_PARENT)throw Error('Exact28d artifact identity changed.');return repair.readBoundIntakeReceipt(b,pin,pin.bytes,entry);};
+    const receipt=archive(repairArtifact,PUBLIC_PAGES_REPAIR_ARTIFACT,repairRun,repairArchive,'repair-receipt.json'),nativeReceipt=archive(dbArtifact,PUBLIC_PAGES_DB_ARTIFACT,dbRun,dbArchive,'native-sql-rehearsal-receipt.json');
+    if(receipt.headSha!==PUBLIC_PAGES_PARENT||receipt.completedHeadSha!==PUBLIC_PAGES_PARENT||receipt.repairAnchorSha!==FULL_ANCHOR||receipt.gate!=='passed-scoped-only'||receipt.gateFailures?.length!==0||receipt.fullQualification!=='pending'||receipt.executedChecks?.units!=='success'||JSON.stringify(receipt.unitFiles)!==JSON.stringify(['lib/db-rehearsal-workflow.test.ts','lib/pgtap-fixtures.test.ts'])||!receipt.pendingDebt?.includes('database-contract')||JSON.stringify(receipt.knownRegressionResolution)!==JSON.stringify(prior.knownRegressionResolution))throw Error('Exact28d scoped repair receipt changed.');
+    if(nativeReceipt.schemaVersion!==1||nativeReceipt.nativeSqlOnly!==true||nativeReceipt.requestedHead!==PUBLIC_PAGES_PARENT||nativeReceipt.checkoutHead!==PUBLIC_PAGES_PARENT||nativeReceipt.runId!==String(dbRun.id)||nativeReceipt.runAttempt!=='1'||nativeReceipt.job!=='db-rehearsal'||nativeReceipt.stagingResult!=='success'||nativeReceipt.state!=='ephemeral'||nativeReceipt.firstPgTapResult!=='success'||nativeReceipt.secondPgTapResult!=='success'||nativeReceipt.gate!=='passed-native-sql-only'||nativeReceipt.failures?.length!==0||nativeReceipt.fullQualification!=='pending'||nativeReceipt.realConcurrency!=='UNRUN'||nativeReceipt.canonicalPinnedRowCrossSessionFk!=='UNRUN')throw Error('Native SQL receipt scope/debt changed.');
+    const sql=Object.entries(NATIVE_DB_SOURCE_BLOBS).filter(([p])=>p.endsWith('.sql'));if(nativeReceipt.records?.length!==7||new Set(nativeReceipt.records.map(r=>r.source)).size!==7)throw Error('Incomplete native SQL source records.');for(const [p,pin]of sql){const r=nativeReceipt.records.find(r=>r.source===p);if(!r||r.sha256!==pin.sha256||r.kind!==(p.includes('/tests/')?'test':'migration'))throw Error('Native SQL staged identity changed.');}
+    for(const key of ['publicClosedGateEvidence','privatePositiveFixtureEvidence']){const e=nativeReceipt[key],source=key==='publicClosedGateEvidence'?'supabase/drafts/tests/native-purpose-candidate-reader.sql':'supabase/drafts/tests/native-purpose-candidate-reader-correction.sql';if(!e||e.status!=='passed in both actual pgTAP steps'||e.sha256!==NATIVE_DB_SOURCE_BLOBS[source]?.sha256||e.test!==source.replace('/drafts/','/').replace(/native-([^/]+)\.sql$/,(_,n)=>'native_'+n.replaceAll('-','_')+'.sql'))throw Error('Native SQL public/private evidence missing.');}
+    if(nativeReceipt.privatePositiveFixtureEvidence.qualification!=='unreviewed/proposed/unbound synthetic candidate; no runtime authority')throw Error('Native positive fixture authority changed.');
+    return {eligible:true,parentUi:prior.parentUi,storageTransport:prior.storageTransport,knownRegressionResolution:prior.knownRegressionResolution,knownRegressionObservations:prior.knownRegressionObservations,historicalUiFailure:prior.historicalUiFailure,pendingFullDebt:prior.pendingFullDebt,nativeSql:{sourceHead:PUBLIC_PAGES_PARENT,runId:dbRun.id,jobId:dbJob.id,artifactId:dbArtifact.id,artifactDigest:dbArtifact.digest,status:'historical passed-native-sql-only at exact28d; not executed at page head',receipt:nativeReceipt}};
+  }catch(error){return {eligible:false,reason:error.message};}
+}
+export function verifyPublicPagesEligibility({headSha,exec=execFileSync,api=nativeDbApi}) {
+  const source=verifyPublicPagesSource({headSha,exec});if(!source.eligible)return source;
+  try {const evidence=verifyPublicPagesEvidence({repairRun:api('actions/runs/37396201379'),repairJob:api('actions/jobs/112052635651'),repairArtifact:api('actions/artifacts/11382378932'),repairArchive:api('actions/artifacts/11382378932/zip'),dbRun:api('actions/runs/37396201273'),dbJob:api('actions/jobs/112052706651'),dbArtifact:api('actions/artifacts/11382619023'),dbArchive:api('actions/artifacts/11382619023/zip'),priorUi:{run:api('actions/runs/37387689345'),job:api('actions/jobs/112025031853'),artifact:api('actions/artifacts/11379078787'),archive:api('actions/artifacts/11379078787/zip')}});return evidence.eligible?{eligible:true,source,evidence}:evidence;}catch(error){return {eligible:false,reason:error.message};}
+}
+export function publicPagesPlan(normal,proof) {
+  if(!proof?.eligible||normal.headSha!==proof.source.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Exact coordinated page proof is required.');
+  return {...normal,publicPagesPresentation:{source:proof.source,eligible:true},nativeDbRehearsal:undefined,collectorOnly:undefined,knownRegressionRepair:undefined,intakePresentation:undefined,groups:['selector-config','public-product-pages','database-contract'],unitFiles:[...PUBLIC_PAGES_UNIT_FILES],browserFiles:['e2e/public-package-proof.spec.ts','e2e/compiler-contract.spec.ts'].sort(),unknownPaths:[],catalogueFiles:[],runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:false,runDetailIntegrity:false,runWorkflowStaticGate:true,requireWorkspaceIntakeCapture:false,requirePublicUiScreenshots:false,requireHomePricingCaptures:false,requirePublicProductCaptures:true,runDatabaseRehearsal:false,databaseRehearsalStatus:'inherited exact28d passed-native-sql-only; no page-head DB execution',databaseBaselineEvidence:undefined,deferredGroups:['database-contract'],pendingQualificationDebt:['database-contract'],pendingDebt:['database-contract'],pendingFullDebt:[...proof.evidence.pendingFullDebt],fullQualification:'pending',inheritedChecks:{parentScopedUi:proof.evidence.parentUi,storageTransport:proof.evidence.storageTransport,nativeSql:proof.evidence.nativeSql},knownRegressionResolution:proof.evidence.knownRegressionResolution,knownRegressionObservations:proof.evidence.knownRegressionObservations,historicalUiFailure:proof.evidence.historicalUiFailure,qualificationReasons:['Four owning unit files, all configured browser cases and16 exact PNGs are fresh page checks; native concurrency/FK and full-release debt remain.']};
+}
+export function publicPagesLineageFailures(plan,proof) {
+  if(!proof?.eligible)return ['Coordinated page source/evidence proof unavailable: '+(proof?.reason??'missing')];
+  const expected=publicPagesPlan({...plan,qualificationReasons:[]},proof),keys=['publicPagesPresentation','nativeDbRehearsal','collectorOnly','knownRegressionRepair','intakePresentation','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','runDatabaseRehearsal','databaseRehearsalStatus','databaseBaselineEvidence','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','knownRegressionResolution','knownRegressionObservations','historicalUiFailure'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Coordinated page plan changed: '+k);
+}
+export function authenticateFailedPublicPagesResolution(receipt,{intent,api=nativeDbApi}) {
+  if(intent?.parent!==PUBLIC_PAGES_PARENT)return receipt;
+  try {
+    const evidence=verifyNativeDbParentEvidence({run:api('actions/runs/37387689345'),job:api('actions/jobs/112025031853'),artifact:api('actions/artifacts/11379078787'),archive:api('actions/artifacts/11379078787/zip')});if(!evidence.eligible)return receipt;
+    return {...receipt,knownRegressionResolution:{...evidence.knownRegressionResolution,status:'historical qualified895 resolution retained; current public product qualification failed'},knownRegressionObservations:evidence.knownRegressionObservations,historicalUiFailure:evidence.historicalUiFailure,pendingDebt:[...new Set((receipt.pendingDebt??[]).filter(d=>d!==REGRESSION_DEBT).concat(['database-contract','public-product-pages']))],inheritedChecks:{},gate:'failed',fullQualification:'pending'};
+  }catch{return receipt;}
+}
+function runPublicPagesMode(mode,headSha,intent) {
+  const proof=verifyPublicPagesEligibility({headSha});
+  if(!proof.eligible){const plan=failedCollectorPlan({headSha,reason:proof.reason,intent}),receipt=failedCollectorReceipt(plan);receipt.pendingDebt=[...new Set([...receipt.pendingDebt,'database-contract','public-product-pages'])];Object.assign(receipt,authenticateFailedPublicPagesResolution(receipt,{intent}));writeFileSync('collector-only-failure-receipt.json',JSON.stringify(receipt,null,2)+'\n');if(mode==='plan'){writeFileSync('repair-plan.json',JSON.stringify(plan,null,2)+'\n');writeFileSync('repair-receipt.json',JSON.stringify(receipt,null,2)+'\n');}console.error('Intended coordinated page candidate is unqualified; no installation or broad fallback is permitted: '+proof.reason);process.exit(1);}
+  if(mode==='eligibility'){if(process.env.GITHUB_OUTPUT)writeFileSync(process.env.GITHUB_OUTPUT,'intended=true\neligible=true\nnative_database=false\n',{flag:'a'});console.log(JSON.stringify({eligible:true,nativeSql:proof.evidence.nativeSql,fullQualification:'pending'}));}
+  else {const r=spawnSync(process.execPath,['scripts/repair-scope.mjs'],{env:{...process.env,GITHUB_OUTPUT:''},encoding:'utf8'});if(r.status!==0){process.stderr.write(r.stderr??'Normal selector failed.');process.exit(r.status??1);}emit(publicPagesPlan(JSON.parse(readFileSync('repair-plan.json','utf8')),proof));}
+}
+
 function emit(plan) {
   writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
-  const values = { native_database: Boolean(plan.nativeDbRehearsal), broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, home_pricing_capture: Boolean(plan.requireHomePricingCaptures), workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
+  const values = { public_pages: Boolean(plan.publicPagesPresentation), public_product_capture: Boolean(plan.requirePublicProductCaptures), native_database: Boolean(plan.nativeDbRehearsal), broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, home_pricing_capture: Boolean(plan.requireHomePricingCaptures), workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), head: plan.headSha, groups: plan.groups.join(', ') };
   if (process.env.GITHUB_OUTPUT) for (const [key, value] of Object.entries(values)) writeFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`, { flag: 'a' });
 }
 
@@ -514,6 +891,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const mode = process.argv[2];
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
+  const pageIntent=classifyPublicPagesIntent({headSha});
+  if(pageIntent.classification!=='normal'){runPublicPagesMode(mode,headSha,pageIntent);process.exit(0);}
   const nativeIntent = classifyNativeDbIntent({ headSha });
   if (nativeIntent.classification !== 'normal') { runNativeDbMode(mode, headSha, nativeIntent); process.exit(0); }
   if (process.env.REQUIRE_NATIVE_DB_SCOPE === '1') throw Error('Expected an exact intended native DB source.');

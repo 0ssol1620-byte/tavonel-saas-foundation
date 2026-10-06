@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -96,6 +97,29 @@ const normal = () => ({ headSha: head, repairAnchorSha: FULL_ANCHOR, pullRequest
   qualificationReasons: ['full release pending'], pendingFullDebt: ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
   pendingQualificationDebt: ['database-contract'], deferredGroups: ['database-contract'], fullQualification: 'pending', runFullHermeticVitest: true });
 function proofFixture() { return { eligible: true, source: verifyCollectorSource({ headSha: head, exec: gitFixture() }), evidence: verifyPriorEvidence(evidenceFixture()) }; }
+
+// Preserve the original published28d native profile and its exact infrastructure fixtures.
+const published28d='28d675b2ed3f8bf93ba439caca61940d477423e5',published28dBlobs={
+  ".github/workflows/repair-scope.yml": "c7e8b90bd7ef52ba66d15bdd6c2ba896d769efee",
+  "nextjs/scripts/repair-collector-only.mjs": "f13e370de7ca2692b53cbfa262cfd541de3fd633",
+  "nextjs/scripts/repair-scope.mjs": "07b181b59bab2f636dafe9f1227b18e8113c452d",
+  "nextjs/scripts/repair-scope.test.mjs": "26f5ada994eb32cc1a33c0e9c6893673a8110d26",
+  "nextjs/scripts/repair-scope-gate.mjs": "305f9f854f6e85c64a6410b712f73c396a13aae1",
+  "nextjs/scripts/verify-repair-workflows.mjs": "55a7f6ea85057a6cdb08ef9ac23e9ece552e1d01",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0e6198e86fd8d06ad27ff27617a67cc260b69750",
+  "nextjs/scripts/repair-known-regression.mjs": "9a98148ba2c5ab19fee8fbd5ec705732b33c04d9",
+  "nextjs/scripts/repair-known-regression.test.mjs": "0bf7d9a731c8111e1d0523ffee86050c0632dd33",
+  ".github/workflows/db-rehearsal.yml": "9c8a57e33b383387075d89bf7059a7b7ce148041",
+  "nextjs/scripts/run-repair-check.mjs": "57b1617fce020b9fce8ddc744b72962cd06e4e01",
+  "nextjs/scripts/repair-test-report.mjs": "4e3878f8b6311f06879415d6fa87ad25de0d7254",
+  "nextjs/vitest.repair-scope.config.ts": "67844b0446fb9e1e94d17ec235c1423faac535b6"
+},published28dCache=process.env.PUBLIC_PAGES_PARENT_FIXTURE_ARCHIVE?JSON.parse(gunzipSync(readFileSync(process.env.PUBLIC_PAGES_PARENT_FIXTURE_ARCHIVE))):{};
+function published28dBytes(p){if(!Object.hasOwn(published28dBlobs,p))return readFileSync(resolve(nativeRoot,p));const b=published28dCache[p]?Buffer.from(published28dCache[p],'base64'):execFileSync('git',['show',published28d+':'+p],{stdio:'pipe'});assert.equal(gitBlob(b),published28dBlobs[p],'Original28d fixture byte identity: '+p);return b;}
+const nativeModuleRoot=mkdtempSync(resolve(tmpdir(),'repair-native28d-module-'));after(()=>rmSync(nativeModuleRoot,{recursive:true,force:true}));
+writeFileSync(resolve(nativeModuleRoot,'repair-collector-only.mjs'),published28dBytes('nextjs/scripts/repair-collector-only.mjs'));
+let nativeKnownSource=published28dBytes('nextjs/scripts/repair-known-regression.mjs').toString();for(const name of ['run-repair-check.mjs','repair-test-report.mjs'])nativeKnownSource=nativeKnownSource.replace('./'+name,pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)),name)).href);writeFileSync(resolve(nativeModuleRoot,'repair-known-regression.mjs'),nativeKnownSource);
+const native=await import(pathToFileURL(resolve(nativeModuleRoot,'repair-collector-only.mjs')).href);
+const nativeRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 
 test('collector source proof seals all infrastructure and preserves the three immutable fix blobs', () => {
   assert.deepEqual(Object.keys(CONFIG_SEAL).sort(), [...CONFIG_PATHS].sort());
@@ -476,8 +500,6 @@ test('actual gate CLI rejects an eligibility-failure marker even when surroundin
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-import * as native from './repair-collector-only.mjs';
-const nativeRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 let nativeParentFixtureCache;
 function nativeParentFixture() {
   if(!nativeParentFixtureCache){const endpoint=p=>JSON.parse(execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/'+p],{encoding:'utf8',timeout:20000})),value=process.env.NATIVE_DB_PARENT_EVIDENCE?JSON.parse(readFileSync(process.env.NATIVE_DB_PARENT_EVIDENCE,'utf8')):{run:endpoint('actions/runs/37387689345'),job:endpoint('actions/jobs/112025031853'),artifact:endpoint('actions/artifacts/11379078787')},archive=process.env.NATIVE_DB_PARENT_ARCHIVE?readFileSync(process.env.NATIVE_DB_PARENT_ARCHIVE):execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/actions/artifacts/11379078787/zip'],{timeout:20000});nativeParentFixtureCache={run:value.run,job:value.job,artifact:value.artifact,archive};}
@@ -490,8 +512,8 @@ function nativeGitFixture(options={}) {
     if(args[0]==='rev-list')return args.at(-1)===native.NATIVE_DB_PARENT?`${native.NATIVE_DB_PARENT} ${options.grandparent??'203d14c615a99617e9073bfea3b2a281952f9b8f'}`:`${head} ${options.parent??native.NATIVE_DB_PARENT}`;
     if(args[0]==='merge-base'){if(options.ancestor===false)throw Error('Missing ancestry');return '';}
     if(args[0]==='diff'){if(args[1]==='--raw'){if(options.dirty)throw Error('Dirty native checkout');return '';}return (options.paths??[...new Set([...native.NATIVE_DB_CONFIG_PATHS,...Object.keys(native.NATIVE_DB_SOURCE_BLOBS)])]).join('\0')+'\0';}
-    if(args[0]==='ls-tree'){const ref=args[2],p=args.at(-1),pin=native.NATIVE_DB_SOURCE_BLOBS[p];let oid=ref===native.COLLECTOR_BASE?native.NATIVE_DB_TRANSPORT_BLOBS[p]:pin?pin[ref===native.NATIVE_DB_PARENT?'before':'after']:ref===native.NATIVE_DB_PARENT?native.NATIVE_DB_PARENT_BLOBS[p]:native.NATIVE_DB_CONFIG_PATHS.includes(p)?gitBlob(readFileSync(resolve(nativeRoot,p))):native.NATIVE_DB_PARENT_BLOBS[p];if(options.badBlob===p)oid='f'.repeat(40);return oid?`${options.unsafe===p?'120000':'100644'} blob ${oid}\t${p}`:'';}
-    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(nativeRoot,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
+    if(args[0]==='ls-tree'){const ref=args[2],p=args.at(-1),pin=native.NATIVE_DB_SOURCE_BLOBS[p];let oid=ref===native.COLLECTOR_BASE?native.NATIVE_DB_TRANSPORT_BLOBS[p]:pin?pin[ref===native.NATIVE_DB_PARENT?'before':'after']:ref===native.NATIVE_DB_PARENT?native.NATIVE_DB_PARENT_BLOBS[p]:native.NATIVE_DB_CONFIG_PATHS.includes(p)?gitBlob(published28dBytes(p)):native.NATIVE_DB_PARENT_BLOBS[p];if(options.badBlob===p)oid='f'.repeat(40);return oid?`${options.unsafe===p?'120000':'100644'} blob ${oid}\t${p}`:'';}
+    if(args[0]==='show'){const p=args[1].slice(41),b=published28dBytes(p);return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
     throw Error('Unexpected native metadata query '+args.join(' '));
   };
 }
@@ -528,4 +550,42 @@ test('native final gate rejects unqualified proof even with synthetic successful
 });
 test('required native pgTAP gate rejects requested/checkout mismatch and skipped passes before any acceptance claim',()=>{
   const workflow=readFileSync(resolve(nativeRoot,'.github/workflows/db-rehearsal.yml'),'utf8'),block=workflow.slice(workflow.indexOf('      - name: Require both disposable pgTAP passes for exact native SQL')),start=block.indexOf("node --input-type=module <<'NODE'\n")+"node --input-type=module <<'NODE'\n".length,script=block.slice(start,block.indexOf('\n          NODE',start)).replace(/^ {10}/gm,''),temp=mkdtempSync(resolve(tmpdir(),'native-db-exact-head-gate-'));try{const env={...process.env,NATIVE_SCOPE_REQUIRED:'true',NATIVE_REQUESTED_HEAD:head,NATIVE_CHECKOUT_HEAD:'f'.repeat(40),NATIVE_STAGE_RESULT:'success',NATIVE_STATE:'ephemeral',FIRST_PGTAP_RESULT:'success',SECOND_PGTAP_RESULT:'skipped'};const run=spawnSync(process.execPath,['--input-type=module'],{cwd:temp,env,input:script,encoding:'utf8'});assert.equal(run.status,1);const receipt=JSON.parse(readFileSync(resolve(temp,'native-sql-rehearsal-receipt.json'),'utf8'));assert.equal(receipt.gate,'failed');assert.match(JSON.stringify(receipt),/exact requested head/);assert.match(JSON.stringify(receipt),/second pgTAP outcome: skipped/);}finally{rmSync(temp,{recursive:true,force:true});}
+});
+
+import * as pages from './repair-collector-only.mjs';
+function pageGitFixture(options={}) {
+  const configs=pages.PUBLIC_PAGES_CONFIG_PATHS,source=pages.PUBLIC_PAGES_SOURCE_BLOBS;
+  return (_cmd,original)=>{const args=original[0]==='-C'?original.slice(2):original,p=args.at(-1);
+    if(args[0]==='rev-parse')return p==='--show-toplevel'?nativeRoot:options.checkout??head;
+    if(args[0]==='rev-list')return p===pages.PUBLIC_PAGES_PARENT?`${p} ${pages.NATIVE_DB_PARENT}`:`${head} ${options.parent??pages.PUBLIC_PAGES_PARENT}`;
+    if(args[0]==='merge-base'){if(options.ancestor===false)throw Error('Missing ancestry');return '';}
+    if(args[0]==='diff'){if(args[1]==='--raw'){if(options.dirty)throw Error('Dirty pages');return '';}return (options.paths??[...configs,...Object.keys(source)]).join('\0')+'\0';}
+    if(args[0]==='ls-tree'){const ref=args[2],pin=source[p];let oid=pin?pin[ref===pages.PUBLIC_PAGES_PARENT?'before':'after']:ref===pages.PUBLIC_PAGES_PARENT?pages.PUBLIC_PAGES_PARENT_CONFIG_BLOBS[p]??pages.PUBLIC_PAGES_DB_BLOBS[p]??pages.PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS[p]??pages.NATIVE_DB_TRANSPORT_BLOBS[p]:configs.includes(p)||pages.CONFIG_PATHS.includes(p)||pages.PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS[p]&&!pages.PUBLIC_PAGES_DB_BLOBS[p]?gitBlob(readFileSync(resolve(nativeRoot,p))):pages.PUBLIC_PAGES_DB_BLOBS[p]??pages.NATIVE_DB_TRANSPORT_BLOBS[p];if(options.badBlob===p)oid='f'.repeat(40);return oid?`${options.unsafe===p?'120000':'100644'} blob ${oid}\t${p}`:'';}
+    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(nativeRoot,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}throw Error('Unexpected page source query '+args.join(' '));
+  };
+}
+let pageEvidenceCache;
+function pageEvidenceFixture(){
+  if(!pageEvidenceCache){const endpoint=p=>JSON.parse(execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/'+p],{encoding:'utf8',timeout:20000})),archive=id=>execFileSync('gh',['api',`repos/0ssol1620-byte/tavonel-saas-foundation/actions/artifacts/${id}/zip`],{timeout:20000}),m=process.env.PUBLIC_PAGES_EVIDENCE?JSON.parse(readFileSync(process.env.PUBLIC_PAGES_EVIDENCE)):Object.fromEntries([['repairRun','actions/runs/37396201379'],['repairJob','actions/jobs/112052635651'],['repairArtifact','actions/artifacts/11382378932'],['dbRun','actions/runs/37396201273'],['dbJob','actions/jobs/112052706651'],['dbArtifact','actions/artifacts/11382619023']].map(([k,p])=>[k,endpoint(p)]));pageEvidenceCache={...m,repairArchive:process.env.PUBLIC_PAGES_REPAIR_ARCHIVE?readFileSync(process.env.PUBLIC_PAGES_REPAIR_ARCHIVE):archive(11382378932),dbArchive:process.env.PUBLIC_PAGES_DB_ARCHIVE?readFileSync(process.env.PUBLIC_PAGES_DB_ARCHIVE):archive(11382619023),priorUi:nativeParentFixture()};}const f=structuredClone(pageEvidenceCache);f.repairArchive=Buffer.from(f.repairArchive);f.dbArchive=Buffer.from(f.dbArchive);f.priorUi.archive=Buffer.from(f.priorUi.archive);return f;
+}
+function pageApiFixture(f=pageEvidenceFixture()){const values={'actions/runs/37396201379':f.repairRun,'actions/jobs/112052635651':f.repairJob,'actions/artifacts/11382378932':f.repairArtifact,'actions/artifacts/11382378932/zip':f.repairArchive,'actions/runs/37396201273':f.dbRun,'actions/jobs/112052706651':f.dbJob,'actions/artifacts/11382619023':f.dbArtifact,'actions/artifacts/11382619023/zip':f.dbArchive,...Object.fromEntries(['run','job','artifact','archive'].map((k,i)=>[['actions/runs/37387689345','actions/jobs/112025031853','actions/artifacts/11379078787','actions/artifacts/11379078787/zip'][i],f.priorUi[k]]))};return p=>{if(!Object.hasOwn(values,p))throw Error('Unexpected pages API '+p);return p.endsWith('/zip')?Buffer.from(values[p]):values[p];};}
+function pageProof(){return pages.verifyPublicPagesEligibility({headSha:head,exec:pageGitFixture(),api:pageApiFixture()});}
+test('public product admission binds all nine frozen sources and eight config owners before evidence reads',()=>{
+  const source=pages.verifyPublicPagesSource({headSha:head,exec:pageGitFixture()});assert.equal(source.eligible,true,source.reason);assert.equal(source.exactChangedPaths.length,17);
+  for(const options of [{checkout:'f'.repeat(40)},{parent:'f'.repeat(40)},{ancestor:false},{dirty:true},{paths:pages.PUBLIC_PAGES_CONFIG_PATHS},{paths:[...source.exactChangedPaths,'nextjs/lib/auth.ts']},{badBlob:'supabase/tests/global_collection_compile.sql'},{badBlob:'nextjs/lib/r2-presign.ts'},...Object.keys(pages.PUBLIC_PAGES_SOURCE_BLOBS).flatMap(p=>[{badBlob:p},{mutated:p},{unsafe:p}])]){let reads=0;const proof=pages.verifyPublicPagesEligibility({headSha:head,exec:pageGitFixture(options),api:()=>{reads++;throw Error('Must not read evidence');}});assert.equal(proof.eligible,false,JSON.stringify(options));assert.equal(reads,0);}
+});
+test('public product proof authenticates both exact28d artifact bytes and preserves native UNRUN debt',()=>{
+  const proof=pageProof();assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.evidence.nativeSql.receipt.realConcurrency,'UNRUN');assert.equal(proof.evidence.nativeSql.receipt.canonicalPinnedRowCrossSessionFk,'UNRUN');assert.equal(proof.evidence.parentUi.browserPassed,158);
+  for(const mutate of [f=>f.repairRun.head_sha=head,f=>f.dbRun.head_sha=head,f=>f.repairArtifact.expired=true,f=>f.dbArtifact.expired=true,f=>f.repairJob.steps.find(s=>s.name==='Run Foundation focused unit checks').conclusion='skipped',f=>f.dbJob.steps.find(s=>s.name==='Run the pgTAP suite').conclusion='skipped',f=>f.repairArchive[100]^=1,f=>f.dbArchive[100]^=1]){const f=pageEvidenceFixture();mutate(f);assert.equal(pages.verifyPublicPagesEvidence(f).eligible,false);}
+});
+test('public product plan requires four owner suites, three configured browser groups and sixteen fresh captures',()=>{
+  const proof=pageProof();assert.equal(proof.eligible,true,proof.reason);const normal={headSha:head,repairAnchorSha:pages.FULL_ANCHOR},plan=pages.publicPagesPlan(normal,proof);assert.equal(plan.unitFiles.length,4);assert.equal(plan.requirePublicProductCaptures,true);assert.equal(plan.runFullHermeticVitest,false);assert.equal(plan.runCdrWorkerChecks,false);assert.deepEqual(plan.pendingQualificationDebt,['database-contract']);assert.equal(plan.inheritedChecks.nativeSql.sourceHead,pages.PUBLIC_PAGES_PARENT);assert.deepEqual(pages.publicPagesLineageFailures(plan,proof),[]);
+  for(const [key,value]of [['unitFiles',plan.unitFiles.slice(1)],['browserFiles',[]],['requirePublicProductCaptures',false],['pendingFullDebt',[]],['pendingQualificationDebt',[]],['fullQualification','passed'],['inheritedChecks',{}]])assert.ok(pages.publicPagesLineageFailures({...plan,[key]:value},proof).length,key);
+  const receipt=buildRepairReceipt(plan,{headSha:head,databaseResult:'success'});assert.match(receipt.databaseObservation,/not executed at page head/);assert.ok(receipt.pendingDebt.includes('database-contract'));assert.equal(receipt.fullQualification,'pending');assert.throws(()=>pages.publicPagesPlan({...normal,repairAnchorSha:head},proof));
+});
+test('public product failed admission preserves authenticated historical resolution without accepting inheritance',()=>{
+  const receipt=pages.failedCollectorReceipt(pages.failedCollectorPlan({headSha:head,reason:'Changed source',intent:{parent:pages.PUBLIC_PAGES_PARENT}})),preserved=pages.authenticateFailedPublicPagesResolution(receipt,{intent:{parent:pages.PUBLIC_PAGES_PARENT},api:nativeApiFixture()});assert.equal(preserved.knownRegressionResolution.passed,433);assert.equal(preserved.knownRegressionResolution.catalogue.passed,13);assert.deepEqual(preserved.inheritedChecks,{});assert.equal(preserved.gate,'failed');assert.equal(preserved.fullQualification,'pending');assert.ok(preserved.pendingDebt.includes('database-contract'));assert.ok(preserved.pendingDebt.includes('public-product-pages'));assert.deepEqual(preserved.historicalUiFailure,native.verifyNativeDbParentEvidence(nativeParentFixture()).historicalUiFailure);
+});
+test('public product final gate rejects synthetic success without exact source and actual report/capture evidence',()=>{
+  const proof=pageProof();assert.equal(proof.eligible,true,proof.reason);const plan=pages.publicPagesPlan({headSha:head,repairAnchorSha:pages.FULL_ANCHOR},proof),temp=mkdtempSync(resolve(tmpdir(),'public-product-invalid-gate-'));try{writeFileSync(resolve(temp,'repair-plan.json'),JSON.stringify(plan));const env={...process.env,HEAD_SHA:head,DATABASE_REHEARSAL_RESULT:'success'};for(const k of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT','TARGETED_REPAIR_UNIT_RESULT','TRANSITIVE_TEST_RESULT','PUBLIC_PRODUCT_CAPTURE_RESULT','BROWSER_INSTALL_RESULT','BROWSER_BUILD_RESULT','BROWSER_RESULT'])env[k]='success';const run=spawnSync(process.execPath,[resolve(nativeRoot,'nextjs/scripts/repair-scope-gate.mjs')],{cwd:temp,env,encoding:'utf8'});assert.equal(run.status,1);const r=JSON.parse(readFileSync(resolve(temp,'repair-receipt.json')));assert.equal(r.gate,'failed');assert.equal(r.fullQualification,'pending');assert.ok(r.pendingDebt.includes('database-contract'));assert.ok(r.gateFailures.some(f=>f.includes('fresh public product execution')));assert.equal(r.inheritedChecks.nativeSql.status,'not accepted for current head');}finally{rmSync(temp,{recursive:true,force:true});}
 });
