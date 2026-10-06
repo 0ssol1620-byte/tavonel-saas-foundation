@@ -5,6 +5,8 @@ import { PublicSitePage } from "@/components/public-site-chrome";
 import BreadcrumbJsonLd, { DocBreadcrumb } from "@/components/breadcrumb-json-ld";
 import { clause } from "@/lib/compiler-contract";
 import WorldDiffSample from "@/components/world-diff-sample";
+import PublicPackageProof from "@/components/public-package-proof";
+import { exploreSampleArtifact, exploreSampleDocuments } from "@/lib/explore-sample";
 import { CAPABILITY_MANIFEST, isAcceptedAtUpload } from "../../../../shared/capabilityManifest";
 import { EXPLORE_CTA } from "@/lib/site-navigation";
 
@@ -203,6 +205,7 @@ export default function CompiledWorldPage() {
                 figure read out of two frozen compiles. No copy on this page changes.
               */}
               <WorldDiffSample />
+              <PublicPackageProof artifact={exploreSampleArtifact} sources={exploreSampleDocuments} runtime={exploreSampleArtifact.coreExecution.runtime} />
             </div>
             <div className="stack">
               <p className="lede">
