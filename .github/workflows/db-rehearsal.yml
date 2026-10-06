@@ -573,7 +573,7 @@ jobs:
           test "$WORLD_PREREQUISITE_STATE" = ephemeral
           export WORLD_CHECKOUT_HEAD="$(git rev-parse HEAD)"
           test "$WORLD_CHECKOUT_HEAD" = "$WORLD_REQUESTED_HEAD"
-          printf '%s  %s\n' 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db' "$schema" '1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718' "$fixture" | sha256sum --check
+          printf '%s  %s\n' 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db' "$schema" '561d43d6f1f2a6c26a66e7e050db7b196d209939f337d2c773951d23f031cc62' "$fixture" | sha256sum --check
           previous_version="$(ls supabase/migrations/*.sql | sed 's#.*/##' | sed -E 's/^([0-9]+)_.*/\1/' | sort | tail -1)"
           test "$previous_version" = "$WORLD_PREREQUISITE_VERSION"
           shopt -s nullglob
@@ -596,7 +596,7 @@ jobs:
           printf '%s\n' '\set ON_ERROR_STOP on' '\set world_disposable 1' '\set world_role unit' '\set world_case none' > "$target"
           cat -- "$fixture" >> "$target"
           cmp -- "$fixture" <(tail -n +5 "$target")
-          printf '%s  %s\n' 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84' "$target" | sha256sum --check
+          printf '%s  %s\n' '04a09fc2de7f66193366f3002a31892bf60170c1252ccfe099ff55a6fa0ade5a' "$target" | sha256sum --check
           export WORLD_MIGRATION_PATH="${generated[0]}" WORLD_MIGRATION_VERSION="$version"
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs';
@@ -616,7 +616,7 @@ jobs:
               {kind: 'migration', source: 'supabase/drafts/native-world-reduction-commit.sql', path: env.WORLD_MIGRATION_PATH,
                 sha256: 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', copySha256: 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', version: env.WORLD_MIGRATION_VERSION},
               {kind: 'unit-test', source: 'supabase/drafts/tests/native-world-reduction-commit.sql', path: 'supabase/tests/native_world_reduction_commit.sql',
-                sha256: '1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718', copySha256: 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84', version: '-'},
+                sha256: '561d43d6f1f2a6c26a66e7e050db7b196d209939f337d2c773951d23f031cc62', copySha256: '04a09fc2de7f66193366f3002a31892bf60170c1252ccfe099ff55a6fa0ade5a', version: '-'},
             ],
           }, null, 2) + '\n');
           NODE
@@ -884,7 +884,7 @@ jobs:
           import { createHash } from 'node:crypto';
           const env = process.env, failures = [];
           const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-          const expected = ['de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', '1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718'];
+          const expected = ['de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', '561d43d6f1f2a6c26a66e7e050db7b196d209939f337d2c773951d23f031cc62'];
           const sources = ['supabase/drafts/native-world-reduction-commit.sql', 'supabase/drafts/tests/native-world-reduction-commit.sql'];
           const prefix = Buffer.from('\\set ON_ERROR_STOP on\n\\set world_disposable 1\n\\set world_role unit\n\\set world_case none\n');
           const receipt = {schemaVersion: 1, nativeWorldSqlOnly: true, fullQualification: 'pending',
@@ -928,7 +928,7 @@ jobs:
               if (row.source !== sources[i] || row.sha256 !== expected[i] || row.path !== target ||
                   row.kind !== (i === 0 ? 'migration' : 'unit-test') ||
                   (i === 0 ? !/^[0-9]{14}$/.test(row.version) || row.version <= lastVersion : row.version !== '-') ||
-                  row.copySha256 !== (i === 0 ? expected[0] : 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84'))
+                  row.copySha256 !== (i === 0 ? expected[0] : '04a09fc2de7f66193366f3002a31892bf60170c1252ccfe099ff55a6fa0ade5a'))
                 throw Error('Unreviewed, unordered or undiscoverable World copy');
               const sourceBytes = readFileSync(row.source), copyBytes = readFileSync(row.path);
               if (hash(sourceBytes) !== row.sha256 || hash(copyBytes) !== row.copySha256 ||
@@ -939,7 +939,7 @@ jobs:
             receipt.prerequisiteStageSha256 = stage.prerequisiteStageSha256;
           } catch (error) { failures.push(error.message); }
           const evidence = {test: 'supabase/tests/native_world_reduction_commit.sql', payloadSha256: expected[1],
-            copySha256: 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84', status: failures.length ? 'unaccepted' : 'passed in both actual pgTAP steps'};
+            copySha256: '04a09fc2de7f66193366f3002a31892bf60170c1252ccfe099ff55a6fa0ade5a', status: failures.length ? 'unaccepted' : 'passed in both actual pgTAP steps'};
           receipt.publicClosedGateEvidence = {...evidence, assertions: ['public gate stays false', 'public function closed'],
             qualification: 'Production gate remains disabled; no runtime authority granted'};
           receipt.privateVerifierDoubleEvidence = {...evidence, qualification:

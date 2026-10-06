@@ -42,10 +42,10 @@ export const CONFIG_PATHS = Object.freeze([
 // are normalized in this verifier's hash; all declaration tokens remain covered.
 // collector-seal:start
 export const CONFIG_SEAL = Object.freeze({
-  ".github/workflows/db-rehearsal.yml": "5b1199f2fc1ac5beabbe1fe3e0b605630c061b98869f5a6513cf61d94530870f",
+  ".github/workflows/db-rehearsal.yml": "f4001dbbcab9b6081875bce2c0843a99a5cb09944ce8d4a2b1d1da76ce573ab3",
   ".github/workflows/repair-scope.yml": "00d72e4acf9c6380f93ec5b411d24fcdd70919340cd8d73956ecfdb41904e28e",
-  "nextjs/scripts/repair-collector-only.mjs": "5c639b90d65f2c38bbeff49b02aff0e8f091b16cea408a5fa66cc9c9661acc61",
-  "nextjs/scripts/repair-collector-only.test.mjs": "75a119ff6e88343ef763d324e60fa0244abb2bdd84d8cbe091d8824395a0f197",
+  "nextjs/scripts/repair-collector-only.mjs": "9d6f067831cc5b9410a85156e602c07f8b01724cab05e0a2de1c3e2e6ebbe5dd",
+  "nextjs/scripts/repair-collector-only.test.mjs": "f75847a3d2658e7ee65dc69cd4a7ef19b719b72d1eb939a83864785938ddccaf",
   "nextjs/scripts/repair-scope-gate.mjs": "db1fec0ba53b8421698693907a1d52b03e5b9e0845c7ff6958ae895902589978",
   "nextjs/scripts/verify-repair-workflows.mjs": "171c799023d99d779f75fd30326e770f581c1729843c5926d16c28db4ec9d9d8"
 });
@@ -426,7 +426,7 @@ export function classifyNativeDbIntent({ headSha, exec = execFileSync }) {
     const repoRoot=git(['rev-parse','--show-toplevel']),line=git(['rev-list','--parents','-n','1',headSha]).split(/\s+/);
     if(line[0]!==headSha||line.length<2)throw Error('Missing native source parent metadata.');
     const parent=line[1],paths=git(['-C',repoRoot,'diff','--name-only','--no-relative','--no-renames','-z',`${parent}..${headSha}`]).split('\0').filter(Boolean).sort();
-    const world=paths.some(p=>Object.hasOwn(NATIVE_WORLD_SOURCE_BLOBS,p)&&NATIVE_WORLD_SOURCE_BLOBS[p].before===null)||(parent===NATIVE_WORLD_PARENT&&paths.some(p=>Object.hasOwn(NATIVE_WORLD_SOURCE_BLOBS,p)||Object.hasOwn(NATIVE_WORLD_PARENT_CONFIG_BLOBS,p)));
+    const world=paths.some(p=>Object.hasOwn(NATIVE_WORLD_SOURCE_BLOBS,p)&&!CONFIG_PATHS.includes(p)&&p!=='nextjs/lib/db-rehearsal-workflow.test.ts')||(parent===NATIVE_WORLD_PARENT&&paths.some(p=>Object.hasOwn(NATIVE_WORLD_SOURCE_BLOBS,p)||Object.hasOwn(NATIVE_WORLD_PARENT_CONFIG_BLOBS,p)));
     const relevant=world||paths.some(p=>Object.hasOwn(NATIVE_DB_SOURCE_BLOBS,p))||(parent===NATIVE_DB_PARENT&&paths.some(p=>NATIVE_DB_CONFIG_PATHS.includes(p)));
     if(relevant&&line.length!==2)throw Error('Native scope requires a single-parent candidate.');
     return relevant?{classification:'intended',intended:true,headSha,parent,repoRoot,paths,...(world?{profile:'native-world'}:{})}:{classification:'normal',intended:false,reason:'Outside the frozen native DB source increment.'};
@@ -480,7 +480,7 @@ export function verifyNativeDbEligibility({headSha,exec=execFileSync,api=nativeD
 export function nativeDbPlan(normal,proof) {
   if(!proof?.eligible||proof.source.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Native DB plan requires exact source and qualified a3b evidence.');
   const world=proof.source.profile==='native-world';
-  return {...normal,...(world?{nativeWorldCommit:{defaultServices:null,publicGate:false,trustedDbVerifier:'ABSENT',productionAdapters:'ABSENT',realConcurrency:'UNRUN',canonicalPinnedRowCrossSessionFk:'UNRUN'},requirePublicProductCaptures:false}:{}),source:world?'exact corrected Native World over qualified852; fresh disposable SQL required':'exact frozen native SQL over qualified a3b; fresh disposable DB required',normalSelection:{groups:normal.groups,unitFiles:normal.unitFiles,browserFiles:normal.browserFiles,unknownPaths:normal.unknownPaths},nativeDbRehearsal:proof,collectorOnly:false,knownRegressionRepair:undefined,intakePresentation:undefined,
+  return {...normal,...(world?{nativeWorldCommit:{defaultServices:null,publicGate:false,trustedDbVerifier:'ABSENT',productionAdapters:'ABSENT',realConcurrency:'UNRUN',canonicalPinnedRowCrossSessionFk:'UNRUN'},requirePublicProductCaptures:false}:{}),source:world?'exact World fixture correction over failed744; qualified852 UI unchanged; fresh disposable SQL required':'exact frozen native SQL over qualified a3b; fresh disposable DB required',normalSelection:{groups:normal.groups,unitFiles:normal.unitFiles,browserFiles:normal.browserFiles,unknownPaths:normal.unknownPaths},nativeDbRehearsal:proof,collectorOnly:false,knownRegressionRepair:undefined,intakePresentation:undefined,
     groups:['database-contract','native-db-rehearsal','selector-config','workflow-static'],unitFiles:world?['lib/native-world-reduction-commit.test.ts','lib/db-rehearsal-workflow.test.ts','lib/pgtap-fixtures.test.ts']:['lib/db-rehearsal-workflow.test.ts','lib/pgtap-fixtures.test.ts'],browserFiles:[],unknownPaths:[],catalogueFiles:[],runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:false,runDetailIntegrity:false,runWorkflowStaticGate:true,requireWorkspaceIntakeCapture:false,requirePublicUiScreenshots:false,requireHomePricingCaptures:false,
     runDatabaseRehearsal:false,databaseRehearsalStatus:'invalidated; fresh separate exact-head native DB staging and both pgTAP passes required',deferredGroups:['database-contract'],pendingQualificationDebt:['database-contract'],pendingDebt:['database-contract'],pendingFullDebt:[...proof.evidence.pendingFullDebt],fullQualification:'pending',databaseBaselineEvidence:undefined,
     inheritedChecks:{parentScopedUi:proof.evidence.parentUi,storageTransport:proof.evidence.storageTransport},knownRegressionResolution:proof.evidence.knownRegressionResolution,knownRegressionObservations:proof.evidence.knownRegressionObservations,historicalUiFailure:proof.evidence.historicalUiFailure,qualificationReasons:['Native source and focused contracts do not prove disposable DB or full-release qualification.']};
@@ -887,63 +887,65 @@ function runPublicPagesMode(mode,headSha,intent) {
 }
 
 // A separate exact-source profile; published a3b/28d and public-page profiles remain immutable.
-export const NATIVE_WORLD_PARENT = '852ffbee9b71ee75ce2ee047874731596c13e837';
-export const NATIVE_WORLD_PARENT_BASE = '1f894711d0eac02e98510ba7f63e27ab4c028b6f';
-export const NATIVE_WORLD_PARENT_TREE = '30d03ce4ce8bdd1c1e81921932bd19f7a946011e';
+export const NATIVE_WORLD_PARENT = '744f1b3116b149c1c4f03f29f3b1d70e94e5d798';
+export const NATIVE_WORLD_UI_PARENT = '852ffbee9b71ee75ce2ee047874731596c13e837';
+export const NATIVE_WORLD_CHANGED_SOURCES = Object.freeze(["nextjs/lib/native-world-reduction-commit.test.ts","supabase/drafts/tests/native-world-reduction-commit.sql",".github/workflows/db-rehearsal.yml","nextjs/lib/db-rehearsal-workflow.test.ts"]);
+export const NATIVE_WORLD_PARENT_BASE = '852ffbee9b71ee75ce2ee047874731596c13e837';
+export const NATIVE_WORLD_PARENT_TREE = '236bb32d72d710ab60b4f631594f4e6d6223c4a4';
 export const NATIVE_WORLD_SOURCE_BLOBS = Object.freeze({
   "nextjs/lib/native-world-reduction-contract.ts": {
-    "before": null,
+    "before": "f6f40ce8bc8f7a7c14e0d5e5d4d915010f830587",
     "after": "f6f40ce8bc8f7a7c14e0d5e5d4d915010f830587",
     "sha256": "803f36bfa90e584afad7955058b7d9efa2d1adef6e3a0b6e6234ed6f1a8ea8f2",
     "bytes": 14212
   },
   "nextjs/lib/native-world-reduction-commit.ts": {
-    "before": null,
+    "before": "8c2d044c324f9a4d916d23095314c349437c165e",
     "after": "8c2d044c324f9a4d916d23095314c349437c165e",
     "sha256": "fa5f884185f335e9026d817f78207a1f90d76aaff53fb0d047a1bd5c136673f1",
     "bytes": 8750
   },
   "nextjs/lib/native-world-reduction-commit.test.ts": {
-    "before": null,
-    "after": "0f86f740d52d218a378066703404d43da7bd6120",
-    "sha256": "0db4dbe1e829aaca8523fbdce1b7fa342d4aaa8b69d1c50975cfb7ccc06b9a54",
-    "bytes": 250623
+    "before": "0f86f740d52d218a378066703404d43da7bd6120",
+    "after": "607322c29a190adecbe7b9652222bdc4e258afdc",
+    "sha256": "67b2da90be23b28da12a47a0507eb78d24d4a92e7446a0d2d21c369ee5f9b8be",
+    "bytes": 250651
   },
   "supabase/drafts/native-world-reduction-commit.sql": {
-    "before": null,
+    "before": "1e5f449a562832f3db9f4ba9b89e1b8a3fa25f22",
     "after": "1e5f449a562832f3db9f4ba9b89e1b8a3fa25f22",
     "sha256": "de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db",
     "bytes": 37069
   },
   "supabase/drafts/tests/native-world-reduction-commit.sql": {
-    "before": null,
-    "after": "b2b4586c5a3e2aa11613f87c28372971b6e180c2",
-    "sha256": "1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718",
-    "bytes": 40600
+    "before": "b2b4586c5a3e2aa11613f87c28372971b6e180c2",
+    "after": "53a102d03b95de75714d32925f868001ac896331",
+    "sha256": "561d43d6f1f2a6c26a66e7e050db7b196d209939f337d2c773951d23f031cc62",
+    "bytes": 40602
   },
   "docs/integration/NATIVE_WORLD_REDUCTION_COMMIT_V1_DRAFT.md": {
-    "before": null,
+    "before": "b486ab21956624b82cb2c7a2d36b600b52922691",
     "after": "b486ab21956624b82cb2c7a2d36b600b52922691",
     "sha256": "ffe314d677e8b820824afd910ea221467abc7de24160c5201833a0cfe7c6965e",
     "bytes": 19623
   },
   ".github/workflows/db-rehearsal.yml": {
-    "before": "9c8a57e33b383387075d89bf7059a7b7ce148041",
-    "after": "9d6f93ed986672327a374e6f3c284df6c39db3d7",
-    "sha256": "5b1199f2fc1ac5beabbe1fe3e0b605630c061b98869f5a6513cf61d94530870f",
+    "before": "9d6f93ed986672327a374e6f3c284df6c39db3d7",
+    "after": "3cca60005b0069d92b692d5f1322afa3a505653b",
+    "sha256": "f4001dbbcab9b6081875bce2c0843a99a5cb09944ce8d4a2b1d1da76ce573ab3",
     "bytes": 71308
   },
   "nextjs/lib/db-rehearsal-workflow.test.ts": {
-    "before": "3e723a40e1bf09e8be44bb6de96b74d77663ff75",
-    "after": "5cd2d4861f082ddfa4a8c7b4646549ca9194a57d",
-    "sha256": "c0ace48f0903f2bfab36235a2c7c013d7a7c0962f8b68c5730550e8bbf43bc66",
+    "before": "5cd2d4861f082ddfa4a8c7b4646549ca9194a57d",
+    "after": "5a212505090dafeed4f2c9f08986c70733823220",
+    "sha256": "defe33566a11469f290637b5c3c773734adb2f398a580cf43622ea8929fb40d4",
     "bytes": 26840
   }
 });
 export const NATIVE_WORLD_PARENT_CONFIG_BLOBS = Object.freeze({
-  "nextjs/scripts/repair-collector-only.mjs": "6727bf88aac81dfd4827119cf15a48ffd3361dd3",
-  "nextjs/scripts/repair-collector-only.test.mjs": "37e780d262cfadbb8a0e0195150be4601e1368df",
-  "nextjs/scripts/repair-known-regression.mjs": "8d00b72c36d1d15ddc01ee4a96dec38c318f8061"
+  "nextjs/scripts/repair-collector-only.mjs": "6844a718c20fe28bea0ca672014de52e24feeaf2",
+  "nextjs/scripts/repair-collector-only.test.mjs": "9171fe54736049e0ffc47ececd0d8feaf7f26fda",
+  "nextjs/scripts/repair-known-regression.mjs": "208fded258f1d6faab0937062695f193a7806e75"
 });
 export const NATIVE_WORLD_PREREQUISITE_BLOBS = Object.freeze({
   "nextjs/lib/bounded-source-body.ts": "98727804370d022ed31ded2fc4f4f486ac3bb2ac",
@@ -977,13 +979,13 @@ export const NATIVE_WORLD_CAPTURE_FILES = Object.freeze([
 export function verifyNativeWorldSource({headSha,intent,exec=execFileSync}) {
   try {
     const git=(args,encoding='utf8')=>{const b=exec('git',['-C',intent.repoRoot,...args],{encoding});return encoding==='buffer'?b:b.trim();};
-    if(intent.parent!==NATIVE_WORLD_PARENT||git(['rev-list','--parents','-n','1',NATIVE_WORLD_PARENT])!==`${NATIVE_WORLD_PARENT} ${NATIVE_WORLD_PARENT_BASE}`||git(['rev-parse',`${NATIVE_WORLD_PARENT}^{tree}`])!==NATIVE_WORLD_PARENT_TREE)throw Error('Native World requires the exact published852 parent, parentage and tree.');
-    const expected=[...Object.keys(NATIVE_WORLD_SOURCE_BLOBS),...Object.keys(NATIVE_WORLD_PARENT_CONFIG_BLOBS)].sort();if(JSON.stringify(intent.paths)!==JSON.stringify(expected))throw Error('Native World delta must contain every exact source/configuration path and no extra path.');
+    if(intent.parent!==NATIVE_WORLD_PARENT||git(['rev-list','--parents','-n','1',NATIVE_WORLD_PARENT])!==`${NATIVE_WORLD_PARENT} ${NATIVE_WORLD_PARENT_BASE}`||git(['rev-parse',`${NATIVE_WORLD_PARENT}^{tree}`])!==NATIVE_WORLD_PARENT_TREE)throw Error('Native World requires the exact published744 parent, parentage and tree.');
+    const expected=[...NATIVE_WORLD_CHANGED_SOURCES,...Object.keys(NATIVE_WORLD_PARENT_CONFIG_BLOBS)].sort();if(JSON.stringify(intent.paths)!==JSON.stringify(expected))throw Error('Native World delta must contain every exact source/configuration path and no extra path.');
     git(['merge-base','--is-ancestor',FULL_ANCHOR,NATIVE_WORLD_PARENT]);git(['merge-base','--is-ancestor',NATIVE_WORLD_PARENT,headSha]);verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});
     const tree=(ref,p,absent=false)=>{const raw=git(['ls-tree','--full-tree',ref,'--',p]);if(!raw&&absent)return null;const m=/^100644 blob ([a-f0-9]{40})\t(.+)$/.exec(raw);if(!m||m[2]!==p)throw Error('Unsafe or missing exact World leaf: '+p);return m[1];};
     for(const[p,pin]of Object.entries(NATIVE_WORLD_SOURCE_BLOBS)){const b=git(['show',`${headSha}:${p}`],'buffer');if(tree(NATIVE_WORLD_PARENT,p,true)!==pin.before||tree(headSha,p)!==pin.after||b.length!==pin.bytes||createHash('sha256').update(b).digest('hex')!==pin.sha256)throw Error('World source preimage/blob/byte identity changed: '+p);}
-    for(const[p,pin]of Object.entries(NATIVE_WORLD_PARENT_CONFIG_BLOBS))if(tree(NATIVE_WORLD_PARENT,p)!==pin)throw Error('Exact852 configuration preimage changed: '+p);
-    for(const[p,pin]of Object.entries({...PUBLIC_PAGES_DB_BLOBS,...NATIVE_DB_TRANSPORT_BLOBS,...NATIVE_WORLD_PREREQUISITE_BLOBS}))if(tree(NATIVE_WORLD_PARENT,p)!==pin||(!Object.hasOwn(NATIVE_WORLD_SOURCE_BLOBS,p)&&tree(headSha,p)!==pin))throw Error('Unchanged qualified dependency changed: '+p);
+    for(const[p,pin]of Object.entries(NATIVE_WORLD_PARENT_CONFIG_BLOBS))if(tree(NATIVE_WORLD_PARENT,p)!==pin)throw Error('Exact744 configuration preimage changed: '+p);
+    for(const[p,pin]of Object.entries({...PUBLIC_PAGES_DB_BLOBS,...NATIVE_DB_TRANSPORT_BLOBS,...NATIVE_WORLD_PREREQUISITE_BLOBS}))if(!Object.hasOwn(NATIVE_WORLD_SOURCE_BLOBS,p)&&(tree(NATIVE_WORLD_PARENT,p)!==pin||tree(headSha,p)!==pin))throw Error('Unchanged qualified dependency changed: '+p);
     for(const[p,pin]of Object.entries(PUBLIC_PAGES_SOURCE_BLOBS))if(tree(NATIVE_WORLD_PARENT,p)!==pin.after||tree(headSha,p)!==pin.after)throw Error('Exact852 public source changed: '+p);
     for(const[p,d]of Object.entries(CONFIG_SEAL))if(!tree(headSha,p)||sealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==d)throw Error('World collector seal changed: '+p);
     for(const[p,d]of Object.entries(repair.REPAIR_SEAL))if(!tree(headSha,p)||repair.repairSealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==d)throw Error('World repair seal changed: '+p);
@@ -992,14 +994,14 @@ export function verifyNativeWorldSource({headSha,intent,exec=execFileSync}) {
 }
 export function verifyNativeWorldParentEvidence({run,job,artifact,archive,captures}) {
   try {
-    if(run?.id!==37408812981||run.path!=='.github/workflows/repair-scope.yml'||run.head_sha!==NATIVE_WORLD_PARENT||run.event!=='pull_request'||run.run_attempt!==1||run.status!=='completed'||run.conclusion!=='success'||job?.id!==112092360049||job.run_id!==run.id||job.head_sha!==NATIVE_WORLD_PARENT||job.status!=='completed'||job.conclusion!=='success')throw Error('Unqualified exact852 UI run/job.');
+    if(run?.id!==37408812981||run.path!=='.github/workflows/repair-scope.yml'||run.head_sha!==NATIVE_WORLD_UI_PARENT||run.event!=='pull_request'||run.run_attempt!==1||run.status!=='completed'||run.conclusion!=='success'||job?.id!==112092360049||job.run_id!==run.id||job.head_sha!==NATIVE_WORLD_UI_PARENT||job.status!=='completed'||job.conclusion!=='success')throw Error('Unqualified exact852 UI run/job.');
     for(const name of ['Run TypeScript and lint checks','Run Foundation focused unit checks','Build the isolated live-commerce test bundle after scoped checks','Run selected browser checks against one production server','Require sixteen exact file-backed public product captures','Upload only sixteen named public product captures','Fail closed on missing or failed scoped checks']){const steps=job.steps?.filter(s=>s.name===name);if(steps?.length!==1||steps[0].status!=='completed'||steps[0].conclusion!=='success')throw Error('Missing/failed exact852 execution: '+name);}
-    for(const[a,pin]of [[artifact,NATIVE_WORLD_UI_ARTIFACT],[captures,NATIVE_WORLD_UI_CAPTURES]])if(a?.id!==pin.id||a.name!==pin.name||a.digest!==pin.digest||a.size_in_bytes!==pin.bytes||a.expired!==false||a.workflow_run?.id!==run.id||a.workflow_run?.head_sha!==NATIVE_WORLD_PARENT)throw Error('Exact852 receipt/capture artifact changed.');
+    for(const[a,pin]of [[artifact,NATIVE_WORLD_UI_ARTIFACT],[captures,NATIVE_WORLD_UI_CAPTURES]])if(a?.id!==pin.id||a.name!==pin.name||a.digest!==pin.digest||a.size_in_bytes!==pin.bytes||a.expired!==false||a.workflow_run?.id!==run.id||a.workflow_run?.head_sha!==NATIVE_WORLD_UI_PARENT)throw Error('Exact852 receipt/capture artifact changed.');
     const receipt=repair.readBoundIntakeReceipt(archive,NATIVE_WORLD_UI_ARTIFACT,NATIVE_WORLD_UI_ARTIFACT.bytes),checks=receipt.executedChecks;
-    if(receipt.headSha!==NATIVE_WORLD_PARENT||receipt.completedHeadSha!==NATIVE_WORLD_PARENT||receipt.repairAnchorSha!==FULL_ANCHOR||receipt.gate!=='passed-scoped-only'||receipt.gateFailures?.length!==0||receipt.fullQualification!=='pending'||!receipt.pendingDebt?.includes('database-contract')||JSON.stringify(receipt.unitFiles)!==JSON.stringify(PUBLIC_PAGES_UNIT_FILES)||JSON.stringify(receipt.browserFiles)!==JSON.stringify(['e2e/compiler-contract.spec.ts','e2e/public-package-proof.spec.ts'])||checks?.units?.status!=='success'||checks.units.files!==4||checks.units.passed!==71||checks.units.failed!==0||checks.units.skipped!==0)throw Error('Exact852 source-bound scoped receipt changed.');
+    if(receipt.headSha!==NATIVE_WORLD_UI_PARENT||receipt.completedHeadSha!==NATIVE_WORLD_UI_PARENT||receipt.repairAnchorSha!==FULL_ANCHOR||receipt.gate!=='passed-scoped-only'||receipt.gateFailures?.length!==0||receipt.fullQualification!=='pending'||!receipt.pendingDebt?.includes('database-contract')||JSON.stringify(receipt.unitFiles)!==JSON.stringify(PUBLIC_PAGES_UNIT_FILES)||JSON.stringify(receipt.browserFiles)!==JSON.stringify(['e2e/compiler-contract.spec.ts','e2e/public-package-proof.spec.ts'])||checks?.units?.status!=='success'||checks.units.files!==4||checks.units.passed!==71||checks.units.failed!==0||checks.units.skipped!==0)throw Error('Exact852 source-bound scoped receipt changed.');
     if(JSON.stringify(checks.selectedBrowserReports)!==JSON.stringify({status:'success',reports:[{project:'1440',files:2,passed:10,skipped:0,flaky:0,failed:0},{project:'390',files:1,passed:9,skipped:0,flaky:0,failed:0},{project:'reduced-motion',files:1,passed:8,skipped:1,flaky:0,failed:0}]})||checks.publicProductCaptures?.status!=='success'||JSON.stringify(checks.publicProductCaptures.files)!==JSON.stringify(NATIVE_WORLD_CAPTURE_FILES))throw Error('Exact852 configured browser cases or16 captures changed.');
     if(receipt.inheritedChecks?.nativeSql?.receipt?.realConcurrency!=='UNRUN'||receipt.inheritedChecks.nativeSql.receipt.canonicalPinnedRowCrossSessionFk!=='UNRUN'||receipt.pendingFullDebt?.length!==4||!receipt.inheritedChecks.storageTransport)throw Error('Exact852 inherited debt/transport lineage changed.');
-    return {eligible:true,parentRunId:run.id,parentJobId:job.id,parentArtifact:NATIVE_WORLD_UI_ARTIFACT,parentUi:{sourceHead:NATIVE_WORLD_PARENT,runId:run.id,jobId:job.id,artifact:NATIVE_WORLD_UI_ARTIFACT,captureArtifact:NATIVE_WORLD_UI_CAPTURES,passedUnits:71,unitFiles:4,browserPassed:27,legitimateProjectSkips:1,captures:16,status:'successful exact852 unchanged-source UI evidence; not executed at World candidate head; pixel acceptance is separate root review'},storageTransport:receipt.inheritedChecks.storageTransport,knownRegressionResolution:receipt.knownRegressionResolution,knownRegressionObservations:receipt.knownRegressionObservations,historicalUiFailure:receipt.historicalUiFailure,pendingFullDebt:receipt.pendingFullDebt};
+    return {eligible:true,parentRunId:run.id,parentJobId:job.id,parentArtifact:NATIVE_WORLD_UI_ARTIFACT,parentUi:{sourceHead:NATIVE_WORLD_UI_PARENT,runId:run.id,jobId:job.id,artifact:NATIVE_WORLD_UI_ARTIFACT,captureArtifact:NATIVE_WORLD_UI_CAPTURES,passedUnits:71,unitFiles:4,browserPassed:27,legitimateProjectSkips:1,captures:16,status:'successful exact852 unchanged-source UI evidence; not executed at World candidate head; pixel acceptance is separate root review'},storageTransport:receipt.inheritedChecks.storageTransport,knownRegressionResolution:receipt.knownRegressionResolution,knownRegressionObservations:receipt.knownRegressionObservations,historicalUiFailure:receipt.historicalUiFailure,pendingFullDebt:receipt.pendingFullDebt};
   }catch(error){return {eligible:false,reason:error.message};}
 }
 

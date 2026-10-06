@@ -61,10 +61,10 @@ describe("db-rehearsal native World SQL acceptance", () => {
   const gateCode = finalGate.split("node --input-type=module <<'NODE'\n")[1]?.split("\n          NODE")[0]?.split("\n").map(line => line.slice(10)).join("\n") ?? "";
   const inputs = [
     {source:"supabase/drafts/native-world-reduction-commit.sql",sha256:"de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db"},
-    {source:"supabase/drafts/tests/native-world-reduction-commit.sql",sha256:"1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718"},
+    {source:"supabase/drafts/tests/native-world-reduction-commit.sql",sha256:"561d43d6f1f2a6c26a66e7e050db7b196d209939f337d2c773951d23f031cc62"},
   ];
   const prefix = Buffer.from("\\set ON_ERROR_STOP on\n\\set world_disposable 1\n\\set world_role unit\n\\set world_case none\n");
-  const wrapperSha256 = "df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84";
+  const wrapperSha256 = "04a09fc2de7f66193366f3002a31892bf60170c1252ccfe099ff55a6fa0ade5a";
   const hash = (bytes:Buffer|string) => createHash("sha256").update(bytes).digest("hex");
 
   it("stages only on a disposable hosted runner after all exact native prerequisites and before reset", () => {

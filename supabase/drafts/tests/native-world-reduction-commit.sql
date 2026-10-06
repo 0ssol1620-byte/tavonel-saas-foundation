@@ -290,7 +290,7 @@ begin
    where reservation_id='30000000-0000-4000-8000-000000000091';observed:=found;
   elsif mode='wrong_input' then req:=jsonb_set(req,'{inputWorkSha256}',to_jsonb('sha256:'||repeat('f',64)));observed:=true;
   elsif mode='wrong_third' then req:=jsonb_set(req,'{artifactRefs,2,objectKey}','"alias"');observed:=true;
-  elsif mode='missing_third' then req:=jsonb_set(req,'{artifactRefs}',req->'artifactRefs'-2);observed:=true;
+  elsif mode='missing_third' then req:=jsonb_set(req,'{artifactRefs}',(req->'artifactRefs')-2);observed:=true;
   else observed:=true;end if;
   if not observed then raise exception 'SQL_FIXTURE_MUTATION_FAILED';end if;
   begin

@@ -174,7 +174,7 @@ describe("closed World-purpose commit", () => {
     if (mode === "stage-ref") h.services.stageModel = vi.fn(async (r: StoredArtifactRef) => ({ ...r, objectKey: "alias" }));
     if (mode === "stage-failure") h.services.stageModel = vi.fn(async () => { throw Error("IMMUTABLE_CREATE_FAILED"); });
     if (mode === "atomic-failure") h.services.commitAtomically = vi.fn(async () => { throw Error("DB_ROLLBACK"); });
-    if (mode === "result-ref") h.services.commitAtomically = vi.fn(async (r: WorldCommitRequest) => ({ schemaVersion: WORLD_COMMIT_SCHEMA,
+    if (mode === "result-ref") h.services.commitAtomically = vi.fn(async (r: WorldCommitRequest): Promise<WorldCommitResult> => ({ schemaVersion: WORLD_COMMIT_SCHEMA,
       writeStatus: "written", worldStateId: h.manifest.worldStateId, manifestRawSha256: r.manifestRawSha256, artifactRefs: r.artifactRefs.slice(0, 2) }));
     await expect(h.run(h.ctx, grantId, raw, model)).rejects.toThrow(); expect(h.committed.size).toBe(0);
   });
