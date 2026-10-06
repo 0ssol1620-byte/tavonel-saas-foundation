@@ -285,7 +285,7 @@ test('actual shared classifier CLI preserves unrelated PR fallback and fails clo
     const script=fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url));
     const normal=spawnSync(process.execPath,[script,'eligibility'],{cwd:temp,env,encoding:'utf8'});
     assert.equal(normal.status,0,normal.stderr);
-    assert.equal(readFileSync(output,'utf8'),'intended=false\neligible=false\n');
+    assert.equal(readFileSync(output,'utf8'),'intended=false\neligible=false\nnative_database=false\n');
     const failed=spawnSync(process.execPath,[script,'plan'],{cwd:temp,env:{...env,REPAIR_HEAD_SHA:head},encoding:'utf8'});
     assert.equal(failed.status,1,failed.stderr);
     const receipt=JSON.parse(readFileSync(resolve(temp,'repair-receipt.json'),'utf8'));
@@ -439,8 +439,8 @@ test('actual intake gate CLI cannot turn missing raw unit/build/browser/capture 
   const temp=mkdtempSync(resolve(tmpdir(),'intake-presentation-gate-'));assert.ok(isInsideWorkspace(resolve(tmpdir()),temp));
   try{const plan=intakePresentationPlan(normal(),intakeProof());writeFileSync(resolve(temp,'repair-plan.json'),JSON.stringify(plan));const env={...process.env,HEAD_SHA:head,PLAN_RESULT:'success',SECRET_RESULT:'success',CHECK_RESULT:'success',VITEST_RESULT:'success',AUX_RESULT:'success',WORKFLOW_RESULT:'success',SELECTOR_TEST_RESULT:'success',TRANSITIVE_TEST_RESULT:'success'};const result=spawnSync(process.execPath,[fileURLToPath(new URL('./repair-scope-gate.mjs',import.meta.url))],{cwd:temp,env,encoding:'utf8'});assert.equal(result.status,1,result.stderr);const receipt=JSON.parse(readFileSync(resolve(temp,'repair-receipt.json'),'utf8'));for(const name of ['actual selected intake unit outcome','single production build','selected browser checks','mounted workspace intake artifacts'])assert.ok(receipt.gateFailures.some(reason=>reason.startsWith(name)),name);assert.equal(receipt.knownRegressionResolution.headSha,INTAKE_PARENT);assert.ok(!receipt.pendingDebt.includes(REGRESSION_DEBT));assert.ok(Object.values(receipt.inheritedChecks).every(value=>value.status==='not accepted for current head'));
     const workflow=readFileSync(resolve(root,'.github/workflows/db-rehearsal.yml'),'utf8');
-    const inline=workflow.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n          NODE/)[1].split('\n').map(line=>line.slice(10)).join('\n').replace("'./nextjs/scripts/repair-known-regression.mjs'",JSON.stringify(new URL('./repair-known-regression.mjs',import.meta.url).href));
-    const missingEnv={...process.env,REPAIR_HEAD_SHA:head};for(const key of ['CLASSIFIER_RESULT','INTENDED_RESULT','ELIGIBLE_RESULT'])delete missingEnv[key];
+    const inline=workflow.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n          NODE/)[1].split('\n').map(line=>line.slice(10)).join('\n').replace("'./nextjs/scripts/repair-known-regression.mjs'",JSON.stringify(new URL('./repair-known-regression.mjs',import.meta.url).href)).replace("'./nextjs/scripts/repair-collector-only.mjs'",JSON.stringify(new URL('./repair-collector-only.mjs',import.meta.url).href));
+    const missingEnv={...process.env,REPAIR_HEAD_SHA:head};for(const key of ['CLASSIFIER_RESULT','INTENDED_RESULT','ELIGIBLE_RESULT','NATIVE_DATABASE_RESULT'])delete missingEnv[key];
     const decision=spawnSync(process.execPath,['--input-type=module'],{cwd:temp,input:inline,env:missingEnv,encoding:'utf8'});assert.equal(decision.status,1,decision.stderr);
     const conservative=JSON.parse(readFileSync(resolve(temp,'collector-only-failure-receipt.json'),'utf8'));assert.equal(conservative.gate,'failed');assert.ok(conservative.pendingDebt.includes(REGRESSION_DEBT));assert.ok(conservative.pendingDebt.includes('database-contract'));assert.deepEqual(conservative.inheritedChecks,{});assert.equal(conservative.databaseObservation,'not executed; inherited evidence unaccepted');
   }finally{rmSync(temp,{recursive:true,force:true});}

@@ -49,9 +49,13 @@ jobs:
         run: node scripts/verify-repair-workflows.mjs
       - name: Run selector regression tests
         id: selector-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
         if: steps.plan.outputs.selector_tests == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+          if [ '${{ steps.plan.outputs.native_database }}' = true ]; then
+            node --test scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs scripts/repair-known-regression.test.mjs
+          elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs

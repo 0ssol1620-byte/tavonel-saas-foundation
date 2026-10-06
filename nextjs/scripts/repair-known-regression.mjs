@@ -164,16 +164,16 @@ export const REPAIR_CATALOGUE_FILES = Object.freeze([
 export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
-  ".github/workflows/repair-scope.yml": "9f6f610ed7074612eaf3b93b34b9b26a69f657164e086a124b3a3a57e2e1d701",
-  "nextjs/scripts/repair-collector-only.mjs": "c2feb4291e63c06945e93ff506f805c3710844603d06256f9e662f6faf865706",
+  ".github/workflows/repair-scope.yml": "67db363fe40c2f9d184d96ce90d040e77d70c21481b03701e38fa224e20849d2",
+  "nextjs/scripts/repair-collector-only.mjs": "733c24fa9984d5bbfd28856041dadb4d90f56b7a3bd1f18137f6b61ba5f4f6f8",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
   "nextjs/scripts/repair-scope.test.mjs": "ab5d1c9e8461e0afc3e7928be2b1f225eeabc58612ed3b100180b87566cac9d7",
-  "nextjs/scripts/repair-scope-gate.mjs": "dc0ba27b742c9bf82f93f3150a5eb73e1f5fa20e2a3e50b3ec29d7139b185939",
-  "nextjs/scripts/verify-repair-workflows.mjs": "e2654679bb59645d1d5b00f73277aefcc33589e21479f945eecdb4826790bc96",
-  "nextjs/scripts/repair-collector-only.test.mjs": "2f469e28ca986cdefd3cd297d8811d5799bc51330a652c34ea96bc0a13a26ac0",
-  "nextjs/scripts/repair-known-regression.mjs": "a34c2f9bae4e295e8935767eb6be0f6a232665e939b0916c2118aef376b4647f",
-  "nextjs/scripts/repair-known-regression.test.mjs": "0e9ca66fd95a46325b0112140491bbe0d3eac11cde7ac78a1b95c002f0bac623",
-  ".github/workflows/db-rehearsal.yml": "f02257b45c4c6b2e9743da2c51a5fd204e323c9f8ee54f47f260031d1de1902a",
+  "nextjs/scripts/repair-scope-gate.mjs": "9fb33cf17827accb5e2ca944722b098e486c565b94d22606148103e57d1fed8f",
+  "nextjs/scripts/verify-repair-workflows.mjs": "8a4d7ad10001611d60e29a0ff68bc1a877fa3f0b47ebd23f0f749e5e7d5fc05c",
+  "nextjs/scripts/repair-collector-only.test.mjs": "12206bc38448ad4913c6769d161a89dae8e7fc45b698191623d2a31950c15c56",
+  "nextjs/scripts/repair-known-regression.mjs": "6c5d561d24f6f2dca2b11162cd0d841b31b3a36969c87aa6e03d38ef0719f685",
+  "nextjs/scripts/repair-known-regression.test.mjs": "fde23e0dc80d19c53f2703489e851959238aa4c4fba55f6c18a3b967e226aec0",
+  ".github/workflows/db-rehearsal.yml": "e9262d6f83b4494c7f8552af48b7e4b28f8ee1c7e8964ae2db0b895beece37ec",
   "nextjs/scripts/run-repair-check.mjs": "08e5a181264faf7accf220554dfa8db6edee8385d7685509e1fef40e80a0288f",
   "nextjs/scripts/repair-test-report.mjs": "5dd9b98ffa8aa6b67aa5034567e00857246073a0d8c94dc5df3eea60096e741f",
   "nextjs/vitest.repair-scope.config.ts": "229623b695037e9e8173e74107dd252a77182ad068ab195d2a9710e0100c8742"
@@ -873,7 +873,7 @@ export function verifyIntakePresentationSource({ headSha, exec = execFileSync })
 // The archive is authenticated before decompression. Only the single bounded
 // receipt entry from that immutable archive is accepted; there are no disk writes.
 export function readIntakeParentReceipt(archive) { return readBoundIntakeReceipt(archive, INTAKE_PARENT_ARTIFACT, 8239); }
-function readBoundIntakeReceipt(archive, artifact, sizeBytes) {
+export function readBoundIntakeReceipt(archive, artifact, sizeBytes) {
   if (!Buffer.isBuffer(archive) || archive.length !== sizeBytes || 'sha256:' + createHash('sha256').update(archive).digest('hex') !== artifact.digest) throw Error('Intake parent receipt archive digest or size mismatch.');
   const end = archive.length - 22;
   if (archive.readUInt32LE(end) !== 0x06054b50 || archive.readUInt16LE(end + 4) !== 0 || archive.readUInt16LE(end + 6) !== 0 || archive.readUInt16LE(end + 8) !== 1 || archive.readUInt16LE(end + 10) !== 1 || archive.readUInt16LE(end + 20) !== 0) throw Error('Unexpected parent receipt archive directory.');

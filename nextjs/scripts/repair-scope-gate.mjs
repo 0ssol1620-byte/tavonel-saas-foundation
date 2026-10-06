@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectorLineageFailures, verifyCollectorEligibility } from './repair-collector-only.mjs';
+import { collectorLineageFailures, verifyCollectorEligibility, verifyNativeDbEligibility, nativeDbLineageFailures } from './repair-collector-only.mjs';
 import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt, verifyIntakePresentationEligibility, intakePresentationLineageFailures, readIntakePresentationExecution } from './repair-known-regression.mjs';
 
 export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
@@ -37,11 +37,11 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
     ...plan,
     completedHeadSha: headSha,
     runResults,
-    databaseObservation: plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.intakePresentation ? 'successful historical f082 DB evidence via qualified 6a32 and 895 classifiers; not executed at current head' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
+    databaseObservation: plan.nativeDbRehearsal ? 'native SQL changed; fresh separate exact-head staging and both disposable pgTAP passes remain pending; no DB inheritance accepted' : plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.intakePresentation ? 'successful historical f082 DB evidence via qualified 6a32 and 895 classifiers; not executed at current head' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
     pendingDebt: [...pendingDebt].sort(),
     passedGroupAnchors,
     executedChecks,
-    inheritedChecks: plan.collectorOnly || plan.knownRegressionRepair || plan.intakePresentation ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
+    inheritedChecks: plan.nativeDbRehearsal || plan.collectorOnly || plan.knownRegressionRepair || plan.intakePresentation ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
     fullQualification: 'pending',
     gate: failed ? 'failed' : 'passed-scoped-only',
     gateFailures,
@@ -77,6 +77,10 @@ function runGate() {
   ];
   if (plan.collectorOnlyFailure) requirements.push([`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`, 'failure']);
   let repairProof, repairExecution, intakeExecution;
+  if (plan.nativeDbRehearsal || plan.groups.includes('native-db-rehearsal')) {
+    const proof=verifyNativeDbEligibility({headSha:env.HEAD_SHA});
+    for (const reason of nativeDbLineageFailures(plan,proof)) requirements.push([reason,'failure']);
+  }
   if (plan.intakePresentation || plan.groups.includes('intake-presentation')) {
     const proof = verifyIntakePresentationEligibility({ headSha: env.HEAD_SHA });
     for (const reason of intakePresentationLineageFailures(plan, proof)) requirements.push([reason, 'failure']);

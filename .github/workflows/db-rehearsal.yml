@@ -41,6 +41,7 @@ jobs:
     outputs:
       eligible: ${{ steps.scope.outputs.eligible }}
       intended: ${{ steps.scope.outputs.intended }}
+      native_database: ${{ steps.scope.outputs.native_database }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,12 +65,14 @@ jobs:
           CLASSIFIER_RESULT: ${{ steps.scope.outcome }}
           INTENDED_RESULT: ${{ steps.scope.outputs.intended }}
           ELIGIBLE_RESULT: ${{ steps.scope.outputs.eligible }}
+          NATIVE_DATABASE_RESULT: ${{ steps.scope.outputs.native_database }}
           REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           node --input-type=module <<'NODE'
           import { existsSync, readFileSync, writeFileSync } from 'node:fs';
           const env = process.env;
-          const explicit = env.CLASSIFIER_RESULT === 'success' && ((env.INTENDED_RESULT === 'false' && env.ELIGIBLE_RESULT === 'false') || (env.INTENDED_RESULT === 'true' && env.ELIGIBLE_RESULT === 'true'));
+          const { nativeDbJobDecision, authenticateFailedNativeResolution } = await import('./nextjs/scripts/repair-collector-only.mjs');
+          const explicit = nativeDbJobDecision({classifierResult:env.CLASSIFIER_RESULT,intended:env.INTENDED_RESULT,eligible:env.ELIGIBLE_RESULT,nativeDatabase:env.NATIVE_DATABASE_RESULT}).explicit;
           if (!explicit) {
             const fullDebt = ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'];
             if (!existsSync('collector-only-failure-receipt.json')) writeFileSync('collector-only-failure-receipt.json', JSON.stringify({ headSha: env.REPAIR_HEAD_SHA, gate: 'failed', gateFailures: ['Missing, failed or unqualified collector classification'], fullQualification: 'pending', runResults: { 'collector-only-eligibility': 'unqualified' }, inheritedChecks: {}, pendingDebt: ['hermetic-vitest-71-failures-triage'], knownRegressionObservations: [{ sourceHead: 'e402e61c9ea7d2ecbabe8aeb35144055c2b7b540', runId: 37330362300, jobId: 111831591345, passed: 6407, failed: 71, skipped: 1, files: 442, failingFiles: 17, affectedness: 'pending independent log-only triage' }] }, null, 2) + '\n');
@@ -82,6 +85,7 @@ jobs:
               const { authenticateFailedIntakeResolution } = await import('./nextjs/scripts/repair-known-regression.mjs');
               receipt = authenticateFailedIntakeResolution(receipt, { headSha: env.REPAIR_HEAD_SHA, intendedResult: env.INTENDED_RESULT, eligibleResult: env.ELIGIBLE_RESULT });
             }
+            receipt = authenticateFailedNativeResolution(receipt, {headSha:env.REPAIR_HEAD_SHA,intended:env.INTENDED_RESULT});
             writeFileSync('collector-only-failure-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
             process.exit(1);
           }
@@ -97,8 +101,11 @@ jobs:
   db-rehearsal:
     name: db-rehearsal
     needs: [collector-only-eligibility]
-    # Only an explicit unrelated/unknown decision runs normally; invalid intended corrections fail fast.
-    if: always() && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'
+    # Qualified native scope runs a fresh DB; invalid/missing classification blocks expensive jobs.
+    if: >-
+      always() && needs.collector-only-eligibility.result == 'success' &&
+      ((needs.collector-only-eligibility.outputs.native_database == 'true' && needs.collector-only-eligibility.outputs.intended == 'true' && needs.collector-only-eligibility.outputs.eligible == 'false') ||
+       (needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -124,6 +131,16 @@ jobs:
           ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
 
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.collector-only-eligibility.outputs.native_database == 'true' && (github.event.pull_request.head.sha || github.sha) || github.sha }}
+          fetch-depth: 0
+      - name: Revalidate exact native scope before disposable database setup
+        if: needs.collector-only-eligibility.outputs.native_database == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REQUIRE_NATIVE_DB_SCOPE: "1"
+        run: node nextjs/scripts/repair-collector-only.mjs eligibility
 
       # Pinned to the version the repository already runs locally. `latest` would let a CLI
       # release change what this receipt means without a commit saying so.
@@ -441,6 +458,99 @@ jobs:
           echo "path=${generated[0]}" >> "$GITHUB_OUTPUT"
           echo "version=$completed_read_version" >> "$GITHUB_OUTPUT"
 
+
+      # Native SQL is a create-once, unregistered draft in this disposable checkout.
+      # The private positive fixture leaves the public candidate gate closed.
+      - name: Stage exact native SQL drafts after completed-read
+        id: native-sql-drafts
+        env:
+          NATIVE_REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          NATIVE_SCOPE_REQUIRED: ${{ needs.collector-only-eligibility.outputs.native_database }}
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          migration_names=('native_source_ledger_snapshot' 'native_purpose_authority_schema' 'native_purpose_candidate_reader')
+          migration_sources=('supabase/drafts/native-source-ledger-snapshot.sql' 'supabase/drafts/native-purpose-authority-schema.sql' 'supabase/drafts/native-purpose-candidate-reader.sql')
+          migration_hashes=('08fc0baa0cf5f3776c91331218ca4cdf8e1ad41e688dc06c7363b5f85baec258' '976346877d4103d7f5c0ab14e560d2971370da4ebececd4dba909853c3fd3268' '84f2e7f54d484c7149237c15ede60df79ef688469da79c29e8b33ccc17ae75e2')
+          test_names=('native_source_ledger_snapshot' 'native_purpose_authority_schema' 'native_purpose_candidate_reader' 'native_purpose_candidate_reader_correction')
+          test_sources=('supabase/drafts/tests/native-source-ledger-snapshot.sql' 'supabase/drafts/tests/native-purpose-authority-schema.sql' 'supabase/drafts/tests/native-purpose-candidate-reader.sql' 'supabase/drafts/tests/native-purpose-candidate-reader-correction.sql')
+          test_hashes=('dd462f0b0777310f06793661d3e96d9b3b91f47e6606233600f2997968e6074b' '381e50a775f2d93c0ae6b5757dedb38c3b9c834fe9aff8d8a21e824dd5b1a6fe' 'c5256a58200ac8e3122add1b7b887868d1a8e195256dd97e13ea7e5c54840c25' '5c30190276057bb2d4875d0e6f2c5984b6ec6b0d381e77e40ade64682eb9d58e')
+          present=0
+          for source in "${migration_sources[@]}" "${test_sources[@]}"; do
+            if [[ -e "$source" ]]; then present=$((present + 1)); fi
+          done
+          if [[ "$present" -eq 0 ]]; then
+            test "$NATIVE_SCOPE_REQUIRED" != true
+            echo "state=absent" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$present" -eq 7
+          if [[ "$NATIVE_SCOPE_REQUIRED" == true ]]; then test "$(git rev-parse HEAD)" = "$NATIVE_REQUESTED_HEAD"; fi
+          for source in "${migration_sources[@]}" "${test_sources[@]}"; do test -f "$source"; done
+          prerequisite_state='${{ steps.completed-read-draft.outputs.state }}'
+          previous_version='${{ steps.completed-read-draft.outputs.version }}'
+          test "$prerequisite_state" = ephemeral
+          [[ "$previous_version" =~ ^[0-9]{14}$ ]]
+          export NATIVE_CHECKOUT_HEAD="$(git rev-parse HEAD)"
+          [[ "$NATIVE_REQUESTED_HEAD" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$NATIVE_CHECKOUT_HEAD" =~ ^[a-f0-9]{40}$ ]]
+          test ! -e .native-sql-rehearsal-stage.tsv
+          test ! -e .native-sql-rehearsal-stage.json
+          shopt -s nullglob
+          for i in 0 1 2; do
+            name="${migration_names[$i]}"
+            source="${migration_sources[$i]}"
+            expected="${migration_hashes[$i]}"
+            printf '%s  %s\n' "$expected" "$source" | sha256sum --check
+            existing=(supabase/migrations/*_"$name".sql)
+            test "${#existing[@]}" -eq 0
+            now_version="$(date -u +%Y%m%d%H%M%S)"
+            if [[ "$previous_version" > "$now_version" ]]; then
+              echo "Native prerequisite version is in the future; refusing unordered staging." >&2
+              exit 1
+            fi
+            while [[ ! "$now_version" > "$previous_version" ]]; do
+              sleep 1
+              now_version="$(date -u +%Y%m%d%H%M%S)"
+            done
+            supabase migration new "$name"
+            generated=(supabase/migrations/*_"$name".sql)
+            test "${#generated[@]}" -eq 1
+            [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_"$name"\.sql$ ]]
+            version="${BASH_REMATCH[1]}"
+            [[ "$version" > "$previous_version" ]]
+            cp -- "$source" "${generated[0]}"
+            cmp -- "$source" "${generated[0]}"
+            printf '%s  %s\n' "$expected" "${generated[0]}" | sha256sum --check
+            printf '%s\t%s\t%s\t%s\t%s\n' migration "$source" "${generated[0]}" "$expected" "$version" >> .native-sql-rehearsal-stage.tsv
+            previous_version="$version"
+          done
+          for i in 0 1 2 3; do
+            source="${test_sources[$i]}"
+            expected="${test_hashes[$i]}"
+            target="supabase/tests/${test_names[$i]}.sql"
+            test ! -e "$target"
+            printf '%s  %s\n' "$expected" "$source" | sha256sum --check
+            cp -- "$source" "$target"
+            cmp -- "$source" "$target"
+            printf '%s  %s\n' "$expected" "$target" | sha256sum --check
+            printf '%s\t%s\t%s\t%s\t%s\n' test "$source" "$target" "$expected" - >> .native-sql-rehearsal-stage.tsv
+          done
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const records = readFileSync('.native-sql-rehearsal-stage.tsv', 'utf8').trimEnd().split('\n').map(line => {
+            const [kind, source, path, sha256, version] = line.split('\t');
+            return { kind, source, path, sha256, version };
+          });
+          if (records.length !== 7) throw Error('Incomplete native staging receipt');
+          writeFileSync('.native-sql-rehearsal-stage.json', JSON.stringify({
+            schemaVersion: 1, state: 'ephemeral', requestedHead: process.env.NATIVE_REQUESTED_HEAD,
+            checkoutHead: process.env.NATIVE_CHECKOUT_HEAD, records,
+          }, null, 2) + '\n');
+          NODE
+          echo "state=ephemeral" >> "$GITHUB_OUTPUT"
+          echo "version=$previous_version" >> "$GITHUB_OUTPUT"
+
       # Artifact names are derived from the post-staging migration folder, so the schema
       # artifact is named by the exact temporary head that db reset will apply.
       - name: Read the head migration version out of the folder
@@ -584,6 +694,108 @@ jobs:
           done
           supabase test db
 
+
+      - name: Require both disposable pgTAP passes for exact native SQL
+        if: always() && (needs.collector-only-eligibility.outputs.native_database == 'true' || steps.native-sql-drafts.outputs.state != 'absent')
+        env:
+          NATIVE_STAGE_RESULT: ${{ steps.native-sql-drafts.outcome }}
+          NATIVE_STATE: ${{ steps.native-sql-drafts.outputs.state }}
+          FIRST_PGTAP_RESULT: ${{ steps.pgtap-first.outcome }}
+          SECOND_PGTAP_RESULT: ${{ steps.pgtap-second.outcome }}
+          NATIVE_REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          NATIVE_SCOPE_REQUIRED: ${{ needs.collector-only-eligibility.outputs.native_database }}
+        run: |
+          export NATIVE_CHECKOUT_HEAD="$(git rev-parse HEAD)"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const expected = {"supabase/drafts/native-source-ledger-snapshot.sql":"08fc0baa0cf5f3776c91331218ca4cdf8e1ad41e688dc06c7363b5f85baec258","supabase/drafts/tests/native-source-ledger-snapshot.sql":"dd462f0b0777310f06793661d3e96d9b3b91f47e6606233600f2997968e6074b","supabase/drafts/native-purpose-authority-schema.sql":"976346877d4103d7f5c0ab14e560d2971370da4ebececd4dba909853c3fd3268","supabase/drafts/tests/native-purpose-authority-schema.sql":"381e50a775f2d93c0ae6b5757dedb38c3b9c834fe9aff8d8a21e824dd5b1a6fe","supabase/drafts/native-purpose-candidate-reader.sql":"84f2e7f54d484c7149237c15ede60df79ef688469da79c29e8b33ccc17ae75e2","supabase/drafts/tests/native-purpose-candidate-reader.sql":"c5256a58200ac8e3122add1b7b887868d1a8e195256dd97e13ea7e5c54840c25","supabase/drafts/tests/native-purpose-candidate-reader-correction.sql":"5c30190276057bb2d4875d0e6f2c5984b6ec6b0d381e77e40ade64682eb9d58e"};
+          const requiredTests = ["supabase/tests/native_source_ledger_snapshot.sql","supabase/tests/native_purpose_authority_schema.sql","supabase/tests/native_purpose_candidate_reader.sql","supabase/tests/native_purpose_candidate_reader_correction.sql"];
+          const env = process.env;
+          const failures = [];
+          const receipt = {
+            schemaVersion: 1, nativeSqlOnly: true, fullQualification: 'pending',
+            requestedHead: env.NATIVE_REQUESTED_HEAD, checkoutHead: env.NATIVE_CHECKOUT_HEAD,
+            runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT, job: env.GITHUB_JOB,
+            stagingResult: env.NATIVE_STAGE_RESULT, state: env.NATIVE_STATE,
+            firstPgTapResult: env.FIRST_PGTAP_RESULT, secondPgTapResult: env.SECOND_PGTAP_RESULT,
+            realConcurrency: 'UNRUN', canonicalPinnedRowCrossSessionFk: 'UNRUN',
+          };
+          for (const [label, actual, wanted] of [
+            ['native staging outcome', env.NATIVE_STAGE_RESULT, 'success'],
+            ['native staging state', env.NATIVE_STATE, 'ephemeral'],
+            ['first pgTAP outcome', env.FIRST_PGTAP_RESULT, 'success'],
+            ['second pgTAP outcome', env.SECOND_PGTAP_RESULT, 'success'],
+          ]) if (actual !== wanted) failures.push(label + ': ' + (actual ?? 'missing'));
+          try {
+            if (env.NATIVE_SCOPE_REQUIRED === 'true' && env.NATIVE_CHECKOUT_HEAD !== env.NATIVE_REQUESTED_HEAD) throw Error('Native rehearsal must execute the exact requested head.');
+            const stage = JSON.parse(readFileSync('.native-sql-rehearsal-stage.json', 'utf8'));
+            if (stage.schemaVersion !== 1 || stage.state !== 'ephemeral' ||
+                !/^[a-f0-9]{40}$/.test(env.NATIVE_REQUESTED_HEAD ?? '') ||
+                !/^[a-f0-9]{40}$/.test(env.NATIVE_CHECKOUT_HEAD ?? '') ||
+                stage.requestedHead !== env.NATIVE_REQUESTED_HEAD || stage.checkoutHead !== env.NATIVE_CHECKOUT_HEAD)
+              throw Error('Native stage/checkout identity mismatch');
+            if (!Array.isArray(stage.records) || stage.records.length !== 7 ||
+                new Set(stage.records.map(row => row.source)).size !== 7 ||
+                new Set(stage.records.map(row => row.path)).size !== 7)
+              throw Error('Incomplete or duplicate native source/copy identities');
+            let previousVersion = '';
+            const tests = [];
+            let migrations = 0;
+            for (const row of stage.records) {
+              if (!Object.hasOwn(expected, row.source) || expected[row.source] !== row.sha256)
+                throw Error('Unreviewed native source identity/hash');
+              if (row.kind === 'migration') {
+                const name = row.source.slice('supabase/drafts/'.length).replaceAll('-', '_');
+                if (row.source.startsWith('supabase/drafts/tests/') ||
+                    !/^[0-9]{14}$/.test(row.version) || row.version <= previousVersion ||
+                    row.path !== 'supabase/migrations/' + row.version + '_' + name)
+                  throw Error('Unordered or registered native migration copy');
+                previousVersion = row.version;
+                migrations++;
+              } else if (row.kind === 'test') {
+                const target = 'supabase/tests/' + row.source.slice('supabase/drafts/tests/'.length).replaceAll('-', '_');
+                if (!row.source.startsWith('supabase/drafts/tests/') || row.version !== '-' ||
+                    row.path !== target || !requiredTests.includes(target))
+                  throw Error('Undiscoverable native owning test');
+                tests.push(target);
+              } else throw Error('Unknown native source kind');
+              for (const path of [row.source, row.path]) {
+                if (createHash('sha256').update(readFileSync(path)).digest('hex') !== row.sha256)
+                  throw Error('Native source/copy changed: ' + path);
+              }
+            }
+            if (migrations !== 3 || tests.length !== 4 || requiredTests.some(path => !tests.includes(path)))
+              throw Error('Missing native migration, closed-gate or private positive fixture');
+            receipt.records = stage.records;
+          } catch (error) { failures.push(error.message); }
+          receipt.publicClosedGateEvidence = {
+            test: 'supabase/tests/native_purpose_candidate_reader.sql',
+            sha256: expected['supabase/drafts/tests/native-purpose-candidate-reader.sql'],
+            status: failures.length ? 'unaccepted' : 'passed in both actual pgTAP steps',
+          };
+          receipt.privatePositiveFixtureEvidence = {
+            test: 'supabase/tests/native_purpose_candidate_reader_correction.sql',
+            sha256: expected['supabase/drafts/tests/native-purpose-candidate-reader-correction.sql'],
+            status: failures.length ? 'unaccepted' : 'passed in both actual pgTAP steps',
+            qualification: 'unreviewed/proposed/unbound synthetic candidate; no runtime authority',
+          };
+          receipt.gate = failures.length ? 'failed' : 'passed-native-sql-only';
+          receipt.failures = failures;
+          writeFileSync('native-sql-rehearsal-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
+          if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
+          console.log('Native closed-gate and private positive SQL fixtures passed both disposable pgTAP steps; concurrency and full qualification remain pending.');
+          NODE
+
+      - name: Retain native SQL acceptance or failure receipt
+        if: always() && (needs.collector-only-eligibility.outputs.native_database == 'true' || steps.native-sql-drafts.outputs.state != 'absent')
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-sql-rehearsal-${{ github.event.pull_request.head.sha || github.sha }}
+          path: native-sql-rehearsal-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
       # Last on purpose: the race commits synthetic budgets, reservations and append-only ledger
       # rows it cannot remove, so it must follow every pgTAP pass. Loopback, port and password do
       # not prove the target is disposable, so this step writes a fresh random marker into the
@@ -713,7 +925,7 @@ jobs:
   browser-storage-transport:
     name: Local Chromium signed-storage transport
     needs: [collector-only-eligibility]
-    if: always() && github.event_name == 'pull_request' && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'
+    if: always() && github.event_name == 'pull_request' && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false' && needs.collector-only-eligibility.outputs.native_database == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

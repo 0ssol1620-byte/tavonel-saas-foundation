@@ -385,7 +385,9 @@ test('both workflows independently verify eligibility and failed DB classificati
   const transport = db.slice(db.indexOf('  browser-storage-transport:'));
   assert.ok(transport.includes('needs: [collector-only-eligibility]'));
   assert.ok(transport.includes("if: always() && github.event_name == 'pull_request' && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'"));
-  assert.ok(db.includes("if: always() && needs.collector-only-eligibility.result == 'success' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'"));
+  assert.ok(db.includes("always() && needs.collector-only-eligibility.result == 'success' &&"));
+  assert.ok(db.includes("(needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false')"));
+  assert.ok(db.includes("(needs.collector-only-eligibility.outputs.native_database == 'true' && needs.collector-only-eligibility.outputs.intended == 'true' && needs.collector-only-eligibility.outputs.eligible == 'false')"));
   assert.ok(db.includes('Require an explicit collector classifier decision'));
   assert.ok(db.includes('path: collector-only-failure-receipt.json'));
   assert.ok(repair.includes('node --test scripts/repair-collector-only.test.mjs'));
@@ -437,12 +439,12 @@ test('missing classifier decisions block expensive jobs and failure receipts rej
 
 test('actual workflow protocol blocks missing or failed classifier outputs and preserves failure debt', () => {
   const db = readFileSync(resolve(process.cwd(), '../.github/workflows/db-rehearsal.yml'), 'utf8');
-  const script = db.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n          NODE/)[1].replace(/^          /gm, '');
+  const script = db.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n          NODE/)[1].replace(/^          /gm, '').replace("import('./nextjs/scripts/repair-collector-only.mjs')", 'import(' + JSON.stringify(new URL('./repair-collector-only.mjs', import.meta.url).href) + ')');
   const root = mkdtempSync(resolve(tmpdir(), 'repair-collector-protocol-'));
   assert.ok(isInsideWorkspace(resolve(tmpdir()), root));
   try {
-    for (const [result, intended, eligible, expected] of [['success', 'false', 'false', 0], ['success', 'true', 'true', 0], ['success', '', '', 1], ['failure', 'true', 'false', 1], ['success', 'true', 'false', 1]]) {
-      const run = spawnSync(process.execPath, ['--input-type=module'], { cwd: root, input: script, env: { ...process.env, CLASSIFIER_RESULT: result, INTENDED_RESULT: intended, ELIGIBLE_RESULT: eligible, REPAIR_HEAD_SHA: head }, encoding: 'utf8' });
+    for (const [result, intended, eligible, expected, nativeDatabase] of [['success', 'false', 'false', 0, 'false'], ['success', 'true', 'true', 0, 'false'], ['success', 'true', 'false', 0, 'true'], ['success', '', '', 1, 'false'], ['failure', 'true', 'false', 1, 'false'], ['success', 'true', 'false', 1, 'false'], ['success', 'false', 'false', 1, undefined], ['success', 'true', 'true', 1, 'true']]) {
+      const run = spawnSync(process.execPath, ['--input-type=module'], { cwd: root, input: script, env: { ...process.env, CLASSIFIER_RESULT: result, INTENDED_RESULT: intended, ELIGIBLE_RESULT: eligible, NATIVE_DATABASE_RESULT: nativeDatabase, REPAIR_HEAD_SHA: head }, encoding: 'utf8' });
       assert.equal(run.status, expected, run.stderr);
       if (expected) {
         const receipt = JSON.parse(readFileSync(resolve(root, 'collector-only-failure-receipt.json'), 'utf8'));
@@ -472,4 +474,58 @@ test('actual gate CLI rejects an eligibility-failure marker even when surroundin
     assert.deepEqual(receipt.inheritedChecks, {});
     assert.ok(receipt.pendingDebt.includes(REGRESSION_DEBT));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+import * as native from './repair-collector-only.mjs';
+const nativeRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
+let nativeParentFixtureCache;
+function nativeParentFixture() {
+  if(!nativeParentFixtureCache){const endpoint=p=>JSON.parse(execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/'+p],{encoding:'utf8',timeout:20000})),value=process.env.NATIVE_DB_PARENT_EVIDENCE?JSON.parse(readFileSync(process.env.NATIVE_DB_PARENT_EVIDENCE,'utf8')):{run:endpoint('actions/runs/37387689345'),job:endpoint('actions/jobs/112025031853'),artifact:endpoint('actions/artifacts/11379078787')},archive=process.env.NATIVE_DB_PARENT_ARCHIVE?readFileSync(process.env.NATIVE_DB_PARENT_ARCHIVE):execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/actions/artifacts/11379078787/zip'],{timeout:20000});nativeParentFixtureCache={run:value.run,job:value.job,artifact:value.artifact,archive};}
+  return {...structuredClone({run:nativeParentFixtureCache.run,job:nativeParentFixtureCache.job,artifact:nativeParentFixtureCache.artifact}),archive:Buffer.from(nativeParentFixtureCache.archive)};
+}
+function nativeApiFixture(fixture=nativeParentFixture()) {return p=>{const values={'actions/runs/37387689345':fixture.run,'actions/jobs/112025031853':fixture.job,'actions/artifacts/11379078787':fixture.artifact,'actions/artifacts/11379078787/zip':fixture.archive};if(!Object.hasOwn(values,p))throw Error('Unexpected native endpoint '+p);return Buffer.isBuffer(values[p])?Buffer.from(values[p]):structuredClone(values[p]);};}
+function nativeGitFixture(options={}) {
+  return (_command,original)=>{const args=original[0]==='-C'?original.slice(2):original;
+    if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'native-fixture-root':options.checkout??head;
+    if(args[0]==='rev-list')return args.at(-1)===native.NATIVE_DB_PARENT?`${native.NATIVE_DB_PARENT} ${options.grandparent??'203d14c615a99617e9073bfea3b2a281952f9b8f'}`:`${head} ${options.parent??native.NATIVE_DB_PARENT}`;
+    if(args[0]==='merge-base'){if(options.ancestor===false)throw Error('Missing ancestry');return '';}
+    if(args[0]==='diff'){if(args[1]==='--raw'){if(options.dirty)throw Error('Dirty native checkout');return '';}return (options.paths??[...new Set([...native.NATIVE_DB_CONFIG_PATHS,...Object.keys(native.NATIVE_DB_SOURCE_BLOBS)])]).join('\0')+'\0';}
+    if(args[0]==='ls-tree'){const ref=args[2],p=args.at(-1),pin=native.NATIVE_DB_SOURCE_BLOBS[p];let oid=ref===native.COLLECTOR_BASE?native.NATIVE_DB_TRANSPORT_BLOBS[p]:pin?pin[ref===native.NATIVE_DB_PARENT?'before':'after']:ref===native.NATIVE_DB_PARENT?native.NATIVE_DB_PARENT_BLOBS[p]:native.NATIVE_DB_CONFIG_PATHS.includes(p)?gitBlob(readFileSync(resolve(nativeRoot,p))):native.NATIVE_DB_PARENT_BLOBS[p];if(options.badBlob===p)oid='f'.repeat(40);return oid?`${options.unsafe===p?'120000':'100644'} blob ${oid}\t${p}`:'';}
+    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(nativeRoot,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}
+    throw Error('Unexpected native metadata query '+args.join(' '));
+  };
+}
+function nativeProof(){return native.verifyNativeDbEligibility({headSha:head,exec:nativeGitFixture(),api:nativeApiFixture()});}
+test('native DB source binds exact a3b, all16 paths, seven SQL payloads and transport dependencies before evidence reads',()=>{
+  const proof=nativeProof();assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.source.exactChangedPaths.length,16);assert.equal(proof.source.parent,native.NATIVE_DB_PARENT);assert.equal(Object.keys(proof.source.transportDependencyBlobs).length,16);
+  const sql='supabase/drafts/native-purpose-candidate-reader.sql',runner='nextjs/scripts/run-repair-check.mjs';
+  for(const options of [{checkout:'f'.repeat(40)},{parent:'f'.repeat(40)},{grandparent:'f'.repeat(40)},{ancestor:false},{dirty:true},{badBlob:sql},{mutated:sql},{unsafe:sql},{badBlob:runner},{badBlob:'nextjs/lib/r2-presign.ts'},{mutated:'nextjs/scripts/repair-scope-gate.mjs'},{paths:native.NATIVE_DB_CONFIG_PATHS},{paths:[...proof.source.exactChangedPaths,'nextjs/lib/auth.ts']}]){let reads=0;const result=native.verifyNativeDbEligibility({headSha:head,exec:nativeGitFixture(options),api:()=>{reads++;throw Error('Evidence must not be read');}});assert.equal(result.eligible,false,JSON.stringify(options));assert.equal(reads,0);}
+});
+test('native parent proof requires actual a3b run, receipt digest,659/22 units,158 browsers and all captures',()=>{
+  const f=nativeParentFixture();assert.equal(native.verifyNativeDbParentEvidence(f).eligible,true);
+  for(const mutate of [x=>x.run.head_sha=head,x=>x.run.run_attempt=2,x=>x.job.steps.find(s=>s.name==='Require exact file-backed Home and Pricing captures').conclusion='failure',x=>x.artifact.expired=true,x=>x.artifact.workflow_run.head_sha=head,x=>x.archive[100]^=1]){const changed=nativeParentFixture();mutate(changed);assert.equal(native.verifyNativeDbParentEvidence(changed).eligible,false);}
+});
+test('native Repair plan selects only owning and canonical source tests, retains DB debt and truthful historical transport',()=>{
+  const proof=nativeProof(),normal={headSha:head,repairAnchorSha:native.FULL_ANCHOR,groups:['unknown'],unitFiles:[],browserFiles:['e2e/site-nav.spec.ts'],unknownPaths:['native'],runFullHermeticVitest:true},plan=native.nativeDbPlan(normal,proof);
+  assert.deepEqual(plan.unitFiles,['lib/db-rehearsal-workflow.test.ts','lib/pgtap-fixtures.test.ts']);assert.deepEqual(plan.browserFiles,[]);assert.deepEqual(plan.unknownPaths,[]);
+  for(const name of ['runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','runDatabaseRehearsal'])assert.equal(plan[name],false);
+  assert.equal(plan.runWorkflowStaticGate,true);assert.equal(plan.inheritedChecks.database,undefined);assert.equal(plan.databaseBaselineEvidence,undefined);assert.equal(plan.knownRegressionResolution.passed,433);assert.match(plan.inheritedChecks.storageTransport.status,/historical.*not executed/);assert.deepEqual(native.nativeDbLineageFailures(plan,proof),[]);
+  for(const change of [{unitFiles:[]},{browserFiles:['e2e/site-nav.spec.ts']},{deferredGroups:[]},{pendingQualificationDebt:[]},{pendingFullDebt:[]},{inheritedChecks:{...plan.inheritedChecks,database:{status:'success'}}},{nativeDbRehearsal:{eligible:true}},{runFullHermeticVitest:true}])assert.ok(native.nativeDbLineageFailures({...plan,...change},proof).length);
+  const receipt=buildRepairReceipt(plan,{headSha:head,databaseResult:'success'});assert.equal(receipt.gate,'passed-scoped-only');assert.equal(receipt.runResults['database-contract'],'pending-deferred');assert.ok(receipt.pendingDebt.includes('database-contract'));assert.match(receipt.databaseObservation,/no DB inheritance accepted/);assert.equal(receipt.inheritedChecks.database,undefined);assert.match(receipt.inheritedChecks.storageTransport.status,/not executed/);
+});
+test('native DB decision permits fresh DB only and fails missing/contradictory classifier outputs',()=>{
+  assert.deepEqual(native.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'false',nativeDatabase:'true'}),{explicit:true,runDatabase:true,runTransport:false});
+  assert.deepEqual(native.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false'}),{explicit:true,runDatabase:false,runTransport:false});
+  assert.deepEqual(native.nativeDbJobDecision({classifierResult:'success',intended:'false',eligible:'false',nativeDatabase:'false'}),{explicit:true,runDatabase:true,runTransport:true});
+  for(const classifierResult of ['failure','cancelled','skipped',undefined])assert.deepEqual(native.nativeDbJobDecision({classifierResult,intended:'true',eligible:'false',nativeDatabase:'true'}),{explicit:false,runDatabase:false,runTransport:false});
+  for(const [intended,eligible,nativeDatabase]of [['true','false','false'],['false','false','true'],['true','true','true'],['true','false',undefined]])assert.deepEqual(native.nativeDbJobDecision({classifierResult:'success',intended,eligible,nativeDatabase}),{explicit:false,runDatabase:false,runTransport:false});
+});
+test('native CLI rejects unavailable scope before normal planning and keeps failure receipts for both entry modes',()=>{
+  for(const mode of ['plan','eligibility']){const temp=mkdtempSync(resolve(tmpdir(),'native-db-invalid-cli-'));try{const run=spawnSync(process.execPath,[resolve(nativeRoot,'nextjs/scripts/repair-collector-only.mjs'),mode],{cwd:temp,env:{...process.env,REPAIR_HEAD_SHA:head,GITHUB_OUTPUT:''},encoding:'utf8'});assert.equal(run.status,1);assert.match(run.stderr,/no installation or broad fallback/);const receipt=JSON.parse(readFileSync(resolve(temp,'collector-only-failure-receipt.json'),'utf8'));assert.equal(receipt.gate,'failed');assert.deepEqual(receipt.inheritedChecks,{});assert.ok(receipt.pendingDebt.includes('database-contract'));assert.equal(receipt.fullQualification,'pending');}finally{rmSync(temp,{recursive:true,force:true});}}
+});
+test('native final gate rejects unqualified proof even with synthetic successful check and DB outcomes',()=>{
+  const proof=nativeProof(),plan=native.nativeDbPlan({headSha:head,repairAnchorSha:native.FULL_ANCHOR},proof),temp=mkdtempSync(resolve(tmpdir(),'native-db-failed-gate-'));try{writeFileSync(resolve(temp,'repair-plan.json'),JSON.stringify(plan));const env={...process.env,HEAD_SHA:head,DATABASE_REHEARSAL_RESULT:'success'};for(const key of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT'])env[key]='success';const run=spawnSync(process.execPath,[resolve(nativeRoot,'nextjs/scripts/repair-scope-gate.mjs')],{cwd:temp,env,encoding:'utf8'});assert.equal(run.status,1);const receipt=JSON.parse(readFileSync(resolve(temp,'repair-receipt.json'),'utf8'));assert.equal(receipt.gate,'failed');assert.ok(receipt.pendingDebt.includes('database-contract'));assert.equal(receipt.inheritedChecks.database,undefined);assert.equal(receipt.inheritedChecks.storageTransport.status,'not accepted for current head');}finally{rmSync(temp,{recursive:true,force:true});}
+});
+test('required native pgTAP gate rejects requested/checkout mismatch and skipped passes before any acceptance claim',()=>{
+  const workflow=readFileSync(resolve(nativeRoot,'.github/workflows/db-rehearsal.yml'),'utf8'),block=workflow.slice(workflow.indexOf('      - name: Require both disposable pgTAP passes for exact native SQL')),start=block.indexOf("node --input-type=module <<'NODE'\n")+"node --input-type=module <<'NODE'\n".length,script=block.slice(start,block.indexOf('\n          NODE',start)).replace(/^ {10}/gm,''),temp=mkdtempSync(resolve(tmpdir(),'native-db-exact-head-gate-'));try{const env={...process.env,NATIVE_SCOPE_REQUIRED:'true',NATIVE_REQUESTED_HEAD:head,NATIVE_CHECKOUT_HEAD:'f'.repeat(40),NATIVE_STAGE_RESULT:'success',NATIVE_STATE:'ephemeral',FIRST_PGTAP_RESULT:'success',SECOND_PGTAP_RESULT:'skipped'};const run=spawnSync(process.execPath,['--input-type=module'],{cwd:temp,env,input:script,encoding:'utf8'});assert.equal(run.status,1);const receipt=JSON.parse(readFileSync(resolve(temp,'native-sql-rehearsal-receipt.json'),'utf8'));assert.equal(receipt.gate,'failed');assert.match(JSON.stringify(receipt),/exact requested head/);assert.match(JSON.stringify(receipt),/second pgTAP outcome: skipped/);}finally{rmSync(temp,{recursive:true,force:true});}
 });
