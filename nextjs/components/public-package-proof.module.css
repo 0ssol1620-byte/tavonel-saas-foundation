@@ -36,6 +36,8 @@
 .sources li > span { display: block; color: #46545e; font: 500 13px/1.5 var(--f-sans); }
 .sources a, .actions a { display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; box-sizing: border-box; color: #2447b3; font: 500 14px/1.5 var(--f-sans); text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-direction: column; padding-block: 12px; }
+/* Keep focused controls and their outlines clear of rounded viewport scroll edges. */
+.proof :is(summary, a, pre) { scroll-margin-block: 8px; }
 .proof :is(summary, a, pre):focus-visible { outline: 3px solid #2447b3; outline-offset: 3px; }
 @media (max-width: 600px) {
   .proof { margin-top: 20px; }
