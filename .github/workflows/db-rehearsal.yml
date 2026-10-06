@@ -551,6 +551,77 @@ jobs:
           echo "state=ephemeral" >> "$GITHUB_OUTPUT"
           echo "version=$previous_version" >> "$GITHUB_OUTPUT"
 
+      # Separate staging only: no selector/admission promotion or production gate change.
+      # A self-contained pgTAP wrapper selects rollback-only unit mode; races are NOT run here.
+      - name: Stage exact native World commit after native prerequisites
+        id: native-world-sql-drafts
+        env:
+          WORLD_REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          WORLD_PREREQUISITE_RESULT: ${{ steps.native-sql-drafts.outcome }}
+          WORLD_PREREQUISITE_STATE: ${{ steps.native-sql-drafts.outputs.state }}
+          WORLD_PREREQUISITE_VERSION: ${{ steps.native-sql-drafts.outputs.version }}
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          schema='supabase/drafts/native-world-reduction-commit.sql'
+          fixture='supabase/drafts/tests/native-world-reduction-commit.sql'
+          present=0
+          for source in "$schema" "$fixture"; do if test -f "$source"; then present=$((present + 1)); fi; done
+          if test "$present" -eq 0; then echo 'state=absent' >> "$GITHUB_OUTPUT"; exit 0; fi
+          test "$present" -eq 2
+          test "$WORLD_PREREQUISITE_RESULT" = success
+          test "$WORLD_PREREQUISITE_STATE" = ephemeral
+          export WORLD_CHECKOUT_HEAD="$(git rev-parse HEAD)"
+          test "$WORLD_CHECKOUT_HEAD" = "$WORLD_REQUESTED_HEAD"
+          printf '%s  %s\n' 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db' "$schema" '1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718' "$fixture" | sha256sum --check
+          previous_version="$(ls supabase/migrations/*.sql | sed 's#.*/##' | sed -E 's/^([0-9]+)_.*/\1/' | sort | tail -1)"
+          test "$previous_version" = "$WORLD_PREREQUISITE_VERSION"
+          shopt -s nullglob
+          existing=(supabase/migrations/*_native_world_reduction_commit.sql)
+          test "${#existing[@]}" -eq 0
+          now_version="$(date -u +%Y%m%d%H%M%S)"
+          if [[ "$previous_version" > "$now_version" ]]; then echo 'World prerequisite version is in the future' >&2; exit 1; fi
+          while [[ ! "$now_version" > "$previous_version" ]]; do sleep 1; now_version="$(date -u +%Y%m%d%H%M%S)"; done
+          supabase migration new native_world_reduction_commit
+          generated=(supabase/migrations/*_native_world_reduction_commit.sql)
+          test "${#generated[@]}" -eq 1
+          [[ "$(basename "${generated[0]}")" =~ ^([0-9]{14})_native_world_reduction_commit\.sql$ ]]
+          version="${BASH_REMATCH[1]}"
+          [[ "$version" > "$previous_version" ]]
+          cp -- "$schema" "${generated[0]}"
+          cmp -- "$schema" "${generated[0]}"
+          printf '%s  %s\n' 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db' "${generated[0]}" | sha256sum --check
+          target='supabase/tests/native_world_reduction_commit.sql'
+          test ! -e "$target"
+          printf '%s\n' '\set ON_ERROR_STOP on' '\set world_disposable 1' '\set world_role unit' '\set world_case none' > "$target"
+          cat -- "$fixture" >> "$target"
+          cmp -- "$fixture" <(tail -n +5 "$target")
+          printf '%s  %s\n' 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84' "$target" | sha256sum --check
+          export WORLD_MIGRATION_PATH="${generated[0]}" WORLD_MIGRATION_VERSION="$version"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const env = process.env;
+          const prerequisiteBytes = readFileSync('.native-sql-rehearsal-stage.json');
+          const prerequisite = JSON.parse(prerequisiteBytes);
+          if (prerequisite.schemaVersion !== 1 || prerequisite.state !== 'ephemeral' ||
+              prerequisite.requestedHead !== env.WORLD_REQUESTED_HEAD || prerequisite.checkoutHead !== env.WORLD_CHECKOUT_HEAD ||
+              prerequisite.records?.length !== 7 || prerequisite.records.filter(r => r.kind === 'migration').at(-1)?.version !== env.WORLD_PREREQUISITE_VERSION)
+            throw Error('Exact native prerequisite staging required');
+          writeFileSync('.native-world-sql-rehearsal-stage.json', JSON.stringify({
+            schemaVersion: 1, state: 'ephemeral', requestedHead: env.WORLD_REQUESTED_HEAD, checkoutHead: env.WORLD_CHECKOUT_HEAD,
+            prerequisiteStageSha256: createHash('sha256').update(prerequisiteBytes).digest('hex'),
+            prerequisiteVersion: env.WORLD_PREREQUISITE_VERSION,
+            records: [
+              {kind: 'migration', source: 'supabase/drafts/native-world-reduction-commit.sql', path: env.WORLD_MIGRATION_PATH,
+                sha256: 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', copySha256: 'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', version: env.WORLD_MIGRATION_VERSION},
+              {kind: 'unit-test', source: 'supabase/drafts/tests/native-world-reduction-commit.sql', path: 'supabase/tests/native_world_reduction_commit.sql',
+                sha256: '1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718', copySha256: 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84', version: '-'},
+            ],
+          }, null, 2) + '\n');
+          NODE
+          echo 'state=ephemeral' >> "$GITHUB_OUTPUT"
+
       # Artifact names are derived from the post-staging migration folder, so the schema
       # artifact is named by the exact temporary head that db reset will apply.
       - name: Read the head migration version out of the folder
@@ -696,6 +767,7 @@ jobs:
 
 
       - name: Require both disposable pgTAP passes for exact native SQL
+        id: native-sql-acceptance
         if: always() && (needs.collector-only-eligibility.outputs.native_database == 'true' || steps.native-sql-drafts.outputs.state != 'absent')
         env:
           NATIVE_STAGE_RESULT: ${{ steps.native-sql-drafts.outcome }}
@@ -793,6 +865,98 @@ jobs:
         with:
           name: native-sql-rehearsal-${{ github.event.pull_request.head.sha || github.sha }}
           path: native-sql-rehearsal-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require both disposable pgTAP passes for native World commit
+        if: always() && steps.native-world-sql-drafts.outputs.state != 'absent'
+        env:
+          WORLD_STAGE_RESULT: ${{ steps.native-world-sql-drafts.outcome }}
+          WORLD_STATE: ${{ steps.native-world-sql-drafts.outputs.state }}
+          WORLD_PREREQUISITE_RESULT: ${{ steps.native-sql-acceptance.outcome }}
+          FIRST_PGTAP_RESULT: ${{ steps.pgtap-first.outcome }}
+          SECOND_PGTAP_RESULT: ${{ steps.pgtap-second.outcome }}
+          WORLD_REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          export WORLD_CHECKOUT_HEAD="$(git rev-parse HEAD)"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const env = process.env, failures = [];
+          const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+          const expected = ['de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db', '1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718'];
+          const sources = ['supabase/drafts/native-world-reduction-commit.sql', 'supabase/drafts/tests/native-world-reduction-commit.sql'];
+          const prefix = Buffer.from('\\set ON_ERROR_STOP on\n\\set world_disposable 1\n\\set world_role unit\n\\set world_case none\n');
+          const receipt = {schemaVersion: 1, nativeWorldSqlOnly: true, fullQualification: 'pending',
+            requestedHead: env.WORLD_REQUESTED_HEAD, checkoutHead: env.WORLD_CHECKOUT_HEAD,
+            runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT, job: env.GITHUB_JOB,
+            stagingResult: env.WORLD_STAGE_RESULT, state: env.WORLD_STATE, prerequisiteResult: env.WORLD_PREREQUISITE_RESULT,
+            firstPgTapResult: env.FIRST_PGTAP_RESULT, secondPgTapResult: env.SECOND_PGTAP_RESULT,
+            realConcurrency: 'UNRUN', canonicalPinnedRowCrossSessionFk: 'UNRUN', reservationExpiryCrossSession: 'UNRUN',
+            concurrencyRequirement: 'Separate barrier-controlled psql sessions/job outside the rollback-only unit transaction; fresh disposable setup per case',
+          };
+          for (const [label, actual, wanted] of [
+            ['World staging outcome', env.WORLD_STAGE_RESULT, 'success'], ['World staging state', env.WORLD_STATE, 'ephemeral'],
+            ['native prerequisite acceptance', env.WORLD_PREREQUISITE_RESULT, 'success'],
+            ['first pgTAP outcome', env.FIRST_PGTAP_RESULT, 'success'], ['second pgTAP outcome', env.SECOND_PGTAP_RESULT, 'success'],
+          ]) if (actual !== wanted) failures.push(label + ': ' + (actual ?? 'missing'));
+          try {
+            if (!/^[a-f0-9]{40}$/.test(env.WORLD_REQUESTED_HEAD ?? '') || env.WORLD_CHECKOUT_HEAD !== env.WORLD_REQUESTED_HEAD)
+              throw Error('World rehearsal must execute the exact requested head');
+            const stage = JSON.parse(readFileSync('.native-world-sql-rehearsal-stage.json', 'utf8'));
+            const prerequisiteBytes = readFileSync('.native-sql-rehearsal-stage.json');
+            const prerequisite = JSON.parse(prerequisiteBytes);
+            const accepted = JSON.parse(readFileSync('native-sql-rehearsal-receipt.json', 'utf8'));
+            if (stage.schemaVersion !== 1 || stage.state !== 'ephemeral' || stage.requestedHead !== env.WORLD_REQUESTED_HEAD ||
+                stage.checkoutHead !== env.WORLD_CHECKOUT_HEAD || hash(prerequisiteBytes) !== stage.prerequisiteStageSha256 ||
+                prerequisite.schemaVersion !== 1 || prerequisite.state !== 'ephemeral' ||
+                prerequisite.requestedHead !== stage.requestedHead || prerequisite.checkoutHead !== stage.checkoutHead ||
+                prerequisite.records?.length !== 7 || accepted.gate !== 'passed-native-sql-only' ||
+                accepted.requestedHead !== stage.requestedHead || accepted.checkoutHead !== stage.checkoutHead ||
+                JSON.stringify(accepted.records) !== JSON.stringify(prerequisite.records) ||
+                accepted.firstPgTapResult !== 'success' || accepted.secondPgTapResult !== 'success')
+              throw Error('World/native prerequisite identity or acceptance mismatch');
+            const lastVersion = prerequisite.records.filter(row => row.kind === 'migration').at(-1)?.version;
+            if (!/^[0-9]{14}$/.test(lastVersion ?? '') || lastVersion !== stage.prerequisiteVersion)
+              throw Error('World native prerequisite version mismatch');
+            if (!Array.isArray(stage.records) || stage.records.length !== 2 ||
+                new Set(stage.records.map(row => row.source)).size !== 2 || new Set(stage.records.map(row => row.path)).size !== 2)
+              throw Error('Incomplete or duplicate World source/copy identities');
+            for (const [i, row] of stage.records.entries()) {
+              const target = i === 0 ? 'supabase/migrations/' + row.version + '_native_world_reduction_commit.sql'
+                : 'supabase/tests/native_world_reduction_commit.sql';
+              if (row.source !== sources[i] || row.sha256 !== expected[i] || row.path !== target ||
+                  row.kind !== (i === 0 ? 'migration' : 'unit-test') ||
+                  (i === 0 ? !/^[0-9]{14}$/.test(row.version) || row.version <= lastVersion : row.version !== '-') ||
+                  row.copySha256 !== (i === 0 ? expected[0] : 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84'))
+                throw Error('Unreviewed, unordered or undiscoverable World copy');
+              const sourceBytes = readFileSync(row.source), copyBytes = readFileSync(row.path);
+              if (hash(sourceBytes) !== row.sha256 || hash(copyBytes) !== row.copySha256 ||
+                  !(i === 0 ? copyBytes.equals(sourceBytes) : copyBytes.equals(Buffer.concat([prefix, sourceBytes]))))
+                throw Error('World source/copy/preamble changed');
+            }
+            receipt.records = stage.records;
+            receipt.prerequisiteStageSha256 = stage.prerequisiteStageSha256;
+          } catch (error) { failures.push(error.message); }
+          const evidence = {test: 'supabase/tests/native_world_reduction_commit.sql', payloadSha256: expected[1],
+            copySha256: 'df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84', status: failures.length ? 'unaccepted' : 'passed in both actual pgTAP steps'};
+          receipt.publicClosedGateEvidence = {...evidence, assertions: ['public gate stays false', 'public function closed'],
+            qualification: 'Production gate remains disabled; no runtime authority granted'};
+          receipt.privateVerifierDoubleEvidence = {...evidence, qualification:
+            'Owner-only synthetic gate-open function copy and fake verifier; no scanner/CDR/producer/issuer/Core qualification or production verifier implementation'};
+          receipt.gate = failures.length ? 'failed' : 'passed-native-world-unit-sql-only';
+          receipt.failures = failures;
+          writeFileSync('native-world-sql-rehearsal-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
+          if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
+          console.log('World rollback-only unit fixture passed both disposable pgTAP steps; cross-session races and full qualification remain UNRUN/pending.');
+          NODE
+
+      - name: Retain native World SQL acceptance or failure receipt
+        if: always() && steps.native-world-sql-drafts.outputs.state != 'absent'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-world-sql-rehearsal-${{ github.event.pull_request.head.sha || github.sha }}
+          path: native-world-sql-rehearsal-receipt.json
           if-no-files-found: error
           retention-days: 30
 

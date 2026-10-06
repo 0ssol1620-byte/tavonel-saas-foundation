@@ -54,6 +54,134 @@ describe("db-rehearsal local stack port reservation", () => {
   });
 });
 
+describe("db-rehearsal native World SQL acceptance", () => {
+  const body = job("db-rehearsal");
+  const stage = body.split("- name: Stage exact native World commit after native prerequisites")[1]?.split("# Artifact names are derived")[0] ?? "";
+  const finalGate = body.split("- name: Require both disposable pgTAP passes for native World commit")[1]?.split("- name: Retain native World SQL acceptance")[0] ?? "";
+  const gateCode = finalGate.split("node --input-type=module <<'NODE'\n")[1]?.split("\n          NODE")[0]?.split("\n").map(line => line.slice(10)).join("\n") ?? "";
+  const inputs = [
+    {source:"supabase/drafts/native-world-reduction-commit.sql",sha256:"de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db"},
+    {source:"supabase/drafts/tests/native-world-reduction-commit.sql",sha256:"1124200ca855d14f38337aeaf0156cf5462949b8bc24d5cc2f55ca10b6a65718"},
+  ];
+  const prefix = Buffer.from("\\set ON_ERROR_STOP on\n\\set world_disposable 1\n\\set world_role unit\n\\set world_case none\n");
+  const wrapperSha256 = "df2b30a09f3dab4b86d62f06156ae575d5bc1f613e2efbc228e473e60eb19f84";
+  const hash = (bytes:Buffer|string) => createHash("sha256").update(bytes).digest("hex");
+
+  it("stages only on a disposable hosted runner after all exact native prerequisites and before reset", () => {
+    expect(stage).not.toBe("");
+    expect(body.indexOf("- name: Stage exact native World commit")).toBeGreaterThan(body.indexOf("- name: Stage exact native SQL drafts"));
+    expect(body.indexOf("- name: Stage exact native World commit")).toBeLessThan(body.indexOf("- name: Read the head migration version"));
+    for (const required of ['test "$RUNNER_ENVIRONMENT" = github-hosted', 'test "$present" -eq 2',
+      'test "$WORLD_PREREQUISITE_RESULT" = success', 'test "$WORLD_PREREQUISITE_STATE" = ephemeral',
+      'test "$WORLD_CHECKOUT_HEAD" = "$WORLD_REQUESTED_HEAD"', 'test "$previous_version" = "$WORLD_PREREQUISITE_VERSION"',
+      'test "${#existing[@]}" -eq 0', '[[ "$version" > "$previous_version" ]]',
+      'cmp -- "$schema" "${generated[0]}"', 'cmp -- "$fixture" <(tail -n +5 "$target")',
+      "test ! -e \"$target\"", "prerequisiteStageSha256"]) expect(stage).toContain(required);
+    const replay = body.split("- name: Apply the repair migrations a second time and re-run the suite")[1]?.split("- name: Require both disposable pgTAP passes for exact native SQL")[0] ?? "";
+    expect(replay).not.toMatch(/native_|native-/);
+    expect((body.match(/supabase test db\n/g) ?? []).length).toBe(2);
+  });
+
+  it("pins the corrected source bytes and self-contained unit wrapper without altering the SQL fixture", () => {
+    for (const input of inputs) {
+      expect(hash(readFileSync("../"+input.source))).toBe(input.sha256);
+      for (const code of [stage,gateCode]) {expect(code).toContain(input.source);expect(code).toContain(input.sha256);}
+    }
+    const fixture = readFileSync("../"+inputs[1].source);
+    expect(hash(Buffer.concat([prefix,fixture]))).toBe(wrapperSha256);
+    for (const code of [stage,gateCode]) expect(code).toContain(wrapperSha256);
+    for (const assertion of ["public gate stays false","public function closed","expired_before_entry","settled_past_expiry",
+      "NATIVE_WORLD_RESERVATION_EXPIRED", "world_arm_expiry", "rollback;"]) expect(fixture.toString()).toContain(assertion);
+    expect(stage).toContain("'\\set world_role unit'");
+    expect(stage).toContain("'\\set world_case none'");
+    expect(stage).not.toContain("world_role setup");
+  });
+
+  it("requires both actual outcomes plus prerequisite acceptance and keeps races/private doubles distinct", () => {
+    for (const required of ["if: always() && steps.native-world-sql-drafts.outputs.state != 'absent'",
+      "steps.native-world-sql-drafts.outcome", "steps.native-sql-acceptance.outcome", "steps.pgtap-first.outcome", "steps.pgtap-second.outcome",
+      "publicClosedGateEvidence", "privateVerifierDoubleEvidence", "realConcurrency: 'UNRUN'", "reservationExpiryCrossSession: 'UNRUN'",
+      "Separate barrier-controlled psql sessions/job outside the rollback-only unit transaction"]) expect(finalGate).toContain(required);
+    expect(body).toContain("id: native-sql-acceptance");
+    expect(body).toContain("path: native-world-sql-rehearsal-receipt.json");
+    expect(stage+finalGate).not.toMatch(/world_role (setup|holder|contender|arm_expiry)/);
+  });
+
+  type Row = {kind:string;source:string;path:string;sha256:string;copySha256:string;version:string};
+  type Stage = {schemaVersion:number;state:string;requestedHead:string;checkoutHead:string;prerequisiteStageSha256:string;prerequisiteVersion:string;records:Row[]};
+  function runGate(overrides:Record<string,string|undefined>={},mutate?:(root:string,stage:Stage)=>void) {
+    const tempRoot=realpathSync(tmpdir()),temp=realpathSync(mkdtempSync(join(tempRoot,"native-world-sql-gate-")));
+    if (dirname(temp)!==tempRoot || !basename(temp).startsWith("native-world-sql-gate-")) throw Error("Fixture cleanup path escaped temporary root");
+    try {
+      // Gate harness only: these success strings are doubles, never SQL execution evidence.
+      const head="a".repeat(40),previousVersion="20261006120003";
+      const prerequisite={schemaVersion:1,state:"ephemeral",requestedHead:head,checkoutHead:head,
+        records:Array.from({length:7},(_,i)=>({kind:i<3?"migration":"test",source:`prior-source-${i}`,path:`prior-copy-${i}`,version:i<3?`2026100612000${i+1}`:"-"}))};
+      const prerequisiteBytes=JSON.stringify(prerequisite);
+      writeFileSync(join(temp,".native-sql-rehearsal-stage.json"),prerequisiteBytes);
+      writeFileSync(join(temp,"native-sql-rehearsal-receipt.json"),JSON.stringify({...prerequisite,gate:"passed-native-sql-only",firstPgTapResult:"success",secondPgTapResult:"success"}));
+      const records=inputs.map((input,i)=>{
+        const path=i===0?"supabase/migrations/20261006120004_native_world_reduction_commit.sql":"supabase/tests/native_world_reduction_commit.sql";
+        const source=readFileSync("../"+input.source);
+        for(const target of [input.source,path]) mkdirSync(dirname(join(temp,target)),{recursive:true});
+        writeFileSync(join(temp,input.source),source);
+        writeFileSync(join(temp,path),i===0?source:Buffer.concat([prefix,source]));
+        return {kind:i===0?"migration":"unit-test",source:input.source,path,sha256:input.sha256,copySha256:i===0?input.sha256:wrapperSha256,version:i===0?"20261006120004":"-"};
+      });
+      const stage:Stage={schemaVersion:1,state:"ephemeral",requestedHead:head,checkoutHead:head,
+        prerequisiteStageSha256:hash(prerequisiteBytes),prerequisiteVersion:previousVersion,records};
+      mutate?.(temp,stage);
+      writeFileSync(join(temp,".native-world-sql-rehearsal-stage.json"),JSON.stringify(stage));
+      const env:NodeJS.ProcessEnv={...process.env,WORLD_STAGE_RESULT:"success",WORLD_STATE:"ephemeral",WORLD_PREREQUISITE_RESULT:"success",
+        FIRST_PGTAP_RESULT:"success",SECOND_PGTAP_RESULT:"success",WORLD_REQUESTED_HEAD:head,WORLD_CHECKOUT_HEAD:head,...overrides};
+      for(const [key,value] of Object.entries(overrides)) if(value===undefined) delete env[key];
+      const run=spawnSync(process.execPath,["--input-type=module","-e",gateCode],{cwd:temp,env,encoding:"utf8"});
+      const receipt=JSON.parse(readFileSync(join(temp,"native-world-sql-rehearsal-receipt.json"),"utf8"));
+      return {run,receipt};
+    } finally {rmSync(temp,{recursive:true,force:true});}
+  }
+
+  it("accepts exact copies with simulated successful outcomes while leaving qualification and races pending",()=>{
+    const {run,receipt}=runGate();expect(run.status,run.stderr).toBe(0);
+    expect(receipt.gate).toBe("passed-native-world-unit-sql-only");expect(receipt.records).toHaveLength(2);
+    expect(receipt.fullQualification).toBe("pending");expect(receipt.realConcurrency).toBe("UNRUN");
+    expect(receipt.reservationExpiryCrossSession).toBe("UNRUN");
+    expect(receipt.publicClosedGateEvidence.assertions).toEqual(["public gate stays false","public function closed"]);
+    expect(receipt.privateVerifierDoubleEvidence.qualification).toContain("fake verifier");
+    // Both assertion groups live in one owning fixture; do not invent separate test files.
+    expect(receipt.publicClosedGateEvidence.test).toBe(receipt.privateVerifierDoubleEvidence.test);
+  });
+
+  it.each([
+    ["failed staging",{WORLD_STAGE_RESULT:"failure"}], ["skipped staging",{WORLD_STAGE_RESULT:"skipped"}],
+    ["absent staging",{WORLD_STATE:"absent"}], ["failed prerequisite",{WORLD_PREREQUISITE_RESULT:"failure"}],
+    ["skipped prerequisite",{WORLD_PREREQUISITE_RESULT:"skipped"}], ["failed first pass",{FIRST_PGTAP_RESULT:"failure"}],
+    ["skipped first pass",{FIRST_PGTAP_RESULT:"skipped"}], ["cancelled second pass",{SECOND_PGTAP_RESULT:"cancelled"}],
+    ["missing second pass",{SECOND_PGTAP_RESULT:undefined}], ["wrong checkout",{WORLD_CHECKOUT_HEAD:"b".repeat(40)}],
+  ])("rejects %s and records both fixture groups as unaccepted",(_label,overrides)=>{
+    const {run,receipt}=runGate(overrides);expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");
+    expect(receipt.publicClosedGateEvidence.status).toBe("unaccepted");expect(receipt.privateVerifierDoubleEvidence.status).toBe("unaccepted");
+  });
+
+  it.each([
+    ["changed schema",(root:string,stage:Stage)=>writeFileSync(join(root,stage.records[0].source),"changed")],
+    ["changed migration",(root:string,stage:Stage)=>writeFileSync(join(root,stage.records[0].path),"changed")],
+    ["changed fixture",(root:string,stage:Stage)=>writeFileSync(join(root,stage.records[1].source),"changed")],
+    ["race preamble",(root:string,stage:Stage)=>writeFileSync(join(root,stage.records[1].path),"\\set world_role setup\n")],
+    ["duplicate identities",(_root:string,stage:Stage)=>{stage.records[1]=stage.records[0];}],
+    ["missing fixture",(_root:string,stage:Stage)=>{stage.records.pop();}],
+    ["wrong requested head",(_root:string,stage:Stage)=>{stage.requestedHead="b".repeat(40);}],
+    ["wrong stage version",(_root:string,stage:Stage)=>{stage.schemaVersion=2;}],
+    ["unbound prerequisite",(_root:string,stage:Stage)=>{stage.prerequisiteStageSha256="0".repeat(64);}],
+    ["unordered migration",(_root:string,stage:Stage)=>{stage.records[0].version=stage.prerequisiteVersion;}],
+    ["undiscoverable test",(_root:string,stage:Stage)=>{stage.records[1].path="supabase/drafts/not-discovered.sql";}],
+    ["unaccepted prerequisite",(root:string)=>writeFileSync(join(root,"native-sql-rehearsal-receipt.json"),JSON.stringify({gate:"failed"}))],
+    ["mutated prerequisite",(root:string)=>writeFileSync(join(root,".native-sql-rehearsal-stage.json"),"{}")],
+  ])("rejects %s despite simulated successful step outcomes",(_label,mutate)=>{
+    const {run,receipt}=runGate({},mutate);expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");expect(receipt.failures.length).toBeGreaterThan(0);
+  });
+});
+
 describe("db-rehearsal model-provider spend proof", () => {
   const body = job("db-rehearsal");
   const replay = body.split("- name: Apply the repair migrations a second time and re-run the suite")[1] ?? "";

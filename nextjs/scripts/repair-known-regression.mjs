@@ -165,15 +165,15 @@ export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
   ".github/workflows/repair-scope.yml": "00d72e4acf9c6380f93ec5b411d24fcdd70919340cd8d73956ecfdb41904e28e",
-  "nextjs/scripts/repair-collector-only.mjs": "5aba95b7c418cb53e6bb2b1d2993b1551362b0505e5930f3253a2a8b24223bc9",
+  "nextjs/scripts/repair-collector-only.mjs": "5c639b90d65f2c38bbeff49b02aff0e8f091b16cea408a5fa66cc9c9661acc61",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
   "nextjs/scripts/repair-scope.test.mjs": "e650852c6d173959fbbc1a22cf8de825cc209bec0002a7408217b8c99e710e3d",
   "nextjs/scripts/repair-scope-gate.mjs": "db1fec0ba53b8421698693907a1d52b03e5b9e0845c7ff6958ae895902589978",
   "nextjs/scripts/verify-repair-workflows.mjs": "171c799023d99d779f75fd30326e770f581c1729843c5926d16c28db4ec9d9d8",
-  "nextjs/scripts/repair-collector-only.test.mjs": "338520027985e08967c1abcdccbd1616e300a3e41547abb1ccb4b22a50c507c7",
+  "nextjs/scripts/repair-collector-only.test.mjs": "75a119ff6e88343ef763d324e60fa0244abb2bdd84d8cbe091d8824395a0f197",
   "nextjs/scripts/repair-known-regression.mjs": "8920b4abcc007674855aa70cabab02c9a6ea8872b34bed0ddcefa7f8b82c0951",
   "nextjs/scripts/repair-known-regression.test.mjs": "fde23e0dc80d19c53f2703489e851959238aa4c4fba55f6c18a3b967e226aec0",
-  ".github/workflows/db-rehearsal.yml": "e9262d6f83b4494c7f8552af48b7e4b28f8ee1c7e8964ae2db0b895beece37ec",
+  ".github/workflows/db-rehearsal.yml": "5b1199f2fc1ac5beabbe1fe3e0b605630c061b98869f5a6513cf61d94530870f",
   "nextjs/scripts/run-repair-check.mjs": "b01ae995d8a1d5f84f23f5b9e510b003bd67919d37ae50c139966538c6679bc8",
   "nextjs/scripts/repair-test-report.mjs": "5dd9b98ffa8aa6b67aa5034567e00857246073a0d8c94dc5df3eea60096e741f",
   "nextjs/vitest.repair-scope.config.ts": "229623b695037e9e8173e74107dd252a77182ad068ab195d2a9710e0100c8742"
