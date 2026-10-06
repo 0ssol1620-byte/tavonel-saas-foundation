@@ -44,8 +44,8 @@ export const CONFIG_PATHS = Object.freeze([
 export const CONFIG_SEAL = Object.freeze({
   ".github/workflows/db-rehearsal.yml": "e9262d6f83b4494c7f8552af48b7e4b28f8ee1c7e8964ae2db0b895beece37ec",
   ".github/workflows/repair-scope.yml": "00d72e4acf9c6380f93ec5b411d24fcdd70919340cd8d73956ecfdb41904e28e",
-  "nextjs/scripts/repair-collector-only.mjs": "e07e95f0c39344e439db12fed67435090e646a354d47ab8b1f52696e018deb6f",
-  "nextjs/scripts/repair-collector-only.test.mjs": "f47d75fc3344565029f28b1faac438285d855bef04da9c65d2fc714efbc1705e",
+  "nextjs/scripts/repair-collector-only.mjs": "e7da84cf9a92384e98629fa6f2e672fb8267766e20a7773359e8681011f52e23",
+  "nextjs/scripts/repair-collector-only.test.mjs": "3a345f624b704ddba545b596df9a8c14372ca250b9efc381286b2d01aa65ec18",
   "nextjs/scripts/repair-scope-gate.mjs": "db1fec0ba53b8421698693907a1d52b03e5b9e0845c7ff6958ae895902589978",
   "nextjs/scripts/verify-repair-workflows.mjs": "171c799023d99d779f75fd30326e770f581c1729843c5926d16c28db4ec9d9d8"
 });
@@ -505,57 +505,61 @@ function runNativeDbMode(mode,headSha,intent) {
 }
 
 export const PUBLIC_PAGES_PARENT = Object.freeze("28d675b2ed3f8bf93ba439caca61940d477423e5");
+// The qualified DB receipt remains bound to28d. This one-file source correction advances only the exact source parent.
+export const PUBLIC_PAGES_SOURCE_PARENT = '629b7b84fa8fe5e6db9eaa010a941ba42c447a08';
+export const PUBLIC_PAGES_SOURCE_PARENT_TREE = '11b136438f9421c04b546b829fbcfcb5755237e3';
+export const PUBLIC_PAGES_CHANGED_SOURCE = 'nextjs/e2e/public-package-proof.spec.ts';
 export const PUBLIC_PAGES_SOURCE_BLOBS = Object.freeze({
   "nextjs/app/product/compiled-world/page.tsx": {
-    "before": "7abc6116612c808e5e1baa2b95ec88a02d428808",
+    "before": "9c08497bee50875ca29c33597f4697525a587509",
     "after": "9c08497bee50875ca29c33597f4697525a587509",
     "sha256": "53c2c8be31426bf16bac575055dc010c3637cbf3fc4e51ae5adba8f1af562404",
     "bytes": 15159
   },
   "nextjs/app/product/continuous-knowledge/continuous-knowledge.module.css": {
-    "before": "a38855c75c39082cb774d9d77ed9851d4d8662c0",
+    "before": "6ef020bdb7c5f0f63b53ed18aaa396862fce8af6",
     "after": "6ef020bdb7c5f0f63b53ed18aaa396862fce8af6",
     "sha256": "f66f6cd9fc28cc5f17b5530492665af03739364efabdf54aad43eabeb04afc87",
     "bytes": 7949
   },
   "nextjs/app/product/continuous-knowledge/page.tsx": {
-    "before": "cb81d6991b601dbc80a82d5c81afcc5d4f700d1c",
+    "before": "5cca7928c2fa20390110a15dce951f0d07e5acab",
     "after": "5cca7928c2fa20390110a15dce951f0d07e5acab",
     "sha256": "2f95638ce3efea87c78cd6bed86b4754fc48180b22df5be2ce9aa848b2b32687",
     "bytes": 15094
   },
   "nextjs/components/public-package-proof.module.css": {
-    "before": null,
+    "before": "7b0d64fa009ad2552152860e61d9382742633f40",
     "after": "7b0d64fa009ad2552152860e61d9382742633f40",
     "sha256": "40ef578b8957d1b52bb5ffdd9cce91631b7331537aafbc35877d785bd1217ac9",
     "bytes": 3530
   },
   "nextjs/components/public-package-proof.tsx": {
-    "before": null,
+    "before": "ed1358fd3dfbcf5e987e4a8b32ee2b55ada8f570",
     "after": "ed1358fd3dfbcf5e987e4a8b32ee2b55ada8f570",
     "sha256": "351ad67eec06c3c9d21a86c654c230e69a0ec33d7006183fc4e25f2e3b1059c5",
     "bytes": 6953
   },
   "nextjs/e2e/compiler-contract.spec.ts": {
-    "before": "71341d2bf68bd4ba535a247bcddc9a567c2cfc76",
+    "before": "1fd3e098e4a0ef574d55faee2ac7314e033e3007",
     "after": "1fd3e098e4a0ef574d55faee2ac7314e033e3007",
     "sha256": "dbeff0089dbdfe66636ad8589f70074f213c317d2c9b495044b5227742cd63b4",
     "bytes": 17099
   },
   "nextjs/e2e/public-package-proof.spec.ts": {
-    "before": null,
-    "after": "37d5584f28696620a47a84ea79cb0a01ba505cd5",
-    "sha256": "50d297ea628521529349ce461a6f328e0d2989aca7846d87437b5f6d31131ee5",
-    "bytes": 10090
+    "before": "37d5584f28696620a47a84ea79cb0a01ba505cd5",
+    "after": "b4977dda8550bc8fbb8cfe0373eda3895a1ac140",
+    "sha256": "1334bf29ea94bf8115c6f32bbbe288d65ef116d6cb2bf769b6ee1f28862a5017",
+    "bytes": 10202
   },
   "nextjs/lib/continuous-knowledge-page.test.ts": {
-    "before": null,
+    "before": "6b8e08cbf5aa463d3554c0deeaa929684c135f39",
     "after": "6b8e08cbf5aa463d3554c0deeaa929684c135f39",
     "sha256": "f24d5daff6b5f2808e7f50134b2df1059ea08b2a91b9b24f248fb6f3d130ac69",
     "bytes": 5607
   },
   "nextjs/lib/public-package-proof.test.ts": {
-    "before": null,
+    "before": "6f1fa72efdb260f00efbbf98f286a431d6bc0ec1",
     "after": "6f1fa72efdb260f00efbbf98f286a431d6bc0ec1",
     "sha256": "9a3a49c74d2c3fc7ec16f5b407953cfa288f61f10d88f881bfa2284bd174aeb7",
     "bytes": 9428
@@ -564,33 +568,23 @@ export const PUBLIC_PAGES_SOURCE_BLOBS = Object.freeze({
 export const PUBLIC_PAGES_CONFIG_PATHS = Object.freeze([
   "nextjs/scripts/repair-collector-only.mjs",
   "nextjs/scripts/repair-collector-only.test.mjs",
-  "nextjs/scripts/repair-known-regression.mjs",
-  "nextjs/scripts/repair-scope.test.mjs",
-  "nextjs/scripts/run-repair-check.mjs",
-  "nextjs/scripts/repair-scope-gate.mjs",
-  "nextjs/scripts/verify-repair-workflows.mjs",
-  ".github/workflows/repair-scope.yml"
+  "nextjs/scripts/repair-known-regression.mjs"
 ]);
 export const PUBLIC_PAGES_PARENT_CONFIG_BLOBS = Object.freeze({
-  "nextjs/scripts/repair-collector-only.mjs": "f13e370de7ca2692b53cbfa262cfd541de3fd633",
-  "nextjs/scripts/repair-collector-only.test.mjs": "0e6198e86fd8d06ad27ff27617a67cc260b69750",
-  "nextjs/scripts/repair-known-regression.mjs": "9a98148ba2c5ab19fee8fbd5ec705732b33c04d9",
-  "nextjs/scripts/repair-scope.test.mjs": "26f5ada994eb32cc1a33c0e9c6893673a8110d26",
-  "nextjs/scripts/run-repair-check.mjs": "57b1617fce020b9fce8ddc744b72962cd06e4e01",
-  "nextjs/scripts/repair-scope-gate.mjs": "305f9f854f6e85c64a6410b712f73c396a13aae1",
-  "nextjs/scripts/verify-repair-workflows.mjs": "55a7f6ea85057a6cdb08ef9ac23e9ece552e1d01",
-  ".github/workflows/repair-scope.yml": "c7e8b90bd7ef52ba66d15bdd6c2ba896d769efee"
+  "nextjs/scripts/repair-collector-only.mjs": "82be2e45260ce64d95f95779d6fd7a184357743a",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0c21d93f748da1b2610dd70d3ea56d4c2bb594a0",
+  "nextjs/scripts/repair-known-regression.mjs": "948d367fbe2b1b8f7c056d255cd5aa476850f2ac"
 });
 export const PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS = Object.freeze({
   ".github/workflows/db-rehearsal.yml": "9c8a57e33b383387075d89bf7059a7b7ce148041",
-  ".github/workflows/repair-scope.yml": "c7e8b90bd7ef52ba66d15bdd6c2ba896d769efee",
+  ".github/workflows/repair-scope.yml": "bc389e37e24a3544472a80da1012063cdd748eee",
   "nextjs/lib/db-rehearsal-workflow.test.ts": "3e723a40e1bf09e8be44bb6de96b74d77663ff75",
-  "nextjs/scripts/repair-collector-only.mjs": "f13e370de7ca2692b53cbfa262cfd541de3fd633",
-  "nextjs/scripts/repair-collector-only.test.mjs": "0e6198e86fd8d06ad27ff27617a67cc260b69750",
-  "nextjs/scripts/repair-known-regression.mjs": "9a98148ba2c5ab19fee8fbd5ec705732b33c04d9",
+  "nextjs/scripts/repair-collector-only.mjs": "82be2e45260ce64d95f95779d6fd7a184357743a",
+  "nextjs/scripts/repair-collector-only.test.mjs": "0c21d93f748da1b2610dd70d3ea56d4c2bb594a0",
+  "nextjs/scripts/repair-known-regression.mjs": "948d367fbe2b1b8f7c056d255cd5aa476850f2ac",
   "nextjs/scripts/repair-known-regression.test.mjs": "0bf7d9a731c8111e1d0523ffee86050c0632dd33",
-  "nextjs/scripts/repair-scope-gate.mjs": "305f9f854f6e85c64a6410b712f73c396a13aae1",
-  "nextjs/scripts/verify-repair-workflows.mjs": "55a7f6ea85057a6cdb08ef9ac23e9ece552e1d01",
+  "nextjs/scripts/repair-scope-gate.mjs": "667b64533c8f47674ea6170efd555b1bcb51b4e4",
+  "nextjs/scripts/verify-repair-workflows.mjs": "963417ac33d1ef8f81c1c2e37e5e3437cb1e39b0",
   "supabase/drafts/native-purpose-authority-schema.sql": "8438442ca2870999faa5a24cf594aaec692d98d9",
   "supabase/drafts/native-purpose-candidate-reader.sql": "6ab100f029290a4938535539a0cc0bb63e15ed63",
   "supabase/drafts/native-source-ledger-snapshot.sql": "7a441d9c7212813c6c2cd1c29989cb12e1f6f8bd",
@@ -813,27 +807,28 @@ export function classifyPublicPagesIntent({headSha,exec=execFileSync}) {
     if(git(['rev-parse','HEAD'])!==headSha)throw Error('Page checkout does not match requested head.');
     const line=git(['rev-list','--parents','-n','1',headSha]).split(' ');parent=line[1];
     const paths=git(['diff','--name-only','--no-renames','-z',parent,headSha]).split('\0').filter(Boolean).sort();
-    const intended=paths.some(p=>Object.hasOwn(PUBLIC_PAGES_SOURCE_BLOBS,p))||(parent===PUBLIC_PAGES_PARENT&&paths.some(p=>PUBLIC_PAGES_CONFIG_PATHS.includes(p)));
+    const intended=paths.some(p=>Object.hasOwn(PUBLIC_PAGES_SOURCE_BLOBS,p))||(parent===PUBLIC_PAGES_SOURCE_PARENT&&paths.some(p=>PUBLIC_PAGES_CONFIG_PATHS.includes(p)));
     if(intended&&line.length!==2)throw Error('Page candidate requires one exact parent.');
     return intended?{classification:'intended',intended:true,headSha,parent,repoRoot,paths}:{classification:'normal',intended:false};
-  }catch(error){return parent===PUBLIC_PAGES_PARENT?{classification:'unavailable',intended:true,headSha,parent,reason:error.message}:{classification:'normal',intended:false,reason:'Existing classifier must resolve unreadable/outside page metadata.'};}
+  }catch(error){return parent===PUBLIC_PAGES_SOURCE_PARENT?{classification:'unavailable',intended:true,headSha,parent,reason:error.message}:{classification:'normal',intended:false,reason:'Existing classifier must resolve unreadable/outside page metadata.'};}
 }
 export function verifyPublicPagesSource({headSha,exec=execFileSync}) {
   const intent=classifyPublicPagesIntent({headSha,exec});if(intent.classification!=='intended')return {eligible:false,reason:intent.reason??'Not the exact page source increment.'};
   try {
     const git=(args,encoding='utf8')=>{const b=exec('git',['-C',intent.repoRoot,...args],{encoding});return encoding==='buffer'?b:b.trim();};
-    if(intent.parent!==PUBLIC_PAGES_PARENT||git(['rev-list','--parents','-n','1',PUBLIC_PAGES_PARENT])!==`${PUBLIC_PAGES_PARENT} ${NATIVE_DB_PARENT}`)throw Error('Pages must be the exact direct child of qualified28d.');
-    const expected=[...Object.keys(PUBLIC_PAGES_SOURCE_BLOBS),...PUBLIC_PAGES_CONFIG_PATHS].sort();if(JSON.stringify(intent.paths)!==JSON.stringify(expected))throw Error('Incomplete or extra coordinated page source/configuration delta.');
-    git(['merge-base','--is-ancestor',FULL_ANCHOR,PUBLIC_PAGES_PARENT]);git(['merge-base','--is-ancestor',PUBLIC_PAGES_PARENT,headSha]);verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});
+    if(intent.parent!==PUBLIC_PAGES_SOURCE_PARENT||git(['rev-list','--parents','-n','1',PUBLIC_PAGES_SOURCE_PARENT])!==`${PUBLIC_PAGES_SOURCE_PARENT} ${PUBLIC_PAGES_PARENT}`)throw Error('Page source correction must be the exact direct child of published629b.');
+    if(git(['rev-parse',`${PUBLIC_PAGES_SOURCE_PARENT}^{tree}`])!==PUBLIC_PAGES_SOURCE_PARENT_TREE)throw Error('Published629b source tree changed.');
+    const expected=[PUBLIC_PAGES_CHANGED_SOURCE,...PUBLIC_PAGES_CONFIG_PATHS].sort();if(JSON.stringify(intent.paths)!==JSON.stringify(expected))throw Error('Incomplete or extra coordinated page source/configuration delta.');
+    git(['merge-base','--is-ancestor',FULL_ANCHOR,PUBLIC_PAGES_SOURCE_PARENT]);git(['merge-base','--is-ancestor',PUBLIC_PAGES_SOURCE_PARENT,headSha]);verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});
     const tree=(ref,p,optional=false)=>{const e=git(['ls-tree','--full-tree',ref,'--',p]);if(optional&&!e)return null;if(!/^100644 blob [a-f0-9]{40}\t/.test(e)||e.split('\t')[1]!==p)throw Error('Page source is not an exact regular tracked file: '+p);return e.split(' ')[2].split('\t')[0];};
-    for(const [p,pin]of Object.entries(PUBLIC_PAGES_SOURCE_BLOBS)){const b=git(['show',`${headSha}:${p}`],'buffer');if(tree(PUBLIC_PAGES_PARENT,p,true)!==pin.before||tree(headSha,p)!==pin.after||b.length!==pin.bytes||createHash('sha256').update(b).digest('hex')!==pin.sha256)throw Error('Frozen page source identity changed: '+p);}
-    for(const [p,pin]of Object.entries(PUBLIC_PAGES_PARENT_CONFIG_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin)throw Error('Page infrastructure preimage changed: '+p);
-    for(const [p,pin]of Object.entries(PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin)throw Error('Qualified native parent checkpoint changed: '+p);
-    for(const [p,pin]of Object.entries(PUBLIC_PAGES_DB_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin||tree(headSha,p)!==pin)throw Error('Qualified database dependency changed: '+p);
-    for(const [p,pin]of Object.entries(NATIVE_DB_TRANSPORT_BLOBS))if(tree(PUBLIC_PAGES_PARENT,p)!==pin||tree(headSha,p)!==pin)throw Error('Historical transport dependency changed: '+p);
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_SOURCE_BLOBS)){const b=git(['show',`${headSha}:${p}`],'buffer');if(tree(PUBLIC_PAGES_SOURCE_PARENT,p,true)!==pin.before||tree(headSha,p)!==pin.after||b.length!==pin.bytes||createHash('sha256').update(b).digest('hex')!==pin.sha256)throw Error('Frozen page source identity changed: '+p);}
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_PARENT_CONFIG_BLOBS))if(tree(PUBLIC_PAGES_SOURCE_PARENT,p)!==pin)throw Error('Page infrastructure preimage changed: '+p);
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_PARENT_CHECKPOINT_BLOBS))if(tree(PUBLIC_PAGES_SOURCE_PARENT,p)!==pin)throw Error('Qualified native parent checkpoint changed: '+p);
+    for(const [p,pin]of Object.entries(PUBLIC_PAGES_DB_BLOBS))if(tree(PUBLIC_PAGES_SOURCE_PARENT,p)!==pin||tree(headSha,p)!==pin)throw Error('Qualified database dependency changed: '+p);
+    for(const [p,pin]of Object.entries(NATIVE_DB_TRANSPORT_BLOBS))if(tree(PUBLIC_PAGES_SOURCE_PARENT,p)!==pin||tree(headSha,p)!==pin)throw Error('Historical transport dependency changed: '+p);
     for(const [p,digest]of Object.entries(CONFIG_SEAL))if(sealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==digest)throw Error('Page collector seal changed: '+p);
     for(const [p,digest]of Object.entries(repair.REPAIR_SEAL))if(repair.repairSealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==digest)throw Error('Page repair seal changed: '+p);
-    return {eligible:true,headSha,parent:PUBLIC_PAGES_PARENT,fullAnchor:FULL_ANCHOR,exactChangedPaths:expected,sourceBlobs:Object.fromEntries(Object.entries(PUBLIC_PAGES_SOURCE_BLOBS).map(([p,pin])=>[p,pin.after])),databaseDependencyBlobs:PUBLIC_PAGES_DB_BLOBS,transportDependencyBlobs:NATIVE_DB_TRANSPORT_BLOBS};
+    return {eligible:true,headSha,parent:PUBLIC_PAGES_SOURCE_PARENT,fullAnchor:FULL_ANCHOR,exactChangedPaths:expected,sourceBlobs:Object.fromEntries(Object.entries(PUBLIC_PAGES_SOURCE_BLOBS).map(([p,pin])=>[p,pin.after])),databaseDependencyBlobs:PUBLIC_PAGES_DB_BLOBS,transportDependencyBlobs:NATIVE_DB_TRANSPORT_BLOBS};
   }catch(error){return {eligible:false,reason:error.message};}
 }
 export function verifyPublicPagesEvidence({repairRun,repairJob,repairArtifact,repairArchive,dbRun,dbJob,dbArtifact,dbArchive,priorUi}) {
@@ -868,7 +863,7 @@ export function publicPagesLineageFailures(plan,proof) {
   const expected=publicPagesPlan({...plan,qualificationReasons:[]},proof),keys=['publicPagesPresentation','nativeDbRehearsal','collectorOnly','knownRegressionRepair','intakePresentation','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','runDatabaseRehearsal','databaseRehearsalStatus','databaseBaselineEvidence','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','knownRegressionResolution','knownRegressionObservations','historicalUiFailure'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Coordinated page plan changed: '+k);
 }
 export function authenticateFailedPublicPagesResolution(receipt,{intent,api=nativeDbApi}) {
-  if(intent?.parent!==PUBLIC_PAGES_PARENT)return receipt;
+  if(intent?.parent!==PUBLIC_PAGES_SOURCE_PARENT)return receipt;
   try {
     const evidence=verifyNativeDbParentEvidence({run:api('actions/runs/37387689345'),job:api('actions/jobs/112025031853'),artifact:api('actions/artifacts/11379078787'),archive:api('actions/artifacts/11379078787/zip')});if(!evidence.eligible)return receipt;
     return {...receipt,knownRegressionResolution:{...evidence.knownRegressionResolution,status:'historical qualified895 resolution retained; current public product qualification failed'},knownRegressionObservations:evidence.knownRegressionObservations,historicalUiFailure:evidence.historicalUiFailure,pendingDebt:[...new Set((receipt.pendingDebt??[]).filter(d=>d!==REGRESSION_DEBT).concat(['database-contract','public-product-pages']))],inheritedChecks:{},gate:'failed',fullQualification:'pending'};

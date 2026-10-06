@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { compileCollectionCandidate, validateCollectionOcrInput } from "../lib/collection-compiler";
-import rawInputs from "../lib/explore-sample.w4.inputs.json";
+const rawInputs: unknown[] = JSON.parse(
+  readFileSync(new URL("../lib/explore-sample.w4.inputs.json", import.meta.url), "utf8"),
+);
 
 test("the actual sample package remains readable and keyboard usable at narrow widths and zoom", async ({ browser, page }) => {
   test.skip(test.info().project.name !== "1440" || page.viewportSize()?.width !== 1440, "Run the internal viewport matrix only in project1440.");
