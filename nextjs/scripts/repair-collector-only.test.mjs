@@ -762,3 +762,87 @@ test('DB decision after a failed Explore admission without classifier outputs re
   }
   assert.deepEqual(nativeCalls,[]);
 });
+// Static checker scope: the workflow checker imports this exact helper; the old whole-runner substring failed454 on a legitimate declaration.
+test('shared browser project map exclusion accepts the current runner and rejects an Explore row only inside that exact map',()=>{
+  const runner=readFileSync(fileURLToPath(new URL('./run-repair-check.mjs',import.meta.url)),'utf8').replace(/\r\n/g,'\n'),checker=readFileSync(fileURLToPath(new URL('./verify-repair-workflows.mjs',import.meta.url)),'utf8');
+  assert.ok(checker.includes("import { sharedBrowserProjectsMapExcludesExplore } from './repair-collector-only.mjs';"));assert.ok(checker.includes('assert(sharedBrowserProjectsMapExcludesExplore(runner)&&'));
+  assert.ok(!checker.includes(`!runner.includes("['e2e/explore.spec.ts',")`),'the whole-runner negative substring is removed');
+  for(const kept of ["runner.includes('export function planExploreRepairBrowserRuns(files,runDetailIntegrity)')","runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity)')"])assert.ok(checker.includes(kept),kept);
+  // The legitimate separate Explore declaration lives outside the shared map and is accepted.
+  assert.ok(runner.includes("export const EXPLORE_REPAIR_BROWSER_FILES=Object.freeze(['e2e/explore.spec.ts','e2e/solutions-workflows.spec.ts']);"));
+  assert.equal(world.sharedBrowserProjectsMapExcludesExplore(runner),true);assert.equal(world.sharedBrowserProjectsMapExcludesExplore(runner.replaceAll('\n','\r\n')),true);
+  const start=world.BROWSER_PROJECTS_MAP_START,first="  ['e2e/solutions-workflows.spec.ts', ['1440']],",last="  ['e2e/workspace-intake-layout.spec.ts', ['1440']],";
+  assert.equal(start,'const browserProjectsByFile = new Map([');assert.ok(runner.includes(`${start}\n${first}\n`));assert.ok(runner.includes(`${last}\n]);\n`));
+  const rows=world.browserProjectsMapRows(runner);assert.equal(rows[0],first);assert.equal(rows.at(-1),last);assert.ok(rows.every(row=>!/explore/i.test(row)));
+  // An Explore row injected anywhere inside that exact map is rejected.
+  for(const [label,source] of [['first row',runner.replace(`${start}\n`,`${start}\n  ['e2e/explore.spec.ts', ['1440']],\n`)],['last row',runner.replace(`${last}\n]);`,`${last}\n  ['e2e/explore.spec.ts', ['1440', '390', 'reduced-motion']],\n]);`)]]){assert.notEqual(source,runner,label);assert.equal(world.sharedBrowserProjectsMapExcludesExplore(source),false,label);}
+  // Absent, duplicated, unterminated or non-row boundaries fail closed rather than passing silently.
+  const failures=[
+    ['absent start',runner.replace(start,'const browserProjects = new Map([')],
+    ['duplicate start',runner+`\n${start}\n${first}\n]);\n`],
+    ['second binding',runner+'\nbrowserProjectsByFile = new Map();\n'],
+    ['unterminated',runner.replace(`${last}\n]);`,`${last}\n])`)],
+    ['spread row',runner.replace(`${start}\n`,`${start}\n  ...exploreRows,\n`)],
+    ['commented Explore row',runner.replace(`${start}\n`,`${start}\n  // ['e2e/explore.spec.ts', ['1440']],\n`)],
+    ['empty map',runner.replace(/const browserProjectsByFile = new Map\(\[\n[\s\S]*?\n\]\);/,`${start}\n]);`)],
+  ];
+  for(const [label,source] of failures){assert.notEqual(source,runner,label);assert.throws(()=>world.sharedBrowserProjectsMapExcludesExplore(source),/Shared browser project map/,label);}
+});
+// Explore repair successor: one direct child of failed454; exactly the five corrective paths; the424 profile stays as published.
+test('Explore repair successor pins exact454, its tree, the five corrective paths, the unchanged runner and both failures',()=>{
+  assert.equal(world.EXPLORE_SUCCESSOR_PROFILE,'explore-repair-successor');assert.equal(world.EXPLORE_SUCCESSOR_PARENT,'4540cd47cc881b5d2339c70159bc657047149204');assert.equal(world.EXPLORE_SUCCESSOR_PARENT_TREE,'7cce3c9f266cf4715a02ebd7676c17b38a700a90');
+  assert.deepEqual([...world.EXPLORE_SUCCESSOR_PATHS],['nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-collector-only.test.mjs','nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/verify-repair-workflows.mjs']);
+  // Each corrective path is already a424 and Solutions configuration path, so the424 and623 deltas keep their exact sets.
+  for(const p of world.EXPLORE_SUCCESSOR_PATHS){assert.ok(world.EXPLORE_REPAIR_CONFIG_PATHS.includes(p),p);assert.ok(world.SOLUTIONS_CONFIG_PATHS.includes(p),p);assert.ok(!world.EXPLORE_REPAIR_TREE_SOURCES.includes(p),p);}
+  for(const p of [world.EXPLORE_SUCCESSOR_RUNNER_PATH,world.EXPLORE_REPAIR_WORKFLOW_PATH,'nextjs/scripts/repair-scope-gate.mjs','nextjs/scripts/repair-known-regression.test.mjs',...world.EXPLORE_REPAIR_TREE_SOURCES])assert.ok(!world.EXPLORE_SUCCESSOR_PATHS.includes(p),p);
+  assert.equal(new Set([...world.EXPLORE_REPAIR_TREE_SOURCES,...world.SOLUTIONS_CONFIG_PATHS]).size,20);
+  assert.deepEqual([world.EXPLORE_SUCCESSOR_RUNNER_PATH,world.EXPLORE_SUCCESSOR_RUNNER_BLOB,world.EXPLORE_REPAIR_WORKFLOW_BLOB],['nextjs/scripts/run-repair-check.mjs','6cede7a8b0cb529409f24f4bfcae0b111df4c1ed','0990f734a31660dd5a29164f5cb0068aaac91b6c']);
+  const f=world.EXPLORE_SUCCESSOR_FAILED_PARENT;
+  assert.deepEqual([f.sourceHead,f.parent,f.profile,f.scope,f.runId,f.jobId,f.step,f.failedAt,f.outcome],[world.EXPLORE_SUCCESSOR_PARENT,world.EXPLORE_REPAIR_PARENT,'explore-repair','workflow-static',37461081048,112260519816,'Verify workflow and selector contracts','nextjs/scripts/verify-repair-workflows.mjs:307','failure']);
+  // 454 ran no install, product or browser test; its capture error is downstream of the missing install and never evidence.
+  assert.deepEqual([f.dependencyInstall,f.productTests,f.browserTests],['not executed','not executed','not executed']);assert.match(f.captureError,/missing node_modules.*not product or browser evidence/);assert.match(f.status,/no tested product or browser evidence; not inherited/);
+  // The prior424 profile and its browser history are unchanged.
+  assert.equal(world.EXPLORE_REPAIR_PARENT,'424f5737752d723bcd81ad7d06b7d977880a1b02');assert.deepEqual({...world.EXPLORE_REPAIR_FAILED_PARENT},{sourceHead:world.EXPLORE_REPAIR_PARENT,parent:world.SOLUTIONS_PARENT,profile:'solutions-workflows',scope:'browser',outcome:'failure',status:'historical failed424 browser evidence only; not inherited for the Explore repair head'});
+});
+const successorExec=({paths=[...world.EXPLORE_SUCCESSOR_PATHS],parent=world.EXPLORE_SUCCESSOR_PARENT,checkout=head,merge=false,broken=false}={})=>(_command,args)=>{if(broken)throw Error('git unavailable');if(args[0]==='-C')args=args.slice(2);if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'fixture-root':checkout;if(args[0]==='rev-list')return `${head} ${parent}${merge?' '+'a'.repeat(40):''}`;if(args[0]==='diff')return paths.join('\0')+'\0';throw new Error('Unexpected Explore successor git command: '+args.join(' '));};
+test('collector routes the exact454 successor before exact424 and Solutions; neither Explore classifier claims the other parent',()=>{
+  const source=readFileSync(fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url)),'utf8'),cli=source.slice(source.lastIndexOf('if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))'));
+  const successor=cli.indexOf('classifyExploreSuccessorIntent({headSha})'),explore=cli.indexOf('classifyExploreRepairIntent({headSha})'),solutions=cli.indexOf('classifySolutionsIntent({headSha})');assert.ok(successor>=0&&successor<explore&&explore<solutions);
+  const classify=options=>world.classifyExploreSuccessorIntent({headSha:head,exec:successorExec(options)});
+  const accepted=classify();assert.equal(accepted.classification,'intended');assert.equal(accepted.profile,'explore-repair-successor');assert.equal(accepted.parent,world.EXPLORE_SUCCESSOR_PARENT);assert.deepEqual(accepted.paths,[...world.EXPLORE_SUCCESSOR_PATHS]);
+  assert.equal(world.classifyExploreRepairIntent({headSha:head,exec:successorExec()}).classification,'normal','the424 classifier never claims a454 child');
+  for(const parent of [world.EXPLORE_REPAIR_PARENT,world.SOLUTIONS_PARENT,'b'.repeat(40)])assert.equal(classify({parent}).classification,'normal',parent);
+  assert.equal(classify({paths:['nextjs/lib/unrelated.ts']}).classification,'normal');assert.equal(classify({broken:true}).classification,'normal');assert.equal(world.classifyExploreSuccessorIntent({headSha:undefined,exec:successorExec()}).classification,'normal');
+  for(const options of [{checkout:'f'.repeat(40)},{merge:true}]){const intent=classify(options);assert.equal(intent.classification,'unavailable',JSON.stringify(options));assert.equal(intent.intended,true);}
+  // Source admission refuses anything short of the exact successor intent before reading git.
+  for(const intent of [{classification:'unavailable',intended:true,headSha:head,parent:world.EXPLORE_SUCCESSOR_PARENT,reason:'unreadable'},{...accepted,profile:'explore-repair'},{...accepted,parent:world.EXPLORE_REPAIR_PARENT},{...accepted,headSha:'f'.repeat(40)},{...accepted,classification:'normal'}]){const value=world.verifyExploreSuccessorSource({headSha:head,intent,exec:()=>{throw Error('no git read expected');}});assert.equal(value.eligible,false);assert.match(value.reason,/exact direct child of454/);}
+  let reads=0;const refused=world.verifyExploreSuccessorEligibility({headSha:head,intent:{...accepted,parent:world.EXPLORE_REPAIR_PARENT},exec:()=>{throw Error('no git read expected');},api:()=>{reads++;throw Error('no evidence read expected');}});assert.equal(refused.eligible,false);assert.equal(reads,0);
+});
+test('failed Explore repair successor admission keeps71 historical, both failures and every pending debt, and accepts no inheritance',()=>{
+  const intent={classification:'intended',intended:true,headSha:head,parent:world.EXPLORE_SUCCESSOR_PARENT,profile:'explore-repair-successor'},reason='Explore repair successor must change exactly the five corrective selector/checker paths, with no other path.';
+  const {plan,receipt}=world.failedExploreSuccessorReceipt({headSha:head,reason,intent,api:()=>{throw Error('offline');}});
+  assert.deepEqual(plan.currentAdmission,{profile:'explore-repair-successor',headSha:head,parent:world.EXPLORE_SUCCESSOR_PARENT,status:'failed',reason});
+  assert.deepEqual(plan.historicalBrowserFailure,{...world.EXPLORE_REPAIR_FAILED_PARENT});assert.deepEqual(plan.historicalStaticFailure,{...world.EXPLORE_SUCCESSOR_FAILED_PARENT});
+  assert.ok(plan.pendingQualificationDebt.includes('explore-repair-successor-eligibility'));assert.ok(!plan.pendingQualificationDebt.includes(world.REGRESSION_DEBT));
+  assert.equal(receipt.gate,'failed');assert.deepEqual(receipt.gateFailures,[reason]);assert.deepEqual(receipt.currentAdmission,plan.currentAdmission);assert.deepEqual(receipt.inheritedChecks,{});assert.equal(receipt.fullQualification,'pending');
+  assert.equal(receipt.knownRegressionResolution,undefined);assert.equal(receipt.historicalRegressionResolution.sourceHead,'8956734a6675ae79d5081e77f551e0cb49cf8a39');
+  assert.deepEqual(receipt.historicalBrowserFailure,{...world.EXPLORE_REPAIR_FAILED_PARENT});assert.deepEqual(receipt.historicalStaticFailure,{...world.EXPLORE_SUCCESSOR_FAILED_PARENT});assert.equal(receipt.historicalStaticFailure.browserTests,'not executed');
+  for(const debt of ['database-contract','explore-repair','explore-repair-successor-eligibility',...world.EXPLORE_REPAIR_PENDING_DEBT])assert.ok(receipt.pendingDebt.includes(debt),debt);assert.ok(!receipt.pendingDebt.includes(world.REGRESSION_DEBT));
+  // Only the454 parent receives the454 static history; the424 and623 failure shapes are unchanged.
+  assert.equal(world.failedCollectorPlan({headSha:head,reason,intent:{...intent,parent:world.EXPLORE_REPAIR_PARENT}}).historicalStaticFailure,undefined);
+  assert.equal(world.failedCollectorPlan({headSha:head,reason,intent:{...intent,parent:world.SOLUTIONS_PARENT}}).historicalStaticFailure,undefined);
+});
+test('DB decision after a failed successor admission re-derives exact454 intent from the head only; wrong head, parent or paths stay conservative',()=>{
+  const intent={classification:'intended',intended:true,headSha:head,parent:world.EXPLORE_SUCCESSOR_PARENT,profile:'explore-repair-successor'},reason='Explore repair successor seal changed: nextjs/scripts/verify-repair-workflows.mjs';
+  const written=world.failedExploreSuccessorReceipt({headSha:head,reason,intent,api:()=>{throw Error('offline');}}).receipt;
+  const before=structuredClone(written);before.pendingDebt=[...new Set([...(before.pendingDebt??[]),'database-contract',world.REGRESSION_DEBT])];before.databaseObservation='not executed; inherited evidence unaccepted';before.inheritedChecks={};
+  const nativeCalls=[],nativeApi=p=>{nativeCalls.push(p);throw Error('native evidence must not be read for the successor');};
+  // The exact successor is routed to its own resolution, which reads only actual623 evidence (offline here, so nothing changes).
+  const routedCalls=[],routed=world.authenticateFailedNativeResolution(structuredClone(before),{headSha:head,intended:undefined,exec:successorExec(),api:nativeApi,exploreApi:p=>{routedCalls.push(p);throw Error('offline');}});
+  assert.deepEqual(routed,before);assert.deepEqual(routedCalls,['actions/runs/37413409860']);
+  for(const [label,options] of [['wrong head',{checkout:'f'.repeat(40)}],['wrong parent',{parent:world.SOLUTIONS_PARENT}],['unrelated parent',{parent:'b'.repeat(40)}],['two parents',{merge:true}],['wrong paths',{paths:['nextjs/lib/unrelated.ts']}],['classifier error',{broken:true}]]){
+    const evidenceCalls=[],kept=world.authenticateFailedNativeResolution(structuredClone(before),{headSha:head,intended:undefined,exec:successorExec(options),api:nativeApi,exploreApi:p=>{evidenceCalls.push(p);throw Error('evidence must not be read: '+label);}});
+    assert.deepEqual(kept,before,label);assert.ok(kept.pendingDebt.includes(world.REGRESSION_DEBT),label);assert.equal(kept.gate,'failed',label);assert.equal(kept.fullQualification,'pending',label);assert.deepEqual(evidenceCalls,[],label);
+  }
+  assert.deepEqual(nativeCalls,[]);
+});

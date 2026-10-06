@@ -45,10 +45,10 @@ export const CONFIG_PATHS = Object.freeze([
 export const CONFIG_SEAL = Object.freeze({
   ".github/workflows/db-rehearsal.yml": "f4001dbbcab9b6081875bce2c0843a99a5cb09944ce8d4a2b1d1da76ce573ab3",
   ".github/workflows/repair-scope.yml": "b7112fc3fedac86028ed062b8cff702783f89f6f8a8803abfba41bd93207e041",
-  "nextjs/scripts/repair-collector-only.mjs": "093c67377be8f13f8651b156b51d2fc8e7302a1bf56d0f3a3bb3e66ed9831944",
-  "nextjs/scripts/repair-collector-only.test.mjs": "9560523d9464a9d13622e3faab04ba07972e396b031835746053d0f13dcd49e4",
+  "nextjs/scripts/repair-collector-only.mjs": "f97d43104ad69d7ca2a7380222a32413c04129024fe5fb3eec8c07b5cc31ff1c",
+  "nextjs/scripts/repair-collector-only.test.mjs": "8df576ad187bf509339762f95eb5b12140921b9bf1f9133cac925cf85b7fcc4e",
   "nextjs/scripts/repair-scope-gate.mjs": "b8ec75bc16cdb5f1b8a069f510233d9a4c9a5a6b5bf9d27f460c9208514a022f",
-  "nextjs/scripts/verify-repair-workflows.mjs": "7a741eabe58ab76e13acf8d12b3b8a1ce62c6ee5e937327210eb047d96afab8a"
+  "nextjs/scripts/verify-repair-workflows.mjs": "9db018e050aa3e5936e7c58d07a39ac4b2da9f34709f11e5f5dab9c415308679"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -227,6 +227,14 @@ export function failedCollectorPlan({ headSha, reason, intent }) {
   };
   // A failed new admission cannot revoke the parent's actual historical repair.
   // Evidence remains unaccepted for this head until its independent proof passes.
+  if (intent?.parent === EXPLORE_SUCCESSOR_PARENT) return { ...plan,
+    knownRegressionObservations: [KNOWN_REGRESSION],
+    historicalRegressionResolution: { sourceHead: repair.INTAKE_PARENT, status: 'historical resolution retained; evidence unaccepted for current head' },
+    historicalBrowserFailure: { ...EXPLORE_REPAIR_FAILED_PARENT },
+    historicalStaticFailure: { ...EXPLORE_SUCCESSOR_FAILED_PARENT },
+    currentAdmission: { profile: EXPLORE_SUCCESSOR_PROFILE, headSha, parent: EXPLORE_SUCCESSOR_PARENT, status: 'failed', reason },
+    pendingQualificationDebt: [...plan.pendingQualificationDebt, 'explore-repair-successor-eligibility'],
+  };
   if (intent?.parent === EXPLORE_REPAIR_PARENT) return { ...plan,
     knownRegressionObservations: [KNOWN_REGRESSION],
     historicalRegressionResolution: { sourceHead: repair.INTAKE_PARENT, status: 'historical resolution retained; evidence unaccepted for current head' },
@@ -512,6 +520,9 @@ export function authenticateFailedNativeResolution(receipt, { headSha, intended,
   try {
     // A failed Explore admission exits before writing classifier outputs, so its intent is re-derived from the supplied head only;
     // receipt fields and the intended output are never trusted. Anything short of an exact single-parent child of424 stays conservative.
+    // The exact454 successor is re-derived the same way first; a child of424 or any other parent is never classified as it.
+    const successorIntent=classifyExploreSuccessorIntent({headSha,exec});
+    if(successorIntent.classification==='intended'&&successorIntent.intended===true&&successorIntent.profile===EXPLORE_SUCCESSOR_PROFILE&&successorIntent.headSha===headSha&&successorIntent.parent===EXPLORE_SUCCESSOR_PARENT)return authenticateFailedExploreSuccessorResolution(receipt,{intent:successorIntent,api:exploreApi});
     const exploreIntent=classifyExploreRepairIntent({headSha,exec});
     if(exploreIntent.classification==='intended'&&exploreIntent.intended===true&&exploreIntent.profile==='explore-repair'&&exploreIntent.headSha===headSha&&exploreIntent.parent===EXPLORE_REPAIR_PARENT)return authenticateFailedExploreRepairResolution(receipt,{intent:exploreIntent,api:exploreApi});
     const worldIntent=classifyNativeDbIntent({headSha,exec});
@@ -1007,7 +1018,10 @@ export function verifyExploreRepairSource({headSha,intent=classifyExploreRepairI
   return{eligible:true,headSha,parent:EXPLORE_REPAIR_PARENT,grandparent:SOLUTIONS_PARENT,grandparentTree:SOLUTIONS_PARENT_TREE,fullAnchor:FULL_ANCHOR,profile:'explore-repair',exactChangedPaths:expected,treeSources:[...EXPLORE_REPAIR_TREE_SOURCES],sourceBlobs:Object.fromEntries(EXPLORE_REPAIR_TREE_SOURCES.map(p=>[p,EXPLORE_REPAIR_SOURCE_BLOBS[p]?.after??SOLUTIONS_SOURCE_BLOBS[p].after])),workflowBlob:EXPLORE_REPAIR_WORKFLOW_BLOB,patch:EXPLORE_REPAIR_PATCH,exploreCases};
  }catch(error){return{eligible:false,reason:error.message};}
 }
-export function verifyExploreRepairEligibility({headSha,exec=execFileSync,api=solutionsApi}){const intent=classifyExploreRepairIntent({headSha,exec}),source=verifyExploreRepairSource({headSha,intent,exec});if(!source.eligible)return source;try{const evidence=readSolutionsParentEvidence(api);return evidence.eligible?{eligible:true,source,evidence}:evidence;}catch(error){return{eligible:false,reason:'Exact623 inherited evidence unavailable: '+error.message};}}
+export function verifyExploreRepairEligibility({headSha,exec=execFileSync,api=solutionsApi}){
+ // The unchanged final gate calls this name for every Explore plan; only an actual direct child of exact454 is re-dispatched.
+ const successor=classifyExploreSuccessorIntent({headSha,exec});if(successor.classification!=='normal')return verifyExploreSuccessorEligibility({headSha,exec,api,intent:successor});
+ const intent=classifyExploreRepairIntent({headSha,exec}),source=verifyExploreRepairSource({headSha,intent,exec});if(!source.eligible)return source;try{const evidence=readSolutionsParentEvidence(api);return evidence.eligible?{eligible:true,source,evidence}:evidence;}catch(error){return{eligible:false,reason:'Exact623 inherited evidence unavailable: '+error.message};}}
 export function authenticateFailedExploreRepairResolution(receipt,{intent,api=solutionsApi}){
  if(intent?.parent!==EXPLORE_REPAIR_PARENT)return receipt;
  let evidence;try{evidence=readSolutionsParentEvidence(api);}catch{return receipt;}if(!evidence.eligible)return receipt;
@@ -1019,7 +1033,92 @@ export function failedExploreRepairReceipt({headSha,reason,intent,api=solutionsA
  return{plan,receipt:authenticateFailedExploreRepairResolution(receipt,{intent,api})};
 }
 export function exploreRepairPlan(normal,proof){if(!proof?.eligible||proof.source?.profile!=='explore-repair'||proof.source.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Explore repair plan requires exact424 source and actual623 evidence.');if(proof.evidence?.knownRegressionResolution?.headSha!==repair.INTAKE_PARENT||JSON.stringify(proof.evidence.knownRegressionObservations)!==JSON.stringify([KNOWN_REGRESSION]))throw Error('Explore repair plan requires the authenticated623 historical71 resolution.');return{...normal,exploreRepairPresentation:{source:proof.source,eligible:true},solutionsPagesPresentation:undefined,publicPagesPresentation:undefined,nativeDbRehearsal:undefined,collectorOnly:undefined,collectorOnlyFailure:undefined,knownRegressionRepair:undefined,intakePresentation:undefined,groups:['selector-config','explore-repair'],unitFiles:[...EXPLORE_REPAIR_UNIT_FILES],browserFiles:[...EXPLORE_REPAIR_BROWSER_FILES],unknownPaths:[],catalogueFiles:[],runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:false,runDetailIntegrity:false,runWorkflowStaticGate:true,requireWorkspaceIntakeCapture:false,requirePublicUiScreenshots:false,requireHomePricingCaptures:false,requirePublicProductCaptures:false,requireSolutionsCaptures:true,runDatabaseRehearsal:false,databaseRehearsalStatus:'actual exact623 native World two-pass unit-SQL evidence reused as historical proof; SQL sources, copies and dependencies unchanged through exact424 and this head; cross-session concurrency/FK/expiry tests remain UNRUN',deferredGroups:[],pendingQualificationDebt:[...EXPLORE_REPAIR_PENDING_DEBT],pendingDebt:[...EXPLORE_REPAIR_PENDING_DEBT],pendingFullDebt:[...proof.evidence.pendingFullDebt],fullQualification:'pending',inheritedChecks:{parentScopedUi:proof.evidence.parentUi,storageTransport:proof.evidence.storageTransport,nativeSql:proof.evidence.nativeSql},knownRegressionResolution:proof.evidence.knownRegressionResolution,knownRegressionObservations:proof.evidence.knownRegressionObservations,historicalUiFailure:proof.evidence.historicalUiFailure,historicalBrowserFailure:{...EXPLORE_REPAIR_FAILED_PARENT},qualificationReasons:['Four Solutions unit owners (34 cases), six Solutions cases with104 exact captures and the separate19-case Explore report (17 passed, two predicate-bound skips) are required once in1440; source pins are not test results, and inherited623 SQL scope qualifies neither concurrency nor full release.']};}
-export function exploreRepairLineageFailures(plan,proof){if(!proof?.eligible)return['Explore repair source/evidence unavailable: '+(proof?.reason??'missing')];let expected;try{expected=exploreRepairPlan({...plan,qualificationReasons:[]},proof);}catch(error){return['Explore repair plan lineage unavailable: '+error.message];}const keys=['headSha','repairAnchorSha','exploreRepairPresentation','solutionsPagesPresentation','publicPagesPresentation','nativeDbRehearsal','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','runDatabaseRehearsal','databaseRehearsalStatus','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','knownRegressionResolution','knownRegressionObservations','historicalUiFailure','historicalBrowserFailure','collectorOnly','collectorOnlyFailure','knownRegressionRepair','intakePresentation'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Explore repair plan changed: '+k);}
+export function exploreRepairLineageFailures(plan,proof){if([proof?.source?.profile,plan?.exploreRepairPresentation?.source?.profile].includes(EXPLORE_SUCCESSOR_PROFILE))return exploreSuccessorLineageFailures(plan,proof);if(!proof?.eligible)return['Explore repair source/evidence unavailable: '+(proof?.reason??'missing')];let expected;try{expected=exploreRepairPlan({...plan,qualificationReasons:[]},proof);}catch(error){return['Explore repair plan lineage unavailable: '+error.message];}const keys=['headSha','repairAnchorSha','exploreRepairPresentation','solutionsPagesPresentation','publicPagesPresentation','nativeDbRehearsal','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','runDatabaseRehearsal','databaseRehearsalStatus','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','knownRegressionResolution','knownRegressionObservations','historicalUiFailure','historicalBrowserFailure','collectorOnly','collectorOnlyFailure','knownRegressionRepair','intakePresentation'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Explore repair plan changed: '+k);}
+
+// The shared browser project map is scoped by its own declaration, never by a whole-runner substring: one exact start line,
+// the first exact `]);` line after it and only file/project rows between them. Absent or ambiguous boundaries fail closed.
+export const BROWSER_PROJECTS_MAP_START='const browserProjectsByFile = new Map([';
+export function browserProjectsMapRows(source){
+ const lines=String(source).replace(/\r\n/g,'\n').split('\n'),starts=lines.flatMap((line,i)=>line===BROWSER_PROJECTS_MAP_START?[i]:[]);
+ if(starts.length!==1||(String(source).match(/\bbrowserProjectsByFile\s*=/g)??[]).length!==1)throw Error('Shared browser project map must have exactly one start declaration.');
+ const end=lines.findIndex((line,i)=>i>starts[0]&&line===']);');
+ if(end<0)throw Error('Shared browser project map must have a closing declaration boundary.');
+ const rows=lines.slice(starts[0]+1,end);
+ if(!rows.length||rows.some(row=>!/^  \['e2e\/[^'\s]+\.spec\.ts', \['[^'\s]+'(?:, '[^'\s]+')*\]\],$/.test(row)))throw Error('Shared browser project map must contain only exact file/project rows between its boundaries.');
+ return rows;
+}
+export const sharedBrowserProjectsMapExcludesExplore=source=>!browserProjectsMapRows(source).some(row=>/explore/i.test(row));
+
+/*
+  Explore repair successor: an additive exact-source profile for one single-parent direct child of the published exact454
+  Explore repair candidate (itself the exact direct child of424). 454 failed only its static workflow checker; the successor
+  changes exactly the five corrective selector/checker paths below, never a UI source, the runner or the workflow, so the
+  cumulative623 delta stays the eleven tree sources and nine Solutions configuration paths. The424 profile is unchanged:
+  the successor reuses its plan selection and adds only the exact454 identities and failure history.
+*/
+export const EXPLORE_SUCCESSOR_PROFILE='explore-repair-successor';
+export const EXPLORE_SUCCESSOR_PARENT='4540cd47cc881b5d2339c70159bc657047149204';
+export const EXPLORE_SUCCESSOR_PARENT_TREE='7cce3c9f266cf4715a02ebd7676c17b38a700a90';
+export const EXPLORE_SUCCESSOR_PATHS=Object.freeze(['nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-collector-only.test.mjs','nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/verify-repair-workflows.mjs']);
+export const EXPLORE_SUCCESSOR_RUNNER_PATH='nextjs/scripts/run-repair-check.mjs';
+export const EXPLORE_SUCCESSOR_RUNNER_BLOB='6cede7a8b0cb529409f24f4bfcae0b111df4c1ed';
+// Root-authenticated454 history only. The static checker failed before dependency install, so no product, unit or browser
+// test ran; the later missing-node_modules capture error follows from that absent install and is never test evidence.
+export const EXPLORE_SUCCESSOR_FAILED_PARENT=Object.freeze({sourceHead:EXPLORE_SUCCESSOR_PARENT,parent:EXPLORE_REPAIR_PARENT,profile:'explore-repair',scope:'workflow-static',runId:37461081048,jobId:112260519816,step:'Verify workflow and selector contracts',failedAt:'nextjs/scripts/verify-repair-workflows.mjs:307',cause:'whole-runner negative substring matched the legitimate EXPLORE_REPAIR_BROWSER_FILES declaration outside the shared browser project map',outcome:'failure',dependencyInstall:'not executed',productTests:'not executed',browserTests:'not executed',captureError:'downstream missing node_modules after no install; not product or browser evidence',status:'historical failed454 static checker evidence only; no tested product or browser evidence; not inherited for the successor head'});
+export function classifyExploreSuccessorIntent({headSha,exec=execFileSync}){
+ // Only a direct child of454 is considered; children of424 and every other parent stay with the existing classifiers.
+ let parent,intended=false;
+ try{if(!/^[a-f0-9]{40}$/.test(headSha??''))throw Error('Requested Explore repair successor head is missing.');const git=(a)=>exec('git',a,{encoding:'utf8'}).trim(),root=git(['rev-parse','--show-toplevel']),row=git(['-C',root,'rev-list','--parents','-n','1',headSha]).split(/\s+/);if(row[0]!==headSha||row.length<2)throw Error('Missing Explore repair successor parent.');parent=row[1];if(parent!==EXPLORE_SUCCESSOR_PARENT)return{classification:'normal',intended:false,reason:'Outside the exact454 Explore repair successor parent.'};const paths=git(['-C',root,'diff','--name-only','--no-relative','--no-renames','-z',`${parent}..${headSha}`]).split('\0').filter(Boolean).sort();intended=paths.some(p=>EXPLORE_REPAIR_TREE_SOURCES.includes(p)||EXPLORE_REPAIR_CONFIG_PATHS.includes(p)||SOLUTIONS_CONFIG_PATHS.includes(p));if(intended&&row.length!==2)throw Error('Explore repair successor requires one exact parent.');if(intended&&git(['-C',root,'rev-parse','HEAD'])!==headSha)throw Error('Explore repair successor checkout does not match requested head.');return intended?{classification:'intended',intended:true,headSha,parent,repoRoot:root,paths,profile:EXPLORE_SUCCESSOR_PROFILE}:{classification:'normal',intended:false,reason:'Outside the exact Explore repair successor increment.'};}catch(error){return parent===EXPLORE_SUCCESSOR_PARENT?{classification:'unavailable',intended:true,headSha,parent,reason:error.message}:{classification:'normal',intended:false,reason:'Existing classifiers must resolve unreadable or outside Explore repair successor metadata.'};}
+}
+export function verifyExploreSuccessorSource({headSha,intent=classifyExploreSuccessorIntent({headSha}),exec=execFileSync}){
+ try{
+  if(intent?.classification!=='intended'||!intent.intended||intent.profile!==EXPLORE_SUCCESSOR_PROFILE||intent.headSha!==headSha||intent.parent!==EXPLORE_SUCCESSOR_PARENT)throw Error('Explore repair successor requires an exact direct child of454: '+(intent?.reason??'unclassified'));
+  const git=(a,encoding='utf8')=>exec('git',['-C',intent.repoRoot,...a],{encoding}),text=a=>git(a).trim(),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const names=range=>text(['diff','--name-only','--no-relative','--no-renames','-z',range]).split('\0').filter(Boolean).sort();
+  // Actual commits and trees only, never receipt fields: head -> exact454 (exact tree) -> exact424 -> exact623 -> 744.
+  if(text(['rev-list','--parents','-n','1',headSha])!==`${headSha} ${EXPLORE_SUCCESSOR_PARENT}`)throw Error('Explore repair successor must be the single-parent child of exact454.');
+  if(text(['rev-list','--parents','-n','1',EXPLORE_SUCCESSOR_PARENT])!==`${EXPLORE_SUCCESSOR_PARENT} ${EXPLORE_REPAIR_PARENT}`||text(['rev-parse',`${EXPLORE_SUCCESSOR_PARENT}^{tree}`])!==EXPLORE_SUCCESSOR_PARENT_TREE)throw Error('Exact454 commit parent/tree changed.');
+  if(text(['rev-list','--parents','-n','1',EXPLORE_REPAIR_PARENT])!==`${EXPLORE_REPAIR_PARENT} ${SOLUTIONS_PARENT}`)throw Error('Exact424 must be the single-parent child of exact623.');
+  if(text(['rev-list','--parents','-n','1',SOLUTIONS_PARENT])!==`${SOLUTIONS_PARENT} ${NATIVE_WORLD_PARENT}`||text(['rev-parse',`${SOLUTIONS_PARENT}^{tree}`])!==SOLUTIONS_PARENT_TREE)throw Error('Exact623 commit parent/tree changed.');
+  const expected=[...EXPLORE_SUCCESSOR_PATHS],repairPaths=[...EXPLORE_REPAIR_CHANGED_SOURCES,...EXPLORE_REPAIR_CONFIG_PATHS].sort();
+  if(!same(intent.paths,expected)||!same(names(`${EXPLORE_SUCCESSOR_PARENT}..${headSha}`),expected))throw Error('Explore repair successor must change exactly the five corrective selector/checker paths, with no other path.');
+  if(!same(names(`${EXPLORE_REPAIR_PARENT}..${EXPLORE_SUCCESSOR_PARENT}`),repairPaths)||!same(names(`${EXPLORE_REPAIR_PARENT}..${headSha}`),repairPaths))throw Error('Exact424 deltas to454 and to the successor must stay the five UI owners and seven CI paths.');
+  if(!same(names(`${SOLUTIONS_PARENT}..${headSha}`),[...EXPLORE_REPAIR_TREE_SOURCES,...SOLUTIONS_CONFIG_PATHS].sort()))throw Error('Cumulative623 successor delta must be the eleven tree sources and nine Solutions configuration paths.');
+  for(const[a,b]of[[FULL_ANCHOR,SOLUTIONS_PARENT],[SOLUTIONS_PARENT,EXPLORE_REPAIR_PARENT],[EXPLORE_REPAIR_PARENT,EXPLORE_SUCCESSOR_PARENT],[EXPLORE_SUCCESSOR_PARENT,headSha]])text(['merge-base','--is-ancestor',a,b]);
+  verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});
+  const entry=(ref,p)=>{const raw=text(['ls-tree','--full-tree',ref,'--',p]);if(!raw)return null;const m=/^100644 blob ([a-f0-9]{40})\t(.+)$/.exec(raw);if(!m||m[2]!==p)throw Error('Unsafe Explore repair successor leaf: '+p);return m[1];};
+  for(const p of EXPLORE_REPAIR_TREE_SOURCES){const original=Object.hasOwn(SOLUTIONS_SOURCE_BLOBS,p)?SOLUTIONS_SOURCE_BLOBS[p].before:EXPLORE_REPAIR_SOURCE_BLOBS[p].before;if(entry(SOLUTIONS_PARENT,p)!==original)throw Error('Exact623 source preimage changed: '+p);}
+  // The five final424-profile UI identities stay exactly as published at454 and at the successor head.
+  for(const[p,pin]of Object.entries(EXPLORE_REPAIR_SOURCE_BLOBS)){const bytes=git(['show',`${headSha}:${p}`],'buffer');if(entry(EXPLORE_REPAIR_PARENT,p)!==pin.before||entry(EXPLORE_SUCCESSOR_PARENT,p)!==pin.after||entry(headSha,p)!==pin.after||bytes.length!==pin.bytes)throw Error('Unchanged exact454 Explore repair UI identity changed: '+p);}
+  for(const p of EXPLORE_REPAIR_UNCHANGED_SOLUTIONS_SOURCES){const pin=SOLUTIONS_SOURCE_BLOBS[p],bytes=git(['show',`${headSha}:${p}`],'buffer');if([EXPLORE_REPAIR_PARENT,EXPLORE_SUCCESSOR_PARENT,headSha].some(ref=>entry(ref,p)!==pin.after)||bytes.length!==pin.bytes||createHash('sha256').update(bytes).digest('hex')!==pin.sha256)throw Error('Unchanged exact454 Solutions owner changed: '+p);}
+  if(entry(EXPLORE_SUCCESSOR_PARENT,EXPLORE_SUCCESSOR_RUNNER_PATH)!==EXPLORE_SUCCESSOR_RUNNER_BLOB||entry(headSha,EXPLORE_SUCCESSOR_RUNNER_PATH)!==EXPLORE_SUCCESSOR_RUNNER_BLOB)throw Error('Runner must stay at its exact454 blob.');
+  if([EXPLORE_REPAIR_PARENT,EXPLORE_SUCCESSOR_PARENT,headSha].some(ref=>entry(ref,EXPLORE_REPAIR_WORKFLOW_PATH)!==EXPLORE_REPAIR_WORKFLOW_BLOB))throw Error('Repair workflow must stay at its exact424 blob.');
+  for(const[p,d]of Object.entries({...PUBLIC_PAGES_DB_BLOBS,...NATIVE_DB_TRANSPORT_BLOBS,...NATIVE_WORLD_PREREQUISITE_BLOBS,...Object.fromEntries(Object.entries(NATIVE_WORLD_SOURCE_BLOBS).map(([q,v])=>[q,v.after]))}))if([EXPLORE_REPAIR_PARENT,EXPLORE_SUCCESSOR_PARENT,headSha].some(ref=>entry(ref,p)!==d))throw Error('Inherited623 SQL or dependency input changed: '+p);
+  const exploreCases=verifyExploreSpecSource(git(['show',`${headSha}:nextjs/e2e/explore.spec.ts`],'buffer'));
+  for(const[p,d]of Object.entries(CONFIG_SEAL))if(sealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==d)throw Error('Explore repair successor collector seal changed: '+p);
+  for(const[p,d]of Object.entries(repair.REPAIR_SEAL))if(repair.repairSealHash(p,git(['show',`${headSha}:${p}`],'buffer'))!==d)throw Error('Explore repair successor seal changed: '+p);
+  return{eligible:true,headSha,parent:EXPLORE_SUCCESSOR_PARENT,parentTree:EXPLORE_SUCCESSOR_PARENT_TREE,repairParent:EXPLORE_REPAIR_PARENT,grandparent:SOLUTIONS_PARENT,grandparentTree:SOLUTIONS_PARENT_TREE,fullAnchor:FULL_ANCHOR,profile:EXPLORE_SUCCESSOR_PROFILE,exactChangedPaths:expected,repairChangedPaths:repairPaths,treeSources:[...EXPLORE_REPAIR_TREE_SOURCES],sourceBlobs:Object.fromEntries(EXPLORE_REPAIR_TREE_SOURCES.map(p=>[p,EXPLORE_REPAIR_SOURCE_BLOBS[p]?.after??SOLUTIONS_SOURCE_BLOBS[p].after])),runnerBlob:EXPLORE_SUCCESSOR_RUNNER_BLOB,workflowBlob:EXPLORE_REPAIR_WORKFLOW_BLOB,patch:EXPLORE_REPAIR_PATCH,exploreCases};
+ }catch(error){return{eligible:false,reason:error.message};}
+}
+export function verifyExploreSuccessorEligibility({headSha,exec=execFileSync,api=solutionsApi,intent=classifyExploreSuccessorIntent({headSha,exec})}){const source=verifyExploreSuccessorSource({headSha,intent,exec});if(!source.eligible)return source;try{const evidence=readSolutionsParentEvidence(api);return evidence.eligible?{eligible:true,source,evidence}:evidence;}catch(error){return{eligible:false,reason:'Exact623 inherited evidence unavailable: '+error.message};}}
+export function authenticateFailedExploreSuccessorResolution(receipt,{intent,api=solutionsApi}){
+ if(intent?.parent!==EXPLORE_SUCCESSOR_PARENT)return receipt;
+ let evidence;try{evidence=readSolutionsParentEvidence(api);}catch{return receipt;}if(!evidence.eligible)return receipt;
+ const current=d=>d!==REGRESSION_DEBT;
+ return{...receipt,knownRegressionResolution:{...evidence.knownRegressionResolution,status:'historical qualified895 resolution retained via actual623 receipt; current Explore repair successor admission failed'},knownRegressionObservations:evidence.knownRegressionObservations,historicalUiFailure:evidence.historicalUiFailure,historicalBrowserFailure:{...EXPLORE_REPAIR_FAILED_PARENT},historicalStaticFailure:{...EXPLORE_SUCCESSOR_FAILED_PARENT},pendingQualificationDebt:(receipt.pendingQualificationDebt??[]).filter(current),pendingDebt:[...new Set((receipt.pendingDebt??[]).filter(current))].sort(),inheritedChecks:{},gate:'failed',fullQualification:'pending'};
+}
+export function failedExploreSuccessorReceipt({headSha,reason,intent,api=solutionsApi}){
+ const plan=failedCollectorPlan({headSha,reason,intent}),receipt=failedCollectorReceipt(plan);receipt.pendingDebt=[...new Set([...receipt.pendingDebt,'database-contract','explore-repair',...EXPLORE_REPAIR_PENDING_DEBT])].sort();
+ return{plan,receipt:authenticateFailedExploreSuccessorResolution(receipt,{intent,api})};
+}
+export function exploreSuccessorPlan(normal,proof){
+ if(!proof?.eligible||proof.source?.profile!==EXPLORE_SUCCESSOR_PROFILE||proof.source.parent!==EXPLORE_SUCCESSOR_PARENT||proof.source.headSha!==normal.headSha)throw Error('Explore repair successor plan requires exact454 successor source and actual623 evidence.');
+ // The unchanged424 selection is reused verbatim (34 units, six Solutions and nineteen Explore cases, 104 Solutions-only captures);
+ // only the presented source, the exact454 static failure and the reasons differ. Nothing executed at454 is counted.
+ const selection=exploreRepairPlan(normal,{...proof,source:{...proof.source,profile:'explore-repair'}});
+ return{...selection,exploreRepairPresentation:{source:proof.source,eligible:true},historicalStaticFailure:{...EXPLORE_SUCCESSOR_FAILED_PARENT},qualificationReasons:['Four Solutions unit owners (34 cases), six Solutions cases with104 exact captures and the separate19-case Explore report (17 passed, two predicate-bound skips) are required once in1440 at this successor head; failed454 ran no install, product, unit or browser test and its capture error is not evidence; source pins are not test results, and inherited623 SQL scope qualifies neither concurrency nor full release.']};
+}
+export function exploreSuccessorLineageFailures(plan,proof){if(!proof?.eligible)return['Explore repair successor source/evidence unavailable: '+(proof?.reason??'missing')];let expected;try{expected=exploreSuccessorPlan({...plan,qualificationReasons:[]},proof);}catch(error){return['Explore repair successor plan lineage unavailable: '+error.message];}const keys=['headSha','repairAnchorSha','exploreRepairPresentation','solutionsPagesPresentation','publicPagesPresentation','nativeDbRehearsal','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','runDatabaseRehearsal','databaseRehearsalStatus','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','knownRegressionResolution','knownRegressionObservations','historicalUiFailure','historicalBrowserFailure','historicalStaticFailure','collectorOnly','collectorOnlyFailure','knownRegressionRepair','intakePresentation'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Explore repair successor plan changed: '+k);}
 
 // A separate exact-source profile; published a3b/28d and public-page profiles remain immutable.
 export const NATIVE_WORLD_PARENT = '744f1b3116b149c1c4f03f29f3b1d70e94e5d798';
@@ -1152,6 +1251,12 @@ function runExploreRepairMode(mode,headSha,intent){
  if(mode==='eligibility'){if(process.env.GITHUB_OUTPUT)writeFileSync(process.env.GITHUB_OUTPUT,'intended=true\neligible=true\nnative_database=false\nsolutions_pages=true\nexplore_repair=true\n',{flag:'a'});console.log(JSON.stringify({eligible:true,source:proof.source,parentEvidence:proof.evidence,fullQualification:'pending'}));return;}
  const r=spawnSync(process.execPath,['scripts/repair-scope.mjs'],{env:{...process.env,GITHUB_OUTPUT:''},encoding:'utf8'});if(r.status!==0){process.stderr.write(r.stderr??'Normal selector failed.');process.exit(r.status??1);}emit(exploreRepairPlan(JSON.parse(readFileSync('repair-plan.json','utf8')),proof));console.log('Affected-only: four Solutions unit owners (34 cases); Solutions six cases and104 captures as report1, then the separate Explore19-case report2, each once in1440; actual623 unit SQL reused, failed424 browser history retained; full qualification pending.');
 }
+function runExploreSuccessorMode(mode,headSha,intent){
+ const proof=verifyExploreSuccessorEligibility({headSha,intent});
+ if(!proof.eligible){const{plan,receipt}=failedExploreSuccessorReceipt({headSha,reason:proof.reason,intent});writeFileSync('collector-only-failure-receipt.json',JSON.stringify(receipt,null,2)+'\n');if(mode==='plan'){writeFileSync('repair-plan.json',JSON.stringify(plan,null,2)+'\n');writeFileSync('repair-receipt.json',JSON.stringify(receipt,null,2)+'\n');}console.error('Intended Explore repair successor admission is unqualified; no broad fallback is permitted: '+proof.reason);process.exit(1);}
+ if(mode==='eligibility'){if(process.env.GITHUB_OUTPUT)writeFileSync(process.env.GITHUB_OUTPUT,'intended=true\neligible=true\nnative_database=false\nsolutions_pages=true\nexplore_repair=true\n',{flag:'a'});console.log(JSON.stringify({eligible:true,source:proof.source,parentEvidence:proof.evidence,fullQualification:'pending'}));return;}
+ const r=spawnSync(process.execPath,['scripts/repair-scope.mjs'],{env:{...process.env,GITHUB_OUTPUT:''},encoding:'utf8'});if(r.status!==0){process.stderr.write(r.stderr??'Normal selector failed.');process.exit(r.status??1);}emit(exploreSuccessorPlan(JSON.parse(readFileSync('repair-plan.json','utf8')),proof));console.log('Affected-only successor of failed454: the unchanged424 selection (34 units; Solutions six cases and104 captures as report1, then the separate Explore19-case report2, each once in1440); actual623 unit SQL reused, failed424 browser and failed454 static history retained; full qualification pending.');
+}
 
 function emit(plan) {
   writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
@@ -1163,7 +1268,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const mode = process.argv[2];
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
-  // The unchanged workflow has one Solutions lane; the Explore repair over424 is routed first and reuses that lane.
+  // The unchanged workflow has one Solutions lane; the exact454 successor, then the Explore repair over424, are routed first and reuse that lane.
+  const successorIntent=classifyExploreSuccessorIntent({headSha});if(successorIntent.classification!=='normal'){runExploreSuccessorMode(mode,headSha,successorIntent);process.exit(0);}
   const exploreIntent=classifyExploreRepairIntent({headSha});if(exploreIntent.classification!=='normal'){runExploreRepairMode(mode,headSha,exploreIntent);process.exit(0);}
   const solutionsIntent=classifySolutionsIntent({headSha});if(solutionsIntent.classification!=='normal'){runSolutionsMode(mode,headSha,solutionsIntent);process.exit(0);}
   const pageIntent=classifyPublicPagesIntent({headSha});

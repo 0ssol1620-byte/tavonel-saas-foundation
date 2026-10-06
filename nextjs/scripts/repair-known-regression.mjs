@@ -165,13 +165,13 @@ export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
   ".github/workflows/repair-scope.yml": "b7112fc3fedac86028ed062b8cff702783f89f6f8a8803abfba41bd93207e041",
-  "nextjs/scripts/repair-collector-only.mjs": "093c67377be8f13f8651b156b51d2fc8e7302a1bf56d0f3a3bb3e66ed9831944",
+  "nextjs/scripts/repair-collector-only.mjs": "f97d43104ad69d7ca2a7380222a32413c04129024fe5fb3eec8c07b5cc31ff1c",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
-  "nextjs/scripts/repair-scope.test.mjs": "d736a0f8d23b6aaf408abbc83122e4b14238ca75e4fdc796ec22bf0f683789a5",
+  "nextjs/scripts/repair-scope.test.mjs": "1a8138746edef8ca46aafd2183e56929ef9e9999dd0fb11c2002efd475440ad6",
   "nextjs/scripts/repair-scope-gate.mjs": "b8ec75bc16cdb5f1b8a069f510233d9a4c9a5a6b5bf9d27f460c9208514a022f",
-  "nextjs/scripts/verify-repair-workflows.mjs": "7a741eabe58ab76e13acf8d12b3b8a1ce62c6ee5e937327210eb047d96afab8a",
-  "nextjs/scripts/repair-collector-only.test.mjs": "9560523d9464a9d13622e3faab04ba07972e396b031835746053d0f13dcd49e4",
-  "nextjs/scripts/repair-known-regression.mjs": "92a476e20fca89319205d42c6da809faf838fb38fc12e7cac84a9ef75aa7946b",
+  "nextjs/scripts/verify-repair-workflows.mjs": "9db018e050aa3e5936e7c58d07a39ac4b2da9f34709f11e5f5dab9c415308679",
+  "nextjs/scripts/repair-collector-only.test.mjs": "8df576ad187bf509339762f95eb5b12140921b9bf1f9133cac925cf85b7fcc4e",
+  "nextjs/scripts/repair-known-regression.mjs": "d7b0dcda90b20ef5174b95a3ac15180391a673c774cc21c930ab5969638ccbb6",
   "nextjs/scripts/repair-known-regression.test.mjs": "3e86911fd98bcbfebf6eaefb6e64a97c483f21b023027799f05b0659fc2aaa7e",
   ".github/workflows/db-rehearsal.yml": "f4001dbbcab9b6081875bce2c0843a99a5cb09944ce8d4a2b1d1da76ce573ab3",
   "nextjs/scripts/run-repair-check.mjs": "2a9dc628dbc4c3c233aec81d470c6b3be07571e107831b92526ed71d669634e2",
@@ -873,7 +873,8 @@ export function verifyIntakePresentationSource({ headSha, exec = execFileSync })
 // The archive is authenticated before decompression. Only the single bounded
 // receipt entry from that immutable archive is accepted; there are no disk writes.
 export function readIntakeParentReceipt(archive) { return readBoundIntakeReceipt(archive, INTAKE_PARENT_ARTIFACT, 8239); }
-// The Explore repair over exact424 reuses this same exact623 artifact as historical SQL proof; it never stages or reruns a database.
+// The Explore repair over exact424 and its exact454 successor reuse this same exact623 artifact as historical SQL proof; neither
+// stages or reruns a database, and failed454 (static checker only, no install) contributes no SQL, product or browser evidence.
 export const SOLUTIONS_NATIVE_WORLD_ARTIFACT = Object.freeze({id:11390495928,name:'native-world-sql-rehearsal-62362e39b4052458fc15f8731dbccf45d9b73f63',digest:'sha256:30f91555bea0d321e0ad4b48f7b8ebbc07c22833b08ba3d1e21bcb067f795735',bytes:1190});
 export function readBoundSolutionsWorldReceipt(archive, artifact, sizeBytes = SOLUTIONS_NATIVE_WORLD_ARTIFACT.bytes) {
   // GitHub reports size_in_bytes; pinned fixtures carry bytes. Every declared size must equal the pin.
