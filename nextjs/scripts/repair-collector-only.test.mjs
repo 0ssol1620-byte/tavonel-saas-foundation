@@ -121,11 +121,37 @@ let nativeKnownSource=published28dBytes('nextjs/scripts/repair-known-regression.
 const native=await import(pathToFileURL(resolve(nativeModuleRoot,'repair-collector-only.mjs')).href);
 const nativeRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 
-const published852='852ffbee9b71ee75ce2ee047874731596c13e837',published852Blobs={"nextjs/scripts/repair-collector-only.mjs":"6727bf88aac81dfd4827119cf15a48ffd3361dd3","nextjs/scripts/repair-collector-only.test.mjs":"37e780d262cfadbb8a0e0195150be4601e1368df","nextjs/scripts/repair-known-regression.mjs":"8d00b72c36d1d15ddc01ee4a96dec38c318f8061",".github/workflows/db-rehearsal.yml":"9c8a57e33b383387075d89bf7059a7b7ce148041","nextjs/lib/db-rehearsal-workflow.test.ts":"3e723a40e1bf09e8be44bb6de96b74d77663ff75"},published852Cache=process.env.NATIVE_WORLD_PARENT_FIXTURE_ARCHIVE?JSON.parse(gunzipSync(readFileSync(process.env.NATIVE_WORLD_PARENT_FIXTURE_ARCHIVE))):{};
-function published852Bytes(p){if(!Object.hasOwn(published852Blobs,p))return readFileSync(resolve(nativeRoot,p));const b=published852Cache[p]?Buffer.from(published852Cache[p],'base64'):execFileSync('git',['show',published852+':'+p],{stdio:'pipe'});assert.equal(gitBlob(b),published852Blobs[p]);return b;}
+// Frozen exact852 seal boundary: all thirteen sealed paths resolve only from authenticated historical bytes.
+const published852='852ffbee9b71ee75ce2ee047874731596c13e837',published852Blobs={
+  ".github/workflows/repair-scope.yml": "bc389e37e24a3544472a80da1012063cdd748eee",
+  "nextjs/scripts/repair-collector-only.mjs": "6727bf88aac81dfd4827119cf15a48ffd3361dd3",
+  "nextjs/scripts/repair-scope.mjs": "07b181b59bab2f636dafe9f1227b18e8113c452d",
+  "nextjs/scripts/repair-scope.test.mjs": "823989f9f7fc71ab610f85386f88d6722ac6f8e9",
+  "nextjs/scripts/repair-scope-gate.mjs": "667b64533c8f47674ea6170efd555b1bcb51b4e4",
+  "nextjs/scripts/verify-repair-workflows.mjs": "963417ac33d1ef8f81c1c2e37e5e3437cb1e39b0",
+  "nextjs/scripts/repair-collector-only.test.mjs": "37e780d262cfadbb8a0e0195150be4601e1368df",
+  "nextjs/scripts/repair-known-regression.mjs": "8d00b72c36d1d15ddc01ee4a96dec38c318f8061",
+  "nextjs/scripts/repair-known-regression.test.mjs": "0bf7d9a731c8111e1d0523ffee86050c0632dd33",
+  ".github/workflows/db-rehearsal.yml": "9c8a57e33b383387075d89bf7059a7b7ce148041",
+  "nextjs/scripts/run-repair-check.mjs": "8141b4ab6b24c30db5481a83c161320da6a06e90",
+  "nextjs/scripts/repair-test-report.mjs": "4e3878f8b6311f06879415d6fa87ad25de0d7254",
+  "nextjs/vitest.repair-scope.config.ts": "67844b0446fb9e1e94d17ec235c1423faac535b6",
+  "nextjs/lib/db-rehearsal-workflow.test.ts": "3e723a40e1bf09e8be44bb6de96b74d77663ff75"
+},published852Sealed=Object.freeze(['.github/workflows/repair-scope.yml','nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-scope.mjs','nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repair-scope-gate.mjs','nextjs/scripts/verify-repair-workflows.mjs','nextjs/scripts/repair-collector-only.test.mjs','nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/repair-known-regression.test.mjs','.github/workflows/db-rehearsal.yml','nextjs/scripts/run-repair-check.mjs','nextjs/scripts/repair-test-report.mjs','nextjs/vitest.repair-scope.config.ts']),published852Cache=process.env.NATIVE_WORLD_PARENT_FIXTURE_ARCHIVE?JSON.parse(gunzipSync(readFileSync(process.env.NATIVE_WORLD_PARENT_FIXTURE_ARCHIVE))):{};
+function historical852Bytes(p,{cache=published852Cache,show=q=>execFileSync('git',['show',published852+':'+q],{stdio:'pipe'}),current=q=>readFileSync(resolve(nativeRoot,q))}={}){if(!Object.hasOwn(published852Blobs,p)){if(published852Sealed.includes(p))throw Error('Sealed852 fixture lacks an exact pin: '+p);return current(p);}const b=cache[p]?Buffer.from(cache[p],'base64'):show(p);assert.equal(gitBlob(b),published852Blobs[p],'Original852 fixture byte identity: '+p);return b;}
+function published852Bytes(p){return historical852Bytes(p);}
 const pageModuleRoot=mkdtempSync(resolve(tmpdir(),'repair-pages852-module-'));after(()=>rmSync(pageModuleRoot,{recursive:true,force:true}));writeFileSync(resolve(pageModuleRoot,'repair-collector-only.mjs'),published852Bytes('nextjs/scripts/repair-collector-only.mjs'));let pageKnown=published852Bytes('nextjs/scripts/repair-known-regression.mjs').toString();for(const name of ['run-repair-check.mjs','repair-test-report.mjs'])pageKnown=pageKnown.replace('./'+name,pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)),name)).href);writeFileSync(resolve(pageModuleRoot,'repair-known-regression.mjs'),pageKnown);const pages=await import(pathToFileURL(resolve(pageModuleRoot,'repair-collector-only.mjs')).href);
 import * as world from './repair-collector-only.mjs';
 import { REPAIR_SEAL_PATHS as worldRepairPaths } from './repair-known-regression.mjs';
+
+test('historical852 sealed files never resolve from changed current candidate bytes when exact historical source is unavailable',()=>{
+  assert.equal(published852Sealed.length,13);assert.equal(new Set(published852Sealed).size,13);
+  for(const p of published852Sealed){assert.ok(Object.hasOwn(published852Blobs,p),p);let currentReads=0;const changed=Buffer.from('changed current candidate '+p),current=()=>{currentReads++;return changed;},show=()=>{throw Error('Historical852 source unavailable: '+p);};
+    assert.throws(()=>historical852Bytes(p,{cache:{},show,current}),/Historical852 source unavailable/,p);
+    assert.throws(()=>historical852Bytes(p,{cache:{[p]:changed.toString('base64')},show,current}),/Original852 fixture byte identity/,p);
+    assert.throws(()=>historical852Bytes(p,{cache:{},show:()=>changed,current}),/Original852 fixture byte identity/,p);
+    assert.equal(currentReads,0,p);}
+});
 
 test('collector source proof seals all infrastructure and preserves the three immutable fix blobs', () => {
   assert.deepEqual(Object.keys(CONFIG_SEAL).sort(), [...CONFIG_PATHS].sort());
@@ -624,4 +650,32 @@ test('Native World selects77 product cases,57 DB owners and canonical SQL contra
 });
 test('failed Native World preserves authenticated historical resolution while accepting no current UI or DB evidence',()=>{
   const receipt=world.failedCollectorReceipt(world.failedCollectorPlan({headSha:head,reason:'World SQL mutated',intent:{classification:'intended',intended:true,parent:world.NATIVE_WORLD_PARENT}})),preserved=world.authenticateFailedNativeResolution(receipt,{headSha:head,intended:'true',exec:worldGitFixture({mutated:'supabase/drafts/native-world-reduction-commit.sql'}),api:worldApiFixture()});assert.equal(preserved.gate,'failed');assert.deepEqual(preserved.inheritedChecks,{});assert.equal(preserved.knownRegressionResolution.passed,433);assert.ok(!preserved.pendingDebt.includes(world.REGRESSION_DEBT));assert.ok(preserved.pendingDebt.includes('database-contract'));assert.equal(preserved.fullQualification,'pending');
+});
+test('current collector routes exact623 Solutions intent before the published page and native profiles',()=>{
+  const source=readFileSync(fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url)),'utf8'),cli=source.slice(source.lastIndexOf('if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))'));
+  const solutions=cli.indexOf('classifySolutionsIntent({headSha})'),pages=cli.indexOf('classifyPublicPagesIntent({headSha})'),native=cli.indexOf('classifyNativeDbIntent({ headSha })');
+  assert.ok(solutions>=0&&solutions<pages&&pages<native);
+  const exec=paths=>(_command,args)=>{if(args[0]==='-C')args=args.slice(2);if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'fixture-root':head;if(args[0]==='rev-list')return `${head} ${world.SOLUTIONS_PARENT}`;if(args[0]==='diff')return paths.join('\0')+'\0';throw new Error('Unexpected Solutions git command: '+args.join(' '));};
+  assert.equal(world.classifySolutionsIntent({headSha:head,exec:exec(['nextjs/lib/unrelated.ts'])}).classification,'normal');
+  assert.equal(world.classifySolutionsIntent({headSha:head,exec:exec(['nextjs/scripts/repair-collector-only.test.mjs'])}).classification,'intended');
+  assert.equal(world.verifySolutionsSource({headSha:head,intent:{classification:'unavailable',intended:true,headSha:head,parent:world.SOLUTIONS_PARENT,reason:'unreadable'}}).eligible,false);
+});
+// Actual exact623 Repair and native World evidence, read only through authenticated gh api.
+const solutionsEndpoints=['actions/runs/37413409860','actions/jobs/112106655290','actions/artifacts/11390745419','actions/artifacts/11390745419/zip','actions/runs/37413409719','actions/jobs/112106717073','actions/artifacts/11390495928','actions/artifacts/11390495928/zip'];
+let solutionsEvidenceCache;
+function solutionsApiFixture(){solutionsEvidenceCache??=Object.fromEntries(solutionsEndpoints.map(p=>[p,p.endsWith('/zip')?execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/'+p],{timeout:20000,maxBuffer:1024*1024}):JSON.parse(execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/'+p],{encoding:'utf8',timeout:20000}))]));return p=>{if(!Object.hasOwn(solutionsEvidenceCache,p))throw Error('Unexpected Solutions evidence '+p);const v=solutionsEvidenceCache[p];return Buffer.isBuffer(v)?Buffer.from(v):structuredClone(v);};}
+test('actual623 evidence authenticates the historical71 resolution carried into the Solutions plan',()=>{
+  const api=solutionsApiFixture(),evidence=world.verifySolutionsParentEvidence(Object.fromEntries([['repairRun',0],['repairJob',1],['repairArtifact',2],['repairArchive',3],['dbRun',4],['dbJob',5],['dbArtifact',6],['dbArchive',7]].map(([k,i])=>[k,api(solutionsEndpoints[i])])));
+  assert.equal(evidence.eligible,true,evidence.reason);assert.equal(evidence.knownRegressionResolution.headSha,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.equal(evidence.knownRegressionResolution.passed,433);assert.equal(evidence.knownRegressionResolution.catalogue.passed,13);assert.deepEqual(evidence.knownRegressionObservations,[{...world.KNOWN_REGRESSION}]);assert.equal(evidence.historicalUiFailure.gate,'failed');
+  const plan=world.solutionsPagesPlan({headSha:head,repairAnchorSha:world.FULL_ANCHOR,groups:[],unitFiles:[],browserFiles:[],unknownPaths:[]},{eligible:true,source:{eligible:true,headSha:head},evidence});assert.deepEqual(plan.knownRegressionResolution,evidence.knownRegressionResolution);assert.deepEqual(plan.knownRegressionObservations,evidence.knownRegressionObservations);assert.deepEqual(plan.historicalUiFailure,evidence.historicalUiFailure);
+});
+test('failed Solutions admission keeps historical71 resolved and records the current failure separately',()=>{
+  const intent={classification:'intended',intended:true,headSha:head,parent:world.SOLUTIONS_PARENT},reason='Solutions source identity changed: nextjs/app/solutions/solutions.module.css';
+  const {plan,receipt}=world.failedSolutionsReceipt({headSha:head,reason,intent,api:solutionsApiFixture()});
+  assert.deepEqual(plan.currentAdmission,{profile:'solutions-workflows',headSha:head,parent:world.SOLUTIONS_PARENT,status:'failed',reason});assert.ok(!plan.pendingQualificationDebt.includes(world.REGRESSION_DEBT));assert.ok(plan.pendingQualificationDebt.includes('solutions-pages-eligibility'));
+  assert.equal(receipt.gate,'failed');assert.deepEqual(receipt.gateFailures,[reason]);assert.deepEqual(receipt.currentAdmission,plan.currentAdmission);assert.deepEqual(receipt.inheritedChecks,{});assert.equal(receipt.fullQualification,'pending');
+  assert.equal(receipt.knownRegressionResolution.passed,433);assert.equal(receipt.knownRegressionResolution.headSha,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.match(receipt.knownRegressionResolution.status,/historical.*retained.*current Solutions admission failed/);assert.equal(receipt.knownRegressionObservations[0].failed,71);
+  assert.ok(!receipt.pendingDebt.includes(world.REGRESSION_DEBT));assert.ok(!receipt.pendingQualificationDebt.includes(world.REGRESSION_DEBT));for(const debt of ['database-contract','solutions-pages','solutions-pages-eligibility','native-world-real-concurrency'])assert.ok(receipt.pendingDebt.includes(debt),debt);
+  // Without authenticated evidence the resolution is still historical, never resurrected as current unresolved debt.
+  const offline=world.failedSolutionsReceipt({headSha:head,reason,intent,api:()=>{throw Error('offline');}}).receipt;assert.equal(offline.knownRegressionResolution,undefined);assert.equal(offline.historicalRegressionResolution.sourceHead,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.ok(!offline.pendingDebt.includes(world.REGRESSION_DEBT));assert.equal(offline.currentAdmission.status,'failed');assert.equal(offline.gate,'failed');
 });

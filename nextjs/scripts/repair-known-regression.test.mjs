@@ -10,6 +10,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { FULL_ANCHOR, COLLECTOR_BASE, REGRESSION_DEBT, KNOWN_REGRESSION, collectorJobDecision } from './repair-collector-only.mjs';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
 import { buildUnitArgs, isInsideWorkspace } from './run-repair-check.mjs';
+import { readBoundSolutionsWorldReceipt, SOLUTIONS_NATIVE_WORLD_ARTIFACT } from './repair-known-regression.mjs';
+
+test('Solutions can read only the exact623 native World receipt artifact and exact member name',()=>{
+  const pin=SOLUTIONS_NATIVE_WORLD_ARTIFACT;
+  for(const change of [{id:pin.id+1},{name:'other.json'},{digest:'sha256:'+'0'.repeat(64)},{bytes:pin.bytes+1},{size_in_bytes:pin.bytes+1},{bytes:undefined}])assert.throws(()=>readBoundSolutionsWorldReceipt(Buffer.alloc(0),{...pin,...change}),/exact qualified623 artifact/);
+  assert.throws(()=>readBoundSolutionsWorldReceipt(Buffer.alloc(0),pin,pin.bytes+1),/exact qualified623 artifact/);
+  // Correct pins proceed to archive authentication; an empty archive still fails closed.
+  assert.throws(()=>readBoundSolutionsWorldReceipt(Buffer.alloc(0),{id:pin.id,name:pin.name,digest:pin.digest,size_in_bytes:pin.bytes}),/digest or size mismatch/);
+});
 
 
 const head = 'e'.repeat(40), root = resolve(process.cwd(), '..');

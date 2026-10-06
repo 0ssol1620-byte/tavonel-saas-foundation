@@ -2581,3 +2581,225 @@ test('public product actual reports reject omitted old assertions arbitrary skip
 test('public product capture destination and source ancestors reject symlink junctions',()=>{
   const root=mkdtempSync(resolve(tmpdir(),'repair-public-product-symlink-')),outside=mkdtempSync(resolve(tmpdir(),'repair-public-product-outside-'));try{const f=publicProductFixture(root);symlinkSync(outside,f.destination,'junction');assert.throws(()=>collectPublicProductCaptures(root,f.plan),/symlink/);assert.deepEqual(readdirSync(outside),[]);}finally{rmSync(root,{recursive:true,force:true});rmSync(outside,{recursive:true,force:true});}
 });
+
+// Solutions admission: exact623 child, eight pinned sources, nine configuration paths, one1440 run and104 named captures.
+import * as solutionsAdmission from './repair-collector-only.mjs';
+import { REPAIR_SEAL, repairSealHash, INTAKE_FOLD_FAILURE as solutionsFoldFailure, INTAKE_PARENT as solutionsIntakeParent } from './repair-known-regression.mjs';
+import { SOLUTIONS_BROWSER_TITLES, SOLUTIONS_CAPTURE_BINDINGS, SOLUTIONS_CAPTURE_SET_COUNTS, solutionsCaptureSetCounts, collectSolutionsWorkflowCaptures, readSolutionsWorkflowExecution } from './run-repair-check.mjs';
+const solutionsHead='5'.repeat(40),solutionsSpec='e2e/solutions-workflows.spec.ts',solutionsRepoRoot=resolve(process.cwd(),'..');
+const solutionsUnitFiles=['lib/solutions-hub.test.ts','lib/solution-proof-sample.test.ts','lib/solution-workflows.test.ts','lib/solutions-thumbnails.test.ts'];
+const solutionsGitBlob=bytes=>createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+const solutionsWorkspaceBytes=path=>readFileSync(resolve(solutionsRepoRoot,path));
+const solutionsChangedPaths=()=>[...solutionsAdmission.SOLUTIONS_CHANGED_SOURCES,...solutionsAdmission.SOLUTIONS_CONFIG_PATHS].sort();
+// Authenticated read-only GitHub API identities of exact623 (git/commits and contents?ref=623; null is HTTP 404).
+// The fixture serves these, never the candidate's own pins, so a wrong candidate preimage cannot be echoed back.
+const solutions623={commit:'62362e39b4052458fc15f8731dbccf45d9b73f63',tree:'d95dc8463b9acb9033692cf1752e77f13da7ee54',parent:'744f1b3116b149c1c4f03f29f3b1d70e94e5d798'};
+const solutions623Blobs=Object.freeze({
+  'nextjs/app/solutions/page.tsx':'2d8714b4fd209d7b0ec25a7c7b96985c873eb194',
+  'nextjs/app/solutions/[slug]/page.tsx':'c4894161fd267fb95049003f163c3e8306441e2d',
+  'nextjs/app/solutions/solutions.module.css':'9971076eeae3b63e007032cf7261d7bbf55ebdbe',
+  'nextjs/app/solutions/solution-workflow-proof.tsx':null,
+  'nextjs/lib/solutions-hub.test.ts':'e8ff23545aeec79bfec00d22460c87b63a7c79eb',
+  'nextjs/lib/solution-proof-sample.test.ts':'b97a007589dd88dff0fcd9c551944d2da477f296',
+  'nextjs/lib/solution-workflows.test.ts':null,
+  'nextjs/e2e/solutions-workflows.spec.ts':null,
+  '.github/workflows/repair-scope.yml':'bc389e37e24a3544472a80da1012063cdd748eee',
+  'nextjs/scripts/repair-collector-only.mjs':'b9f39531e29a5a985d9bdce7f3c0b410fc02d3e3',
+  'nextjs/scripts/repair-collector-only.test.mjs':'2ae1c371df79ad64cca1da10ec5d992d2f28299f',
+  'nextjs/scripts/repair-known-regression.mjs':'ac24912b4360c85bc2a7bfee23954a56997f5afa',
+  'nextjs/scripts/repair-known-regression.test.mjs':'0bf7d9a731c8111e1d0523ffee86050c0632dd33',
+  'nextjs/scripts/run-repair-check.mjs':'8141b4ab6b24c30db5481a83c161320da6a06e90',
+  'nextjs/scripts/repair-scope-gate.mjs':'667b64533c8f47674ea6170efd555b1bcb51b4e4',
+  'nextjs/scripts/repair-scope.test.mjs':'823989f9f7fc71ab610f85386f88d6722ac6f8e9',
+  'nextjs/scripts/verify-repair-workflows.mjs':'963417ac33d1ef8f81c1c2e37e5e3437cb1e39b0',
+});
+function solutionsGit(options={}){
+  const c=solutionsAdmission,unchanged={...c.PUBLIC_PAGES_DB_BLOBS,...c.NATIVE_DB_TRANSPORT_BLOBS,...c.NATIVE_WORLD_PREREQUISITE_BLOBS,...Object.fromEntries(Object.entries(c.NATIVE_WORLD_SOURCE_BLOBS).map(([p,v])=>[p,v.after]))};
+  const base={...solutions623Blobs,...options.base};
+  const headBytes=path=>options.mutate===path?Buffer.concat([solutionsWorkspaceBytes(path),Buffer.from('\n')]):solutionsWorkspaceBytes(path);
+  const blob=(ref,path)=>{
+    if(ref===solutions623.commit){if(Object.hasOwn(base,path))return options.configPreimage===path?'0'.repeat(40):base[path];if(Object.hasOwn(unchanged,path))return unchanged[path];return null;}
+    if(ref===solutionsHead){if(Object.hasOwn(unchanged,path))return options.dependency===path?'1'.repeat(40):unchanged[path];return solutionsGitBlob(headBytes(path));}
+    throw new Error('Unexpected Solutions fixture ref: '+ref);
+  };
+  return (_command,args,settings={})=>{
+    if(args[0]==='-C'){assert.equal(args[1],'fixture-root');args=args.slice(2);}
+    if(args[0]==='rev-parse'){if(args[1]==='--show-toplevel')return 'fixture-root';if(args[1]==='HEAD')return options.checkout??solutionsHead;if(args[1]===`${solutions623.commit}^{tree}`)return options.tree??solutions623.tree;throw new Error('Unbound Solutions fixture revision: '+args[1]);}
+    if(args[0]==='rev-list'){assert.deepEqual(args.slice(0,4),['rev-list','--parents','-n','1']);if(args[4]===solutionsHead)return `${solutionsHead} ${options.parent??solutions623.commit}${options.merge?' '+'a'.repeat(40):''}`;if(args[4]===solutions623.commit)return `${solutions623.commit} ${options.grandparent??solutions623.parent}`;throw new Error('Unbound Solutions fixture commit: '+args[4]);}
+    if(args[0]==='diff'&&args[1]==='--raw'){if(options.dirty)throw new Error('dirty checkout');return '';}
+    if(args[0]==='diff')return (options.paths??solutionsChangedPaths()).join('\0')+'\0';
+    if(args[0]==='merge-base'){if(options.ancestor===false)throw new Error('not ancestor');return '';}
+    if(args[0]==='ls-tree'){assert.equal(args.length,5);assert.deepEqual([args[1],args[3]],['--full-tree','--']);const path=args[4],sha=blob(args[2],path);return sha?`100644 blob ${sha}\t${path}`:'';}
+    if(args[0]==='show'){const [ref,path]=args[1].split(/:(.+)/);assert.equal(ref,solutionsHead);const bytes=headBytes(path);return settings.encoding==='buffer'?bytes:bytes.toString('utf8');}
+    throw new Error('Unexpected Solutions fixture git command: '+args.join(' '));
+  };
+}
+test('Solutions workspace holds the eight reviewed source identities on the exact623 lineage', () => {
+  assert.equal(solutionsAdmission.SOLUTIONS_PARENT,'62362e39b4052458fc15f8731dbccf45d9b73f63');
+  assert.equal(solutionsAdmission.SOLUTIONS_PARENT_TREE,'d95dc8463b9acb9033692cf1752e77f13da7ee54');
+  assert.equal(solutionsAdmission.NATIVE_WORLD_PARENT,'744f1b3116b149c1c4f03f29f3b1d70e94e5d798');
+  assert.equal(solutionsAdmission.FULL_ANCHOR,'6401c3524b5294f3a395acede35e4632eb89c0fb');
+  assert.deepEqual(Object.fromEntries(Object.entries(solutionsAdmission.SOLUTIONS_SOURCE_BLOBS).map(([p,v])=>[p,[v.after,v.sha256]])),{
+    'nextjs/app/solutions/page.tsx':['15993633437b3f162c4d38fffa97fb5faea8cd00','e0589e51fc087fa71ff4644726de22b2f4eed46b1c25d48a7e2b61dc7e634688'],
+    'nextjs/app/solutions/[slug]/page.tsx':['d79525434e5812abc61ac3c65b379528ec8ca533','6eda1ca3b4bebd52c36688086e55a9b573bcb57025638bc7854fd8f5edde4f9a'],
+    'nextjs/app/solutions/solutions.module.css':['96d44197edf2c7a79ac2519c5167ee64091f5999','22b725e59dfa60f5604409ff264f5b8db95924ca583992b20b54a15aba216441'],
+    'nextjs/app/solutions/solution-workflow-proof.tsx':['107f60793a1c01a61fb53d660afda3b6c74b3dae','92dcf57e7d5238741cd1b99956bc7cf1694c02defeacd9efbed8b9760e7ba0fb'],
+    'nextjs/lib/solutions-hub.test.ts':['d26eef51b1d540ac395f15b4bb3525333ff2f6c2','de1be7c88e38c1fe2356f2f08d6b7f14a0102d6dcec7f479447a5f092d4cb789'],
+    'nextjs/lib/solution-proof-sample.test.ts':['27254cd1405aa3a3e9acf3065b12fc6da8a64c61','2261a661a9406eab14c678aa23d73bbfdf85d22c64d14a528a56bff10e5cf089'],
+    'nextjs/lib/solution-workflows.test.ts':['67ee42a3e502da39b25ca8fdfbbed723d6bcbf14','94efd1a038507b0c92013ce7cb4d27e0b987514e5fb86864c2e0021741adbb93'],
+    'nextjs/e2e/solutions-workflows.spec.ts':['d2af505f4b546a586ab13c96d0be11cd820edc2f','3851061aeb95a055e5a9dd383d85098ed55688fc9d086d900263123ebec5dfe5'],
+  });
+  for(const [path,pin] of Object.entries(solutionsAdmission.SOLUTIONS_SOURCE_BLOBS)){
+    const bytes=solutionsWorkspaceBytes(path);
+    assert.deepEqual([bytes.length,solutionsGitBlob(bytes),createHash('sha256').update(bytes).digest('hex')],[pin.bytes,pin.after,pin.sha256],path);
+  }
+});
+test('Solutions preimage and configuration pins equal the authenticated exact623 identities', () => {
+  assert.deepEqual([solutionsAdmission.SOLUTIONS_PARENT,solutionsAdmission.SOLUTIONS_PARENT_TREE,solutionsAdmission.NATIVE_WORLD_PARENT],[solutions623.commit,solutions623.tree,solutions623.parent]);
+  assert.deepEqual(Object.fromEntries(Object.entries(solutionsAdmission.SOLUTIONS_SOURCE_BLOBS).map(([p,v])=>[p,v.before])),Object.fromEntries(solutionsAdmission.SOLUTIONS_CHANGED_SOURCES.map(p=>[p,solutions623Blobs[p]])));
+  assert.deepEqual({...solutionsAdmission.SOLUTIONS_PARENT_CONFIG_BLOBS},Object.fromEntries(solutionsAdmission.SOLUTIONS_CONFIG_PATHS.map(p=>[p,solutions623Blobs[p]])));
+  assert.equal(solutionsAdmission.SOLUTIONS_SOURCE_BLOBS['nextjs/app/solutions/solutions.module.css'].before,'9971076eeae3b63e007032cf7261d7bbf55ebdbe');
+  assert.equal(solutionsAdmission.SOLUTIONS_PARENT_CONFIG_BLOBS['nextjs/scripts/repair-known-regression.test.mjs'],'0bf7d9a731c8111e1d0523ffee86050c0632dd33');
+  assert.throws(()=>solutionsGit()('git',['rev-parse','f'.repeat(40)+'^{tree}']),/Unbound/);assert.throws(()=>solutionsGit()('git',['ls-tree','--full-tree','f'.repeat(40),'--','nextjs/app/solutions/page.tsx']),/Unexpected Solutions fixture ref/);
+});
+test('Solutions exact-source seals bind the checked-out configuration bytes', () => {
+  const actual=(seal,hash)=>Object.fromEntries(Object.keys(seal).map(path=>{const bytes=solutionsWorkspaceBytes(path);assert.equal(bytes.includes(13),false,'sealed bytes must be LF-only: '+path);return [path,hash(path,bytes)];}));
+  assert.deepEqual({collector:actual(solutionsAdmission.CONFIG_SEAL,solutionsAdmission.sealHash),repair:actual(REPAIR_SEAL,repairSealHash)},{collector:{...solutionsAdmission.CONFIG_SEAL},repair:{...REPAIR_SEAL}});
+});
+test('Solutions intent fails closed for owned sources or exact623 configuration and leaves unrelated metadata to existing classifiers', () => {
+  const classify=options=>solutionsAdmission.classifySolutionsIntent({headSha:solutionsHead,exec:solutionsGit(options)});
+  const intended=classify();assert.equal(intended.classification,'intended');assert.equal(intended.parent,solutionsAdmission.SOLUTIONS_PARENT);assert.deepEqual(intended.paths,solutionsChangedPaths());
+  assert.equal(classify({paths:['nextjs/scripts/repair-scope.test.mjs']}).intended,true);
+  assert.equal(classify({parent:'d'.repeat(40),paths:['nextjs/app/solutions/page.tsx']}).intended,true);
+  assert.equal(classify({parent:'d'.repeat(40),paths:['nextjs/scripts/repair-scope.test.mjs']}).classification,'normal');
+  assert.equal(classify({paths:['nextjs/app/solutions/other.tsx']}).classification,'normal');
+  for(const options of [{merge:true},{checkout:'f'.repeat(40)}]){const result=classify(options);assert.equal(result.classification,'unavailable');assert.equal(result.intended,true);}
+  assert.equal(classify({parent:'d'.repeat(40),checkout:'f'.repeat(40)}).classification,'unavailable');
+  assert.equal(classify({parent:'d'.repeat(40),checkout:'f'.repeat(40),paths:['nextjs/scripts/repair-scope.test.mjs']}).classification,'normal');
+  assert.equal(solutionsAdmission.classifySolutionsIntent({headSha:undefined,exec:solutionsGit()}).classification,'normal');
+});
+test('Solutions source admission accepts only the complete exact delta and rejects every mutated, extra or missing input', () => {
+  const verify=options=>solutionsAdmission.verifySolutionsSource({headSha:solutionsHead,intent:solutionsAdmission.classifySolutionsIntent({headSha:solutionsHead,exec:solutionsGit(options)}),exec:solutionsGit(options)});
+  const accepted=verify();assert.equal(accepted.eligible,true,accepted.reason);assert.deepEqual(accepted.exactChangedPaths,solutionsChangedPaths());assert.equal(accepted.fullAnchor,solutionsAdmission.FULL_ANCHOR);
+  const rejected=[
+    {paths:[...solutionsChangedPaths(),'nextjs/app/solutions/extra.tsx']},
+    {paths:solutionsChangedPaths().filter(path=>path!=='nextjs/e2e/solutions-workflows.spec.ts')},
+    {paths:solutionsChangedPaths().filter(path=>path!=='nextjs/scripts/repair-scope.test.mjs')},
+    {paths:[...solutionsChangedPaths(),'supabase/drafts/native-world-reduction-commit.sql'].sort()},
+    {tree:'0'.repeat(40)},{grandparent:'0'.repeat(40)},{ancestor:false},{dirty:true},{merge:true},{parent:'d'.repeat(40)},
+    {configPreimage:'nextjs/scripts/run-repair-check.mjs'},
+    // The superseded candidate pins are rejected once the fixture serves authenticated exact623 identities.
+    {base:{'nextjs/app/solutions/solutions.module.css':'ec1a5e3aa8951b2efa03e8552b20a51e0a9e7aea'}},
+    {base:{'nextjs/scripts/repair-known-regression.test.mjs':'208fded258f1d6faab0937062695f193a7806e75'}},
+    {base:{'nextjs/app/solutions/solution-workflow-proof.tsx':'3c912f9216be2d0f3cc814141c5e1ddbe859a252'}},
+    {dependency:'supabase/drafts/native-world-reduction-commit.sql'},{dependency:'.github/workflows/db-rehearsal.yml'},
+    ...solutionsAdmission.SOLUTIONS_CHANGED_SOURCES.map(mutate=>({mutate})),
+    ...['nextjs/scripts/run-repair-check.mjs','nextjs/scripts/repair-scope-gate.mjs','.github/workflows/repair-scope.yml','nextjs/scripts/repair-test-report.mjs'].map(mutate=>({mutate})),
+  ];
+  for(const options of rejected)assert.equal(verify(options).eligible,false,JSON.stringify(options));
+});
+function solutionsProof(){return {eligible:true,source:{eligible:true,headSha:solutionsHead,profile:'solutions-workflows'},evidence:{pendingFullDebt:['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair'],parentUi:{sourceHead:solutionsAdmission.NATIVE_WORLD_UI_PARENT},storageTransport:{status:'historical'},nativeSql:{status:'exact623 World source-bound',realConcurrency:'UNRUN',canonicalPinnedRowCrossSessionFk:'UNRUN',reservationExpiryCrossSession:'UNRUN'},
+  // Values read from the actual623 Repair receipt artifact 11390745419.
+  knownRegressionResolution:{debt:solutionsAdmission.REGRESSION_DEBT,scope:'71 failures from the cancelled e402 report; repaired 17-suite selection only',headSha:solutionsIntakeParent,passed:433,files:17,catalogue:{files:3,passed:13,skipped:0,failed:0},fullQualification:'pending'},
+  knownRegressionObservations:[{...solutionsAdmission.KNOWN_REGRESSION}],historicalUiFailure:{...solutionsFoldFailure}}};}
+test('Solutions plan keeps four unit owners, one browser spec, exact captures, UNRUN SQL debt and full-release debt', () => {
+  const proof=solutionsProof(),normal={headSha:solutionsHead,repairAnchorSha:solutionsAdmission.FULL_ANCHOR,pullRequestBaseSha:'7'.repeat(40),groups:['unknown'],unitFiles:['lib/unrelated.test.ts'],browserFiles:['e2e/site-nav.spec.ts'],unknownPaths:['nextjs/app/solutions/page.tsx'],runFullHermeticVitest:true,requirePublicUiScreenshots:false};
+  const plan=solutionsAdmission.solutionsPagesPlan(normal,proof);
+  assert.deepEqual(plan.unitFiles,solutionsUnitFiles);assert.deepEqual(plan.browserFiles,[solutionsSpec]);assert.deepEqual(plan.groups,['selector-config','solutions-pages']);
+  assert.equal(plan.runFullHermeticVitest,false);assert.equal(plan.requireSolutionsCaptures,true);assert.equal(plan.runWorkflowStaticGate,true);assert.equal(plan.runDatabaseRehearsal,false);assert.equal(plan.fullQualification,'pending');
+  assert.deepEqual(plan.pendingDebt,['native-world-real-concurrency','native-world-canonical-pinned-row-cross-session-fk','native-world-reservation-expiry-cross-session']);assert.equal(plan.pendingFullDebt.length,4);assert.match(plan.databaseRehearsalStatus,/UNRUN/);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),[{kind:'project',project:'1440',files:[solutionsSpec]}]);
+  assert.deepEqual(solutionsAdmission.solutionsPagesLineageFailures(plan,proof),[]);
+  const stored=JSON.parse(JSON.stringify(plan));assert.deepEqual(solutionsAdmission.solutionsPagesLineageFailures(stored,proof),[]);
+  for(const [key,value] of [['unitFiles',solutionsUnitFiles.slice(1)],['browserFiles',[solutionsSpec,'e2e/site-nav.spec.ts']],['requireSolutionsCaptures',false],['runFullHermeticVitest',true],['pendingDebt',[]],['pendingQualificationDebt',[]],['pendingFullDebt',[]],['unknownPaths',['nextjs/app/solutions/extra.tsx']],['inheritedChecks',{}],['collectorOnly',{}],['publicPagesPresentation',{}],['nativeDbRehearsal',{}],['databaseRehearsalStatus','passed']])assert.ok(solutionsAdmission.solutionsPagesLineageFailures({...stored,[key]:value},proof).length,key);
+  assert.match(solutionsAdmission.solutionsPagesLineageFailures({...stored,headSha:'9'.repeat(40)},proof)[0],/lineage unavailable/);
+  assert.match(solutionsAdmission.solutionsPagesLineageFailures(stored,{eligible:false,reason:'changed'})[0],/unavailable: changed/);
+  assert.throws(()=>solutionsAdmission.solutionsPagesPlan({...normal,repairAnchorSha:'9'.repeat(40)},proof));
+  const passed=buildRepairReceipt(stored,{headSha:solutionsHead});assert.equal(passed.gate,'passed-scoped-only');assert.equal(passed.fullQualification,'pending');assert.match(passed.databaseObservation,/concurrency, cross-session FK and reservation-expiry race remain UNRUN/);
+  for(const debt of plan.pendingDebt)assert.ok(passed.pendingDebt.includes(debt));
+  const failed=buildRepairReceipt(stored,{headSha:solutionsHead,failures:['selected browser checks: skipped']});assert.equal(failed.gate,'failed');assert.ok(Object.values(failed.inheritedChecks).every(value=>value.status==='not accepted for current head'));assert.ok(failed.pendingDebt.includes('solutions-pages'));
+});
+test('Solutions plan and failed gate retain the authenticated623 historical71 resolution without resurrecting it as current debt', () => {
+  const proof=solutionsProof(),normal={headSha:solutionsHead,repairAnchorSha:solutionsAdmission.FULL_ANCHOR,groups:['unknown'],unitFiles:[],browserFiles:[],unknownPaths:[]},plan=JSON.parse(JSON.stringify(solutionsAdmission.solutionsPagesPlan(normal,proof)));
+  assert.deepEqual(plan.knownRegressionResolution,proof.evidence.knownRegressionResolution);assert.deepEqual(plan.knownRegressionObservations,[{...solutionsAdmission.KNOWN_REGRESSION}]);assert.deepEqual(plan.historicalUiFailure,{...solutionsFoldFailure});
+  assert.ok(!plan.pendingQualificationDebt.includes(solutionsAdmission.REGRESSION_DEBT));
+  for(const key of ['knownRegressionResolution','knownRegressionObservations','historicalUiFailure'])assert.deepEqual(solutionsAdmission.solutionsPagesLineageFailures({...plan,[key]:undefined},proof),['Solutions plan changed: '+key],key);
+  for(const change of [{knownRegressionResolution:undefined},{knownRegressionResolution:{...proof.evidence.knownRegressionResolution,headSha:'9'.repeat(40)}},{knownRegressionObservations:[]}])assert.throws(()=>solutionsAdmission.solutionsPagesPlan(normal,{...proof,evidence:{...proof.evidence,...change}}),/historical71/);
+  for(const failures of [['Solutions source/evidence unavailable: changed'],['fresh Solutions execution evidence: missing']]){
+    const failed=buildRepairReceipt(plan,{headSha:solutionsHead,failures});assert.equal(failed.gate,'failed');assert.deepEqual(failed.gateFailures,failures);
+    assert.deepEqual(failed.knownRegressionResolution,plan.knownRegressionResolution);assert.equal(failed.knownRegressionObservations[0].failed,71);
+    assert.ok(!failed.pendingDebt.includes(solutionsAdmission.REGRESSION_DEBT));assert.ok(failed.pendingDebt.includes('solutions-pages'));assert.equal(failed.fullQualification,'pending');
+  }
+});
+test('Solutions inherited SQL evidence is unaccepted for the head on any final source/evidence validation failure', () => {
+  const plan=JSON.parse(JSON.stringify(solutionsAdmission.solutionsPagesPlan({headSha:solutionsHead,repairAnchorSha:solutionsAdmission.FULL_ANCHOR,groups:[],unitFiles:[],browserFiles:[],unknownPaths:[]},solutionsProof())));
+  const passed=buildRepairReceipt(plan,{headSha:solutionsHead});assert.match(passed.databaseObservation,/reused/);assert.equal(passed.inheritedChecks.nativeSql.status,'exact623 World source-bound');assert.equal(passed.databaseRehearsalStatus,plan.databaseRehearsalStatus);
+  for(const [failures,headSha] of [[['Solutions plan changed: inheritedChecks'],solutionsHead],[['Solutions source/evidence unavailable: Exact623 inherited evidence unavailable'],solutionsHead],[[],'9'.repeat(40)]]){
+    const failed=buildRepairReceipt(plan,{headSha,failures});assert.equal(failed.gate,'failed');
+    assert.equal(failed.inheritedChecks.nativeSql.status,'not accepted for current head');assert.match(failed.databaseObservation,/not accepted for current head/);assert.doesNotMatch(failed.databaseObservation,/reused/);assert.match(failed.databaseRehearsalStatus,/not accepted for current head/);assert.match(failed.databaseObservation,/UNRUN/);
+  }
+  // The actual gate revalidates source at the final step; an unverifiable checkout invalidates SQL reuse.
+  const temp=mkdtempSync(resolve(tmpdir(),'repair-solutions-gate-'));try{writeFileSync(resolve(temp,'repair-plan.json'),JSON.stringify(plan));const env={...process.env,HEAD_SHA:solutionsHead,GIT_CEILING_DIRECTORIES:dirname(temp)};for(const k of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT','TARGETED_REPAIR_UNIT_RESULT','TRANSITIVE_TEST_RESULT','SOLUTIONS_CAPTURE_RESULT','BROWSER_INSTALL_RESULT','BROWSER_BUILD_RESULT','BROWSER_RESULT'])env[k]='success';const run=spawnSync(process.execPath,[resolve(solutionsRepoRoot,'nextjs/scripts/repair-scope-gate.mjs')],{cwd:temp,env,encoding:'utf8'});assert.equal(run.status,1,run.stderr);const r=JSON.parse(readFileSync(resolve(temp,'repair-receipt.json'),'utf8'));assert.equal(r.gate,'failed');assert.ok(r.gateFailures.some(f=>f.startsWith('Solutions source/evidence unavailable')));assert.equal(r.inheritedChecks.nativeSql.status,'not accepted for current head');assert.match(r.databaseObservation,/not accepted for current head/);assert.deepEqual(r.knownRegressionResolution,plan.knownRegressionResolution);assert.ok(!r.pendingDebt.includes(solutionsAdmission.REGRESSION_DEBT));}finally{rmSync(temp,{recursive:true,force:true});}
+});
+test('Solutions capture contract names the exact 104 screenshots of the 390/1440/1920 matrix', () => {
+  assert.deepEqual([...SOLUTIONS_BROWSER_TITLES],[...solutionsAdmission.SOLUTIONS_BROWSER_TITLES]);
+  const names=SOLUTIONS_CAPTURE_BINDINGS.map(b=>b.name);assert.equal(names.length,104);assert.equal(new Set(names).size,104);
+  assert.deepEqual(solutionsCaptureSetCounts(names),{viewport:18,proof:5,preview:6,cta:54,evidence:15,package:6});assert.deepEqual({...SOLUTIONS_CAPTURE_SET_COUNTS},{viewport:18,proof:5,preview:6,cta:54,evidence:15,package:6});
+  assert.deepEqual([...new Set(SOLUTIONS_CAPTURE_BINDINGS.map(b=>b.width))],[390,1440,1920]);
+  for(const b of SOLUTIONS_CAPTURE_BINDINGS){assert.equal(b.project,'1440');assert.equal(b.file,solutionsSpec);assert.ok(SOLUTIONS_BROWSER_TITLES.includes(b.title),b.name);assert.ok(b.title.endsWith(' '+b.width),b.name);}
+  assert.throws(()=>solutionsCaptureSetCounts([...names,'solutions-unowned.png']),/Unowned/);
+  const spec=readFileSync(new URL('../'+solutionsSpec,import.meta.url),'utf8');
+  assert.equal((spec.match(/for \(const width of \[390, 1440, 1920\]\)/g)??[]).length,2);
+  assert.equal((spec.match(/test\.skip\(test\.info\(\)\.project\.name !== "1440"/g)??[]).length,2);
+  for(const template of ['`solutions-hub-${width}.png`','`solutions-${slug}-${width}.png`','`solutions-${slug}-390-proof.png`','`solutions-${slug}-${width}-preview-focus.png`','`solutions-${name}-${width}-cta-normal.png`','`solutions-${name}-${width}-cta-hover.png`','`solutions-${name}-${width}-cta-focus.png`','`solutions-${slug}-${width}-selected-evidence.png`','`solutions-${slug}-${width}-package-destination.png`','`Solutions choices and proofs remain readable at ${width}`','`Solutions keyboard and evidence journeys at ${width}`'])assert.ok(spec.includes(template),template);
+  const config=readFileSync(new URL('../playwright.config.ts',import.meta.url),'utf8'),auditPattern=config.match(/const auditSpecs = \/(.+)\//)?.[1];
+  assert.ok(auditPattern);assert.equal(new RegExp(auditPattern).test(solutionsSpec),false);assert.equal(/launch-qa.*\.spec\.ts/.test(solutionsSpec),false);
+});
+function solutionsFixture(root){
+  const plan={unitFiles:solutionsUnitFiles,browserFiles:[solutionsSpec],runDetailIntegrity:false},reportRoot=resolve(root,'node_modules/.cache/repair-scope-reports');mkdirSync(reportRoot,{recursive:true});
+  const perFile=[9,8,8,8],units={numTotalTests:33,numPassedTests:33,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,testResults:solutionsUnitFiles.map((name,index)=>({name:resolve(root,name),status:'passed',assertionResults:Array.from({length:perFile[index]},()=>({status:'passed'}))}))},unitPath=resolve(reportRoot,'vitest.json');writeFileSync(unitPath,JSON.stringify(units));
+  const png=(path,width,height)=>{mkdirSync(dirname(path),{recursive:true});const bytes=Buffer.alloc(33);Buffer.from([137,80,78,71,13,10,26,10]).copy(bytes);bytes.writeUInt32BE(13,8);bytes.write('IHDR',12);bytes.writeUInt32BE(width,16);bytes.writeUInt32BE(height,20);writeFileSync(path,bytes);};
+  const specs=SOLUTIONS_BROWSER_TITLES.map(title=>({file:solutionsSpec,title,tests:[{projectName:'1440',status:'expected',results:[{status:'passed',attachments:SOLUTIONS_CAPTURE_BINDINGS.filter(b=>b.title===title).map(b=>{const path=resolve(root,`test-results/repair-scope-playwright-1/solutions-workflows-synthetic/attachments/${b.name}`);png(path,b.kind==='element'?Math.min(b.width,300):b.width,b.kind==='element'?200:b.height);return {name:b.name,contentType:'image/png',path};})}]}]}));
+  const report={config:{rootDir:root},stats:{expected:6,skipped:0,unexpected:0,flaky:0},suites:[{specs}]},reportPath=resolve(reportRoot,'playwright-1.json');writeFileSync(reportPath,JSON.stringify(report));
+  return {plan,units,unitPath,report,reportPath,destination:resolve(root,'test-results/repair-scope-solutions')};
+}
+test('Solutions report owner requires 33 unit cases, six once-only 1440 cases and the exact 104 captures', () => {
+  const root=mkdtempSync(resolve(tmpdir(),'repair-solutions-'));try{const f=solutionsFixture(root);assert.equal(collectSolutionsWorkflowCaptures(root,f.plan,true).length,104);assert.equal(readdirSync(f.destination).length,104);const r=readSolutionsWorkflowExecution(root,f.plan);assert.equal(r.units.passed,33);assert.equal(r.units.files,4);assert.equal(r.browser.passed,6);assert.equal(r.captures.length,104);assert.throws(()=>collectSolutionsWorkflowCaptures(root,f.plan,true),/already exists/);writeFileSync(resolve(f.destination,'unexpected.png'),'extra');assert.throws(()=>readSolutionsWorkflowExecution(root,f.plan),/Unexpected/);}finally{rmSync(root,{recursive:true,force:true});}
+});
+test('Solutions captures and reports reject missing, duplicate, misowned, resized, skipped, retried, wrong-project and partial evidence', () => {
+  const spec=(f,title)=>f.report.suites[0].specs.find(s=>s.title===title),journey=SOLUTIONS_BROWSER_TITLES[4],choices=SOLUTIONS_BROWSER_TITLES[1];
+  const captureScenarios={
+    missing:f=>spec(f,choices).tests[0].results[0].attachments.shift(),
+    duplicate:f=>{const a=spec(f,choices).tests[0].results[0].attachments;a.push({...a[0]});},
+    misowned:f=>{const from=spec(f,choices).tests[0].results[0].attachments,to=spec(f,journey).tests[0].results[0].attachments;to.push(from.shift());},
+    body:f=>{spec(f,choices).tests[0].results[0].attachments[0].body='data';},
+    'journey-height':f=>{const a=spec(f,journey).tests[0].results[0].attachments[0],b=readFileSync(a.path);b.writeUInt32BE(1200,20);writeFileSync(a.path,b);},
+    'element-width':f=>{const a=spec(f,choices).tests[0].results[0].attachments.find(x=>x.name.includes('cta')),b=readFileSync(a.path);b.writeUInt32BE(2000,16);writeFileSync(a.path,b);},
+    retry:f=>{const t=spec(f,choices).tests[0];t.results.unshift({status:'failed',attachments:[]});},
+    'wrong-source':f=>{spec(f,choices).file='wrong/solutions-workflows.spec.ts';},
+    'second-spec':f=>{f.plan.browserFiles=[solutionsSpec,'e2e/site-nav.spec.ts'];},
+  };
+  for(const [scenario,mutate] of Object.entries(captureScenarios)){const root=mkdtempSync(resolve(tmpdir(),'repair-solutions-invalid-'));try{const f=solutionsFixture(root);mutate(f);writeFileSync(f.reportPath,JSON.stringify(f.report));assert.throws(()=>collectSolutionsWorkflowCaptures(root,f.plan,true),undefined,scenario);assert.equal(existsSync(f.destination),false,scenario);}finally{rmSync(root,{recursive:true,force:true});}}
+  const outcomeScenarios={
+    'unit-32':f=>{f.units.testResults[0].assertionResults.pop();f.units.numTotalTests=32;f.units.numPassedTests=32;writeFileSync(f.unitPath,JSON.stringify(f.units));},
+    'unit-skip':f=>{f.units.testResults[1].assertionResults[0].status='skipped';writeFileSync(f.unitPath,JSON.stringify(f.units));},
+    'unit-three-owners':f=>{f.units.testResults.pop();writeFileSync(f.unitPath,JSON.stringify(f.units));},
+    'browser-omitted':f=>{f.report.suites[0].specs.splice(4,1);f.report.stats.expected=5;},
+    'browser-skip':f=>{const t=spec(f,journey).tests[0];t.status='skipped';t.results[0].status='skipped';f.report.stats.expected=5;f.report.stats.skipped=1;},
+    'browser-flaky':f=>{spec(f,journey).tests[0].status='flaky';},
+    'browser-390':f=>{spec(f,journey).tests[0].projectName='390';},
+    'curated-change':f=>{writeFileSync(resolve(f.destination,SOLUTIONS_CAPTURE_BINDINGS[0].name),'changed');},
+  };
+  for(const [scenario,mutate] of Object.entries(outcomeScenarios)){const root=mkdtempSync(resolve(tmpdir(),'repair-solutions-outcome-'));try{const f=solutionsFixture(root);collectSolutionsWorkflowCaptures(root,f.plan,true);mutate(f);writeFileSync(f.reportPath,JSON.stringify(f.report));assert.throws(()=>readSolutionsWorkflowExecution(root,f.plan),undefined,scenario);}finally{rmSync(root,{recursive:true,force:true});}}
+});
+test('Solutions rejects distinct capture names backed by one canonical source PNG before copying, while equal pixels from distinct files pass', () => {
+  const choices=SOLUTIONS_BROWSER_TITLES[1],pair=f=>{const a=f.report.suites[0].specs.find(s=>s.title===choices).tests[0].results[0].attachments;return [a.find(x=>x.name==='solutions-hub-1440-cta-normal.png'),a.find(x=>x.name==='solutions-hub-1440-cta-hover.png')];};
+  const scenarios={'same-path':(f,[a,b])=>{b.path=a.path;},'dot-segment':(f,[a,b])=>{b.path=dirname(a.path)+'/../attachments/./'+a.name;}};
+  if(process.platform==='win32')scenarios['case-variant']=(f,[a,b])=>{b.path=resolve(dirname(a.path),'Solutions-hub-1440-cta-normal.png');};
+  for(const [scenario,mutate] of Object.entries(scenarios)){const root=mkdtempSync(resolve(tmpdir(),'repair-solutions-shared-'));try{const f=solutionsFixture(root),[a,b]=pair(f);mutate(f,[a,b]);assert.notEqual(b.name,a.name);writeFileSync(f.reportPath,JSON.stringify(f.report));assert.throws(()=>collectSolutionsWorkflowCaptures(root,f.plan,true),/Distinct Solutions captures share one source PNG: solutions-hub-1440-cta-normal\.png, solutions-hub-1440-cta-hover\.png/,scenario);assert.equal(existsSync(f.destination),false,scenario);}finally{rmSync(root,{recursive:true,force:true});}}
+  const root=mkdtempSync(resolve(tmpdir(),'repair-solutions-equal-pixels-'));try{const f=solutionsFixture(root),[a,b]=pair(f);assert.notEqual(a.path,b.path);assert.ok(readFileSync(a.path).equals(readFileSync(b.path)));const captures=collectSolutionsWorkflowCaptures(root,f.plan,true);assert.equal(captures.length,104);const hashes=captures.map(c=>c.sha256);assert.ok(new Set(hashes).size<hashes.length);assert.equal(readSolutionsWorkflowExecution(root,f.plan).captures.length,104);}finally{rmSync(root,{recursive:true,force:true});}
+});
+test('Solutions changes every declared configuration path from its exact623 preimage', () => {
+  assert.deepEqual(Object.keys(solutionsAdmission.SOLUTIONS_PARENT_CONFIG_BLOBS).sort(),[...solutionsAdmission.SOLUTIONS_CONFIG_PATHS].sort());
+  assert.deepEqual(solutionsAdmission.SOLUTIONS_CONFIG_PATHS.filter(path=>solutionsGitBlob(solutionsWorkspaceBytes(path))===solutionsAdmission.SOLUTIONS_PARENT_CONFIG_BLOBS[path]),[],'unchanged configuration paths cannot satisfy the exact path set');
+});

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { playwrightReportContainsPath, readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
 
 const repoRoot = realpathSync(process.cwd());
@@ -183,6 +184,7 @@ export function collectWorkspaceIntakeCaptures(workspaceRoot = repoRoot) {
 }
 
 const browserProjectsByFile = new Map([
+  ['e2e/solutions-workflows.spec.ts', ['1440']],
   ['e2e/public-package-proof.spec.ts', ['1440']],
   ['e2e/compiler-contract.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/contrast-zoom-audit.spec.ts', ['audit', 'audit-768', 'audit-1280']],
@@ -202,6 +204,36 @@ const browserProjectsByFile = new Map([
   ['e2e/workspace-intake-triage.spec.ts', ['audit']],
   ['e2e/workspace-intake-layout.spec.ts', ['1440']],
 ]);
+
+const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];
+const SOLUTIONS_CAPTURE_TITLE='Solutions choices and proofs remain readable at ';
+const SOLUTIONS_JOURNEY_TITLE='Solutions keyboard and evidence journeys at ';
+export const SOLUTIONS_BROWSER_TITLES=Object.freeze([390,1440,1920].map(width=>SOLUTIONS_CAPTURE_TITLE+width).concat([390,1440,1920].map(width=>SOLUTIONS_JOURNEY_TITLE+width)));
+// 'viewport' and 'journey' captures are page screenshots and must equal the width x 900 viewport; 'element' captures may only be narrower.
+const solutionBinding=(name,width,kind='element')=>Object.freeze({name,file:'e2e/solutions-workflows.spec.ts',project:'1440',title:kind==='journey'?SOLUTIONS_JOURNEY_TITLE+width:SOLUTIONS_CAPTURE_TITLE+width,width,height:900,kind});
+export const SOLUTIONS_CAPTURE_BINDINGS=Object.freeze([
+ ...[390,1440,1920].flatMap(width=>[
+   solutionBinding(`solutions-hub-${width}.png`,width,'viewport'),
+   ...SOLUTIONS_ROUTES.map(slug=>solutionBinding(`solutions-${slug}-${width}.png`,width,'viewport')),
+   ...SOLUTIONS_ROUTES.filter(slug=>width===390).map(slug=>solutionBinding(`solutions-${slug}-390-proof.png`,width)),
+   ...['ai-ready-knowledge','knowledge-graph'].map(slug=>solutionBinding(`solutions-${slug}-${width}-preview-focus.png`,width)),
+   ...['hub',...SOLUTIONS_ROUTES].flatMap(page=>['normal','hover','focus'].map(state=>solutionBinding(`solutions-${page}-${width}-cta-${state}.png`,width))),
+   ...SOLUTIONS_ROUTES.map(slug=>solutionBinding(`solutions-${slug}-${width}-selected-evidence.png`,width,'journey')),
+   ...['ai-ready-knowledge','knowledge-graph'].map(slug=>solutionBinding(`solutions-${slug}-${width}-package-destination.png`,width,'journey')),
+ ]),
+].flat().map(Object.freeze));
+export const SOLUTIONS_CAPTURE_SET_COUNTS=Object.freeze({viewport:18,proof:5,preview:6,cta:54,evidence:15,package:6});
+const solutionsCaptureCategory=name=>/-cta-(normal|hover|focus)\.png$/.test(name)?'cta':/-390-proof\.png$/.test(name)?'proof':/-preview-focus\.png$/.test(name)?'preview':/-selected-evidence\.png$/.test(name)?'evidence':/-package-destination\.png$/.test(name)?'package':/^solutions-[a-z-]+-(390|1440|1920)\.png$/.test(name)?'viewport':'unowned';
+export function solutionsCaptureSetCounts(names){const counts=Object.fromEntries(Object.keys(SOLUTIONS_CAPTURE_SET_COUNTS).map(key=>[key,0]));for(const name of names){const kind=solutionsCaptureCategory(name);if(!Object.hasOwn(counts,kind))throw Error('Unowned Solutions capture name: '+name);counts[kind]+=1;}return counts;}
+export function collectSolutionsWorkflowCaptures(workspaceRoot=repoRoot,plan=readPlan(),copy=true){
+ const supplied=resolve(workspaceRoot),entry=lstatSync(supplied);if(entry.isSymbolicLink()||!entry.isDirectory())throw Error('Solutions workspace must be a regular directory.');const root=realpathSync(supplied),destination=resolve(root,'test-results/repair-scope-solutions'),names=SOLUTIONS_CAPTURE_BINDINGS.map(b=>b.name);if(SOLUTIONS_CAPTURE_BINDINGS.length!==104||new Set(names).size!==104||JSON.stringify(solutionsCaptureSetCounts(names))!==JSON.stringify(SOLUTIONS_CAPTURE_SET_COUNTS))throw Error('Solutions capture contract must contain104 unique names in the exact named set.');protectedCapturePath(root,destination,'directory',true);if(existsSync(destination)&&readdirSync(destination).some(n=>!names.includes(n)))throw Error('Unexpected Solutions capture destination file.');for(const name of names){const p=resolve(destination,name),exists=protectedCapturePath(root,p,'file',true);if(copy&&exists)throw Error('Solutions capture destination already exists.');if(!copy&&!exists)throw Error('Required Solutions capture missing: '+name);}
+ const runs=planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity);if(runs.length!==1||runs[0].project!=='1440'||JSON.stringify(runs[0].files)!==JSON.stringify(['e2e/solutions-workflows.spec.ts']))throw Error('Solutions must execute exactly once in configured project1440.');const matches=new Map(SOLUTIONS_CAPTURE_BINDINGS.map(b=>[b.name,[]]));const reportPath=resolve(root,'node_modules/.cache/repair-scope-reports/playwright-1.json');protectedCapturePath(root,reportPath,'file');const report=JSON.parse(readFileSync(reportPath,'utf8'));const visit=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[])for(const t of spec.tests??[]){const last=t.results?.at(-1);if(t.projectName!=='1440'||!SOLUTIONS_CAPTURE_BINDINGS.some(b=>b.title===spec.title)||!playwrightReportContainsPath(spec.file??suite.file,'e2e/solutions-workflows.spec.ts',root,report.config?.rootDir))continue;if(t.status!=='expected'||t.results.length!==1||last?.status!=='passed')throw Error('Solutions capture came from an unqualified browser outcome.');for(const a of last.attachments??[]){if(a.contentType==='image/png'){if(typeof a.path!=='string'||a.body!==undefined)throw Error('Solutions PNG must be file-backed.');const name=a.name,owner=SOLUTIONS_CAPTURE_BINDINGS.find(b=>b.name===name);if(!owner||owner.title!==spec.title)throw Error('Unowned Solutions PNG attachment: '+name);matches.get(name).push(a);}}}visit(suite.suites);}};visit(report.suites);
+ const prepared=SOLUTIONS_CAPTURE_BINDINGS.map(b=>{const values=matches.get(b.name);if(values.length!==1)throw Error('Missing or duplicate exact Solutions capture: '+b.name);const a=values[0],p=resolve(root,a.path),fromRoot=relative(root,p).replaceAll('\\','/');if(!new RegExp(`^test-results/repair-scope-playwright-1/solutions-workflows-[^/]+/attachments/[^/]+\\.png$`).test(fromRoot))throw Error('Solutions capture escaped its exact spec output.');validateMountedPngMetadata(protectedCapturePath(root,p,'file'));const bytes=readFileSync(p);if(bytes.length<33||!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||bytes.readUInt32BE(8)!==13||bytes.toString('ascii',12,16)!=='IHDR')throw Error('Solutions capture is not a valid PNG.');const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);if(!width||!height||height>32768||width>b.width||(b.kind!=='element'&&(width!==b.width||height!==b.height)))throw Error('Solutions capture dimensions mismatch: '+b.name);const target=resolve(destination,b.name);if(!copy&&!bytes.equals(readFileSync(target)))throw Error('Curated Solutions capture bytes changed: '+b.name);const file=statSync(p,{bigint:true});return{name:b.name,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),width,height,target,source:p,canonical:realpathSync.native(p),file:file.ino?`${file.dev}:${file.ino}`:null};});
+  // Each expected name needs its own source file; equal pixels from distinct files stay valid.
+  const sources=new Map();for(const x of prepared)for(const key of ['path:'+x.canonical,x.file&&'file:'+x.file].filter(Boolean)){if(sources.has(key))throw Error('Distinct Solutions captures share one source PNG: '+sources.get(key)+', '+x.name);sources.set(key,x.name);}
+  if(copy){mkdirSync(destination,{recursive:true});for(const x of prepared){protectedCapturePath(root,x.target,'file',true);writeFileSync(x.target,readFileSync(x.source),{flag:'wx'});}}return prepared.map(({name,bytes,sha256,width,height})=>({name,bytes,sha256,width,height}));
+}
+export function readSolutionsWorkflowExecution(workspaceRoot,plan){const root=realpathSync(workspaceRoot),reportRoot=resolve(root,'node_modules/.cache/repair-scope-reports'),u=resolve(reportRoot,'vitest.json');protectedCapturePath(root,u,'file');const units=readAndValidateVitestReport(u,plan.unitFiles),ur=JSON.parse(readFileSync(u,'utf8'));if(units.failed||units.skipped||ur.numPendingTests||ur.numTodoTests||ur.testResults.length!==4||ur.numTotalTests!==33||ur.numPassedTests!==33||units.passed!==33)throw Error('Four Solutions unit owners must pass all33 cases without skips.');const runs=planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity);if(runs.length!==1||runs[0].project!=='1440'||JSON.stringify(runs[0].files)!==JSON.stringify(['e2e/solutions-workflows.spec.ts']))throw Error('Solutions must execute exactly once in configured project1440.');const run=runs[0],p=resolve(reportRoot,'playwright-1.json');protectedCapturePath(root,p,'file');const browser=readAndValidatePlaywrightReport(p,run.files,root,[run.project]),pr=JSON.parse(readFileSync(p,'utf8')),seen=[];const walk=suites=>{for(const suite of suites??[]){for(const spec of suite.specs??[])for(const t of spec.tests??[]){if(!playwrightReportContainsPath(spec.file??suite.file,run.files[0],root,pr.config?.rootDir))continue;if(t.projectName!=='1440'||!SOLUTIONS_BROWSER_TITLES.includes(spec.title)||seen.includes(spec.title)||t.status!=='expected'||t.results.length!==1||t.results[0].status!=='passed')throw Error('Solutions browser report contains an unexpected, skipped, retried or failed case.');seen.push(spec.title);}walk(suite.suites);}};walk(pr.suites);if(JSON.stringify(seen.sort())!==JSON.stringify([...SOLUTIONS_BROWSER_TITLES].sort())||browser.failed||browser.flaky||browser.skipped||browser.passed!==6||pr.stats.expected!==6||pr.stats.skipped||pr.stats.unexpected||pr.stats.flaky)throw Error('All six Solutions browser cases must pass once in1440.');return{units,browser,captures:collectSolutionsWorkflowCaptures(root,plan,false)};}
 
 export function collectHomePricingCaptures(workspaceRoot = repoRoot, plan = readPlan()) {
   const supplied = resolve(workspaceRoot);
@@ -516,6 +548,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   else if (mode === 'browser') await runBrowser();
   else if (mode === 'intake-captures') console.log(`Collected ${collectWorkspaceIntakeCaptures().length} exact synthetic mounted intake files.`);
   else if (mode === 'public-product-captures') console.log(`Collected ${collectPublicProductCaptures().length} exact public product PNGs.`);
+  else if(mode==='solutions-captures'){const files=collectSolutionsWorkflowCaptures(repoRoot,readPlan(),true);console.log(`Collected ${files.length} exact named Solutions PNGs.`);}
   else if (mode === 'home-pricing-captures') console.log(`Collected ${collectHomePricingCaptures().length} exact public Home/Pricing PNGs.`);
   else throw new Error('Usage: node scripts/run-repair-check.mjs <unit|browser>');
 }

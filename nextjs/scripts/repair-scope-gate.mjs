@@ -1,8 +1,8 @@
-import { readPublicProductExecution } from './run-repair-check.mjs';
+import { readPublicProductExecution, readSolutionsWorkflowExecution } from './run-repair-check.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verifyPublicPagesEligibility, publicPagesLineageFailures, collectorLineageFailures, verifyCollectorEligibility, verifyNativeDbEligibility, nativeDbLineageFailures } from './repair-collector-only.mjs';
+import { verifyPublicPagesEligibility, publicPagesLineageFailures, collectorLineageFailures, verifyCollectorEligibility, verifyNativeDbEligibility, nativeDbLineageFailures, verifySolutionsEligibility, solutionsPagesLineageFailures } from './repair-collector-only.mjs';
 import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt, verifyIntakePresentationEligibility, intakePresentationLineageFailures, readIntakePresentationExecution } from './repair-known-regression.mjs';
 
 export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
@@ -38,11 +38,13 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
     ...plan,
     completedHeadSha: headSha,
     runResults,
-    databaseObservation: plan.publicPagesPresentation ? 'exact28d historical passed-native-sql-only; not executed at page head; native concurrency and canonical cross-session FK remain UNRUN' : plan.nativeDbRehearsal ? 'native SQL changed; fresh separate exact-head staging and both disposable pgTAP passes remain pending; no DB inheritance accepted' : plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.intakePresentation ? 'successful historical f082 DB evidence via qualified 6a32 and 895 classifiers; not executed at current head' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
+    // Any final Solutions source/evidence failure invalidates SQL reuse for this head like every other inherited check.
+    ...(plan.solutionsPagesPresentation && failed ? { databaseRehearsalStatus: 'actual623 native World two-pass unit-SQL evidence not accepted for current head; cross-session concurrency/FK/expiry tests remain UNRUN' } : {}),
+    databaseObservation: plan.solutionsPagesPresentation ? (failed ? 'actual623 native World SQL-only evidence not accepted for current head after final source/evidence validation failure; concurrency, cross-session FK and reservation-expiry race remain UNRUN' : 'actual623 native World SQL-only staging and both pgTAP passes reused with exact unchanged SQL/copy bindings; concurrency, cross-session FK and reservation-expiry race remain UNRUN') : plan.publicPagesPresentation ? 'exact28d historical passed-native-sql-only; not executed at page head; native concurrency and canonical cross-session FK remain UNRUN' : plan.nativeDbRehearsal ? 'native SQL changed; fresh separate exact-head staging and both disposable pgTAP passes remain pending; no DB inheritance accepted' : plan.collectorOnlyFailure ? 'not executed; inherited evidence unaccepted' : plan.intakePresentation ? 'successful historical f082 DB evidence via qualified 6a32 and 895 classifiers; not executed at current head' : plan.knownRegressionRepair ? 'successful f082 source evidence via qualified 6a32 classifier; not executed at current head' : plan.collectorOnly ? 'prior successful f082 rehearsal; not executed at current head' : deferred.has('database-contract') ? databaseResult : 'not-applicable',
     pendingDebt: [...pendingDebt].sort(),
     passedGroupAnchors,
     executedChecks,
-    inheritedChecks: plan.publicPagesPresentation || plan.nativeDbRehearsal || plan.collectorOnly || plan.knownRegressionRepair || plan.intakePresentation ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
+    inheritedChecks: plan.solutionsPagesPresentation || plan.publicPagesPresentation || plan.nativeDbRehearsal || plan.collectorOnly || plan.knownRegressionRepair || plan.intakePresentation ? Object.fromEntries(Object.entries(plan.inheritedChecks ?? {}).map(([name, evidence]) => [name, { ...evidence, status: failed ? 'not accepted for current head' : evidence.status }])) : {},
     fullQualification: 'pending',
     gate: failed ? 'failed' : 'passed-scoped-only',
     gateFailures,
@@ -73,17 +75,24 @@ function runGate() {
     ['six paired public UI screenshots', plan.requirePublicUiScreenshots ? env.PUBLIC_UI_CAPTURE_RESULT : 'success'],
     ['sixteen exact public product captures', plan.requirePublicProductCaptures ? env.PUBLIC_PRODUCT_CAPTURE_RESULT : 'success'],
     ['exact Home and Pricing captures', plan.requireHomePricingCaptures ? env.HOME_PRICING_CAPTURE_RESULT : 'success'],
+    ['exact104 Solutions captures',plan.requireSolutionsCaptures?env.SOLUTIONS_CAPTURE_RESULT:'success'],
     ['Chromium install', browserRequired ? env.BROWSER_INSTALL_RESULT : 'success'],
     ['single production build', browserRequired ? env.BROWSER_BUILD_RESULT : 'success'],
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
   if (plan.collectorOnlyFailure) requirements.push([`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`, 'failure']);
-  let repairProof, repairExecution, intakeExecution, publicProductExecution;
+  let repairProof, repairExecution, intakeExecution, publicProductExecution, solutionsExecution;
   if(plan.publicPagesPresentation||plan.groups.includes('public-product-pages')){
     const proof=verifyPublicPagesEligibility({headSha:env.HEAD_SHA});
     for(const reason of publicPagesLineageFailures(plan,proof))requirements.push([reason,'failure']);
     requirements.push(['actual public product unit step',env.TARGETED_REPAIR_UNIT_RESULT],['public product report/capture owner contracts',env.TRANSITIVE_TEST_RESULT]);
     try{publicProductExecution=readPublicProductExecution(process.cwd(),plan);}catch(error){requirements.push(['fresh public product execution: '+error.message,'failure']);}
+  }
+  if(plan.solutionsPagesPresentation||plan.groups.includes('solutions-pages')){
+    const proof=verifySolutionsEligibility({headSha:env.HEAD_SHA});
+    for(const reason of solutionsPagesLineageFailures(plan,proof))requirements.push([reason,'failure']);
+    requirements.push(['actual Solutions owning units',env.TARGETED_REPAIR_UNIT_RESULT],['Solutions report/capture contracts',env.TRANSITIVE_TEST_RESULT]);
+    try{solutionsExecution=readSolutionsWorkflowExecution(process.cwd(),plan);}catch(error){requirements.push(['fresh Solutions execution evidence: '+error.message,'failure']);}
   }
   if (plan.nativeDbRehearsal || plan.groups.includes('native-db-rehearsal')) {
     const proof=verifyNativeDbEligibility({headSha:env.HEAD_SHA});
@@ -128,9 +137,11 @@ function runGate() {
       ...(plan.requireWorkspaceIntakeCapture ? { mountedCaptures: env.WORKSPACE_INTAKE_CAPTURE_RESULT } : {}),
       ...(plan.requirePublicUiScreenshots ? { publicUiCaptures: env.PUBLIC_UI_CAPTURE_RESULT } : {}),
       ...(plan.requireHomePricingCaptures ? { homePricingCaptures: env.HOME_PRICING_CAPTURE_RESULT } : {}),
+      ...(plan.requireSolutionsCaptures?{solutionsCaptureCollection:env.SOLUTIONS_CAPTURE_RESULT}:{}),
     },
   });
   if(plan.publicPagesPresentation&&receipt.gate==='passed-scoped-only')receipt.executedChecks={...receipt.executedChecks,units:{status:'success',...publicProductExecution.units},selectedBrowserReports:{status:'success',reports:publicProductExecution.browsers},publicProductCaptures:{status:'success',files:publicProductExecution.captures}};
+  if(plan.solutionsPagesPresentation&&receipt.gate==='passed-scoped-only')receipt.executedChecks={...receipt.executedChecks,units:{status:'success',...solutionsExecution.units},selectedBrowserReports:{status:'success',reports:[{project:'1440',...solutionsExecution.browser}]},solutionsWorkflowCases:solutionsExecution.browser,captures:{status:'success',files:solutionsExecution.captures}};
   if (plan.intakePresentation && receipt.gate === 'passed-scoped-only') receipt.executedChecks = { ...receipt.executedChecks,
     units: { status: 'success', ...intakeExecution.units }, intakeBrowsers: { status: 'success', reports: intakeExecution.browsers },
     ...(intakeExecution.intakeUnits ? { intakeUnits: { status: 'success', ...intakeExecution.intakeUnits }, selectedBrowserReports: { status: 'success', reports: intakeExecution.selectedBrowsers } } : {}) };

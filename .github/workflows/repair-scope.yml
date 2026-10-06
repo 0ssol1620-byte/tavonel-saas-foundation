@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         if: steps.plan.outputs.selector_tests == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.native_database }}' = true ] || [ '${{ steps.plan.outputs.public_pages }}' = true ]; then
+          if [ '${{ steps.plan.outputs.native_database }}' = true ] || [ '${{ steps.plan.outputs.public_pages }}' = true ] || [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs scripts/repair-known-regression.test.mjs
           elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
@@ -67,6 +67,8 @@ jobs:
         if: steps.plan.outputs.workflow_static == 'true'
         run: |
           if [ '${{ steps.plan.outputs.intake_presentation }}' = true ]; then
+            node --test scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
             node --test scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test --test-name-pattern='targeted regression transitive' scripts/repair-scope.test.mjs
@@ -272,6 +274,18 @@ jobs:
             nextjs/test-results/repair-scope-public-product/continuous-knowledge-expanded-1440.png
           if-no-files-found: error
           retention-days: 3
+      - name: Require exactly 104 named Solutions captures
+        id: solutions-captures
+        if: always() && steps.plan.outputs.solutions_capture == 'true'
+        run: node scripts/run-repair-check.mjs solutions-captures
+      - name: Upload only named Solutions captures
+        if: always() && steps.solutions-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: solutions-workflows-${{ github.event.pull_request.head.sha }}
+          path: nextjs/test-results/repair-scope-solutions/
+          if-no-files-found: error
+          retention-days: 3
       - name: Fail closed on missing or failed scoped checks
         id: gate
         if: always()
@@ -290,6 +304,7 @@ jobs:
           WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}
           PUBLIC_UI_CAPTURE_RESULT: ${{ steps.public-ui-screenshots.outcome }}
           PUBLIC_PRODUCT_CAPTURE_RESULT: ${{ steps.public-product-captures.outcome }}
+          SOLUTIONS_CAPTURE_RESULT: ${{ steps.solutions-captures.outcome }}
           HOME_PRICING_CAPTURE_RESULT: ${{ steps.home-pricing-captures.outcome }}
           SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
           BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}
