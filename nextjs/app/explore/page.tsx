@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { SOLUTIONS, type SolutionSlug } from "@/app/solutions/[slug]/page";
+import { solutionWorkflowEvidence } from "@/app/solutions/solution-workflow-proof";
 import ExploreStage from "@/components/explore/explore-stage";
 import stageStyles from "@/components/explore/explore-stage.module.css";
 import { PublicSiteFooter } from "@/components/public-site-chrome";
@@ -78,12 +80,36 @@ const change = buildExploreChangeView(
 );
 const answers = buildExploreAnswerViews(exploreSampleAnswers, world.evidence);
 const entryProof = chooseExploreEntryProof(world.evidence, answers);
+/*
+  Each Solutions page links one passage here as `/explore?evidence=<id>`, and that passage is what
+  `solutionWorkflowEvidence` resolves from the page's own proof pick -- the call the page renders
+  from. Naming those regions keeps them, an owner and their page-mates in the bounded model through
+  the same `keepRegionIds` the Ask citations use. Nothing is typed: a pick that stops resolving
+  throws here at build time rather than shipping a link that opens some other passage.
+*/
+const solutionTargets = (Object.keys(SOLUTIONS) as SolutionSlug[]).map(
+  (slug) => solutionWorkflowEvidence(slug, SOLUTIONS[slug].proof).region.id,
+);
 const model = boundVisualWorld(
   world,
   layout.placements.map((placement) => placement.id),
   [...answers.flatMap((answer) => answer.regions.map((region) => region.evidenceId)),
-    ...(entryProof ? [entryProof.id] : [])],
+    ...(entryProof ? [entryProof.id] : []),
+    ...solutionTargets],
 );
+/*
+  Foundation 424. The stage resolves `?evidence=<id>` only when the exact region *and* an owner
+  holding it both shipped; either half missing renders the unavailable state. So a published
+  Solutions link is kept whole here -- region and retained owner together -- and a target that
+  would ship without one fails the build instead of shipping a link that opens nothing. This is a
+  correctness check on named IDs, not a size gate: REGION_BOUND and RELATION_BOUND bound only the
+  initial selection, and explicit retention plus page-mates may legitimately exceed them.
+*/
+for (const id of solutionTargets) {
+  const shipped = model.evidence.some((item) => item.id === id);
+  const owned = model.nodes.some((node) => node.evidenceRefs.includes(id));
+  if (!shipped || !owned) throw new Error(`explore_solution_target_unretained:${id}`);
+}
 
 const technical: ExploreTechnicalRecord = {
   worldId: world.worldId,

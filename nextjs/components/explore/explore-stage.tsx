@@ -100,6 +100,17 @@ export default function ExploreStage({ model, layout, change, answers, technical
     const node = model.nodes.find((item) => item.id === opening);
     return node?.evidenceRefs[0] ?? model.evidence[0]?.id ?? "";
   });
+  /*
+    An `evidence` link that names a region this model cannot open. That is not the same as no
+    `evidence` parameter: an absent one lets `act` decide, but an explicit ID that does not resolve
+    must not be filled with the seeded fallback or a page-mate, because that shows a reader a
+    passage they did not ask for as if it were the one they did. The Evidence act says so instead,
+    and this clears when the URL is restored to something valid or the reader moves on.
+
+    Foundation 424: a flag, not the ID. The query string is untrusted input, so the stage never
+    echoes it back onto the page; the unavailable state is the same generic copy for every link.
+  */
+  const [evidenceUnavailable, setEvidenceUnavailable] = useState(false);
   const [askIndex, setAskIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const returnAct = useRef<ExploreAct>("world");
@@ -113,6 +124,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
     else url.searchParams.set("act", next);
     url.searchParams.delete("evidence");
     if (url.href !== window.location.href) window.history.pushState(null, "", url);
+    setEvidenceUnavailable(false);
     setAct(next);
     setSettled(true);
   }, []);
@@ -138,11 +150,17 @@ export default function ExploreStage({ model, layout, change, answers, technical
     [enter, narrow, selectNode],
   );
 
+  // The object a region is opened under: a Claim that holds it if one shipped, else any holder.
+  const ownerOf = useCallback(
+    (regionId: string) =>
+      model.nodes.find((node) => node.kind === "Claim" && node.evidenceRefs.includes(regionId)) ??
+      model.nodes.find((node) => node.evidenceRefs.includes(regionId)),
+    [model.nodes],
+  );
+
   const openRegion = useCallback(
     (regionId: string) => {
-      const owner =
-        model.nodes.find((node) => node.kind === "Claim" && node.evidenceRefs.includes(regionId)) ??
-        model.nodes.find((node) => node.evidenceRefs.includes(regionId));
+      const owner = ownerOf(regionId);
       if (owner) setSelectedId(owner.id);
       setEvidenceId(regionId);
       trackFunnel("explore_evidence_opened", { from: "region" });
@@ -151,7 +169,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
       url.searchParams.set("evidence", regionId);
       window.history.replaceState(null, "", url);
     },
-    [enter, model.nodes],
+    [enter, ownerOf],
   );
 
   // Reading a URL must not call the click openers: their pushState would discard the browser's
@@ -159,18 +177,28 @@ export default function ExploreStage({ model, layout, change, answers, technical
   // for initial links and popstate; only an explicit user action creates a history entry.
   const restoreFromUrl = useCallback(() => {
     const query = new URLSearchParams(window.location.search);
-    const region = evidenceIdFromQuery(query.get("evidence") ?? undefined, model.evidence);
-    const requested = region ? "evidence" : actFromQuery(query.get("act") ?? undefined);
-    if (region) {
-      const owner = model.nodes.find(node => node.kind === "Claim" && node.evidenceRefs.includes(region)) ??
-        model.nodes.find(node => node.evidenceRefs.includes(region));
-      if (owner) setSelectedId(owner.id);
+    const asked = query.get("evidence");
+    const found = evidenceIdFromQuery(asked ?? undefined, model.evidence);
+    /*
+      Only the region the link names counts as resolved; any other answer would be a substitute.
+      And the exact region is not enough on its own: it resolves only together with a retained
+      owner that holds it, so the source sheet never opens under an object it does not belong to.
+      Either half missing is the unavailable state, not a nearby passage.
+    */
+    const owner = asked !== null && found === asked ? ownerOf(found) : undefined;
+    const region = owner ? found ?? undefined : undefined;
+    const requested: ExploreAct = asked !== null ? "evidence" : actFromQuery(query.get("act") ?? undefined);
+    if (region && owner) {
+      setSelectedId(owner.id);
       setEvidenceId(region);
+    } else if (asked !== null) {
+      setSelectedId(null);
     }
+    setEvidenceUnavailable(asked !== null && !region);
     setAct(requested);
     setSettled(true);
     return { requested, region };
-  }, [model.evidence, model.nodes]);
+  }, [model.evidence, ownerOf]);
 
   useEffect(() => {
     const { requested, region } = restoreFromUrl();
@@ -292,7 +320,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
   const scene = act === "entry" ? "world" : act === "ask" ? returnAct.current : act;
   const railAct: ExploreAct = scene === "object_focus" ? "evidence" : scene;
   const selectedNode = model.nodes.find((node) => node.id === selectedId) ?? model.nodes[0];
-  const activeRegion = model.evidence.find((item) => item.id === evidenceId) ?? null;
+  const activeRegion =
+    evidenceUnavailable ? null : model.evidence.find((item) => item.id === evidenceId) ?? null;
 
   const selection: TechnicalSelection = {
     objectId: selectedNode.id,
@@ -397,7 +426,24 @@ export default function ExploreStage({ model, layout, change, answers, technical
             />
           ) : null}
 
-          {scene === "object_focus" || scene === "evidence" ? (
+          {/*
+            Foundation 424. Generic copy: the requested ID is never rendered. The recovery action
+            reuses `.paneBack` -- the Evidence act's own back control, with its 44px minimum target
+            -- and returns through `enter("entry")`, the same sample navigation the rail uses, which
+            also clears the unavailable flag.
+          */}
+          {(scene === "object_focus" || scene === "evidence") && evidenceUnavailable ? (
+            <div role="alert" data-evidence-unavailable="1">
+              <h2>This passage is not available here</h2>
+              <p>
+                The link names a source region this sample cannot open. No other passage is shown in
+                its place.
+              </p>
+              <button type="button" className={styles.paneBack} onClick={() => enter("entry")}>
+                Browse the evidence in this sample
+              </button>
+            </div>
+          ) : scene === "object_focus" || scene === "evidence" ? (
             <EvidenceAct
               model={model}
               selectedId={selectedNode.id}

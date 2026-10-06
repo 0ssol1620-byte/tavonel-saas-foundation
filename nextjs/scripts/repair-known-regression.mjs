@@ -165,16 +165,16 @@ export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
   ".github/workflows/repair-scope.yml": "b7112fc3fedac86028ed062b8cff702783f89f6f8a8803abfba41bd93207e041",
-  "nextjs/scripts/repair-collector-only.mjs": "79d86cd98238fb7e266d6b97d635cfd4df424f5e4df4c54d0222bee2487b9ec3",
+  "nextjs/scripts/repair-collector-only.mjs": "093c67377be8f13f8651b156b51d2fc8e7302a1bf56d0f3a3bb3e66ed9831944",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
-  "nextjs/scripts/repair-scope.test.mjs": "0320854c77b5256c3b137cfc5212cd5dab5fd88d0ace7f3854d1d3209da402be",
-  "nextjs/scripts/repair-scope-gate.mjs": "e3aa8776111b426e3f4e84638cdd2d24a3791901338eed348efe70cecad51903",
-  "nextjs/scripts/verify-repair-workflows.mjs": "2b6707a316836d3928962f53558cdf50f0a7574cce96e4b57c5e22a8492d9448",
-  "nextjs/scripts/repair-collector-only.test.mjs": "4ef7a9ce249a45f090fda69a3ecf8de7ae87d9e77f7f272e37075b58c5807e56",
-  "nextjs/scripts/repair-known-regression.mjs": "1a5ed81af62de7a8965d389a4f777c712912faf759185479d18c7195b5bc9d84",
+  "nextjs/scripts/repair-scope.test.mjs": "d736a0f8d23b6aaf408abbc83122e4b14238ca75e4fdc796ec22bf0f683789a5",
+  "nextjs/scripts/repair-scope-gate.mjs": "b8ec75bc16cdb5f1b8a069f510233d9a4c9a5a6b5bf9d27f460c9208514a022f",
+  "nextjs/scripts/verify-repair-workflows.mjs": "7a741eabe58ab76e13acf8d12b3b8a1ce62c6ee5e937327210eb047d96afab8a",
+  "nextjs/scripts/repair-collector-only.test.mjs": "9560523d9464a9d13622e3faab04ba07972e396b031835746053d0f13dcd49e4",
+  "nextjs/scripts/repair-known-regression.mjs": "92a476e20fca89319205d42c6da809faf838fb38fc12e7cac84a9ef75aa7946b",
   "nextjs/scripts/repair-known-regression.test.mjs": "3e86911fd98bcbfebf6eaefb6e64a97c483f21b023027799f05b0659fc2aaa7e",
   ".github/workflows/db-rehearsal.yml": "f4001dbbcab9b6081875bce2c0843a99a5cb09944ce8d4a2b1d1da76ce573ab3",
-  "nextjs/scripts/run-repair-check.mjs": "bfce44903892793c69036fa6e5da913494106855a648ca5186a8871d31947d8d",
+  "nextjs/scripts/run-repair-check.mjs": "2a9dc628dbc4c3c233aec81d470c6b3be07571e107831b92526ed71d669634e2",
   "nextjs/scripts/repair-test-report.mjs": "5dd9b98ffa8aa6b67aa5034567e00857246073a0d8c94dc5df3eea60096e741f",
   "nextjs/vitest.repair-scope.config.ts": "229623b695037e9e8173e74107dd252a77182ad068ab195d2a9710e0100c8742"
 });
@@ -873,6 +873,7 @@ export function verifyIntakePresentationSource({ headSha, exec = execFileSync })
 // The archive is authenticated before decompression. Only the single bounded
 // receipt entry from that immutable archive is accepted; there are no disk writes.
 export function readIntakeParentReceipt(archive) { return readBoundIntakeReceipt(archive, INTAKE_PARENT_ARTIFACT, 8239); }
+// The Explore repair over exact424 reuses this same exact623 artifact as historical SQL proof; it never stages or reruns a database.
 export const SOLUTIONS_NATIVE_WORLD_ARTIFACT = Object.freeze({id:11390495928,name:'native-world-sql-rehearsal-62362e39b4052458fc15f8731dbccf45d9b73f63',digest:'sha256:30f91555bea0d321e0ad4b48f7b8ebbc07c22833b08ba3d1e21bcb067f795735',bytes:1190});
 export function readBoundSolutionsWorldReceipt(archive, artifact, sizeBytes = SOLUTIONS_NATIVE_WORLD_ARTIFACT.bytes) {
   // GitHub reports size_in_bytes; pinned fixtures carry bytes. Every declared size must equal the pin.

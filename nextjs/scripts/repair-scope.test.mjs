@@ -2634,7 +2634,7 @@ function solutionsGit(options={}){
     throw new Error('Unexpected Solutions fixture git command: '+args.join(' '));
   };
 }
-test('Solutions workspace holds the eight reviewed source identities on the exact623 lineage', () => {
+test('Solutions pins the eight reviewed source identities on the exact623 lineage; the Explore head updates exactly two of them', () => {
   assert.equal(solutionsAdmission.SOLUTIONS_PARENT,'62362e39b4052458fc15f8731dbccf45d9b73f63');
   assert.equal(solutionsAdmission.SOLUTIONS_PARENT_TREE,'d95dc8463b9acb9033692cf1752e77f13da7ee54');
   assert.equal(solutionsAdmission.NATIVE_WORLD_PARENT,'744f1b3116b149c1c4f03f29f3b1d70e94e5d798');
@@ -2649,8 +2649,11 @@ test('Solutions workspace holds the eight reviewed source identities on the exac
     'nextjs/lib/solution-workflows.test.ts':['67ee42a3e502da39b25ca8fdfbbed723d6bcbf14','94efd1a038507b0c92013ce7cb4d27e0b987514e5fb86864c2e0021741adbb93'],
     'nextjs/e2e/solutions-workflows.spec.ts':['d2af505f4b546a586ab13c96d0be11cd820edc2f','3851061aeb95a055e5a9dd383d85098ed55688fc9d086d900263123ebec5dfe5'],
   });
+  // At the exact424 Explore repair head two Solutions owners carry their final Explore blobs; the other six stay byte-identical.
+  assert.deepEqual(Object.keys(solutionsAdmission.EXPLORE_REPAIR_SOURCE_BLOBS).filter(path=>Object.hasOwn(solutionsAdmission.SOLUTIONS_SOURCE_BLOBS,path)).sort(),['nextjs/e2e/solutions-workflows.spec.ts','nextjs/lib/solution-workflows.test.ts']);
   for(const [path,pin] of Object.entries(solutionsAdmission.SOLUTIONS_SOURCE_BLOBS)){
-    const bytes=solutionsWorkspaceBytes(path);
+    const bytes=solutionsWorkspaceBytes(path),explore=solutionsAdmission.EXPLORE_REPAIR_SOURCE_BLOBS[path];
+    if(explore){assert.equal(explore.before,pin.after,path);assert.deepEqual([bytes.length,solutionsGitBlob(bytes)],[explore.bytes,explore.after],path);continue;}
     assert.deepEqual([bytes.length,solutionsGitBlob(bytes),createHash('sha256').update(bytes).digest('hex')],[pin.bytes,pin.after,pin.sha256],path);
   }
 });
@@ -2678,9 +2681,10 @@ test('Solutions intent fails closed for owned sources or exact623 configuration 
   assert.equal(classify({parent:'d'.repeat(40),checkout:'f'.repeat(40),paths:['nextjs/scripts/repair-scope.test.mjs']}).classification,'normal');
   assert.equal(solutionsAdmission.classifySolutionsIntent({headSha:undefined,exec:solutionsGit()}).classification,'normal');
 });
-test('Solutions source admission accepts only the complete exact delta and rejects every mutated, extra or missing input', () => {
+test('Solutions source admission refuses the Explore head bytes and rejects every mutated, extra or missing input', () => {
   const verify=options=>solutionsAdmission.verifySolutionsSource({headSha:solutionsHead,intent:solutionsAdmission.classifySolutionsIntent({headSha:solutionsHead,exec:solutionsGit(options)}),exec:solutionsGit(options)});
-  const accepted=verify();assert.equal(accepted.eligible,true,accepted.reason);assert.deepEqual(accepted.exactChangedPaths,solutionsChangedPaths());assert.equal(accepted.fullAnchor,solutionsAdmission.FULL_ANCHOR);
+  // The accepted exact623 child is historical (actual623 receipt); over the Explore head bytes the first updated owner ends Solutions admission.
+  const current=verify();assert.equal(current.eligible,false);assert.equal(current.reason,'Solutions source identity changed: nextjs/lib/solution-workflows.test.ts');
   const rejected=[
     {paths:[...solutionsChangedPaths(),'nextjs/app/solutions/extra.tsx']},
     {paths:solutionsChangedPaths().filter(path=>path!=='nextjs/e2e/solutions-workflows.spec.ts')},
@@ -2802,4 +2806,191 @@ test('Solutions rejects distinct capture names backed by one canonical source PN
 test('Solutions changes every declared configuration path from its exact623 preimage', () => {
   assert.deepEqual(Object.keys(solutionsAdmission.SOLUTIONS_PARENT_CONFIG_BLOBS).sort(),[...solutionsAdmission.SOLUTIONS_CONFIG_PATHS].sort());
   assert.deepEqual(solutionsAdmission.SOLUTIONS_CONFIG_PATHS.filter(path=>solutionsGitBlob(solutionsWorkspaceBytes(path))===solutionsAdmission.SOLUTIONS_PARENT_CONFIG_BLOBS[path]),[],'unchanged configuration paths cannot satisfy the exact path set');
+});
+
+// Explore repair over exact424: Solutions stays report1 and the only capture owner; Explore is its own report2 in1440.
+import { EXPLORE_BROWSER_CASES, EXPLORE_1440_ALLOWED_SKIPS, EXPLORE_DEEP_LINK_CONTRACT, EXPLORE_REPAIR_BROWSER_FILES, exploreSpecInventory, verifyExploreSpecSource, planExploreRepairBrowserRuns, readExploreRepairExecution } from './run-repair-check.mjs';
+const exploreHead='6'.repeat(40),exploreSpec='e2e/explore.spec.ts';
+const exploreChangedPaths=()=>[...solutionsAdmission.EXPLORE_REPAIR_CHANGED_SOURCES,...solutionsAdmission.EXPLORE_REPAIR_CONFIG_PATHS].sort();
+const exploreCumulativePaths=()=>[...solutionsAdmission.EXPLORE_REPAIR_TREE_SOURCES,...solutionsAdmission.SOLUTIONS_CONFIG_PATHS].sort();
+// Serves the authenticated623 and424 preimages; head identities are computed from the workspace bytes, never echoed from pins.
+function exploreGit(options={}){
+  const c=solutionsAdmission,parent=c.EXPLORE_REPAIR_PARENT,dependencies={...c.PUBLIC_PAGES_DB_BLOBS,...c.NATIVE_DB_TRANSPORT_BLOBS,...c.NATIVE_WORLD_PREREQUISITE_BLOBS,...Object.fromEntries(Object.entries(c.NATIVE_WORLD_SOURCE_BLOBS).map(([p,v])=>[p,v.after]))};
+  const at623=p=>Object.hasOwn(c.SOLUTIONS_SOURCE_BLOBS,p)?c.SOLUTIONS_SOURCE_BLOBS[p].before:c.EXPLORE_REPAIR_SOURCE_BLOBS[p]?.before??null;
+  const at424=p=>c.EXPLORE_REPAIR_SOURCE_BLOBS[p]?.before??(Object.hasOwn(c.SOLUTIONS_SOURCE_BLOBS,p)?c.SOLUTIONS_SOURCE_BLOBS[p].after:p===c.EXPLORE_REPAIR_WORKFLOW_PATH?c.EXPLORE_REPAIR_WORKFLOW_BLOB:dependencies[p]??null);
+  const headBytes=p=>options.mutate===p?Buffer.concat([solutionsWorkspaceBytes(p),Buffer.from('\n')]):solutionsWorkspaceBytes(p);
+  const blob=(ref,p)=>{
+    if(ref===c.SOLUTIONS_PARENT)return options.preimage623===p?'0'.repeat(40):at623(p);
+    if(ref===parent)return options.preimage424===p?'0'.repeat(40):at424(p);
+    if(ref===exploreHead)return Object.hasOwn(dependencies,p)?(options.dependency===p?'1'.repeat(40):dependencies[p]):solutionsGitBlob(headBytes(p));
+    throw new Error('Unexpected Explore fixture ref: '+ref);
+  };
+  return (_command,args,settings={})=>{
+    if(args[0]==='-C'){assert.equal(args[1],'fixture-root');args=args.slice(2);}
+    if(args[0]==='rev-parse'){if(args[1]==='--show-toplevel')return 'fixture-root';if(args[1]==='HEAD')return options.checkout??exploreHead;if(args[1]===`${c.SOLUTIONS_PARENT}^{tree}`)return options.tree??c.SOLUTIONS_PARENT_TREE;throw new Error('Unbound Explore fixture revision: '+args[1]);}
+    if(args[0]==='rev-list'){assert.deepEqual(args.slice(0,4),['rev-list','--parents','-n','1']);if(args[4]===exploreHead)return `${exploreHead} ${options.parent??parent}${options.merge?' '+'a'.repeat(40):''}`;if(args[4]===parent)return `${parent} ${options.grandparent??c.SOLUTIONS_PARENT}`;if(args[4]===c.SOLUTIONS_PARENT)return `${c.SOLUTIONS_PARENT} ${c.NATIVE_WORLD_PARENT}`;throw new Error('Unbound Explore fixture commit: '+args[4]);}
+    if(args[0]==='diff'&&args[1]==='--raw'){if(options.dirty)throw new Error('dirty checkout');return '';}
+    if(args[0]==='diff')return (args.at(-1)===`${c.SOLUTIONS_PARENT}..${exploreHead}`?options.cumulative??exploreCumulativePaths():options.paths??exploreChangedPaths()).join('\0')+'\0';
+    if(args[0]==='merge-base'){if(options.ancestor===false)throw new Error('not ancestor');return '';}
+    if(args[0]==='ls-tree'){assert.equal(args.length,5);assert.deepEqual([args[1],args[3]],['--full-tree','--']);const p=args[4],sha=blob(args[2],p);return sha?`100644 blob ${sha}\t${p}`:'';}
+    if(args[0]==='show'){const [ref,p]=args[1].split(/:(.+)/);assert.equal(ref,exploreHead);const bytes=headBytes(p);return settings.encoding==='buffer'?bytes:bytes.toString('utf8');}
+    throw new Error('Unexpected Explore fixture git command: '+args.join(' '));
+  };
+}
+test('Explore repair workspace holds the five final UI identities and the final spec carries exactly the reviewed inventory', () => {
+  for(const [path,pin] of Object.entries(solutionsAdmission.EXPLORE_REPAIR_SOURCE_BLOBS)){const bytes=solutionsWorkspaceBytes(path);assert.deepEqual([bytes.length,solutionsGitBlob(bytes)],[pin.bytes,pin.after],path);}
+  assert.deepEqual(verifyExploreSpecSource(solutionsWorkspaceBytes('nextjs/'+exploreSpec)),EXPLORE_BROWSER_CASES.map(({title,skip})=>({title,skip})));
+  assert.equal(solutionsGitBlob(solutionsWorkspaceBytes(solutionsAdmission.EXPLORE_REPAIR_WORKFLOW_PATH)),solutionsAdmission.EXPLORE_REPAIR_WORKFLOW_BLOB,'the Repair workflow stays at its exact424 blob');
+});
+test('Explore repair source admission binds exact424, the eleven-source623 tree and the unchanged workflow before any evidence read', () => {
+  const verify=options=>solutionsAdmission.verifyExploreRepairSource({headSha:exploreHead,intent:solutionsAdmission.classifyExploreRepairIntent({headSha:exploreHead,exec:exploreGit(options)}),exec:exploreGit(options)});
+  const accepted=verify();assert.equal(accepted.eligible,true,accepted.reason);assert.equal(accepted.profile,'explore-repair');assert.equal(accepted.parent,solutionsAdmission.EXPLORE_REPAIR_PARENT);assert.equal(accepted.grandparent,solutionsAdmission.SOLUTIONS_PARENT);
+  assert.deepEqual(accepted.exactChangedPaths,exploreChangedPaths());assert.equal(accepted.exactChangedPaths.length,12);assert.deepEqual(accepted.treeSources,[...solutionsAdmission.EXPLORE_REPAIR_TREE_SOURCES]);assert.equal(accepted.treeSources.length,11);assert.equal(accepted.workflowBlob,'0990f734a31660dd5a29164f5cb0068aaac91b6c');assert.equal(accepted.exploreCases.length,19);
+  for(const [path,pin] of Object.entries(solutionsAdmission.EXPLORE_REPAIR_SOURCE_BLOBS))assert.equal(accepted.sourceBlobs[path],pin.after,path);
+  for(const path of solutionsAdmission.EXPLORE_REPAIR_UNCHANGED_SOLUTIONS_SOURCES)assert.equal(accepted.sourceBlobs[path],solutionsAdmission.SOLUTIONS_SOURCE_BLOBS[path].after,path);
+  const sources=[...solutionsAdmission.EXPLORE_REPAIR_TREE_SOURCES],rejected=[
+    {paths:[...exploreChangedPaths(),'nextjs/app/explore/extra.tsx'].sort()},
+    ...exploreChangedPaths().map(path=>({paths:exploreChangedPaths().filter(other=>other!==path)})),
+    {paths:[...exploreChangedPaths(),solutionsAdmission.EXPLORE_REPAIR_WORKFLOW_PATH].sort()},
+    {paths:[...exploreChangedPaths(),'nextjs/scripts/repair-known-regression.test.mjs'].sort()},
+    {paths:[...exploreChangedPaths(),'supabase/drafts/native-world-reduction-commit.sql'].sort()},
+    {cumulative:exploreCumulativePaths().filter(path=>path!=='nextjs/app/solutions/page.tsx')},
+    {cumulative:[...exploreCumulativePaths(),'supabase/drafts/native-world-reduction-commit.sql'].sort()},
+    {grandparent:'0'.repeat(40)},{tree:'0'.repeat(40)},{ancestor:false},{dirty:true},{merge:true},{checkout:'f'.repeat(40)},
+    ...sources.map(preimage623=>({preimage623})),
+    ...[...sources,solutionsAdmission.EXPLORE_REPAIR_WORKFLOW_PATH].map(preimage424=>({preimage424})),
+    ...[...sources,solutionsAdmission.EXPLORE_REPAIR_WORKFLOW_PATH].map(mutate=>({mutate})),
+    {dependency:'supabase/drafts/native-world-reduction-commit.sql'},{dependency:'.github/workflows/db-rehearsal.yml'},
+    ...[...solutionsAdmission.EXPLORE_REPAIR_CONFIG_PATHS,'nextjs/scripts/repair-scope.mjs','nextjs/scripts/repair-test-report.mjs'].map(mutate=>({mutate})),
+  ];
+  for(const options of rejected){let reads=0;const value=solutionsAdmission.verifyExploreRepairEligibility({headSha:exploreHead,exec:exploreGit(options),api:()=>{reads++;throw new Error('Must not read evidence');}});assert.equal(value.eligible,false,JSON.stringify(options));assert.equal(reads,0,JSON.stringify(options));}
+  // Source alone is not admission: the actual623 evidence is read only after the exact source passes.
+  let reads=0;const offline=solutionsAdmission.verifyExploreRepairEligibility({headSha:exploreHead,exec:exploreGit(),api:()=>{reads++;throw new Error('offline');}});assert.equal(offline.eligible,false);assert.match(offline.reason,/Exact623 inherited evidence unavailable: offline/);assert.equal(reads,1);
+  // Other parents stay with their own classifiers; unreadable metadata on424 fails closed.
+  assert.equal(solutionsAdmission.classifyExploreRepairIntent({headSha:exploreHead,exec:exploreGit({parent:solutionsAdmission.SOLUTIONS_PARENT})}).classification,'normal');
+  for(const options of [{merge:true},{checkout:'f'.repeat(40)}]){const intent=solutionsAdmission.classifyExploreRepairIntent({headSha:exploreHead,exec:exploreGit(options)});assert.equal(intent.classification,'unavailable',JSON.stringify(options));assert.equal(intent.intended,true);}
+});
+function exploreSyntheticSpec(){
+  const body=c=>[...(c.skip?[`  test.skip(${c.skip});`]:[]),...(EXPLORE_DEEP_LINK_CONTRACT[c.title]?.required??[]).map(line=>'  '+line),'  expect(["AFFECTED"].some((word) => /AFFECTED|UNCHANGED/.test(word))).toBe(true);'].join('\n');
+  return 'const NARROW_STAGE_MAX = 820;\nconst isNarrow = (page: Page) => (page.viewportSize()?.width ?? 1440) <= NARROW_STAGE_MAX;\n'+EXPLORE_BROWSER_CASES.map(c=>`\ntest(${JSON.stringify(c.title)}, async (${c.skip===EXPLORE_1440_ALLOWED_SKIPS[1].skip?'{ page }, testInfo':'{ page }'}) => {\n${body(c)}\n});\n`).join('');
+}
+test('Explore spec inventory binds nineteen cases to their own skip predicates and the final deep-link contract', () => {
+  const spec=exploreSyntheticSpec(),identities=EXPLORE_BROWSER_CASES.map(({title,skip})=>({title,skip}));
+  assert.deepEqual(verifyExploreSpecSource(spec),identities);assert.equal(exploreSpecInventory(Buffer.from(spec)).length,19);
+  // Member calls such as /AFFECTED|UNCHANGED/.test(word) are not cases.
+  assert.ok(spec.includes('.test(word)'));
+  assert.equal(EXPLORE_BROWSER_CASES.filter(c=>c.skip==='isNarrow(page)').length,7);assert.equal(EXPLORE_BROWSER_CASES.filter(c=>c.skip===null).length,10);
+  assert.deepEqual(EXPLORE_1440_ALLOWED_SKIPS.map(s=>[s.title,s.skip]),[['a phone walks World, Object, Source as steps rather than shrinking three panels','!isNarrow(page)'],['reduced motion removes the transitions and none of the content','testInfo.project.name !== "reduced-motion"']]);
+  for(const s of EXPLORE_1440_ALLOWED_SKIPS)assert.equal(EXPLORE_BROWSER_CASES.find(c=>c.title===s.title).skip,s.skip);
+  const [first,second]=EXPLORE_BROWSER_CASES.slice(0,2).map(c=>JSON.stringify(c.title)),desktop=JSON.stringify(EXPLORE_BROWSER_CASES[6].title);
+  const mutations={
+    crlf:s=>s.replaceAll('\n','\r\n'),
+    breakpoint:s=>s.replace('const NARROW_STAGE_MAX = 820;','const NARROW_STAGE_MAX = 821;'),
+    'extra-case':s=>s+'\ntest("an unreviewed Explore case", async ({ page }) => {\n});\n',
+    'unshaped-case':s=>s+'\n  test("an indented case", async () => {});\n',
+    only:s=>s.replace('\ntest(','\ntest.only('),
+    describe:s=>s+'\ntest.describe("grouped", () => {});\n',
+    fixme:s=>s.replace('  test.skip(!isNarrow(page));','  test.fixme(!isNarrow(page));'),
+    reorder:s=>s.replace(first,'\u0000').replace(second,first).replace('\u0000',second),
+    'phone-predicate':s=>s.replace('  test.skip(!isNarrow(page));','  test.skip(isNarrow(page));'),
+    'reduced-motion-predicate':s=>s.replace('  test.skip(testInfo.project.name !== "reduced-motion");','  test.skip(testInfo.project.name === "1440");'),
+    'second-skip':s=>s.replace('  test.skip(!isNarrow(page));','  test.skip(!isNarrow(page));\n  test.skip(isNarrow(page));'),
+    'nested-skip':s=>s.replace('  test.skip(!isNarrow(page));','    test.skip(!isNarrow(page));'),
+    'desktop-skip-removed':s=>s.replace(`${desktop}, async ({ page }) => {\n  test.skip(isNarrow(page));\n`,`${desktop}, async ({ page }) => {\n`),
+    'missing-unavailable-loop':s=>s.replace('  for (const id of ["region-that-never-existed", "constructor"]) {\n',''),
+    'echoes-id':s=>s.replace('  await expect(unavailable, id).not.toContainText(id);\n',''),
+    'stand-in-sheet':s=>s.replace('  await expect(page.locator("[data-source-sheet]"), id).toHaveCount(0);\n',''),
+    'kept-entry-expectation':s=>s.replace('  ["?act=constructor", "entry"],','  ["?act=constructor", "entry"],\n  ["?evidence=constructor", "entry"],'),
+  };
+  for(const [name,mutate] of Object.entries(mutations)){const mutated=mutate(spec);assert.notEqual(mutated,spec,name);assert.throws(()=>verifyExploreSpecSource(mutated),undefined,name);}
+});
+test('Explore repair plans two separate1440 reports, Solutions first, and never combines, widens or reuses the shared planner', () => {
+  const expected=[{kind:'project',project:'1440',files:[solutionsSpec]},{kind:'project',project:'1440',files:[exploreSpec]}];
+  assert.deepEqual([...EXPLORE_REPAIR_BROWSER_FILES],[exploreSpec,solutionsSpec]);
+  assert.deepEqual(planExploreRepairBrowserRuns([...EXPLORE_REPAIR_BROWSER_FILES],false),expected);assert.deepEqual(planExploreRepairBrowserRuns([solutionsSpec,exploreSpec],false),expected);
+  for(const [files,detail] of [[[exploreSpec],false],[[solutionsSpec],false],[[...EXPLORE_REPAIR_BROWSER_FILES,exploreSpec],false],[[...EXPLORE_REPAIR_BROWSER_FILES],true],[[...EXPLORE_REPAIR_BROWSER_FILES,'e2e/site-nav.spec.ts'],false],[[],false]])assert.throws(()=>planExploreRepairBrowserRuns(files,detail),/exactly the Solutions and Explore specs/,JSON.stringify(files));
+});
+function exploreProof(){const proof=solutionsProof();return {...proof,source:{eligible:true,headSha:exploreHead,profile:'explore-repair'}};}
+test('Explore repair plan keeps four unit owners, both reports, exact Solutions captures, inherited623 SQL proof and failed424 history', () => {
+  const proof=exploreProof(),normal={headSha:exploreHead,repairAnchorSha:solutionsAdmission.FULL_ANCHOR,pullRequestBaseSha:'7'.repeat(40),groups:['unknown'],unitFiles:['lib/unrelated.test.ts'],browserFiles:['e2e/site-nav.spec.ts'],unknownPaths:['nextjs/app/explore/page.tsx'],runFullHermeticVitest:true,requirePublicUiScreenshots:false};
+  const plan=solutionsAdmission.exploreRepairPlan(normal,proof);
+  assert.deepEqual(plan.groups,['selector-config','explore-repair']);assert.deepEqual(plan.unitFiles,solutionsUnitFiles);assert.deepEqual(plan.browserFiles,[...EXPLORE_REPAIR_BROWSER_FILES]);assert.deepEqual(plan.unknownPaths,[]);
+  assert.equal(plan.exploreRepairPresentation.source.profile,'explore-repair');assert.equal(plan.solutionsPagesPresentation,undefined);assert.equal(plan.requireSolutionsCaptures,true);assert.equal(plan.runFullHermeticVitest,false);assert.equal(plan.runDetailIntegrity,false);assert.equal(plan.runDatabaseRehearsal,false);assert.equal(plan.runWorkflowStaticGate,true);assert.equal(plan.fullQualification,'pending');
+  assert.deepEqual(plan.pendingDebt,[...solutionsAdmission.EXPLORE_REPAIR_PENDING_DEBT]);assert.equal(plan.pendingFullDebt.length,4);assert.match(plan.databaseRehearsalStatus,/exact424.*UNRUN/);assert.deepEqual(plan.inheritedChecks.nativeSql,proof.evidence.nativeSql);
+  assert.deepEqual(plan.knownRegressionResolution,proof.evidence.knownRegressionResolution);assert.deepEqual(plan.historicalUiFailure,{...solutionsFoldFailure});
+  assert.deepEqual(plan.historicalBrowserFailure,{...solutionsAdmission.EXPLORE_REPAIR_FAILED_PARENT});assert.equal(plan.historicalBrowserFailure.sourceHead,solutionsAdmission.EXPLORE_REPAIR_PARENT);assert.equal(plan.historicalBrowserFailure.outcome,'failure');assert.match(plan.historicalBrowserFailure.status,/not inherited/);
+  assert.deepEqual(planExploreRepairBrowserRuns(plan.browserFiles,plan.runDetailIntegrity).map(run=>[run.project,run.files]),[['1440',[solutionsSpec]],['1440',[exploreSpec]]]);
+  const stored=JSON.parse(JSON.stringify(plan));assert.deepEqual(solutionsAdmission.exploreRepairLineageFailures(stored,proof),[]);
+  for(const [key,value] of [['unitFiles',solutionsUnitFiles.slice(1)],['browserFiles',[solutionsSpec]],['browserFiles',[exploreSpec]],['requireSolutionsCaptures',false],['runFullHermeticVitest',true],['runDatabaseRehearsal',true],['pendingDebt',[]],['pendingQualificationDebt',[]],['pendingFullDebt',[]],['fullQualification','passed'],['inheritedChecks',{}],['historicalBrowserFailure',undefined],['historicalBrowserFailure',{...solutionsAdmission.EXPLORE_REPAIR_FAILED_PARENT,outcome:'success'}],['knownRegressionResolution',undefined],['solutionsPagesPresentation',{}],['groups',['selector-config','solutions-pages']],['unknownPaths',['nextjs/app/explore/extra.tsx']]])assert.ok(solutionsAdmission.exploreRepairLineageFailures({...stored,[key]:value},proof).length,key);
+  assert.match(solutionsAdmission.exploreRepairLineageFailures({...stored,headSha:'9'.repeat(40)},proof)[0],/lineage unavailable/);
+  assert.match(solutionsAdmission.exploreRepairLineageFailures(stored,{eligible:false,reason:'changed'})[0],/unavailable: changed/);
+  // Neither profile accepts the other's source proof or plan.
+  assert.throws(()=>solutionsAdmission.exploreRepairPlan(normal,{...proof,source:{...proof.source,profile:'solutions-workflows'}}),/exact424/);
+  assert.throws(()=>solutionsAdmission.exploreRepairPlan({...normal,repairAnchorSha:'9'.repeat(40)},proof));
+  assert.ok(solutionsAdmission.solutionsPagesLineageFailures(stored,{...proof,source:{...proof.source,profile:'solutions-workflows'}}).length);
+  const passed=buildRepairReceipt(stored,{headSha:exploreHead});assert.equal(passed.gate,'passed-scoped-only');assert.equal(passed.fullQualification,'pending');assert.match(passed.databaseObservation,/historical evidence.*exact424.*UNRUN/);assert.equal(passed.inheritedChecks.nativeSql.status,proof.evidence.nativeSql.status);assert.deepEqual(passed.historicalBrowserFailure,plan.historicalBrowserFailure);for(const debt of plan.pendingDebt)assert.ok(passed.pendingDebt.includes(debt),debt);
+  const failed=buildRepairReceipt(stored,{headSha:exploreHead,failures:['fresh Explore repair execution evidence: missing']});assert.equal(failed.gate,'failed');assert.ok(Object.values(failed.inheritedChecks).every(value=>value.status==='not accepted for current head'));assert.match(failed.databaseObservation,/not accepted for the current Explore repair head/);assert.match(failed.databaseRehearsalStatus,/not accepted for current head/);
+  assert.deepEqual(failed.knownRegressionResolution,plan.knownRegressionResolution);assert.deepEqual(failed.historicalBrowserFailure,plan.historicalBrowserFailure);assert.ok(failed.pendingDebt.includes('explore-repair'));assert.ok(!failed.pendingDebt.includes(solutionsAdmission.REGRESSION_DEBT));assert.equal(failed.fullQualification,'pending');
+});
+test('Explore repair final gate rejects synthetic step success without exact source and fresh report evidence', () => {
+  const plan=JSON.parse(JSON.stringify(solutionsAdmission.exploreRepairPlan({headSha:exploreHead,repairAnchorSha:solutionsAdmission.FULL_ANCHOR,groups:[],unitFiles:[],browserFiles:[],unknownPaths:[]},exploreProof())));
+  const temp=mkdtempSync(resolve(tmpdir(),'repair-explore-gate-'));try{writeFileSync(resolve(temp,'repair-plan.json'),JSON.stringify(plan));const env={...process.env,HEAD_SHA:exploreHead,GIT_CEILING_DIRECTORIES:dirname(temp)};for(const k of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT','TARGETED_REPAIR_UNIT_RESULT','TRANSITIVE_TEST_RESULT','SOLUTIONS_CAPTURE_RESULT','BROWSER_INSTALL_RESULT','BROWSER_BUILD_RESULT','BROWSER_RESULT'])env[k]='success';const run=spawnSync(process.execPath,[resolve(solutionsRepoRoot,'nextjs/scripts/repair-scope-gate.mjs')],{cwd:temp,env,encoding:'utf8'});assert.equal(run.status,1,run.stderr);const r=JSON.parse(readFileSync(resolve(temp,'repair-receipt.json'),'utf8'));
+    assert.equal(r.gate,'failed');assert.ok(r.gateFailures.some(f=>f.startsWith('Explore repair source/evidence unavailable')));assert.ok(r.gateFailures.some(f=>f.startsWith('fresh Explore repair execution evidence')));assert.equal(r.inheritedChecks.nativeSql.status,'not accepted for current head');assert.match(r.databaseObservation,/not accepted for the current Explore repair head/);
+    assert.deepEqual(r.knownRegressionResolution,plan.knownRegressionResolution);assert.deepEqual(r.historicalBrowserFailure,plan.historicalBrowserFailure);assert.ok(r.pendingDebt.includes('explore-repair'));assert.ok(!r.pendingDebt.includes(solutionsAdmission.REGRESSION_DEBT));assert.equal(r.fullQualification,'pending');}finally{rmSync(temp,{recursive:true,force:true});}
+});
+function exploreFixture(root){
+  const f=solutionsFixture(root);f.plan={unitFiles:solutionsUnitFiles,browserFiles:[...EXPLORE_REPAIR_BROWSER_FILES],runDetailIntegrity:false,exploreRepairPresentation:{eligible:true}};
+  // The repaired Solutions workflow owner gains one case: 10+10+9+5 = 34.
+  f.units.testResults[2].assertionResults.push({status:'passed'});f.units.numTotalTests=34;f.units.numPassedTests=34;writeFileSync(f.unitPath,JSON.stringify(f.units));
+  const specs=EXPLORE_BROWSER_CASES.map(c=>{const skipped=EXPLORE_1440_ALLOWED_SKIPS.some(s=>s.title===c.title);return {file:exploreSpec,title:c.title,tests:[{projectName:'1440',status:skipped?'skipped':'expected',annotations:skipped?[{type:'skip'}]:[],results:[{status:skipped?'skipped':'passed',attachments:[]}]}]};});
+  f.exploreReport={config:{rootDir:root},stats:{expected:17,skipped:2,unexpected:0,flaky:0},suites:[{specs}]};f.exploreReportPath=resolve(root,'node_modules/.cache/repair-scope-reports/playwright-2.json');writeFileSync(f.exploreReportPath,JSON.stringify(f.exploreReport));
+  return f;
+}
+test('Explore repair report owner requires 34 unit cases, six Solutions passes with the exact104 captures and seventeen Explore passes with only the two bound skips', () => {
+  const root=mkdtempSync(resolve(tmpdir(),'repair-explore-'));try{const f=exploreFixture(root);
+    // Report2 is never a capture source: an Explore PNG cannot add, replace or own a Solutions capture.
+    f.exploreReport.suites[0].specs[0].tests[0].results[0].attachments.push({name:SOLUTIONS_CAPTURE_BINDINGS[0].name,contentType:'image/png',path:resolve(root,'test-results/repair-scope-playwright-2/explore-synthetic/attachments/'+SOLUTIONS_CAPTURE_BINDINGS[0].name)});writeFileSync(f.exploreReportPath,JSON.stringify(f.exploreReport));
+    assert.equal(collectSolutionsWorkflowCaptures(root,f.plan,true).length,104);assert.equal(readdirSync(f.destination).length,104);assert.throws(()=>readExploreRepairExecution(root,f.plan),/no retry, attachment or modifier/);
+    f.exploreReport.suites[0].specs[0].tests[0].results[0].attachments=[];writeFileSync(f.exploreReportPath,JSON.stringify(f.exploreReport));
+    const r=readExploreRepairExecution(root,f.plan);assert.equal(r.units.passed,34);assert.equal(r.units.files,4);assert.equal(r.solutionsBrowser.passed,6);assert.equal(r.exploreBrowser.passed,17);assert.equal(r.exploreBrowser.skipped,2);assert.equal(r.captures.length,104);assert.equal(r.exploreCases.length,19);
+    assert.deepEqual(r.exploreCases.filter(c=>c.outcome==='skipped').map(c=>[c.title,c.skip]),EXPLORE_1440_ALLOWED_SKIPS.map(s=>[s.title,s.skip]));
+    // The Solutions-only reader keeps its own 33-case, one-report contract and refuses the Explore head's evidence.
+    assert.throws(()=>readSolutionsWorkflowExecution(root,f.plan),/33/);}finally{rmSync(root,{recursive:true,force:true});}
+});
+test('Explore repair reports reject unit drift, extra or unbound skips, retries, failures, missing, duplicate, unowned, wrong-project, merged and attached cases', () => {
+  const of=(f,title)=>f.exploreReport.suites[0].specs.find(s=>s.title===title),phone=EXPLORE_1440_ALLOWED_SKIPS[0].title,reduced=EXPLORE_1440_ALLOWED_SKIPS[1].title,desktop=EXPLORE_BROWSER_CASES[6].title,deep=EXPLORE_BROWSER_CASES[16].title,closing=EXPLORE_BROWSER_CASES[18].title;
+  const skip=(f,title)=>{const t=of(f,title).tests[0];t.status='skipped';t.annotations=[{type:'skip'}];t.results[0].status='skipped';f.exploreReport.stats.expected--;f.exploreReport.stats.skipped++;};
+  const units=(f,change)=>{change(f.units);writeFileSync(f.unitPath,JSON.stringify(f.units));};
+  const scenarios={
+    'unit-33':f=>units(f,u=>{u.testResults[2].assertionResults.pop();u.numTotalTests=33;u.numPassedTests=33;}),
+    'unit-35':f=>units(f,u=>{u.testResults[0].assertionResults.push({status:'passed'});u.numTotalTests=35;u.numPassedTests=35;}),
+    'unit-skip':f=>units(f,u=>{u.testResults[1].assertionResults[0].status='skipped';}),
+    'unit-three-owners':f=>units(f,u=>{u.testResults.pop();}),
+    'solutions-retry':f=>{f.report.suites[0].specs[1].tests[0].results.unshift({status:'failed',attachments:[]});},
+    'solutions-skip':f=>{const t=f.report.suites[0].specs[4].tests[0];t.status='skipped';t.results[0].status='skipped';f.report.stats.expected=5;f.report.stats.skipped=1;},
+    'solutions-gains-explore':f=>{f.report.suites[0].specs.push(...structuredClone(f.exploreReport.suites[0].specs));f.report.stats.expected+=17;f.report.stats.skipped+=2;},
+    'third-skip':f=>skip(f,desktop),
+    'deep-link-skip':f=>skip(f,deep),
+    'closing-skip':f=>skip(f,closing),
+    'phone-ran':f=>{const t=of(f,phone).tests[0];t.status='expected';t.annotations=[];t.results[0].status='passed';f.exploreReport.stats.expected=18;f.exploreReport.stats.skipped=1;},
+    'reduced-motion-ran':f=>{const t=of(f,reduced).tests[0];t.status='expected';t.annotations=[];t.results[0].status='passed';f.exploreReport.stats.expected=18;f.exploreReport.stats.skipped=1;},
+    'skip-without-annotation':f=>{of(f,reduced).tests[0].annotations=[];},
+    retry:f=>{of(f,desktop).tests[0].results.unshift({status:'failed',attachments:[]});},
+    flaky:f=>{const t=of(f,desktop).tests[0];t.status='flaky';t.results.unshift({status:'failed',attachments:[]});f.exploreReport.stats.expected=16;f.exploreReport.stats.flaky=1;},
+    failed:f=>{const t=of(f,deep).tests[0];t.status='unexpected';t.results[0].status='failed';f.exploreReport.stats.expected=16;f.exploreReport.stats.unexpected=1;},
+    missing:f=>{f.exploreReport.suites[0].specs.splice(16,1);f.exploreReport.stats.expected=16;},
+    duplicate:f=>{const s=f.exploreReport.suites[0].specs;s.push(structuredClone(s[0]));f.exploreReport.stats.expected=18;},
+    unowned:f=>{const s=f.exploreReport.suites[0].specs;s.push({...structuredClone(s[0]),title:'an unreviewed Explore case'});f.exploreReport.stats.expected=18;},
+    'project-390':f=>{of(f,desktop).tests[0].projectName='390';},
+    'reduced-motion-project':f=>{of(f,reduced).tests[0].projectName='reduced-motion';},
+    attachment:f=>{of(f,desktop).tests[0].results[0].attachments.push({name:'explore.png',contentType:'image/png',path:'explore.png'});},
+    fixme:f=>{of(f,desktop).tests[0].annotations=[{type:'fixme'}];},
+    'other-spec':f=>{of(f,desktop).file='e2e/site-nav.spec.ts';},
+    stats:f=>{f.exploreReport.stats.skipped=3;},
+    'report-missing':f=>{f.exploreReport=null;rmSync(f.exploreReportPath);},
+    'third-browser-file':f=>{f.plan.browserFiles=[...EXPLORE_REPAIR_BROWSER_FILES,'e2e/site-nav.spec.ts'];},
+    'detail-integrity':f=>{f.plan.runDetailIntegrity=true;},
+    'curated-change':f=>{writeFileSync(resolve(f.destination,SOLUTIONS_CAPTURE_BINDINGS[0].name),'changed');},
+  };
+  for(const [scenario,mutate] of Object.entries(scenarios)){const root=mkdtempSync(resolve(tmpdir(),'repair-explore-outcome-'));try{const f=exploreFixture(root);collectSolutionsWorkflowCaptures(root,f.plan,true);mutate(f);writeFileSync(f.reportPath,JSON.stringify(f.report));if(f.exploreReport)writeFileSync(f.exploreReportPath,JSON.stringify(f.exploreReport));assert.throws(()=>readExploreRepairExecution(root,f.plan),undefined,scenario);}finally{rmSync(root,{recursive:true,force:true});}}
 });

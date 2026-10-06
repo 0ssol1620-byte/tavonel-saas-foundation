@@ -551,15 +551,27 @@ test("the deep links land on the acts they name", async ({ page }) => {
     ["?act=evidence", "evidence"],
     ["?act=change", "change_compare"],
     ["?act=constructor", "entry"],
-    // §28 P0's other half is a region, not an act. An id no compiled World holds cannot be
-    // honoured, and it lands on the entry rather than on an empty source sheet.
-    ["?evidence=region-that-never-existed", "entry"],
-    ["?evidence=constructor", "entry"],
     ["", "entry"],
   ] as const) {
     await page.goto(`/explore${query}`);
     const expected = act === "evidence" && isNarrow(page) ? "evidence" : act;
     await expect(page.locator(STAGE), query || "(no query)").toHaveAttribute("data-world-act", expected);
+  }
+  /*
+    §28 P0's other half is a region, not an act. An id no compiled World holds cannot be honoured:
+    Foundation 424 lands it on a deliberate unavailable state in the Evidence act, with generic
+    copy that does not echo the id, and no other passage's source sheet stands in for it.
+  */
+  for (const id of ["region-that-never-existed", "constructor"]) {
+    await page.goto(`/explore?evidence=${id}`);
+    await expect(page.locator(STAGE), id).toHaveAttribute("data-world-act", "evidence");
+    const unavailable = page.locator('[role="alert"][data-evidence-unavailable]');
+    await expect(unavailable, id).toHaveCount(1);
+    await expect(unavailable, id).toBeVisible();
+    await expect(unavailable, id).toContainText("This passage is not available here");
+    await expect(unavailable, id).not.toContainText(id);
+    await expect(page.locator("[data-source-sheet]"), id).toHaveCount(0);
+    await expect(page.locator("[data-active-region]:visible"), id).toHaveCount(0);
   }
 });
 

@@ -678,4 +678,87 @@ test('failed Solutions admission keeps historical71 resolved and records the cur
   assert.ok(!receipt.pendingDebt.includes(world.REGRESSION_DEBT));assert.ok(!receipt.pendingQualificationDebt.includes(world.REGRESSION_DEBT));for(const debt of ['database-contract','solutions-pages','solutions-pages-eligibility','native-world-real-concurrency'])assert.ok(receipt.pendingDebt.includes(debt),debt);
   // Without authenticated evidence the resolution is still historical, never resurrected as current unresolved debt.
   const offline=world.failedSolutionsReceipt({headSha:head,reason,intent,api:()=>{throw Error('offline');}}).receipt;assert.equal(offline.knownRegressionResolution,undefined);assert.equal(offline.historicalRegressionResolution.sourceHead,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.ok(!offline.pendingDebt.includes(world.REGRESSION_DEBT));assert.equal(offline.currentAdmission.status,'failed');assert.equal(offline.gate,'failed');
+  // A Solutions-parent failure never borrows the failed424 browser history that belongs to the Explore repair.
+  assert.equal(plan.historicalBrowserFailure,undefined);assert.equal(receipt.historicalBrowserFailure,undefined);
+});
+// Explore repair: one direct child of failed424; the five final UI owners, seven CI paths and the unchanged workflow blob.
+test('Explore repair pins the five final UI identities, the eleven-source623 tree and the unchanged exact424 workflow',()=>{
+  assert.equal(world.EXPLORE_REPAIR_PARENT,'424f5737752d723bcd81ad7d06b7d977880a1b02');
+  assert.deepEqual(Object.fromEntries(Object.entries(world.EXPLORE_REPAIR_SOURCE_BLOBS).map(([p,v])=>[p,[v.after,v.bytes]])),{
+    'nextjs/app/explore/page.tsx':['5c247a99e23015994b83ac2e3fa388a6c00ed750',7475],
+    'nextjs/components/explore/explore-stage.tsx':['d149e38dc68bae082a52596740b14b0f071c17f6',24738],
+    'nextjs/lib/solution-workflows.test.ts':['7df199503c8014f7ccf5f13df689dacbb4c5265a',11835],
+    'nextjs/e2e/solutions-workflows.spec.ts':['7e2720289a104e34b192ce66017aacafef06ccd0',13183],
+    'nextjs/e2e/explore.spec.ts':['961f4fdafd3e12bb790cebdd08560f607d40a64f',36447],
+  });
+  assert.deepEqual({...world.EXPLORE_REPAIR_PATCH},{bytes:23477,sha256:'d43e6db490097f1041a21cb649df7dbbdd624567671db8fdea645f78b3e3380b',filesChanged:5});
+  // Updated Solutions owners start from their exact623-child (424) pins; the six others stay byte-identical.
+  for(const [p,pin] of Object.entries(world.EXPLORE_REPAIR_SOURCE_BLOBS))if(Object.hasOwn(world.SOLUTIONS_SOURCE_BLOBS,p))assert.equal(pin.before,world.SOLUTIONS_SOURCE_BLOBS[p].after,p);
+  assert.deepEqual([...world.EXPLORE_REPAIR_ADDED_OWNERS],['nextjs/app/explore/page.tsx','nextjs/components/explore/explore-stage.tsx','nextjs/e2e/explore.spec.ts']);
+  assert.deepEqual([...world.EXPLORE_REPAIR_UNCHANGED_SOLUTIONS_SOURCES].sort(),['nextjs/app/solutions/[slug]/page.tsx','nextjs/app/solutions/page.tsx','nextjs/app/solutions/solution-workflow-proof.tsx','nextjs/app/solutions/solutions.module.css','nextjs/lib/solution-proof-sample.test.ts','nextjs/lib/solutions-hub.test.ts']);
+  assert.equal(world.EXPLORE_REPAIR_TREE_SOURCES.length,11);assert.deepEqual([...world.EXPLORE_REPAIR_TREE_SOURCES],[...world.SOLUTIONS_CHANGED_SOURCES,...world.EXPLORE_REPAIR_ADDED_OWNERS].sort());
+  assert.equal(world.EXPLORE_REPAIR_CONFIG_PATHS.length,7);assert.ok(!world.EXPLORE_REPAIR_CONFIG_PATHS.includes(world.EXPLORE_REPAIR_WORKFLOW_PATH));for(const p of world.EXPLORE_REPAIR_CONFIG_PATHS)assert.ok(world.SOLUTIONS_CONFIG_PATHS.includes(p),p);
+  assert.ok(!world.EXPLORE_REPAIR_CONFIG_PATHS.includes('nextjs/scripts/repair-known-regression.test.mjs'));
+  assert.deepEqual([world.EXPLORE_REPAIR_WORKFLOW_PATH,world.EXPLORE_REPAIR_WORKFLOW_BLOB],['.github/workflows/repair-scope.yml','0990f734a31660dd5a29164f5cb0068aaac91b6c']);
+  assert.deepEqual([...world.EXPLORE_REPAIR_UNIT_FILES],['lib/solutions-hub.test.ts','lib/solution-proof-sample.test.ts','lib/solution-workflows.test.ts','lib/solutions-thumbnails.test.ts']);
+  assert.deepEqual({...world.EXPLORE_REPAIR_FAILED_PARENT},{sourceHead:world.EXPLORE_REPAIR_PARENT,parent:world.SOLUTIONS_PARENT,profile:'solutions-workflows',scope:'browser',outcome:'failure',status:'historical failed424 browser evidence only; not inherited for the Explore repair head'});
+});
+test('current collector routes exact424 Explore repair intent before Solutions, published pages and native profiles',()=>{
+  const source=readFileSync(fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url)),'utf8'),cli=source.slice(source.lastIndexOf('if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))'));
+  const explore=cli.indexOf('classifyExploreRepairIntent({headSha})'),solutions=cli.indexOf('classifySolutionsIntent({headSha})'),pages=cli.indexOf('classifyPublicPagesIntent({headSha})'),native=cli.indexOf('classifyNativeDbIntent({ headSha })');
+  assert.ok(explore>=0&&explore<solutions&&solutions<pages&&pages<native);
+  const exec=({paths,parent=world.EXPLORE_REPAIR_PARENT,checkout=head,merge=false})=>(_command,args)=>{if(args[0]==='-C')args=args.slice(2);if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'fixture-root':checkout;if(args[0]==='rev-list')return `${head} ${parent}${merge?' '+'a'.repeat(40):''}`;if(args[0]==='diff')return paths.join('\0')+'\0';throw new Error('Unexpected Explore git command: '+args.join(' '));};
+  const classify=options=>world.classifyExploreRepairIntent({headSha:head,exec:exec(options)});
+  assert.equal(classify({paths:['nextjs/lib/unrelated.ts']}).classification,'normal');
+  for(const p of ['nextjs/scripts/repair-collector-only.test.mjs','nextjs/e2e/explore.spec.ts','nextjs/app/solutions/page.tsx','.github/workflows/repair-scope.yml']){const intent=classify({paths:[p]});assert.equal(intent.classification,'intended',p);assert.equal(intent.profile,'explore-repair',p);assert.equal(intent.parent,world.EXPLORE_REPAIR_PARENT,p);}
+  // The exact623 parent stays with the Solutions classifier; metadata failures on424 fail closed.
+  assert.equal(classify({paths:['nextjs/e2e/explore.spec.ts'],parent:world.SOLUTIONS_PARENT}).classification,'normal');
+  for(const options of [{paths:['nextjs/e2e/explore.spec.ts'],checkout:'f'.repeat(40)},{paths:['nextjs/e2e/explore.spec.ts'],merge:true}]){const intent=classify(options);assert.equal(intent.classification,'unavailable');assert.equal(intent.intended,true);}
+  assert.equal(world.classifyExploreRepairIntent({headSha:undefined,exec:exec({paths:['nextjs/e2e/explore.spec.ts']})}).classification,'normal');
+  for(const intent of [{classification:'unavailable',intended:true,headSha:head,parent:world.EXPLORE_REPAIR_PARENT,reason:'unreadable'},{classification:'intended',intended:true,headSha:head,parent:world.SOLUTIONS_PARENT,paths:[]}]){const value=world.verifyExploreRepairSource({headSha:head,intent});assert.equal(value.eligible,false);assert.match(value.reason,/exact direct child of424/);}
+});
+test('failed Explore repair admission keeps historical71 resolved, retains failed424 browser history and accepts no inheritance',()=>{
+  const intent={classification:'intended',intended:true,headSha:head,parent:world.EXPLORE_REPAIR_PARENT},reason='Explore repair source identity changed: nextjs/e2e/explore.spec.ts';
+  const {plan,receipt}=world.failedExploreRepairReceipt({headSha:head,reason,intent,api:solutionsApiFixture()});
+  assert.deepEqual(plan.currentAdmission,{profile:'explore-repair',headSha:head,parent:world.EXPLORE_REPAIR_PARENT,status:'failed',reason});assert.ok(plan.pendingQualificationDebt.includes('explore-repair-eligibility'));assert.ok(!plan.pendingQualificationDebt.includes(world.REGRESSION_DEBT));
+  assert.deepEqual(plan.historicalBrowserFailure,{...world.EXPLORE_REPAIR_FAILED_PARENT});
+  assert.equal(receipt.gate,'failed');assert.deepEqual(receipt.gateFailures,[reason]);assert.deepEqual(receipt.currentAdmission,plan.currentAdmission);assert.deepEqual(receipt.inheritedChecks,{});assert.equal(receipt.fullQualification,'pending');
+  assert.deepEqual(receipt.historicalBrowserFailure,{...world.EXPLORE_REPAIR_FAILED_PARENT});assert.equal(receipt.historicalBrowserFailure.outcome,'failure');
+  assert.equal(receipt.knownRegressionResolution.headSha,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.match(receipt.knownRegressionResolution.status,/historical.*retained.*current Explore repair admission failed/);assert.equal(receipt.knownRegressionObservations[0].failed,71);
+  assert.ok(!receipt.pendingDebt.includes(world.REGRESSION_DEBT));assert.ok(!receipt.pendingQualificationDebt.includes(world.REGRESSION_DEBT));for(const debt of ['database-contract','explore-repair','explore-repair-eligibility',...world.EXPLORE_REPAIR_PENDING_DEBT])assert.ok(receipt.pendingDebt.includes(debt),debt);
+  assert.ok(!receipt.pendingDebt.includes('solutions-pages'));
+  const offline=world.failedExploreRepairReceipt({headSha:head,reason,intent,api:()=>{throw Error('offline');}}).receipt;
+  assert.equal(offline.knownRegressionResolution,undefined);assert.equal(offline.historicalRegressionResolution.sourceHead,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.deepEqual(offline.historicalBrowserFailure,{...world.EXPLORE_REPAIR_FAILED_PARENT});assert.ok(!offline.pendingDebt.includes(world.REGRESSION_DEBT));assert.equal(offline.currentAdmission.profile,'explore-repair');assert.equal(offline.gate,'failed');
+  // A different parent never receives the Explore failure shape.
+  assert.equal(world.failedCollectorPlan({headSha:head,reason,intent:{...intent,parent:world.SOLUTIONS_PARENT}}).historicalBrowserFailure,undefined);
+});
+test('DB decision after a failed Explore admission without classifier outputs re-derives exact424 intent and removes only the re-added71 debt',()=>{
+  // The unchanged DB workflow re-adds the71 debt after a failed classifier, then authenticates with the (absent) intended output.
+  const db=readFileSync(resolve(process.cwd(),'../.github/workflows/db-rehearsal.yml'),'utf8');
+  for(const line of ['INTENDED_RESULT: ${{ steps.scope.outputs.intended }}',"receipt.pendingDebt = [...new Set([...(receipt.pendingDebt ?? []), 'database-contract', 'hermetic-vitest-71-failures-triage'])];",'receipt = authenticateFailedNativeResolution(receipt, {headSha:env.REPAIR_HEAD_SHA,intended:env.INTENDED_RESULT});'])assert.ok(db.includes(line),line);
+  const reason='Explore repair source identity changed: nextjs/e2e/explore.spec.ts',intent={classification:'intended',intended:true,headSha:head,parent:world.EXPLORE_REPAIR_PARENT};
+  // runExploreRepairMode writes this receipt and exits before any classifier output exists.
+  const written=world.failedExploreRepairReceipt({headSha:head,reason,intent,api:solutionsApiFixture()}).receipt;assert.ok(!written.pendingDebt.includes(world.REGRESSION_DEBT));
+  const decision=intended=>{for(const missing of [undefined,''])assert.equal(world.nativeDbJobDecision({classifierResult:'failure',intended,eligible:missing,nativeDatabase:missing}).explicit,false);assert.notEqual(intended,'true');
+    const receipt=structuredClone(written);receipt.pendingFullDebt=[...new Set([...(receipt.pendingFullDebt??[]),'PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair'])];receipt.pendingDebt=[...new Set([...(receipt.pendingDebt??[]),'database-contract','hermetic-vitest-71-failures-triage'])];receipt.databaseObservation='not executed; inherited evidence unaccepted';receipt.inheritedChecks={};return receipt;};
+  const exact=[...world.EXPLORE_REPAIR_CHANGED_SOURCES,...world.EXPLORE_REPAIR_CONFIG_PATHS].sort();
+  const exec=({paths=exact,parent=world.EXPLORE_REPAIR_PARENT,checkout=head,merge=false,broken=false}={})=>(_command,args)=>{if(broken)throw Error('git unavailable');if(args[0]==='-C')args=args.slice(2);if(args[0]==='rev-parse')return args[1]==='--show-toplevel'?'fixture-root':checkout;if(args[0]==='rev-list')return `${head} ${parent}${merge?' '+'a'.repeat(40):''}`;if(args[0]==='diff')return paths.join('\0')+'\0';throw new Error('Unexpected Explore git command: '+args.join(' '));};
+  const nativeCalls=[],nativeApi=p=>{nativeCalls.push(p);throw Error('native evidence must not be read for Explore');};
+  for(const intended of [undefined,'']){
+    const before=decision(intended);assert.ok(before.pendingDebt.includes(world.REGRESSION_DEBT));
+    const resolved=world.authenticateFailedNativeResolution(structuredClone(before),{headSha:head,intended,exec:exec(),api:nativeApi,exploreApi:solutionsApiFixture()});
+    // Exactly the independently resolved debt goes; gate, original failure, history, debts and pending qualification stay.
+    assert.deepEqual(resolved,{...before,pendingDebt:before.pendingDebt.filter(d=>d!==world.REGRESSION_DEBT).sort()});
+    assert.equal(resolved.gate,'failed');assert.deepEqual(resolved.gateFailures,[reason]);assert.deepEqual(resolved.currentAdmission,{profile:'explore-repair',headSha:head,parent:world.EXPLORE_REPAIR_PARENT,status:'failed',reason});assert.deepEqual(resolved.inheritedChecks,{});assert.equal(resolved.fullQualification,'pending');
+    assert.deepEqual(resolved.historicalBrowserFailure,{...world.EXPLORE_REPAIR_FAILED_PARENT});assert.equal(resolved.knownRegressionResolution.headSha,'8956734a6675ae79d5081e77f551e0cb49cf8a39');assert.match(resolved.knownRegressionResolution.status,/current Explore repair admission failed/);
+    for(const debt of ['database-contract','explore-repair','explore-repair-eligibility',...world.EXPLORE_REPAIR_PENDING_DEBT])assert.ok(resolved.pendingDebt.includes(debt),debt);assert.ok(!resolved.pendingDebt.includes(world.REGRESSION_DEBT));
+  }
+  assert.deepEqual(nativeCalls,[]);
+  // Wrong head, wrong or extra parent, unrelated candidates, classifier errors and unavailable evidence keep the re-added debt.
+  for(const [label,options,exploreApi] of [['wrong head',{checkout:'f'.repeat(40)}],['wrong parent',{parent:world.SOLUTIONS_PARENT}],['unrelated parent',{parent:'b'.repeat(40)}],['two parents',{merge:true}],['unrelated candidate',{paths:['nextjs/lib/unrelated.ts']}],['classifier error',{broken:true}],['unavailable evidence',{},()=>{throw Error('offline');}]]){
+    const before=decision(undefined),evidenceCalls=[];
+    const kept=world.authenticateFailedNativeResolution(structuredClone(before),{headSha:head,intended:undefined,exec:exec(options),api:nativeApi,exploreApi:exploreApi??(p=>{evidenceCalls.push(p);throw Error('Explore evidence must not be read: '+label);})});
+    assert.deepEqual(kept,before,label);assert.ok(kept.pendingDebt.includes(world.REGRESSION_DEBT),label);assert.equal(kept.gate,'failed',label);assert.equal(kept.fullQualification,'pending',label);assert.deepEqual(evidenceCalls,[],label);
+  }
+  assert.deepEqual(nativeCalls,[]);
 });

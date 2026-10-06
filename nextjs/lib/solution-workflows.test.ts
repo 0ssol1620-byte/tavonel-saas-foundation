@@ -1,16 +1,27 @@
-import { createElement, type ReactNode } from "react";
+import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import ExplorePage from "../app/explore/page";
 import SolutionsPage from "../app/solutions/page";
 import SolutionPage, { SOLUTIONS } from "../app/solutions/[slug]/page";
 import SolutionWorkflowProof, { solutionWorkflowEvidence } from "../app/solutions/solution-workflow-proof";
-import { exploreSampleArtifact, exploreSampleAnswers, exploreSampleWorld } from "./explore-sample";
+import { exploreSampleArtifact, exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+import {
+  REGION_BOUND,
+  RELATION_BOUND,
+  boundVisualWorld,
+  layoutVisualWorld,
+  toVisualWorldModel,
+  type VisualWorldModel,
+} from "./visual-world-model";
 
 // This suite owns Solutions composition and evidence, rather than commercial state or chrome.
 vi.mock("@/components/public-page-shell", () => ({
   PublicPageShell: ({ children }: { children: ReactNode }) => createElement("main", null, children),
 }));
 vi.mock("@/components/public-primary-cta", () => ({ default: () => null }));
+// The /explore page is read for the model it hands the stage, never rendered as the client stage.
+vi.mock("@/components/explore/explore-stage", () => ({ default: () => null }));
 
 const entries = Object.entries(SOLUTIONS) as [keyof typeof SOLUTIONS, typeof SOLUTIONS[keyof typeof SOLUTIONS]][];
 const escape = (text: string) => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#x27;");
@@ -44,6 +55,68 @@ describe("Solutions task choices and workflow evidence", () => {
       expect(html).toContain(escape(proof.region.excerpt.slice(0, 100)));
       expect(html).toContain(encodeURIComponent(proof.region.id));
       expect(html).toContain("mechanics demonstrations, not customer engagements or domain-accuracy results");
+    }
+  });
+
+  it("ships every published Solutions target in the bounded /explore model, with its locator and owner", () => {
+    // The model /explore actually hands its stage, not a projection rebuilt beside it.
+    const [stage] = ExplorePage().props.children as [ReactElement<{ model: VisualWorldModel }>, ReactNode];
+    const shipped = stage.props.model;
+    const full = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
+    const shippedIds = new Set(shipped.evidence.map((item) => item.id));
+    expect(entries.map(([slug]) => slug)).toContain("knowledge-operations");
+    /*
+      Foundation 424: correctness of the projection, not its size. The bounds are unchanged and
+      govern the initial selection only; explicit region retention and page-mates may exceed them,
+      so nothing here caps a count or compares the payload against a number.
+    */
+    expect(REGION_BOUND).toBe(12);
+    expect(RELATION_BOUND).toBe(24);
+    expect(shippedIds.size, "every shipped region id is unique").toBe(shipped.evidence.length);
+    const fullNodeById = new Map(full.nodes.map((node) => [node.id, node] as const));
+    for (const node of shipped.nodes) {
+      const source = fullNodeById.get(node.id);
+      expect(source, node.id).toBeDefined();
+      // No shipped object points at a region the browser was not sent.
+      for (const ref of node.evidenceRefs) expect(shippedIds.has(ref), `${node.id} ${ref}`).toBe(true);
+      // REGION_BOUND still selects each shipped object's leading regions; retention only adds.
+      for (const ref of source!.evidenceRefs.slice(0, REGION_BOUND)) {
+        expect(node.evidenceRefs, `${node.id} ${ref}`).toContain(ref);
+      }
+    }
+    // Initial selection alone, against the shipped model: explicit retention adds and never drops.
+    const baseline = boundVisualWorld(full, layoutVisualWorld(full).placements.map((placement) => placement.id));
+    const shippedNodeIds = new Set(shipped.nodes.map((node) => node.id));
+    for (const item of baseline.evidence) expect(shippedIds.has(item.id), item.id).toBe(true);
+    for (const node of baseline.nodes) expect(shippedNodeIds.has(node.id), node.id).toBe(true);
+    // Diagnostics only: serialized UTF-8 byte counts, never the model content.
+    const bytes = (value: VisualWorldModel) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+    console.info(`[explore-model-bytes] baseline=${bytes(baseline)} corrected=${bytes(shipped)}`);
+    for (const [slug, solution] of entries) {
+      const { region, document } = solutionWorkflowEvidence(slug, solution.proof);
+      const kept = shipped.evidence.filter((item) => item.id === region.id);
+      expect(kept, slug).toHaveLength(1);
+      expect(kept[0].id, slug).toBe(region.id);
+      expect(kept[0].sourceId, slug).toBe(region.sourceId);
+      expect(kept[0].sourceId, slug).toBe(document.documentId);
+      expect(kept[0].page, slug).toBe(region.page);
+      expect(kept[0].bbox1000, slug).toEqual([...region.bbox]);
+      expect(kept[0].excerpt, slug).toBe(region.excerpt);
+      expect(kept[0], slug).toEqual(full.evidence.find((item) => item.id === region.id));
+      // The owner `boundVisualWorld` retains for a kept region, unchanged but for its shipped refs.
+      const owner = full.nodes.find((node) => node.evidenceRefs.includes(region.id));
+      expect(owner, slug).toBeDefined();
+      const shippedOwner = shipped.nodes.find((node) => node.id === owner!.id);
+      expect(shippedOwner, slug).toEqual({ ...owner!, evidenceRefs: owner!.evidenceRefs.filter((ref) => shippedIds.has(ref)) });
+      expect(shippedOwner!.evidenceRefs, slug).toContain(region.id);
+      // The owner the stage resolves `?evidence=` under (a Claim first) is shipped and holds it.
+      const stageOwner = shipped.nodes.find((node) => node.kind === "Claim" && node.evidenceRefs.includes(region.id))
+        ?? shipped.nodes.find((node) => node.evidenceRefs.includes(region.id));
+      expect(stageOwner?.evidenceRefs, slug).toContain(region.id);
+      // The source sheet draws the page, so every page-mate ships with the target.
+      for (const mate of full.evidence.filter((item) => item.sourceId === region.sourceId && item.page === region.page)) {
+        expect(shippedIds.has(mate.id), `${slug} ${mate.id}`).toBe(true);
+      }
     }
   });
 

@@ -131,6 +131,9 @@ for (const width of [390, 1440, 1920]) {
     test.skip(test.info().project.name !== "1440", "This spec owns its three-width matrix and runs once in the 1440 project.");
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: "reduce" });
+    const unavailableState = page.locator('[role="alert"], [role="status"]').filter({ hasText: /unavailable|not available|not found/i });
+    const activeRegion = page.locator("[data-parsed-source-page] [data-active-region]:visible");
+    let knowledgeGraphEvidence: string | null = null;
     for (const slug of routes) {
       await page.goto("/solutions", { waitUntil: "networkidle" });
       const choice = page.locator(`main article a[href="/solutions/${slug}"]`);
@@ -140,13 +143,16 @@ for (const width of [390, 1440, 1920]) {
       await expect(page.locator(`[data-workflow-proof="${slug}"]`)).toBeVisible();
       const proof = page.locator(`[data-workflow-proof="${slug}"]`);
       const expectedEvidence = await proof.locator("[data-evidence-id]").getAttribute("data-evidence-id");
+      expect(expectedEvidence).toBeTruthy();
+      if (slug === "knowledge-graph") knowledgeGraphEvidence = expectedEvidence;
       const source = proof.locator('[data-proof-variant="excerpt"] a');
       await tabTo(page, source);
       await Promise.all([page.waitForURL((url) => url.pathname === "/explore"), page.keyboard.press("Enter")]);
       expect(new URL(page.url()).searchParams.get("evidence")).toBe(expectedEvidence);
       await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", "evidence");
-      await expect(page.locator('[data-parsed-source-page] [data-active-region]:visible').first())
-        .toHaveAttribute("data-region-id", expectedEvidence!);
+      await expect(activeRegion).toHaveCount(1);
+      await expect(activeRegion).toHaveAttribute("data-region-id", expectedEvidence!);
+      await expect(unavailableState).toHaveCount(0);
       await capture(page, info, `solutions-${slug}-${width}-selected-evidence.png`);
       if (slug === "ai-ready-knowledge" || slug === "knowledge-graph") {
         await page.goto(`/solutions/${slug}`, { waitUntil: "networkidle" });
@@ -157,5 +163,38 @@ for (const width of [390, 1440, 1920]) {
         await capture(page, info, `solutions-${slug}-${width}-package-destination.png`);
       }
     }
+    // Same-prefix chunk ID with the chunk-<hex> suffix swapped for a long fixed one: real route, no mocks.
+    expect(knowledgeGraphEvidence).toMatch(/chunk-[0-9a-f]+$/i);
+    const missingEvidence = knowledgeGraphEvidence!.replace(/chunk-[0-9a-f]+$/i, `chunk-${"0badc0de".repeat(16)}`);
+    expect(missingEvidence).not.toBe(knowledgeGraphEvidence);
+    await page.goto(`/explore?evidence=${encodeURIComponent(missingEvidence)}`, { waitUntil: "networkidle" });
+    expect(new URL(page.url()).searchParams.get("evidence")).toBe(missingEvidence);
+    await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", "evidence");
+    // Foundation 424: one deliberate, generic unavailable state that never echoes the untrusted ID.
+    const missingState = unavailableState.and(page.locator("[data-evidence-unavailable]"));
+    await expect(missingState).toHaveCount(1);
+    await expect(missingState).toBeVisible();
+    await expect(page.locator("main")).not.toContainText(missingEvidence);
+    // No unrelated source sheet opens in its place.
+    await expect(page.locator("[data-source-sheet]:visible")).toHaveCount(0);
+    await expect(page.locator("[data-parsed-source-page]:visible")).toHaveCount(0);
+    await expect(page.locator("[data-active-region]:visible")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    const recovery = missingState.getByRole("button", { name: "Browse the evidence in this sample" });
+    await tabTo(page, recovery);
+    await expect(recovery).toBeFocused();
+    expect(await recovery.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
+    expect((await recovery.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await page.keyboard.press("Enter");
+    await expect.poll(() => new URL(page.url()).searchParams.has("evidence")).toBe(false);
+    expect(new URL(page.url()).pathname).toBe("/explore");
+    await expect(unavailableState).toHaveCount(0);
+    await page.goBack();
+    await expect.poll(() => new URL(page.url()).searchParams.get("evidence")).toBe(missingEvidence);
+    await expect(missingState).toBeVisible();
+    await expect(page.locator("[data-source-sheet]:visible")).toHaveCount(0);
+    await page.goForward();
+    await expect.poll(() => new URL(page.url()).searchParams.has("evidence")).toBe(false);
+    await expect(unavailableState).toHaveCount(0);
   });
 }
