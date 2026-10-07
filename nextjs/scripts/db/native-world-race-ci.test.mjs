@@ -1,19 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPOSITORY, MAIN_REF, PR_NUMBER, PR_REF, PR_BASE_REF, PR_HEAD_REF, BASE_COMMIT, BASE_TREE, CASES, CONTAINER, IMAGES, HARNESS, HARNESS_TEST, HARNESS_DOC, SCHEMA, FIXTURE,
   SCHEMA_SHA256, FIXTURE_SHA256, INPUT_PINS, UNIT_WRAPPER_PREFIX, UNIT_WRAPPER_COPY_SHA256, MIGRATIONS, TEST_COPIES, PLAN, SETUP_KIND, CONFIG_TOML,
-  digest, gitBlobSha1, expectedMountpoint, unitWrapper, testCopyBytes, verifySourcePins, admitEvent, admitDispatch, stageDrafts, stageProblems, utcStamp,
+  digest, gitBlobSha1, expectedMountpoint, unitWrapper, testCopyBytes, verifySourcePins, readSource, admitEvent, admitDispatch, stageDrafts, stageProblems, utcStamp,
   validateEvidence, validateServerSettings, validatePgTap, captureTarget, markerCommand, writeMarker, setupPgTap, prepareTarget, harnessEnv,
-  ownerCleanup, buildCaseReceipt, caseProblems, aggregateReceipts, admitRaceSource, MAIN_OVERLAY_PR, MAIN_OVERLAY_COMMIT, MAIN_OVERLAY_PINS, main } from './native-world-race-ci.mjs';
+  ownerCleanup, buildCaseReceipt, caseProblems, aggregateReceipts, admitRaceSource, MAIN_OVERLAY_PR, MAIN_OVERLAY_COMMIT, MAIN_OVERLAY_PINS, main,
+  STATUS_ARGS, parsePorcelainStatus, verifyCandidateStatus, RACE_SUCCESSOR_PARENT, RACE_SUCCESSOR_PARENT_TREE, RACE_HELPER, RACE_HELPER_TEST,
+  RACE_SUCCESSOR_PATHS } from './native-world-race-ci.mjs';
 import { NATIVE_RACE_PROFILE, NATIVE_RACE_PARENT, NATIVE_RACE_PARENT_TREE, NATIVE_RACE_ADDITIONS, NATIVE_RACE_PARENT_OWNER_BLOBS, NATIVE_RACE_CONFIG_PATHS,
   NATIVE_RACE_UNCHANGED_OWNERS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PATHS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE,
   nativeRaceMainOverlayEvidence, EXPLORE_SUCCESSOR_PARENT, EXPLORE_SUCCESSOR_PARENT_TREE, EXPLORE_SUCCESSOR_PATHS,
   EXPLORE_REPAIR_PARENT, EXPLORE_REPAIR_TREE_SOURCES, SOLUTIONS_PARENT, SOLUTIONS_PARENT_TREE, SOLUTIONS_CONFIG_PATHS, NATIVE_WORLD_PARENT,
-  FULL_ANCHOR } from '../repair-collector-only.mjs';
+  FULL_ANCHOR, NATIVE_RACE_SUCCESSOR_PARENT, NATIVE_RACE_SUCCESSOR_PARENT_TREE, NATIVE_RACE_SUCCESSOR_KIND, NATIVE_RACE_SUCCESSOR_PATHS,
+  NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS, NATIVE_RACE_SUCCESSOR_FINAL_SHA256 } from '../repair-collector-only.mjs';
 
 const HEAD='9'.repeat(40),RUN_ID='101',ATTEMPT='1';
 const env={GITHUB_ACTIONS:'true',RUNNER_ENVIRONMENT:'github-hosted',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REPOSITORY:REPOSITORY,
@@ -34,10 +38,11 @@ const plan={inputs:[pin(HARNESS),pin(HARNESS_TEST),pin(HARNESS_DOC)],
     {source:pin(FIXTURE),target:'supabase/tests/native_world_reduction_commit.sql',wrapper:'unit',copySha256:digest(expectedWrapper(bytes[FIXTURE]))}],
   present:[{path:'supabase/tests/registered.sql'}]};
 const read=(over={})=>p=>p in over?over[p]:(bytes[p] ?? null);
+const STATUS_KEY=STATUS_ARGS.join(' ');
 function fakeGit(over={}) {
   const answers={'rev-parse --verify HEAD^{commit}':{code:0,out:HEAD+'\n'},[`rev-parse --verify ${BASE_COMMIT}^{commit}`]:{code:0,out:BASE_COMMIT},
     [`rev-parse --verify ${BASE_COMMIT}^{tree}`]:{code:0,out:BASE_TREE},[`merge-base --is-ancestor ${BASE_COMMIT} ${HEAD}`]:{code:0,out:''},
-    'status --porcelain --untracked-files=all':{code:0,out:''},...over};
+    [STATUS_KEY]:{code:0,out:''},...over};
   return args=>answers[args.join(' ')] ?? {code:128,out:''};
 }
 // Manual dispatch must never reach the PR 141 race verifiers: every entry point throws if touched.
@@ -106,7 +111,7 @@ for (const [label,changes,pattern] of [
   ['623 absent',{git:fakeGit({[`rev-parse --verify ${BASE_COMMIT}^{commit}`]:{code:128,out:''}})},/623/],
   ['623 tree changed',{git:fakeGit({[`rev-parse --verify ${BASE_COMMIT}^{tree}`]:{code:0,out:'0'.repeat(40)}})},/tree/],
   ['623 not an ancestor',{git:fakeGit({[`merge-base --is-ancestor ${BASE_COMMIT} ${HEAD}`]:{code:1,out:''}})},/ancestor/],
-  ['dirty candidate',{git:fakeGit({'status --porcelain --untracked-files=all':{code:0,out:'?? x.sql'}})},/unmodified/],
+  ['dirty candidate',{git:fakeGit({[STATUS_KEY]:{code:0,out:'?? x.sql\0'}})},/unmodified/],
   ['missing runner',{read:read({[HARNESS]:null})},/Missing pinned source/],
   ['changed runner byte',{read:read({[HARNESS]:Buffer.from('-- synthetic changed\n')})},/SHA256 pin mismatch/],
   ['changed Git-blob-bound source',{read:read({'supabase/drafts/a.sql':Buffer.from('x')})},/Git blob pin mismatch/],
@@ -227,7 +232,7 @@ test('PR admission without race git access fails closed',()=>{
 const ROOT='/repo',ZERO='0'.repeat(40),NEW_BLOB='c'.repeat(40),OUTSIDE='a'.repeat(40);
 const RACE_RUNNER='nextjs/scripts/db/native-world-race.mjs',RACE_DOC='docs/integration/NATIVE_WORLD_HOSTED_CI_DRAFT.md';
 const PUBLISHED=[...EXPLORE_REPAIR_TREE_SOURCES,...SOLUTIONS_CONFIG_PATHS].sort(),DELTA=`${NATIVE_RACE_PARENT}..${HEAD}`;
-const REPO_ROOT=fileURLToPath(new URL('../../../',import.meta.url)),overlayBytes=p=>readFileSync(path.join(REPO_ROOT,p));
+const REPO_ROOT=fileURLToPath(new URL('../../../',import.meta.url)),overlayBytes=p=>execFileSync('git',['-C',REPO_ROOT,'show','c61fe1a5ea7487a6819ee6f0a812a6adbd343767:'+p],{encoding:'buffer',stdio:'pipe'});
 const OVERLAY=NATIVE_RACE_MAIN_OVERLAY_PATHS[0];
 const rawOf=p=>[Object.hasOwn(NATIVE_RACE_ADDITIONS,p)?`:000000 100644 ${ZERO} ${NEW_BLOB} A`:
   Object.hasOwn(NATIVE_RACE_MAIN_OVERLAYS,p)?`:100644 100644 ${NATIVE_RACE_MAIN_OVERLAYS[p].preimage} ${NATIVE_RACE_MAIN_OVERLAYS[p].resolution} M`:
@@ -380,6 +385,257 @@ test('a refused PR 141 race admission writes no admission, so staging, capture a
     const admitted=JSON.parse(readFileSync(path.join(state,'admission.json'),'utf8'));
     assert.equal(admitted.head,HEAD);assert.equal(admitted.event,'pull_request');assert.deepEqual(admitted.nativeRaceSource,raceExact());
   } finally {rmSync(temp,{recursive:true,force:true});}
+});
+
+// ---- Candidate status: NUL porcelain v1 records and a real Git checkout ----
+test('candidate status parser keeps NUL porcelain v1 records with their leading XY columns intact',()=>{
+  assert.deepEqual(parsePorcelainStatus(''),[]);
+  assert.deepEqual(parsePorcelainStatus(' M a.txt\0M  b.txt\0MM c d.txt\0?? new/e.txt\0 M  lead.txt\0'),[{x:' ',y:'M',path:'a.txt'},{x:'M',y:' ',path:'b.txt'},
+    {x:'M',y:'M',path:'c d.txt'},{x:'?',y:'?',path:'new/e.txt'},{x:' ',y:'M',path:' lead.txt'}]);
+  assert.deepEqual(parsePorcelainStatus('R  to.txt\0from.txt\0 M x\n.txt\0'),[{x:'R',y:' ',path:'to.txt',from:'from.txt'},{x:' ',y:'M',path:'x\n.txt'}]);
+});
+for (const [label,text,pattern] of [['a non-string status',Buffer.from(' M a.txt\0'),/text required/],
+  ['an unterminated record',' M a.txt',/unterminated record/],['a newline terminator',' M a.txt\n',/unterminated record/],
+  ['a trailing unterminated record',' M a.txt\0 M b.txt',/unterminated record/],['an empty record','\0',/Malformed candidate status record/],
+  ['a doubled terminator',' M a.txt\0\0',/Malformed candidate status record/],['a trimmed XY column','M a.txt\0',/Malformed candidate status record/],
+  ['an unknown status code','XY a.txt\0',/Malformed candidate status record/],['a missing path',' M \0',/Malformed candidate status record/],
+  ['a rename without its source','R  to.txt\0',/rename\/copy record/],['a rename with an empty source','R  to.txt\0\0',/rename\/copy record/]]) {
+  test('candidate status parser rejects '+label,()=>assert.throws(()=>parsePorcelainStatus(text),pattern));
+}
+// No system config and an empty global config file (no autocrlf, hooks, signing); safe.directory is scoped to the created repository only.
+// Git for Windows rejects os.devNull (\\.\nul) as GIT_CONFIG_GLOBAL, so the empty file lives inside the created repository.
+const isolatedGitEnv=(repo,globalConfig)=>({...Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^GIT_/i.test(k))),GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:globalConfig,
+  GIT_TERMINAL_PROMPT:'0',GIT_CONFIG_COUNT:'1',GIT_CONFIG_KEY_0:'safe.directory',GIT_CONFIG_VALUE_0:realpathSync.native(repo).split(path.sep).join('/')});
+test('candidate status in a real Git checkout tolerates only an unstaged byte-identical mixed-EOL file',()=>{
+  // Rooted under the runner's TMPDIR/TEMP; only this created repository is removed.
+  const repo=mkdtempSync(path.join(process.env.TMPDIR || process.env.TEMP || tmpdir(),'nwr-ci-status-'));
+  try {
+    const CONFIG='.isolated-global.gitconfig',globalConfig=path.join(repo,CONFIG);
+    writeFileSync(globalConfig,'',{flag:'wx'});
+    const gitEnv=isolatedGitEnv(repo,globalConfig),write=(p,b)=>writeFileSync(path.join(repo,p),b);
+    const spawn=(args,input)=>spawnSync('git',args,{cwd:repo,env:gitEnv,input,encoding:'utf8',timeout:20000,windowsHide:true});
+    const git=args=>{const r=spawn(args);return {code:r.status,out:r.stdout};};
+    const must=(args,input)=>{const r=spawn(args,input);assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);return r.stdout;};
+    const status=()=>parsePorcelainStatus(must([...STATUS_ARGS]));
+    must(['init','-q']);
+    // The empty global config is never untracked status.
+    mkdirSync(path.join(repo,'.git','info'),{recursive:true});writeFileSync(path.join(repo,'.git','info','exclude'),'/'+CONFIG+'\n',{flag:'a'});
+    for (const [key,value] of [['user.name','Native World CI Test'],['user.email','native-world-ci@example.invalid'],['core.autocrlf','false'],['commit.gpgsign','false']])
+      must(['config',key,value]);
+    write('.gitattributes','*.txt text eol=lf\n');write('clean.txt','one\n');
+    // The exact mixed CRLF/LF bytes are indexed and committed raw, bypassing the eol=lf clean filter.
+    const mixed=Buffer.from('alpha\r\nbeta\ngamma\r\ndelta\n'),blob=must(['hash-object','-w','--no-filters','--stdin'],mixed).trim();
+    assert.equal(blob,gitBlobSha1(mixed));
+    write('mixed.txt',mixed);
+    must(['update-index','--add','--cacheinfo',`100644,${blob},mixed.txt`]);must(['add','--','.gitattributes','clean.txt']);
+    must(['commit','-q','-m','mixed EOL blob']);
+    const head=must(['rev-parse','HEAD']).trim();
+    assert.match(head,/^[a-f0-9]{40}$/);assert.equal(must(['rev-parse',`${head}:mixed.txt`]).trim(),blob);
+    // Porcelain really reports an unstaged ' M' while the raw worktree bytes still hash to the HEAD blob.
+    assert.deepEqual(status(),[{x:' ',y:'M',path:'mixed.txt'}]);
+    assert.ok(readFileSync(path.join(repo,'mixed.txt')).equals(mixed));
+    assert.equal(must(['hash-object','--no-filters','--','mixed.txt']).trim(),blob);assert.notEqual(must(['hash-object','--','mixed.txt']).trim(),blob,'the clean filter differs');
+    const accepted=[{status:' M',path:'mixed.txt',mode:'100644',headBlob:blob}],verify=()=>verifyCandidateStatus(git,{event:'pull_request',head});
+    assert.deepEqual(verify(),accepted);
+    assert.throws(()=>verifyCandidateStatus(git,{event:'workflow_dispatch',head}),/Candidate checkout must be unmodified/);
+    // Mutated raw bytes keep the same ' M' record but no longer hash to HEAD; restoring them is accepted again.
+    write('mixed.txt',Buffer.from('alpha\r\nBETA\ngamma\r\ndelta\n'));
+    assert.deepEqual(status(),[{x:' ',y:'M',path:'mixed.txt'}]);assert.throws(verify,/Candidate worktree content differs from HEAD: mixed\.txt/);
+    write('mixed.txt',mixed);assert.deepEqual(verify(),accepted);
+    // A genuinely changed unstaged file, then the same change staged.
+    write('clean.txt','two\n');
+    assert.deepEqual(status(),[{x:' ',y:'M',path:'clean.txt'},{x:' ',y:'M',path:'mixed.txt'}]);assert.throws(verify,/Candidate worktree content differs from HEAD: clean\.txt/);
+    must(['add','--','clean.txt']);
+    assert.deepEqual(status(),[{x:'M',y:' ',path:'clean.txt'},{x:' ',y:'M',path:'mixed.txt'}]);assert.throws(verify,/refused status 'M ' for "clean\.txt"/);
+    write('clean.txt','one\n');must(['add','--','clean.txt']);assert.deepEqual(verify(),accepted);
+    // An untracked file.
+    write('extra.txt','untracked\n');
+    assert.deepEqual(status().map(e=>e.x+e.y+' '+e.path).sort(),[' M mixed.txt','?? extra.txt']);assert.throws(verify,/refused status '\?\?' for "extra\.txt"/);
+    rmSync(path.join(repo,'extra.txt'));assert.deepEqual(verify(),accepted);
+  } finally {rmSync(repo,{recursive:true,force:true,maxRetries:3});}
+});
+
+// ---- PR 141 race successor over exact c61: the centralized collector proof, delegated to and restated by the helper ----
+const SUCCESSOR_HEAD='5'.repeat(40),C61=RACE_SUCCESSOR_PARENT;
+const workspaceBytes=p=>RACE_SUCCESSOR_PATHS.includes(p)?readFileSync(path.join(REPO_ROOT,p)):c61Bytes(p);
+// The actual c61 preimage bytes of the six owners, read lazily from the checkout's history (the collector proof re-derives them the same way).
+const C61_BYTES=new Map(),c61Bytes=p=>{
+  if(!C61_BYTES.has(p)) {const r=spawnSync('git',['-C',REPO_ROOT,'show',`${C61}:${p}`],{maxBuffer:64*1024*1024,windowsHide:true});
+    assert.equal(r.status,0,`git show ${C61}:${p}: ${r.stderr}`);C61_BYTES.set(p,r.stdout);}
+  return C61_BYTES.get(p);};
+const successorExact=(head=SUCCESSOR_HEAD)=>({profile:NATIVE_RACE_PROFILE,kind:NATIVE_RACE_SUCCESSOR_KIND,headSha:head,parent:C61,parentTree:RACE_SUCCESSOR_PARENT_TREE,
+  raceParent:NATIVE_RACE_PARENT,raceParentTree:NATIVE_RACE_PARENT_TREE,grandparent:EXPLORE_SUCCESSOR_PARENT,fullAnchor:FULL_ANCHOR,exactChangedPaths:[...NATIVE_RACE_CHANGED_PATHS],
+  successorChangedPaths:[...RACE_SUCCESSOR_PATHS],finalSha256:{...NATIVE_RACE_SUCCESSOR_FINAL_SHA256},unchangedPaths:[...NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS],
+  unchangedOwners:[...NATIVE_RACE_UNCHANGED_OWNERS],mainOverlays:nativeRaceMainOverlayEvidence()});
+const blobs=c=>Object.fromEntries(RACE_SUCCESSOR_PATHS.map((p,i)=>[p,(c+i.toString(16)).repeat(20)]));
+// Stubbed classifier and collector proof: the positive path and every result-shape refusal, with no git at all.
+function successorStub({source=args=>({eligible:true,...successorExact(args.headSha),preimages:blobs('a'),finalBlobs:blobs('b'),parentFailure:{runId:37646273750}}),parent=C61}={}) {
+  const log=[];
+  return {log,race:{exec:()=>{throw Error('stubbed successor runs no git');},
+    classify:args=>{log.push('classify');return {classification:'intended',intended:true,headSha:args.headSha,parent,repoRoot:ROOT,paths:[...RACE_SUCCESSOR_PATHS],profile:NATIVE_RACE_PROFILE};},
+    verify:()=>{log.push('verify');throw Error('exact2bb verifier reached');},
+    successor:args=>{log.push('successor');assert.equal(args.intent.headSha,args.headSha);assert.equal(args.intent.parent,C61);return source(args);}}};
+}
+test('PR 141 race successor identity is the collector proof restated: exact c61, its tree and the six in-place owners',()=>{
+  assert.deepEqual([RACE_SUCCESSOR_PARENT,RACE_SUCCESSOR_PARENT_TREE],['c61fe1a5ea7487a6819ee6f0a812a6adbd343767','4318378cbba223182cb3b64677d01e706460bc3b']);
+  assert.deepEqual([RACE_SUCCESSOR_PARENT,RACE_SUCCESSOR_PARENT_TREE,NATIVE_RACE_SUCCESSOR_KIND],[NATIVE_RACE_SUCCESSOR_PARENT,NATIVE_RACE_SUCCESSOR_PARENT_TREE,'exact-c61-successor']);
+  assert.deepEqual([RACE_HELPER,RACE_HELPER_TEST],['nextjs/scripts/db/native-world-race-ci.mjs','nextjs/scripts/db/native-world-race-ci.test.mjs']);
+  assert.deepEqual([...RACE_SUCCESSOR_PATHS],[RACE_HELPER,RACE_HELPER_TEST,'nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-collector-only.test.mjs',
+    'nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/verify-repair-workflows.mjs']);
+  assert.deepEqual([...RACE_SUCCESSOR_PATHS],[...NATIVE_RACE_SUCCESSOR_PATHS]);
+  assert.ok(RACE_SUCCESSOR_PATHS.every(p=>NATIVE_RACE_CHANGED_PATHS.includes(p)),'every successor owner is one of the 18 race paths');
+  assert.deepEqual(RACE_SUCCESSOR_PATHS.filter(p=>Object.hasOwn(NATIVE_RACE_ADDITIONS,p)),[RACE_HELPER,RACE_HELPER_TEST]);
+  assert.equal(RACE_SUCCESSOR_PATHS.filter(p=>NATIVE_RACE_CONFIG_PATHS.includes(p)).length,4);
+  assert.equal(NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS.length,12);for (const p of NATIVE_RACE_MAIN_OVERLAY_PATHS) assert.ok(NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS.includes(p),p);
+});
+test('PR 141 race successor final pins bind the actual helper and test bytes while the historical2bb addition pins stay',()=>{
+  assert.deepEqual(Object.keys(NATIVE_RACE_SUCCESSOR_FINAL_SHA256).sort(),[RACE_HELPER,RACE_HELPER_TEST]);
+  // Computed from the bytes, never restated: this file and the helper carry no literal of their own final digests.
+  assert.equal(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[RACE_HELPER],digest(workspaceBytes(RACE_HELPER)));
+  assert.equal(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[RACE_HELPER_TEST],digest(readFileSync(fileURLToPath(import.meta.url))));
+  for (const p of [RACE_HELPER,RACE_HELPER_TEST]) {
+    assert.equal(digest(c61Bytes(p)),NATIVE_RACE_ADDITIONS[p],'c61 bytes are the historical2bb addition: '+p);
+    assert.notEqual(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[p],NATIVE_RACE_ADDITIONS[p],'the successor edits '+p+' in place');
+  }
+  assert.equal(NATIVE_RACE_ADDITIONS[RACE_HELPER],'cc9eb2f07871835d6e83131f1b0437a46fc209e6285d0bf239c4bdca699d6268');
+  assert.equal(NATIVE_RACE_ADDITIONS[RACE_HELPER_TEST],'112ec96d8460aa50d1ddd1e5e576bf2422882cd63ecdc004363565af13ac8f50');
+});
+test('PR 141 race successor: a classified c61 child is admitted only through the collector proof, never the exact2bb verifier',()=>{
+  const {log,race}=successorStub(),a=admitRaceSource(SUCCESSOR_HEAD,race);
+  assert.deepEqual(log,['classify','successor']);
+  assert.deepEqual(a,{...successorExact(),preimages:blobs('a'),finalBlobs:blobs('b')});assert.equal(a.exactChangedPaths.length,18);assert.equal(a.successorChangedPaths.length,6);
+  assert.ok(!('parentFailure' in a),'only the restated increment is admitted');
+  // The PR admission records the successor increment before 623 ancestry, pins or staging.
+  const calls=[],reads=[],admitted=admitPr({git:recordGit(calls),read:recordRead(reads),race:successorStub().race});
+  assert.deepEqual(admitted.nativeRaceSource,{...successorExact(HEAD),preimages:blobs('a'),finalBlobs:blobs('b')});
+  assert.deepEqual(calls.slice(0,2),['rev-parse --verify HEAD^{commit}',`rev-parse --verify ${BASE_COMMIT}^{commit}`]);
+  // Every other classified parent goes to the exact2bb verifier and never reaches the successor proof.
+  for (const parent of [NATIVE_RACE_PARENT,OUTSIDE]) {
+    const stub=successorStub({parent});
+    assert.throws(()=>admitRaceSource(SUCCESSOR_HEAD,stub.race),/exact2bb verifier reached/);assert.deepEqual(stub.log,['classify','verify']);
+  }
+});
+const withSource=edit=>args=>{const s={eligible:true,...successorExact(args.headSha),preimages:blobs('a'),finalBlobs:blobs('b')};edit(s);return s;};
+const SOURCE_DIFFERS=key=>new RegExp('source differs from the exact c61 increment: '+key+'$');
+for (const [label,source,pattern] of [
+  ['a seal failure',()=>({eligible:false,reason:'Native World race successor repair seal changed: nextjs/scripts/repair-known-regression.mjs'}),/successor source refused: Native World race successor repair seal changed/],
+  ['pending final pins',()=>({eligible:false,reason:'Native World race successor final pins are pending the seal pass: '+RACE_HELPER}),/pending the seal pass/],
+  ['an unverified result',()=>null,/successor source refused: unverified/],
+  ['another head',withSource(s=>{s.headSha='8'.repeat(40);}),SOURCE_DIFFERS('headSha')],
+  ['another parent',withSource(s=>{s.parent=NATIVE_RACE_PARENT;}),SOURCE_DIFFERS('parent')],
+  ['another c61 tree',withSource(s=>{s.parentTree=ZERO;}),SOURCE_DIFFERS('parentTree')],
+  ['another kind',withSource(s=>{s.kind='exact2bb';}),SOURCE_DIFFERS('kind')],
+  ['a 17-path cumulative delta',withSource(s=>{s.exactChangedPaths=s.exactChangedPaths.slice(1);}),SOURCE_DIFFERS('exactChangedPaths')],
+  ['a two-path successor',withSource(s=>{s.successorChangedPaths=[RACE_HELPER,RACE_HELPER_TEST];}),SOURCE_DIFFERS('successorChangedPaths')],
+  ['other final pins',withSource(s=>{s.finalSha256={...s.finalSha256,[RACE_HELPER]:'0'.repeat(64)};}),SOURCE_DIFFERS('finalSha256')],
+  ['an overlay counted as edited',withSource(s=>{s.unchangedPaths=s.unchangedPaths.filter(p=>p!==NATIVE_RACE_MAIN_OVERLAY_PATHS[0]);}),SOURCE_DIFFERS('unchangedPaths')],
+  ['a mutated overlay pair',withSource(s=>{s.mainOverlays.overlays[NATIVE_RACE_MAIN_OVERLAY_PATHS[0]].resolution=ZERO;}),SOURCE_DIFFERS('mainOverlays')],
+  ['missing preimages',withSource(s=>{delete s.preimages;}),SOURCE_DIFFERS('preimages')],
+  ['a missing preimage owner',withSource(s=>{delete s.preimages[RACE_HELPER];}),SOURCE_DIFFERS('preimages')],
+  ['an abbreviated final blob',withSource(s=>{s.finalBlobs[RACE_HELPER]=s.finalBlobs[RACE_HELPER].slice(0,12);}),SOURCE_DIFFERS('finalBlobs')],
+  ['an owner reported unchanged',withSource(s=>{s.finalBlobs[RACE_HELPER]=s.preimages[RACE_HELPER];}),/must edit every owner in place/]]) {
+  test('PR 141 race successor refuses '+label+' before 623 checks or pins',()=>{
+    const calls=[],reads=[],{log,race}=successorStub({source});
+    assert.throws(()=>admitPr({git:recordGit(calls),read:recordRead(reads),race}),pattern);
+    assert.deepEqual(log,['classify','successor']);assert.deepEqual(calls,['rev-parse --verify HEAD^{commit}']);assert.deepEqual(reads,[]);
+  });
+}
+// A git double for the actual collector proof (verifyNativeRaceSuccessorSource) through the default classifier: head -> c61 -> exact2bb, the
+// six-path and 18-path deltas, raw records, leaves, actual c61 preimage bytes and actual workspace final bytes.
+const successorBytes=(o,ref,p)=>ref===C61?(RACE_SUCCESSOR_PATHS.includes(p)?c61Bytes(p):workspaceBytes(p)):(o.bytes?.[p] ?? workspaceBytes(p));
+const successorLeaf=(o,ref,p)=>{
+  const key=`${ref}:${p}`;if(o.tree && Object.hasOwn(o.tree,key)) return o.tree[key];
+  if(Object.hasOwn(NATIVE_RACE_MAIN_OVERLAYS,p)) return NATIVE_RACE_MAIN_OVERLAYS[p].resolution;
+  if(NATIVE_RACE_UNCHANGED_OWNERS.includes(p)) return NATIVE_RACE_PARENT_OWNER_BLOBS[p];
+  return gitBlobSha1(successorBytes(o,ref,p));
+};
+function successorGit(o={}) {
+  const calls=[],R=NATIVE_RACE_PARENT,H=SUCCESSOR_HEAD;
+  const exec=(file,args,{encoding='utf8'}={})=>{
+    assert.equal(file,'git');
+    const a=args[0]==='-C'?args.slice(2):args,key=a.join(' ');calls.push(key);
+    const out=v=>encoding==='buffer'?Buffer.from(v):v,nul=list=>out(list.flat().map(x=>x+'\0').join('')),none=()=>{throw Error('successor git double refused: '+key);};
+    if(a[0]==='diff' && a[1]==='--cached') return out(o.staged ?? '');
+    if(a[0]==='ls-files') return out(o.untracked ?? '');
+    if(key==='rev-parse --show-toplevel') return out(ROOT+'\n');
+    if(key==='rev-parse HEAD') return out((o.checkout ?? H)+'\n');
+    if(a[0]==='rev-list' && a.length===5) {const rows={[H]:[o.parent ?? C61,...(o.merge?[OUTSIDE]:[])],[C61]:[o.c61Parent ?? R],[R]:[EXPLORE_SUCCESSOR_PARENT]};return rows[a[4]]?out([a[4],...rows[a[4]]].join(' ')+'\n'):none();}
+    if(a[0]==='rev-parse' && a.length===2 && a[1].endsWith('^{tree}')) {const t={[C61]:o.c61Tree ?? RACE_SUCCESSOR_PARENT_TREE,[R]:NATIVE_RACE_PARENT_TREE}[a[1].slice(0,-7)];return t?out(t+'\n'):none();}
+    if(a[0]==='merge-base') return out('');
+    if(a[0]==='diff' && a[1]==='--name-only') {const d={[`${o.parent ?? C61}..${H}`]:o.paths ?? [...RACE_SUCCESSOR_PATHS],[`${R}..${C61}`]:[...NATIVE_RACE_CHANGED_PATHS],[`${R}..${H}`]:o.cumulative ?? [...NATIVE_RACE_CHANGED_PATHS]}[a.at(-1)];return d?nul(d):none();}
+    if(key===`diff --raw --no-abbrev --no-renames --no-relative -z ${C61} ${H}`) return nul(o.raw ?? RACE_SUCCESSOR_PATHS.map(p=>[`:100644 100644 ${successorLeaf(o,C61,p)} ${successorLeaf(o,H,p)} M`,p]));
+    // The tracked checkout against HEAD: stat/clean-filter records the proof must qualify against the raw worktree bytes.
+    if(a[0]==='diff' && a[1]==='--raw' && a.at(-1)===H) return nul(o.tracked ?? []);
+    if(a[0]==='ls-tree') return out(`100644 blob ${successorLeaf(o,a[2],a[4])}\t${a[4]}\n`);
+    if(a[0]==='hash-object' && a[1]==='--no-filters') {const p=a.at(-1);return out((o.rawHash?.[p] ?? successorLeaf(o,H,p))+'\n');}
+    if(a[0]==='show') {const ref=a[1].slice(0,40),p=a[1].slice(41);if(![C61,H].includes(ref)) return none();const b=successorBytes(o,ref,p);return encoding==='buffer'?b:b.toString('utf8');}
+    return none();
+  };
+  return {exec,calls};
+}
+const SUCCESSOR_READ_ONLY=/^(?:rev-parse|rev-list|merge-base|diff|ls-tree|show|hash-object --no-filters|ls-files) /;
+const admitSuccessor=o=>{const g=successorGit(o);try {return {value:admitRaceSource(SUCCESSOR_HEAD,{exec:g.exec}),calls:g.calls};} catch (error) {return {error,calls:g.calls};}};
+test('PR 141 race successor admits the exact c61 child through the actual collector proof over actual c61 and workspace bytes',()=>{
+  const {value,error,calls}=admitSuccessor({});
+  assert.equal(error,undefined,error?.message);
+  assert.deepEqual(value,{...successorExact(),preimages:Object.fromEntries(RACE_SUCCESSOR_PATHS.map(p=>[p,gitBlobSha1(c61Bytes(p))])),
+    finalBlobs:Object.fromEntries(RACE_SUCCESSOR_PATHS.map(p=>[p,gitBlobSha1(workspaceBytes(p))]))});
+  for (const call of [`rev-list --parents -n 1 ${SUCCESSOR_HEAD}`,`rev-list --parents -n 1 ${C61}`,`rev-parse ${C61}^{tree}`,`rev-parse ${NATIVE_RACE_PARENT}^{tree}`,
+    `diff --raw --no-abbrev --no-renames --no-relative -z ${C61} ${SUCCESSOR_HEAD}`,...RACE_SUCCESSOR_PATHS.flatMap(p=>[`ls-tree --full-tree ${C61} -- ${p}`,`show ${C61}:${p}`,`show ${SUCCESSOR_HEAD}:${p}`])])
+    assert.ok(calls.includes(call),call);
+  assert.ok(calls.every(c=>SUCCESSOR_READ_ONLY.test(c)),'read-only git only');
+});
+// c61 raw-byte cleanliness: Git's stat/clean-filter comparison may report a byte-identical owner as modified; only raw bytes equal to the
+// HEAD blob are tolerated, and any mode, type, addition, deletion or content change refuses the successor.
+test('PR 141 race successor tolerates only a byte-identical tracked record and refuses any raw-byte change',()=>{
+  const blob=gitBlobSha1(workspaceBytes(RACE_HELPER)),record=(head,mode='100644 100644',status='M')=>[[`:${mode} ${head} ${ZERO} ${status}`,RACE_HELPER]];
+  const tolerated=admitSuccessor({tracked:record(blob)});
+  assert.equal(tolerated.error,undefined,tolerated.error?.message);assert.equal(tolerated.value.kind,NATIVE_RACE_SUCCESSOR_KIND);
+  assert.ok(tolerated.calls.includes(`hash-object --no-filters -- ${RACE_HELPER}`),'the raw worktree bytes are hashed without filters');
+  for (const [label,o,pattern] of [
+    ['changed raw worktree bytes',{tracked:record(blob),rawHash:{[RACE_HELPER]:'d'.repeat(40)}},/Tracked checkout content changed: nextjs\/scripts\/db\/native-world-race-ci\.mjs/],
+    ['a record against another HEAD blob',{tracked:record('b'.repeat(40))},/Tracked checkout HEAD identity mismatch/],
+    ['an executable worktree file',{tracked:record(blob,'100644 100755')},/Tracked checkout mode, type, deletion or addition changed/],
+    ['a deleted worktree file',{tracked:record(blob,'100644 000000','D')},/Tracked checkout mode, type, deletion or addition changed/],
+    ['a malformed tracked diff',{tracked:[[`:100644 100644 ${blob} ${ZERO} M`]]},/Malformed tracked checkout diff/]]) {
+    const {error,calls}=admitSuccessor(o);
+    assert.match(error?.message ?? '',pattern,label);assert.match(error.message,/PR 141 native World race successor source refused/,label);
+    assert.ok(calls.every(c=>SUCCESSOR_READ_ONLY.test(c)),label+': read-only git only');
+  }
+});
+for (const [label,o,pattern] of [
+  ['a merge commit over c61',{merge:true},/not an admitted native World race candidate: .*requires one exact parent/],
+  ['c61 detached from exact2bb',{c61Parent:EXPLORE_SUCCESSOR_PARENT},/Exact c61 commit parent\/tree changed/],
+  ['a changed c61 tree',{c61Tree:ZERO},/Exact c61 commit parent\/tree changed/],
+  ['an extra path',{paths:[...RACE_SUCCESSOR_PATHS,'nextjs/app/page.tsx'].sort()},/edit exactly the six CI owners over c61/],
+  ['the former two-file correction',{paths:[RACE_HELPER,RACE_HELPER_TEST]},/edit exactly the six CI owners over c61/],
+  ['an overlay edit',{paths:[...RACE_SUCCESSOR_PATHS,NATIVE_RACE_MAIN_OVERLAY_PATHS[0]].sort()},/edit exactly the six CI owners over c61/],
+  ['staged changes',{staged:'x\0'},/staged changes/],
+  ['untracked files',{untracked:'x\0'},/untracked files/],
+  ['cumulative2bb drift',{cumulative:[...NATIVE_RACE_CHANGED_PATHS,'nextjs/app/page.tsx'].sort()},/Cumulative2bb successor delta must remain exactly the 18/],
+  ['an executable owner',{raw:RACE_SUCCESSOR_PATHS.map((p,i)=>[`:100644 ${i?'100644':'100755'} ${'a'.repeat(40)} ${'b'.repeat(40)} M`,p])},/in-place regular edit of its exact c61 blob/],
+  ['a raw preimage other than the c61 leaf',{tree:{[`${C61}:${RACE_HELPER}`]:'b'.repeat(40)},raw:RACE_SUCCESSOR_PATHS.map(p=>[`:100644 100644 ${gitBlobSha1(c61Bytes(p))} ${gitBlobSha1(workspaceBytes(p))} M`,p])},/preimage or final leaf changed/],
+  ['mutated final helper bytes',{bytes:{[RACE_HELPER]:Buffer.concat([workspaceBytes(RACE_HELPER),Buffer.from('\n')])}},/final helper\/test bytes changed: nextjs\/scripts\/db\/native-world-race-ci\.mjs/],
+  ['an overlay moved at both c61 and head',{tree:{[`${C61}:${NATIVE_RACE_MAIN_OVERLAY_PATHS[0]}`]:'b'.repeat(40),[`${SUCCESSOR_HEAD}:${NATIVE_RACE_MAIN_OVERLAY_PATHS[0]}`]:'b'.repeat(40)}},
+    /Released-main overlay must stay unchanged at its exact main resolution/]]) {
+  test('PR 141 race successor refuses '+label+' through the actual collector proof',()=>{
+    const {error,calls}=admitSuccessor(o);
+    assert.match(error?.message ?? '',pattern);assert.ok(calls.every(c=>SUCCESSOR_READ_ONLY.test(c)),'read-only git only');
+  });
+}
+test('native world race static: the c61 successor proof is centralized in the collector and the helper only delegates',()=>{
+  const helper=readFileSync(fileURLToPath(new URL('./native-world-race-ci.mjs',import.meta.url)),'utf8');
+  const collector=readFileSync(fileURLToPath(new URL('../repair-collector-only.mjs',import.meta.url)),'utf8');
+  const successor=helper.slice(helper.indexOf('export function admitRaceSuccessor('),helper.indexOf('// ---- Dispatch / candidate admission'));
+  assert.ok(helper.includes('successor=verifyNativeRaceSuccessorSource') && successor.includes('const source=verify({headSha:head,intent,exec});'),'the helper delegates to the collector proof');
+  assert.doesNotMatch(successor,/exec\(|'diff'|'ls-tree'|'show'|verifyTrackedCheckout|race-successor-seal/,'no local successor git proof or self-seal');
+  const proof=collector.slice(collector.indexOf('export function verifyNativeRaceSuccessorSource('),collector.indexOf('export function verifyNativeRaceCandidateSource('));
+  for (const contract of ['Exact c61 commit parent/tree changed.','Native World race successor must edit exactly the six CI owners over c61, with no other path.',
+    'Cumulative2bb successor delta must remain exactly the 18 native World race paths.','Successor owner must be an in-place regular edit of its exact c61 blob: ',
+    'Exact c61 owner preimage bytes changed: ','verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});','Released-main overlay must stay unchanged at its exact main resolution: ',
+    'Native World race successor collector seal changed: ','Native World race successor repair seal changed: '])
+    assert.ok(proof.includes(contract),contract);
+  assert.ok(collector.includes('source=verifyNativeRaceCandidateSource({headSha,intent,exec,checkoutOwner:finalGate?NATIVE_RACE_FINAL_GATE_PLAN_OWNER:undefined})'),'Repair eligibility routes c61 children to the successor proof');
 });
 
 function stageFixture({existing=['0001_init.sql','0048_history.sql','20261001000000_registered.sql'],config=false,preexistingCopy=false,preexistingWrapper=false}={}) {
@@ -895,7 +1151,7 @@ test('case receipt without setup evidence or harness receipt fails closed',()=>{
 
 // Static contracts: Repair's native_race report step selects exactly the tests named 'native world race static: ...'.
 test('native world race static: workflow draft keeps manual dispatch, adds only the PR 141 pull_request path, and checks out github.sha or the PR head',()=>{
-  const text=readFileSync(fileURLToPath(new URL('../../../.github/workflows/native-world-race.yml',import.meta.url)),'utf8');
+  const text=c61Bytes('.github/workflows/native-world-race.yml').toString('utf8');
   const count=s=>text.split(s).length-1;
   const on=/^on:\n((?:[ \t]+.*\n|\n)*?)(?=^\S)/m.exec(text)?.[1] ?? '';
   assert.equal(on,'  workflow_dispatch:\n  pull_request:\n    branches:\n      - main\n\n','exact triggers: dispatch with no inputs, pull_request into main');
@@ -928,7 +1184,7 @@ test('native world race static: workflow draft keeps manual dispatch, adds only 
   assert.ok(text.indexOf('"$NWR_HELPER" admit --aggregate')<text.indexOf('actions/download-artifact'),'aggregate admission precedes receipt download');
 });
 test('native world race static: Repair routes the race plan to the focused suites and only these static contracts',()=>{
-  const repair=readFileSync(fileURLToPath(new URL('../../../.github/workflows/repair-scope.yml',import.meta.url)),'utf8');
+  const repair=c61Bytes('.github/workflows/repair-scope.yml').toString('utf8');
   const step=name=>{const start=repair.indexOf(`      - name: ${name}\n`);assert.ok(start>=0,name);return repair.slice(start,repair.indexOf('\n      - ',start+1));};
   assert.ok(step('Run selector regression tests').includes("if [ '${{ steps.plan.outputs.native_race }}' = true ]; then\n"+
     '            node --test scripts/db/native-world-race.test.mjs scripts/db/native-world-race-ci.test.mjs\n'+
@@ -977,4 +1233,8 @@ test('native world race static: admission and the source verifier pin the exact 
     'Released-main overlay exact2bb preimage changed: ','Released-main overlay resolution identity changed: ','Released-main overlay PR143 main commit/tree provenance is not pinned.'])
     assert.ok(verifier.includes(contract),contract);
   assert.doesNotMatch(helper+verifier,/product-left-column/);
+});
+
+test('PR 141 race successor native initial admission refuses even a correctly named generated final-gate plan',()=>{
+ const {error}=admitSuccessor({untracked:'nextjs/repair-plan.json\0'});assert.match(error?.message??'',/untracked files/);
 });

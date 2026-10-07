@@ -165,12 +165,12 @@ export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
   ".github/workflows/repair-scope.yml": "fc85b0b3e89d048a9c6f4acb80f9321726e3bb37659f9e16ddcff85ca7b23bfe",
-  "nextjs/scripts/repair-collector-only.mjs": "df17ab181603b3d621371555887f8564d011868e5f8739f1f6d98e70958f3d32",
+  "nextjs/scripts/repair-collector-only.mjs": "307bde061d3bdffb933bf45f94d4224a74a739b853e2672d32326e5200f972de",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
   "nextjs/scripts/repair-scope.test.mjs": "1a8138746edef8ca46aafd2183e56929ef9e9999dd0fb11c2002efd475440ad6",
   "nextjs/scripts/repair-scope-gate.mjs": "9105fb80c35ee637699e52df99b52c66e4481bb5ea2e7bfc43400898b37c79d3",
-  "nextjs/scripts/verify-repair-workflows.mjs": "351b9a17218fdfded8e052c6431e725cab7cbcb44cb1c143cbf06d4b2535aeac",
-  "nextjs/scripts/repair-collector-only.test.mjs": "ca2a239a4a49c458c71ef7ab5013bfc372402c0fe25f4012f9ea286230a2d98b",
+  "nextjs/scripts/verify-repair-workflows.mjs": "6bb950760463c40a7effddd6712bf4a5aaeb221cf38f66ea8a4ef536a83bc8da",
+  "nextjs/scripts/repair-collector-only.test.mjs": "8418c904a9d06faf1e7583dbccf0fced5bf5d8020829f3c768af3f19f356a9d7",
   "nextjs/scripts/repair-known-regression.mjs": "d7b0dcda90b20ef5174b95a3ac15180391a673c774cc21c930ab5969638ccbb6",
   "nextjs/scripts/repair-known-regression.test.mjs": "3e86911fd98bcbfebf6eaefb6e64a97c483f21b023027799f05b0659fc2aaa7e",
   ".github/workflows/db-rehearsal.yml": "90335c3abfa39275f9f0e8b1e00d7e5012e64d029081ba148faf1bafaad3634f",

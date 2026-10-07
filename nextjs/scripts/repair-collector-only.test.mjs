@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -327,7 +327,7 @@ test('fresh Linux-style checkout of exact f082 CRLF blobs passes immutable byte 
     const git = (args, cwd = root, options = {}) => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', '-c', `core.hooksPath=${empty}`, ...args], { cwd, encoding: 'utf8', ...options });
     git(['init', '--quiet', `--template=${empty}`]);
     for (const [index, path] of fixturePaths.entries()) {
-      const bytes = readFileSync(resolve(process.cwd(), '..', path));
+      const bytes = execFileSync('git', ['-C', fileURLToPath(new URL('../../', import.meta.url)), 'show', expected[index]], { encoding: 'buffer', stdio: 'pipe' });
       assert.equal(gitBlob(bytes), expected[index], path);
       mkdirSync(dirname(resolve(root, path)), { recursive: true });
       writeFileSync(resolve(root, path), bytes);
@@ -850,7 +850,10 @@ test('DB decision after a failed successor admission re-derives exact454 intent 
 // Native World race over exact2bb: one direct child, exactly seven additions, seven in-place CI owner edits and four released-main
 // overlay pairs (18 paths), PR 141 at the event head.
 const race=await import('./repair-collector-only.mjs');
-const raceHead='c'.repeat(40),raceRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),raceBytes=p=>readFileSync(resolve(raceRoot,p));
+const raceHead='c'.repeat(40),raceRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),workspaceBytes=p=>race.NATIVE_RACE_SUCCESSOR_PATHS.includes(p)?readFileSync(resolve(raceRoot,p)):raceC61Bytes(p);
+// The c61 successor edits the helper and its test in place; the exact2bb increment is exercised with their immutable c61 bytes.
+const raceC61Cache=new Map(),raceC61Bytes=p=>{if(!raceC61Cache.has(p))raceC61Cache.set(p,execFileSync('git',['-C',raceRoot,'show',`${race.NATIVE_RACE_SUCCESSOR_PARENT}:${p}`],{stdio:'pipe',maxBuffer:64*1024*1024}));return raceC61Cache.get(p);};
+const raceBytes=p=>Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)&&race.NATIVE_RACE_SUCCESSOR_PATHS.includes(p)?raceC61Bytes(p):workspaceBytes(p);
 const racePublished=[...race.EXPLORE_REPAIR_TREE_SOURCES,...race.SOLUTIONS_CONFIG_PATHS].sort();
 const raceOverlay=p=>race.NATIVE_RACE_MAIN_OVERLAYS[p];
 const raceRecord=p=>Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)?`:000000 100644 ${'0'.repeat(40)} ${'1'.repeat(40)} A`:
@@ -873,6 +876,8 @@ const raceExec=(o={})=>(_command,args,options={})=>{
   if(args[0]==='rev-parse'){if(args[1]==='--show-toplevel')return 'fixture-root';if(args[1]==='HEAD')return o.checkout??raceHead;const trees={[`${P}^{tree}`]:o.parentTree??race.NATIVE_RACE_PARENT_TREE,[`${G}^{tree}`]:race.EXPLORE_SUCCESSOR_PARENT_TREE,[`${S}^{tree}`]:race.SOLUTIONS_PARENT_TREE};assert.ok(Object.hasOwn(trees,args[1]),args[1]);return trees[args[1]];}
   if(args[0]==='rev-list'){const rows={[raceHead]:`${raceHead} ${o.parent??P}${o.merge?' '+'a'.repeat(40):''}`,[P]:`${P} ${o.grandparent??G}`,[G]:`${G} ${R}`,[R]:`${R} ${S}`,[S]:`${S} ${race.NATIVE_WORLD_PARENT}`};return rows[args.at(-1)];}
   if(args[0]==='merge-base'){if(o.ancestor===false)throw Error('not ancestor');return '';}
+  if(args[0]==='diff'&&args[1]==='--cached')return o.staged??'';
+  if(args[0]==='ls-files')return o.untracked??'';
   if(args[0]==='diff'&&args[1]==='--name-only'){const names={[`${o.parent??P}..${raceHead}`]:o.paths??changed,[`${G}..${P}`]:[...race.EXPLORE_SUCCESSOR_PATHS],[`${S}..${P}`]:racePublished,[`${S}..${raceHead}`]:o.cumulative??[...new Set([...racePublished,...changed])].sort()};assert.ok(Object.hasOwn(names,args.at(-1)),args.at(-1));return names[args.at(-1)].join('\0')+'\0';}
   if(args[0]==='diff'&&args[1]==='--raw')return args.at(-2)===P?(o.raw??changed.map(p=>[raceRecord(p),p])).map(([r,p])=>`${r}\0${p}\0`).join(''):'';
   if(args[0]==='ls-tree'){const [ref,,p]=args.slice(2),key=`${ref}:${p}`,blob=o.tree&&Object.hasOwn(o.tree,key)?o.tree[key]:raceTree(ref,p);return blob?`100644 blob ${blob}\t${p}`:'';}
@@ -883,8 +888,9 @@ const raceSource=(o={})=>{const exec=raceExec(o);return race.verifyNativeRaceSou
 test('native world race pins exact2bb, the seven immutable additions, the eight owner preimages and the narrow owner set',()=>{
   assert.deepEqual([race.NATIVE_RACE_PROFILE,race.NATIVE_RACE_PARENT,race.NATIVE_RACE_PARENT_TREE],['native-world-race','2bbcc5b10f400cfc554294e3467491405ab757e7','b0ef9d53eb4f73270a5da12ecbb944c6b9c59230']);
   assert.deepEqual({...race.NATIVE_RACE_PR},{repository:'0ssol1620-byte/tavonel-saas-foundation',number:141,baseRef:'main',headRef:'codex/masterplan-checkpoint-2026-09-30'});
-  // The seven additions are the exact immutable workspace bytes.
+  // The seven additions are the exact immutable c61 bytes; the five the c61 successor does not edit are also the workspace bytes.
   assert.equal(Object.keys(race.NATIVE_RACE_ADDITIONS).length,7);for(const[p,digest]of Object.entries(race.NATIVE_RACE_ADDITIONS))assert.equal(createHash('sha256').update(raceBytes(p)).digest('hex'),digest,p);
+  for(const[p,digest]of Object.entries(race.NATIVE_RACE_ADDITIONS))if(!race.NATIVE_RACE_SUCCESSOR_PATHS.includes(p))assert.equal(createHash('sha256').update(workspaceBytes(p)).digest('hex'),digest,p);
   assert.equal(Object.keys(race.NATIVE_RACE_PARENT_OWNER_BLOBS).length,8);assert.deepEqual([...race.NATIVE_RACE_UNCHANGED_OWNERS],['nextjs/scripts/repair-scope.test.mjs']);
   assert.equal(race.NATIVE_RACE_CHANGED_PATHS.length,18);for(const p of race.NATIVE_RACE_CONFIG_PATHS)assert.ok(Object.hasOwn(race.NATIVE_RACE_PARENT_OWNER_BLOBS,p),p);
   assert.deepEqual([...race.NATIVE_RACE_CHANGED_PATHS],[...Object.keys(race.NATIVE_RACE_ADDITIONS),...race.NATIVE_RACE_CONFIG_PATHS,...race.NATIVE_RACE_MAIN_OVERLAY_PATHS].sort());
@@ -1061,4 +1067,215 @@ test('failed native world race admission keeps71 historical, both failures and e
   // The DB failure path re-derives the exact race head and reads only actual623 evidence (offline here); other heads read nothing.
   const before=structuredClone(receipt),calls=[];assert.deepEqual(race.authenticateFailedNativeResolution(structuredClone(before),{headSha:raceHead,intended:undefined,exec:raceExec(),api:()=>{throw Error('native evidence must not be read');},exploreApi:p=>{calls.push(p);throw Error('offline');}}),before);assert.deepEqual(calls,['actions/runs/37413409860']);
   for(const o of [{parent:'b'.repeat(40)},{merge:true},{paths:['nextjs/lib/unrelated.ts']}]){const reads=[];assert.deepEqual(race.authenticateFailedNativeResolution(structuredClone(before),{headSha:raceHead,intended:undefined,exec:raceExec(o),api:p=>{reads.push(p);throw Error('no read');},exploreApi:p=>{reads.push(p);throw Error('no read');}}),before,JSON.stringify(o));assert.deepEqual(reads,[],JSON.stringify(o));}
+});
+
+// Native World race c61 successor: a mocked git over the actual c61 preimage bytes (git show c61) and the actual workspace successor bytes.
+const raceKnown=await import('./repair-known-regression.mjs');
+const succHead='5'.repeat(40),C61=race.NATIVE_RACE_SUCCESSOR_PARENT,SUCC=[...race.NATIVE_RACE_SUCCESSOR_PATHS];
+const succHelper='nextjs/scripts/db/native-world-race-ci.mjs',succHelperTest='nextjs/scripts/db/native-world-race-ci.test.mjs',succCollectorTest='nextjs/scripts/repair-collector-only.test.mjs',succKnown='nextjs/scripts/repair-known-regression.mjs';
+const succSha=b=>createHash('sha256').update(b).digest('hex');
+const succBytes=(ref,p,o)=>ref===C61?(o.before?.[p]??(SUCC.includes(p)?raceC61Bytes(p):workspaceBytes(p))):(o.bytes?.[p]??workspaceBytes(p));
+const succLeaf=(ref,p,o)=>{
+  const key=`${ref}:${p}`;if(o.tree&&Object.hasOwn(o.tree,key))return o.tree[key];
+  if(Object.hasOwn(race.NATIVE_RACE_MAIN_OVERLAYS,p))return race.NATIVE_RACE_MAIN_OVERLAYS[p].resolution;
+  if(race.NATIVE_RACE_UNCHANGED_OWNERS.includes(p))return race.NATIVE_RACE_PARENT_OWNER_BLOBS[p];
+  return gitBlob(succBytes(ref,p,o));
+};
+const succRecords=o=>SUCC.map(p=>[`:100644 100644 ${succLeaf(C61,p,o)} ${succLeaf(succHead,p,o)} M`,p]);
+const succExec=(o={})=>(_command,args,options={})=>{
+  if(args[0]==='-C'){assert.equal(args[1],'fixture-root');args=args.slice(2);}
+  const R=race.NATIVE_RACE_PARENT,changed=[...race.NATIVE_RACE_CHANGED_PATHS];
+  if(args[0]==='diff'&&args[1]==='--cached')return o.staged??'';
+  if(args[0]==='ls-files')return o.untracked??'';
+  if(args[0]==='rev-parse'){if(args[1]==='--show-toplevel')return 'fixture-root';if(args[1]==='HEAD')return o.checkout??succHead;const trees={[`${C61}^{tree}`]:o.c61Tree??race.NATIVE_RACE_SUCCESSOR_PARENT_TREE,[`${R}^{tree}`]:o.raceTree??race.NATIVE_RACE_PARENT_TREE};assert.ok(Object.hasOwn(trees,args[1]),args[1]);return trees[args[1]];}
+  if(args[0]==='rev-list'){const rows={[succHead]:`${succHead} ${o.parent??C61}${o.merge?' '+'a'.repeat(40):''}`,[C61]:`${C61} ${o.c61Parent??R}`,[R]:`${R} ${race.EXPLORE_SUCCESSOR_PARENT}`};return rows[args.at(-1)];}
+  if(args[0]==='merge-base'){if(o.ancestor===false)throw Error('not ancestor');return '';}
+  if(args[0]==='diff'&&args[1]==='--name-only'){const names={[`${o.parent??C61}..${succHead}`]:o.paths??SUCC,[`${R}..${C61}`]:changed,[`${R}..${succHead}`]:o.cumulative??changed};assert.ok(Object.hasOwn(names,args.at(-1)),args.at(-1));return names[args.at(-1)].join('\0')+'\0';}
+  if(args[0]==='diff'&&args[1]==='--raw')return args.at(-2)===C61?(o.raw??succRecords(o)).map(([r,p])=>`${r}\0${p}\0`).join(''):(o.dirty??'');
+  if(args[0]==='ls-tree'){const [ref,,p]=args.slice(2),blob=succLeaf(ref,p,o);return blob?`100644 blob ${blob}\t${p}`:'';}
+  if(args[0]==='show'){const ref=args[1].slice(0,40),p=args[1].slice(41);assert.ok([C61,succHead].includes(ref),ref);const bytes=succBytes(ref,p,o);return options.encoding==='buffer'?bytes:bytes.toString('utf8');}
+  throw Error('Unexpected native world race successor git command: '+args.join(' '));
+};
+const succSource=(o={})=>{const exec=succExec(o);return race.verifyNativeRaceCandidateSource({headSha:succHead,intent:race.classifyNativeRaceIntent({headSha:succHead,exec}),exec});};
+test('native world race successor pins exact c61, the six owners, historical c61 seals and the sealed final helper/test bytes',()=>{
+  assert.deepEqual([C61,race.NATIVE_RACE_SUCCESSOR_PARENT_TREE,race.NATIVE_RACE_SUCCESSOR_KIND],['c61fe1a5ea7487a6819ee6f0a812a6adbd343767','4318378cbba223182cb3b64677d01e706460bc3b','exact-c61-successor']);
+  assert.deepEqual(SUCC,[succHelper,succHelperTest,'nextjs/scripts/repair-collector-only.mjs',succCollectorTest,succKnown,'nextjs/scripts/verify-repair-workflows.mjs']);
+  for(const p of SUCC)assert.ok(race.NATIVE_RACE_CHANGED_PATHS.includes(p),p);
+  assert.deepEqual(SUCC.filter(p=>Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)),[succHelper,succHelperTest]);assert.deepEqual(SUCC.filter(p=>race.NATIVE_RACE_CONFIG_PATHS.includes(p)).length,4);
+  assert.equal(race.NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS.length,12);for(const p of race.NATIVE_RACE_MAIN_OVERLAY_PATHS)assert.ok(race.NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS.includes(p),p);
+  // The historical2bb pins stay: the c61 helper and test carry exactly their2bb addition digests.
+  assert.equal(race.NATIVE_RACE_ADDITIONS[succHelper],'cc9eb2f07871835d6e83131f1b0437a46fc209e6285d0bf239c4bdca699d6268');assert.equal(race.NATIVE_RACE_ADDITIONS[succHelperTest],'112ec96d8460aa50d1ddd1e5e576bf2422882cd63ecdc004363565af13ac8f50');
+  for(const p of [succHelper,succHelperTest])assert.equal(succSha(raceC61Bytes(p)),race.NATIVE_RACE_ADDITIONS[p],p);
+  // The historical c61 seals bind the actual c61 collector-side owner bytes.
+  assert.deepEqual(Object.keys(race.NATIVE_RACE_SUCCESSOR_PARENT_SEALS).sort(),SUCC.filter(p=>!Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)));
+  for(const[p,d]of Object.entries(race.NATIVE_RACE_SUCCESSOR_PARENT_SEALS))assert.equal(raceKnown.repairSealHash(p,raceC61Bytes(p)),d,p);
+  // The final helper/test pins are exactly the workspace bytes (written by the seal pass), and differ from the c61 bytes.
+  assert.deepEqual(Object.keys(race.NATIVE_RACE_SUCCESSOR_FINAL_SHA256).sort(),[succHelper,succHelperTest]);
+  for(const p of [succHelper,succHelperTest]){assert.equal(race.NATIVE_RACE_SUCCESSOR_FINAL_SHA256[p],succSha(workspaceBytes(p)),p);assert.notEqual(race.NATIVE_RACE_SUCCESSOR_FINAL_SHA256[p],race.NATIVE_RACE_ADDITIONS[p],p);}
+  assert.deepEqual({...race.NATIVE_RACE_SUCCESSOR_PARENT_FAILURE},{sourceHead:C61,runId:37646273750,workflow:'.github/workflows/native-world-race.yml',sourceAdmission:'byte-qualified source admission passed',refusal:'candidate checkout status refused',hostedCases:'not executed',status:'historical c61 failure only; not test evidence and not executed at the successor head'});
+});
+test('native world race successor classification fails closed for every race or owner touch on c61 only',()=>{
+  const classify=o=>race.classifyNativeRaceIntent({headSha:succHead,exec:succExec(o)});
+  const accepted=classify();assert.equal(accepted.classification,'intended');assert.equal(accepted.profile,'native-world-race');assert.equal(accepted.parent,C61);assert.deepEqual(accepted.paths,SUCC);
+  for(const paths of [['nextjs/scripts/repair-collector-only.mjs'],['nextjs/scripts/repair-scope.test.mjs'],['.github/workflows/db-rehearsal.yml'],[race.NATIVE_RACE_MAIN_OVERLAY_PATHS[0]]]){const intent=classify({paths});assert.equal(intent.classification,'intended',paths.join());assert.equal(intent.parent,C61,paths.join());}
+  assert.equal(classify({paths:['nextjs/lib/unrelated.ts']}).classification,'normal');
+  for(const o of [{merge:true},{checkout:'f'.repeat(40)}]){const intent=classify(o);assert.equal(intent.classification,'unavailable',JSON.stringify(o));assert.equal(intent.intended,true);}
+  // Each verifier refuses the other's lineage; the router sends c61 children only to the successor proof.
+  assert.match(race.verifyNativeRaceSource({headSha:succHead,intent:accepted,exec:()=>{throw Error('no git read expected');}}).reason,/exact direct child of2bb/);
+  const raceIntent=race.classifyNativeRaceIntent({headSha:raceHead,exec:raceExec()});
+  assert.match(race.verifyNativeRaceSuccessorSource({headSha:raceHead,intent:raceIntent,exec:()=>{throw Error('no git read expected');}}).reason,/exact direct child of c61/);
+  const routed=race.verifyNativeRaceCandidateSource({headSha:raceHead,intent:raceIntent,exec:raceExec()});assert.equal(routed.eligible,true,routed.reason);assert.equal(routed.kind,undefined);assert.equal(routed.parent,race.NATIVE_RACE_PARENT);
+});
+test('native world race successor binds exact c61 lineage, the six-path and cumulative 18-path scope, preimages, overlays and seals',()=>{
+  const accepted=succSource();assert.equal(accepted.eligible,true,accepted.reason);
+  assert.deepEqual([accepted.kind,accepted.parent,accepted.parentTree,accepted.raceParent,accepted.raceParentTree],['exact-c61-successor',C61,race.NATIVE_RACE_SUCCESSOR_PARENT_TREE,race.NATIVE_RACE_PARENT,race.NATIVE_RACE_PARENT_TREE]);
+  assert.deepEqual(accepted.exactChangedPaths,[...race.NATIVE_RACE_CHANGED_PATHS]);assert.deepEqual(accepted.successorChangedPaths,SUCC);assert.deepEqual(accepted.unchangedOwners,['nextjs/scripts/repair-scope.test.mjs']);
+  assert.deepEqual(accepted.preimages,Object.fromEntries(SUCC.map(p=>[p,gitBlob(raceC61Bytes(p))])));assert.deepEqual(accepted.finalBlobs,Object.fromEntries(SUCC.map(p=>[p,gitBlob(workspaceBytes(p))])));
+  assert.deepEqual(accepted.mainOverlays,race.nativeRaceMainOverlayEvidence());assert.deepEqual(accepted.parentFailure,{...race.NATIVE_RACE_SUCCESSOR_PARENT_FAILURE});
+  const records=succRecords({}),swap=(p,make)=>records.map(([r,q])=>[q===p?make(gitBlob(raceC61Bytes(p)),gitBlob(workspaceBytes(p))):r,q]);
+  const owner='nextjs/scripts/repair-collector-only.mjs',runner='nextjs/scripts/db/native-world-race.mjs',overlay=race.NATIVE_RACE_MAIN_OVERLAY_PATHS[0],LF=Buffer.from('\n'),plus=b=>Buffer.concat([b,LF]);
+  const SIX=/must edit exactly the six CI owners over c61, with no other path/,EDIT=/in-place regular edit of its exact c61 blob/,OVERLAY=/Released-main overlay must stay unchanged at its exact main resolution/;
+  const refused=[
+    ['merge',{merge:true},/exact direct child of c61/],
+    ['another checkout',{checkout:'f'.repeat(40)},/exact direct child of c61/],
+    ['c61 detached from2bb',{c61Parent:'b'.repeat(40)},/Exact c61 commit parent\/tree changed/],
+    ['changed c61 tree',{c61Tree:'b'.repeat(40)},/Exact c61 commit parent\/tree changed/],
+    ['changed2bb tree',{raceTree:'b'.repeat(40)},/Exact2bb commit parent\/tree changed/],
+    ['ancestry',{ancestor:false},/not ancestor/],
+    ['extra path',{paths:[...SUCC,'nextjs/lib/unrelated.ts'].sort()},SIX],
+    ['missing helper',{paths:SUCC.filter(p=>p!==succHelper)},SIX],
+    ['missing known-regression seal owner',{paths:SUCC.filter(p=>p!==succKnown)},SIX],
+    ['an unedited CI owner',{paths:[...SUCC,'nextjs/scripts/repair-scope-gate.mjs'].sort()},SIX],
+    ['the historical repair-scope.test.mjs',{paths:[...SUCC,'nextjs/scripts/repair-scope.test.mjs'].sort()},SIX],
+    ['an overlay edit',{paths:[...SUCC,overlay].sort()},SIX],
+    ['an unedited race addition',{paths:[...SUCC,runner].sort()},SIX],
+    ['cumulative2bb drift',{cumulative:[...race.NATIVE_RACE_CHANGED_PATHS,'docs/other.md'].sort()},/Cumulative2bb successor delta must remain exactly the 18/],
+    ['cumulative2bb missing a race path',{cumulative:race.NATIVE_RACE_CHANGED_PATHS.filter(p=>p!==runner)},/Cumulative2bb successor delta must remain exactly the 18/],
+    ['incomplete raw delta',{raw:records.slice(1)},/malformed or incomplete/],
+    ['repeated raw path',{raw:[records[0],...records.slice(0,-1)]},EDIT],
+    ['executable owner',{raw:swap(owner,(a,b)=>`:100644 100755 ${a} ${b} M`)},EDIT],
+    ['symlinked helper',{raw:swap(succHelper,(a,b)=>`:100644 120000 ${a} ${b} T`)},EDIT],
+    ['deleted test',{raw:swap(succHelperTest,a=>`:100644 000000 ${a} ${'0'.repeat(40)} D`)},EDIT],
+    ['re-added owner',{raw:swap(owner,(a,b)=>`:000000 100644 ${'0'.repeat(40)} ${b} A`)},EDIT],
+    ['unchanged blob reported as an edit',{raw:swap(owner,a=>`:100644 100644 ${a} ${a} M`)},EDIT],
+    ['staged checkout',{staged:'x\0'},/staged changes/],
+    ['untracked checkout',{untracked:'x\0'},/untracked files/],
+    ['dirty tracked checkout',{dirty:`:100644 100644 ${'1'.repeat(40)} ${'2'.repeat(40)} M\0${owner}\0`},/Tracked checkout/],
+    ['raw preimage other than the c61 leaf',{tree:{[`${C61}:${owner}`]:'b'.repeat(40)},raw:records},/preimage or final leaf changed/],
+    ['c61 collector preimage bytes',{before:{[owner]:plus(raceC61Bytes(owner))},tree:{[`${C61}:${owner}`]:race.NATIVE_RACE_SUCCESSOR_PREIMAGES[owner]}},/Exact c61 owner preimage bytes changed: nextjs\/scripts\/repair-collector-only\.mjs/],
+    ['c61 known-regression preimage bytes',{before:{[succKnown]:plus(raceC61Bytes(succKnown))},tree:{[`${C61}:${succKnown}`]:race.NATIVE_RACE_SUCCESSOR_PREIMAGES[succKnown]}},/Exact c61 owner preimage bytes changed: nextjs\/scripts\/repair-known-regression\.mjs/],
+    ['c61 helper preimage bytes',{before:{[succHelper]:plus(raceC61Bytes(succHelper))},tree:{[`${C61}:${succHelper}`]:race.NATIVE_RACE_SUCCESSOR_PREIMAGES[succHelper]}},/Exact c61 owner preimage bytes changed: nextjs\/scripts\/db\/native-world-race-ci\.mjs/],
+    ['final helper bytes',{bytes:{[succHelper]:plus(workspaceBytes(succHelper))}},/final helper\/test bytes changed: nextjs\/scripts\/db\/native-world-race-ci\.mjs/],
+    ['final helper test bytes',{bytes:{[succHelperTest]:plus(workspaceBytes(succHelperTest))}},/final helper\/test bytes changed: nextjs\/scripts\/db\/native-world-race-ci\.test\.mjs/],
+    ['final collector test bytes',{bytes:{[succCollectorTest]:plus(workspaceBytes(succCollectorTest))}},/successor collector seal changed: nextjs\/scripts\/repair-collector-only\.test\.mjs/],
+    ['final known-regression bytes',{bytes:{[succKnown]:plus(workspaceBytes(succKnown))}},/successor repair seal changed: nextjs\/scripts\/repair-known-regression\.mjs/],
+    ['an unedited addition leaf',{tree:{[`${succHead}:${runner}`]:'b'.repeat(40)}},/Unchanged native World race path modified/],
+    ['unedited addition bytes under its c61 leaf',{bytes:{[runner]:plus(workspaceBytes(runner))},tree:{[`${succHead}:${runner}`]:gitBlob(workspaceBytes(runner))}},/Race file byte identity changed/],
+    ['an unedited CI owner leaf',{tree:{[`${succHead}:nextjs/scripts/repair-scope-gate.mjs`]:'b'.repeat(40)}},/Unchanged native World race path modified/],
+    ['the historical repair-scope.test.mjs leaf',{tree:{[`${succHead}:nextjs/scripts/repair-scope.test.mjs`]:'b'.repeat(40)}},/Unchanged CI owner modified/],
+    ['an overlay moved at both c61 and head',{tree:{[`${C61}:${overlay}`]:'b'.repeat(40),[`${succHead}:${overlay}`]:'b'.repeat(40)}},OVERLAY],
+    ['mutated overlay bytes',{bytes:{[overlay]:plus(workspaceBytes(overlay))}},OVERLAY],
+  ];
+  for(const[label,o,reason]of refused){const value=succSource(o);assert.equal(value.eligible,false,label);assert.match(value.reason,reason,label);}
+});
+const succProof=(source={})=>({...raceProof(),source:{eligible:true,profile:'native-world-race',kind:'exact-c61-successor',headSha:raceHead,parent:C61,parentTree:race.NATIVE_RACE_SUCCESSOR_PARENT_TREE,raceParent:race.NATIVE_RACE_PARENT,mainOverlays:race.nativeRaceMainOverlayEvidence(),...source}});
+test('native world race successor plan keeps the exact2bb selection and debt, adding only c61 provenance and history',()=>{
+  const base=race.nativeRacePlan(raceNormal(),raceProof()),plan=race.nativeRacePlan(raceNormal(),succProof());
+  assert.equal(base.nativeWorldRaceSuccessor,undefined);
+  for(const k of ['groups','unitFiles','browserFiles','unknownPaths','deferredGroups','nativeWorldRaceContractSuites','nativeWorldRaceWorkflow','runFullHermeticVitest','runScriptContracts','runDatabaseRehearsal','runWorkflowStaticGate','databaseDisposition','databaseRehearsalStatus','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','parentSkippedJobs','knownRegressionResolution','historicalStaticFailure'])assert.deepEqual(plan[k],base[k],k);
+  assert.deepEqual(plan.nativeWorldRaceSuccessor,{kind:'exact-c61-successor',parent:C61,parentTree:race.NATIVE_RACE_SUCCESSOR_PARENT_TREE,raceParent:race.NATIVE_RACE_PARENT,changedPaths:SUCC,historicalParentFailure:{...race.NATIVE_RACE_SUCCESSOR_PARENT_FAILURE},status:'exact c61 successor; c61 qualifies nothing and exact2bb Repair evidence stays inherited parent evidence only'});
+  assert.match(plan.qualificationReasons.at(-1),/four PR143 released-main overlays are inherited source evidence only.*The exact c61 successor edits only six CI owners over c61; c61 run 37646273750 is historical failure only, and no hosted case ran at c61 or this head\.$/);
+  const written=JSON.parse(JSON.stringify(plan));assert.deepEqual(race.nativeRaceLineageFailures(written,succProof()),[]);
+  assert.deepEqual(race.nativeRaceLineageFailures({...written,nativeWorldRaceSuccessor:undefined},succProof()),['Native World race plan changed: nativeWorldRaceSuccessor']);
+  assert.deepEqual(race.nativeRaceLineageFailures(JSON.parse(JSON.stringify(base)),succProof()),['Native World race plan changed: nativeWorldRacePresentation','Native World race plan changed: nativeWorldRaceSuccessor']);
+  for(const source of [{parentTree:'b'.repeat(40)},{raceParent:race.EXPLORE_SUCCESSOR_PARENT},{parent:race.NATIVE_RACE_PARENT},{kind:'other'},{profile:'native-world'}])assert.throws(()=>race.nativeRacePlan(raceNormal(),succProof(source)),/Native World race plan requires/,JSON.stringify(source));
+  assert.throws(()=>race.nativeRacePlan(raceNormal(),{...raceProof(),source:{...raceProof().source,parent:C61}}),/Native World race plan requires/);
+});
+test('failed native world race successor admission keeps race history, adds c61 history and every debt',()=>{
+  const intent={classification:'intended',intended:true,headSha:succHead,parent:C61,profile:'native-world-race'},reason='Native World race successor repair seal changed: nextjs/scripts/repair-known-regression.mjs';
+  const {plan,receipt}=race.failedNativeRaceReceipt({headSha:succHead,reason,intent,api:()=>{throw Error('offline');}});
+  assert.deepEqual(plan.currentAdmission,{profile:'native-world-race',headSha:succHead,parent:C61,status:'failed',reason});assert.deepEqual(plan.historicalRaceParentFailure,{...race.NATIVE_RACE_SUCCESSOR_PARENT_FAILURE});
+  assert.deepEqual(plan.historicalStaticFailure,{...race.EXPLORE_SUCCESSOR_FAILED_PARENT});assert.ok(!plan.pendingQualificationDebt.includes(race.REGRESSION_DEBT));
+  assert.equal(receipt.gate,'failed');assert.deepEqual(receipt.inheritedChecks,{});assert.equal(receipt.fullQualification,'pending');
+  for(const debt of ['database-contract','native-world-race','native-world-race-eligibility',...race.EXPLORE_REPAIR_PENDING_DEBT])assert.ok(receipt.pendingDebt.includes(debt),debt);
+  // An exact2bb child carries no c61 history.
+  assert.equal(race.failedCollectorPlan({headSha:raceHead,reason,intent:{...intent,headSha:raceHead,parent:race.NATIVE_RACE_PARENT}}).historicalRaceParentFailure,undefined);
+  // The DB failure path re-derives the exact c61 child from the head and reads only actual623 evidence (offline here); other parents read nothing.
+  const before=structuredClone(receipt),calls=[];assert.deepEqual(race.authenticateFailedNativeResolution(structuredClone(before),{headSha:succHead,intended:undefined,exec:succExec(),api:()=>{throw Error('native evidence must not be read');},exploreApi:p=>{calls.push(p);throw Error('offline');}}),before);assert.deepEqual(calls,['actions/runs/37413409860']);
+  const reads=[];assert.deepEqual(race.authenticateFailedNativeRaceResolution(structuredClone(before),{intent:{...intent,parent:'b'.repeat(40)},api:p=>{reads.push(p);throw Error('no read');}}),before);assert.deepEqual(reads,[]);
+});
+
+test('native world race successor real Git c61 child uses default classifier, shared eligibility, native admission and final-gate revalidation',async()=>{
+  const root=mkdtempSync(resolve(tmpdir(),'c61-real-git-')),support=mkdtempSync(resolve(tmpdir(),'c61-final-support-')),previous=process.cwd();
+  const git=(args,options={})=>execFileSync('git',['-C',root,...args],{encoding:'utf8',stdio:'pipe',...options});
+  const sourceGit=args=>execFileSync('git',['-C',raceRoot,...args],{encoding:'utf8',stdio:'pipe'}).trim();
+  const author={...process.env,GIT_AUTHOR_NAME:'c61 fixture',GIT_AUTHOR_EMAIL:'fixture@example.invalid',GIT_COMMITTER_NAME:'c61 fixture',GIT_COMMITTER_EMAIL:'fixture@example.invalid'};
+  try{
+    git(['init','--quiet']);git(['config','core.autocrlf','false']);git(['config','core.filemode','true']);
+    writeFileSync(resolve(root,'.git/objects/info/alternates'),sourceGit(['rev-parse','--path-format=absolute','--git-path','objects'])+'\n');
+    const selected=[...new Set([...race.NATIVE_RACE_CHANGED_PATHS,...race.CONFIG_PATHS,...raceKnown.REPAIR_SEAL_PATHS,'nextjs/scripts/run-repair-check.mjs','nextjs/scripts/repair-test-report.mjs','nextjs/scripts/repair-scope.mjs'])];
+    const blobs=Object.fromEntries(SUCC.map(p=>[p,git(['hash-object','-w','--no-filters','--stdin'],{input:workspaceBytes(p)}).trim()]));
+    const commit=(paths=SUCC,parent=C61)=>{
+      git(['read-tree',C61]);
+      for(const p of paths)git(['update-index','--add','--cacheinfo',`100644,${blobs[p]},${p}`]);
+      const tree=git(['write-tree']).trim(),head=git(['commit-tree',tree,'-p',parent],{input:'Exact c61 successor test fixture\n',env:author}).trim();
+      git(['update-ref','HEAD',head]);
+      const tracked=git(['ls-files','-z']).split('\0').filter(Boolean);
+      git(['update-index','--skip-worktree','-z','--stdin'],{input:tracked.join('\0')+'\0'});
+      git(['update-index','--no-skip-worktree','--',...selected]);
+      for(const p of selected){mkdirSync(dirname(resolve(root,p)),{recursive:true});writeFileSync(resolve(root,p),git(['show',`${head}:${p}`],{encoding:'buffer'}));}
+      return head;
+    };
+    const head=commit();process.chdir(root);
+    const intent=race.classifyNativeRaceIntent({headSha:head});assert.equal(intent.classification,'intended');assert.equal(intent.parent,C61);
+    const source=race.verifyNativeRaceCandidateSource({headSha:head});assert.equal(source.eligible,true,source.reason);
+    const helper=await import('./db/native-world-race-ci.mjs');assert.equal(helper.admitRaceSource(head,{exec:execFileSync}).kind,race.NATIVE_RACE_SUCCESSOR_KIND);
+    const historical=solutionsApiFixture(),parent=raceParent(),records=Object.values(parent),api=p=>records.find(r=>p===`actions/${p.includes('/jobs/')?'jobs':'runs'}/${r.id}`)??historical(p);
+    const env={GITHUB_REPOSITORY:'0ssol1620-byte/tavonel-saas-foundation',GITHUB_EVENT_NAME:'pull_request'},repo={full_name:env.GITHUB_REPOSITORY,id:7};
+    const event={number:141,repository:repo,pull_request:{number:141,base:{ref:'main',repo},head:{ref:'codex/masterplan-checkpoint-2026-09-30',sha:head,repo}}};
+    const eligibility=()=>race.verifyNativeRaceEligibility({headSha:head,api,env,event});
+    const proof=eligibility();assert.equal(proof.eligible,true,proof.reason);
+    const plan=race.nativeRacePlan({...raceNormal(),headSha:head},proof);assert.equal(plan.runFullHermeticVitest,false);assert.equal(plan.runDatabaseRehearsal,false);
+    // These are the independent calls used by the unchanged final scope gate, without injecting intent or source proof.
+    assert.deepEqual(race.nativeRaceLineageFailures(JSON.parse(JSON.stringify(plan)),eligibility()),[]);
+    assert.equal(race.nativeRaceDecisionHolds({headSha:head,nativeRace:'true',decision:race.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false',nativeRace:'true'})}),true);
+    writeFileSync(resolve(root,succHelper),Buffer.concat([workspaceBytes(succHelper),Buffer.from('\n')]));
+    assert.equal(eligibility().eligible,false);assert.ok(race.nativeRaceLineageFailures(plan,eligibility()).length>0);assert.throws(()=>helper.admitRaceSource(head,{exec:execFileSync}));
+    writeFileSync(resolve(root,succHelper),workspaceBytes(succHelper));
+    const staged=git(['hash-object','-w','--stdin'],{input:'staged mutation\n'}).trim();git(['update-index','--cacheinfo',`100644,${staged},${succHelper}`]);
+    assert.match(race.verifyNativeRaceCandidateSource({headSha:head}).reason,/staged changes/);git(['update-index','--cacheinfo',`100644,${blobs[succHelper]},${succHelper}`]);
+    writeFileSync(resolve(root,'untracked.txt'),'x');assert.match(race.verifyNativeRaceCandidateSource({headSha:head}).reason,/untracked files/);rmSync(resolve(root,'untracked.txt'));
+    // Production workflow: run the actual collector plan CLI, keep its disk output through checks, then run the unchanged final gate.
+    // Only historical gh reads are recorded API fixtures; every classifier, Git proof, selector and final-gate call is the default.
+    const cache=Object.fromEntries([...solutionsEndpoints,...records.map(r=>`actions/${r.run_id?'jobs':'runs'}/${r.id}`)].map(p=>{
+      const v=api(p);return[p,Buffer.isBuffer(v)?{buffer:v.toString('base64')}:{json:v}];
+    }));
+    writeFileSync(resolve(support,'api.json'),JSON.stringify(cache));
+    const preload=resolve(support,'recorded-api.mjs');writeFileSync(preload,`import cp from 'node:child_process';import {syncBuiltinESMExports} from 'node:module';import {readFileSync} from 'node:fs';
+const data=JSON.parse(readFileSync(new URL('./api.json',import.meta.url))),actual=cp.execFileSync;
+cp.execFileSync=(file,args,options)=>{if(file!=='gh')return actual(file,args,options);const p=args[1].replace('repos/0ssol1620-byte/tavonel-saas-foundation/',''),v=data[p];if(!v)throw Error('Unexpected recorded gh endpoint '+p);return v.buffer?Buffer.from(v.buffer,'base64'):JSON.stringify(v.json);};syncBuiltinESMExports();`);
+    const base=race.NATIVE_RACE_MAIN_OVERLAY_PROVENANCE.mainCommit,workflowEvent={...event,pull_request:{...event.pull_request,base:{...event.pull_request.base,sha:base}}};
+    const eventPath=resolve(support,'event.json');writeFileSync(eventPath,JSON.stringify(workflowEvent));
+    const workflowEnv={...process.env,...env,GITHUB_EVENT_PATH:eventPath,PR_BASE_SHA:base,PR_NUMBER:'141',REPAIR_ANCHOR_SHA:race.FULL_ANCHOR,REPAIR_HEAD_SHA:head,HEAD_SHA:head,GITHUB_OUTPUT:resolve(support,'outputs.txt')};
+    for(const k of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT'])workflowEnv[k]='success';
+    const cli=(name,args=[])=>spawnSync(process.execPath,['--import',pathToFileURL(preload).href,resolve(root,'nextjs/scripts/'+name),...args],{cwd:resolve(root,'nextjs'),env:{...workflowEnv,RUN_REPAIR_SCOPE:name==='repair-collector-only.mjs'?'1':'0'},encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});
+    const planned=cli('repair-collector-only.mjs',['plan']);assert.equal(planned.status,0,planned.stderr);const planPath=resolve(root,'nextjs/repair-plan.json'),plannedBytes=readFileSync(planPath),diskPlan=JSON.parse(plannedBytes);
+    assert.equal(diskPlan.headSha,head);assert.equal(diskPlan.nativeWorldRaceSuccessor.parent,C61);assert.equal(diskPlan.runFullHermeticVitest,false);assert.equal(diskPlan.runDatabaseRehearsal,false);
+    assert.match(readFileSync(workflowEnv.GITHUB_OUTPUT,'utf8'),/native_race=true/);
+    // Checks may read the plan, but initial/native source admission must still refuse it, including a caller-forged owner token.
+    assert.match(race.verifyNativeRaceCandidateSource({headSha:head,checkoutOwner:Symbol('native race final-gate generated plan')}).reason,/untracked files/);
+    assert.throws(()=>helper.admitRaceSource(head,{exec:execFileSync}),/untracked files/);
+    const gated=cli('repair-scope-gate.mjs');assert.equal(gated.status,0,gated.stderr);
+    const receiptPath=resolve(root,'nextjs/repair-receipt.json'),receipt=JSON.parse(readFileSync(receiptPath));assert.equal(receipt.gate,'passed-scoped-only');assert.equal(receipt.fullQualification,'pending');assert.match(receipt.databaseObservation,/no DB, Auth or transport ran/);rmSync(receiptPath);
+    const refusal=(pattern)=>{const result=cli('repair-scope-gate.mjs');assert.equal(result.status,1,result.stdout);assert.match(result.stderr,pattern);};
+    // A routing mutation cannot skip the protected proof: the import preflight qualifies the full disk bytes before runGate reads flags.
+    writeFileSync(planPath,JSON.stringify({...diskPlan,nativeWorldRacePresentation:undefined,nativeWorldRaceSuccessor:undefined,groups:[]},null,2)+'\n');refusal(/independently recomputed current-head plan/);writeFileSync(planPath,plannedBytes);
+    writeFileSync(planPath,Buffer.concat([plannedBytes,Buffer.from(' ')]));refusal(/independently recomputed current-head plan/);writeFileSync(planPath,plannedBytes);
+    const extra=resolve(root,'nextjs/repair-plan-extra.json');writeFileSync(extra,'{}');refusal(/untracked files/);rmSync(extra);
+    const linkTarget=resolve(support,'plan-target.json');writeFileSync(linkTarget,plannedBytes);rmSync(planPath);if(process.platform==='win32'){const junction=resolve(support,'empty-plan-link');mkdirSync(junction);symlinkSync(junction,planPath,'junction');}else symlinkSync(linkTarget,planPath,'file');refusal(/regular non-symlink owner output/);rmSync(planPath);writeFileSync(planPath,plannedBytes);
+    writeFileSync(planPath,JSON.stringify({...diskPlan,headSha:'f'.repeat(40)},null,2)+'\n');refusal(/independently recomputed current-head plan/);rmSync(planPath);
+    assert.equal(race.verifyNativeRaceCandidateSource({headSha:head}).eligible,true);
+    const partial=commit([succHelper]);assert.equal(race.classifyNativeRaceIntent({headSha:partial}).intended,true);assert.match(race.verifyNativeRaceCandidateSource({headSha:partial}).reason,/six CI owners/);assert.throws(()=>helper.admitRaceSource(partial,{exec:execFileSync}));
+    const wrong=commit(SUCC,race.NATIVE_RACE_PARENT);assert.equal(race.classifyNativeRaceIntent({headSha:wrong}).intended,true);assert.equal(race.verifyNativeRaceCandidateSource({headSha:wrong}).eligible,false);
+  }finally{process.chdir(previous);rmSync(root,{recursive:true,force:true});rmSync(support,{recursive:true,force:true});}
 });

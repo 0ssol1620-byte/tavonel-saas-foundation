@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { constants, closeSync, fstatSync, lstatSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as repair from './repair-known-regression.mjs';
@@ -46,10 +47,10 @@ export const CONFIG_PATHS = Object.freeze([
 export const CONFIG_SEAL = Object.freeze({
   ".github/workflows/db-rehearsal.yml": "90335c3abfa39275f9f0e8b1e00d7e5012e64d029081ba148faf1bafaad3634f",
   ".github/workflows/repair-scope.yml": "fc85b0b3e89d048a9c6f4acb80f9321726e3bb37659f9e16ddcff85ca7b23bfe",
-  "nextjs/scripts/repair-collector-only.mjs": "df17ab181603b3d621371555887f8564d011868e5f8739f1f6d98e70958f3d32",
-  "nextjs/scripts/repair-collector-only.test.mjs": "ca2a239a4a49c458c71ef7ab5013bfc372402c0fe25f4012f9ea286230a2d98b",
+  "nextjs/scripts/repair-collector-only.mjs": "307bde061d3bdffb933bf45f94d4224a74a739b853e2672d32326e5200f972de",
+  "nextjs/scripts/repair-collector-only.test.mjs": "8418c904a9d06faf1e7583dbccf0fced5bf5d8020829f3c768af3f19f356a9d7",
   "nextjs/scripts/repair-scope-gate.mjs": "9105fb80c35ee637699e52df99b52c66e4481bb5ea2e7bfc43400898b37c79d3",
-  "nextjs/scripts/verify-repair-workflows.mjs": "351b9a17218fdfded8e052c6431e725cab7cbcb44cb1c143cbf06d4b2535aeac"
+  "nextjs/scripts/verify-repair-workflows.mjs": "6bb950760463c40a7effddd6712bf4a5aaeb221cf38f66ea8a4ef536a83bc8da"
 });
 // collector-seal:end
 export function sealedBytes(path, bytes) {
@@ -228,12 +229,14 @@ export function failedCollectorPlan({ headSha, reason, intent }) {
   };
   // A failed new admission cannot revoke the parent's actual historical repair.
   // Evidence remains unaccepted for this head until its independent proof passes.
-  if (intent?.profile === NATIVE_RACE_PROFILE && intent?.parent === NATIVE_RACE_PARENT) return { ...plan,
+  // The exact c61 successor keeps the same race history and adds only c61's own historical failed race run.
+  if (intent?.profile === NATIVE_RACE_PROFILE && [NATIVE_RACE_PARENT, NATIVE_RACE_SUCCESSOR_PARENT].includes(intent?.parent)) return { ...plan,
     knownRegressionObservations: [KNOWN_REGRESSION],
     historicalRegressionResolution: { sourceHead: repair.INTAKE_PARENT, status: 'historical resolution retained; evidence unaccepted for current head' },
     historicalBrowserFailure: { ...EXPLORE_REPAIR_FAILED_PARENT },
     historicalStaticFailure: { ...EXPLORE_SUCCESSOR_FAILED_PARENT },
-    currentAdmission: { profile: NATIVE_RACE_PROFILE, headSha, parent: NATIVE_RACE_PARENT, status: 'failed', reason },
+    ...(intent.parent === NATIVE_RACE_SUCCESSOR_PARENT ? { historicalRaceParentFailure: { ...NATIVE_RACE_SUCCESSOR_PARENT_FAILURE } } : {}),
+    currentAdmission: { profile: NATIVE_RACE_PROFILE, headSha, parent: intent.parent, status: 'failed', reason },
     pendingQualificationDebt: [...plan.pendingQualificationDebt, 'native-world-race-eligibility'],
   };
   if (intent?.parent === EXPLORE_SUCCESSOR_PARENT) return { ...plan,
@@ -532,9 +535,9 @@ export function authenticateFailedNativeResolution(receipt, { headSha, intended,
     // A failed Explore admission exits before writing classifier outputs, so its intent is re-derived from the supplied head only;
     // receipt fields and the intended output are never trusted. Anything short of an exact single-parent child of424 stays conservative.
     // The exact454 successor is re-derived the same way first; a child of424 or any other parent is never classified as it.
-    // An exact2bb race head is re-derived before both, likewise from the head only.
+    // An exact2bb race head, or an exact c61 successor head, is re-derived before both, likewise from the head only.
     const raceIntent=classifyNativeRaceIntent({headSha,exec});
-    if(raceIntent.classification==='intended'&&raceIntent.intended===true&&raceIntent.profile===NATIVE_RACE_PROFILE&&raceIntent.headSha===headSha&&raceIntent.parent===NATIVE_RACE_PARENT)return authenticateFailedNativeRaceResolution(receipt,{intent:raceIntent,api:exploreApi});
+    if(raceIntent.classification==='intended'&&raceIntent.intended===true&&raceIntent.profile===NATIVE_RACE_PROFILE&&raceIntent.headSha===headSha&&[NATIVE_RACE_PARENT,NATIVE_RACE_SUCCESSOR_PARENT].includes(raceIntent.parent))return authenticateFailedNativeRaceResolution(receipt,{intent:raceIntent,api:exploreApi});
     const successorIntent=classifyExploreSuccessorIntent({headSha,exec});
     if(successorIntent.classification==='intended'&&successorIntent.intended===true&&successorIntent.profile===EXPLORE_SUCCESSOR_PROFILE&&successorIntent.headSha===headSha&&successorIntent.parent===EXPLORE_SUCCESSOR_PARENT)return authenticateFailedExploreSuccessorResolution(receipt,{intent:successorIntent,api:exploreApi});
     const exploreIntent=classifyExploreRepairIntent({headSha,exec});
@@ -1314,11 +1317,50 @@ export const NATIVE_RACE_DB_DISPOSITION='native-world-race-dedicated-workflow';
 // Root-authenticated exact2bb runs. Repair succeeded; the DB run classified only, and its DB, Auth and transport jobs were skipped.
 export const NATIVE_RACE_PARENT_EVIDENCE=Object.freeze({repairRunId:37469420680,repairJobId:112288690913,dbRunId:37469420827,collectorJobId:112288690590,databaseJobId:112288823687,authJobId:112288692877,transportJobId:112288824132});
 export const NATIVE_RACE_PARENT_REPAIR_STEPS=Object.freeze(['Plan changes since the authenticated full-pass anchor','Verify workflow and selector contracts','Run selector regression tests','Run browser report and screenshot regressions','Scan repository secrets','Run TypeScript and lint checks','Run Foundation focused unit checks','Install Chromium for detail-integrity coverage','Build the isolated live-commerce test bundle after scoped checks','Run selected browser checks against one production server','Require exactly 104 named Solutions captures','Fail closed on missing or failed scoped checks','Publish exact-head scope receipt']);
+/*
+  Native World race successor: one single-parent direct child of the published c61 race candidate (itself the exact single-parent child
+  of2bb, bound by its exact tree). It edits exactly the six CI owners below in place from their c61 blobs; the cumulative2bb delta stays
+  exactly the 18 race paths, and every other race path (including all four released-main overlays) stays at its c61 leaf. The exact2bb
+  pins above stay historical and unchanged. This proof is centralized here; the hosted helper imports it and nothing imports the helper.
+*/
+export const NATIVE_RACE_SUCCESSOR_PARENT='c61fe1a5ea7487a6819ee6f0a812a6adbd343767';
+export const NATIVE_RACE_SUCCESSOR_PARENT_TREE='4318378cbba223182cb3b64677d01e706460bc3b';
+export const NATIVE_RACE_SUCCESSOR_KIND='exact-c61-successor';
+export const NATIVE_RACE_SUCCESSOR_HELPER='nextjs/scripts/db/native-world-race-ci.mjs',NATIVE_RACE_SUCCESSOR_HELPER_TEST='nextjs/scripts/db/native-world-race-ci.test.mjs';
+export const NATIVE_RACE_SUCCESSOR_PATHS=Object.freeze([NATIVE_RACE_SUCCESSOR_HELPER,NATIVE_RACE_SUCCESSOR_HELPER_TEST,'nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-collector-only.test.mjs','nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/verify-repair-workflows.mjs'].sort());
+export const NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS=Object.freeze(NATIVE_RACE_CHANGED_PATHS.filter(p=>!NATIVE_RACE_SUCCESSOR_PATHS.includes(p)));
+// Historical c61 canonical seals of the four collector-side owners, checked against their actual c61 preimage bytes (the c61 helper and
+// test are checked against their historical2bb addition digests). They are never this head's CONFIG_SEAL/REPAIR_SEAL values.
+export const NATIVE_RACE_SUCCESSOR_PREIMAGES=Object.freeze({
+  "nextjs/scripts/db/native-world-race-ci.mjs": "8cad178e9226624a6eaa824e3c7ac476526aaffb",
+  "nextjs/scripts/db/native-world-race-ci.test.mjs": "cce1a4fdd8dec6a7ad3c0fd6ec63f0e81215a22f",
+  "nextjs/scripts/repair-collector-only.mjs": "6071a09cd51a27f843fd4fdab555cfa351534551",
+  "nextjs/scripts/repair-collector-only.test.mjs": "d42db5e7f9086fa60fd4b83ee8131edf66188763",
+  "nextjs/scripts/repair-known-regression.mjs": "e8705073dba753ca78f52346734ec0a7cadc3aca",
+  "nextjs/scripts/verify-repair-workflows.mjs": "32b55772c142f015da8eb9eec0f2442f648fc1c6"
+});
+export const NATIVE_RACE_SUCCESSOR_PARENT_SEALS=Object.freeze({
+ 'nextjs/scripts/repair-collector-only.mjs':'df17ab181603b3d621371555887f8564d011868e5f8739f1f6d98e70958f3d32',
+ 'nextjs/scripts/repair-collector-only.test.mjs':'ca2a239a4a49c458c71ef7ab5013bfc372402c0fe25f4012f9ea286230a2d98b',
+ 'nextjs/scripts/repair-known-regression.mjs':'d7b0dcda90b20ef5174b95a3ac15180391a673c774cc21c930ab5969638ccbb6',
+ 'nextjs/scripts/verify-repair-workflows.mjs':'351b9a17218fdfded8e052c6431e725cab7cbcb44cb1c143cbf06d4b2535aeac'
+});
+// Final successor helper/test bytes (SHA-256), written by the seal pass; the four collector-side owners are bound by this head's
+// canonical CONFIG_SEAL/REPAIR_SEAL. A non-digest value refuses every successor head before any git read.
+export const NATIVE_RACE_SUCCESSOR_FINAL_SHA256=Object.freeze({
+  "nextjs/scripts/db/native-world-race-ci.mjs": "d7d4181c03b61026c1bf756b789d475f2a0ab06fa2bec1e5a88ecdc935ecfa0d",
+  "nextjs/scripts/db/native-world-race-ci.test.mjs": "00245bff264045fd81d53f5f6c32f213e7336fce05e16b901574c793b882ef2c"
+});
+// c61's own hosted race run is history only: it passed source admission, was refused at candidate status and executed no hosted case.
+export const NATIVE_RACE_SUCCESSOR_PARENT_FAILURE=Object.freeze({sourceHead:NATIVE_RACE_SUCCESSOR_PARENT,runId:37646273750,workflow:'.github/workflows/native-world-race.yml',
+ sourceAdmission:'byte-qualified source admission passed',refusal:'candidate checkout status refused',hostedCases:'not executed',
+ status:'historical c61 failure only; not test evidence and not executed at the successor head'});
 export function classifyNativeRaceIntent({headSha,exec=execFileSync}){
  // Any race addition on any parent, or any authorized CI owner or released-main overlay path directly on2bb, is intended and fails closed
- // (a partial overlay never escapes to the public-page or normal classifiers); other heads stay with the existing classifiers.
+ // (a partial overlay never escapes to the public-page or normal classifiers); so is any race path touched directly on c61. Other heads
+ // stay with the existing classifiers.
  let parent,intended=false;
- try{if(!/^[a-f0-9]{40}$/.test(headSha??''))throw Error('Requested native World race head is missing.');const git=a=>exec('git',a,{encoding:'utf8'}).trim(),root=git(['rev-parse','--show-toplevel']),row=git(['-C',root,'rev-list','--parents','-n','1',headSha]).split(/\s+/);if(row[0]!==headSha||row.length<2)throw Error('Missing native World race parent.');parent=row[1];const paths=git(['-C',root,'diff','--name-only','--no-relative','--no-renames','-z',`${parent}..${headSha}`]).split('\0').filter(Boolean).sort();intended=paths.some(p=>Object.hasOwn(NATIVE_RACE_ADDITIONS,p))||(parent===NATIVE_RACE_PARENT&&paths.some(p=>Object.hasOwn(NATIVE_RACE_PARENT_OWNER_BLOBS,p)||Object.hasOwn(NATIVE_RACE_MAIN_OVERLAYS,p)));if(intended&&row.length!==2)throw Error('Native World race candidate requires one exact parent.');if(intended&&git(['-C',root,'rev-parse','HEAD'])!==headSha)throw Error('Native World race checkout does not match requested head.');return intended?{classification:'intended',intended:true,headSha,parent,repoRoot:root,paths,profile:NATIVE_RACE_PROFILE}:{classification:'normal',intended:false,reason:'Outside the exact native World race increment.'};}catch(error){return intended||parent===NATIVE_RACE_PARENT?{classification:'unavailable',intended:true,headSha,parent,profile:NATIVE_RACE_PROFILE,reason:error.message}:{classification:'normal',intended:false,reason:'Existing classifiers must resolve unreadable or outside native World race metadata.'};}
+ try{if(!/^[a-f0-9]{40}$/.test(headSha??''))throw Error('Requested native World race head is missing.');const git=a=>exec('git',a,{encoding:'utf8'}).trim(),root=git(['rev-parse','--show-toplevel']),row=git(['-C',root,'rev-list','--parents','-n','1',headSha]).split(/\s+/);if(row[0]!==headSha||row.length<2)throw Error('Missing native World race parent.');parent=row[1];const paths=git(['-C',root,'diff','--name-only','--no-relative','--no-renames','-z',`${parent}..${headSha}`]).split('\0').filter(Boolean).sort();intended=paths.some(p=>Object.hasOwn(NATIVE_RACE_ADDITIONS,p))||(parent===NATIVE_RACE_PARENT&&paths.some(p=>Object.hasOwn(NATIVE_RACE_PARENT_OWNER_BLOBS,p)||Object.hasOwn(NATIVE_RACE_MAIN_OVERLAYS,p)));intended||=parent===NATIVE_RACE_SUCCESSOR_PARENT&&paths.some(p=>NATIVE_RACE_CHANGED_PATHS.includes(p)||Object.hasOwn(NATIVE_RACE_PARENT_OWNER_BLOBS,p));if(intended&&row.length!==2)throw Error('Native World race candidate requires one exact parent.');if(intended&&git(['-C',root,'rev-parse','HEAD'])!==headSha)throw Error('Native World race checkout does not match requested head.');return intended?{classification:'intended',intended:true,headSha,parent,repoRoot:root,paths,profile:NATIVE_RACE_PROFILE}:{classification:'normal',intended:false,reason:'Outside the exact native World race increment.'};}catch(error){return intended||parent===NATIVE_RACE_PARENT||parent===NATIVE_RACE_SUCCESSOR_PARENT?{classification:'unavailable',intended:true,headSha,parent,profile:NATIVE_RACE_PROFILE,reason:error.message}:{classification:'normal',intended:false,reason:'Existing classifiers must resolve unreadable or outside native World race metadata.'};}
 }
 // Runner-written event payload only: same-repository PR 141 from the checkpoint branch into main, at the exact requested head.
 export function verifyNativeRaceEvent({headSha,env=process.env,event}={}){
@@ -1384,6 +1426,66 @@ export function verifyNativeRaceSource({headSha,intent=classifyNativeRaceIntent(
   return{eligible:true,profile:NATIVE_RACE_PROFILE,headSha,parent:NATIVE_RACE_PARENT,parentTree:NATIVE_RACE_PARENT_TREE,grandparent:EXPLORE_SUCCESSOR_PARENT,grandparentTree:EXPLORE_SUCCESSOR_PARENT_TREE,fullAnchor:FULL_ANCHOR,exactChangedPaths:expected,additions:{...NATIVE_RACE_ADDITIONS},ownerPreimages:{...NATIVE_RACE_PARENT_OWNER_BLOBS},changedOwners:[...NATIVE_RACE_CONFIG_PATHS],unchangedOwners:[...NATIVE_RACE_UNCHANGED_OWNERS],mainOverlays:nativeRaceMainOverlayEvidence(),workflow:NATIVE_RACE_WORKFLOW.path};
  }catch(error){return{eligible:false,reason:error.message};}
 }
+// A private capability used only by eligibility in the unchanged final-gate owner. Direct source and native admission remain strict.
+const NATIVE_RACE_FINAL_GATE_PLAN_OWNER=Symbol('native race final-gate generated plan');
+// The exact c61 successor, re-derived from actual commits, trees and bytes only, never from receipt fields or workflow outputs.
+export function verifyNativeRaceSuccessorSource({headSha,intent=classifyNativeRaceIntent({headSha}),exec=execFileSync,checkoutOwner}){
+ try{
+  if(intent?.classification!=='intended'||!intent.intended||intent.profile!==NATIVE_RACE_PROFILE||intent.headSha!==headSha||intent.parent!==NATIVE_RACE_SUCCESSOR_PARENT)throw Error('Native World race successor requires an exact direct child of c61: '+(intent?.reason??'unclassified'));
+  for(const[p,d]of Object.entries(NATIVE_RACE_SUCCESSOR_FINAL_SHA256))if(!/^[a-f0-9]{64}$/.test(d))throw Error('Native World race successor final pins are pending the seal pass: '+p);
+  const P=NATIVE_RACE_SUCCESSOR_PARENT,R=NATIVE_RACE_PARENT,C=[...NATIVE_RACE_SUCCESSOR_PATHS],RACE=[...NATIVE_RACE_CHANGED_PATHS];
+  const git=(a,encoding='utf8')=>exec('git',['-C',intent.repoRoot,...a],{encoding}),text=a=>git(a).trim(),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const sha=b=>createHash('sha256').update(b).digest('hex'),show=(ref,p)=>git(['show',`${ref}:${p}`],'buffer');
+  const names=range=>text(['diff','--name-only','--no-relative','--no-renames','-z',range]).split('\0').filter(Boolean).sort();
+  if(text(['rev-parse','HEAD'])!==headSha)throw Error('Native World race successor checkout does not match requested head.');
+  // head -> exact c61 (exact tree) -> exact2bb (exact tree) -> exact454; the c61 tree binds every other c61 leaf.
+  if(text(['rev-list','--parents','-n','1',headSha])!==`${headSha} ${P}`)throw Error('Native World race successor must be the single-parent direct child of exact c61.');
+  if(text(['rev-list','--parents','-n','1',P])!==`${P} ${R}`||text(['rev-parse',`${P}^{tree}`])!==NATIVE_RACE_SUCCESSOR_PARENT_TREE)throw Error('Exact c61 commit parent/tree changed.');
+  if(text(['rev-list','--parents','-n','1',R])!==`${R} ${EXPLORE_SUCCESSOR_PARENT}`||text(['rev-parse',`${R}^{tree}`])!==NATIVE_RACE_PARENT_TREE)throw Error('Exact2bb commit parent/tree changed.');
+  for(const[a,b]of[[FULL_ANCHOR,R],[R,P],[P,headSha]])text(['merge-base','--is-ancestor',a,b]);
+  if(!same(intent.paths,C)||!same(names(`${P}..${headSha}`),C))throw Error('Native World race successor must edit exactly the six CI owners over c61, with no other path.');
+  if(!same(names(`${R}..${P}`),RACE)||!same(names(`${R}..${headSha}`),RACE))throw Error('Cumulative2bb successor delta must remain exactly the 18 native World race paths.');
+  // Status, modes and preimage of every changed leaf: each owner is an in-place regular edit of its exact c61 blob.
+  const raw=text(['diff','--raw','--no-abbrev','--no-renames','--no-relative','-z',P,headSha]).split('\0').filter(Boolean),pre={},post={};
+  if(raw.length!==C.length*2)throw Error('Native World race successor raw delta is malformed or incomplete.');
+  for(let i=0;i<raw.length;i+=2){
+   const[record,p]=[raw[i],raw[i+1]],m=/^:100644 100644 ([a-f0-9]{40}) ([a-f0-9]{40}) M$/.exec(record);
+   if(!m||!C.includes(p)||Object.hasOwn(pre,p)||m[1]===m[2])throw Error('Successor owner must be an in-place regular edit of its exact c61 blob: '+p);
+   pre[p]=m[1];post[p]=m[2];
+  }
+  if(!same(Object.keys(pre).sort(),C))throw Error('Native World race successor raw delta paths differ from the exact six owners.');
+  if(text(['diff','--cached','--name-only','--no-relative','-z',headSha]))throw Error('Native World race successor has staged changes.');
+  const untracked=text(['ls-files','--others','--exclude-standard','-z']).split('\0').filter(Boolean);
+  if(untracked.length&&!(checkoutOwner===NATIVE_RACE_FINAL_GATE_PLAN_OWNER&&same(untracked,['nextjs/repair-plan.json'])))throw Error('Native World race successor has untracked files.');
+  verifyTrackedCheckout({repoRoot:intent.repoRoot,headSha,exec});
+  const entry=(ref,p)=>{const m=/^100644 blob ([a-f0-9]{40})\t(.+)$/.exec(text(['ls-tree','--full-tree',ref,'--',p]));if(!m||m[2]!==p)throw Error('Unsafe native World race successor leaf: '+p);return m[1];};
+  // Preimages: the c61 leaf is the raw preimage and its actual bytes carry the historical2bb addition digest or the historical c61 seal.
+  for(const p of C){
+   if(entry(P,p)!==NATIVE_RACE_SUCCESSOR_PREIMAGES[p]||entry(P,p)!==pre[p]||entry(headSha,p)!==post[p])throw Error('Native World race successor preimage or final leaf changed: '+p);
+   const before=show(P,p),held=Object.hasOwn(NATIVE_RACE_ADDITIONS,p)?sha(before)===NATIVE_RACE_ADDITIONS[p]:Object.hasOwn(NATIVE_RACE_SUCCESSOR_PARENT_SEALS,p)&&repair.repairSealHash(p,before)===NATIVE_RACE_SUCCESSOR_PARENT_SEALS[p];
+   if(!held)throw Error('Exact c61 owner preimage bytes changed: '+p);
+  }
+  for(const[p,d]of Object.entries(NATIVE_RACE_SUCCESSOR_FINAL_SHA256))if(sha(show(headSha,p))!==d)throw Error('Native World race successor final helper/test bytes changed: '+p);
+  // Every other race path stays at its c61 leaf: the five other additions at their2bb digests, the three unedited owners, and all four
+  // released-main overlays unchanged at their exact main resolution.
+  for(const p of NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS)if(entry(headSha,p)!==entry(P,p))throw Error('Unchanged native World race path modified: '+p);
+  for(const[p,d]of Object.entries(NATIVE_RACE_ADDITIONS))if(!C.includes(p)&&sha(show(headSha,p))!==d)throw Error('Race file byte identity changed: '+p);
+  for(const[p,o]of Object.entries(NATIVE_RACE_MAIN_OVERLAYS))if(entry(P,p)!==o.resolution||entry(headSha,p)!==o.resolution||sha(show(headSha,p))!==o.sha256)throw Error('Released-main overlay must stay unchanged at its exact main resolution: '+p);
+  for(const p of NATIVE_RACE_UNCHANGED_OWNERS)if(entry(headSha,p)!==NATIVE_RACE_PARENT_OWNER_BLOBS[p])throw Error('Unchanged CI owner modified: '+p);
+  for(const[p,d]of Object.entries(CONFIG_SEAL))if(sealHash(p,show(headSha,p))!==d)throw Error('Native World race successor collector seal changed: '+p);
+  for(const[p,d]of Object.entries(repair.REPAIR_SEAL))if(repair.repairSealHash(p,show(headSha,p))!==d)throw Error('Native World race successor repair seal changed: '+p);
+  return{eligible:true,profile:NATIVE_RACE_PROFILE,kind:NATIVE_RACE_SUCCESSOR_KIND,headSha,parent:P,parentTree:NATIVE_RACE_SUCCESSOR_PARENT_TREE,raceParent:R,raceParentTree:NATIVE_RACE_PARENT_TREE,
+   grandparent:EXPLORE_SUCCESSOR_PARENT,fullAnchor:FULL_ANCHOR,exactChangedPaths:RACE,successorChangedPaths:C,preimages:pre,finalBlobs:post,finalSha256:{...NATIVE_RACE_SUCCESSOR_FINAL_SHA256},
+   unchangedPaths:[...NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS],unchangedOwners:[...NATIVE_RACE_UNCHANGED_OWNERS],mainOverlays:nativeRaceMainOverlayEvidence(),parentFailure:{...NATIVE_RACE_SUCCESSOR_PARENT_FAILURE},workflow:NATIVE_RACE_WORKFLOW.path};
+ }catch(error){return{eligible:false,reason:error.message};}
+}
+// Routes a classified race head to its one exact verifier: c61 children to the successor proof, everything else to the exact2bb proof.
+export function verifyNativeRaceCandidateSource({headSha,intent=classifyNativeRaceIntent({headSha}),exec=execFileSync,checkoutOwner}){
+ return intent?.parent===NATIVE_RACE_SUCCESSOR_PARENT?verifyNativeRaceSuccessorSource({headSha,intent,exec,checkoutOwner}):verifyNativeRaceSource({headSha,intent,exec});
+}
+function exactNativeRaceSource(s){
+ return s?.profile===NATIVE_RACE_PROFILE&&(s.kind===NATIVE_RACE_SUCCESSOR_KIND?s.parent===NATIVE_RACE_SUCCESSOR_PARENT&&s.parentTree===NATIVE_RACE_SUCCESSOR_PARENT_TREE&&s.raceParent===NATIVE_RACE_PARENT:s.kind===undefined&&s.parent===NATIVE_RACE_PARENT);
+}
 export function verifyNativeRaceParentEvidence({repairRun,repairJob,dbRun,collectorJob,databaseJob,authJob,transportJob}){
  try{
   const e=NATIVE_RACE_PARENT_EVIDENCE,run=(r,id,path)=>{if(r?.id!==id||r.path!==path||r.head_sha!==NATIVE_RACE_PARENT||r.event!=='pull_request'||r.status!=='completed'||r.conclusion!=='success')throw Error('Exact2bb run identity/result changed.');};
@@ -1404,10 +1506,43 @@ export function verifyNativeRaceParentEvidence({repairRun,repairJob,dbRun,collec
  }catch(error){return{eligible:false,reason:error.message};}
 }
 const readNativeRaceParentEvidence=api=>{const e=NATIVE_RACE_PARENT_EVIDENCE;return verifyNativeRaceParentEvidence({repairRun:api(`actions/runs/${e.repairRunId}`),repairJob:api(`actions/jobs/${e.repairJobId}`),dbRun:api(`actions/runs/${e.dbRunId}`),collectorJob:api(`actions/jobs/${e.collectorJobId}`),databaseJob:api(`actions/jobs/${e.databaseJobId}`),authJob:api(`actions/jobs/${e.authJobId}`),transportJob:api(`actions/jobs/${e.transportJobId}`)});};
+// Only the unchanged final-gate CLI, at the repository's nextjs cwd, may qualify its generated plan. An API caller, collector planning,
+// DB classifier or native helper never receives this capability, even when a correctly named plan is already present.
+function nativeRaceFinalGateOwnsPlan(intent){
+ return intent?.parent===NATIVE_RACE_SUCCESSOR_PARENT&&process.argv[1]&&resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')&&resolve(process.cwd())===resolve(intent.repoRoot,'nextjs');
+}
+function verifyNativeRaceGeneratedPlan({headSha,intent,proof,env,event,exec}){
+ const root=resolve(intent.repoRoot),cwd=resolve(root,'nextjs'),output=resolve(cwd,'repair-plan.json');
+ const payload=event!==undefined?event:JSON.parse(readFileSync(env.GITHUB_EVENT_PATH,'utf8')),base=payload?.pull_request?.base?.sha;
+ if(!/^[a-f0-9]{40}$/.test(base??'')||env.PR_BASE_SHA!==base||env.PR_NUMBER!=='141'||env.REPAIR_ANCHOR_SHA!==FULL_ANCHOR||env.REPAIR_HEAD_SHA!==headSha||env.HEAD_SHA!==headSha)throw Error('Native World race final plan inputs differ from the current PR event/head.');
+ if(realpathSync(cwd)!==cwd||lstatSync(cwd).isSymbolicLink())throw Error('Native World race final plan directory is not its regular owner path.');
+ const before=lstatSync(output);
+ if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o111)!==0||before.size>1024*1024||realpathSync(output)!==output)throw Error('Native World race final plan must be a regular non-symlink owner output.');
+ let fd,bytes;
+ try{
+  fd=openSync(output,constants.O_RDONLY|(constants.O_NOFOLLOW??0));const opened=fstatSync(fd);
+  if(!opened.isFile()||opened.dev!==before.dev||opened.ino!==before.ino||opened.size!==before.size)throw Error('Native World race final plan changed while opening.');
+  bytes=readFileSync(fd);const after=lstatSync(output),held=fstatSync(fd);
+  if(!after.isFile()||after.isSymbolicLink()||after.dev!==opened.dev||after.ino!==opened.ino||after.size!==bytes.length||held.size!==bytes.length||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs)throw Error('Native World race final plan changed while reading.');
+ }finally{if(fd!==undefined)closeSync(fd);}
+ // Re-run the already sealed, unchanged selector from its exact source owner in a disposable output directory. Git still sees the
+ // original current-head checkout; no plan field is used as an input, and the actual workflow output is never overwritten by this check.
+ const scratch=mkdtempSync(resolve(tmpdir(),'native-race-final-plan-'));
+ try{
+  const gitDir=exec('git',['-C',root,'rev-parse','--absolute-git-dir'],{encoding:'utf8'}).trim();
+  const childEnv={...env,GIT_DIR:gitDir,GIT_WORK_TREE:root,RUN_REPAIR_SCOPE:'1',GITHUB_OUTPUT:''};delete childEnv.GIT_INDEX_FILE;
+  const selected=spawnSync(process.execPath,[resolve(root,'nextjs/scripts/repair-scope.mjs')],{cwd:scratch,env:childEnv,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
+  if(selected.status!==0)throw Error('Native World race final plan selector recomputation failed.');
+  const normal=JSON.parse(readFileSync(resolve(scratch,'repair-plan.json'),'utf8')),expected=Buffer.from(JSON.stringify(nativeRacePlan(normal,proof),null,2)+'\n');
+  if(!bytes.equals(expected))throw Error('Native World race final plan differs from the independently recomputed current-head plan.');
+ }finally{rmSync(scratch,{recursive:true,force:true});}
+}
 export function verifyNativeRaceEligibility({headSha,exec=execFileSync,api=solutionsApi,env=process.env,event,intent=classifyNativeRaceIntent({headSha,exec})}){
- const source=verifyNativeRaceSource({headSha,intent,exec});if(!source.eligible)return source;
+ const finalGate=nativeRaceFinalGateOwnsPlan(intent),source=verifyNativeRaceCandidateSource({headSha,intent,exec,checkoutOwner:finalGate?NATIVE_RACE_FINAL_GATE_PLAN_OWNER:undefined});if(!source.eligible)return source;
  const admitted=verifyNativeRaceEvent({headSha,env,event});if(!admitted.eligible)return admitted;
- try{const evidence=readSolutionsParentEvidence(api);if(!evidence.eligible)return evidence;const parentEvidence=readNativeRaceParentEvidence(api);return parentEvidence.eligible?{eligible:true,source,event:admitted,evidence,parentEvidence}:parentEvidence;}catch(error){return{eligible:false,reason:'Exact2bb or623 inherited evidence unavailable: '+error.message};}
+ try{const evidence=readSolutionsParentEvidence(api);if(!evidence.eligible)return evidence;const parentEvidence=readNativeRaceParentEvidence(api);if(!parentEvidence.eligible)return parentEvidence;
+  const proof={eligible:true,source,event:admitted,evidence,parentEvidence};if(finalGate)verifyNativeRaceGeneratedPlan({headSha,intent,proof,env,event,exec});return proof;
+ }catch(error){return{eligible:false,reason:'Exact2bb/623 evidence or final plan qualification unavailable: '+error.message};}
 }
 // Re-derived from the head, never from outputs: a recognized race head needs the exact race disposition, and only it may carry one.
 export function nativeRaceDecisionHolds({headSha,nativeRace,decision,exec=execFileSync}){
@@ -1415,20 +1550,23 @@ export function nativeRaceDecisionHolds({headSha,nativeRace,decision,exec=execFi
  return recognized?raced&&nativeRace==='true':!raced&&nativeRace!=='true';
 }
 export function authenticateFailedNativeRaceResolution(receipt,{intent,api=solutionsApi}){
- if(intent?.profile!==NATIVE_RACE_PROFILE||intent?.parent!==NATIVE_RACE_PARENT)return receipt;
+ if(intent?.profile!==NATIVE_RACE_PROFILE||![NATIVE_RACE_PARENT,NATIVE_RACE_SUCCESSOR_PARENT].includes(intent?.parent))return receipt;
  let evidence;try{evidence=readSolutionsParentEvidence(api);}catch{return receipt;}if(!evidence.eligible)return receipt;
  const current=d=>d!==REGRESSION_DEBT;
- return{...receipt,knownRegressionResolution:{...evidence.knownRegressionResolution,status:'historical qualified895 resolution retained via actual623 receipt; current native World race admission failed'},knownRegressionObservations:evidence.knownRegressionObservations,historicalUiFailure:evidence.historicalUiFailure,historicalBrowserFailure:{...EXPLORE_REPAIR_FAILED_PARENT},historicalStaticFailure:{...EXPLORE_SUCCESSOR_FAILED_PARENT},pendingQualificationDebt:(receipt.pendingQualificationDebt??[]).filter(current),pendingDebt:[...new Set((receipt.pendingDebt??[]).filter(current))].sort(),inheritedChecks:{},gate:'failed',fullQualification:'pending'};
+ return{...receipt,knownRegressionResolution:{...evidence.knownRegressionResolution,status:'historical qualified895 resolution retained via actual623 receipt; current native World race admission failed'},knownRegressionObservations:evidence.knownRegressionObservations,historicalUiFailure:evidence.historicalUiFailure,historicalBrowserFailure:{...EXPLORE_REPAIR_FAILED_PARENT},historicalStaticFailure:{...EXPLORE_SUCCESSOR_FAILED_PARENT},...(intent.parent===NATIVE_RACE_SUCCESSOR_PARENT?{historicalRaceParentFailure:{...NATIVE_RACE_SUCCESSOR_PARENT_FAILURE}}:{}),pendingQualificationDebt:(receipt.pendingQualificationDebt??[]).filter(current),pendingDebt:[...new Set((receipt.pendingDebt??[]).filter(current))].sort(),inheritedChecks:{},gate:'failed',fullQualification:'pending'};
 }
 export function failedNativeRaceReceipt({headSha,reason,intent,api=solutionsApi}){
  const plan=failedCollectorPlan({headSha,reason,intent}),receipt=failedCollectorReceipt(plan);receipt.pendingDebt=[...new Set([...receipt.pendingDebt,'database-contract','native-world-race',...EXPLORE_REPAIR_PENDING_DEBT])].sort();
  return{plan,receipt:authenticateFailedNativeRaceResolution(receipt,{intent,api})};
 }
 export function nativeRacePlan(normal,proof){
- if(!proof?.eligible||proof.source?.profile!==NATIVE_RACE_PROFILE||proof.source.parent!==NATIVE_RACE_PARENT||proof.source.headSha!==normal.headSha||proof.event?.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Native World race plan requires exact2bb source and the PR 141 event head.');
+ if(!proof?.eligible||!exactNativeRaceSource(proof.source)||proof.source.headSha!==normal.headSha||proof.event?.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Native World race plan requires exact2bb source and the PR 141 event head.');
  if(proof.evidence?.knownRegressionResolution?.headSha!==repair.INTAKE_PARENT||JSON.stringify(proof.evidence.knownRegressionObservations)!==JSON.stringify([KNOWN_REGRESSION])||!proof.parentEvidence?.eligible)throw Error('Native World race plan requires the authenticated623 historical71 resolution and exact2bb parent evidence.');
- const historical=(evidence,status)=>({...evidence,status});
- return{...normal,nativeWorldRacePresentation:{source:proof.source,event:proof.event,eligible:true},exploreRepairPresentation:undefined,solutionsPagesPresentation:undefined,publicPagesPresentation:undefined,nativeDbRehearsal:undefined,collectorOnly:undefined,collectorOnlyFailure:undefined,knownRegressionRepair:undefined,intakePresentation:undefined,
+ const historical=(evidence,status)=>({...evidence,status}),successor=proof.source.kind===NATIVE_RACE_SUCCESSOR_KIND;
+ // The c61 successor changes only the selection's provenance: the same groups, suites, deferrals, inheritance and debt, plus c61 history.
+ const successorReason=successor?' The exact c61 successor edits only six CI owners over c61; c61 run 37646273750 is historical failure only, and no hosted case ran at c61 or this head.':'';
+ return{...normal,nativeWorldRacePresentation:{source:proof.source,event:proof.event,eligible:true},
+  nativeWorldRaceSuccessor:successor?{kind:NATIVE_RACE_SUCCESSOR_KIND,parent:NATIVE_RACE_SUCCESSOR_PARENT,parentTree:NATIVE_RACE_SUCCESSOR_PARENT_TREE,raceParent:NATIVE_RACE_PARENT,changedPaths:[...NATIVE_RACE_SUCCESSOR_PATHS],historicalParentFailure:{...NATIVE_RACE_SUCCESSOR_PARENT_FAILURE},status:'exact c61 successor; c61 qualifies nothing and exact2bb Repair evidence stays inherited parent evidence only'}:undefined,exploreRepairPresentation:undefined,solutionsPagesPresentation:undefined,publicPagesPresentation:undefined,nativeDbRehearsal:undefined,collectorOnly:undefined,collectorOnlyFailure:undefined,knownRegressionRepair:undefined,intakePresentation:undefined,
   groups:['selector-config','workflow-static','native-world-race-contracts','native-world-race-hosted'],unitFiles:[],browserFiles:[],unknownPaths:[],catalogueFiles:[],nativeWorldRaceContractSuites:[...NATIVE_RACE_CONTRACT_SUITES],
   nativeWorldRaceWorkflow:{path:NATIVE_RACE_WORKFLOW.path,cases:[...NATIVE_RACE_WORKFLOW.cases],status:'the dedicated workflow alone executes the seven hosted cases; not executed or inherited by Repair or DB rehearsal; resolves no debt'},
   runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:false,runDetailIntegrity:false,runWorkflowStaticGate:true,requireWorkspaceIntakeCapture:false,requirePublicUiScreenshots:false,requireHomePricingCaptures:false,requirePublicProductCaptures:false,requireSolutionsCaptures:false,
@@ -1436,9 +1574,9 @@ export function nativeRacePlan(normal,proof){
   pendingQualificationDebt:[...EXPLORE_REPAIR_PENDING_DEBT],pendingDebt:[...EXPLORE_REPAIR_PENDING_DEBT],pendingFullDebt:[...proof.evidence.pendingFullDebt],fullQualification:'pending',
   inheritedChecks:{parentRepair:proof.parentEvidence.repair,parentDatabaseClassification:proof.parentEvidence.databaseClassification,parentScopedUi:historical(proof.evidence.parentUi,'historical852 UI evidence; not executed at the race candidate head'),storageTransport:historical(proof.evidence.storageTransport,'historical f082 transport; skipped at exact2bb and not executed at the race candidate head'),nativeSql:historical(proof.evidence.nativeSql,'historical actual623 unit-SQL evidence only; not executed at exact2bb or the race candidate head; not current-head DB inheritance')},
   parentSkippedJobs:proof.parentEvidence.skippedAtParent,knownRegressionResolution:proof.evidence.knownRegressionResolution,knownRegressionObservations:proof.evidence.knownRegressionObservations,historicalUiFailure:proof.evidence.historicalUiFailure,historicalBrowserFailure:{...EXPLORE_REPAIR_FAILED_PARENT},historicalStaticFailure:{...EXPLORE_SUCCESSOR_FAILED_PARENT},
-  qualificationReasons:['Only the two focused native-world-race Node contract suites, targeted race collector tests and the static workflow gate run here; the seven hosted cases run only in the dedicated workflow; exact2bb Repair evidence is inherited parent evidence; the four PR143 released-main overlays are inherited source evidence only, and no PR143 test, capture or release check is run or passed at this head; DB, Auth and transport ran at neither 2bb nor this head; native World debt and full qualification remain pending.']};
+  qualificationReasons:['Only the two focused native-world-race Node contract suites, targeted race collector tests and the static workflow gate run here; the seven hosted cases run only in the dedicated workflow; exact2bb Repair evidence is inherited parent evidence; the four PR143 released-main overlays are inherited source evidence only, and no PR143 test, capture or release check is run or passed at this head; DB, Auth and transport ran at neither 2bb nor this head; native World debt and full qualification remain pending.'+successorReason]};
 }
-export function nativeRaceLineageFailures(plan,proof){if(!proof?.eligible)return['Native World race source/event/evidence unavailable: '+(proof?.reason??'missing')];let expected;try{expected=nativeRacePlan({...plan,qualificationReasons:[]},proof);}catch(error){return['Native World race plan lineage unavailable: '+error.message];}const keys=['headSha','repairAnchorSha','nativeWorldRacePresentation','exploreRepairPresentation','solutionsPagesPresentation','publicPagesPresentation','nativeDbRehearsal','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','nativeWorldRaceContractSuites','nativeWorldRaceWorkflow','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','runDatabaseRehearsal','databaseDisposition','databaseBaselineEvidence','databaseRehearsalStatus','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','parentSkippedJobs','knownRegressionResolution','knownRegressionObservations','historicalUiFailure','historicalBrowserFailure','historicalStaticFailure','collectorOnly','collectorOnlyFailure','knownRegressionRepair','intakePresentation'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Native World race plan changed: '+k);}
+export function nativeRaceLineageFailures(plan,proof){if(!proof?.eligible)return['Native World race source/event/evidence unavailable: '+(proof?.reason??'missing')];let expected;try{expected=nativeRacePlan({...plan,qualificationReasons:[]},proof);}catch(error){return['Native World race plan lineage unavailable: '+error.message];}const keys=['headSha','repairAnchorSha','nativeWorldRacePresentation','nativeWorldRaceSuccessor','exploreRepairPresentation','solutionsPagesPresentation','publicPagesPresentation','nativeDbRehearsal','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','nativeWorldRaceContractSuites','nativeWorldRaceWorkflow','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','runDatabaseRehearsal','databaseDisposition','databaseBaselineEvidence','databaseRehearsalStatus','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','parentSkippedJobs','knownRegressionResolution','knownRegressionObservations','historicalUiFailure','historicalBrowserFailure','historicalStaticFailure','collectorOnly','collectorOnlyFailure','knownRegressionRepair','intakePresentation'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Native World race plan changed: '+k);}
 
 function runNativeRaceMode(mode,headSha,intent){
  const proof=verifyNativeRaceEligibility({headSha,intent});
@@ -1522,4 +1660,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     if (!proof.eligible) console.log(`Collector-only ineligible; normal selection retained: ${proof.reason}`);
     console.log(proof.eligible ? intakePresentation ? 'Affected-only: ten intake/copy/layout suites, eight audit cases, the six-width layout sweep and four fresh capture pairs; 895 regression resolution inherited, full qualification pending.' : knownRepair ? 'Affected-only: 17 regression suites and separate API catalogue checks; 433 tests required, full qualification pending.' : 'Affected-only: intake audit and four capture pairs; unaffected checks retain f082 lineage, full release pending.' : 'Normal full-anchor plan selected.');
   }
+}
+
+// The final gate reads routing flags from the generated plan. Validate its owner output before that read, so deleting those flags
+// cannot evade the race branch. This runs only when the unchanged final-gate file is the CLI entrypoint in its exact nextjs cwd.
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(new URL('./repair-scope-gate.mjs',import.meta.url))&&resolve(process.cwd())===fileURLToPath(new URL('..',import.meta.url)).replace(/[\\/]$/,'')){
+ const intent=classifyNativeRaceIntent({headSha:process.env.HEAD_SHA});
+ if(intent.parent===NATIVE_RACE_SUCCESSOR_PARENT&&intent.classification!=='normal'){
+  const proof=verifyNativeRaceEligibility({headSha:process.env.HEAD_SHA,intent});
+  if(!proof.eligible)throw Error('Native World race final-gate owner output refused: '+proof.reason);
+ }
 }

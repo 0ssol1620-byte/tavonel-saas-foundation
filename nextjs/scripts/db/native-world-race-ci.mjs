@@ -1,5 +1,5 @@
 /** Default-off hosted CI owner helper for the Native World cross-session harness. No package dependencies (PR 141 admission reuses the
- * local exact2bb race verifiers from repair-collector-only.mjs, which imports nothing back); never runs or retries race SQL. */
+ * local exact2bb race and exact c61 successor verifiers from repair-collector-only.mjs, which imports nothing back); never runs or retries race SQL. */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -11,7 +11,9 @@ import { isDeepStrictEqual } from 'node:util';
 // Constants and pure verifier functions only; that module's CLI is guarded by its own entry-point check.
 import { classifyNativeRaceIntent, verifyNativeRaceSource, NATIVE_RACE_PROFILE, NATIVE_RACE_PARENT, NATIVE_RACE_PARENT_TREE, NATIVE_RACE_PR,
   NATIVE_RACE_ADDITIONS, NATIVE_RACE_PARENT_OWNER_BLOBS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_UNCHANGED_OWNERS, NATIVE_RACE_CHANGED_PATHS,
-  NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PATHS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE, nativeRaceMainOverlayEvidence, EXPLORE_SUCCESSOR_PARENT, EXPLORE_SUCCESSOR_PARENT_TREE, SOLUTIONS_PARENT, SOLUTIONS_PARENT_TREE, FULL_ANCHOR } from '../repair-collector-only.mjs';
+  NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PATHS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE, nativeRaceMainOverlayEvidence, EXPLORE_SUCCESSOR_PARENT, EXPLORE_SUCCESSOR_PARENT_TREE, SOLUTIONS_PARENT, SOLUTIONS_PARENT_TREE, FULL_ANCHOR,
+  verifyNativeRaceSuccessorSource, NATIVE_RACE_SUCCESSOR_PARENT, NATIVE_RACE_SUCCESSOR_PARENT_TREE, NATIVE_RACE_SUCCESSOR_KIND, NATIVE_RACE_SUCCESSOR_PATHS,
+  NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS, NATIVE_RACE_SUCCESSOR_FINAL_SHA256 } from '../repair-collector-only.mjs';
 
 export const REPOSITORY='0ssol1620-byte/tavonel-saas-foundation', MAIN_REF='refs/heads/main', JOB='race', AGGREGATE_JOB='aggregate';
 // The only admitted pull_request: PR 141, same-repository head branch into main, checked out at its payload head SHA (never the merge ref).
@@ -195,13 +197,24 @@ export const nativeRaceGit=root=>(file,args,{encoding='utf8'}={})=>{
     stdio:['ignore','pipe','pipe'],windowsHide:true});
 };
 const refusal=(message,result)=>message+': '+(result?.reason ?? result?.classification ?? 'unverified');
+
+// ---- PR 141 race successor: one exact six-owner correction directly over published c61 ----
+// c61 is the published exact2bb race candidate; run 37646273750 passed its byte-qualified source admission and refused only its status.
+// The successor proof (lineage, scope, preimages, overlays, final pins and seals) lives in repair-collector-only.mjs; this helper restates
+// only its identity and requires the verifier's own result to name exactly that increment.
+export const RACE_SUCCESSOR_PARENT='c61fe1a5ea7487a6819ee6f0a812a6adbd343767', RACE_SUCCESSOR_PARENT_TREE='4318378cbba223182cb3b64677d01e706460bc3b';
+export const RACE_HELPER='nextjs/scripts/db/native-world-race-ci.mjs', RACE_HELPER_TEST='nextjs/scripts/db/native-world-race-ci.test.mjs';
+export const RACE_SUCCESSOR_PATHS=Object.freeze([RACE_HELPER,RACE_HELPER_TEST,'nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-collector-only.test.mjs',
+  'nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/verify-repair-workflows.mjs']);
+
 /**
  * Fails closed unless the PR head classifies as the intended native World race candidate and verifyNativeRaceSource proves it:
  * single-parent direct child of exact2bb, exactly the 18-path delta (seven new regular additions, seven in-place CI owner edits and
  * all four PR143 released-main overlay pairs together), raw statuses/modes/preimages, the cumulative623 lineage and the canonical
  * collector/repair seals. The verifier's own result must then name exactly that increment; the overlays stay inherited source evidence.
+ * A head the classifier places directly on c61 is admitted only by admitRaceSuccessor; no other parent is redirected.
  */
-export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, verify=verifyNativeRaceSource}={}) {
+export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, verify=verifyNativeRaceSource, successor=verifyNativeRaceSuccessorSource}={}) {
   assert.equal(typeof exec,'function','Native World race git access required for PR 141 admission');
   // This helper's PR identity, 623 commit and harness pins must be the race verifier's own.
   assert.ok(NATIVE_RACE_PR.repository===REPOSITORY && NATIVE_RACE_PR.number===PR_NUMBER && NATIVE_RACE_PR.baseRef===PR_BASE_REF &&
@@ -220,6 +233,8 @@ export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, 
   const intent=classify({headSha:head,exec});
   assert.ok(isObject(intent) && intent.classification==='intended' && intent.intended===true && intent.profile===NATIVE_RACE_PROFILE &&
     intent.headSha===head,refusal('PR 141 head is not an admitted native World race candidate',intent));
+  // The exact c61 successor has its own branch; every other classified head goes to the unchanged exact2bb verifier below.
+  if(intent.parent===RACE_SUCCESSOR_PARENT) return admitRaceSuccessor(head,{exec,intent,verify:successor});
   const source=verify({headSha:head,intent,exec});
   assert.ok(isObject(source) && source.eligible===true,refusal('PR 141 native World race source refused',source));
   const exact={profile:NATIVE_RACE_PROFILE,headSha:head,parent:NATIVE_RACE_PARENT,parentTree:NATIVE_RACE_PARENT_TREE,
@@ -229,9 +244,82 @@ export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, 
   for (const [key,value] of Object.entries(exact)) assert.ok(isDeepStrictEqual(source[key],value),'PR 141 native World race source differs from the exact2bb increment: '+key);
   return exact;
 }
+/**
+ * The exact c61 successor: verifyNativeRaceSuccessorSource (repair-collector-only.mjs) proves the single-parent direct child of published
+ * c61 at its exact tree over exact2bb, exactly the six in-place CI owner edits, the cumulative 18-path2bb delta, raw statuses/modes and
+ * c61 preimages, the four unchanged released-main overlays, raw-byte checkout cleanliness, the final helper/test pins and the canonical
+ * collector/repair seals. This helper restates the successor identity and requires the verifier's own result to name exactly it.
+ */
+export function admitRaceSuccessor(head, {exec, intent, verify=verifyNativeRaceSuccessorSource}) {
+  assert.ok(NATIVE_RACE_SUCCESSOR_PARENT===RACE_SUCCESSOR_PARENT && NATIVE_RACE_SUCCESSOR_PARENT_TREE===RACE_SUCCESSOR_PARENT_TREE &&
+    isDeepStrictEqual([...NATIVE_RACE_SUCCESSOR_PATHS],[...RACE_SUCCESSOR_PATHS]),'Native World race successor identity differs from the collector proof');
+  assert.ok(RACE_SUCCESSOR_PATHS.every(p=>NATIVE_RACE_CHANGED_PATHS.includes(p)) && [RACE_HELPER,RACE_HELPER_TEST].every(p=>Object.hasOwn(NATIVE_RACE_ADDITIONS,p)),
+    'Native World race successor paths must be existing race paths');
+  assert.ok(isObject(intent) && intent.parent===RACE_SUCCESSOR_PARENT && intent.headSha===head,'Native World race successor requires the classified c61 child');
+  const source=verify({headSha:head,intent,exec});
+  assert.ok(isObject(source) && source.eligible===true,refusal('PR 141 native World race successor source refused',source));
+  const exact={profile:NATIVE_RACE_PROFILE,kind:NATIVE_RACE_SUCCESSOR_KIND,headSha:head,parent:RACE_SUCCESSOR_PARENT,parentTree:RACE_SUCCESSOR_PARENT_TREE,
+    raceParent:NATIVE_RACE_PARENT,raceParentTree:NATIVE_RACE_PARENT_TREE,grandparent:EXPLORE_SUCCESSOR_PARENT,fullAnchor:FULL_ANCHOR,
+    exactChangedPaths:[...NATIVE_RACE_CHANGED_PATHS],successorChangedPaths:[...RACE_SUCCESSOR_PATHS],finalSha256:{...NATIVE_RACE_SUCCESSOR_FINAL_SHA256},
+    unchangedPaths:[...NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS],unchangedOwners:[...NATIVE_RACE_UNCHANGED_OWNERS],mainOverlays:nativeRaceMainOverlayEvidence()};
+  for (const [key,value] of Object.entries(exact)) assert.ok(isDeepStrictEqual(source[key],value),'PR 141 native World race successor source differs from the exact c61 increment: '+key);
+  // Preimages and final blobs are re-derived by the verifier from c61's exact tree and the head; only their exact shape is restated here.
+  for (const key of ['preimages','finalBlobs']) assert.ok(isObject(source[key]) && isDeepStrictEqual(Object.keys(source[key]).sort(),[...RACE_SUCCESSOR_PATHS]) &&
+    Object.values(source[key]).every(v=>GIT_SHA.test(String(v))),'PR 141 native World race successor source differs from the exact c61 increment: '+key);
+  assert.ok(RACE_SUCCESSOR_PATHS.every(p=>source.preimages[p]!==source.finalBlobs[p]),'PR 141 native World race successor must edit every owner in place');
+  return {...exact,preimages:{...source.preimages},finalBlobs:{...source.finalBlobs}};
+}
 
 // ---- Dispatch / candidate admission ----
-/** `race` is used only for the PR 141 event; manual dispatch keeps its github.sha, 623 ancestry and input-pin admission unchanged. */
+export const STATUS_ARGS=Object.freeze(['status','--porcelain=v1','-z','--untracked-files=all','--ignore-submodules=none']);
+/** NUL-delimited porcelain v1 records with their leading XY columns intact (never trimmed); a rename/copy record carries its source. */
+export function parsePorcelainStatus(text) {
+  assert.equal(typeof text,'string','Malformed candidate status: text required');
+  if(text==='') return [];
+  assert.ok(text.endsWith('\0'),'Malformed candidate status: unterminated record');
+  const fields=text.slice(0,-1).split('\0'),entries=[];
+  for (let i=0;i<fields.length;i++) {
+    const m=/^([ MTADRCU?!])([ MTADRCU?!]) (.+)$/s.exec(fields[i]);
+    assert.ok(m,'Malformed candidate status record');
+    const entry={x:m[1],y:m[2],path:m[3]};
+    if('RC'.includes(entry.x) || 'RC'.includes(entry.y)) {assert.ok(i+1<fields.length && fields[i+1]!=='','Malformed candidate status rename/copy record');entry.from=fields[++i];}
+    entries.push(entry);
+  }
+  return entries;
+}
+const safeRelativePath=p=>typeof p==='string' && p.length>0 && !/[\0-\x1f\x7f\\]/.test(p) && !p.startsWith('/') &&
+  p.split('/').every(s=>s!=='' && s!=='.' && s!=='..' && s.toLowerCase()!=='.git');
+/**
+ * Manual dispatch requires an empty status. The PR 141 checkout additionally tolerates only unstaged ` M` records whose bytes are unchanged:
+ * Git's stat/clean-filter comparison can report a byte-identical file (a mixed-EOL HEAD blob under eol attributes) as modified. Each must be
+ * a safe relative path and a regular HEAD blob whose index and worktree modes and index blob equal HEAD, with raw worktree bytes
+ * (hash-object --no-filters) equal to that blob. diff-files' worktree OID is clean-filtered (or zero when unhashed), so it must only be
+ * well-formed; the raw hash is the content guard. Any other record, malformed output or git failure refuses.
+ */
+export function verifyCandidateStatus(git, {event, head}) {
+  const status=git([...STATUS_ARGS]);
+  assert.ok(status?.code===0 && typeof status.out==='string','Candidate status unavailable');
+  if(event!=='pull_request') {assert.equal(status.out,'','Candidate checkout must be unmodified');return [];}
+  const seen=new Set(),tolerated=[];
+  for (const entry of parsePorcelainStatus(status.out)) {
+    assert.ok(entry.x===' ' && entry.y==='M' && entry.from===undefined,
+      `Candidate checkout must be unmodified: refused status '${entry.x}${entry.y}' for ${JSON.stringify(entry.path)}`);
+    assert.ok(safeRelativePath(entry.path) && !seen.has(entry.path),'Candidate status path is unsafe or repeated: '+JSON.stringify(entry.path));
+    seen.add(entry.path);
+    const run=(args,what)=>{const r=git(args);assert.ok(r?.code===0 && typeof r.out==='string',`Candidate ${what} unavailable: ${entry.path}`);return r.out;};
+    const tree=/^(100644|100755) blob ([a-f0-9]{40})\t([^\0]+)\0$/.exec(run(['--literal-pathspecs','ls-tree','--full-tree','-z',head,'--',entry.path],'HEAD tree entry'));
+    assert.ok(tree && tree[3]===entry.path,'Candidate status path is not a regular HEAD blob: '+entry.path);
+    const [,mode,blob]=tree;
+    const files=/^:([0-7]{6}) ([0-7]{6}) ([a-f0-9]{40}) ([a-f0-9]{40}) M\0([^\0]+)\0$/.exec(
+      run(['--literal-pathspecs','diff-files','--raw','--no-abbrev','--no-renames','-z','--',entry.path],'index/worktree record'));
+    assert.ok(files && files[1]===mode && files[2]===mode && files[3]===blob && files[5]===entry.path,
+      'Candidate index or worktree mode/blob differs from HEAD: '+entry.path);
+    assert.equal(run(['hash-object','--no-filters','--',entry.path],'raw worktree hash'),blob+'\n','Candidate worktree content differs from HEAD: '+entry.path);
+    tolerated.push({status:' M',path:entry.path,mode,headBlob:blob});
+  }
+  return tolerated;
+}
+/** `race` is used only for the PR 141 event; manual dispatch keeps its github.sha, 623 ancestry, strictly empty status and input-pin admission unchanged. */
 export function admitDispatch(env, {git, read, race, event=null, plan=PLAN, caseName, aggregate=false, platform=process.platform, nodeVersion=process.versions.node}) {
   assert.equal(platform,'linux','Linux GitHub-hosted runner required');
   assert.equal(env.GITHUB_ACTIONS,'true','Hosted action context required');
@@ -251,14 +339,14 @@ export function admitDispatch(env, {git, read, race, event=null, plan=PLAN, case
   assert.equal(out(['rev-parse','--verify',BASE_COMMIT+'^{commit}'],'Commit 623 absent from checkout'),BASE_COMMIT,'Commit 623 identity mismatch');
   assert.equal(out(['rev-parse','--verify',BASE_COMMIT+'^{tree}'],'Commit 623 tree unresolvable'),BASE_TREE,'Commit 623 tree mismatch');
   assert.equal(git(['merge-base','--is-ancestor',BASE_COMMIT,head])?.code,0,'Commit 623 must be an ancestor of HEAD');
-  assert.equal(out(['status','--porcelain','--untracked-files=all'],'Candidate status unavailable'),'','Candidate checkout must be unmodified');
+  const checkoutStatus=verifyCandidateStatus(git,{event:identity.event,head});
   const sources=verifySourcePins(read,plan);
   const all=[...sources.inputs,...sources.migrations,...sources.testSources];
   const hashOf=p=>{const found=all.find(s=>s.path===p);assert.ok(found,'Pinned harness input missing from plan: '+p);return found.sha256;};
   return {schemaVersion:1,kind:'native-world-hosted-ci-admission',repository:REPOSITORY,event:identity.event,ref:identity.ref,head,
     runId:env.GITHUB_RUN_ID,runAttempt:env.GITHUB_RUN_ATTEMPT,job:env.GITHUB_JOB,caseName:aggregate?null:caseName,
     inputs:{harnessSha256:hashOf(HARNESS),harnessTestSha256:hashOf(HARNESS_TEST),harnessDocSha256:hashOf(HARNESS_DOC),
-      fixtureSha256:hashOf(FIXTURE),schemaSha256:hashOf(SCHEMA)},sources,nativeRaceSource};
+      fixtureSha256:hashOf(FIXTURE),schemaSha256:hashOf(SCHEMA)},sources,nativeRaceSource,checkoutStatus};
 }
 
 // ---- Runner-local staging (623 semantics) ----
