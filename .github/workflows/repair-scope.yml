@@ -53,7 +53,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         if: steps.plan.outputs.selector_tests == 'true'
         run: |
-          if [ '${{ steps.plan.outputs.native_database }}' = true ] || [ '${{ steps.plan.outputs.public_pages }}' = true ] || [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
+          if [ '${{ steps.plan.outputs.native_race }}' = true ]; then
+            node --test scripts/db/native-world-race.test.mjs scripts/db/native-world-race-ci.test.mjs
+            node --test --test-name-pattern='native world race' scripts/repair-collector-only.test.mjs
+          elif [ '${{ steps.plan.outputs.native_database }}' = true ] || [ '${{ steps.plan.outputs.public_pages }}' = true ] || [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs scripts/repair-known-regression.test.mjs
           elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
             node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
@@ -65,8 +68,12 @@ jobs:
       - name: Run browser report and screenshot regressions
         id: browser-report-tests
         if: steps.plan.outputs.workflow_static == 'true'
+        # The native World race plan selects no browser file: only the race helper's static workflow/route contracts run here,
+        # never the full historical repair-scope suite. Every other plan keeps its existing route below.
         run: |
-          if [ '${{ steps.plan.outputs.intake_presentation }}' = true ]; then
+          if [ '${{ steps.plan.outputs.native_race }}' = true ]; then
+            node --test --test-name-pattern='native world race static' scripts/db/native-world-race-ci.test.mjs
+          elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ]; then
             node --test scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
             node --test scripts/repair-scope.test.mjs

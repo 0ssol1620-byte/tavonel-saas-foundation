@@ -7,6 +7,8 @@ const rawInputs: unknown[] = JSON.parse(
 
 test("the actual sample package remains readable and keyboard usable at narrow widths and zoom", async ({ browser, page }) => {
   test.skip(test.info().project.name !== "1440" || page.viewportSize()?.width !== 1440, "Run the internal viewport matrix only in project1440.");
+  // Six sequential browser contexts, each with its own scroll and capture checks, outrun the 30s default.
+  test.setTimeout(90_000);
   const inputs = rawInputs.map(input => {
     const validated = validateCollectionOcrInput(input);
     if (!validated) throw new Error("public_package_browser_input_invalid");

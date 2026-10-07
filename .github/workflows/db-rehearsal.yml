@@ -42,6 +42,7 @@ jobs:
       eligible: ${{ steps.scope.outputs.eligible }}
       intended: ${{ steps.scope.outputs.intended }}
       native_database: ${{ steps.scope.outputs.native_database }}
+      native_race: ${{ steps.scope.outputs.native_race }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,13 +67,17 @@ jobs:
           INTENDED_RESULT: ${{ steps.scope.outputs.intended }}
           ELIGIBLE_RESULT: ${{ steps.scope.outputs.eligible }}
           NATIVE_DATABASE_RESULT: ${{ steps.scope.outputs.native_database }}
+          NATIVE_RACE_RESULT: ${{ steps.scope.outputs.native_race }}
           REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           node --input-type=module <<'NODE'
           import { existsSync, readFileSync, writeFileSync } from 'node:fs';
           const env = process.env;
-          const { nativeDbJobDecision, authenticateFailedNativeResolution } = await import('./nextjs/scripts/repair-collector-only.mjs');
-          const explicit = nativeDbJobDecision({classifierResult:env.CLASSIFIER_RESULT,intended:env.INTENDED_RESULT,eligible:env.ELIGIBLE_RESULT,nativeDatabase:env.NATIVE_DATABASE_RESULT}).explicit;
+          const { nativeDbJobDecision, nativeRaceDecisionHolds, authenticateFailedNativeResolution } = await import('./nextjs/scripts/repair-collector-only.mjs');
+          const decision = nativeDbJobDecision({classifierResult:env.CLASSIFIER_RESULT,intended:env.INTENDED_RESULT,eligible:env.ELIGIBLE_RESULT,nativeDatabase:env.NATIVE_DATABASE_RESULT,nativeRace:env.NATIVE_RACE_RESULT});
+          // The exact native World race disposition is re-derived from the head: no DB/Auth/transport rerun and no DB inheritance.
+          const explicit = decision.explicit && nativeRaceDecisionHolds({headSha:env.REPAIR_HEAD_SHA,nativeRace:env.NATIVE_RACE_RESULT,decision});
+          if (explicit && decision.disposition) console.log(JSON.stringify({ databaseDisposition: decision.disposition, runDatabase: decision.runDatabase, runTransport: decision.runTransport, databaseInherited: false, fullQualification: 'pending' }));
           if (!explicit) {
             const fullDebt = ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'];
             if (!existsSync('collector-only-failure-receipt.json')) writeFileSync('collector-only-failure-receipt.json', JSON.stringify({ headSha: env.REPAIR_HEAD_SHA, gate: 'failed', gateFailures: ['Missing, failed or unqualified collector classification'], fullQualification: 'pending', runResults: { 'collector-only-eligibility': 'unqualified' }, inheritedChecks: {}, pendingDebt: ['hermetic-vitest-71-failures-triage'], knownRegressionObservations: [{ sourceHead: 'e402e61c9ea7d2ecbabe8aeb35144055c2b7b540', runId: 37330362300, jobId: 111831591345, passed: 6407, failed: 71, skipped: 1, files: 442, failingFiles: 17, affectedness: 'pending independent log-only triage' }] }, null, 2) + '\n');

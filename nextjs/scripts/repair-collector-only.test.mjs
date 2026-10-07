@@ -846,3 +846,219 @@ test('DB decision after a failed successor admission re-derives exact454 intent 
   }
   assert.deepEqual(nativeCalls,[]);
 });
+
+// Native World race over exact2bb: one direct child, exactly seven additions, seven in-place CI owner edits and four released-main
+// overlay pairs (18 paths), PR 141 at the event head.
+const race=await import('./repair-collector-only.mjs');
+const raceHead='c'.repeat(40),raceRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),raceBytes=p=>readFileSync(resolve(raceRoot,p));
+const racePublished=[...race.EXPLORE_REPAIR_TREE_SOURCES,...race.SOLUTIONS_CONFIG_PATHS].sort();
+const raceOverlay=p=>race.NATIVE_RACE_MAIN_OVERLAYS[p];
+const raceRecord=p=>Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)?`:000000 100644 ${'0'.repeat(40)} ${'1'.repeat(40)} A`:
+  Object.hasOwn(race.NATIVE_RACE_MAIN_OVERLAYS,p)?`:100644 100644 ${raceOverlay(p).preimage} ${raceOverlay(p).resolution} M`:`:100644 100644 ${race.NATIVE_RACE_PARENT_OWNER_BLOBS[p]} ${'2'.repeat(40)} M`;
+const raceTree=(ref,p)=>{
+  if(Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p))return ref===race.NATIVE_RACE_PARENT?null:gitBlob(raceBytes(p));
+  if(Object.hasOwn(race.NATIVE_RACE_MAIN_OVERLAYS,p))return ref===race.NATIVE_RACE_PARENT?raceOverlay(p).preimage:raceOverlay(p).resolution;
+  if(Object.hasOwn(race.NATIVE_RACE_PARENT_OWNER_BLOBS,p))return ref===race.NATIVE_RACE_PARENT||!race.NATIVE_RACE_CONFIG_PATHS.includes(p)?race.NATIVE_RACE_PARENT_OWNER_BLOBS[p]:'9'.repeat(40);
+  if(Object.hasOwn(race.EXPLORE_REPAIR_SOURCE_BLOBS,p))return race.EXPLORE_REPAIR_SOURCE_BLOBS[p].after;
+  if(Object.hasOwn(race.SOLUTIONS_SOURCE_BLOBS,p))return race.SOLUTIONS_SOURCE_BLOBS[p].after;
+  if(p===race.EXPLORE_SUCCESSOR_RUNNER_PATH)return race.EXPLORE_SUCCESSOR_RUNNER_BLOB;
+  const deps={...race.PUBLIC_PAGES_DB_BLOBS,...race.NATIVE_DB_TRANSPORT_BLOBS,...race.NATIVE_WORLD_PREREQUISITE_BLOBS,...Object.fromEntries(Object.entries(race.NATIVE_WORLD_SOURCE_BLOBS).map(([q,v])=>[q,v.after]))};
+  if(Object.hasOwn(deps,p))return deps[p];
+  throw Error('Unpinned native world race fixture leaf: '+p);
+};
+// Mocked git over actual workspace bytes: every ref, tree, range and leaf the race admission reads, and nothing else.
+const raceExec=(o={})=>(_command,args,options={})=>{
+  if(o.broken)throw Error('git unavailable');if(args[0]==='-C'){assert.equal(args[1],'fixture-root');args=args.slice(2);}
+  const P=race.NATIVE_RACE_PARENT,G=race.EXPLORE_SUCCESSOR_PARENT,R=race.EXPLORE_REPAIR_PARENT,S=race.SOLUTIONS_PARENT,changed=[...race.NATIVE_RACE_CHANGED_PATHS];
+  if(args[0]==='rev-parse'){if(args[1]==='--show-toplevel')return 'fixture-root';if(args[1]==='HEAD')return o.checkout??raceHead;const trees={[`${P}^{tree}`]:o.parentTree??race.NATIVE_RACE_PARENT_TREE,[`${G}^{tree}`]:race.EXPLORE_SUCCESSOR_PARENT_TREE,[`${S}^{tree}`]:race.SOLUTIONS_PARENT_TREE};assert.ok(Object.hasOwn(trees,args[1]),args[1]);return trees[args[1]];}
+  if(args[0]==='rev-list'){const rows={[raceHead]:`${raceHead} ${o.parent??P}${o.merge?' '+'a'.repeat(40):''}`,[P]:`${P} ${o.grandparent??G}`,[G]:`${G} ${R}`,[R]:`${R} ${S}`,[S]:`${S} ${race.NATIVE_WORLD_PARENT}`};return rows[args.at(-1)];}
+  if(args[0]==='merge-base'){if(o.ancestor===false)throw Error('not ancestor');return '';}
+  if(args[0]==='diff'&&args[1]==='--name-only'){const names={[`${o.parent??P}..${raceHead}`]:o.paths??changed,[`${G}..${P}`]:[...race.EXPLORE_SUCCESSOR_PATHS],[`${S}..${P}`]:racePublished,[`${S}..${raceHead}`]:o.cumulative??[...new Set([...racePublished,...changed])].sort()};assert.ok(Object.hasOwn(names,args.at(-1)),args.at(-1));return names[args.at(-1)].join('\0')+'\0';}
+  if(args[0]==='diff'&&args[1]==='--raw')return args.at(-2)===P?(o.raw??changed.map(p=>[raceRecord(p),p])).map(([r,p])=>`${r}\0${p}\0`).join(''):'';
+  if(args[0]==='ls-tree'){const [ref,,p]=args.slice(2),key=`${ref}:${p}`,blob=o.tree&&Object.hasOwn(o.tree,key)?o.tree[key]:raceTree(ref,p);return blob?`100644 blob ${blob}\t${p}`:'';}
+  if(args[0]==='show'){const p=args[1].slice(raceHead.length+1);assert.equal(args[1].slice(0,raceHead.length),raceHead);const bytes=o.bytes?.[p]??raceBytes(p);return options.encoding==='buffer'?bytes:bytes.toString('utf8');}
+  throw Error('Unexpected native world race git command: '+args.join(' '));
+};
+const raceSource=(o={})=>{const exec=raceExec(o);return race.verifyNativeRaceSource({headSha:raceHead,intent:race.classifyNativeRaceIntent({headSha:raceHead,exec}),exec});};
+test('native world race pins exact2bb, the seven immutable additions, the eight owner preimages and the narrow owner set',()=>{
+  assert.deepEqual([race.NATIVE_RACE_PROFILE,race.NATIVE_RACE_PARENT,race.NATIVE_RACE_PARENT_TREE],['native-world-race','2bbcc5b10f400cfc554294e3467491405ab757e7','b0ef9d53eb4f73270a5da12ecbb944c6b9c59230']);
+  assert.deepEqual({...race.NATIVE_RACE_PR},{repository:'0ssol1620-byte/tavonel-saas-foundation',number:141,baseRef:'main',headRef:'codex/masterplan-checkpoint-2026-09-30'});
+  // The seven additions are the exact immutable workspace bytes.
+  assert.equal(Object.keys(race.NATIVE_RACE_ADDITIONS).length,7);for(const[p,digest]of Object.entries(race.NATIVE_RACE_ADDITIONS))assert.equal(createHash('sha256').update(raceBytes(p)).digest('hex'),digest,p);
+  assert.equal(Object.keys(race.NATIVE_RACE_PARENT_OWNER_BLOBS).length,8);assert.deepEqual([...race.NATIVE_RACE_UNCHANGED_OWNERS],['nextjs/scripts/repair-scope.test.mjs']);
+  assert.equal(race.NATIVE_RACE_CHANGED_PATHS.length,18);for(const p of race.NATIVE_RACE_CONFIG_PATHS)assert.ok(Object.hasOwn(race.NATIVE_RACE_PARENT_OWNER_BLOBS,p),p);
+  assert.deepEqual([...race.NATIVE_RACE_CHANGED_PATHS],[...Object.keys(race.NATIVE_RACE_ADDITIONS),...race.NATIVE_RACE_CONFIG_PATHS,...race.NATIVE_RACE_MAIN_OVERLAY_PATHS].sort());
+  assert.equal(new Set(race.NATIVE_RACE_CHANGED_PATHS).size,18);assert.ok(!race.NATIVE_RACE_CHANGED_PATHS.some(p=>/product-left-column/.test(p)),'the main-only product-left-column change is excluded');
+  // Four released-main overlay pairs, each the exact2bb preimage (the published852 public pin) and the exact main resolution blob.
+  assert.deepEqual(Object.fromEntries(Object.entries(race.NATIVE_RACE_MAIN_OVERLAYS).map(([p,o])=>[p,{...o}])),{
+    'nextjs/app/product/continuous-knowledge/page.tsx':{preimage:'5cca7928c2fa20390110a15dce951f0d07e5acab',resolution:'3503b577127930b52bfee8202f91267842e10af1',sha256:'f5cb8088ee7e1bbad3dd00caeb24dee566d111470ff11826d30f11a05f2b4885'},
+    'nextjs/e2e/compiler-contract.spec.ts':{preimage:'1fd3e098e4a0ef574d55faee2ac7314e033e3007',resolution:'525182a048df8e2655aafbc86ae17a92b96c4e75',sha256:'893c378954795546063a8ccba5848686d6f705c8e092b4890b709309ac001d6e'},
+    'nextjs/e2e/public-package-proof.spec.ts':{preimage:'7bcf63dbbe35e74dc0c822593c4664e8048eb295',resolution:'f728e78ef4be4ace1eca37ceedbd6768bb7ae15a',sha256:'88a06448bf0ac1ea71247229894256f9cef12934bb4009e6f814f976faf6eece'},
+    'nextjs/lib/continuous-knowledge-page.test.ts':{preimage:'6b8e08cbf5aa463d3554c0deeaa929684c135f39',resolution:'247aea56b0e1e10fc1bf5a05d8ddf89f62d67abd',sha256:'7a73d3e7bffea75d05e9f98502c7f869a0ca47634c1888805813f1874b12ffd1'}});
+  for(const[p,o]of Object.entries(race.NATIVE_RACE_MAIN_OVERLAYS)){
+    assert.equal(race.PUBLIC_PAGES_SOURCE_BLOBS[p].after,o.preimage,p);assert.ok(!Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)&&!Object.hasOwn(race.NATIVE_RACE_PARENT_OWNER_BLOBS,p),p);
+    // The workspace carries the raw main resolution bytes unchanged.
+    assert.equal(gitBlob(raceBytes(p)),o.resolution,p);assert.equal(createHash('sha256').update(raceBytes(p)).digest('hex'),o.sha256,p);
+  }
+  assert.deepEqual([race.NATIVE_RACE_MAIN_OVERLAY_PROVENANCE.pr,race.NATIVE_RACE_MAIN_OVERLAY_PROVENANCE.mainCommit],[143,'2065e1c7eaf28d0d944fc066a1ca9633c0df70cd']);
+  assert.match(race.NATIVE_RACE_MAIN_OVERLAY_PROVENANCE.status,/^inherited PR143 released-main source evidence only; not executed, run or passed at the race candidate head$/);
+  assert.equal(race.NATIVE_RACE_PARENT_OWNER_BLOBS['.github/workflows/repair-scope.yml'],race.EXPLORE_REPAIR_WORKFLOW_BLOB);assert.equal(race.NATIVE_RACE_PARENT_OWNER_BLOBS['.github/workflows/db-rehearsal.yml'],race.NATIVE_WORLD_SOURCE_BLOBS['.github/workflows/db-rehearsal.yml'].after);
+  assert.deepEqual([...race.NATIVE_RACE_CONTRACT_SUITES],['scripts/db/native-world-race.test.mjs','scripts/db/native-world-race-ci.test.mjs']);assert.deepEqual([...race.NATIVE_RACE_WORKFLOW.cases],['grant_revoke','qualification_revoke','epoch','delete','same_replay','changed_replay','member_fk']);
+});
+test('native world race routes first and classifies only exact2bb children or race-owned additions; partial touches fail closed',()=>{
+  const source=readFileSync(fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url)),'utf8'),cli=source.slice(source.lastIndexOf('if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))'));
+  assert.ok(cli.indexOf('classifyNativeRaceIntent({headSha})')>=0&&cli.indexOf('classifyNativeRaceIntent({headSha})')<cli.indexOf('classifyExploreSuccessorIntent({headSha})'));
+  const classify=o=>race.classifyNativeRaceIntent({headSha:raceHead,exec:raceExec(o)});
+  const accepted=classify();assert.equal(accepted.classification,'intended');assert.equal(accepted.profile,'native-world-race');assert.equal(accepted.parent,race.NATIVE_RACE_PARENT);assert.deepEqual(accepted.paths,[...race.NATIVE_RACE_CHANGED_PATHS]);
+  // A partial touch of one owner, one addition or one released-main overlay directly on2bb is still the race profile, never normal CI or public pages.
+  for(const paths of [['nextjs/scripts/repair-scope.test.mjs'],['.github/workflows/native-world-race.yml'],...race.NATIVE_RACE_MAIN_OVERLAY_PATHS.map(p=>[p]),[...race.NATIVE_RACE_MAIN_OVERLAY_PATHS]]){const intent=classify({paths});assert.equal(intent.classification,'intended',paths.join());assert.equal(intent.profile,'native-world-race',paths.join());}
+  // Overlay paths alone over another parent are not race-owned and stay with the existing classifiers.
+  assert.equal(classify({parent:'b'.repeat(40),paths:[...race.NATIVE_RACE_MAIN_OVERLAY_PATHS]}).classification,'normal');
+  assert.equal(classify({paths:['nextjs/lib/unrelated.ts']}).classification,'normal');
+  // A race addition over any other parent is intended (and later refused); owners alone over another parent stay with the existing classifiers.
+  const elsewhere=classify({parent:'b'.repeat(40),paths:['nextjs/scripts/db/native-world-race-ci.mjs']});assert.equal(elsewhere.classification,'intended');assert.equal(race.verifyNativeRaceSource({headSha:raceHead,intent:elsewhere,exec:()=>{throw Error('no git read expected');}}).eligible,false);
+  assert.equal(classify({parent:race.EXPLORE_SUCCESSOR_PARENT,paths:['nextjs/scripts/repair-collector-only.mjs']}).classification,'normal');
+  for(const o of [{merge:true},{checkout:'f'.repeat(40)}]){const intent=classify(o);assert.equal(intent.classification,'unavailable',JSON.stringify(o));assert.equal(intent.intended,true);assert.equal(intent.profile,'native-world-race');}
+  assert.equal(classify({broken:true}).classification,'normal');assert.equal(race.classifyNativeRaceIntent({headSha:undefined,exec:raceExec()}).classification,'normal');
+  // Neither Explore classifier claims a2bb child.
+  assert.equal(world.classifyExploreSuccessorIntent({headSha:raceHead,exec:raceExec()}).classification,'normal');assert.equal(world.classifyExploreRepairIntent({headSha:raceHead,exec:raceExec()}).classification,'normal');
+});
+test('native world race source binds exact lineage, raw status/mode/preimage, cumulative623 delta, bytes and canonical seals',()=>{
+  // Accepted only with the actual candidate bytes and the canonical CONFIG_SEAL/REPAIR_SEAL values for them.
+  const accepted=raceSource();assert.equal(accepted.eligible,true,accepted.reason);assert.equal(accepted.parent,race.NATIVE_RACE_PARENT);assert.deepEqual(accepted.exactChangedPaths,[...race.NATIVE_RACE_CHANGED_PATHS]);assert.deepEqual(accepted.unchangedOwners,['nextjs/scripts/repair-scope.test.mjs']);
+  const C=race.NATIVE_RACE_CHANGED_PATHS,records=C.map(p=>[raceRecord(p),p]),swap=(p,record)=>records.map(([r,q])=>[q===p?record:r,q]),addition='nextjs/scripts/db/native-world-race.mjs',owner='nextjs/scripts/repair-scope-gate.mjs';
+  const refused=[
+    ['extra path',{paths:[...C,'nextjs/lib/unrelated.ts'].sort()},/exactly the seven race files/],
+    ['missing addition',{paths:C.filter(p=>p!==addition)},/exactly the seven race files/],
+    ['unchanged owner edited',{paths:[...C,'nextjs/scripts/repair-scope.test.mjs'].sort()},/exactly the seven race files/],
+    ['merge',{merge:true},/exact direct child of2bb/],
+    ['wrong grandparent',{grandparent:'b'.repeat(40)},/Exact2bb commit parent\/tree changed/],
+    ['wrong2bb tree',{parentTree:'b'.repeat(40)},/Exact2bb commit parent\/tree changed/],
+    ['ancestry',{ancestor:false},/not ancestor/],
+    ['cumulative extra',{cumulative:[...racePublished,...C,'docs/other.md'].sort()},/Cumulative623 race delta/],
+    ['deleted addition',{raw:swap(addition,`:100644 000000 ${'1'.repeat(40)} ${'0'.repeat(40)} D`)},/new regular file absent at2bb/],
+    ['executable addition',{raw:swap(addition,`:000000 100755 ${'0'.repeat(40)} ${'1'.repeat(40)} A`)},/new regular file absent at2bb/],
+    ['owner wrong preimage',{raw:swap(owner,`:100644 100644 ${'b'.repeat(40)} ${'2'.repeat(40)} M`)},/in-place regular edit/],
+    ['owner type change',{raw:swap(owner,`:100644 120000 ${race.NATIVE_RACE_PARENT_OWNER_BLOBS[owner]} ${'2'.repeat(40)} T`)},/in-place regular edit/],
+    ['rename split',{raw:[...records,[`:100644 000000 ${'3'.repeat(40)} ${'0'.repeat(40)} D`,'docs/renamed.md']]},/malformed or incomplete/],
+    ['addition bytes',{bytes:{[addition]:Buffer.concat([raceBytes(addition),Buffer.from('\n')])}},/Race file byte identity changed/],
+  ];
+  for(const[label,o,reason]of refused){const value=raceSource(o);assert.equal(value.eligible,false,label);assert.match(value.reason,reason,label);}
+});
+test('native world race source requires all four released-main overlay pairs together, exactly, as inherited source evidence only',()=>{
+  // The accepted result reports every exact pair and its PR143 provenance as inherited source evidence, never as a run or pass here.
+  const accepted=raceSource();assert.equal(accepted.eligible,true,accepted.reason);assert.equal(accepted.exactChangedPaths.length,18);
+  assert.deepEqual(accepted.mainOverlays,race.nativeRaceMainOverlayEvidence());assert.match(accepted.mainOverlays.status,/not executed, run or passed at the race candidate head/);
+  const C=race.NATIVE_RACE_CHANGED_PATHS,O=race.NATIVE_RACE_MAIN_OVERLAY_PATHS,P=race.NATIVE_RACE_PARENT,records=C.map(p=>[raceRecord(p),p]),swap=(p,record)=>records.map(([r,q])=>[q===p?record:r,q]);
+  const PATHS=/carry exactly the four released-main overlays, with no other path/,PAIR=/Released-main overlay must be an in-place regular edit from its exact2bb preimage to its exact main resolution blob/;
+  const refused=[
+    // The former 14-path increment (no overlay) and any partial overlay set are refused before any raw record is read.
+    ['the 14-path increment without overlays',{paths:C.filter(p=>!O.includes(p)),cumulative:[...new Set([...racePublished,...C.filter(p=>!O.includes(p))])].sort()},PATHS],
+    ['overlays only, without the race increment',{paths:[...O]},PATHS],
+    ['an extra non-overlay public source',{paths:[...C,'nextjs/components/public-package-proof.tsx'].sort()},PATHS],
+    ['an extra released-main path',{paths:[...C,'nextjs/lib/product-left-column.test.ts'].sort()},PATHS],
+    ['an extra overlay raw record',{raw:[...records,[`:100644 100644 ${'4'.repeat(40)} ${'5'.repeat(40)} M`,'nextjs/components/public-package-proof.tsx']]},/malformed or incomplete/],
+  ];
+  for(const p of O){
+    const o=raceOverlay(p);
+    refused.push(
+      ['missing overlay '+p,{paths:C.filter(q=>q!==p)},PATHS],
+      ['partial overlay set keeping only '+p,{paths:C.filter(q=>!O.includes(q)||q===p)},PATHS],
+      ['changed preimage record '+p,{raw:swap(p,`:100644 100644 ${'b'.repeat(40)} ${o.resolution} M`)},PAIR],
+      ['mutated resolution record '+p,{raw:swap(p,`:100644 100644 ${o.preimage} ${'b'.repeat(40)} M`)},PAIR],
+      ['swapped pair '+p,{raw:swap(p,`:100644 100644 ${o.resolution} ${o.preimage} M`)},PAIR],
+      ['executable overlay '+p,{raw:swap(p,`:100644 100755 ${o.preimage} ${o.resolution} M`)},PAIR],
+      ['symlinked overlay '+p,{raw:swap(p,`:100644 120000 ${o.preimage} ${o.resolution} T`)},PAIR],
+      ['overlay added instead of edited '+p,{raw:swap(p,`:000000 100644 ${'0'.repeat(40)} ${o.resolution} A`)},PAIR],
+      ['deleted overlay '+p,{raw:swap(p,`:100644 000000 ${o.preimage} ${'0'.repeat(40)} D`)},PAIR],
+      ['changed exact2bb preimage leaf '+p,{tree:{[`${P}:${p}`]:'b'.repeat(40)}},/Released-main overlay exact2bb preimage changed/],
+      ['mutated resolution leaf '+p,{tree:{[`${raceHead}:${p}`]:'b'.repeat(40)}},/Released-main overlay resolution identity changed/],
+      ['mutated resolution bytes '+p,{bytes:{[p]:Buffer.concat([raceBytes(p),Buffer.from('\n')])}},/Released-main overlay resolution identity changed/],
+      ['2bb preimage bytes in place of the resolution '+p,{tree:{[`${raceHead}:${p}`]:o.preimage}},/Released-main overlay resolution identity changed/],
+    );
+  }
+  for(const[label,o,reason]of refused){const value=raceSource(o);assert.equal(value.eligible,false,label);assert.match(value.reason,reason,label);}
+});
+test('native world race admits only same-repository PR 141 from the checkpoint branch at the exact event head',()=>{
+  const env={GITHUB_REPOSITORY:'0ssol1620-byte/tavonel-saas-foundation',GITHUB_EVENT_NAME:'pull_request'},repo={full_name:'0ssol1620-byte/tavonel-saas-foundation',id:7};
+  const event=()=>({number:141,repository:{...repo},pull_request:{number:141,base:{ref:'main',repo:{...repo}},head:{ref:'codex/masterplan-checkpoint-2026-09-30',sha:raceHead,repo:{...repo}}}});
+  const ok=race.verifyNativeRaceEvent({headSha:raceHead,env,event:event()});assert.equal(ok.eligible,true,ok.reason);assert.deepEqual([ok.number,ok.headSha,ok.baseRef],[141,raceHead,'main']);
+  const refused=[['dispatch',{...env,GITHUB_EVENT_NAME:'workflow_dispatch'},event()],['other repository',{...env,GITHUB_REPOSITORY:'fork/tavonel'},event()],['other PR',env,{...event(),number:142}],['fork head',env,(e=>{e.pull_request.head.repo={full_name:'fork/tavonel-saas-foundation',id:8};return e;})(event())],['same name other id',env,(e=>{e.pull_request.head.repo.id=8;return e;})(event())],['other base',env,(e=>{e.pull_request.base.ref='develop';return e;})(event())],['other head ref',env,(e=>{e.pull_request.head.ref='other';return e;})(event())],['stale head',env,(e=>{e.pull_request.head.sha='f'.repeat(40);return e;})(event())],['no payload',env,null]];
+  for(const[label,e,payload]of refused)assert.equal(race.verifyNativeRaceEvent({headSha:raceHead,env:e,event:payload}).eligible,false,label);
+});
+const raceParent=(mutate=v=>v)=>{
+  const e=race.NATIVE_RACE_PARENT_EVIDENCE,h=race.NATIVE_RACE_PARENT,done=(name,conclusion='success')=>({name,status:'completed',conclusion}),job=(id,run_id,name,conclusion,steps)=>({id,run_id,head_sha:h,name,status:'completed',conclusion,...(steps?{steps}:{})});
+  return mutate({repairRun:{id:e.repairRunId,path:'.github/workflows/repair-scope.yml',head_sha:h,event:'pull_request',status:'completed',conclusion:'success',run_attempt:1},
+    repairJob:job(e.repairJobId,e.repairRunId,'Repair scope validation','success',[...race.NATIVE_RACE_PARENT_REPAIR_STEPS.map(n=>done(n)),done('Run hermetic full Vitest for shared or unknown changes','skipped'),done('Run script contract suite for shared or unknown changes','skipped')]),
+    dbRun:{id:e.dbRunId,path:'.github/workflows/db-rehearsal.yml',head_sha:h,event:'pull_request',status:'completed',conclusion:'success',run_attempt:1},
+    collectorJob:job(e.collectorJobId,e.dbRunId,'Verify exact collector-only DB evidence reuse','success',[done('Independently verify unchanged DB source and prior evidence'),done('Require an explicit collector classifier decision')]),
+    databaseJob:job(e.databaseJobId,e.dbRunId,'db-rehearsal','skipped'),authJob:job(e.authJobId,e.dbRunId,'Real local Auth journey','skipped'),transportJob:job(e.transportJobId,e.dbRunId,'Local Chromium signed-storage transport','skipped')});
+};
+test('native world race inherits exact2bb Repair evidence only and never reports a DB, Auth or transport run at2bb',()=>{
+  assert.deepEqual({...race.NATIVE_RACE_PARENT_EVIDENCE},{repairRunId:37469420680,repairJobId:112288690913,dbRunId:37469420827,collectorJobId:112288690590,databaseJobId:112288823687,authJobId:112288692877,transportJobId:112288824132});
+  const ok=race.verifyNativeRaceParentEvidence(raceParent());assert.equal(ok.eligible,true,ok.reason);
+  assert.match(ok.repair.status,/inherited exact2bb parent evidence only; not executed at the race candidate head/);assert.match(ok.skippedAtParent.status,/no DB, Auth or transport execution at 2bb or the race candidate head/);
+  assert.deepEqual([ok.skippedAtParent.database,ok.skippedAtParent.auth,ok.skippedAtParent.transport],[112288823687,112288692877,112288824132]);
+  const refused=[['fresh DB claimed',v=>{v.databaseJob.conclusion='success';return v;}],['fresh transport claimed',v=>{v.transportJob.conclusion='success';return v;}],['Auth claimed',v=>{v.authJob.conclusion='success';return v;}],['other head',v=>{v.repairRun.head_sha='f'.repeat(40);return v;}],['failed Repair step',v=>{v.repairJob.steps[5].conclusion='failure';return v;}],['broad Vitest ran',v=>{v.repairJob.steps.find(s=>s.name.startsWith('Run hermetic')).conclusion='success';return v;}],['missing104 owner',v=>{v.repairJob.steps=v.repairJob.steps.filter(s=>s.name!=='Require exactly 104 named Solutions captures');return v;}],['failed classifier',v=>{v.collectorJob.conclusion='failure';return v;}]];
+  for(const[label,mutate]of refused)assert.equal(race.verifyNativeRaceParentEvidence(raceParent(mutate)).eligible,false,label);
+});
+const raceFullDebt=['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair'];
+const raceProof=()=>({eligible:true,source:{eligible:true,profile:'native-world-race',headSha:raceHead,parent:race.NATIVE_RACE_PARENT,mainOverlays:race.nativeRaceMainOverlayEvidence()},event:{eligible:true,number:141,headSha:raceHead},
+  evidence:{eligible:true,knownRegressionResolution:{debt:race.REGRESSION_DEBT,headSha:'8956734a6675ae79d5081e77f551e0cb49cf8a39',passed:433},knownRegressionObservations:[race.KNOWN_REGRESSION],historicalUiFailure:{sourceHead:'7d4bdac08041f282616ba85a25e8938a29230759'},pendingFullDebt:[...raceFullDebt],parentUi:{sourceHead:race.NATIVE_WORLD_UI_PARENT,status:'source'},storageTransport:{runId:37320682223,status:'source'},nativeSql:{runId:37413409719,realConcurrency:'UNRUN',status:'source'}},
+  parentEvidence:race.verifyNativeRaceParentEvidence(raceParent())});
+const raceNormal=()=>({schemaVersion:1,headSha:raceHead,repairAnchorSha:race.FULL_ANCHOR,groups:['shared-or-unknown'],unitFiles:['lib/a.test.ts'],browserFiles:['e2e/a.spec.ts'],unknownPaths:['nextjs/scripts/db/native-world-race.mjs'],runFullHermeticVitest:true,runScriptContracts:true,runDatabaseRehearsal:true,deferredGroups:['database-contract'],pendingQualificationDebt:['database-contract'],qualificationReasons:['normal']});
+test('native world race plan is narrow: two contract suites, deferred hosted cases, inherited-only parents and every debt pending',()=>{
+  const plan=race.nativeRacePlan(raceNormal(),raceProof());
+  assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles,plan.unknownPaths,plan.deferredGroups],[['selector-config','workflow-static','native-world-race-contracts','native-world-race-hosted'],[],[],[],['native-world-race-hosted']]);
+  for(const k of ['runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runDatabaseRehearsal','requireSolutionsCaptures','requirePublicProductCaptures'])assert.equal(plan[k],false,k);assert.equal(plan.runWorkflowStaticGate,true);
+  assert.deepEqual(plan.nativeWorldRaceContractSuites,['scripts/db/native-world-race.test.mjs','scripts/db/native-world-race-ci.test.mjs']);assert.equal(plan.nativeWorldRaceWorkflow.cases.length,7);
+  assert.equal(plan.databaseDisposition,'native-world-race-dedicated-workflow');assert.equal(plan.databaseBaselineEvidence,undefined);assert.match(plan.databaseRehearsalStatus,/not executed at exact2bb or this race head/);
+  assert.deepEqual(plan.pendingQualificationDebt,[...race.EXPLORE_REPAIR_PENDING_DEBT]);assert.deepEqual(plan.pendingFullDebt,raceFullDebt);assert.equal(plan.fullQualification,'pending');
+  for(const debt of ['native-world-real-concurrency','native-world-canonical-pinned-row-cross-session-fk','native-world-reservation-expiry-cross-session'])assert.ok(plan.pendingQualificationDebt.includes(debt),debt);
+  for(const[name,evidence]of Object.entries(plan.inheritedChecks))assert.match(evidence.status,/not executed at (exact2bb or )?the race candidate head/,name);
+  assert.deepEqual(plan.historicalStaticFailure,{...race.EXPLORE_SUCCESSOR_FAILED_PARENT});assert.equal(plan.exploreRepairPresentation,undefined);assert.equal(plan.solutionsPagesPresentation,undefined);
+  // PR143 overlays are inherited source evidence only: no public owner, capture, group or inherited check represents a PR143 run or pass.
+  assert.equal(plan.publicPagesPresentation,undefined);assert.equal(plan.requirePublicUiScreenshots,false);assert.equal(plan.requireHomePricingCaptures,false);
+  assert.ok(!plan.groups.some(g=>/public|pr143|overlay/i.test(g)));assert.ok(!Object.keys(plan.inheritedChecks).some(k=>/public|pr143|overlay|main/i.test(k)));
+  assert.match(plan.nativeWorldRacePresentation.source.mainOverlays.status,/not executed, run or passed at the race candidate head/);
+  assert.match(plan.qualificationReasons.at(-1),/four PR143 released-main overlays are inherited source evidence only, and no PR143 test, capture or release check is run or passed at this head/);
+  // The plan survives the JSON hand-off unchanged; any widening or debt loss is a lineage failure.
+  const written=JSON.parse(JSON.stringify(plan));assert.deepEqual(race.nativeRaceLineageFailures(written,raceProof()),[]);
+  for(const[key,value]of [['runFullHermeticVitest',true],['unknownPaths',['x']],['unitFiles',['lib/a.test.ts']],['pendingQualificationDebt',[]],['fullQualification','qualified'],['deferredGroups',[]],['databaseDisposition','inherited'],['inheritedChecks',{}]])assert.deepEqual(race.nativeRaceLineageFailures({...written,[key]:value},raceProof()),['Native World race plan changed: '+key],key);
+  assert.match(race.nativeRaceLineageFailures(written,{eligible:false,reason:'seal'})[0],/unavailable: seal/);
+  for(const proof of [{...raceProof(),event:{...raceProof().event,headSha:'f'.repeat(40)}},{...raceProof(),parentEvidence:{eligible:false}},{...raceProof(),source:{...raceProof().source,parent:race.EXPLORE_SUCCESSOR_PARENT}}])assert.throws(()=>race.nativeRacePlan(raceNormal(),proof),/Native World race plan requires/);
+});
+test('native world race receipt defers hosted cases, keeps every debt and records inheritance as not executed at the candidate head',()=>{
+  const plan=JSON.parse(JSON.stringify(race.nativeRacePlan(raceNormal(),raceProof())));
+  const passed=buildRepairReceipt(plan,{headSha:raceHead});
+  assert.equal(passed.gate,'passed-scoped-only');assert.equal(passed.runResults['native-world-race-hosted'],'pending-deferred');assert.equal(passed.runResults['native-world-race-contracts'],'passed in this run');assert.equal(passed.fullQualification,'pending');
+  for(const debt of [...race.EXPLORE_REPAIR_PENDING_DEBT,'native-world-race-hosted'])assert.ok(passed.pendingDebt.includes(debt),debt);
+  assert.match(passed.databaseObservation,/^native-world-race-dedicated-workflow: no DB, Auth or transport ran at exact2bb or this head and none is inherited/);assert.deepEqual(passed.inheritedChecks,plan.inheritedChecks);
+  // The overlays add no run result: only the plan's own groups are reported, and no PR143 evidence is recorded as passed in this run.
+  assert.deepEqual(Object.keys(passed.runResults).sort(),[...plan.groups].sort());assert.ok(!Object.keys(passed.runResults).some(g=>/public|pr143|overlay/i.test(g)));
+  const failed=buildRepairReceipt(plan,{headSha:raceHead,failures:['Native World race repair seal changed']});
+  assert.equal(failed.gate,'failed');assert.match(failed.databaseObservation,/not accepted for current head/);for(const evidence of Object.values(failed.inheritedChecks))assert.equal(evidence.status,'not accepted for current head');
+});
+test('native world race DB disposition is explicit, re-derived from the head and never a rerun or DB inheritance',()=>{
+  const ok=race.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false',nativeRace:'true'});
+  assert.deepEqual(ok,{explicit:true,runDatabase:false,runTransport:false,disposition:'native-world-race-dedicated-workflow'});
+  for(const bad of [{intended:'false',eligible:'false'},{intended:'true',eligible:'false'},{nativeDatabase:'true'},{nativeRace:'yes'},{classifierResult:'failure'},{nativeDatabase:undefined}])assert.deepEqual(race.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false',nativeRace:'true',...bad}),{explicit:false,runDatabase:false,runTransport:false},JSON.stringify(bad));
+  // Other profiles keep their existing decisions without any race disposition.
+  for(const nativeRace of [undefined,'','false']){assert.deepEqual(race.nativeDbJobDecision({classifierResult:'success',intended:'false',eligible:'false',nativeDatabase:'false',nativeRace}),{explicit:true,runDatabase:true,runTransport:true});assert.deepEqual(race.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false',nativeRace}),{explicit:true,runDatabase:false,runTransport:false});}
+  const inherited=race.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false'});
+  assert.equal(race.nativeRaceDecisionHolds({headSha:raceHead,nativeRace:'true',decision:ok,exec:raceExec()}),true);
+  assert.equal(race.nativeRaceDecisionHolds({headSha:raceHead,nativeRace:'',decision:inherited,exec:raceExec()}),false,'a recognized race head is never generic inheritance');
+  assert.equal(race.nativeRaceDecisionHolds({headSha:raceHead,nativeRace:'true',decision:ok,exec:raceExec({paths:['nextjs/lib/unrelated.ts']})}),false,'an unrelated head never carries the race disposition');
+  assert.equal(race.nativeRaceDecisionHolds({headSha:raceHead,nativeRace:'',decision:inherited,exec:raceExec({paths:['nextjs/lib/unrelated.ts']})}),true);
+});
+test('failed native world race admission keeps71 historical, both failures and every debt; only exact2bb children get race history',()=>{
+  const intent={classification:'intended',intended:true,headSha:raceHead,parent:race.NATIVE_RACE_PARENT,profile:'native-world-race'},reason='Native World race repair seal changed: nextjs/scripts/repair-collector-only.mjs';
+  const {plan,receipt}=race.failedNativeRaceReceipt({headSha:raceHead,reason,intent,api:()=>{throw Error('offline');}});
+  assert.deepEqual(plan.currentAdmission,{profile:'native-world-race',headSha:raceHead,parent:race.NATIVE_RACE_PARENT,status:'failed',reason});assert.ok(plan.pendingQualificationDebt.includes('native-world-race-eligibility'));assert.ok(!plan.pendingQualificationDebt.includes(race.REGRESSION_DEBT));
+  assert.deepEqual(plan.historicalStaticFailure,{...race.EXPLORE_SUCCESSOR_FAILED_PARENT});assert.equal(receipt.gate,'failed');assert.deepEqual(receipt.inheritedChecks,{});assert.equal(receipt.fullQualification,'pending');assert.equal(receipt.databaseObservation,'not executed; inherited evidence unaccepted');
+  for(const debt of ['database-contract','native-world-race','native-world-race-eligibility',...race.EXPLORE_REPAIR_PENDING_DEBT])assert.ok(receipt.pendingDebt.includes(debt),debt);
+  const elsewhere=race.failedCollectorPlan({headSha:raceHead,reason,intent:{...intent,parent:'b'.repeat(40)}});assert.equal(elsewhere.currentAdmission,undefined);assert.ok(elsewhere.pendingQualificationDebt.includes(race.REGRESSION_DEBT));
+  // The DB failure path re-derives the exact race head and reads only actual623 evidence (offline here); other heads read nothing.
+  const before=structuredClone(receipt),calls=[];assert.deepEqual(race.authenticateFailedNativeResolution(structuredClone(before),{headSha:raceHead,intended:undefined,exec:raceExec(),api:()=>{throw Error('native evidence must not be read');},exploreApi:p=>{calls.push(p);throw Error('offline');}}),before);assert.deepEqual(calls,['actions/runs/37413409860']);
+  for(const o of [{parent:'b'.repeat(40)},{merge:true},{paths:['nextjs/lib/unrelated.ts']}]){const reads=[];assert.deepEqual(race.authenticateFailedNativeResolution(structuredClone(before),{headSha:raceHead,intended:undefined,exec:raceExec(o),api:p=>{reads.push(p);throw Error('no read');},exploreApi:p=>{reads.push(p);throw Error('no read');}}),before,JSON.stringify(o));assert.deepEqual(reads,[],JSON.stringify(o));}
+});

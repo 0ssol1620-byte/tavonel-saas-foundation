@@ -65,7 +65,7 @@ describe("Continuous Knowledge business-first presentation", () => {
   it("retains the current-runtime and sample qualifications without promoting a direction", () => {
     const markup = html();
     expect(CONTRACT_CLAUSES.find(clause => clause.id === "selective-recompilation")!.state).toBe("direction");
-    expect(markup).toContain("Selective recompilation is not available today");
+    expect(markup).toContain("Current compilation rebuilds the whole collection.");
     expect(markup).toContain("public timeline compares complete compiles after the fact");
     expect(markup).toContain("Solid is what TAVONEL executes");
     expect(markup).toContain("rebuilds the whole collection it is given into a candidate version a person");

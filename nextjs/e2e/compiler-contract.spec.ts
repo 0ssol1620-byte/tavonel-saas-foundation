@@ -240,7 +240,7 @@ test("leads with version comparison and keeps technical explanations optional", 
   expect(await page.locator("h1").innerText()).toBe("See what changed before you activate it.");
   expect(await page.locator(".world-recompile").isVisible()).toBe(true);
   const overview = page.locator('[aria-labelledby="working-summary"]');
-  expect(await overview.innerText()).toContain("Selective recompilation is not available today");
+  expect(await overview.innerText()).toContain("Current compilation rebuilds the whole collection.");
   const change = overview.locator('a[href="/explore?act=change"]');
   expect(await change.isVisible()).toBe(true);
   expect(await overview.locator('a[href="#clauses"]').isVisible()).toBe(true);

@@ -1,0 +1,168 @@
+# DEFAULT-OFF DRAFT. Manual dispatch on main, plus automatic pull_request checks admitted only for
+# same-repository PR 141 (codex/masterplan-checkpoint-2026-09-30 into main) at its head SHA. Runs the
+# reviewed Native World cross-session harness once per case on seven fresh GitHub-hosted runners against
+# a runner-local Supabase database. No credentials or remote databases are used.
+# See docs/integration/NATIVE_WORLD_HOSTED_CI_DRAFT.md.
+name: Native World race (default-off draft)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  NWR_HELPER: nextjs/scripts/db/native-world-race-ci.mjs
+
+jobs:
+  race:
+    name: race (${{ matrix.case }})
+    if: github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
+    runs-on: ubuntu-24.04
+    # Covers CLI install, image pull, staging and the full-chain reset. The harness keeps its own
+    # 15-second case and 120-second run bounds; this job timeout is not the runner limit.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        case:
+          - grant_revoke
+          - qualification_revoke
+          - epoch
+          - delete
+          - same_replay
+          - changed_replay
+          - member_fk
+    env:
+      NWR_CASE: ${{ matrix.case }}
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
+    steps:
+      - name: Check out the dispatched commit only
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # PR runs check out the PR head commit, never the refs/pull/141/merge commit in github.sha.
+      - name: Check out the PR 141 head commit only
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Admit dispatch, candidate head, 623 ancestry and source pins
+        run: node "$NWR_HELPER" admit
+
+      - name: Install Supabase CLI 2.116.0
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      - name: Verify CLI version and local Docker endpoint
+        run: |
+          set -euo pipefail
+          test "$(supabase --version)" = "2.116.0"
+          test -x /usr/bin/docker
+          test -S /var/run/docker.sock
+          test -z "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}"
+
+      - name: Stage runner-local config and draft copies in dependency order
+        run: node "$NWR_HELPER" stage
+
+      - name: Defer migrations newer than history boundary 0048
+        run: |
+          set -euo pipefail
+          deferred=/tmp/deferred-migrations
+          test ! -e "$deferred"
+          mkdir "$deferred"
+          count=0
+          for f in supabase/migrations/*.sql; do
+            base="${f##*/}"
+            version="${base%%_*}"
+            [[ "$version" =~ ^[0-9]+$ ]] || { echo "Unversioned migration: $base" >&2; exit 1; }
+            if (( 10#$version > 48 )); then mv -- "$f" "$deferred/"; count=$((count + 1)); fi
+          done
+          test "$count" -gt 0
+          (cd "$deferred" && sha256sum -- *.sql) > "$RUNNER_TEMP/native-world-race/deferred.sha256"
+
+      - name: Start local database with the pre-boundary chain
+        run: supabase db start
+
+      - name: Restore deferred migrations
+        run: |
+          set -euo pipefail
+          for f in /tmp/deferred-migrations/*.sql; do
+            test ! -e "supabase/migrations/${f##*/}"
+            mv -- "$f" supabase/migrations/
+          done
+          (cd supabase/migrations && sha256sum --strict --check "$RUNNER_TEMP/native-world-race/deferred.sha256")
+          rmdir /tmp/deferred-migrations
+
+      - name: Apply the full chain from empty
+        run: supabase db reset
+
+      # Mount/tmpfs confinement and a read-only server_version/data_directory/unix_socket_directories check
+      # precede any mutating SQL; then the marker, then pgTAP in schema extensions (no_plan/ok/is/finish verified).
+      - name: Capture confined target, write fresh marker, set up pgTAP
+        run: node "$NWR_HELPER" capture
+
+      - name: Run the selected harness case once
+        timeout-minutes: 5
+        run: node "$NWR_HELPER" run-harness
+
+      - name: Owner cleanup and case receipt
+        if: always()
+        timeout-minutes: 5
+        run: node "$NWR_HELPER" finalize
+
+      - name: Upload case receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-world-race-${{ matrix.case }}
+          path: ${{ runner.temp }}/native-world-race/case-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+  aggregate:
+    needs: race
+    if: always() && github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the dispatched commit only
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the PR 141 head commit only
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Admit aggregation candidate
+        run: node "$NWR_HELPER" admit --aggregate
+
+      - name: Download case receipts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-world-race-*
+          path: ${{ runner.temp }}/native-world-race-receipts
+
+      - name: Aggregate exactly seven bound receipts
+        env:
+          NWR_MATRIX_RESULT: ${{ needs.race.result }}
+        run: node "$NWR_HELPER" aggregate --dir "$RUNNER_TEMP/native-world-race-receipts"

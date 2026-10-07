@@ -164,16 +164,16 @@ export const REPAIR_CATALOGUE_FILES = Object.freeze([
 export const EXPECTED_REPAIR_TESTS = 433;
 // repair-seal:start
 export const REPAIR_SEAL = Object.freeze({
-  ".github/workflows/repair-scope.yml": "b7112fc3fedac86028ed062b8cff702783f89f6f8a8803abfba41bd93207e041",
-  "nextjs/scripts/repair-collector-only.mjs": "f97d43104ad69d7ca2a7380222a32413c04129024fe5fb3eec8c07b5cc31ff1c",
+  ".github/workflows/repair-scope.yml": "fc85b0b3e89d048a9c6f4acb80f9321726e3bb37659f9e16ddcff85ca7b23bfe",
+  "nextjs/scripts/repair-collector-only.mjs": "df17ab181603b3d621371555887f8564d011868e5f8739f1f6d98e70958f3d32",
   "nextjs/scripts/repair-scope.mjs": "620270844f9235c0907689a06b844cbb0a9bdcfcfbf0c0bc19e8bbca04d5776a",
   "nextjs/scripts/repair-scope.test.mjs": "1a8138746edef8ca46aafd2183e56929ef9e9999dd0fb11c2002efd475440ad6",
-  "nextjs/scripts/repair-scope-gate.mjs": "b8ec75bc16cdb5f1b8a069f510233d9a4c9a5a6b5bf9d27f460c9208514a022f",
-  "nextjs/scripts/verify-repair-workflows.mjs": "9db018e050aa3e5936e7c58d07a39ac4b2da9f34709f11e5f5dab9c415308679",
-  "nextjs/scripts/repair-collector-only.test.mjs": "8df576ad187bf509339762f95eb5b12140921b9bf1f9133cac925cf85b7fcc4e",
+  "nextjs/scripts/repair-scope-gate.mjs": "9105fb80c35ee637699e52df99b52c66e4481bb5ea2e7bfc43400898b37c79d3",
+  "nextjs/scripts/verify-repair-workflows.mjs": "351b9a17218fdfded8e052c6431e725cab7cbcb44cb1c143cbf06d4b2535aeac",
+  "nextjs/scripts/repair-collector-only.test.mjs": "ca2a239a4a49c458c71ef7ab5013bfc372402c0fe25f4012f9ea286230a2d98b",
   "nextjs/scripts/repair-known-regression.mjs": "d7b0dcda90b20ef5174b95a3ac15180391a673c774cc21c930ab5969638ccbb6",
   "nextjs/scripts/repair-known-regression.test.mjs": "3e86911fd98bcbfebf6eaefb6e64a97c483f21b023027799f05b0659fc2aaa7e",
-  ".github/workflows/db-rehearsal.yml": "f4001dbbcab9b6081875bce2c0843a99a5cb09944ce8d4a2b1d1da76ce573ab3",
+  ".github/workflows/db-rehearsal.yml": "90335c3abfa39275f9f0e8b1e00d7e5012e64d029081ba148faf1bafaad3634f",
   "nextjs/scripts/run-repair-check.mjs": "2a9dc628dbc4c3c233aec81d470c6b3be07571e107831b92526ed71d669634e2",
   "nextjs/scripts/repair-test-report.mjs": "5dd9b98ffa8aa6b67aa5034567e00857246073a0d8c94dc5df3eea60096e741f",
   "nextjs/vitest.repair-scope.config.ts": "229623b695037e9e8173e74107dd252a77182ad068ab195d2a9710e0100c8742"
