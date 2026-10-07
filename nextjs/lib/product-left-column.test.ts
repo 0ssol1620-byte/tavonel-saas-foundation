@@ -35,6 +35,41 @@ function leftColumn(source: string): string {
   return source.slice(start, end);
 }
 
+/*
+  /product/continuous-knowledge left that template: its intro is one grid. Below 1321px it reads
+  heading, summary, timeline; from 1321px up the timeline sits in the left column under the
+  heading and the summary takes the right. So the source order and the stylesheet's grid areas
+  are what is held here, and the slice returned is the timeline's own cell.
+*/
+function continuousKnowledgeTimelineColumn(source: string): string {
+  const intro = source.indexOf('data-continuous-intro=""');
+  const heading = source.indexOf("className={styles.introHeading}", intro);
+  const summary = source.indexOf("className={styles.summary}", heading);
+  const cell = source.indexOf("className={styles.timeline}", summary);
+  const timeline = source.indexOf("<WorldRecompileTimeline", cell);
+  expect(intro, "the page has no intro grid").toBeGreaterThan(-1);
+  expect(heading, "the heading is not inside the intro grid").toBeGreaterThan(intro);
+  expect(summary, "the summary does not follow the heading").toBeGreaterThan(heading);
+  expect(cell, "the timeline cell does not follow the summary").toBeGreaterThan(summary);
+  expect(timeline, "the timeline is not in its cell").toBeGreaterThan(cell);
+
+  const css = page("app/product/continuous-knowledge/continuous-knowledge.module.css");
+  const areas = (rule: string) =>
+    [...rule.match(/grid-template-areas:([^;]*);/)![1].matchAll(/"([^"]*)"/g)].map(([, row]) => row.trim().split(/\s+/));
+  const narrow = css.match(/(?:^|\n)\.intro \{([^}]*)\}/)?.[1];
+  const wide = css.match(/@media \(min-width: 1321px\) \{\s*\.intro \{([^}]*)\}/)?.[1];
+  expect(narrow, "the intro has no single-column reading order").toBeDefined();
+  expect(wide, "the intro has no two-column layout at 1321px").toBeDefined();
+  expect(areas(narrow!)).toEqual([["heading"], ["summary"], ["timeline"]]);
+  const rows = areas(wide!);
+  expect(rows.map(row => row[0]), "the timeline is not in the left column at 1321px").toEqual(["heading", "timeline"]);
+  expect(rows.map(row => row[1]), "the summary is not in the right column at 1321px").toEqual(["summary", "summary"]);
+  expect(css).toMatch(/\.introHeading \{ grid-area: heading;/);
+  expect(css).toMatch(/\.intro > \.summary \{ grid-area: summary; \}/);
+  expect(css).toMatch(/\.timeline \{ grid-area: timeline;/);
+  return source.slice(cell, source.indexOf("</div>", timeline));
+}
+
 describe("the product sub-pages' left columns", () => {
   it.each([
     ["app/product/document-understanding/page.tsx", "RegionHighlight"],
@@ -45,7 +80,9 @@ describe("the product sub-pages' left columns", () => {
     expect(source, `${path} never imports ${component}`).toContain(component);
     /* /product/document-understanding puts its panel in the second column by design; the other
        two fill the first, which is the column the audit found empty. */
-    const where = path.includes("document-understanding") ? source : leftColumn(source);
+    const where = path.includes("document-understanding")
+      ? source
+      : path.includes("continuous-knowledge") ? continuousKnowledgeTimelineColumn(source) : leftColumn(source);
     expect(where, `${component} is not in the column it was added to fill`).toContain(
       `<${component}`,
     );

@@ -15,6 +15,7 @@
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
+import type { Page as BrowserPage } from "@playwright/test";
 
 type Locator = {
   count: () => Promise<number>;
@@ -26,6 +27,7 @@ type Locator = {
   textContent: () => Promise<string | null>;
   getAttribute: (name: string) => Promise<string | null>;
   isVisible: () => Promise<boolean>;
+  click: () => Promise<void>;
 };
 
 type Page = {
@@ -78,6 +80,7 @@ test("grades no clause as qualified, because no receipt is published here", asyn
      it has to carry did not. What is asserted is still that the rendered row says the capability
      is not shipped, and the row must not name the environment flag it used to name.
   */
+  await selective.locator("details > summary").click();
   expect(await selective.innerText()).toContain("is not available today");
   expect(await selective.innerText()).not.toContain("CORE_V2_REVISION_COMPILE");
 });
@@ -85,6 +88,7 @@ test("grades no clause as qualified, because no receipt is published here", asyn
 test("draws the whole source-change flow, and says which half of it runs here", async ({ page }: { page: Page }) => {
   await page.goto(ROUTE);
 
+  await page.locator('[data-contract-reference="flow"] > summary').click();
   const diagram = page.locator("[data-contract-flow]").first();
   expect(await diagram.isVisible()).toBe(true);
   // The accessible name is the drawing's only content for a reader who cannot see it.
@@ -156,6 +160,8 @@ test("leaves no orphan slot in the product surface grid", async ({ page }: { pag
 
 test("lists the nine interchange standards without implying all nine are emitted", async ({ page }: { page: Page }) => {
   await page.goto(ROUTE);
+  await page.locator('[data-contract-reference="interop"] > summary').click();
+  expect(await page.locator('[data-interop-standards]').isVisible()).toBe(true);
 
   const rows = await page.evaluate(() =>
     [...document.querySelectorAll("[data-interop-standard]")].map((node) => ({
@@ -189,6 +195,10 @@ test("lists the nine interchange standards without implying all nine are emitted
 test("never scrolls the document sideways, at any width", async ({ page }: { page: Page }) => {
   await page.goto(ROUTE);
 
+  await page.locator('[data-contract-reference="flow"] > summary').click();
+  await page.locator('[data-contract-reference="interop"] > summary').click();
+  const details = page.locator('[data-contract-detail] > summary');
+  for (let index = 0; index < await details.count(); index += 1) await details.nth(index).click();
   const overflow = await page.evaluate(() => {
     const problems: string[] = [];
     const doc = document.documentElement;
@@ -222,4 +232,119 @@ test("is reachable from the product index and names itself in the tab", async ({
 
   await page.goto(ROUTE);
   expect(await page.title()).toContain("Continuous recompilation");
+});
+
+// TAV-014: product behaviour and real comparisons precede optional contract detail.
+test("leads with version comparison and keeps technical explanations optional", async ({ page }: { page: Page }) => {
+  await page.goto(ROUTE);
+  expect(await page.locator("h1").innerText()).toBe("See what changed before you activate it.");
+  expect(await page.locator(".world-recompile").isVisible()).toBe(true);
+  const overview = page.locator('[aria-labelledby="working-summary"]');
+  expect(await overview.innerText()).toContain("Current compilation rebuilds the whole collection.");
+  const change = overview.locator('a[href="/explore?act=change"]');
+  expect(await change.isVisible()).toBe(true);
+  expect(await overview.locator('a[href="#clauses"]').isVisible()).toBe(true);
+  const defaultState = await page.evaluate(() => ({
+    clauses: [...document.querySelectorAll("[data-contract-detail]")].map(element => element.hasAttribute("open")),
+    references: [...document.querySelectorAll("[data-contract-reference]")].map(element => element.hasAttribute("open")),
+    actions: [...document.querySelectorAll<HTMLElement>('[aria-labelledby="working-summary"] a')].map(element => ({ height: element.getBoundingClientRect().height, width: element.getBoundingClientRect().width })),
+  }));
+  expect(defaultState.clauses).toEqual(Array(8).fill(false));
+  expect(defaultState.references).toEqual([false, false]);
+  for (const action of defaultState.actions) { expect(action.height).toBeGreaterThanOrEqual(44); expect(action.width).toBeGreaterThanOrEqual(44); }
+});
+
+// TAV-014 follow-on: exercise the reader's actions, then retain both disclosure states as files.
+test("keeps the summary first and supports keyboard reading and Change navigation", async ({ page }: { page: BrowserPage }) => {
+  test.skip(!["390", "1440"].includes(test.info().project.name), "bounded phone and desktop acceptance");
+  test.setTimeout(90_000);
+  const width = page.viewportSize()!.width;
+  expect([390, 1440]).toContain(width);
+  await page.goto(ROUTE);
+  const consent = page.getByRole("region", { name: "Optional analytics" });
+  await expect(consent).toBeVisible();
+  await page.getByRole("button", { name: "No thanks", exact: true }).click();
+  await expect(consent).toBeHidden();
+
+  const summary = page.locator('[aria-labelledby="working-summary"]');
+  const compare = summary.getByRole("link", { name: "Compare the public World versions", exact: true });
+  const contract = summary.getByRole("link", { name: "Read the eight-clause Compiler Contract", exact: true });
+  const order = await page.evaluate(() => {
+    const heading = document.querySelector("h1")!;
+    const summary = document.querySelector('[aria-labelledby="working-summary"]')!;
+    const timeline = document.querySelector(".world-recompile")!;
+    return {
+      headingBeforeSummary: Boolean(heading.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING),
+      summaryBeforeTimeline: Boolean(summary.compareDocumentPosition(timeline) & Node.DOCUMENT_POSITION_FOLLOWING),
+      headingBottom: heading.getBoundingClientRect().bottom,
+      summaryTop: summary.getBoundingClientRect().top,
+      summaryBottom: summary.getBoundingClientRect().bottom,
+      timelineTop: timeline.getBoundingClientRect().top,
+    };
+  });
+  expect(order.headingBeforeSummary).toBe(true);
+  expect(order.summaryBeforeTimeline).toBe(true);
+  if (width === 390) {
+    expect(order.headingBottom).toBeLessThanOrEqual(order.summaryTop + 1);
+    expect(order.summaryBottom).toBeLessThanOrEqual(order.timelineTop + 1);
+  }
+  const disclosures = page.locator("[data-contract-detail], [data-contract-reference]");
+  await expect(disclosures).toHaveCount(10);
+  await expect(page.locator("[data-contract-detail][open], [data-contract-reference][open]")).toHaveCount(0);
+  const capture = async (state: "default" | "expanded") => {
+    await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: "instant" }));
+    const name = `continuous-knowledge-${state}-${width}.png`;
+    const path = test.info().outputPath(name);
+    await page.screenshot({ path, fullPage: true, animations: "disabled" });
+    await test.info().attach(name, { path, contentType: "image/png" });
+  };
+  await capture("default");
+
+  // Begin at the comparison action, then use the browser's real next-focus and activation keys.
+  await compare.focus();
+  await page.keyboard.press("Tab");
+  await expect(contract).toBeFocused();
+  await expect(contract).not.toHaveCSS("outline-style", "none");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/product\/continuous-knowledge#clauses$/);
+  await expect.poll(() => page.evaluate(() => {
+    const heading = document.querySelector("#clauses")!.getBoundingClientRect();
+    const header = document.querySelector("header.nav")!.getBoundingClientRect();
+    return heading.top >= header.bottom - 1 && heading.bottom <= innerHeight;
+  }), { message: "the activated clauses heading clears the fixed public header" }).toBe(true);
+
+  // Native summaries must open and close by keyboard, with their actual content visible only when open.
+  for (const [selector, content] of [
+    ["#evidence-preserving [data-contract-detail]", ":scope > div"],
+    ['[data-contract-reference="flow"]', "[data-contract-flow]"],
+    ['[data-contract-reference="interop"]', "[data-interop-standards]"],
+  ]) {
+    const disclosure = page.locator(selector);
+    const toggle = disclosure.locator(":scope > summary");
+    await toggle.focus();
+    await expect(toggle).toBeFocused();
+    await expect(toggle).not.toHaveCSS("outline-style", "none");
+    await page.keyboard.press("Enter");
+    await expect(disclosure).toHaveAttribute("open", "");
+    await expect(disclosure.locator(content)).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(disclosure).not.toHaveAttribute("open", "");
+    await expect(disclosure.locator(content)).toBeHidden();
+    await expect(toggle).toBeFocused();
+  }
+
+  for (let index = 0; index < await disclosures.count(); index += 1) {
+    await disclosures.nth(index).locator(":scope > summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(disclosures.nth(index)).toHaveAttribute("open", "");
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await capture("expanded");
+
+  await compare.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/explore\?act=(change|change_compare)$/);
+  const changeStage = page.locator('[data-visual-world="explore"]');
+  await expect(changeStage).toBeVisible();
+  await expect(changeStage).toHaveAttribute("data-world-act", "change_compare");
 });

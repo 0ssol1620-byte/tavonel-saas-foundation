@@ -1,0 +1,47 @@
+.proof { min-width: 0; margin-top: 28px; border-top: 2px solid #171c20; color: #171c20; background: #f7f5ef; }
+.intro { padding-block: 20px 16px; }
+.eyebrow { margin: 0 0 8px; color: #46545e; font: 600 13px/1.5 var(--f-sans); }
+.intro h2 { color: #171c20; margin: 0 0 12px; font: 550 clamp(24px, 2.5vw, 30px)/1.15 var(--f-sans); letter-spacing: -.025em; }
+.intro > p:last-child { margin: 0; font: 400 15px/1.6 var(--f-sans); color: #46545e; }
+.facts { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 0; padding-block: 12px 16px; border-top: 1px solid #d8ddd9; }
+.facts div { min-width: 0; }
+.facts dt, .record dt, .fileDigest dt { color: #46545e; font: 500 13px/1.5 var(--f-sans); }
+.facts dd { margin: 4px 0 0; font: 500 15px/1.5 var(--f-sans); }
+.tree { min-width: 0; border-top: 1px solid #88928d; }
+.group, .integrity { min-width: 0; border-bottom: 1px solid #d8ddd9; }
+.group summary, .integrity summary { display: list-item; min-height: 44px; box-sizing: border-box; padding: 12px 8px; cursor: pointer; font: 500 15px/1.5 var(--f-sans); overflow-wrap: anywhere; }
+.group summary::marker, .integrity summary::marker { color: #2447b3; }
+.groupHeading { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; max-width: 100%; }
+.groupHeading code { font-size: 15px; }
+.groupHeading > span { color: #46545e; font-size: 13px; }
+.use { display: block; margin: 4px 0 0 16px; color: #46545e; font: 400 14px/1.5 var(--f-sans); }
+.files { list-style: none; margin: 0; padding: 0 8px 4px 24px; }
+.files li { min-width: 0; padding: 12px 0; border-top: 1px solid #d8ddd9; }
+.path { display: block; color: #171c20; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.format { margin: 4px 0 12px; color: #46545e; font: 400 13px/1.6 var(--f-sans); overflow-wrap: anywhere; }
+.fileDigest { margin: 0; }
+.fileDigest dd, .record dd { margin: 4px 0 0; }
+.fileDigest code, .record code { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.previewFrame { min-width: 0; margin-top: 16px; }
+.previewTitle { margin: 0 0 6px; font: 600 14px/1.5 var(--f-sans); }
+.previewNote { margin: 0 0 12px; color: #46545e; font: 400 13px/1.6 var(--f-sans); }
+.preview { box-sizing: border-box; max-width: 100%; max-height: 240px; margin: 0; padding: 12px; overflow: auto; overscroll-behavior: contain; border: 1px solid #88928d; color: #171c20; background: #fff; white-space: pre; }
+.preview code { font-size: 13px; line-height: 1.6; white-space: inherit; overflow-wrap: normal; }
+.integrity { margin-top: 12px; border-block: 1px solid #88928d; }
+.integrity > p { margin: 12px 8px; color: #46545e; font: 400 14px/1.6 var(--f-sans); }
+.record { margin: 16px 8px; }
+.record > div + div { margin-top: 12px; }
+.sources { list-style: none; margin: 0; padding: 0 8px 12px; }
+.sources li { padding-block: 12px; border-top: 1px solid #d8ddd9; }
+.sources li > span { display: block; color: #46545e; font: 500 13px/1.5 var(--f-sans); }
+.sources a, .actions a { display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; box-sizing: border-box; color: #2447b3; font: 500 14px/1.5 var(--f-sans); text-decoration: underline; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-direction: column; padding-block: 12px; }
+/* Keep focused controls and their outlines clear of rounded viewport scroll edges. */
+.proof :is(summary, a, pre) { scroll-margin-block: 8px; }
+.proof :is(summary, a, pre):focus-visible { outline: 3px solid #2447b3; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .proof { margin-top: 20px; }
+  .facts { gap: 12px 20px; }
+  .group summary, .integrity summary { padding-inline: 4px; }
+  .files { padding-inline: 20px 4px; }
+}

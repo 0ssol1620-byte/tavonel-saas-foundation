@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: { url: "/product/continuous-knowledge" },
   title: "Continuous recompilation — TAVONEL",
   description:
-    "The Compiler Contract: eight clauses that say what a compile guarantees when a source changes, each carrying the state it holds in TAVONEL.",
+    "Compare World versions after a source changes, then inspect the Compiler Contract and the current state of each clause.",
   /*
     No `robots` field here, and one line elsewhere is still wrong.
 
@@ -83,10 +83,25 @@ export default function ContinuousKnowledgePage() {
       <BreadcrumbJsonLd trail={TRAIL} />
       <section className="scene doc">
         <div className="shell">
-          <div className="body">
-            <div className="stack">
+          <div className={`body ${styles.intro}`} data-continuous-intro="">
+            <div className={styles.introHeading}>
               <DocBreadcrumb trail={TRAIL} />
-              <h1 className="document-title">Continuous recompilation — the Compiler Contract.</h1>
+              <h1 className="document-title">See what changed before you activate it.</h1>
+            </div>
+              <aside className={styles.summary} aria-labelledby="working-summary">
+                <h2 id="working-summary">From a source change to a reviewed version</h2>
+                <ol className={styles.workflow}>
+                  <li><h3>Compile a candidate</h3><p>A compile rebuilds the collection you give it into a new candidate World.</p></li>
+                  <li><h3>Compare the versions</h3><p>Inspect what changed and follow the evidence back to the source it came from.</p></li>
+                  <li><h3>Choose what becomes current</h3><p>A person activates the candidate. The version it replaces stays intact and readable.</p></li>
+                </ol>
+                <p className={styles.currentBoundary}>Current compilation rebuilds the whole collection. The public timeline compares complete compiles after the fact.</p>
+                <nav className={styles.summaryActions} aria-label="Compare versions or read the contract">
+                  <Link className={styles.changeLink} href={"/explore?act=change" as Route}>Compare the public World versions</Link>
+                  <Link href="#clauses">Read the eight-clause Compiler Contract</Link>
+                </nav>
+              </aside>
+            <div className={styles.timeline}>
               {/*
                 G1-019 / gap #10 (2026-09-22). Six hundred words about knowledge not being
                 compiled once ran down the right half of this page while the left half held the
@@ -97,19 +112,10 @@ export default function ContinuousKnowledgePage() {
               */}
               <WorldRecompileTimeline />
             </div>
-            <div className="stack">
-              {/*
-                BQ-109 / BQ-134: the lede reads at one weight. The bold ran from the middle of the
-                paragraph to the end of the next sentence, which is not emphasis -- it is a second
-                heading typeset inside a paragraph, on the sentence a reader was going to read
-                anyway. The sentence is unchanged; only the weight is.
-              */}
-              <p className="lede">
-                Knowledge is not compiled once. Sources keep moving, and a compiler that cannot say
-                what a change did to the knowledge standing on it is an indexer with extra steps.
-                The Compiler Contract is the eight promises a compile has to keep — and, on this
-                page, the state each one actually holds here.
-              </p>
+          </div>
+
+          <section className={styles.section} aria-labelledby="clauses">
+            <h2 id="clauses">The eight clauses</h2>
               <dl className={styles.key}>
                 {STATE_KEY.map((state) => (
                   <div key={state} data-state={state}>
@@ -124,11 +130,6 @@ export default function ContinuousKnowledgePage() {
                 measurements it does publish are in the{" "}
                 <Link href={"/research/notes" as Route}>research notes</Link>.
               </p>
-            </div>
-          </div>
-
-          <section className={styles.section} aria-labelledby="clauses">
-            <h2 id="clauses">The eight clauses</h2>
             {/*
               G1-026. One list became two, with the page's first action between them.
 
@@ -164,8 +165,13 @@ export default function ContinuousKnowledgePage() {
                         <span className={styles.state} data-state-label="">{CONTRACT_STATE[clause.state].label}</span>
                       </div>
                       <p className={styles.promise}>{clause.promise}</p>
-                      <p className={styles.explain}>{clause.body}</p>
-                      <p className={styles.check}><b>WHERE TO CHECK IT</b>{clause.evidence}</p>
+                      <details className={styles.detail} data-contract-detail="">
+                        <summary aria-label={`Read ${clause.name}: explanation and evidence`}>Explanation and evidence</summary>
+                        <div className={styles.detailBody}>
+                          <p className={styles.explain}>{clause.body}</p>
+                          <p className={styles.check}><b>WHERE TO CHECK IT</b>{clause.evidence}</p>
+                        </div>
+                      </details>
                     </li>
                   ))}
                 </ol>
@@ -175,6 +181,9 @@ export default function ContinuousKnowledgePage() {
 
           <section className={styles.section} aria-labelledby="flow">
             <h2 id="flow">What a source change does</h2>
+            <details className={styles.reference} data-contract-reference="flow">
+              <summary>Read the source-change contract and diagram</summary>
+              <div className={styles.referenceBody}>
             <p className="lede">
               The contract describes one path. A revision arrives; the change is read for what it{" "}
               <i>means</i> rather than which bytes moved; the units standing on the changed region
@@ -196,10 +205,15 @@ export default function ContinuousKnowledgePage() {
               refuse, and the version a candidate replaces stays intact and readable either way.
               That is clause 04, and it is demonstrated.
             </p>
+              </div>
+            </details>
           </section>
 
           <section className={styles.section} aria-labelledby="interop">
             <h2 id="interop">Leaving the compiler</h2>
+            <details className={styles.reference} data-contract-reference="interop">
+              <summary>Read the formats and interchange standards</summary>
+              <div className={styles.referenceBody}>
             <p className="lede">
               A compiled World that can only be read inside the tool that made it is not an asset.
               The internal representation stays ours; what leaves is a signed package in formats
@@ -233,6 +247,8 @@ export default function ContinuousKnowledgePage() {
                 </li>
               ))}
             </ul>
+              </div>
+            </details>
           </section>
 
           <div className={styles.section}>
