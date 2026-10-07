@@ -95,7 +95,7 @@ export default function ContinuousKnowledgePage() {
                   <li><h3>Compare the versions</h3><p>Inspect what changed and follow the evidence back to the source it came from.</p></li>
                   <li><h3>Choose what becomes current</h3><p>A person activates the candidate. The version it replaces stays intact and readable.</p></li>
                 </ol>
-                <p className={styles.currentBoundary}>Selective recompilation is not available today. The public timeline compares complete compiles after the fact.</p>
+                <p className={styles.currentBoundary}>Current compilation rebuilds the whole collection. The public timeline compares complete compiles after the fact.</p>
                 <nav className={styles.summaryActions} aria-label="Compare versions or read the contract">
                   <Link className={styles.changeLink} href={"/explore?act=change" as Route}>Compare the public World versions</Link>
                   <Link href="#clauses">Read the eight-clause Compiler Contract</Link>
