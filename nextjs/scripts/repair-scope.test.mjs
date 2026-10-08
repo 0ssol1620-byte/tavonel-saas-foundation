@@ -3728,20 +3728,20 @@ test('affected grounded-ask admission: a missing selected Ask suite at head and 
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/);
   }
 });
-// ---- Affected Explore admission: eight exact paths, four ordinary suites and one 1440-only browser suite; the historical 424 report stays separate ----
+// ---- Affected Explore admission: nine exact paths, five ordinary suites and one 1440-only browser suite; the historical 424 report stays separate ----
 import { readAffectedExecution } from './run-repair-check.mjs';
-const AFFECTED_EXPLORE_PATHS=Object.freeze(['nextjs/lib/explore-sample.ts','nextjs/lib/explore-sample.test.ts','nextjs/lib/explore-story.ts','nextjs/lib/explore-story.test.ts',
+const AFFECTED_EXPLORE_PATHS=Object.freeze(['nextjs/lib/explore-sample.ts','nextjs/lib/explore-sample.test.ts','nextjs/lib/explore-story.ts','nextjs/lib/explore-story.test.ts','nextjs/lib/explore-entry-proof.test.ts',
   'nextjs/components/explore/ask-overlay.tsx','nextjs/components/explore/evidence-workbench.tsx','nextjs/components/explore/evidence-workbench.test.tsx','nextjs/e2e/explore.spec.ts']);
-const AFFECTED_EXPLORE_SUITES=Object.freeze(['components/explore/evidence-workbench.test.tsx','lib/explore-sample.test.ts','lib/explore-story.test.ts','lib/visual-world-model.test.ts']);
+const AFFECTED_EXPLORE_SUITES=Object.freeze(['components/explore/evidence-workbench.test.tsx','lib/explore-entry-proof.test.ts','lib/explore-sample.test.ts','lib/explore-story.test.ts','lib/visual-world-model.test.ts']);
 const AFFECTED_EXPLORE_SPEC='e2e/explore.spec.ts',AFFECTED_EXPLORE_TSX='components/explore/evidence-workbench.test.tsx';
-test('affected Explore admission: each of the eight exact paths selects explore-answer, the four suites, one browser suite and fresh native debt', () => {
+test('affected Explore admission: each of the nine exact paths selects explore-answer, the five suites, one browser suite and fresh native debt', () => {
   const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='explore-answer');
   assert.equal(owners.length,1);const [owner]=owners;
   assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
     [AFFECTED_EXPLORE_SUITES,[AFFECTED_EXPLORE_SPEC],[],false,false,false,false,undefined,undefined]);
   for (const flag of ['exploreRepairPresentation','solutionsPagesPresentation','requireSolutionsCaptures','historicalStaticFailure','historicalBrowserFailure']) assert.ok(!owner[flag],flag);
   assert.ok(!AFFECTED_GROUPS.some(o=>['explore-repair','solutions-pages'].includes(o.group)),'no historical profile name is an affected owner');
-  assert.equal(AFFECTED_EXPLORE_PATHS.length,8);assert.equal(new Set(AFFECTED_EXPLORE_PATHS).size,8);
+  assert.equal(AFFECTED_EXPLORE_PATHS.length,9);assert.equal(new Set(AFFECTED_EXPLORE_PATHS).size,9);
   for (const path of AFFECTED_EXPLORE_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['explore-answer'],path);
     const map=affectedMap([affectedRecord('M',[path])]);
@@ -3750,7 +3750,7 @@ test('affected Explore admission: each of the eight exact paths selects explore-
     assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],path);
     assert.match(map.nativeEvidence.status,/neither executed nor claimed/,path);
   }
-  // Added and deleted regular files in the owner map the same way; the whole eight-path delta is one owner.
+  // Added and deleted regular files in the owner map the same way; the whole nine-path delta is one owner.
   const delta=affectedMap(AFFECTED_EXPLORE_PATHS.map(path=>affectedRecord(path.endsWith('.test.tsx')?'A':'M',[path],path.endsWith('.test.tsx')?'000000':'100644')));
   assert.deepEqual([delta.failures,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],[[],['explore-answer'],[...AFFECTED_EXPLORE_PATHS].sort(),AFFECTED_EXPLORE_SUITES,[AFFECTED_EXPLORE_SPEC]]);
   assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_EXPLORE_PATHS].sort());
@@ -3776,7 +3776,7 @@ test('affected Explore admission: mixed changes keep the Ask, ACL, workspace and
     affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
   const map=affectedMap(records);
   assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','ocr-gpu-worker','workspace-lifecycle']]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES));assert.equal(map.unitFiles.length,17);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES));assert.equal(map.unitFiles.length,18);
   assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,'e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -3829,7 +3829,7 @@ test('affected Explore admission: planBrowserRuns maps the Explore spec only to 
 });
 test('affected Explore admission: unknown siblings, bad spellings, bad modes and unknown rename endpoints refuse', () => {
   for (const path of ['nextjs/components/explore/ask-overlay.test.tsx','nextjs/components/explore/other.tsx','nextjs/components/explore/evidence-workbench.module.css','nextjs/components/explore/index.ts',
-    'nextjs/components/explore/evidence-workbench.test.ts','nextjs/components/Explore/ask-overlay.tsx','nextjs/lib/explore-sample.ts.bak','nextjs/lib/explore-samples.ts','nextjs/lib/explore-sample.tsx',
+    'nextjs/components/explore/evidence-workbench.test.ts','nextjs/components/Explore/ask-overlay.tsx','nextjs/lib/explore-sample.ts.bak','nextjs/lib/explore-samples.ts','nextjs/lib/explore-sample.tsx','nextjs/lib/explore-entry-proof.ts',
     'nextjs/lib/explore-story.spec.ts','nextjs/lib/explore.ts','nextjs/e2e/explore-extra.spec.ts','nextjs/e2e/explore.spec.tsx','nextjs/app/explore/page.tsx','lib/explore-sample.ts','nextjs/nextjs/lib/explore-story.ts']) {
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -3867,7 +3867,7 @@ test('affected Explore admission: a selected suite or the spec missing at head r
   const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',['nextjs/components/explore/evidence-workbench.test.tsx'],'100644','000000')],headHasFile:path=>path!=='nextjs/components/explore/evidence-workbench.test.tsx'});
   assert.deepEqual([deleted.groups,deleted.failures],[['explore-answer'],['selected owner check is absent at head: components/explore/evidence-workbench.test.tsx']]);
 });
-test('affected Explore admission: readAffectedExecution rereads the four-unit and 1440 browser reports and rejects missing, malformed, wrong-project and unowned reports', () => {
+test('affected Explore admission: readAffectedExecution rereads the five-unit and 1440 browser reports and rejects missing, malformed, wrong-project and unowned reports', () => {
   const map=affectedMap([affectedRecord('M',['nextjs/components/explore/evidence-workbench.tsx'])]);assert.deepEqual(map.failures,[]);
   const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
   const root=mkdtempSync(resolve(tmpdir(),'affected-explore-reports-'));
@@ -3884,7 +3884,7 @@ test('affected Explore admission: readAffectedExecution rereads the four-unit an
     assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing/);
     write(playwrightPath,playwright());
     const result=readAffectedExecution(root,plan);
-    assert.deepEqual(result.units,{files:4,passed:4,skipped:0,failed:0});
+    assert.deepEqual(result.units,{files:5,passed:5,skipped:0,failed:0});
     assert.deepEqual(result.browsers.map(b=>[b.project,b.passed,b.skipped,b.flaky,b.failed]),[['1440',1,0,0,0]]);
     const rejected=[
       [vitestPath,'{',/Vitest report is malformed JSON/],
@@ -3899,6 +3899,6 @@ test('affected Explore admission: readAffectedExecution rereads the four-unit an
       write(path,value);assert.throws(()=>readAffectedExecution(root,plan),pattern,String(pattern));
       write(vitestPath,vitest(AFFECTED_EXPLORE_SUITES));write(playwrightPath,playwright());
     }
-    assert.equal(readAffectedExecution(root,plan).units.passed,4,'the restored actual reports qualify again');
+    assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
