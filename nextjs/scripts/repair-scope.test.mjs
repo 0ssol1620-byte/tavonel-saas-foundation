@@ -3253,7 +3253,7 @@ test('affected 43-path integrated map selects the Dropbox SQL dependency fixture
   assert.equal(records.length,43);
   const map=affectedMap(records);
   assert.deepEqual(map.failures,[]);assert.equal(map.changedPaths.length,43);
-  assert.deepEqual(map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+  assert.deepEqual(map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
   assert.deepEqual([map.databaseChanged,map.runSelectorContracts,map.runCdrWorkerChecks,map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
   assert.deepEqual(map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
     'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
@@ -3328,8 +3328,15 @@ const affectedBaselineCache=new Map(),affectedBaselineBytes=path=>{
   if(!affectedBaselineCache.has(path))affectedBaselineCache.set(path,execFileSync('git',['-C',affectedRepoRoot,'show',`${AFFECTED_BASELINE.commit}:${path}`],{stdio:'pipe',maxBuffer:64*1024*1024}));
   return affectedBaselineCache.get(path);};
 const AFFECTED_INTEGRATED_PATHS=Object.freeze([...AFFECTED_PRODUCT_PATHS,...AFFECTED_CI_OWNER_PATHS,...AFFECTED_SQL_FIXTURE_PATHS].sort());
-// CI owners carry their actual candidate bytes. Product and SQL fixture leaves are path-exact stand-ins (baseline bytes plus one line, or a marker when
-// absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel product task.
+// The reviewed Ask answer fixture dependency set: the five original-answer leaves the grounded-ask owner needs at a combined head, whose
+// workspace page and ask-route-limits.test.ts (already in the 43-path checkpoint) select all five Ask suites. Only combined synthetic heads
+// carry them; isolated docs, rename, deletion and owner scenarios stay exactly as they were.
+const AFFECTED_ASK_ANSWER_PATHS=Object.freeze(['nextjs/lib/grounded-ask-packet.test.ts','nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask.ts',
+  'nextjs/lib/workspace-ask-copy.test.ts','nextjs/lib/workspace-ask-copy.ts']);
+const AFFECTED_COMBINED_PATHS=Object.freeze([...AFFECTED_INTEGRATED_PATHS,...AFFECTED_ASK_ANSWER_PATHS].sort());
+// CI owners carry their actual candidate bytes. Product (including the Ask answer leaves) and SQL fixture leaves are path-exact stand-ins (baseline
+// bytes plus one line, or a marker when absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel
+// product task.
 const affectedLeafBytes=path=>{
   if(AFFECTED_CI_OWNER_PATHS.includes(path))return readFileSync(resolve(affectedRepoRoot,path));
   let base;try{base=affectedBaselineBytes(path);}catch{return Buffer.from(`affected fixture stand-in for ${path}\n`);}
@@ -3378,7 +3385,7 @@ const affectedLink=(target,path,support,name)=>{
   if(process.platform==='win32'){const junction=resolve(support,name);mkdirSync(junction);symlinkSync(junction,path,'junction');}
   else symlinkSync(target,path,'file');
 };
-test('affected real Git map binds the integrated 43-path delta with rename, deletion and index-only edges from clean baseline checkouts',()=>{
+test('affected real Git map binds the combined 48-path head (43-path checkpoint plus the five Ask answer leaves) with rename, deletion and index-only edges from clean baseline checkouts',()=>{
   const previous=process.cwd();let fixture;
   try{
     fixture=affectedRealGitFixture();const {root,B,git,put,move,remove,commit,checkout,written}=fixture;
@@ -3386,27 +3393,38 @@ test('affected real Git map binds the integrated 43-path delta with rename, dele
     const source=head=>{const intent=affectedCollector.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return affectedCollector.verifyAffectedSource({headSha:head,intent});};
     const leaves=paths=>paths.map(path=>put(path,affectedLeafBytes(path)));
     assert.equal(AFFECTED_INTEGRATED_PATHS.length,43);
-    const integrated=commit(...leaves(AFFECTED_INTEGRATED_PATHS));
-    // Exact target tree: the baseline child differs from the baseline in exactly the 43 written leaves.
-    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),AFFECTED_INTEGRATED_PATHS);
-    for(const path of AFFECTED_INTEGRATED_PATHS)assert.equal(git(['rev-parse',`${integrated}:${path}`]).trim(),written[path],path);
+    assert.equal(AFFECTED_COMBINED_PATHS.length,48);assert.equal(new Set(AFFECTED_COMBINED_PATHS).size,48);
+    const integrated=commit(...leaves(AFFECTED_COMBINED_PATHS));
+    // Exact target tree: the baseline child differs from the baseline in exactly the 48 written leaves.
+    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),AFFECTED_COMBINED_PATHS);
+    for(const path of AFFECTED_COMBINED_PATHS)assert.equal(git(['rev-parse',`${integrated}:${path}`]).trim(),written[path],path);
     const full=source(integrated);
-    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,AFFECTED_INTEGRATED_PATHS);
-    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,AFFECTED_COMBINED_PATHS);
+    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    // The page/ask-route-limits overlap selects every grounded-ask suite, and each one is present at the combined head.
+    for(const suite of AFFECTED_GROUPS.find(owner=>owner.group==='grounded-ask').unitFiles)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
     assert.deepEqual(full.map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
       'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
     assert.deepEqual(full.map.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
     assert.ok(full.map.unitFiles.includes('lib/dropbox-source-reconciliation.test.ts'));
     // A real deletion of a baseline Dropbox owner path is mapped to its owner and keeps the integrated head eligible.
-    const deleted=source(commit(...leaves(AFFECTED_INTEGRATED_PATHS),remove('nextjs/lib/dropbox-source-integrity.test.ts')));
+    const deleted=source(commit(...leaves(AFFECTED_COMBINED_PATHS),remove('nextjs/lib/dropbox-source-integrity.test.ts')));
     assert.equal(deleted.eligible,true,deleted.reason);
     assert.deepEqual(deleted.map.entries.filter(entry=>entry.status==='D'),[{status:'D',paths:['nextjs/lib/dropbox-source-integrity.test.ts'],groups:['dropbox-connector']}]);
     // The same deletion without the actual selected suite fails closed instead of shrinking the Dropbox selection.
     const orphaned=source(commit(remove('nextjs/lib/dropbox-source-integrity.test.ts')));
     assert.equal(orphaned.eligible,false);assert.match(orphaned.reason,/selected owner check is absent at head: lib\/dropbox-source-reconciliation\.test\.ts/);
-    assert.match(source(commit(...leaves(AFFECTED_INTEGRATED_PATHS.filter(path=>path!=='nextjs/lib/dropbox-source-reconciliation.test.ts')))).reason,/absent at head: lib\/dropbox-source-reconciliation\.test\.ts/);
-    assert.match(source(commit(...leaves(AFFECTED_INTEGRATED_PATHS),remove('supabase/tests/connector_checkpoints.sql'))).reason,/selected database fixture is absent at head: supabase\/tests\/connector_checkpoints\.sql/);
+    assert.match(source(commit(...leaves(AFFECTED_COMBINED_PATHS.filter(path=>path!=='nextjs/lib/dropbox-source-reconciliation.test.ts')))).reason,/absent at head: lib\/dropbox-source-reconciliation\.test\.ts/);
+    assert.match(source(commit(...leaves(AFFECTED_COMBINED_PATHS),remove('supabase/tests/connector_checkpoints.sql'))).reason,/selected database fixture is absent at head: supabase\/tests\/connector_checkpoints\.sql/);
+    // The populated Ask fixture cannot weaken the guard: the combined head without workspace-ask-copy.test.ts refuses on exactly that suite,
+    // and the bare 43-path checkpoint (no Ask answer leaves) refuses on it too.
+    const askless=commit(...leaves(AFFECTED_COMBINED_PATHS.filter(path=>path!=='nextjs/lib/workspace-ask-copy.test.ts')),remove('nextjs/lib/workspace-ask-copy.test.ts'));
+    assert.throws(()=>git(['cat-file','-e',`${askless}:nextjs/lib/workspace-ask-copy.test.ts`]),undefined,'the Ask suite is absent at the head');
+    const asklessSource=source(askless);
+    assert.equal(asklessSource.eligible,false);assert.equal(asklessSource.reason,'Affected map failed closed: selected owner check is absent at head: lib/workspace-ask-copy.test.ts');
+    const checkpointOnly=source(commit(...leaves(AFFECTED_INTEGRATED_PATHS)));
+    assert.equal(checkpointOnly.eligible,false);assert.match(checkpointOnly.reason,/selected owner check is absent at head: lib\/workspace-ask-copy\.test\.ts/);
     // Both rename endpoints are mapped; a rename out of owner scope fails closed on its new endpoint.
     const renamed=source(commit(put('nextjs/lib/docs-content.ts','export const docs = 1;\n'),move('nextjs/app/docs/page.tsx','nextjs/app/docs/moved/page.tsx')));
     assert.equal(renamed.eligible,true,renamed.reason);assert.deepEqual(renamed.map.groups,['docs']);
@@ -3441,7 +3459,8 @@ test('affected plan to final gate qualifies only the byte-equal regular owner pl
   try{
     fixture=affectedRealGitFixture();const {root,B,put,commit}=fixture;
     support=mkdtempSync(resolve(tmpdir(),'affected-gate-support-'));
-    const head=commit(...AFFECTED_INTEGRATED_PATHS.map(path=>put(path,affectedLeafBytes(path))));
+    // The combined 48-path head: the 43-path checkpoint plus the five Ask answer leaves its grounded-ask selection requires.
+    const head=commit(...AFFECTED_COMBINED_PATHS.map(path=>put(path,affectedLeafBytes(path))));
     const cwd=resolve(root,'nextjs'),planPath=resolve(cwd,'repair-plan.json'),receiptPath=resolve(cwd,'repair-receipt.json');
     const event={number:141,pull_request:{number:141,base:{sha:B},head:{sha:head}}};
     const env={PR_BASE_SHA:B,PR_NUMBER:'141',REPAIR_ANCHOR_SHA:AUDITED_REPAIR_ANCHOR_SHA,REPAIR_HEAD_SHA:head,HEAD_SHA:head};
@@ -3451,7 +3470,7 @@ test('affected plan to final gate qualifies only the byte-equal regular owner pl
     const source=gate();
     assert.equal(source.eligible,true,source.reason);assert.equal(source.generatedPlan,undefined);
     const plan=affectedCollector.affectedPlan(normal,source),planBytes=Buffer.from(JSON.stringify(plan,null,2)+'\n');
-    assert.deepEqual(plan.affectedIntegration.changedPaths,AFFECTED_INTEGRATED_PATHS);
+    assert.deepEqual(plan.affectedIntegration.changedPaths,AFFECTED_COMBINED_PATHS);
     assert.match(affectedCollector.affectedLineageFailures(plan,source)[0],/not qualified by the final-gate owner/);
     assert.equal(buildRepairReceipt(plan,{headSha:head,failures:affectedCollector.affectedLineageFailures(plan,source)}).gate,'failed');
     writeFileSync(planPath,planBytes);
@@ -3496,4 +3515,216 @@ test('affected plan to final gate qualifies only the byte-equal regular owner pl
     writeFileSync(planPath,planBytes);cliRefused(/selector recomputation failed|differs from the independently recomputed current-head plan/);
     assert.equal(existsSync(receiptPath),false);
   }finally{process.argv[1]=entry;process.chdir(previous);fixture?.cleanup();if(support)rmSync(support,{recursive:true,force:true});}
+});
+// ---- Affected GPU admission: the two actual GPU worker paths, qualified only by the external image workflow ----
+const AFFECTED_GPU_PATHS=Object.freeze(['workers/foundation-ocr-gpu/app.py','workers/foundation-ocr-gpu/tests/test_app.py']);
+const affectedGpuProof=map=>({eligible:true,profile:affectedCollector.AFFECTED_PROFILE,headSha:affectedHeadSha,map});
+const affectedGpuPlan=records=>{
+  const map=affectedMap(records);assert.deepEqual(map.failures,[]);
+  return affectedCollector.affectedPlan(affectedCumulativeStandIn(affectedHeadSha,'b'.repeat(40)),affectedGpuProof(map));
+};
+test('affected GPU admission: both actual GPU worker paths map only to ocr-gpu-worker and invalidate historical native inputs', () => {
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='ocr-gpu-worker');
+  assert.equal(owners.length,1);
+  assert.deepEqual([owners[0].unitFiles,owners[0].browserFiles,Boolean(owners[0].worker),Boolean(owners[0].selector),Boolean(owners[0].database),Boolean(owners[0].nativeReuse)],[[],[],false,false,false,false]);
+  for (const path of AFFECTED_GPU_PATHS) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual(map.failures,[],path);assert.deepEqual(map.groups,['ocr-gpu-worker'],path);
+    assert.deepEqual([map.unitFiles,map.browserFiles,map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged],[[],[],false,false,false],path);
+    assert.equal(map.nativeEvidence.disposition,'fresh-seven-case-native-run-required',path);assert.deepEqual(map.nativeEvidence.invalidatingPaths,[path]);
+    assert.equal(map.nativeEvidence.freshRunClaimed,false,path);
+  }
+  const both=affectedMap([affectedRecord('M',[AFFECTED_GPU_PATHS[0]]),affectedRecord('A',[AFFECTED_GPU_PATHS[1]],'000000')]);
+  assert.deepEqual([both.failures,both.groups],[[],['ocr-gpu-worker']]);
+});
+test('affected GPU admission: unsupported GPU-adjacent paths, spellings and modes fail closed', () => {
+  for (const path of ['workers/foundation-ocr-gpu/tests/test_other.py','workers/foundation-ocr-gpu/tests/test_app_extra.py','workers/foundation-ocr-gpu/tests/conftest.py',
+    'workers/foundation-ocr-gpu/test_app.py','workers/foundation-ocr-gpu/app_v2.py','workers/foundation-ocr-gpu/src/app.py','workers/foundation-ocr-gpu/App.py',
+    'workers/foundation-ocr-gpu/requirements.txt','workers/foundation-ocr-gpu/Dockerfile','workers/foundation-ocr-gpu/README.md',
+    'workers/foundation-ocr-cpu/app.py','workers/foundation-ocr-cpu/tests/test_app.py','nextjs/workers/foundation-ocr-gpu/app.py']) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths],[[`unmapped changed endpoint: ${path}`],[],[path]],path);
+  }
+  for (const path of ['workers/foundation-ocr-gpu/./app.py','workers//foundation-ocr-gpu/app.py','workers/foundation-ocr-gpu/tests/../app.py','workers\\foundation-ocr-gpu\\app.py','workers/foundation-ocr-gpu/app.py '])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['M','100644','120000'],['M','120000','120000'],['M','160000','160000']])
+    assert.deepEqual(affectedMap([affectedRecord(status,[AFFECTED_GPU_PATHS[0]],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${AFFECTED_GPU_PATHS[0]}`]);
+  // An unsupported sibling closes the whole map instead of shrinking it to the admitted path.
+  const mixed=affectedMap([affectedRecord('M',[AFFECTED_GPU_PATHS[0]]),affectedRecord('M',['workers/foundation-ocr-gpu/Dockerfile'])]);
+  assert.deepEqual(mixed.failures,['unmapped changed endpoint: workers/foundation-ocr-gpu/Dockerfile']);
+  assert.throws(()=>affectedCollector.affectedPlan(affectedCumulativeStandIn(affectedHeadSha,'b'.repeat(40)),affectedGpuProof(mixed)),/clean fail-closed map/);
+});
+test('affected GPU admission: CDR ownership is unchanged and the GPU owner never selects CDR/CPU checks', () => {
+  const cdr=affectedMap([affectedRecord('M',['quarantine-sidecar/foundation-cdr-worker/src/ocr.ts'])]);
+  assert.deepEqual([cdr.failures,cdr.groups,cdr.runCdrWorkerChecks],[[],['ocr-worker'],true]);
+  const gpu=affectedGpuPlan(AFFECTED_GPU_PATHS.map(path=>affectedRecord('M',[path])));
+  assert.deepEqual([gpu.runCdrWorkerChecks,gpu.runWorkflowStaticGate,gpu.runFullHermeticVitest,gpu.runScriptContracts,gpu.runDatabaseRehearsal,gpu.unitFiles,gpu.browserFiles],[false,false,false,false,false,[],[]]);
+  const both=affectedGpuPlan([affectedRecord('M',['quarantine-sidecar/foundation-cdr-worker/src/ocr.ts']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])]);
+  assert.equal(both.runCdrWorkerChecks,true);
+  assert.deepEqual(both.affectedIntegration.entries.map(entry=>entry.groups),[['ocr-worker'],['ocr-gpu-worker']]);
+  assert.ok(both.deferredGroups.includes('ocr-gpu-worker'));assert.ok(!both.deferredGroups.includes('ocr-worker'));
+});
+test('affected GPU admission: receipt keeps ocr-gpu-worker pending with no pass anchor, names the exact external job and preserves release debt', () => {
+  const plan=affectedGpuPlan(AFFECTED_GPU_PATHS.map(path=>affectedRecord('M',[path])));
+  assert.deepEqual([plan.deferredGroups,plan.groups],[['native-world-race-fresh-run','ocr-gpu-worker'],['native-world-race-fresh-run','ocr-gpu-worker']]);
+  const docsOnly=affectedGpuPlan([affectedRecord('M',['README.md'])]);
+  assert.deepEqual(docsOnly.deferredGroups,[]);
+  assert.deepEqual(plan.pendingQualificationDebt,[...new Set([...docsOnly.pendingQualificationDebt,'native-world-race-fresh-run','ocr-gpu-worker'])].sort());
+  assert.deepEqual(plan.pendingDebt,plan.pendingQualificationDebt);
+  assert.deepEqual(plan.pendingFullDebt,['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair']);
+  assert.deepEqual(plan.cumulativeRelease.pendingQualificationDebt,['database-contract']);
+  assert.deepEqual([plan.fullQualification,plan.inheritedChecks],['pending',{}]);
+  const obligation=plan.qualificationReasons.filter(reason=>reason.includes('foundation-ocr-gpu-image.yml'));
+  assert.deepEqual(obligation,[`ocr-gpu-worker is pending independent verification: the external .github/workflows/foundation-ocr-gpu-image.yml job candidate must run on exact head ${affectedHeadSha} with the worker pytest and the non-publishing CUDA image build plus provider/runtime checks; Repair neither executes nor inherits it, and no local CPU/CDR pass substitutes for it.`]);
+  assert.equal(plan.qualificationReasons.at(-1),'Cumulative PR/full release debt stays pending separately.');
+  assert.ok(!docsOnly.qualificationReasons.some(reason=>reason.includes('foundation-ocr-gpu-image.yml')));
+  // An apparent local pass (CDR, pytest or a claimed GPU result) never clears the deferred GPU debt or earns a pass anchor.
+  for (const executedChecks of [{},{cdrWorker:'success',localPytest:'success','ocr-gpu-worker':'passed in this run'}]) {
+    const receipt=buildRepairReceipt(plan,{headSha:affectedHeadSha,executedChecks});
+    assert.deepEqual([receipt.gate,receipt.fullQualification,receipt.runResults['ocr-gpu-worker'],receipt.runResults['native-world-race-fresh-run']],['passed-scoped-only','pending','pending-deferred','pending-deferred']);
+    assert.deepEqual(receipt.passedGroupAnchors,{});assert.ok(receipt.pendingDebt.includes('ocr-gpu-worker'));
+    assert.deepEqual(receipt.pendingFullDebt,plan.pendingFullDebt);
+  }
+  const wrongHead=buildRepairReceipt(plan,{headSha:'e'.repeat(40)});
+  assert.deepEqual([wrongHead.gate,wrongHead.runResults['ocr-gpu-worker']],['failed','pending-deferred']);assert.ok(wrongHead.pendingDebt.includes('ocr-gpu-worker'));
+  // DB and native debt stay alongside the GPU obligation.
+  const withSql=affectedGpuPlan([affectedRecord('M',[AFFECTED_GPU_PATHS[1]]),affectedRecord('M',['supabase/tests/a.sql'])]);
+  assert.deepEqual(withSql.deferredGroups,['database-contract','native-world-race-fresh-run','ocr-gpu-worker']);
+  const sqlReceipt=buildRepairReceipt(withSql,{headSha:affectedHeadSha});
+  for (const group of withSql.deferredGroups) {
+    assert.equal(sqlReceipt.runResults[group],'pending-deferred',group);assert.ok(sqlReceipt.pendingDebt.includes(group),group);assert.ok(!(group in sqlReceipt.passedGroupAnchors),group);
+  }
+});
+test('affected GPU admission: only the candidate job pins the exact PR head and stays non-publishing; the manual/main publish route is unchanged', () => {
+  const text=readFileSync(new URL('../../.github/workflows/foundation-ocr-gpu-image.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  const head='${{ github.event.pull_request.head.sha || github.sha }}';
+  const [preamble,jobs]=text.split('\njobs:\n');
+  assert.equal(preamble,['name: foundation-ocr-gpu-image','','on:','  pull_request:','    paths:','      - "workers/foundation-ocr-gpu/**"','      - ".github/workflows/foundation-ocr-gpu-image.yml"',
+    '  push:','    branches: [main]','    paths:','      - "workers/foundation-ocr-gpu/**"','      - ".github/workflows/foundation-ocr-gpu-image.yml"','  workflow_dispatch:','',
+    'permissions:','  contents: read','','concurrency:','  group: foundation-ocr-gpu-${{ github.ref }}',"  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",'',
+    'env:','  IMAGE: ghcr.io/0ssol1620-byte/tavonel-foundation-ocr-gpu',''].join('\n'));
+  const candidate=jobs.slice(0,jobs.indexOf('\n  publish:\n')),publish=jobs.slice(jobs.indexOf('\n  publish:\n'));
+  assert.ok(candidate.startsWith("  candidate:\n    if: github.ref != 'refs/heads/main' && github.event_name != 'workflow_dispatch'\n"));
+  assert.ok(candidate.includes('      - name: Checkout\n        uses: actions/checkout@v4\n        with:\n          ref: '+head+'\n'));
+  assert.ok(candidate.includes('            org.opencontainers.image.revision='+head+'\n'));
+  assert.ok(!candidate.includes('revision=${{ github.sha }}'));
+  for (const kept of ['push: false','load: true','tags: foundation-ocr-gpu:candidate','python -m pytest tests -q',"'CUDAExecutionProvider' in ort.get_available_providers()",'test "$(id -u)" = 10001'])
+    assert.ok(candidate.includes(kept),kept);
+  for (const absent of ['push: true','docker push','docker/login-action','packages: write','ghcr.io','env.IMAGE']) assert.ok(!candidate.includes(absent),absent);
+  assert.ok(publish.startsWith("\n  publish:\n    # A manual branch build publishes only its unique commit/run tag and digest.\n    # It never updates a mutable tag or changes a production endpoint.\n"+
+    "    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/main' && github.event_name != 'pull_request')\n"));
+  assert.ok(publish.includes('      - name: Checkout\n        uses: actions/checkout@v4\n\n'));
+  assert.ok(publish.includes('            org.opencontainers.image.revision=${{ github.sha }}\n'));
+  assert.ok(publish.includes('docker push "$tag"'));assert.ok(!publish.includes('pull_request.head.sha'));
+  assert.equal(text.split(head).length-1,2);
+});
+// ---- Affected grounded-ask admission: eight exact paths, five Ask suites, overlapping the acl and workspace-lifecycle owners ----
+const AFFECTED_ASK_PATHS=Object.freeze(['nextjs/lib/grounded-ask.ts','nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask-packet.test.ts','nextjs/app/workspace/page.tsx',
+  'nextjs/lib/workspace-ask-copy.ts','nextjs/lib/workspace-ask-copy.test.ts','nextjs/lib/context-packet.test.ts','nextjs/lib/ask-route-limits.test.ts']);
+const AFFECTED_ASK_SUITES=Object.freeze(['lib/ask-route-limits.test.ts','lib/context-packet.test.ts','lib/grounded-ask-packet.test.ts','lib/grounded-ask.test.ts','lib/workspace-ask-copy.test.ts']);
+const AFFECTED_ASK_OVERLAPS=Object.freeze({'nextjs/lib/ask-route-limits.test.ts':'acl','nextjs/app/workspace/page.tsx':'workspace-lifecycle'});
+const AFFECTED_ACL_UNITS=Object.freeze(['lib/acl-refresh-core.test.mjs','lib/ask-route-limits.test.ts','lib/connector-source-access.test.ts','lib/google-drive-acl-capture.test.ts','lib/pgtap-fixtures.test.ts','lib/source-acl-admission-migration.test.ts']);
+const AFFECTED_LIFECYCLE_UNITS=Object.freeze(['lib/visual-world-model.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
+const affectedUnion=(...lists)=>[...new Set(lists.flat())].sort();
+const affectedAskPlan=map=>affectedCollector.affectedPlan(affectedCumulativeStandIn(affectedHeadSha,'b'.repeat(40)),affectedGpuProof(map));
+test('affected grounded-ask admission: exactly eight owner paths select exactly five Ask suites, no unrelated flags and fresh native debt', () => {
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='grounded-ask');
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_ASK_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  for (const path of AFFECTED_ASK_PATHS)
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group).sort(),['grounded-ask',...(AFFECTED_ASK_OVERLAPS[path]?[AFFECTED_ASK_OVERLAPS[path]]:[])].sort(),path);
+  for (const path of AFFECTED_ASK_PATHS.filter(path=>!AFFECTED_ASK_OVERLAPS[path])) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['grounded-ask'],AFFECTED_ASK_SUITES,[]],path);
+    assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],path);
+    assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],path);
+    assert.match(map.nativeEvidence.status,/neither executed nor claimed/,path);
+  }
+});
+test('affected grounded-ask admission: ask-route-limits.test.ts overlaps acl and keeps every old ACL check and the fixture contract', () => {
+  const map=affectedMap([affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts'])]);
+  assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['acl','grounded-ask'],affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_ASK_SUITES),[]]);
+  assert.equal(map.unitFiles.length,10);
+  assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
+  assert.deepEqual([map.databaseChanged,map.databaseTests,map.nativeEvidence.disposition],[false,[],'fresh-seven-case-native-run-required']);
+  // Every other ACL path stays ACL-only and never picks up the Ask suites.
+  for (const path of ['nextjs/lib/connector-source-access.ts','nextjs/lib/acl-refresh-core.test.mjs']) {
+    const acl=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([acl.failures,acl.groups,acl.unitFiles],[[],['acl'],AFFECTED_ACL_UNITS],path);
+  }
+  const aclSql=affectedMap([affectedRecord('M',['supabase/tests/google_viewer_principal_boundary.sql'])]);
+  assert.deepEqual([aclSql.groups,aclSql.databaseTests],[['acl','database-contract'],['supabase/tests/google_viewer_principal_boundary.sql']]);
+});
+test('affected grounded-ask admission: workspace page overlaps workspace-lifecycle, world-lifecycle.spec.ts is unchanged and the answer delta unions every selection', () => {
+  const page=affectedMap([affectedRecord('M',['nextjs/app/workspace/page.tsx'])]);
+  assert.deepEqual([page.failures,page.groups,page.unitFiles,page.browserFiles],[[],['grounded-ask','workspace-lifecycle'],affectedUnion(AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES),['e2e/world-lifecycle.spec.ts']]);
+  assert.deepEqual([page.nativeEvidence.disposition,page.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',['nextjs/app/workspace/page.tsx']]);
+  const spec=affectedMap([affectedRecord('M',['nextjs/e2e/world-lifecycle.spec.ts'])]);
+  assert.deepEqual([spec.failures,spec.groups,spec.unitFiles,spec.browserFiles,spec.nativeEvidence.disposition],[[],['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS,['e2e/world-lifecycle.spec.ts'],'historical-input-reuse']);
+  // The complete answer delta: the six original paths plus ask-route-limits.test.ts and world-lifecycle.spec.ts.
+  const delta=[affectedRecord('M',['nextjs/lib/grounded-ask.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.test.ts']),affectedRecord('A',['nextjs/lib/grounded-ask-packet.test.ts'],'000000'),
+    affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('A',['nextjs/lib/workspace-ask-copy.ts'],'000000'),affectedRecord('A',['nextjs/lib/workspace-ask-copy.test.ts'],'000000'),
+    affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/e2e/world-lifecycle.spec.ts'])];
+  const map=affectedMap(delta);
+  assert.deepEqual([map.failures,map.groups,map.changedPaths.length],[[],['acl','grounded-ask','workspace-lifecycle'],8]);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES));assert.equal(map.unitFiles.length,14);
+  assert.deepEqual(map.browserFiles,['e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual(map.fixtureContracts.map(({group,suite})=>({group,suite})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts'}]);
+  assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
+  assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(map.nativeEvidence.invalidatingPaths,delta.map(record=>record.paths[0]).filter(path=>path!=='nextjs/e2e/world-lifecycle.spec.ts').sort());
+  const plan=affectedAskPlan(map);
+  assert.deepEqual(plan.affectedIntegration.changedPaths,map.changedPaths);
+  for (const file of map.unitFiles) assert.ok(plan.unitFiles.includes(file),file);
+  assert.ok(plan.deferredGroups.includes('native-world-race-fresh-run'));assert.equal(plan.fullQualification,'pending');
+});
+test('affected grounded-ask admission: adjacent paths, bad spellings and modes refuse; workspace siblings stay lifecycle-only', () => {
+  for (const path of ['nextjs/lib/context-packet.ts','nextjs/lib/context-packet-builder.test.ts','nextjs/lib/grounded-ask-packet.ts','nextjs/lib/grounded-ask-route.ts','nextjs/lib/grounded-asks.ts',
+    'nextjs/lib/grounded-ask.tsx','nextjs/lib/grounded-ask.test.tsx','nextjs/lib/grounded-ask.spec.ts','nextjs/lib/grounded-ask/index.ts','nextjs/lib/grounded-ask.ts.bak','nextjs/lib/Grounded-Ask.ts',
+    'nextjs/lib/ask-route-limits.ts','nextjs/lib/workspace-ask-copy.tsx','nextjs/lib/workspace-ask.ts','nextjs/components/workspace-ask-copy.ts','nextjs/e2e/grounded-ask.spec.ts',
+    'nextjs/app/api/collections/[id]/ask/route.ts','lib/grounded-ask.ts','nextjs/nextjs/lib/grounded-ask.ts']) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  for (const path of ['nextjs/app/workspace/ask/page.tsx','nextjs/app/workspace/page.test.tsx','nextjs/app/workspace/layout.tsx']) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS],path);
+  }
+  for (const path of ['nextjs/lib/./grounded-ask.ts','nextjs//lib/grounded-ask.ts','nextjs/lib/../lib/grounded-ask.ts','nextjs\\lib\\grounded-ask.ts','nextjs/lib/grounded-ask.ts ','nextjs/app/workspace/page.tsx\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+    assert.deepEqual(affectedMap([affectedRecord(status,['nextjs/lib/grounded-ask.ts'],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: nextjs/lib/grounded-ask.ts`]);
+  assert.match(affectedMap([affectedRecord('C075',['nextjs/lib/grounded-ask.ts','nextjs/lib/grounded-ask.test.ts'])]).failures[0],/^unsupported change status C075:/);
+  assert.match(affectedMap([affectedRecord('T',['nextjs/lib/grounded-ask.ts'],'100644','120000')]).failures[0],/^unsupported change status T:/);
+});
+test('affected grounded-ask admission: a rename with an unknown endpoint refuses in either direction; recognized renames union both endpoints', () => {
+  for (const paths of [['nextjs/lib/grounded-ask.ts','nextjs/lib/grounded-ask-v2.ts'],['nextjs/app/workspace/page.tsx','nextjs/app/answer/page.tsx'],
+    ['nextjs/lib/ask-answer.ts','nextjs/lib/grounded-ask.ts'],['nextjs/lib/context-packet.ts','nextjs/lib/context-packet.test.ts']]) {
+    const unknown=paths.find(path=>!AFFECTED_ASK_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  const within=affectedMap([affectedRecord('R100',['nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask-packet.test.ts'])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],['grounded-ask'],AFFECTED_ASK_SUITES,[{status:'R100',paths:['nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask-packet.test.ts'],groups:['grounded-ask']}]]);
+  const across=affectedMap([affectedRecord('R085',['nextjs/lib/context-packet.test.ts','nextjs/lib/ask-route-limits.test.ts'])]);
+  assert.deepEqual([across.failures,across.groups,across.unitFiles],[[],['acl','grounded-ask'],affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_ASK_SUITES)]);
+  const intoLifecycle=affectedMap([affectedRecord('R100',['nextjs/lib/workspace-ask-copy.ts','nextjs/app/workspace/ask-copy.ts'])]);
+  assert.deepEqual([intoLifecycle.failures,intoLifecycle.entries[0].groups],[[],['grounded-ask','workspace-lifecycle']]);
+});
+test('affected grounded-ask admission: a missing selected Ask suite at head and a mixed known/unknown change both fail closed', () => {
+  for (const suite of AFFECTED_ASK_SUITES) {
+    const map=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',['nextjs/lib/grounded-ask.ts'])],headHasFile:path=>path!==`nextjs/${suite}`});
+    assert.deepEqual(map.failures,[`selected owner check is absent at head: ${suite}`],suite);
+  }
+  const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',['nextjs/lib/workspace-ask-copy.test.ts'],'100644','000000')],headHasFile:path=>path!=='nextjs/lib/workspace-ask-copy.test.ts'});
+  assert.deepEqual([deleted.groups,deleted.failures],[['grounded-ask'],['selected owner check is absent at head: lib/workspace-ask-copy.test.ts']]);
+  for (const [records,unknown] of [[[affectedRecord('M',['nextjs/lib/grounded-ask.ts']),affectedRecord('M',['nextjs/lib/context-packet.ts'])],'nextjs/lib/context-packet.ts'],
+    [[affectedRecord('M',['nextjs/lib/docs-content.ts']),affectedRecord('M',['nextjs/lib/workspace-ask-copy.ts']),affectedRecord('A',['nextjs/lib/grounded-ask-route.ts'],'000000')],'nextjs/lib/grounded-ask-route.ts']]) {
+    const map=affectedMap(records);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]]);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/);
+  }
 });

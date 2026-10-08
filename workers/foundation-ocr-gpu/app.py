@@ -310,16 +310,17 @@ def normalized_bbox(
     return [x1, y1, x2, y2]
 
 
-def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrRegion]:
-    """Reads every page. `on_page` is called once per page, as soon as that page is done.
+def raster_regions(document, on_page: PageObserver | None = None, indexes=None) -> list[OcrRegion]:
+    """Reads every page, or only `indexes`. `on_page` is called once per page, as soon as that page is done.
 
     The per-page callback exists so the reading can be watched while it happens. It changes
     nothing about what this function returns: the caller still receives the complete region list,
-    and a caller that passes no observer behaves exactly as before.
+    and a caller that passes no observer behaves exactly as before. A page that reads empty is
+    still reported, with no regions, so the observer is never left waiting on it.
     """
     regions: list[OcrRegion] = []
     order = 0
-    for index in range(len(document)):
+    for index in range(len(document)) if indexes is None else indexes:
         page = document[index]
         try:
             bitmap = page.render(scale=RENDER_SCALE)
@@ -338,8 +339,6 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
                 )
         finally:
             page.close()
-        if not lines:
-            continue
         width, height = image.size
         for line_index, line in enumerate(lines):
             text = line["text"]
@@ -511,19 +510,20 @@ def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion
             textpage = page.get_textpage()
             try:
                 text = textpage.get_text_bounded().strip()
-                if text:
-                    region = native_page_region(page, textpage, text, index, len(regions))
-                    if region:
-                        regions.append(region)
+                region = native_page_region(page, textpage, text, index, len(regions)) if text else None
             finally:
                 textpage.close()
                 page.close()
             if on_page is not None:
-                on_page(index + 1, page_count, "native", [r for r in regions if r["pageIndex0"] == index])
-        if not regions:
-            # No embedded text anywhere. The raster pass re-reads the same pages, so it reports
-            # them again rather than leaving the observer stuck at the last native page.
-            regions = raster_regions(document, on_page)
+                on_page(index + 1, page_count, "native", [region] if region else [])
+            if region:
+                regions.append(region)
+                continue
+            # No usable embedded text on this page, whatever the other pages carry. The raster
+            # pass re-reads it, so it reports the page again rather than leaving the observer
+            # stuck on its empty native view. A page with usable native text is never rasterized.
+            for raster_region in raster_regions(document, on_page, (index,)):
+                regions.append({**raster_region, "order": len(regions)})
         text = "\n".join(region["text"] for region in regions).strip()
         if not text:
             raise HTTPException(422, "OCR source has no extractable text regions")

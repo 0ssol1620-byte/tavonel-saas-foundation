@@ -7,6 +7,7 @@ import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import { failureSentence } from "@/lib/workspace-failure-copy";
+import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
@@ -150,15 +151,16 @@ type GroundedAnswer = {
   status: "grounded" | "abstained";
   answer: string;
   reason: string | null;
+  /* Both builders' citations: the compiled one sends no sourceId or relevance, and may send a null page or box. */
   citations: Array<{
     evidenceId: string;
-    sourceId: string;
+    sourceId?: string;
     sourceVersionId: string;
-    pageNumber1: number;
-    bbox1000: [number, number, number, number];
+    pageNumber1: number | null;
+    bbox1000: [number, number, number, number] | null;
     authority: string;
     authorityTier?: string;
-    relevance: number;
+    relevance?: number;
     claimIds?: string[];
     entityIds?: string[];
     relevanceBreakdown?: {
@@ -169,7 +171,7 @@ type GroundedAnswer = {
     };
     excerpt: string;
   }>;
-  receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
+  receipt: { collectionId: string; manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
 /*
@@ -639,6 +641,11 @@ export default function WorkspacePage() {
   /* undefined: no source region opened. null: World Studio stays open with nothing selected, so
      picking a graph object or pressing Clear there does not unmount the inspector. */
   const [askEvidenceId, setAskEvidenceId] = useState<string | null | undefined>(undefined);
+  /* The read model of the World that answered, or null: the loaded model, the selected collection
+     and the current answer receipt must name one collection and manifest. Both source resolution
+     and the Ask inspector read only this, so a cleared answer, a changed selection, a loading or
+     absent model, or a candidate beside the answering active World opens nothing. */
+  const askWorldModel = qualifyAskWorldModel(worldReadModel, collectionResult, askResult?.receipt);
 
   const getAuthToken = async () => {
     const client = getSupabaseBrowserClient();
@@ -2335,6 +2342,7 @@ export default function WorkspacePage() {
     if (!collectionResult || !activeWorld || askQuestion.trim().length < 3) return;
     setAskBusy(true);
     setAskResult(null);
+    setAskEvidenceId(undefined);
     try {
       const token = await getAuthToken();
       if (!token) {
@@ -2356,7 +2364,7 @@ export default function WorkspacePage() {
       trackFunnelOnce("workspace_first_ask", { status: json.status });
       setNotice(json.status === "grounded"
         ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
-        : "The active world abstained because no region-bound evidence matched the question.");
+        : askAbstentionCopy(json.reason, navigator.languages).notice);
     } catch {
       setNotice("The answer response could not be read. Your question is kept. No answer is shown; retry when the connection is available.");
     } finally {
@@ -3398,17 +3406,21 @@ export default function WorkspacePage() {
                 {askResult ? (
                   <div className={`ask-result ${askResult.status}`} role="status">
                     <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
-                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : "No region-bound evidence matched this question."}</p>
+                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : askAbstentionCopy(askResult.reason, navigator.languages).result}</p>
                     {askResult.citations.length > 0 ? (
                       <ol data-sensitive="content">
-                        {askResult.citations.map((citation) => (
-                          <li key={`${citation.evidenceId}-${citation.pageNumber1}`}>
+                        {askResult.citations.map((citation, index) => {
+                          // One strict resolver for both availability and the click; null keeps the button disabled.
+                          const regionId = resolveCitationRegion(citation, askWorldModel?.evidence);
+                          const sourceCopy = askSourceCopy(navigator.languages);
+                          return (
+                          <li key={`${index}-${citation.evidenceId}`}>
                             <b>{citation.evidenceId}</b>
                             <span>
-                              Page {citation.pageNumber1} · bbox [{citation.bbox1000.join(", ")}] · {citation.authorityTier ?? citation.authority}
+                              Page {citation.pageNumber1 ?? sourceCopy.missing} · bbox {citation.bbox1000 ? `[${citation.bbox1000.join(", ")}]` : sourceCopy.missing} · {citation.authorityTier ?? citation.authority}
                               {citation.claimIds?.length ? ` · ${citation.claimIds.length} claim${citation.claimIds.length === 1 ? "" : "s"}` : ""}
                             </span>
-                            {citation.relevanceBreakdown ? (
+                            {citation.relevanceBreakdown && citation.relevance !== undefined ? (
                               <span>
                                 score {citation.relevance.toFixed(3)} · lexical {citation.relevanceBreakdown.lexical.toFixed(2)} · graph {citation.relevanceBreakdown.graph.toFixed(2)} · time {citation.relevanceBreakdown.temporal.toFixed(2)} · authority {citation.relevanceBreakdown.authority.toFixed(2)}
                               </span>
@@ -3416,19 +3428,23 @@ export default function WorkspacePage() {
                             <q>{citation.excerpt}</q>
                             <button
                               type="button"
-                              onClick={() => {
-                                const evidence = worldReadModel?.evidence.find((item) => item.id === citation.evidenceId)
-                                  ?? worldReadModel?.evidence.find((item) => item.sourceId === citation.sourceId && item.page === citation.pageNumber1);
-                                setAskEvidenceId(evidence?.id ?? null);
-                              }}
-                              disabled={!worldReadModel?.evidence.some((item) => item.id === citation.evidenceId || (item.sourceId === citation.sourceId && item.page === citation.pageNumber1))}
+                              onClick={() => { if (regionId !== null) setAskEvidenceId(regionId); }}
+                              disabled={regionId === null}
                             >Open source region</button>
+                            {regionId === null ? <small>{askWorldModel ? sourceCopy.unavailable : sourceCopy.unverified}</small> : null}
                           </li>
-                        ))}
+                          );
+                        })}
                       </ol>
                     ) : null}
                     <small>Citations verified against the active World revision.</small>
-                    {askResult.status === "abstained" ? (
+                    {askResult.status === "abstained" && askResult.reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT ? (
+                      <div className="workspace-intake-actions">
+                        <button type="button" onClick={() => document.getElementById("ask-question")?.focus()}>
+                          {askAbstentionCopy(askResult.reason, navigator.languages).action}
+                        </button>
+                      </div>
+                    ) : askResult.status === "abstained" ? (
                       <div className="workspace-intake-actions">
                         <button type="button" onClick={() => navigateSurface("sources")}>Add the source that would answer this</button>
                         <button type="button" onClick={() => navigateSurface("review")}>Check what is waiting for review</button>
@@ -3436,8 +3452,8 @@ export default function WorkspacePage() {
                     ) : null}
                   </div>
                 ) : null}
-                {askEvidenceId !== undefined ? (
-                  <WorldStudioUltimate model={worldReadModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
+                {askWorldModel && askEvidenceId !== undefined ? (
+                  <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
               </section>
               ) : null}

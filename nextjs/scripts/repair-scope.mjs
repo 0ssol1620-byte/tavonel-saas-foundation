@@ -1674,7 +1674,14 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: ['lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/retrieval-docs-parity.test.ts'], browserFiles: ['e2e/docs-reading-layout.spec.ts'], nativeReuse: true }),
   affectedGroup('workspace-lifecycle', /^nextjs\/(?:app\/workspace\/.+|components\/(?:world-studio-ultimate|world-directory-tree|world-ontology-viewer|world-graph-canvas|workspace-ultimate-shell)(?:\.module\.css|\.tsx)|components\/world-visual\/.+|lib\/(?:visual-world-model|world-graph-layout|workspace-failure-copy|world-directory-and-ontology)(?:\.test)?\.ts|e2e\/world-lifecycle\.spec\.ts)$/,
     { unitFiles: ['lib/world-directory-and-ontology.test.ts', 'lib/visual-world-model.test.ts', 'lib/world-graph-layout.test.ts', 'lib/workspace-failure-copy.test.ts'], browserFiles: ['e2e/world-lifecycle.spec.ts'], nativeReuse: true }),
+  // Grounded Ask: exactly eight paths. Overlaps acl on ask-route-limits.test.ts and workspace-lifecycle on app/workspace/page.tsx;
+  // both keep their own selections. Product Ask behavior, so never nativeReuse: any match requires the fresh native run.
+  affectedGroup('grounded-ask', /^nextjs\/(?:app\/workspace\/page\.tsx|lib\/(?:grounded-ask(?:-packet)?\.test|grounded-ask|workspace-ask-copy(?:\.test)?|context-packet\.test|ask-route-limits\.test)\.ts)$/,
+    { unitFiles: ['lib/grounded-ask.test.ts', 'lib/grounded-ask-packet.test.ts', 'lib/context-packet.test.ts', 'lib/ask-route-limits.test.ts', 'lib/workspace-ask-copy.test.ts'] }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
+  // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
+  // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
+  affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/test_app\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',

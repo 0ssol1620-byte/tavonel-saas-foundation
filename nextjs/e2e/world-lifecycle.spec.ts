@@ -218,6 +218,7 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
           },
         ],
         receipt: {
+          collectionId,
           manifestDigest: activeManifest,
           retrieval: "adaptive-multilingual-region-v2",
           outputSha256: `sha256:${"f".repeat(64)}`,
@@ -398,6 +399,315 @@ test("Ask connection failure retains the question and allows an explicit grounde
   expect(requests).toBe(2);
   expect(errors).toEqual([]);
 });
+
+/*
+  An overflowing compiled answer and the source regions it may open.
+
+  The read model is built the way world-read-model.ts builds it: region id
+  `${evidenceId}:${chunkId}`, blockId = chunkId. Two regions of one cited evidence id share page 2,
+  so only the exact box can choose between them -- and the bare-id or sourceId+page lookups this
+  replaced would have opened the top one, or nothing. The citations have the shape the compiled
+  route returns (answerFromContextPacket): no sourceId, no relevance, a box that may be null.
+*/
+function askRegion(evidenceId: string, blockId: string, bbox: [number, number, number, number], excerpt: string) {
+  return { id: `${evidenceId}:${blockId}`, sourceId: "doc-a", sourceVersionId: "version-1", page: 2, bbox, blockId, excerpt, authority: "official", digest: `sha256:${"1".repeat(64)}` };
+}
+
+const overflowAskModel = {
+  ...worldModel,
+  evidence: [
+    askRegion("evidence-a", "block-top", [100, 200, 900, 300], "Top region of page two."),
+    askRegion("evidence-a", "block-bottom", [100, 600, 900, 700], "Bottom region of page two."),
+    askRegion("evidence-nobox", "block-nobox", [100, 800, 900, 900], "Region whose citation carries no box."),
+    askRegion("evidence-twin", "block-twin-1", [100, 400, 900, 500], "First twin region."),
+    askRegion("evidence-twin", "block-twin-2", [100, 400, 900, 500], "Second twin region."),
+  ],
+};
+
+function compiledCitation(evidenceId: string, unitId: string, bbox1000: [number, number, number, number] | null) {
+  return {
+    evidenceId, evidenceIds: [evidenceId], unitId, sourceVersionId: "version-1", pageNumber1: 2, bbox1000,
+    authority: "official", claimIds: [], entityIds: [], excerpt: `Cited excerpt ${unitId}.`,
+    retrieval: { lexicalRank: 1, denseRank: null, structureRank: null, rerankerScore: null },
+  };
+}
+
+const ASK_OVERFLOW_COPY = {
+  "en-US": {
+    result: "The selected evidence is too long for a complete answer, so no partial answer is shown. Open a cited source region below where one is available, or ask a narrower question.",
+    action: "Ask a narrower question",
+    unavailable: "This cited source region cannot be opened: the active World has no single region matching its evidence, version, page and box. The citation stays listed; no location is guessed.",
+    unverified: "This cited source region cannot be opened here: the loaded World is not confirmed as the same collection and revision that answered this question, or is still loading. The citation stays listed; no location is guessed.",
+    missing: "unavailable",
+  },
+  "ko-KR": {
+    result: "선택된 근거가 너무 길어 완전한 답변을 표시할 수 없으며, 일부만 잘라낸 답변은 표시하지 않습니다. 열 수 있는 인용 원문 영역이 있으면 아래에서 열어 보거나 더 좁은 질문을 해 주세요.",
+    action: "더 좁은 질문하기",
+    unavailable: "이 인용 원문 영역은 열 수 없습니다. 활성 World에 근거, 버전, 페이지, 영역이 모두 일치하는 영역이 하나로 확인되지 않습니다. 인용은 그대로 표시되며 위치를 추측하지 않습니다.",
+    unverified: "이 인용 원문 영역은 여기서 열 수 없습니다. 불러온 World가 이 질문에 답한 것과 같은 컬렉션·리비전으로 확인되지 않았거나 아직 불러오는 중입니다. 인용은 그대로 표시되며 위치를 추측하지 않습니다.",
+    missing: "정보 없음",
+  },
+} as const;
+
+/*
+  The overflow answer above, answered by the active World, against whichever manifest the page
+  selects: the read model of every manifest holds the same regions, so only World identity can
+  tell an answering World from a candidate beside it. Source reads and served manifests are recorded.
+*/
+async function routeOverflowAsk(page: Page, reads: string[], served: string[]) {
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, async route => {
+    expect(route.request().headers().authorization).toMatch(/^Bearer \S+$/);
+    const manifest = new URL(route.request().url()).searchParams.get("manifest");
+    await route.fulfill({ json: { model: { ...overflowAskModel, world: { ...overflowAskModel.world, manifestDigest: manifest, status: manifest === activeManifest ? "active" : "candidate" } } } });
+    served.push(manifest ?? "");
+  });
+  await page.route(`**/api/collections/${collectionId}/ask`, route => route.fulfill({
+    json: {
+      code: "ANSWER_ABSTAINED",
+      retrievalPath: "compiled-retrieval-v1",
+      answerMode: "evidence_excerpts",
+      status: "abstained",
+      answer: "",
+      reason: "EVIDENCE_EXCEEDS_ANSWER_LIMIT",
+      citations: [
+        compiledCitation("evidence-a", "unit-bottom", [100, 600, 900, 700]),
+        compiledCitation("evidence-nobox", "unit-nobox", null),
+        compiledCitation("evidence-twin", "unit-twin", [100, 400, 900, 500]),
+        compiledCitation("evidence-missing", "unit-missing", [100, 200, 900, 300]),
+      ],
+      receipt: { collectionId, manifestDigest: activeManifest, retrieval: "bge-m3-v1", candidatePromotion: false, outputSha256: `sha256:${"f".repeat(64)}` },
+    },
+  }));
+  await page.route("**/api/documents/*/source?**", route => {
+    reads.push(route.request().url());
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+  });
+}
+
+for (const locale of ["en-US", "ko-KR"] as const) {
+  test.describe(`overflowing compiled Ask in ${locale}`, () => {
+    test.use({ locale });
+
+    test("opens only the exactly bound source region and marks the rest unavailable", async ({ page }) => {
+      const copy = ASK_OVERFLOW_COPY[locale];
+      const pageErrors: string[] = [];
+      page.on("pageerror", error => pageErrors.push(error.message));
+      await installSession(page);
+      // The selected revision is the active one, so the read model the resolver reads is the active World's.
+      await mockWorkspace(page, false, activeManifest);
+      await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => {
+        expect(route.request().headers().authorization).toMatch(/^Bearer \S+$/);
+        const manifest = new URL(route.request().url()).searchParams.get("manifest");
+        return route.fulfill({ json: { model: { ...overflowAskModel, world: { ...overflowAskModel.world, manifestDigest: manifest, status: manifest === activeManifest ? "active" : "candidate" } } } });
+      });
+      await page.route(`**/api/collections/${collectionId}/ask`, route => {
+        expect(route.request().headers().authorization).toMatch(/^Bearer /);
+        return route.fulfill({
+          json: {
+            code: "ANSWER_ABSTAINED",
+            retrievalPath: "compiled-retrieval-v1",
+            answerMode: "evidence_excerpts",
+            status: "abstained",
+            answer: "",
+            reason: "EVIDENCE_EXCEEDS_ANSWER_LIMIT",
+            citations: [
+              compiledCitation("evidence-a", "unit-bottom", [100, 600, 900, 700]),
+              compiledCitation("evidence-nobox", "unit-nobox", null),
+              compiledCitation("evidence-twin", "unit-twin", [100, 400, 900, 500]),
+              // Same source, page and box as the top region, under an id this World does not hold.
+              compiledCitation("evidence-missing", "unit-missing", [100, 200, 900, 300]),
+            ],
+            receipt: { collectionId, manifestDigest: activeManifest, retrieval: "bge-m3-v1", candidatePromotion: false, outputSha256: `sha256:${"f".repeat(64)}` },
+          },
+        });
+      });
+      const reads: string[] = [];
+      await page.route("**/api/documents/*/source?**", route => {
+        reads.push(route.request().url());
+        expect(route.request().headers().authorization).toMatch(/^Bearer /);
+        return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+      });
+
+      await page.goto(`/workspace/ask?collection=${collectionId}`);
+      await page.getByLabel("Question").fill("When does the contract renew?");
+      await page.getByRole("button", { name: "Ask the active World" }).click();
+      const result = page.locator(".ask-result.abstained");
+      await expect(result.getByText(copy.result, { exact: true })).toBeVisible();
+      await expect(result.getByRole("button", { name: copy.action, exact: true })).toBeVisible();
+      await expect(result.getByRole("button", { name: "Add the source that would answer this" })).toHaveCount(0);
+
+      const citations = result.locator("ol > li");
+      await expect(citations).toHaveCount(4);
+      const [bound, unboxed, ambiguous, missing] = [0, 1, 2, 3].map(index => citations.nth(index));
+      const open = (item: typeof bound) => item.getByRole("button", { name: "Open source region", exact: true });
+      // Enabled only once the active read model has arrived, so the refusals below are not read before it.
+      await expect(open(bound)).toBeEnabled();
+      await expect(bound).toContainText("Page 2 · bbox [100, 600, 900, 700] · official");
+      await expect(bound.getByText(copy.unavailable, { exact: true })).toHaveCount(0);
+      // A null box renders a marker rather than breaking the list.
+      await expect(unboxed).toContainText(`Page 2 · bbox ${copy.missing} · official`);
+      for (const item of [unboxed, ambiguous, missing]) {
+        await expect(open(item)).toBeDisabled();
+        await expect(item.getByText(copy.unavailable, { exact: true })).toBeVisible();
+      }
+      for (const [item, evidenceId] of [[unboxed, "evidence-nobox"], [ambiguous, "evidence-twin"], [missing, "evidence-missing"]] as const) {
+        await expect(item.locator("b")).toHaveText(evidenceId);
+      }
+
+      const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+      await expect(inspector).toHaveCount(0);
+      expect(reads).toEqual([]);
+      await open(bound).click();
+
+      // World Studio opens on the bottom region, not the top one on the same page.
+      await expect(inspector.getByRole("heading", { name: "Selected evidence", exact: true })).toBeVisible();
+      await expect(inspector.locator(":scope > strong")).toHaveText("doc-a");
+      await expect(inspector.locator("dd")).toHaveText(["version-1", "2", "[100, 600, 900, 700]"]);
+      await expect(inspector.locator("blockquote")).toHaveText("Bottom region of page two.");
+      await expect(page.getByRole("button", { name: /Bottom region of page two/ })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByRole("button", { name: /Top region of page two/ })).toHaveAttribute("aria-pressed", "false");
+      // Through the existing authorized source read, for that region's own document and version.
+      await expect(inspector.getByRole("group", { name: "Source doc-a, page 2, exact evidence region", exact: true })).toHaveAttribute("data-state", "ready");
+      await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+      expect(reads).toHaveLength(1);
+      const read = new URL(reads[0]);
+      expect(read.pathname).toBe("/api/documents/doc-a/source");
+      expect(read.searchParams.get("version")).toBe("version-1");
+      const canvasBox = await inspector.locator("canvas").boundingBox();
+      const evidenceBox = await inspector.locator("[data-evidence-bbox]").boundingBox();
+      expect(canvasBox).not.toBeNull();
+      expect(evidenceBox).not.toBeNull();
+      expect(Math.abs(evidenceBox!.y - (canvasBox!.y + canvasBox!.height * 0.6))).toBeLessThan(2);
+      expect(Math.abs(evidenceBox!.height - canvasBox!.height * 0.1)).toBeLessThan(2);
+      expect(pageErrors).toEqual([]);
+    });
+
+    test("opens nothing from a selected candidate beside the active World that answered, though its regions are identical", async ({ page }) => {
+      const copy = ASK_OVERFLOW_COPY[locale];
+      const pageErrors: string[] = [];
+      page.on("pageerror", error => pageErrors.push(error.message));
+      await installSession(page);
+      // The candidate is selected; the receipt names the active manifest.
+      await mockWorkspace(page);
+      const reads: string[] = [];
+      const served: string[] = [];
+      await routeOverflowAsk(page, reads, served);
+
+      await page.goto(`/workspace/ask?collection=${collectionId}`);
+      await expect.poll(() => served).toContain(candidateManifest);
+      await page.getByLabel("Question").fill("When does the contract renew?");
+      await page.getByRole("button", { name: "Ask the active World" }).click();
+      const result = page.locator(".ask-result.abstained");
+      await expect(result.getByText(copy.result, { exact: true })).toBeVisible();
+      const citations = result.locator("ol > li");
+      await expect(citations).toHaveCount(4);
+      for (const index of [0, 1, 2, 3]) {
+        const item = citations.nth(index);
+        await expect(item.getByRole("button", { name: "Open source region", exact: true })).toBeDisabled();
+        // Identity, not region absence: the same-World refusal copy is not shown.
+        await expect(item.getByText(copy.unverified, { exact: true })).toBeVisible();
+        await expect(item.getByText(copy.unavailable, { exact: true })).toHaveCount(0);
+      }
+      await expect(page.getByRole("complementary", { name: "World selection inspector" })).toHaveCount(0);
+      expect(served.every(manifest => manifest === candidateManifest)).toBe(true);
+      expect(reads).toEqual([]);
+      expect(pageErrors).toEqual([]);
+    });
+
+    test("closes an opened source region when a new question clears the answer, and does not reopen it", async ({ page }) => {
+      const copy = ASK_OVERFLOW_COPY[locale];
+      const pageErrors: string[] = [];
+      page.on("pageerror", error => pageErrors.push(error.message));
+      await installSession(page);
+      await mockWorkspace(page, false, activeManifest);
+      const reads: string[] = [];
+      await routeOverflowAsk(page, reads, []);
+      // The second answer is held until the cleared state has been checked; nothing is timed.
+      let asks = 0;
+      let release!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      await page.route(`**/api/collections/${collectionId}/ask`, async route => {
+        asks++;
+        if (asks > 1) await held;
+        await route.fallback();
+      });
+
+      await page.goto(`/workspace/ask?collection=${collectionId}`);
+      await page.getByLabel("Question").fill("When does the contract renew?");
+      const submit = page.getByRole("button", { name: "Ask the active World" });
+      await submit.click();
+      const result = page.locator(".ask-result.abstained");
+      const bound = result.locator("ol > li").first();
+      const open = bound.getByRole("button", { name: "Open source region", exact: true });
+      await expect(open).toBeEnabled();
+      await open.click();
+      const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+      await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+      expect(reads).toHaveLength(1);
+
+      await submit.click();
+      await expect.poll(() => asks).toBe(2);
+      await expect(result).toHaveCount(0);
+      await expect(inspector).toHaveCount(0);
+      release();
+      await expect(result.getByText(copy.result, { exact: true })).toBeVisible();
+      // Same World again: the region is openable, but the earlier one is not reopened on its own.
+      await expect(open).toBeEnabled();
+      await expect(inspector).toHaveCount(0);
+      expect(reads).toHaveLength(1);
+      expect(pageErrors).toEqual([]);
+    });
+
+    test("closes an opened source region as soon as the selection moves to another revision", async ({ page }) => {
+      const copy = ASK_OVERFLOW_COPY[locale];
+      const pageErrors: string[] = [];
+      page.on("pageerror", error => pageErrors.push(error.message));
+      await installSession(page);
+      await mockWorkspace(page, false, activeManifest);
+      const reads: string[] = [];
+      const served: string[] = [];
+      await routeOverflowAsk(page, reads, served);
+
+      await page.goto(`/workspace/ask?collection=${collectionId}&manifest=${encodeURIComponent(activeManifest)}`);
+      await page.getByLabel("Question").fill("When does the contract renew?");
+      await page.getByRole("button", { name: "Ask the active World" }).click();
+      const result = page.locator(".ask-result.abstained");
+      const bound = result.locator("ol > li").first();
+      const open = bound.getByRole("button", { name: "Open source region", exact: true });
+      await expect(open).toBeEnabled();
+      await open.click();
+      const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+      await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+      expect(reads).toHaveLength(1);
+
+      /*
+        The active-pointer read that would clear the answer is held, so the candidate's read model
+        (identical regions) arrives while the active World's answer is still on screen: only the
+        identity gate stands between the remembered region and a candidate source read.
+      */
+      let release!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      await page.route(`**/api/collections/${collectionId}/world`, async route => {
+        await held;
+        await route.fallback();
+      });
+      // Browser history selects the revision, as this file's revision-history tests drive it.
+      await page.evaluate(url => { history.pushState(null, "", url); dispatchEvent(new PopStateEvent("popstate")); }, `/workspace/ask?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+      await expect.poll(() => served).toContain(candidateManifest);
+      await expect(inspector).toHaveCount(0);
+      await expect(open).toBeDisabled();
+      await expect(bound.getByText(copy.unverified, { exact: true })).toBeVisible();
+      await expect(bound.getByText(copy.unavailable, { exact: true })).toHaveCount(0);
+      expect(reads).toHaveLength(1);
+      release();
+      await expect(result).toHaveCount(0);
+      await expect(inspector).toHaveCount(0);
+      expect(reads).toHaveLength(1);
+      expect(pageErrors).toEqual([]);
+    });
+  });
+}
 
 test("a first candidate does not claim consumers are reading a previous active World", async ({ page }, testInfo) => {
   await installSession(page);

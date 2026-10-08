@@ -1392,8 +1392,15 @@ const AFFECTED_CI_OWNER_PATHS=Object.freeze([
 ]);
 // Existing Dropbox dependency contracts edited for compatibility; neither product owner nor CI owner.
 const AFFECTED_SQL_FIXTURE_PATHS=Object.freeze(['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_sync_page_snapshots.sql']);
-// CI owners carry their actual candidate bytes. Product and SQL fixture leaves are path-exact stand-ins (baseline bytes plus one line, or a marker when
-// absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel product task.
+// The reviewed Ask answer fixture dependency set: the five original-answer leaves the grounded-ask owner needs at a combined head, whose
+// workspace page and ask-route-limits.test.ts (already in the 43-path checkpoint) select all five Ask suites. Only combined synthetic heads
+// carry them; isolated docs, rename, SQL, mode and owner-output scenarios stay exactly as they were.
+const AFFECTED_ASK_ANSWER_PATHS=Object.freeze(['nextjs/lib/grounded-ask-packet.test.ts','nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask.ts',
+  'nextjs/lib/workspace-ask-copy.test.ts','nextjs/lib/workspace-ask-copy.ts']);
+const AFFECTED_ASK_SUITES=Object.freeze(['lib/ask-route-limits.test.ts','lib/context-packet.test.ts','lib/grounded-ask-packet.test.ts','lib/grounded-ask.test.ts','lib/workspace-ask-copy.test.ts']);
+// CI owners carry their actual candidate bytes. Product (including the Ask answer leaves) and SQL fixture leaves are path-exact stand-ins (baseline
+// bytes plus one line, or a marker when absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel
+// product task.
 const affectedLeafBytes=p=>{
   if(AFFECTED_CI_OWNER_PATHS.includes(p))return readFileSync(resolve(nativeRoot,p));
   let base;try{base=baselineBytes(p);}catch{return Buffer.from(`affected fixture stand-in for ${p}\n`);}
@@ -1436,7 +1443,7 @@ function affectedRealGitFixture(){
   try{checkout(B);}catch(error){rmSync(root,{recursive:true,force:true});throw error;}
   return {root,B,git,put,move,remove,commit,checkout,written,cleanup:()=>rmSync(root,{recursive:true,force:true})};
 }
-test('affected real Git map covers the integrated 43-path delta and its rename, deletion, index-only and owner-output edges from clean checkouts',()=>{
+test('affected real Git map covers the combined 48-path head (43-path checkpoint plus the five Ask answer leaves) and its rename, deletion, index-only and owner-output edges from clean checkouts',()=>{
   const previous=process.cwd();let fixture;
   try{
     fixture=affectedRealGitFixture();const {root,B,git,put,move,remove,commit,checkout,written}=fixture;
@@ -1444,21 +1451,33 @@ test('affected real Git map covers the integrated 43-path delta and its rename, 
     const map=head=>{const intent=world.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return world.verifyAffectedSource({headSha:head,intent});};
     const all=[...AFFECTED_PRODUCT_PATHS,...AFFECTED_CI_OWNER_PATHS,...AFFECTED_SQL_FIXTURE_PATHS].sort(),leaves=paths=>paths.map(p=>put(p,affectedLeafBytes(p)));
     assert.equal(all.length,43);
-    const integrated=commit(...leaves(all));
-    // Exact target tree: the baseline child differs from the baseline in exactly the 43 written leaves.
-    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),all);
-    for(const p of all)assert.equal(git(['rev-parse',`${integrated}:${p}`]).trim(),written[p],p);
+    const combined=[...all,...AFFECTED_ASK_ANSWER_PATHS].sort();
+    assert.equal(combined.length,48);assert.equal(new Set(combined).size,48);
+    const integrated=commit(...leaves(combined));
+    // Exact target tree: the baseline child differs from the baseline in exactly the 48 written leaves.
+    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),combined);
+    for(const p of combined)assert.equal(git(['rev-parse',`${integrated}:${p}`]).trim(),written[p],p);
     const full=map(integrated);
-    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,all);
-    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,combined);
+    // The workspace page and ask-route-limits.test.ts overlaps (and the Ask answer leaves) also select grounded-ask and its five suites.
+    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    for(const suite of AFFECTED_ASK_SUITES)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
     assert.deepEqual(full.map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
       'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
     assert.deepEqual(Object.keys(full.map.databaseDependencyReasons),['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql',
       'supabase/tests/connector_source_suspensions.sql','supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/foundation_jobs.sql']);
     // A selected owner suite or dependency fixture missing at the head fails the whole map closed.
-    assert.match(map(commit(...leaves(all.filter(p=>p!=='nextjs/lib/dropbox-source-reconciliation.test.ts')))).reason,/absent at head: lib\/dropbox-source-reconciliation\.test\.ts/);
-    assert.match(map(commit(...leaves(all),remove('supabase/tests/connector_checkpoints.sql'))).reason,/selected database fixture is absent at head: supabase\/tests\/connector_checkpoints\.sql/);
+    assert.match(map(commit(...leaves(combined.filter(p=>p!=='nextjs/lib/dropbox-source-reconciliation.test.ts')))).reason,/absent at head: lib\/dropbox-source-reconciliation\.test\.ts/);
+    assert.match(map(commit(...leaves(combined),remove('supabase/tests/connector_checkpoints.sql'))).reason,/selected database fixture is absent at head: supabase\/tests\/connector_checkpoints\.sql/);
+    // The populated Ask fixture cannot weaken the guard: the combined head without workspace-ask-copy.test.ts refuses on exactly that suite,
+    // and the bare 43-path checkpoint (no Ask answer leaves) refuses on it too.
+    const askless=commit(...leaves(combined.filter(p=>p!=='nextjs/lib/workspace-ask-copy.test.ts')),remove('nextjs/lib/workspace-ask-copy.test.ts'));
+    assert.throws(()=>git(['cat-file','-e',`${askless}:nextjs/lib/workspace-ask-copy.test.ts`]),undefined,'the Ask suite is absent at the head');
+    const asklessMap=map(askless);
+    assert.equal(asklessMap.eligible,false);assert.equal(asklessMap.reason,'Affected map failed closed: selected owner check is absent at head: lib/workspace-ask-copy.test.ts');
+    const checkpointOnly=map(commit(...leaves(all)));
+    assert.equal(checkpointOnly.eligible,false);assert.match(checkpointOnly.reason,/selected owner check is absent at head: lib\/workspace-ask-copy\.test\.ts/);
     // Index-only drift: a staged blob while the worktree bytes still equal HEAD.
     checkout(integrated);
     const drift=git(['hash-object','-w','--stdin'],{input:'staged drift\n'}).trim();git(['update-index','--cacheinfo',`100644,${drift},nextjs/lib/docs-content.ts`]);

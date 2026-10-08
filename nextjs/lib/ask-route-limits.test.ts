@@ -42,6 +42,8 @@ vi.mock("@/lib/retrieval-pipeline", async (importOriginal) => ({
 }));
 
 import { POST as ask, maxDuration } from "../app/api/collections/[id]/ask/route";
+import { buildContextPacket } from "./context-packet";
+import { answerFromContextPacket, COMPILED_ANSWER_CHARACTER_LIMIT, EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./grounded-ask";
 import { WORKSPACE_ASK_CONCURRENCY, resetWorkspaceCostGuard } from "./workspace-cost-guard";
 
 const WORKSPACE = "pilot-askcost";
@@ -309,6 +311,87 @@ describe("idempotency", () => {
     const other = await ask(question("an entirely different question", "shared-key-0001"), { params });
     expect(other.status).toBe(200);
     expect(pipeline).toHaveBeenCalledTimes(2);
+  });
+});
+
+/*
+  The compiled answer envelope through the real route: the pipeline is the only stub, and the
+  answer is the real answerFromContextPacket. Evidence over COMPILED_ANSWER_CHARACTER_LIMIT is an
+  abstention with no partial answer and its verified citations kept -- and a replay serves that
+  same receipt and those same citations without running retrieval again.
+*/
+describe("a compiled answer over its envelope", () => {
+  it("abstains with its verified citations and receipt, and replays both without re-running retrieval", async () => {
+    const packet = buildContextPacket([
+      {
+        unitId: "unit-overflow",
+        text: `Renewal clause ${"x".repeat(COMPILED_ANSWER_CHARACTER_LIMIT)}`,
+        claimIds: ["claim-renewal"],
+        entityIds: ["entity-contract"],
+        sourceVersionId: "version-a",
+        evidenceIds: ["evidence-a", "evidence-b"],
+        pageNumber1: 4,
+        bbox1000: [10, 20, 900, 800],
+        authority: "official",
+        lexicalRank: 1,
+        rerankerScore: 0.5,
+      },
+      {
+        unitId: "unit-unboxed",
+        text: "The notice period is ninety days.",
+        claimIds: [],
+        entityIds: [],
+        sourceVersionId: "version-a",
+        evidenceIds: ["evidence-c"],
+        pageNumber1: null,
+        bbox1000: null,
+        authority: "official",
+        denseRank: 2,
+      },
+    ], { worldId: COLLECTION, worldVersion: "3", retrievalProfile: "p", question: "what renews?" });
+    pipeline.mockResolvedValue({
+      ok: true,
+      packet,
+      diagnostics: { compileRunId: "run-1", retrievalProfileId: "p", rerankerApplied: true, gateRejections: [], degradations: [] },
+    });
+    const expected = answerFromContextPacket(packet, { collectionId: COLLECTION, manifestDigest: `sha256:${"d".repeat(64)}` });
+
+    const first = await ask(question("what renews?", "overflow-key-0001"), { params });
+    expect(first.status).toBe(200);
+    expect(first.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    const body = await first.json();
+    expect(body).toMatchObject({
+      code: "ANSWER_ABSTAINED",
+      retrievalPath: "compiled-retrieval-v1",
+      answerMode: "evidence_excerpts",
+      status: "abstained",
+      answer: "",
+      reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT,
+    });
+    // Exactly the builder's verified citations, in packet order, with nothing invented for them.
+    expect(body.citations).toEqual(expected.citations);
+    expect(body.citations.map((citation: { evidenceId: string }) => citation.evidenceId)).toEqual(["evidence-a", "evidence-c"]);
+    expect(body.citations[0]).toMatchObject({ evidenceIds: ["evidence-a", "evidence-b"], sourceVersionId: "version-a", pageNumber1: 4, bbox1000: [10, 20, 900, 800] });
+    expect(body.citations[1]).toMatchObject({ pageNumber1: null, bbox1000: null });
+    for (const citation of body.citations) {
+      expect(citation).not.toHaveProperty("sourceId");
+      expect(citation).not.toHaveProperty("relevance");
+    }
+    // The receipt is the one the builder signed for this World, not a fixture.
+    expect(body.receipt).toEqual(expected.receipt);
+    expect(body.receipt).toMatchObject({ collectionId: COLLECTION, manifestDigest: `sha256:${"d".repeat(64)}`, retrieval: "p", candidatePromotion: false });
+    expect(body.receipt.outputSha256).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(body.contextPacket).toEqual(packet);
+    expect(pipeline).toHaveBeenCalledTimes(1);
+
+    const replay = await ask(question("what renews?", "overflow-key-0001"), { params });
+    expect(replay.status).toBe(200);
+    expect(replay.headers.get("x-tavonel-idempotent-replay")).toBe("true");
+    const replayed = await replay.json();
+    expect(replayed).toEqual(body);
+    expect(replayed.receipt).toEqual(expected.receipt);
+    expect(replayed.citations).toEqual(expected.citations);
+    expect(pipeline).toHaveBeenCalledTimes(1);
   });
 });
 
