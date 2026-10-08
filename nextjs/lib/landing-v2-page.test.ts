@@ -1,7 +1,6 @@
 import { createElement } from "react";
-import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /*
   The one thing a bare `renderToStaticMarkup` cannot supply: the App Router's context.
@@ -13,11 +12,30 @@ import { describe, expect, it, vi } from "vitest";
 */
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
+/*
+  The live commercial posture cannot be reached through the environment here: `isLiveCommerce()`
+  also needs `activationPolicy.customerData`, a module constant that is closed in this deployment.
+  So the live branch is selected by swapping `primaryCallToAction()` for the live action it would
+  return; every other render goes through the real function.
+*/
+const commercial = vi.hoisted(() => ({ live: false }));
+vi.mock("./commercial-state", async importOriginal => {
+  const actual = await importOriginal<typeof import("./commercial-state")>();
+  const { SELF_SERVE_CTA } = await import("./site-navigation");
+  return {
+    ...actual,
+    primaryCallToAction: (...args: Parameters<typeof actual.primaryCallToAction>) =>
+      commercial.live ? SELF_SERVE_CTA : actual.primaryCallToAction(...args),
+  };
+});
+
 import LandingPage from "../components/landing-v2/landing-page";
-import HeroSourceCard, { selectHeroPreparedSample } from "../components/landing-v2/hero-source-card";
-import { buildHeroView, buildProofTabs } from "./landing-v2-runtime";
+import { HERO_FILM_POSTER } from "../components/landing-v2/hero-film";
+import { primaryCallToAction } from "./commercial-state";
+import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
 import { landingV2HeroExtra } from "./landing-v2-hero-copy";
+import { buildEvidenceRecord, buildHeroView, buildProofTabs, landingV2StateWord } from "./landing-v2-runtime";
 import {
   BARRED,
   LANDING_V2_FORBIDDEN,
@@ -25,6 +43,7 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
+import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 
 /*
   THE COMPOSITION GUARD (contract D9, D13).
@@ -93,62 +112,46 @@ function elements(html: string, tag: string): string[] {
 const attr = (open: string, name: string): string | undefined =>
   open.match(new RegExp(`\\s${name}="([^"]*)"`, "i"))?.[1];
 
-/** The 2026-09-30 approved masterplan supersedes historical scene ground names. */
-const PAPER_CSS = readFileSync(new URL("../app/paper-product.css", import.meta.url), "utf8");
+/**
+ * The ground sequence, read off the page rather than off the composition's own table.
+ * The first three beats are the source, its difficulty and its record, all read on paper; the
+ * change, trust and close beats keep the dark grounds their own components declare.
+ */
+const GROUND = ["paper", "paper", "paper", "obsidian", "obsidian", "obsidian"];
 
-describe("home prepared source sample", () => {
-  it("binds the committed question to its complete quotation, page, box and inspector", () => {
-    const prepared = selectHeroPreparedSample(buildHeroView(), buildProofTabs());
-    expect(prepared).not.toBeNull();
-    expect(prepared!.sample.question).toBe("What were operating expenses for research and development?");
-    expect(prepared!.sample.answerExcerpt).toBe("Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443");
-    expect(prepared!.sample.source).toMatchObject({
-      digest: "sha256:7fe2683c59e0b48f6c112bc17b3900d907f64236c138d1dd32f40d544b1ba89f",
-      filename: "apple-2026-q1-10-q-reference.pdf", page: 4,
-    });
-    expect(prepared!.region.id).toBe("evidence-274e80464ffc891ce2ed3077e7d67934:chunk-80ce9cad00306cf5d7cb85c911bdff20");
-    expect(prepared!.region.bbox1000).toEqual([64, 476, 932, 538]);
-    expect(prepared!.sample.openHref).toBe(prepared!.region.href);
-    expect(new URL(prepared!.region.href, "https://example.test").searchParams.get("evidence")).toBe(prepared!.region.id);
-  });
+/** One scene's markup: from its own `<section>` to the next one (scenes never nest). */
+function sceneOf(main: string, id: string): string {
+  const opens = [...main.matchAll(/<section(\s[^>]*)?>/g)];
+  const index = opens.findIndex(match => attr(match[1] ?? "", "id") === id);
+  expect(index, `scene ${id}`).toBeGreaterThan(-1);
+  return main.slice(opens[index]!.index, opens[index + 1]?.index ?? main.length);
+}
 
-  it.each(LOCALES)("%s renders a labelled prepared sample and unchanged English quotation", locale => {
-    const { sample, region } = selectHeroPreparedSample(buildHeroView(), buildProofTabs())!;
-    const html = renderToStaticMarkup(createElement(HeroSourceCard, { korean: locale === "ko" }));
-    expect(html).toContain(locale === "ko" ? "준비된 샘플 · 읽기 전용" : "Prepared sample · read only");
-    expect(html).toContain(locale === "ko" ? "원문 인용" : "Source quotation");
-    expect(html).toContain(`<p class="paper-source-question" lang="en" data-derived="1">${sample.question}</p>`);
-    expect(html).toContain(`<blockquote lang="en" data-derived="1">${sample.answerExcerpt}</blockquote>`);
-    expect(html).toContain(`data-source-digest="${sample.source.digest}"`);
-    expect(html).toContain(`data-source-page="4"`);
-    expect(html).toContain(`data-region-id="${region.id}"`);
-    expect(html).toContain('style="left:6.4%;top:47.6%;width:86.8%;height:6.2%"');
-    expect(html).toContain(`href="${region.href.replace(/&/g, "&amp;")}"`);
-    expect(html).toContain(sample.source.filename);
-    expect(html).toContain(locale === "ko" ? "기준 렌더" : "reference render");
-    expect(html).not.toContain("CONDENSED CONSOLIDATED STATEMENTS");
-  });
+/** A value as react-dom/server writes it into text or an attribute. */
+const escaped = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
 
-  it("does not substitute a heading when no prepared question matches the source", () => {
-    expect(selectHeroPreparedSample(buildHeroView(), [])).toBeNull();
-    const original = buildProofTabs()[0];
-    const mismatches = [
-      { ...original, source: { ...original.source, digest: "sha256:different" } },
-      { ...original, source: { ...original.source, page: 5 } },
-      { ...original, source: { ...original.source, filename: "different.pdf" } },
-      { ...original, region: { ...original.region, id: "missing" } },
-      { ...original, region: { ...original.region, bbox1000: [64, 475, 932, 538] } },
-      { ...original, openHref: "/explore" },
-      { ...original, answerExcerpt: "An invented answer" },
-      { ...original, answerTruncated: true },
-      { ...original, question: " " },
-    ];
-    for (const sample of mismatches) expect(selectHeroPreparedSample(buildHeroView(), [sample])).toBeNull();
-    const view = buildHeroView();
-    const truncated = { ...view, regions: view.regions.map(region => ({ ...region, excerptTruncated: true })) };
-    expect(selectHeroPreparedSample(truncated, [original])).toBeNull();
-  });
-});
+/** What a reader sees: tags gone, React's entities turned back into their characters. */
+const readable = (html: string): string =>
+  html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+
+/** The case the workbench is required to show; it renders nothing without one. */
+function homeCase(): EvidenceCase {
+  const value = buildHomeEvidenceCase(buildHeroView(), buildProofTabs());
+  expect(value, "a case bound to the committed hero page").not.toBeNull();
+  return value!;
+}
 
 describe("landing v2 -- the composition", () => {
   it.each(LOCALES)(
@@ -167,18 +170,20 @@ describe("landing v2 -- the composition", () => {
   );
 
   it.each(LOCALES)(
-    "%s applies the approved paper/ink work surface while retaining named landmarks",
+    "%s reserves paper for actual proof and source evidence",
     locale => {
-      expect(render(locale)).toContain('class="page lv2 paper-product"');
-      expect(PAPER_CSS).toContain("--ground: #f7f5ef");
-      expect(PAPER_CSS).toContain("--text-hi: #171c20");
-      expect(PAPER_CSS).toContain(".paper-product .paper-hero-grid");
-      expect(PAPER_CSS).toContain("prefers-reduced-motion:reduce");
+      const main = mainOf(render(locale));
+      const grounds = elements(main, "section").map(open =>
+        /\blv2-obsidian\b/.test(attr(open, "class") ?? "")
+          ? "obsidian"
+          : "paper"
+      );
+      expect(grounds).toEqual(GROUND);
     }
   );
 
   it.each(LOCALES)(
-    "%s has one h1, matching the approved source-first masterplan",
+    "%s has one h1, and it is the founder-owned headline",
     locale => {
       const html = render(locale);
       const main = mainOf(html);
@@ -196,23 +201,9 @@ describe("landing v2 -- the composition", () => {
       const bare = (value: string) => value.replace(/\s+/g, "");
       const expected =
         locale === "ko"
-          ? "문서에서 찾은 지식, 원문에서 확인하세요"
-          : "Knowledge from your documents. Evidence you can inspect.";
+          ? LANDING_V2_COPY.ko.hero.headline
+          : BRAND_LINE.headline;
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
-    }
-  );
-
-  it.each(LOCALES)(
-    "%s renders headline sentences targeted by the mounted paper stylesheet",
-    locale => {
-      const heading = mainOf(render(locale)).match(/<h1 id="lv2-hero-title">([\s\S]*?)<\/h1>/)?.[1] ?? "";
-      const sentences = [...heading.matchAll(/<span class="paper-hero-sentence">([^<]*)<\/span>/g)].map(match => match[1]);
-      expect(sentences).toEqual(locale === "ko"
-        ? ["문서에서 찾은 지식,", "원문에서 확인하세요"]
-        : ["Knowledge from your documents.", "Evidence you can inspect."]);
-      expect(PAPER_CSS).toMatch(/\.paper-product \.paper-hero-copy h1 \.paper-hero-sentence\s*\{[^}]*display:\s*block/);
-      expect(PAPER_CSS).toContain(".paper-product .paper-hero-copy h1 .paper-hero-sentence + .paper-hero-sentence");
-      expect(heading).not.toContain("aria-hidden");
     }
   );
 
@@ -244,7 +235,7 @@ describe("landing v2 -- the composition", () => {
     }
   );
 
-  it.each(LOCALES)("%s keeps evidence paths in Proof and Trust", locale => {
+  it.each(LOCALES)("%s keeps evidence paths in the workbench, the record and Trust", locale => {
     const main = mainOf(render(locale));
     expect(main).toContain("/explore?act=evidence&amp;evidence=");
     expect(main).toContain('href="/evidence"');
@@ -320,21 +311,47 @@ describe("landing v2 -- the composition", () => {
     expect(koTermDrift(text).map(entry => entry.wrong)).toEqual([]);
   });
 
+  /*
+    The compiler specimen printed a hand-typed period, unit and value beside the operating-expense
+    passage, and the proof tabs framed that passage as the answer to an R&D question. Home now
+    shows the passage as extracted text only, so neither the specimen nor any tab question is on
+    the page, and no media competes with the source page.
+  */
   it.each(LOCALES)(
-    "%s renders the deterministic compiler specimen without hero media",
+    "%s renders no specimen, no question framing and no hero media",
     locale => {
       const main = mainOf(render(locale));
       expect(main).not.toContain("<video");
       expect(main).not.toContain("<iframe");
-      expect(main).toContain("data-compiler-specimen");
-      expect(main).toContain(locale === "ko" ? ">원문</button>" : ">Page</button>");
-      expect(main).toContain(locale === "ko" ? ">활용</button>" : ">Intelligence</button>");
+      expect(main).not.toContain("<canvas");
+      expect(main).not.toContain("data-compiler-specimen");
+      expect(main).not.toContain('role="tablist"');
+      const text = readable(main);
+      for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
+      expect(text).not.toMatch(/verified answer/i);
+      expect(text).not.toContain(locale === "ko" ? "백만 달러" : "USD millions");
       expect(main).toContain(locale === "ko" ? "TIF 또는 GIF" : "TIF or GIF");
-      const heroImage = elements(main, "img").find(open => attr(open, "fetchpriority") === "high");
-      expect(heroImage, "the committed above-fold source page owns the image priority").toBeTruthy();
-      expect(attr(heroImage!, "loading")).toBe("eager");
+      // Only the workbench's source page may ask for priority; nothing below it competes.
+      expect(main.slice(main.indexOf('<section id="s2"'))).not.toMatch(/fetchpriority="high"/i);
     }
   );
+
+  /*
+    The reserved hard case is a slot in the model, not content: no packet was readable, so the
+    page may say a case is reserved and must not name, picture or answer it.
+  */
+  it.each(LOCALES)("%s says the reserved case is unprocessed and shows nothing from it", locale => {
+    const main = mainOf(render(locale));
+    const text = readable(sceneOf(main, "s2"));
+    expect(text).toContain(
+      locale === "ko"
+        ? "아직 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
+        : "It has not been processed, qualified or rights-cleared, so nothing from it is shown."
+    );
+    for (const absent of ["Landsat", "USGS", "NASA", "Cloud = No", "Collection 1"]) {
+      expect(readable(main), `the page mentions "${absent}"`).not.toContain(absent);
+    }
+  });
 
   /*
     `alt` is required to be PRESENT, not to be non-empty.
@@ -349,7 +366,7 @@ describe("landing v2 -- the composition", () => {
     "%s declares every image's box, alt and loading posture",
     locale => {
       const main = mainOf(render(locale));
-      const hero = main.slice(0, main.indexOf('<section id="s2"'));
+      const hero = sceneOf(main, "s1");
       const images = elements(main, "img");
       expect(images.length).toBeGreaterThan(0);
       for (const open of images) {
@@ -388,5 +405,233 @@ describe("landing v2 -- the composition", () => {
   it.each(LOCALES)("%s costs no prefetch below the fold", locale => {
     // T1-014: `prefetch={false}` renders as the absence of Next's prefetch, never as a truthy attr.
     expect(mainOf(render(locale))).not.toMatch(/\sprefetch="?true/);
+  });
+});
+
+/*
+  THE LEAD AND THE WORKBENCH.
+
+  The first beat is a view of the committed public sample, so each assertion compares it with the
+  artifact rather than with a typed string: if the snapshot is recompiled, the expected filename,
+  page, digest and passage move with it and the workbench must still print them.
+*/
+describe("landing v2 -- the lead and the workbench", () => {
+  it.each(LOCALES)(
+    "%s shows the source identity, location, full digest and the prepared, extracted status",
+    locale => {
+      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const view = buildHeroView();
+      const text = readable(hero);
+      expect(hero).toContain(`src="${escaped(view.image!.src)}"`);
+      expect(text).toContain(view.source.filename);
+      // The whole digest is in the markup (inside Source details), not only a `data-` attribute.
+      expect(view.source.digest.length).toBeGreaterThan(0);
+      expect(text).toContain(view.source.digest);
+      expect(text).toContain(
+        locale === "ko"
+          ? `${view.source.pageCount}쪽 중 ${view.source.page}쪽 · ${view.source.qualifierKo}`
+          : `page ${view.source.page} of ${view.source.pageCount} · ${view.source.qualifier}`
+      );
+      expect(text).toContain(
+        locale === "ko" ? "준비된 시연 / 아직 처리를 실행하지 않음" : "Prepared demonstration / processing not yet run"
+      );
+      expect(text).toContain(locale === "ko" ? "기존 추출 구절" : "Existing extracted passage");
+      expect(hero).toContain('data-case-status="extracted"');
+    }
+  );
+
+  it.each(LOCALES)("%s puts the source page right under its name, ahead of the quoted passage", locale => {
+    const hero = sceneOf(mainOf(render(locale)), "s1");
+    const name = hero.indexOf(escaped(buildHeroView().source.filename));
+    const page = hero.indexOf(`src="${escaped(buildHeroView().image!.src)}"`);
+    expect(name).toBeGreaterThan(-1);
+    expect(page).toBeGreaterThan(name);
+    expect(page).toBeLessThan(hero.indexOf("<blockquote"));
+  });
+
+  it.each(LOCALES)(
+    "%s quotes the selected source passage untranslated, marked as English, once",
+    locale => {
+      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const value = homeCase();
+      const selected = value.regions.find(region => region.id === value.selectedRegionId)!;
+      const quotes = elements(hero, "blockquote");
+      expect(quotes).toHaveLength(1);
+      expect(attr(quotes[0]!, "lang")).toBe("en");
+      expect(hero).toContain(`>${escaped(selected.passage!)}</blockquote>`);
+    }
+  );
+
+  it.each(LOCALES)(
+    "%s links the quoted passage to the same evidence in Explore",
+    locale => {
+      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const value = homeCase();
+      const selected = value.regions.find(region => region.id === value.selectedRegionId)!;
+      expect(selected.href).toMatch(/^\/explore\?/);
+      const link = elements(hero, "a").find(open => attr(open, "data-hero-evidence") !== undefined);
+      expect(link, "the workbench's evidence link").toBeDefined();
+      expect(attr(link!, "href")).toBe(escaped(selected.href!));
+      expect(attr(link!, "data-analytics")).toBe("source-open");
+    }
+  );
+
+  it.each(LOCALES)(
+    "%s offers region selection as native, pressed-state buttons, one per region",
+    locale => {
+      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const buttons = elements(hero, "button");
+      expect(buttons).toHaveLength(homeCase().regions.length);
+      for (const open of buttons) expect(attr(open, "type")).toBe("button");
+      expect(buttons.filter(open => attr(open, "aria-pressed") === "true")).toHaveLength(1);
+    }
+  );
+
+  it.each(LOCALES)("%s keeps own-source intake by arrangement beside the actions", locale => {
+    const hero = sceneOf(mainOf(render(locale)), "s1");
+    const text = readable(hero);
+    expect(text).toContain(locale === "ko" ? "자체 원문 접수는 별도 협의" : "Own-source intake by arrangement");
+    // Before the workbench in reading order, so it is part of the lead, not a footnote.
+    expect(text.indexOf(locale === "ko" ? "자체 원문 접수는 별도 협의" : "Own-source intake by arrangement"))
+      .toBeLessThan(text.indexOf(buildHeroView().source.filename));
+  });
+
+  it.each(LOCALES)(
+    "%s keeps the walkthrough film closed at the foot of scene 02, with no player mounted",
+    locale => {
+      const main = mainOf(render(locale));
+      expect(sceneOf(main, "s1")).not.toContain("lv2-film");
+
+      // Scene 02 is where `LandingAnalytics` counts `hero_demo_interact` on the film's controls.
+      const difficulty = sceneOf(main, "s2");
+      const films = elements(difficulty, "details").filter(
+        open => attr(open, "data-testid") === "landing-film-disclosure"
+      );
+      expect(films).toHaveLength(1);
+      expect(films[0]).not.toMatch(/\sopen(=|\s|$)/);
+      const filmAt = difficulty.indexOf('data-testid="landing-film-disclosure"');
+      // An optional illustration after the difficulties, never ahead of them.
+      expect(difficulty.indexOf('id="lv2-difficulty-title"')).toBeLessThan(filmAt);
+      expect(readable(difficulty.slice(filmAt))).toContain(
+        locale === "ko" ? "예시 제품 흐름 영상 보기" : "Watch the illustrative product walkthrough"
+      );
+
+      // Closed means unmounted: no player wrapper, no media element, no poster request.
+      expect(main).not.toMatch(/class="(?:[^"]*\s)?lv2-film(?:\s[^"]*)?"/);
+      expect(main).not.toMatch(/<video|autoplay/i);
+      expect(main).not.toContain(HERO_FILM_POSTER);
+    }
+  );
+});
+
+/*
+  THE HERO'S ACTIONS, BY COMMERCIAL STATE.
+
+  The primary action is always the public sample. The secondary is the access action the server
+  resolved, except while that resolves to `/contact`: then the hero offers the document evaluation
+  in the page's own locale instead. The close keeps the resolved access action either way.
+*/
+describe("landing v2 -- hero actions by commercial state", () => {
+  afterEach(() => {
+    commercial.live = false;
+  });
+
+  const action = (hero: string, name: string) =>
+    hero.match(new RegExp(`<a\\s[^>]*data-analytics="${name}"[^>]*>([\\s\\S]*?)</a>`));
+
+  it.each(LOCALES)("%s sends the primary action to the public sample", locale => {
+    for (const live of [false, true]) {
+      commercial.live = live;
+      const primary = action(sceneOf(mainOf(render(locale)), "s1"), "hero-primary");
+      expect(primary, `primary action (live: ${live})`).not.toBeNull();
+      expect(EXPLORE_CTA.href).toMatch(/^\/explore\b/);
+      expect(attr(primary![0], "href")).toBe(escaped(EXPLORE_CTA.href));
+    }
+  });
+
+  it.each(LOCALES)(
+    "%s maps the /contact access state to the localized document evaluation",
+    locale => {
+      // This deployment's posture: the real resolver, not the live stand-in, answers /contact.
+      expect(primaryCallToAction()).toEqual(ACCESS_CTA);
+      expect(ACCESS_CTA.href).toBe("/contact");
+      const main = mainOf(render(locale));
+      const secondary = action(sceneOf(main, "s1"), "hero-secondary");
+      expect(secondary).not.toBeNull();
+      expect(attr(secondary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
+      expect(readable(secondary![1]!).trim()).toBe(locale === "ko" ? "내 문서 평가 상담" : "Evaluate your documents");
+      // The close is not remapped: Korean keeps the localized contact route, English its price link.
+      const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
+      expect(close).toContain(locale === "ko" ? "/ko/contact" : "/pricing");
+      expect(close).not.toContain(locale === "ko" ? "/ko/evaluation" : "/evaluation");
+    }
+  );
+
+  it.each(LOCALES)(
+    "%s keeps the live access action resolved by commercial state",
+    locale => {
+      commercial.live = true;
+      expect(primaryCallToAction()).toEqual(SELF_SERVE_CTA);
+      expect(SELF_SERVE_CTA.href).not.toBe("/contact");
+      const main = mainOf(render(locale));
+      const secondary = action(sceneOf(main, "s1"), "hero-secondary");
+      expect(secondary).not.toBeNull();
+      expect(attr(secondary![0], "href")).toBe(escaped(SELF_SERVE_CTA.href));
+      expect(readable(secondary![1]!).trim()).toBe(
+        locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
+      );
+      expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);
+      if (locale === "ko") {
+        expect(elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"))).toContain(SELF_SERVE_CTA.href);
+      }
+    }
+  );
+});
+
+/*
+  THE TWO EDITORIAL BEATS.
+
+  Scene 02 may only point at difficulties the workbench's own regions show, and scene 03 prints
+  one real record of the sample World with the World's own status word -- never "verified".
+*/
+describe("landing v2 -- difficulty and record", () => {
+  it.each(LOCALES)("%s links each difficulty to a region the workbench shows", locale => {
+    const difficulty = sceneOf(mainOf(render(locale)), "s2");
+    const hrefs = new Set(homeCase().regions.map(region => escaped(region.href!)));
+    const links = elements(difficulty, "a").filter(open => attr(open, "href")?.startsWith("/explore?"));
+    expect(links.length).toBeGreaterThan(0);
+    for (const open of links) expect(hrefs.has(attr(open, "href")!)).toBe(true);
+    // Every region of the case is reachable from the difficulties, not just the selected one.
+    expect(new Set(links.map(open => attr(open, "href"))).size).toBe(hrefs.size);
+    // The page's region count is read from the page view, inside a receipt.
+    expect(difficulty).toContain(`<b data-derived="1">${buildHeroView().regions.length}</b>`);
+  });
+
+  it.each(LOCALES)("%s prints the sample record with its own status, version and links", locale => {
+    const receive = sceneOf(mainOf(render(locale)), "s3");
+    const record = buildEvidenceRecord();
+    const text = readable(receive);
+    expect(text).toContain(record.claim.excerpt);
+    expect(text).toContain(landingV2StateWord(record.status.state, locale));
+    expect(text).toContain(record.version.digest);
+    expect(text).toContain(record.source.filename);
+    const hrefs = elements(receive, "a").map(open => attr(open, "href"));
+    expect(hrefs).toContain(escaped(record.hrefs.evidence));
+    expect(hrefs).toContain(escaped(record.hrefs.original));
+    expect(text).not.toMatch(/verified answer/i);
+    expect(receive).not.toMatch(/>\s*(verified|검증됨)\s*</i);
+  });
+
+  it.each(LOCALES)("%s separates extraction, interpretation and verification", locale => {
+    const text = readable(sceneOf(mainOf(render(locale)), "s3"));
+    const steps = locale === "ko" ? ["추출", "해석", "검증"] : ["Extraction", "Interpretation", "Verification"];
+    const at = steps.map(step => text.indexOf(step));
+    for (const index of at) expect(index).toBeGreaterThan(-1);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(text).toContain(
+      locale === "ko"
+        ? "값을 기간, 단위, 버전과 묶습니다. 이 미리보기에서는 실행하지 않았습니다."
+        : "Joins a value to its period, unit or version. Not run for this preview."
+    );
   });
 });

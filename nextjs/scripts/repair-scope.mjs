@@ -1657,6 +1657,68 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
+// Ordinary Home landing owner: exactly these fifteen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+export const HOME_AFFECTED_PATHS = Object.freeze([
+  'components/compile-stage-player.mobile-view.test.tsx', 'components/compile-stage-player.tsx',
+  'components/landing-v2/hero-actions.tsx', 'components/landing-v2/hero-film-disclosure.tsx', 'components/landing-v2/hero-film.tsx',
+  'components/landing-v2/hero-source-card.test.tsx', 'components/landing-v2/hero-source-card.tsx', 'components/landing-v2/landing-analytics.tsx',
+  'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'e2e/landing-v2.spec.ts',
+  'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts',
+]);
+export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
+  'components/compile-stage-player.mobile-view.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'lib/home-evidence-view.test.ts',
+  'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
+]);
+export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
+// Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
+// existing include survives, the one addition is the registered mobile-view suite and nothing outside the include list moved.
+export const VITEST_DISCOVERY_CONFIG_PATH = 'nextjs/vitest.config.ts';
+export const VITEST_DISCOVERY_INCLUDES = Object.freeze([
+  'lib/**/*.test.ts', 'lib/**/*.spec.ts', 'eval/**/metrics.test.ts',
+  'components/explore/evidence-workbench.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'components/evaluation-page.test.tsx',
+  'components/compile-stage-player.mobile-view.test.tsx',
+  'scripts/router/*.test.mjs', 'scripts/billing/*.test.mjs',
+]);
+const VITEST_DISCOVERY_INCLUDE_SLOT = '\n    include: [@@],\n';
+// The config with its include list cut out: root, JSX runtime, alias, environment, env and comments stay byte-exact.
+const VITEST_DISCOVERY_FRAME = [
+  'import { defineConfig } from "vitest/config";',
+  'import path from "node:path";',
+  '',
+  'const packageRoot = path.resolve(import.meta.dirname);',
+  '',
+  'export default defineConfig({',
+  '  root: packageRoot,',
+  '  // Component render tests use the same automatic JSX runtime as Next.js.',
+  '  esbuild: { jsx: "automatic" },',
+  '  resolve: {',
+  '    alias: { "@": packageRoot },',
+  '  },',
+  '  test: {',
+  '    environment: "node",',
+  '    // Deployment flags must not turn isolated route tests into live database calls.',
+  '    // Durable boundary suites explicitly stub production/opt-in mode and the RPC.',
+  '    env: { VERCEL_ENV: "preview", TAVONEL_DURABLE_WORKSPACE_GUARDS: "0" },',
+  '    // The eval metric tests only: pure functions over committed result files, fast enough for',
+  '    // every run. eval/ask-eval/run.harness.test.ts and eval/k08-live-engine/emit-inputs.test.ts',
+  '    // stay out -- they write report files and take minutes, and live in eval/vitest.config.ts.',
+  '    // scripts/router/*, scripts/billing/*: operator CLIs whose pure planning/aggregation half is unit tested here.',
+].join('\n') + VITEST_DISCOVERY_INCLUDE_SLOT + '  },\n});\n';
+export function vitestDiscoveryConfigFailures(source) {
+  const text = String(source).replace(/\r\n/g, '\n').replace(/\n*$/, '\n');
+  const lists = [...text.matchAll(/\n    include: \[([^\]]*)\],\n/g)];
+  if (lists.length !== 1) return ['the config must declare exactly one include list'];
+  const failures = [];
+  if (text.replace(lists[0][0], VITEST_DISCOVERY_INCLUDE_SLOT) !== VITEST_DISCOVERY_FRAME) failures.push('changed outside its include list (root, runtime, JSX, alias, environment and env stay fixed)');
+  const body = lists[0][1], includes = [...body.matchAll(/"([^"\\\n]*)"/g)].map(match => match[1]);
+  if (body.replace(/"[^"\\\n]*"/g, '').replace(/[\s,]/g, '')) failures.push('the include list may hold only double-quoted path literals');
+  for (const include of VITEST_DISCOVERY_INCLUDES) if (!includes.includes(include)) failures.push(`include is missing: ${include}`);
+  for (const include of new Set(includes)) {
+    if (!VITEST_DISCOVERY_INCLUDES.includes(include)) failures.push(`include is not admitted: ${include}`);
+    else if (includes.indexOf(include) !== includes.lastIndexOf(include)) failures.push(`include is duplicated: ${include}`);
+  }
+  return failures;
+}
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 export const AFFECTED_GROUPS = Object.freeze([
@@ -1682,6 +1744,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
+  // Ordinary Home landing: the fifteen exact paths above select seven direct suites and one browser suite, which runs only in
+  // projects 1440, 390, 360 and reduced-motion of the shared map.
+  affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
+    { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
@@ -1697,6 +1763,9 @@ export const AFFECTED_GROUPS = Object.freeze([
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
     { selector: true }),
+  // The exact global Vitest config only: selector/static checks, distinct from the Home owner; its content must pass
+  // vitestDiscoveryConfigFailures at head or the map fails closed.
+  affectedGroup('shared-test-discovery', /^nextjs\/vitest\.config\.ts$/, { selector: true }),
   affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
@@ -1720,12 +1789,12 @@ export function parseAffectedRawDiff(output) {
   return records;
 }
 
-export function buildAffectedMap({ headSha, records, headHasFile = () => true }) {
+export function buildAffectedMap({ headSha, records, headHasFile = () => true, readHeadFile = () => null }) {
   if (!sha(headSha)) throw new Error('Affected map requires an exact head SHA.');
   const failures = [], entries = [], unmappedPaths = [];
   const groups = new Set(), unitFiles = new Set(), browserFiles = new Set(), databaseTests = new Set(), invalidatingPaths = new Set();
   const dependencyReasons = new Map();
-  let worker = false, selector = false, database = false;
+  let worker = false, selector = false, database = false, discoveryConfig = false;
   for (const { oldMode, newMode, status, paths } of records) {
     const label = paths.join(' -> ');
     if (!/^(?:[AMD]|R[0-9]{3})$/.test(status)) { failures.push(`unsupported change status ${status}: ${label}`); continue; }
@@ -1742,6 +1811,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true })
       const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path));
       if (!owners.length) { failures.push(`unmapped changed endpoint: ${path}`); unmappedPaths.push(path); continue; }
       if (!owners.every(owner => owner.nativeReuse)) invalidatingPaths.add(path);
+      discoveryConfig ||= path === VITEST_DISCOVERY_CONFIG_PATH;
       for (const owner of owners) {
         entryGroups.add(owner.group);
         for (const file of owner.unitFiles) unitFiles.add(file);
@@ -1764,6 +1834,12 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true })
   }
   for (const file of [...databaseTests].sort()) {
     if (!headHasFile(file)) failures.push(`selected database fixture is absent at head: ${file}`);
+  }
+  // Either rename endpoint or a deletion of the shared discovery config still requires its admitted content at head.
+  if (discoveryConfig) {
+    const source = headHasFile(VITEST_DISCOVERY_CONFIG_PATH) ? readHeadFile(VITEST_DISCOVERY_CONFIG_PATH) : null;
+    if (typeof source !== 'string') failures.push(`shared test-discovery config is absent or unreadable at head: ${VITEST_DISCOVERY_CONFIG_PATH}`);
+    else for (const failure of vitestDiscoveryConfigFailures(source)) failures.push(`unsupported shared test-discovery config change: ${failure}`);
   }
   const fresh = invalidatingPaths.size > 0;
   return {
@@ -1803,7 +1879,9 @@ export function collectAffectedChanges({ headSha, repoRoot, exec = execFileSync 
   git(['merge-base', '--is-ancestor', AFFECTED_BASELINE.commit, headSha]);
   const records = parseAffectedRawDiff(git(['diff', '--raw', '-z', '--no-abbrev', '-M', '--no-relative', '--no-ext-diff', AFFECTED_BASELINE.commit, headSha], 'buffer'));
   const headHasFile = path => { try { git(['cat-file', '-e', `${headSha}:${path}`]); return true; } catch { return false; } };
-  return buildAffectedMap({ headSha, records, headHasFile });
+  // Read only when the shared discovery config is a changed endpoint.
+  const readHeadFile = path => { try { return String(git(['show', `${headSha}:${path}`])); } catch { return null; } };
+  return buildAffectedMap({ headSha, records, headHasFile, readHeadFile });
 }
 
 // Collector and gate import the exports above; only a direct selector run plans.

@@ -126,15 +126,17 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     };
 
     /*
-      `hero_demo_interact` -- once per page session, whichever way the reader touched the visual.
+      `hero_demo_interact` -- once per page session, whichever way the reader touched the demo.
 
-      RETARGETED 2026-09-20 with the founder's centered hero. The triggers were the compiler
-      demo's play/pause control and its two §4.1 signature objects; that demo is off the hero, and
-      what is under the statement now is the four-cut film. The event keeps its name and its
-      meaning -- "this reader did something with the hero's visual instead of scrolling past it"
-      -- and its triggers are the film's own controls: the four stage tabs and the motion control.
-      Renaming it would have broken the one column in the funnel that measures hero engagement,
-      for a change that did not change what is being counted.
+      RETARGETED 2026-09-20 with the founder's centered hero, and again with the source-first
+      hero. The hero now opens on the committed source workbench, and the demonstration sits in
+      scene 02: the optional four-cut walkthrough film's stage tabs and motion control. The film's
+      controls exist only once its closed disclosure is opened, so a reader who never opens it
+      cannot fire the event through it. The `[data-compiler-specimen]` arm still counts the
+      specimen's controls if it is mounted in scene 02; Home does not mount it. The event keeps its
+      name and its meaning -- "this reader did something with the compile demo instead of
+      scrolling past it" -- because renaming it would have broken the one funnel column that
+      measures that engagement, for a change that did not change what is being counted.
 
       Pointer and keyboard focus alike, because both controls are reachable both ways and an event
       that counted only the mouse would report the keyboard path as unused. `trackFunnelOnce` is
@@ -143,7 +145,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s1 .compile-film-sequence button, #s2 [data-compiler-specimen] button")) {
+      if (target.closest("#s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

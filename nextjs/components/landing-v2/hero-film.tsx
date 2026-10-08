@@ -4,8 +4,9 @@ import HeroFilmDisclosure from "./hero-film-disclosure";
 
 /*
   Optional continuation of the home story. The opening screen stays grounded in the committed
-  source card; this component adds the four-cut product walkthrough after the reader reaches the
-  source-to-knowledge explanation. The client disclosure owns the conditional player mount.
+  source workbench; this component adds the four-cut product walkthrough at the foot of scene 02,
+  after the difficulties that passage shows. The client disclosure owns the conditional player
+  mount and asks the player to open a phone on the whole frame.
 
   The player uses the approved recordings and its existing intersection-based playback, visibility
   resume, poster fallback and WCAG motion control. Its poster does not claim the eager image slot

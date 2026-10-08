@@ -3902,3 +3902,323 @@ test('affected Explore admission: readAffectedExecution rereads the five-unit an
     assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
+// ---- Affected Home admission: fifteen exact paths, seven direct suites and one browser suite in 1440/390/360/reduced-motion; the global
+// Vitest config is admitted apart from Home as finite shared test-discovery configuration ----
+import { HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_AFFECTED_BROWSER_FILE, VITEST_DISCOVERY_CONFIG_PATH, VITEST_DISCOVERY_INCLUDES, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
+const AFFECTED_HOME_PATHS=Object.freeze(['nextjs/components/compile-stage-player.mobile-view.test.tsx','nextjs/components/compile-stage-player.tsx','nextjs/components/landing-v2/hero-actions.tsx',
+  'nextjs/components/landing-v2/hero-film-disclosure.tsx','nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-source-card.test.tsx','nextjs/components/landing-v2/hero-source-card.tsx',
+  'nextjs/components/landing-v2/landing-analytics.tsx','nextjs/components/landing-v2/landing-hero.module.css','nextjs/components/landing-v2/landing-page.tsx','nextjs/e2e/landing-v2.spec.ts',
+  'nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/landing-v2-page.test.ts','nextjs/lib/one-path-contract.test.ts']);
+const AFFECTED_HOME_SUITES=Object.freeze(['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts',
+  'lib/landing-v2-page.test.ts','lib/marketing-analytics.test.ts','lib/one-path-contract.test.ts']);
+const AFFECTED_HOME_SPEC='e2e/landing-v2.spec.ts',AFFECTED_HOME_TSX='components/compile-stage-player.mobile-view.test.tsx',AFFECTED_HOME_PROJECTS=Object.freeze(['1440','390','360','reduced-motion']);
+const AFFECTED_HOME_FULL_DEBT=['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair'];
+// The e9c global Vitest config, and the same config with only the registered mobile-view suite added to its include list.
+const affectedHomeConfigHead=['import { defineConfig } from "vitest/config";','import path from "node:path";','','const packageRoot = path.resolve(import.meta.dirname);','','export default defineConfig({',
+  '  root: packageRoot,','  // Component render tests use the same automatic JSX runtime as Next.js.','  esbuild: { jsx: "automatic" },','  resolve: {','    alias: { "@": packageRoot },','  },','  test: {',
+  '    environment: "node",','    // Deployment flags must not turn isolated route tests into live database calls.','    // Durable boundary suites explicitly stub production/opt-in mode and the RPC.',
+  '    env: { VERCEL_ENV: "preview", TAVONEL_DURABLE_WORKSPACE_GUARDS: "0" },','    // The eval metric tests only: pure functions over committed result files, fast enough for',
+  '    // every run. eval/ask-eval/run.harness.test.ts and eval/k08-live-engine/emit-inputs.test.ts','    // stay out -- they write report files and take minutes, and live in eval/vitest.config.ts.',
+  '    // scripts/router/*, scripts/billing/*: operator CLIs whose pure planning/aggregation half is unit tested here.','    include: [','      "lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts",',
+  '      "components/explore/evidence-workbench.test.tsx", "components/landing-v2/hero-source-card.test.tsx", "components/evaluation-page.test.tsx",'];
+const affectedHomeConfigTail=['      "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs",','    ],','  },','});',''];
+const AFFECTED_HOME_E9C_CONFIG=[...affectedHomeConfigHead,...affectedHomeConfigTail].join('\n');
+const AFFECTED_HOME_FINAL_CONFIG=[...affectedHomeConfigHead,'      "components/compile-stage-player.mobile-view.test.tsx",',...affectedHomeConfigTail].join('\n');
+const AFFECTED_HOME_FRAME_FAILURE='changed outside its include list (root, runtime, JSX, alias, environment and env stay fixed)';
+const affectedHomeSwap=(text,from,to)=>{assert.ok(text.includes(from),'fixture anchor: '+from);return text.replace(from,to);};
+const affectedHomeConfigMap=(records,source=AFFECTED_HOME_FINAL_CONFIG,headHasFile)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile,
+  readHeadFile:path=>{assert.equal(path,VITEST_DISCOVERY_CONFIG_PATH);return source;}});
+test('affected Home admission: exactly fifteen owner paths select home-landing, the seven suites, one browser suite and fresh native debt', () => {
+  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,15);
+  assert.deepEqual([...HOME_AFFECTED_UNIT_FILES].sort(),AFFECTED_HOME_SUITES);assert.equal(HOME_AFFECTED_BROWSER_FILE,AFFECTED_HOME_SPEC);
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing');
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC],[],false,false,false,false,undefined,undefined]);
+  assert.ok(!AFFECTED_GROUPS.some(o=>/^home-(?!landing$)|legacy/.test(o.group)),'no legacy Home profile is an affected owner');
+  for (const path of AFFECTED_HOME_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['home-landing'],path);
+    // Added, modified (including an executable-bit change) and deleted regular files in the owner all map the same way.
+    for (const [status,oldMode,newMode] of [['A','000000','100644'],['M','100644','100644'],['M','100644','100755'],['D','100644','000000']]) {
+      const map=affectedMap([affectedRecord(status,[path],oldMode,newMode)]),label=`${status} ${path}`;
+      assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['home-landing'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(AFFECTED_HOME_PATHS.map(path=>affectedRecord('M',[path])));
+  assert.deepEqual([delta.failures,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],[[],['home-landing'],[...AFFECTED_HOME_PATHS].sort(),AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]]);
+  assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_HOME_PATHS].sort());
+  // Both rename endpoints inside the owner map to it; a rename across owners unions both selections.
+  const within=affectedMap([affectedRecord('R100',['nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-film-disclosure.tsx'])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],[[],['home-landing'],AFFECTED_HOME_SUITES,
+    [{status:'R100',paths:['nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-film-disclosure.tsx'],groups:['home-landing']}]]);
+  const across=affectedMap([affectedRecord('R085',['nextjs/lib/home-evidence-view.ts','nextjs/lib/explore-story.ts'])]);
+  assert.deepEqual([across.failures,across.groups,across.unitFiles,across.browserFiles],[[],['explore-answer','home-landing'],affectedUnion(AFFECTED_HOME_SUITES,AFFECTED_EXPLORE_SUITES),[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC]]);
+});
+test('affected Home admission: the regular plan defers only the fresh native run, keeps every release debt and never selects the static/selector checks', () => {
+  const plan=affectedAskPlan(affectedMap([affectedRecord('M',['nextjs/components/landing-v2/landing-page.tsx'])]));
+  assert.deepEqual([plan.groups,plan.browserFiles],[['home-landing','native-world-race-fresh-run'],[AFFECTED_HOME_SPEC]]);
+  for (const suite of AFFECTED_HOME_SUITES) assert.ok(plan.unitFiles.includes(suite),suite);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runDetailIntegrity','requirePublicUiScreenshots','requireHomePricingCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks],[['native-world-race-fresh-run'],'pending',{}]);
+  assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'));
+  assert.deepEqual(plan.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);
+  assert.deepEqual(plan.cumulativeRelease.pendingQualificationDebt,['database-contract']);
+  assert.equal(plan.qualificationReasons.at(-1),'Cumulative PR/full release debt stays pending separately.');
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),AFFECTED_HOME_PROJECTS.map(project=>({kind:'project',project,files:[AFFECTED_HOME_SPEC]})));
+  const receipt=buildRepairReceipt(plan,{headSha:affectedHeadSha});
+  assert.deepEqual([receipt.gate,receipt.fullQualification,receipt.runResults['native-world-race-fresh-run']],['passed-scoped-only','pending','pending-deferred']);
+  assert.ok(receipt.pendingDebt.includes('native-world-race-fresh-run'));assert.ok(!('native-world-race-fresh-run' in receipt.passedGroupAnchors));
+  assert.deepEqual(receipt.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);
+});
+test('affected Home admission: mixed changes union and dedupe with the Explore, Ask, ACL, workspace and GPU owners and keep every debt', () => {
+  const records=[affectedRecord('M',['nextjs/components/compile-stage-player.tsx']),affectedRecord('M',['nextjs/lib/explore-story.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),
+    affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
+  const map=affectedMap(records);
+  assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','home-landing','ocr-gpu-worker','workspace-lifecycle']]);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES));assert.equal(map.unitFiles.length,25);
+  assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
+  assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
+  assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',records.map(r=>r.paths[0]).sort()]);
+  // Explore stays 1440-only, world-lifecycle keeps its three projects and landing-v2 adds exactly its four.
+  assert.deepEqual(planBrowserRuns(map.browserFiles,false),[{kind:'project',project:'1440',files:[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']},
+    {kind:'project',project:'390',files:[AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']},{kind:'project',project:'360',files:[AFFECTED_HOME_SPEC]},
+    {kind:'project',project:'reduced-motion',files:[AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']}]);
+  const plan=affectedAskPlan(map);
+  for (const file of map.unitFiles) assert.ok(plan.unitFiles.includes(file),file);
+  assert.deepEqual(plan.browserFiles,map.browserFiles);
+  assert.deepEqual(plan.deferredGroups,['native-world-race-fresh-run','ocr-gpu-worker']);
+  assert.ok(plan.qualificationReasons.some(reason=>reason.includes('foundation-ocr-gpu-image.yml')&&reason.includes(affectedHeadSha)));
+  assert.deepEqual(plan.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);assert.deepEqual(plan.cumulativeRelease.pendingQualificationDebt,['database-contract']);
+  const receipt=buildRepairReceipt(plan,{headSha:affectedHeadSha});
+  assert.deepEqual([receipt.gate,receipt.runResults['ocr-gpu-worker'],receipt.runResults['native-world-race-fresh-run']],['passed-scoped-only','pending-deferred','pending-deferred']);
+  for (const group of plan.deferredGroups) { assert.ok(receipt.pendingDebt.includes(group),group); assert.ok(!(group in receipt.passedGroupAnchors),group); }
+  // A Home path beside a docs-only owner still invalidates native reuse through the Home path alone.
+  const docs=affectedMap([affectedRecord('M',['nextjs/lib/docs-content.ts']),affectedRecord('M',['nextjs/lib/home-evidence-view.ts'])]);
+  assert.deepEqual([docs.failures,docs.groups,docs.nativeEvidence.invalidatingPaths],[[],['docs','home-landing'],['nextjs/lib/home-evidence-view.ts']]);
+});
+test('affected Home admission: a selected suite or the spec missing at head refuses', () => {
+  for (const file of [...AFFECTED_HOME_SUITES,AFFECTED_HOME_SPEC]) {
+    const map=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',['nextjs/components/compile-stage-player.tsx'])],headHasFile:path=>path!==`nextjs/${file}`});
+    assert.deepEqual([map.groups,map.failures],[['home-landing'],[`selected owner check is absent at head: ${file}`]],file);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,file);
+  }
+  const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[`nextjs/${AFFECTED_HOME_TSX}`],'100644','000000')],headHasFile:path=>path!==`nextjs/${AFFECTED_HOME_TSX}`});
+  assert.deepEqual([deleted.groups,deleted.failures],[['home-landing'],[`selected owner check is absent at head: ${AFFECTED_HOME_TSX}`]]);
+});
+test('affected Home admission: unknown siblings, bad spellings, modes, statuses and unknown rename endpoints refuse', () => {
+  for (const path of ['nextjs/components/landing-v2/other.tsx','nextjs/components/landing-v2/hero-actions.test.tsx','nextjs/components/landing-v2/landing-page.test.tsx','nextjs/components/landing-v2/index.ts',
+    'nextjs/components/landing-v2/landing-hero.css','nextjs/components/landing-v2/landing-hero.module.scss','nextjs/components/landing-v2/hero-film.module.css','nextjs/components/landing-v2/hero-film.tsx.bak',
+    'nextjs/components/Landing-v2/hero-film.tsx','nextjs/components/landing-v2/nested/hero-film.tsx','nextjs/components/compile-stage-player.test.tsx','nextjs/components/compile-stage-player.mobile-view.test.ts',
+    'nextjs/components/compile-stage-player.mobile.test.tsx','nextjs/components/compile-stage-player.module.css','nextjs/lib/home-evidence-view.tsx','nextjs/lib/home-evidence.ts','nextjs/lib/landing-v2-page.ts',
+    'nextjs/lib/one-path-contract.ts','nextjs/lib/film-motion-control.ts','nextjs/lib/film-motion-control.test.ts','nextjs/lib/marketing-analytics.test.ts','nextjs/e2e/landing-v2-extra.spec.ts',
+    'nextjs/e2e/landing-v2.spec.tsx','nextjs/e2e/landing-hero-mobile.spec.ts','nextjs/app/page.tsx','components/landing-v2/hero-film.tsx','nextjs/nextjs/components/landing-v2/hero-film.tsx']) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  for (const path of ['nextjs/components/landing-v2/./hero-film.tsx','nextjs//lib/home-evidence-view.ts','nextjs/lib/../lib/home-evidence-view.ts','nextjs\\e2e\\landing-v2.spec.ts','nextjs/e2e/landing-v2.spec.ts ',
+    'nextjs/components/landing-v2/landing-hero.module.css\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644'],['A','100644','100644']])
+    assert.deepEqual(affectedMap([affectedRecord(status,['nextjs/components/landing-v2/hero-actions.tsx'],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: nextjs/components/landing-v2/hero-actions.tsx`]);
+  assert.match(affectedMap([affectedRecord('C075',['nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-actions.tsx'])]).failures[0],/^unsupported change status C075:/);
+  assert.match(affectedMap([affectedRecord('T',['nextjs/e2e/landing-v2.spec.ts'],'100644','120000')]).failures[0],/^unsupported change status T:/);
+  assert.match(affectedMap([affectedRecord('U',['nextjs/lib/home-evidence-view.ts'])]).failures[0],/^unsupported change status U:/);
+  for (const paths of [['nextjs/components/landing-v2/hero-actions.tsx','nextjs/components/landing-v2/hero-cta.tsx'],['nextjs/components/landing-v2/landing-legacy.tsx','nextjs/e2e/landing-v2.spec.ts']]) {
+    const unknown=paths.find(path=>!AFFECTED_HOME_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // A known Home path beside an unknown sibling closes the whole map instead of shrinking it.
+  const mixed=affectedMap([affectedRecord('M',['nextjs/components/landing-v2/hero-film.tsx']),affectedRecord('A',['nextjs/components/landing-v2/hero-film-poster.tsx'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/components/landing-v2/hero-film-poster.tsx'],['nextjs/components/landing-v2/hero-film-poster.tsx']]);
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+});
+test('affected Home admission: only the mobile-view TSX is newly registered, validates and routes through the scoped Vitest config', () => {
+  const runner=readFileSync(new URL('./run-repair-check.mjs',import.meta.url),'utf8');
+  assert.equal(runner.split(`'${AFFECTED_HOME_TSX}'`).length-1,1,'the mobile-view suite is registered once');
+  assert.ok(runner.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],\n"));
+  const root=mkdtempSync(resolve(tmpdir(),'affected-home-units-'));
+  try {
+    const prior=['app/api/documents/[id]/progress/route.test.ts','app/api/compile-jobs/route.test.ts','components/compile-stage.test.tsx','components/intake-triage-review.interaction.test.ts',
+      'components/intake-triage-review.test.tsx','components/landing-v2/hero-source-card.test.tsx',AFFECTED_EXPLORE_TSX];
+    const neighbours=['components/compile-stage-player.test.tsx','components/compile-stage-player.mobile-view.test.ts','components/compile-stage-player.mobile.test.tsx','components/compile-stage-player.tsx',
+      'components/landing-v2/hero-actions.test.tsx','components/landing-v2/landing-page.test.tsx','components/mobile-view.test.tsx'];
+    assert.throws(()=>validateSelectedPath(AFFECTED_HOME_TSX,'unit',root),/Selected unit file does not exist: components\/compile-stage-player\.mobile-view\.test\.tsx/);
+    for (const file of [...prior,...AFFECTED_HOME_SUITES,AFFECTED_HOME_SPEC,...neighbours]) { mkdirSync(dirname(resolve(root,file)),{recursive:true});writeFileSync(resolve(root,file),'// fixture\n'); }
+    for (const file of [...prior,...AFFECTED_HOME_SUITES]) assert.equal(validateSelectedPath(file,'unit',root),file);
+    assert.equal(validateSelectedPath(AFFECTED_HOME_SPEC,'browser',root),AFFECTED_HOME_SPEC);
+    for (const file of neighbours) assert.throws(()=>validateSelectedPath(file,'unit',root),/Unsupported unit path/,file);
+    assert.throws(()=>validateSelectedPath(AFFECTED_HOME_TSX,'browser',root),/Unsupported browser path/);
+    const tail=['--reporter=default','--reporter=json','--outputFile=r.json'];
+    assert.deepEqual(buildUnitArgs([...AFFECTED_HOME_SUITES],'r.json'),['exec','vitest','run','--config','vitest.repair-scope.config.ts',...tail,...AFFECTED_HOME_SUITES]);
+    assert.deepEqual(buildUnitArgs([AFFECTED_HOME_TSX],'r.json'),['exec','vitest','run','--config','vitest.repair-scope.config.ts',...tail,AFFECTED_HOME_TSX]);
+    const libOnly=AFFECTED_HOME_SUITES.filter(file=>file.startsWith('lib/'));
+    assert.deepEqual(buildUnitArgs(libOnly,'r.json'),['exec','vitest','run',...tail,...libOnly]);
+    const withAsync=[...AFFECTED_HOME_SUITES,'app/api/compile-jobs/route.test.ts'];
+    assert.deepEqual(buildUnitArgs(withAsync,'r.json'),['exec','vitest','run','--config','vitest.repair-scope.async.config.ts',...tail,...withAsync]);
+    for (const file of prior.filter(file=>file!=='app/api/compile-jobs/route.test.ts'))
+      assert.deepEqual(buildUnitArgs([file],'r.json').slice(3,5),['--config','vitest.repair-scope.config.ts'],file);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected Home admission: planBrowserRuns maps landing-v2 to exactly the four reviewed projects', () => {
+  const runs=planBrowserRuns([AFFECTED_HOME_SPEC],false);
+  assert.deepEqual(runs,AFFECTED_HOME_PROJECTS.map(project=>({kind:'project',project,files:[AFFECTED_HOME_SPEC]})));
+  assert.deepEqual(planBrowserRuns([AFFECTED_HOME_SPEC,AFFECTED_HOME_SPEC],false),runs);
+  for (const project of ['1920','1280','1024','768','audit','audit-768','audit-1280','launch-chromium']) assert.ok(!runs.some(run=>run.project===project),project);
+  for (const spec of ['e2e/landing-v2-extra.spec.ts','e2e/landing-v2/hero.spec.ts','e2e/landing.spec.ts']) assert.throws(()=>planBrowserRuns([spec],false),/No reviewed Playwright project mapping/,spec);
+});
+test('affected Home admission: readAffectedExecution rereads seven units and four project reports; missing, malformed, omitted and wrong-project reports refuse while explicit skips survive', () => {
+  const map=affectedMap([affectedRecord('M',['nextjs/components/landing-v2/hero-actions.tsx'])]);assert.deepEqual(map.failures,[]);
+  const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+  const root=mkdtempSync(resolve(tmpdir(),'affected-home-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json'),pw=index=>resolve(reports,`playwright-${index}.json`);
+    mkdirSync(reports,{recursive:true});
+    const vitest=(files,skipped=[])=>({numTotalTests:files.length+skipped.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:skipped.length,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'},...(skipped.includes(file)?[{status:'skipped'}]:[])]}))});
+    const pass=projectName=>({projectName,status:'expected',results:[{status:'passed'}]}),skip=projectName=>({projectName,status:'skipped',results:[{status:'skipped'}]});
+    const playwright=(projectName,file=AFFECTED_HOME_SPEC,tests=[pass(projectName)])=>({config:{rootDir:root},
+      stats:{expected:tests.filter(t=>t.status==='expected').length,skipped:tests.filter(t=>t.status==='skipped').length,unexpected:tests.filter(t=>t.status==='unexpected').length,flaky:0},
+      suites:[{specs:[{file,title:'landing fixture',tests}]}]});
+    const write=(path,value)=>writeFileSync(path,typeof value==='string'?value:JSON.stringify(value));
+    const restore=()=>{write(vitestPath,vitest(AFFECTED_HOME_SUITES));AFFECTED_HOME_PROJECTS.forEach((project,index)=>write(pw(index+1),playwright(project)));};
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    write(vitestPath,vitest(AFFECTED_HOME_SUITES));
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-1\.json/);
+    AFFECTED_HOME_PROJECTS.slice(0,3).forEach((project,index)=>write(pw(index+1),playwright(project)));
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-4\.json/);
+    write(pw(4),playwright('reduced-motion'));
+    const result=readAffectedExecution(root,plan);
+    assert.deepEqual(result.units,{files:7,passed:7,skipped:0,failed:0});
+    assert.deepEqual(result.browsers.map(b=>[b.project,b.files,b.passed,b.skipped,b.flaky,b.failed]),AFFECTED_HOME_PROJECTS.map(project=>[project,1,1,0,0,0]));
+    const rejected=[
+      [vitestPath,'{',/Vitest report is malformed JSON/],
+      [vitestPath,vitest(AFFECTED_HOME_SUITES.filter(file=>file!==AFFECTED_HOME_TSX)),/Vitest report omitted selected file\(s\): components\/compile-stage-player\.mobile-view\.test\.tsx/],
+      [vitestPath,vitest(AFFECTED_EXPLORE_SUITES),/Vitest report omitted selected file\(s\)/],
+      [pw(1),'{',/Playwright report is malformed JSON/],
+      [pw(4),'{',/Playwright report is malformed JSON/],
+      [pw(1),playwright('1920'),/ran in an unconfigured project: e2e\/landing-v2\.spec\.ts/],
+      [pw(1),playwright('1440',AFFECTED_HOME_SPEC,[pass('1440'),pass('390')]),/ran in an unconfigured project: e2e\/landing-v2\.spec\.ts/],
+      [pw(2),playwright('1440'),/ran in an unconfigured project: e2e\/landing-v2\.spec\.ts/],
+      [pw(3),playwright('audit'),/ran in an unconfigured project: e2e\/landing-v2\.spec\.ts/],
+      [pw(4),playwright('768'),/ran in an unconfigured project: e2e\/landing-v2\.spec\.ts/],
+      [pw(2),playwright('390',AFFECTED_EXPLORE_SPEC),/Playwright report omitted selected file\(s\): e2e\/landing-v2\.spec\.ts/],
+      [pw(3),playwright('360',AFFECTED_HOME_SPEC,[skip('360')]),/Selected Playwright file had no executed passing test: e2e\/landing-v2\.spec\.ts/],
+      [pw(4),playwright('reduced-motion',AFFECTED_HOME_SPEC,[pass('reduced-motion'),{projectName:'reduced-motion',status:'unexpected',results:[{status:'failed'}]}]),/Playwright report contains 1 failed test/],
+    ];
+    for (const [path,value,pattern] of rejected) {
+      write(path,value);assert.throws(()=>readAffectedExecution(root,plan),pattern,String(pattern));
+      restore();
+    }
+    // An explicit skip beside an executed pass in the same project and file is preserved, never treated as a failure or a pass.
+    write(vitestPath,vitest(AFFECTED_HOME_SUITES,[AFFECTED_HOME_TSX]));
+    write(pw(4),playwright('reduced-motion',AFFECTED_HOME_SPEC,[pass('reduced-motion'),skip('reduced-motion')]));
+    const skipped=readAffectedExecution(root,plan);
+    assert.deepEqual(skipped.units,{files:7,passed:7,skipped:1,failed:0});
+    assert.deepEqual(skipped.browsers.map(b=>[b.project,b.passed,b.skipped]),[['1440',1,0],['390',1,0],['360',1,0],['reduced-motion',1,1]]);
+    restore();assert.equal(readAffectedExecution(root,plan).units.passed,7,'the restored actual reports qualify again');
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected Home admission: the shared test-discovery contract keeps every include, admits only the mobile-view addition and refuses everything else', () => {
+  assert.equal(VITEST_DISCOVERY_CONFIG_PATH,'nextjs/vitest.config.ts');
+  assert.deepEqual(VITEST_DISCOVERY_INCLUDES,['lib/**/*.test.ts','lib/**/*.spec.ts','eval/**/metrics.test.ts','components/explore/evidence-workbench.test.tsx','components/landing-v2/hero-source-card.test.tsx',
+    'components/evaluation-page.test.tsx',AFFECTED_HOME_TSX,'scripts/router/*.test.mjs','scripts/billing/*.test.mjs']);
+  const missing=`include is missing: ${AFFECTED_HOME_TSX}`;
+  // The checked-in config is either the e9c config (only the addition missing) or the admitted final config; nothing else passes.
+  const actual=vitestDiscoveryConfigFailures(readFileSync(new URL('../vitest.config.ts',import.meta.url),'utf8'));
+  assert.ok(actual.length<=1&&actual.every(failure=>failure===missing),JSON.stringify(actual));
+  assert.deepEqual(vitestDiscoveryConfigFailures(AFFECTED_HOME_E9C_CONFIG),[missing]);
+  const final=AFFECTED_HOME_FINAL_CONFIG;
+  const reordered=affectedHomeSwap(affectedHomeSwap(final,`      "${AFFECTED_HOME_TSX}",\n`,''),'"lib/**/*.test.ts",',`"${AFFECTED_HOME_TSX}", "lib/**/*.test.ts",`);
+  for (const [label,source] of [['final',final],['CRLF',final.replace(/\n/g,'\r\n')],['extra trailing newlines',final+'\n\n'],['reordered',reordered]])
+    assert.deepEqual(vitestDiscoveryConfigFailures(source),[],label);
+  const addition=`"${AFFECTED_HOME_TSX}",`,add=extra=>affectedHomeSwap(final,addition,`${addition} ${extra}`);
+  for (const [label,source,failures] of [
+    ['a wildcard component include',add('"components/**/*.test.tsx",'),['include is not admitted: components/**/*.test.tsx']],
+    ['a repository-wide wildcard',add('"**/*.test.tsx",'),['include is not admitted: **/*.test.tsx']],
+    ['an unrelated suite',add('"components/landing-v2/hero-actions.test.tsx",'),['include is not admitted: components/landing-v2/hero-actions.test.tsx']],
+    ['a duplicated addition',add(addition),[`include is duplicated: ${AFFECTED_HOME_TSX}`]],
+    ['a duplicated existing include',add('"lib/**/*.test.ts",'),['include is duplicated: lib/**/*.test.ts']],
+    ['a replaced instead of added include',affectedHomeSwap(AFFECTED_HOME_E9C_CONFIG,'"components/evaluation-page.test.tsx",',addition),['include is missing: components/evaluation-page.test.tsx']],
+    ['a removed Explore include',affectedHomeSwap(final,'"components/explore/evidence-workbench.test.tsx", ',''),['include is missing: components/explore/evidence-workbench.test.tsx']],
+    ['a removed hero-source-card include',affectedHomeSwap(final,'"components/landing-v2/hero-source-card.test.tsx", ',''),['include is missing: components/landing-v2/hero-source-card.test.tsx']],
+    ['a removed lib glob',affectedHomeSwap(final,'"lib/**/*.spec.ts", ',''),['include is missing: lib/**/*.spec.ts']],
+    ['a spread include',add('...extraIncludes,'),['the include list may hold only double-quoted path literals']],
+    ['a single-quoted include',add("'components/landing-v2/other.test.tsx',"),['the include list may hold only double-quoted path literals']],
+    ['a changed root',affectedHomeSwap(final,'  root: packageRoot,','  root: path.resolve(packageRoot, ".."),'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['a changed JSX runtime',affectedHomeSwap(final,'jsx: "automatic"','jsx: "preserve"'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['a changed alias',affectedHomeSwap(final,'alias: { "@": packageRoot }','alias: { "@": path.resolve(packageRoot, "components") }'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['a changed environment',affectedHomeSwap(final,'environment: "node"','environment: "jsdom"'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['a changed env value',affectedHomeSwap(final,'TAVONEL_DURABLE_WORKSPACE_GUARDS: "0" }','TAVONEL_DURABLE_WORKSPACE_GUARDS: "1" }'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['an added env key',affectedHomeSwap(final,'VERCEL_ENV: "preview",','VERCEL_ENV: "preview", HOME_FIXTURE: "1",'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['an added runtime pool',affectedHomeSwap(final,'    environment: "node",\n','    environment: "node",\n    pool: "vmThreads",\n'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['an added setup file',affectedHomeSwap(final,'  test: {\n','  test: {\n    setupFiles: ["./vitest.setup.ts"],\n'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['an added exclude',affectedHomeSwap(final,'    ],\n  },\n});','    ],\n    exclude: ["lib/**/legacy.test.ts"],\n  },\n});'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['a changed comment',affectedHomeSwap(final,'// Component render tests use','// Component tests use'),[AFFECTED_HOME_FRAME_FAILURE]],
+    ['a changed root with a wildcard',affectedHomeSwap(add('"components/**/*.test.tsx",'),'  root: packageRoot,','  root: "/",'),[AFFECTED_HOME_FRAME_FAILURE,'include is not admitted: components/**/*.test.tsx']],
+    ['a second include list',affectedHomeSwap(final,'  test: {\n','  test: {\n    include: ["lib/**/*.test.ts"],\n'),['the config must declare exactly one include list']],
+    ['no include list',affectedHomeSwap(final,'    include: [','    includeSource: ['),['the config must declare exactly one include list']],
+  ]) assert.deepEqual(vitestDiscoveryConfigFailures(source),failures,label);
+});
+test('affected Home admission: the global Vitest config maps only to shared-test-discovery and is admitted only with valid content at head', () => {
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.match.test(VITEST_DISCOVERY_CONFIG_PATH));
+  assert.deepEqual(owners.map(owner=>[owner.group,owner.selector,owner.unitFiles,owner.browserFiles,owner.nativeReuse]),[['shared-test-discovery',true,[],[],false]]);
+  for (const path of ['nextjs/vitest.config.mts','nextjs/vitest.config.ts.bak','nextjs/eval/vitest.config.ts','vitest.config.ts','nextjs/vitest.unit.config.ts'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unmapped changed endpoint: ${path}`],path);
+  const map=affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])]);
+  assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles,map.runSelectorContracts,map.runCdrWorkerChecks,map.databaseChanged],[[],['shared-test-discovery'],[],[],true,false,false]);
+  assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',[VITEST_DISCOVERY_CONFIG_PATH]]);
+  const plan=affectedAskPlan(map);
+  assert.deepEqual([plan.groups,plan.browserFiles,plan.runWorkflowStaticGate,plan.deferredGroups],
+    [['native-world-race-fresh-run','selector-config','shared-test-discovery','workflow-static'],[],true,['native-world-race-fresh-run']]);
+  for (const suite of AFFECTED_HOME_SUITES) assert.ok(!plan.unitFiles.includes(suite),'the config never selects Home suites: '+suite);
+  assert.deepEqual([plan.pendingFullDebt,plan.cumulativeRelease.pendingQualificationDebt],[AFFECTED_HOME_FULL_DEBT,['database-contract']]);
+  const absent='shared test-discovery config is absent or unreadable at head: nextjs/vitest.config.ts',refused=failure=>`unsupported shared test-discovery config change: ${failure}`;
+  assert.deepEqual(affectedMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])]).failures,[absent],'no head reader is no admission');
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],null).failures,[absent],'an unreadable head config');
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],AFFECTED_HOME_E9C_CONFIG).failures,[refused(`include is missing: ${AFFECTED_HOME_TSX}`)]);
+  const wildcard=affectedHomeSwap(AFFECTED_HOME_FINAL_CONFIG,`"${AFFECTED_HOME_TSX}",`,`"${AFFECTED_HOME_TSX}", "components/**/*.test.tsx",`);
+  const invalid=affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],wildcard);
+  assert.deepEqual([invalid.groups,invalid.failures],[['shared-test-discovery'],[refused('include is not admitted: components/**/*.test.tsx')]]);
+  assert.throws(()=>affectedAskPlan(invalid),/clean fail-closed map/);
+  const jsdom=affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH])],affectedHomeSwap(AFFECTED_HOME_FINAL_CONFIG,'environment: "node"','environment: "jsdom"'));
+  assert.deepEqual(jsdom.failures,[refused(AFFECTED_HOME_FRAME_FAILURE)]);
+  // Deletion, a rename away and a rename in from an unknown path all refuse; the config is never admitted without its content at head.
+  const gone=path=>path!==VITEST_DISCOVERY_CONFIG_PATH;
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('D',[VITEST_DISCOVERY_CONFIG_PATH],'100644','000000')],AFFECTED_HOME_FINAL_CONFIG,gone).failures,[absent]);
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('R100',[VITEST_DISCOVERY_CONFIG_PATH,'nextjs/vitest.base.config.ts'])],AFFECTED_HOME_FINAL_CONFIG,gone).failures,
+    ['unmapped changed endpoint: nextjs/vitest.base.config.ts',absent]);
+  assert.deepEqual(affectedHomeConfigMap([affectedRecord('R090',['nextjs/vitest.unit.config.ts',VITEST_DISCOVERY_CONFIG_PATH])]).failures,['unmapped changed endpoint: nextjs/vitest.unit.config.ts']);
+  // Config plus Home is the union: Home keeps its suites and browser projects, the config adds only the selector/static checks.
+  const both=affectedHomeConfigMap([affectedRecord('M',[VITEST_DISCOVERY_CONFIG_PATH]),affectedRecord('M',['nextjs/components/compile-stage-player.tsx'])]);
+  assert.deepEqual([both.failures,both.groups,both.unitFiles,both.browserFiles,both.runSelectorContracts],[[],['home-landing','shared-test-discovery'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC],true]);
+  assert.deepEqual(affectedAskPlan(both).groups,['home-landing','native-world-race-fresh-run','selector-config','shared-test-discovery','workflow-static']);
+  // The head config is read only when it is a changed endpoint.
+  const homeOnly=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',['nextjs/components/compile-stage-player.tsx'])],readHeadFile:()=>{throw Error('read without a config change');}});
+  assert.deepEqual(homeOnly.failures,[]);
+});
+test('affected Home admission: collection reads the head config only for a config change and binds its content', () => {
+  const run=(path,show)=>{
+    const calls=[],exec=(_command,args,options)=>{
+      assert.deepEqual(args.slice(0,2),['-C','fixture-root']);const a=args.slice(2);calls.push(a.join(' '));
+      if(a[0]==='rev-parse')return AFFECTED_BASELINE.tree+'\n';
+      if(a[0]==='merge-base')return '';
+      if(a[0]==='diff')return Buffer.from(`:100644 100644 ${'1'.repeat(40)} ${'2'.repeat(40)} M\0${path}\0`);
+      if(a[0]==='cat-file')return '';
+      if(a[0]==='show'){assert.equal(options.encoding,'utf8');return show();}
+      throw Error('Unexpected affected git command: '+a.join(' '));
+    };
+    return {map:collectAffectedChanges({headSha:affectedHeadSha,repoRoot:'fixture-root',exec}),shows:calls.filter(call=>call.startsWith('show '))};
+  };
+  const admitted=run(VITEST_DISCOVERY_CONFIG_PATH,()=>AFFECTED_HOME_FINAL_CONFIG);
+  assert.deepEqual([admitted.map.failures,admitted.map.groups,admitted.shows],[[],['shared-test-discovery'],[`show ${affectedHeadSha}:${VITEST_DISCOVERY_CONFIG_PATH}`]]);
+  assert.deepEqual(run(VITEST_DISCOVERY_CONFIG_PATH,()=>AFFECTED_HOME_E9C_CONFIG).map.failures,[`unsupported shared test-discovery config change: include is missing: ${AFFECTED_HOME_TSX}`]);
+  assert.deepEqual(run(VITEST_DISCOVERY_CONFIG_PATH,()=>{throw Error('no blob');}).map.failures,['shared test-discovery config is absent or unreadable at head: nextjs/vitest.config.ts']);
+  const home=run('nextjs/components/landing-v2/hero-film.tsx',()=>{throw Error('unexpected show');});
+  assert.deepEqual([home.map.failures,home.map.groups,home.shows],[[],['home-landing'],[]]);
+});

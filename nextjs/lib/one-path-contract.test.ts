@@ -57,31 +57,49 @@ describe("approved one-path experience", () => {
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
   /*
-    The film opens under the centered hero message. Scene 02 follows with the source-linked
-    CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
-    this contract keeps the buyer's first-visit sequence explicit.
+    The hero opens source first: a short statement and its actions over one full-width workbench
+    (source -> highlighted passage -> record). Scene 02 says why that passage is hard and keeps
+    the optional film behind a closed disclosure; the record, change, trust and action beats
+    follow. The CompilerSpecimen, HeroProof and ProofScene of the retired layout are not composed.
+    The order below is read as positions so this contract keeps the first-visit sequence explicit.
   */
-  it("orders the landing as source evidence, explanation, proof, change, trust and action", () => {
+  it("orders the landing as source workbench, difficulty and optional film, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    expect(page).toContain("<HeroSourceCard");
-    expect(page).toContain("<HeroFilm");
-    expect(page).toContain("<CompilerSpecimen");
+    for (const gone of ["<CompilerSpecimen", "<HeroProof", "<ProofScene"]) {
+      expect(page, `${gone} belongs to the retired layout`).not.toContain(gone);
+    }
     const order = [
       'id="s1"',
-      'id="lv2-hero-title"',
+      "<HeroStatement",
       "<HeroActions",
       "<HeroSourceCard",
       'id="s2"',
-      "<CompilerSpecimen",
+      'id="lv2-difficulty-title"',
       "<HeroFilm",
-      "<HeroProof",
-      "<ProofScene",
+      'id="s3"',
       "<RecompileScene",
       "<TrustScene",
       "<StartScene",
     ].map(token => page.indexOf(token));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
+    const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
+    expect(hero, "the film is not in the hero any more").not.toContain("<HeroFilm");
+    /*
+      Full width: the workbench is the hero layout's own item after the closed intro block, not a
+      column beside the statement, and the layout grid sets no columns of its own.
+    */
+    const intro = hero.slice(hero.indexOf("<div className={heroStyles.intro}>"), hero.indexOf("<HeroSourceCard"));
+    expect(hero.indexOf("<div className={heroStyles.intro}>"), "the hero's intro block").toBeGreaterThan(-1);
+    expect(intro, "the statement and its actions lead the hero").toContain("<HeroActions");
+    expect(intro.match(/<div\b/g)?.length, "the intro block closes before the workbench").toBe(intro.match(/<\/div>/g)?.length);
+    const css = text("components/landing-v2/landing-hero.module.css");
+    const layout = css.slice(css.indexOf("section.hero .layout {"), css.indexOf("}", css.indexOf("section.hero .layout {")));
+    expect(layout).toContain("display: grid");
+    expect(layout).not.toContain("grid-template-columns");
+    /* The workbench takes the case the server selected, so the reserved case can never lead it. */
+    expect(page).toContain("selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE])");
+    expect(page).toContain("{home ? <HeroSourceCard view={home} korean={korean} /> : null}");
     expect(page).toContain("tabIndex={-1}");
     expect(page).toContain('aria-labelledby="lv2-hero-title"');
     for (const gone of ['id="top"', 'id="compile"', 'id="how-it-works"', 'id="connect"', "one-path-works-film", "one-path-film-note"]) {
@@ -89,22 +107,82 @@ describe("approved one-path experience", () => {
     }
     const film = text("components/landing-v2/hero-film.tsx");
     expect(film).not.toContain('"use client"');
-    expect(film).toContain("<HeroFilmDisclosure");
     expect(film).toContain('src: "/film/compile-cut.mp4"');
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
-    /* The client disclosure gates the real player, not a still-hidden native details subtree. */
+    expect(film).toContain("<HeroFilmDisclosure");
+    /*
+      The source raster is the hero's paint now. The film sits closed in scene 02: its player is
+      not mounted until the disclosure opens, and its poster may not take the eager image slot.
+    */
     const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
     expect(disclosure).toContain('"use client"');
-    expect(disclosure).toContain('className="lv2-film-story" onToggle=');
-    expect(disclosure).toContain("{open ? (");
-    expect(disclosure).toContain('<CompileStagePlayer stages={stages} preferVideo');
-    expect(disclosure).not.toContain("priorityPoster");
+    const details = disclosure.slice(disclosure.indexOf("<details"), disclosure.indexOf("<summary"));
+    expect(details, "the disclosure has a native <details>").not.toBe("");
+    expect(details, "the disclosure is closed on load").not.toMatch(/\sopen[\s={]/);
+    expect(disclosure).toContain("useState(false)");
+    expect(disclosure, "the player mounts only once the disclosure is open")
+      .toMatch(/\{open \? \([\s\S]*<CompileStagePlayer[\s\S]*\) : null\}/);
+    expect(disclosure).toMatch(/<CompileStagePlayer[^>]*preferVideo/);
+    for (const source of [film, disclosure]) {
+      expect(source, "the closed film does not prioritize its poster").not.toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
+    }
+    /* The landing asks for the whole frame explicitly; a caller that omits the view also gets "fit". */
+    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
+    expect(disclosure).toMatch(/<CompileStagePlayer[^>]*initialMobileFilmView=\{LANDING_MOBILE_FILM_VIEW\}/);
+    expect(text("components/compile-stage-player.tsx")).toContain('initialMobileFilmView = "fit"');
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");
+    expect(disclosure).not.toContain("lv2-film-note");
     expect(text("lib/landing-v2-hero-copy.ts")).not.toContain("filmNote");
+  });
+
+  /*
+    `hero_demo_interact` is delegated by selector, so moving the film out of the hero silently
+    stops counting its controls unless the selector moves with it. The film is the one demo left
+    on Home, in scene 02; the workbench's region buttons are reading, not a demo, and stay uncounted.
+  */
+  it("counts demo engagement on the scene-two film controls", () => {
+    const analytics = text("components/landing-v2/landing-analytics.tsx");
+    const onDemo = analytics.slice(analytics.indexOf("const onDemo"), analytics.indexOf('main.addEventListener("click"'));
+    expect(onDemo, "the demo listener").not.toBe("");
+    expect(onDemo).toContain('trackFunnelOnce("hero_demo_interact", arm)');
+    const selector = onDemo.match(/target\.closest\("([^"]+)"\)/)?.[1] ?? "";
+    const parts = selector.split(",").map(part => part.trim());
+    expect(parts, "the film's controls, where the film now is").toContain("#s2 .compile-film-sequence button");
+    expect(selector, "the film is not in the hero any more").not.toMatch(/#s1\b/);
+    const page = text("components/landing-v2/landing-page.tsx");
+    const sceneTwo = page.slice(page.indexOf('id="s2"'), page.indexOf('id="s3"'));
+    expect(page.indexOf('id="s3"')).toBeGreaterThan(page.indexOf('id="s2"'));
+    expect(sceneTwo).toContain("<HeroFilm");
+    expect(text("components/compile-stage-player.tsx")).toContain('className="compile-film-sequence');
+  });
+
+  /*
+    The workbench's own contract, read where it is written: native selection, real citations,
+    full filing access and the agreed status line. The rendered behaviour is held by
+    `components/landing-v2/hero-source-card.test.tsx`; this keeps the composition from swapping
+    the card for one without them.
+  */
+  it("keeps native region selection, exact citations, full filing access and the prepared status", () => {
+    const card = text("components/landing-v2/hero-source-card.tsx");
+    expect(card).toContain('type="button"');
+    expect(card).toContain("aria-pressed={region.id === active.id}");
+    expect(card).toContain("aria-controls={passageId}");
+    expect(card).toContain('aria-live="polite"');
+    expect(card).toContain("data-hero-evidence");
+    expect(card).toContain("href={page.image.src}");
+    expect(card).toContain("href={source.officialFiling.href}");
+    expect(card).toContain('"Open full filing (SEC)"');
+    expect(card).toContain('"Prepared demonstration / processing not yet run"');
+    expect(card).toContain('"준비된 시연 / 아직 처리를 실행하지 않음"');
+    expect(card, "the status is chosen by run, not derived by splitting a string").not.toMatch(/status\.split\(/);
+    expect(card).not.toContain("Prepared demonstration ·");
+    const view = text("lib/home-evidence-view.ts");
+    expect(view, "the helper stays a projection, never the corpus build").not.toMatch(/from "\.\/(explore-sample|compile|corpus)/);
+    expect(view).not.toMatch(/[A-Z]:[\\/]/);
   });
 
   /*
@@ -189,9 +267,13 @@ describe("approved one-path experience", () => {
       rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
     const composition = text("components/landing-v2/landing-page.tsx");
-    expect(composition, "the pricing link remains in the Korean journey")
-      .toContain('href={korean ? "/ko/pricing" : "/pricing"}');
+    expect(text("components/landing-v2/scenes/start.tsx"), "the pricing link remains in the Korean journey")
+      .toContain('"/ko/pricing"');
     expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref');
+    expect(composition, "the hero's access action is the one resolved above, not a fixed /pricing")
+      .toContain("startHref={heroStart.href}");
+    expect(composition).not.toContain("pricingHref");
+    expect(composition, "the close keeps the resolved access actions").toContain("actions={startActions}");
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');

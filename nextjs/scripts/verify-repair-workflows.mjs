@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
+import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -320,7 +321,7 @@ assert(collectorVerifier.includes("const exploreCases=verifyExploreSpecSource(gi
 // explore-answer owner is admitted there only as one literal 1440 row; the historical 424 report keeps its own planner.
 const lfRunner=runner.replace(/\r\n/g,'\n'),sharedMapStart=lfRunner.indexOf('\nconst browserProjectsByFile = new Map([\n'),sharedMapEnd=lfRunner.indexOf('\n]);',sharedMapStart+1),sharedMap=sharedMapStart<0||sharedMapEnd<0?'':lfRunner.slice(sharedMapStart,sharedMapEnd);
 assert(!sharedBrowserProjectsMapExcludesExplore(runner)&&sharedMap&&lfRunner.indexOf('const browserProjectsByFile = new Map([',sharedMapStart+2)<0&&(sharedMap.match(/explore/gi)??[]).length===1&&(sharedMap.match(/\n  \['e2e\/explore\.spec\.ts', \['1440'\]\],/g)??[]).length===1
-  &&lfRunner.includes("const registeredUnitTestPaths = new Set([\n  'app/api/documents/[id]/progress/route.test.ts',\n  'app/api/compile-jobs/route.test.ts',\n  'components/compile-stage.test.tsx',\n  'components/intake-triage-review.interaction.test.ts',\n  'components/intake-triage-review.test.tsx',\n  'components/landing-v2/hero-source-card.test.tsx',\n  'components/explore/evidence-workbench.test.tsx',\n]);\nconst asyncRouteUnitTestPath")
+  &&lfRunner.includes("const registeredUnitTestPaths = new Set([\n  'app/api/documents/[id]/progress/route.test.ts',\n  'app/api/compile-jobs/route.test.ts',\n  'components/compile-stage.test.tsx',\n  'components/intake-triage-review.interaction.test.ts',\n  'components/intake-triage-review.test.tsx',\n  'components/landing-v2/hero-source-card.test.tsx',\n  'components/explore/evidence-workbench.test.tsx',\n  'components/compile-stage-player.mobile-view.test.tsx',\n]);\nconst asyncRouteUnitTestPath")
   &&planner.includes("affectedGroup('explore-answer', /^nextjs\\/(?:lib\\/explore-(?:(?:sample|story)(?:\\.test)?|entry-proof\\.test)\\.ts|components\\/explore\\/(?:ask-overlay|evidence-workbench(?:\\.test)?)\\.tsx|e2e\\/explore\\.spec\\.ts)$/,")
   &&planner.includes("{ unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),")&&(planner.match(/explore-answer/g)??[]).length===1
   &&runner.includes("const units = vitestFiles.length ? readAndValidateVitestReport(resolve(reportDir, 'vitest.json'), vitestFiles) : null;")&&runner.includes('const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map((planned, index) => ({')
@@ -413,6 +414,30 @@ for(const suite of ['nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repai
 assert((readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8').match(/^test\('affected /gm)??[]).length>=1 && /test\('native world race static: affected /.test(readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8')), 'affected native selector and report patterns must select actual tests');
 assert(repair.includes('run: pnpm install --frozen-lockfile')&&repair.includes('run: pnpm scan:secrets')&&repair.includes('run: pnpm check')&&repair.includes('run: pnpm exec next build')&&!/run: pnpm (?:run )?build\b/.test(repair), 'frozen install, secrets, global type/lint and the direct browser build (no full Vitest prehook) stay unchanged');
 assert(raceHelper.includes('export function admitAffectedSource(')&&raceHelper.indexOf('const baselineIntent=classifyAffected({headSha:head,exec});')<raceHelper.indexOf('const intent=classify({headSha:head,exec});')&&raceHelper.includes('classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource'), 'PR 141 race admission routes verified-baseline descendants to the collector affected proof before any exact race increment');
+// Ordinary Home admission, restated independently: one finite fifteen-path owner with seven direct suites (the mobile-view TSX is
+// registered above) and one browser suite, a single shared-map row for exactly 1440, 390, 360 and reduced-motion. No legacy Home profile.
+const homePaths=['components/compile-stage-player.mobile-view.test.tsx','components/compile-stage-player.tsx','components/landing-v2/hero-actions.tsx','components/landing-v2/hero-film-disclosure.tsx',
+  'components/landing-v2/hero-film.tsx','components/landing-v2/hero-source-card.test.tsx','components/landing-v2/hero-source-card.tsx','components/landing-v2/landing-analytics.tsx',
+  'components/landing-v2/landing-hero.module.css','components/landing-v2/landing-page.tsx','e2e/landing-v2.spec.ts','lib/home-evidence-view.test.ts','lib/home-evidence-view.ts',
+  'lib/landing-v2-page.test.ts','lib/one-path-contract.test.ts'];
+const homeSuites=['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/home-evidence-view.test.ts','lib/landing-v2-page.test.ts',
+  'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts'];
+const homeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing'),[homeOwner]=homeOwners;
+assert(JSON.stringify(HOME_AFFECTED_PATHS)===JSON.stringify(homePaths)&&JSON.stringify(HOME_AFFECTED_UNIT_FILES)===JSON.stringify(homeSuites)&&HOME_AFFECTED_BROWSER_FILE==='e2e/landing-v2.spec.ts'
+  &&homeOwners.length===1&&JSON.stringify(homeOwner.unitFiles)===JSON.stringify(homeSuites)&&JSON.stringify(homeOwner.browserFiles)===JSON.stringify(['e2e/landing-v2.spec.ts'])
+  &&!homeOwner.nativeReuse&&!homeOwner.selector&&!homeOwner.worker&&!homeOwner.database&&!homeOwner.databaseTests.length
+  &&homePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='home-landing')
+  &&['components/landing-v2/other.tsx','components/landing-v2/hero-actions.test.tsx','components/compile-stage-player.test.tsx','e2e/landing-v2-extra.spec.ts','lib/home-evidence-view.tsx','components/landing-v2/landing-hero.css'].every(p=>!homeOwner.match.test('nextjs/'+p))
+  &&(sharedMap.match(/landing-v2/g)??[]).length===1&&sharedMap.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],")
+  &&!AFFECTED_GROUPS.some(owner=>/^home-(?!landing$)|legacy/.test(owner.group)), 'Home enters the affected map only as the exact fifteen-path owner with its seven suites and one four-project shared-map row');
+// Shared test discovery: the exact global Vitest config is a selector/static owner apart from Home, and its head content must keep every
+// existing include, add only the registered mobile-view suite and leave root, runtime, JSX, alias, environment and env untouched.
+const discoveryOwners=AFFECTED_GROUPS.filter(owner=>owner.match.test(VITEST_DISCOVERY_CONFIG_PATH));
+assert(VITEST_DISCOVERY_CONFIG_PATH==='nextjs/vitest.config.ts'&&discoveryOwners.length===1&&discoveryOwners[0].group==='shared-test-discovery'&&discoveryOwners[0].selector===true
+  &&!discoveryOwners[0].unitFiles.length&&!discoveryOwners[0].browserFiles.length&&!discoveryOwners[0].nativeReuse
+  &&['nextjs/vitest.config.mts','nextjs/vitest.config.ts.bak','nextjs/eval/vitest.config.ts','vitest.config.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test(p)))
+  &&planner.includes('shared test-discovery config is absent or unreadable at head: ')&&planner.includes('unsupported shared test-discovery config change: ')
+  &&JSON.stringify(vitestDiscoveryConfigFailures(globalVitest))==='[]', 'the global Vitest config must pass the finite shared test-discovery contract: '+JSON.stringify(vitestDiscoveryConfigFailures(globalVitest)));
 console.log(`Workflow static gates pass. Full qualification still pending for exact CI/Launch runs at this head.`);
 
 assert(collectorVerifier.includes("Symbol('native race final-gate generated plan')")&&collectorVerifier.includes("same(untracked,['nextjs/repair-plan.json'])")&&collectorVerifier.includes("resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')")&&collectorVerifier.includes('if(!bytes.equals(expected))')&&collectorVerifier.includes('nativeRacePlan(normal,proof)')&&collectorVerifier.includes('before.isSymbolicLink()')&&collectorVerifier.includes('final-gate owner output refused'), 'c61 final gate alone qualifies the exact regular generated plan against a fresh sealed-selector recomputation before trusting routing flags; initial admission stays strict');
