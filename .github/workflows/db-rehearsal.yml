@@ -775,7 +775,9 @@ jobs:
 
       # The path table pgTAP fixture proves ordered reconciliation, but runs in one transaction.
       # This runner-local two-session proof observes the competing generic insert waiting on the
-      # OAuth row lock, then requires the committed canonical stream to reject it and clean up.
+      # OAuth row lock, then requires the committed canonical stream to reject it. The harness
+      # stops its own psql sessions but deletes no rows: the canonical job writes append-only job
+      # events, so its synthetic rows are deferred to this job's final disposable stack teardown.
       - name: Observe Dropbox canonical and generic job exclusion across two sessions
         if: hashFiles('supabase/migrations/20261007100000_dropbox_source_path_reconciliation.sql') != '' && hashFiles('supabase/tests/dropbox_source_reconciliation.sql') != ''
         timeout-minutes: 2
@@ -1002,6 +1004,9 @@ jobs:
           FIRST_PGTAP_RESULT: ${{ steps.pgtap-first.outcome }}
           SECOND_PGTAP_RESULT: ${{ steps.pgtap-second.outcome }}
         run: node nextjs/scripts/repair-scope-gate.mjs database-draft
+      - name: Stop only the runner's disposable local stack
+        if: always()
+        run: supabase stop --no-backup
 
   real-auth-journey:
     name: Real local Auth journey

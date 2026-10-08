@@ -212,11 +212,12 @@ describe("triage paid-processing interaction", () => {
     action(); action();
     await settle();
     expect(approve).toHaveBeenCalledTimes(1);
+    const callbackPromise = approve.mock.results[0].value;
     expect(deferredApproval.release).not.toBeNull();
     expect(putCalled).toBe(false);
     expect(requests).toEqual([]);
     deferredApproval.release?.();
-    await settle();
+    await expect(callbackPromise).resolves.toBe("completed");
     view.rerenderNow();
     expect(requests).toEqual(["/api/uploads/capability", "/api/uploads/confirm"]);
     expect(putCalled).toBe(false);

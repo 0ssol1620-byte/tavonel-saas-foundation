@@ -54,9 +54,11 @@ async function waitForCondition(check,label,{deadline,timeout=LOCK_WAIT_MS}={}) 
   throw Error(`Timed out waiting for ${label}`);
 }
 export async function stopPsqlChildren(processes, graceMs=CHILD_STOP_MS) {
-  const live=processes.filter(proc=>proc?.child?.exitCode===null);
-  for(const proc of live)proc.child.kill('SIGKILL');
-  await Promise.race([Promise.allSettled(processes.filter(Boolean).map(proc=>proc.done)),delay(graceMs)]);
+  const errors=[];
+  for(const proc of processes.filter(proc=>proc?.child?.exitCode===null))try{proc.child.kill('SIGKILL');}catch(error){errors.push(error);}
+  const exited=await Promise.race([Promise.allSettled(processes.filter(Boolean).map(proc=>proc.done)).then(()=>true),delay(graceMs).then(()=>false)]);
+  if(!exited)errors.push(Error(`psql sessions did not exit within ${graceMs}ms of SIGKILL`));
+  if(errors.length)throw AggregateError(errors,'Bounded Dropbox session cleanup failed: '+errors.map(e=>e.message).join('; '));
 }
 
 function assertBlocked(databaseUrl, appName, holderPid, deadline, psql=runPsql) {
@@ -76,17 +78,18 @@ export function buildGenericSourceImportSql({genericJob,workspace,actor,connecti
     `values (${sqlText(genericJob)},${sqlText(workspace)},'source_import',${sqlText('source_import:'+connection)},${sqlText(actor)},${sqlText(connection)},${jsonLiteral})`;
 }
 
-/** Runs only against the local port-qualified disposable DB. The harness never replays migrations. */
-export async function runDropboxSourceStreamRace({databaseUrl, psql=runPsql, start=startPsql, wait=waitForCondition, deadlineMs=TIMEOUT_MS}={}) {
+/** Runs only against the local port-qualified disposable DB. The harness never replays migrations.
+ * Synthetic rows are never deleted: the canonical job writes append-only foundation_job_events (FK on delete restrict),
+ * so row cleanup is deferred to the owning job's disposable stack teardown and reported as such, never as verified. */
+export async function runDropboxSourceStreamRace({databaseUrl, psql=runPsql, start=startPsql, wait=waitForCondition, stop=stopPsqlChildren, deadlineMs=TIMEOUT_MS}={}) {
   const deadline=Date.now()+deadlineMs,db=validateDisposableDatabaseUrl(databaseUrl),actor=uuid(),connection=uuid();
   const ws='pilot-'+actor.replaceAll('-','').slice(0,16),canonicalJob='job-'+uuid().replaceAll('-','');
   const genericJob='job-'+uuid().replaceAll('-',''),suffix=uuid().replaceAll('-','');
   const lockApp='dropbox-lock-'+suffix,contenderApp='dropbox-generic-'+suffix;
-  let lockProcess=null,contender=null,fixtureTouched=false,holderPid=null;
+  let lockProcess=null,contender=null,holderPid=null,result,primary=null;
   const sql=(q,app='dropbox-race-setup')=>{const r=psql(db,q,{applicationName:app,timeout:Math.min(TIMEOUT_MS,remainingMs(deadline))});if(r.code!==0)throw Error(`${app} failed: ${r.stderr}`);return r.stdout.trim();};
   try {
     sql(`insert into auth.users (id,email) values (${sqlText(actor)},${sqlText(`dropbox-race-${actor}@example.invalid`)})`);
-    fixtureTouched=true;
     assert.equal(sql(`select count(*) from public.foundation_workspaces where workspace_key=${sqlText(ws)} and created_by=${sqlText(actor)}`),'1',
       'Synthetic actor must own its trigger-created workspace');
     sql(`insert into public.foundation_oauth_connections (oauth_connection_id,workspace_key,provider,display_name,provider_account_id,granted_scopes,client_secret_reference,refresh_token_reference,created_by,updated_by)
@@ -128,28 +131,21 @@ export async function runDropboxSourceStreamRace({databaseUrl, psql=runPsql, sta
     const replay=JSON.parse(sql(`select public.enqueue_connector_sync(${sqlText('job-'+uuid().replaceAll('-',''))},${sqlText(ws)},${sqlText(actor)},${sqlText(connection)},'{}'::jsonb)`));
     assert.equal(replay.job_id,canonicalJob,'Canonical enqueue must resume the existing job identity');
     assert.equal(replay.created,false,'Canonical enqueue must not create a parallel job');
-    return {status:'passed',observedBlocking:true,holderPid,canonicalJobId:canonicalJob,genericJobRejected:'DROPBOX_SOURCE_STREAM_CONFLICT',cleanup:'verified'};
-  } finally {
-    await stopPsqlChildren([contender,lockProcess]);
-    if(fixtureTouched) {
-      const cleanupDeadline=Date.now()+5000;
-      const cleanup=psql(db,`delete from public.foundation_jobs where oauth_connection_id=${sqlText(connection)};
-        delete from public.foundation_oauth_connections where oauth_connection_id=${sqlText(connection)};
-        delete from public.foundation_workspace_members where workspace_key=${sqlText(ws)};
-        delete from public.foundation_workspaces where workspace_key=${sqlText(ws)};
-        delete from auth.users where id=${sqlText(actor)};`,{applicationName:'dropbox-race-cleanup',timeout:Math.min(TIMEOUT_MS,remainingMs(cleanupDeadline,'fixture cleanup'))});
-      if(cleanup.code!==0) throw Error('Bounded Dropbox fixture cleanup failed: '+cleanup.stderr);
-      const remaining=psql(db,`select (select count(*) from public.foundation_jobs where oauth_connection_id=${sqlText(connection)})+
-        (select count(*) from public.foundation_oauth_connections where oauth_connection_id=${sqlText(connection)})+
-        (select count(*) from public.foundation_workspaces where workspace_key=${sqlText(ws)})+
-        (select count(*) from public.foundation_workspace_members where workspace_key=${sqlText(ws)})+
-        (select count(*) from auth.users where id=${sqlText(actor)})`,{applicationName:'dropbox-race-cleanup-check',timeout:Math.min(TIMEOUT_MS,remainingMs(cleanupDeadline,'cleanup verification'))});
-      if(remaining.code!==0 || remaining.stdout.trim()!=='0') throw Error('Dropbox synthetic fixture cleanup was not verified');
-    }
-  }
+    result={status:'passed',observedBlocking:true,holderPid,canonicalJobId:canonicalJob,genericJobRejected:'DROPBOX_SOURCE_STREAM_CONFLICT',
+      rowCleanup:'deferred',teardownRequired:'runner-local disposable Supabase stack',
+      syntheticOwnership:{actorId:actor,workspaceKey:ws,oauthConnectionId:connection,jobIds:[canonicalJob]}};
+  } catch(error) {primary=error;}
+  let sessionError=null;
+  try{await stop([contender,lockProcess]);}catch(error){sessionError=error;}
+  // The race outcome stays primary; a session cleanup failure alone still fails, and both failures stay visible.
+  if(primary&&sessionError)throw AggregateError([primary,sessionError],`Dropbox race failed: ${primary.message}; and ${sessionError.message}`,{cause:primary});
+  if(primary||sessionError)throw primary??sessionError;
+  return result;
 }
 
 export function main() {
+  // Deferred row cleanup is truthful only where the job owns a disposable stack; refuse persistent/self-hosted stacks.
+  assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted','Dropbox race requires a github-hosted disposable runner whose stack teardown owns synthetic rows');
   const status=spawnSync('supabase',['status','--output','env'],{encoding:'utf8',timeout:10000,windowsHide:true,env:{PATH:process.env.PATH,HOME:process.env.HOME}});
   assert.equal(status.status,0,'supabase status must resolve the runner-local stack');
   const line=(status.stdout??'').split(/\r?\n/).find(value=>/^DB_URL=/.test(value));
