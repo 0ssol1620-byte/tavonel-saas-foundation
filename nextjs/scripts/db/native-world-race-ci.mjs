@@ -13,7 +13,7 @@ import { classifyNativeRaceIntent, verifyNativeRaceSource, NATIVE_RACE_PROFILE, 
   NATIVE_RACE_ADDITIONS, NATIVE_RACE_PARENT_OWNER_BLOBS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_UNCHANGED_OWNERS, NATIVE_RACE_CHANGED_PATHS,
   NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PATHS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE, nativeRaceMainOverlayEvidence, EXPLORE_SUCCESSOR_PARENT, EXPLORE_SUCCESSOR_PARENT_TREE, SOLUTIONS_PARENT, SOLUTIONS_PARENT_TREE, FULL_ANCHOR,
   verifyNativeRaceSuccessorSource, NATIVE_RACE_SUCCESSOR_PARENT, NATIVE_RACE_SUCCESSOR_PARENT_TREE, NATIVE_RACE_SUCCESSOR_KIND, NATIVE_RACE_SUCCESSOR_PATHS,
-  NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS, NATIVE_RACE_SUCCESSOR_FINAL_SHA256 } from '../repair-collector-only.mjs';
+  NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS, NATIVE_RACE_SUCCESSOR_FINAL_SHA256, classifyAffectedIntent, verifyAffectedSource, AFFECTED_BASELINE, AFFECTED_PROFILE } from '../repair-collector-only.mjs';
 
 export const REPOSITORY='0ssol1620-byte/tavonel-saas-foundation', MAIN_REF='refs/heads/main', JOB='race', AGGREGATE_JOB='aggregate';
 // The only admitted pull_request: PR 141, same-repository head branch into main, checked out at its payload head SHA (never the merge ref).
@@ -198,6 +198,19 @@ export const nativeRaceGit=root=>(file,args,{encoding='utf8'}={})=>{
 };
 const refusal=(message,result)=>message+': '+(result?.reason ?? result?.classification ?? 'unverified');
 
+// ---- PR 141 affected integration: a descendant of the verified baseline, admitted by its fail-closed incremental map ----
+// The collector proof re-derives the baseline-to-head map from Git alone; this helper requires a clean map naming exactly this head.
+// Admission only qualifies the source: the seven hosted cases still run fresh, and the Repair plan alone records whether that run is required.
+export function admitAffectedSource(head, {exec, intent, verify=verifyAffectedSource}) {
+  assert.ok(isObject(intent) && intent.profile===AFFECTED_PROFILE && intent.headSha===head,'Affected integration admission requires the classified baseline descendant');
+  const source=verify({headSha:head,intent,exec});
+  assert.ok(isObject(source) && source.eligible===true,refusal('PR 141 affected integration source refused',source));
+  assert.ok(source.headSha===head && source.map?.headSha===head && isDeepStrictEqual(source.baseline,{...AFFECTED_BASELINE}) &&
+    Array.isArray(source.map.failures) && source.map.failures.length===0,'PR 141 affected integration source differs from the exact baseline-to-head map');
+  return {profile:AFFECTED_PROFILE,headSha:head,baseline:{...AFFECTED_BASELINE},changedPaths:[...source.map.changedPaths],groups:[...source.map.groups],
+    nativeEvidence:{...source.map.nativeEvidence}};
+}
+
 // ---- PR 141 race successor: one exact six-owner correction directly over published c61 ----
 // c61 is the published exact2bb race candidate; run 37646273750 passed its byte-qualified source admission and refused only its status.
 // The successor proof (lineage, scope, preimages, overlays, final pins and seals) lives in repair-collector-only.mjs; this helper restates
@@ -214,7 +227,8 @@ export const RACE_SUCCESSOR_PATHS=Object.freeze([RACE_HELPER,RACE_HELPER_TEST,'n
  * collector/repair seals. The verifier's own result must then name exactly that increment; the overlays stay inherited source evidence.
  * A head the classifier places directly on c61 is admitted only by admitRaceSuccessor; no other parent is redirected.
  */
-export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, verify=verifyNativeRaceSource, successor=verifyNativeRaceSuccessorSource}={}) {
+export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, verify=verifyNativeRaceSource, successor=verifyNativeRaceSuccessorSource,
+  classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource}={}) {
   assert.equal(typeof exec,'function','Native World race git access required for PR 141 admission');
   // This helper's PR identity, 623 commit and harness pins must be the race verifier's own.
   assert.ok(NATIVE_RACE_PR.repository===REPOSITORY && NATIVE_RACE_PR.number===PR_NUMBER && NATIVE_RACE_PR.baseRef===PR_BASE_REF &&
@@ -230,6 +244,9 @@ export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, 
     Object.entries(MAIN_OVERLAY_PINS).every(([p,pin])=>isDeepStrictEqual({...NATIVE_RACE_MAIN_OVERLAYS[p]},{...pin})) &&
     NATIVE_RACE_MAIN_OVERLAY_PROVENANCE.pr===MAIN_OVERLAY_PR && NATIVE_RACE_MAIN_OVERLAY_PROVENANCE.mainCommit===MAIN_OVERLAY_COMMIT,
     'Released-main overlay pins differ from the native World race verifier');
+  // A verified-baseline descendant is admitted by its incremental map, before and instead of any exact race increment.
+  const baselineIntent=classifyAffected({headSha:head,exec});
+  if(baselineIntent?.classification!=='normal') return admitAffectedSource(head,{exec,intent:baselineIntent,verify:affected});
   const intent=classify({headSha:head,exec});
   assert.ok(isObject(intent) && intent.classification==='intended' && intent.intended===true && intent.profile===NATIVE_RACE_PROFILE &&
     intent.headSha===head,refusal('PR 141 head is not an admitted native World race candidate',intent));
@@ -243,6 +260,23 @@ export function admitRaceSource(head, {exec, classify=classifyNativeRaceIntent, 
     changedOwners:[...NATIVE_RACE_CONFIG_PATHS],unchangedOwners:[...NATIVE_RACE_UNCHANGED_OWNERS],mainOverlays:nativeRaceMainOverlayEvidence()};
   for (const [key,value] of Object.entries(exact)) assert.ok(isDeepStrictEqual(source[key],value),'PR 141 native World race source differs from the exact2bb increment: '+key);
   return exact;
+}
+
+/** Route the dedicated seven-case matrix from the same verified baseline→head map as affected checks. */
+export function nativeRaceRunDecision({event, head, exec, classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource}) {
+  if(event==='workflow_dispatch') return {runCases:true, reason:'manual-dispatch'};
+  assert.equal(event,'pull_request','Unsupported event for native World race routing');
+  assert.ok(GIT_SHA.test(String(head)),'Native World race routing requires a resolved head SHA');
+  assert.equal(typeof exec,'function','Native World race routing requires Git access');
+  const intent=classifyAffected({headSha:head,exec});
+  assert.ok(intent?.classification==='intended' && intent.profile===AFFECTED_PROFILE && intent.headSha===head,
+    refusal('PR head is outside or unverified against the authenticated affected baseline',intent));
+  const proof=affected({headSha:head,exec,intent});
+  assert.ok(isObject(proof) && proof.eligible===true && proof.map?.headSha===head,'Affected source did not verify for Native World routing');
+  const disposition=proof.map.nativeEvidence?.disposition;
+  if(disposition==='historical-input-reuse') return {runCases:false,reason:disposition,headSha:head};
+  assert.equal(disposition,'fresh-seven-case-native-run-required','Unknown Native World evidence disposition');
+  return {runCases:true,reason:disposition,headSha:head};
 }
 /**
  * The exact c61 successor: verifyNativeRaceSuccessorSource (repair-collector-only.mjs) proves the single-parent direct child of published
@@ -726,7 +760,7 @@ export function aggregateReceipts(entries, expect) {
   const values=[...byCase.values()];
   for (const [label,pick] of [['container ID',v=>v.r.target?.containerId],['marker',v=>v.r.markerSha256],['harness receipt',v=>v.r.harnessReceiptSha256]])
     if(new Set(values.map(pick)).size!==values.length) problems.push('reused '+label+' across cases');
-  return {schemaVersion:1,kind:'native-world-hosted-ci-aggregate',repository:REPOSITORY,event:expect.event ?? 'workflow_dispatch',
+  return {schemaVersion:1,kind:'native-world-hosted-ci-aggregate',repository:REPOSITORY,job:AGGREGATE_JOB,event:expect.event ?? 'workflow_dispatch',
     ref:expect.ref ?? MAIN_REF,head:expect.head ?? null,
     runId:expect.runId ?? null,runAttempt:expect.runAttempt ?? null,
     cases:CASES.map(c=>({case:c,containerId:byCase.get(c)?.r.target?.containerId ?? null,stageReceiptSha256:byCase.get(c)?.r.stageReceiptSha256 ?? null,
@@ -770,6 +804,19 @@ export async function main(argv=process.argv.slice(2), env=process.env, io={}) {
   // Every step re-derives the bound head: github.sha for manual dispatch, the PR head SHA (never the merge ref) for PR 141.
   const identity=admitEvent(env,event);
   const binding={head:identity.head,runId:env.GITHUB_RUN_ID,runAttempt:env.GITHUB_RUN_ATTEMPT,caseName};
+  if(command==='classify-native') {
+    assert.equal(env.GITHUB_JOB,'classify','Unexpected Native World routing job');
+    assert.match(env.GITHUB_RUN_ID ?? '',RUN,'Run ID required');
+    assert.match(env.GITHUB_RUN_ATTEMPT ?? '',RUN,'Run attempt required');
+    const git=io.git ?? localGit(root),head=String(git(['rev-parse','--verify','HEAD^{commit}'])?.out ?? '').trim();
+    assert.equal(head,identity.head,'Checkout HEAD must equal '+(identity.event==='pull_request'?'the PR head SHA':'github.sha'));
+    assert.equal(String(git(['rev-parse','--verify',BASE_COMMIT+'^{commit}'])?.out ?? '').trim(),BASE_COMMIT,'Commit 623 absent or mismatched');
+    assert.equal(String(git(['rev-parse','--verify',BASE_COMMIT+'^{tree}'])?.out ?? '').trim(),BASE_TREE,'Commit 623 tree mismatch');
+    assert.equal(git(['merge-base','--is-ancestor',BASE_COMMIT,head])?.code,0,'Commit 623 must be an ancestor of HEAD');
+    const decision=nativeRaceRunDecision({event:identity.event,head,exec:io.race?.exec ?? nativeRaceGit(root)});
+    if(env.GITHUB_OUTPUT) writeFileSync(env.GITHUB_OUTPUT,`run_cases=${decision.runCases}\nreason=${decision.reason}\n`,{flag:'a'});
+    console.log(JSON.stringify(decision));return 0;
+  }
   if(command==='admit') {
     const aggregate=args[0]==='--aggregate';
     mkdirSync(state);
@@ -809,7 +856,7 @@ export async function main(argv=process.argv.slice(2), env=process.env, io={}) {
       runAttempt:env.GITHUB_RUN_ATTEMPT,matrixResult:env.NWR_MATRIX_RESULT});
     writeJson(file('aggregate.json'),result);console.log(JSON.stringify(result,null,2));return result.gate==='failed'?1:0;
   }
-  throw Error('Unknown command; expected admit|stage|capture|run-harness|finalize|aggregate');
+  throw Error('Unknown command; expected classify-native|admit|stage|capture|run-harness|finalize|aggregate');
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href) {
   main().then(code=>{process.exitCode=code;},error=>{console.error(error.message);process.exitCode=1;});

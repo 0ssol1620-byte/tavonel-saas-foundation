@@ -46,6 +46,7 @@ export function billingProductDecision(
   account: FoundationBillingAccount,
   required: ProductAccessLevel,
   role?: ProductAccessRole,
+  now: Date = new Date(),
 ): { ok: true } | { ok: false; code: string; status: number } {
   if (account.billingHold) return { ok: false, code: "BILLING_HOLD", status: 402 };
   if (!account.accessPlan || !["active", "trialing"].includes(account.subscriptionStatus)) {
@@ -53,6 +54,14 @@ export function billingProductDecision(
   }
   if (!new Set(["observer_access", "studio_access"]).has(account.accessPlan)) {
     return { ok: false, code: "SUBSCRIPTION_PLAN_INVALID", status: 403 };
+  }
+  // A cancellation that has taken effect ends access even while the provider's final webhook is
+  // still in flight; a future scheduled cancellation keeps access until it arrives.
+  if (account.subscriptionCancelAt != null) {
+    const cancelAt = new Date(account.subscriptionCancelAt).getTime();
+    if (Number.isFinite(cancelAt) && cancelAt <= now.getTime()) {
+      return { ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 };
+    }
   }
   // The existing refusal code, deliberately. A client branching on STUDIO_SUBSCRIPTION_REQUIRED
   // keeps working: what changed is who satisfies the gate, not what a refusal is called.

@@ -62,6 +62,8 @@ jobs:
             node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test scripts/repair-collector-only.test.mjs
+          elif [ '${{ steps.plan.outputs.affected }}' = true ]; then
+            node --test --test-name-pattern='^affected ' scripts/repair-scope.test.mjs scripts/repair-collector-only.test.mjs scripts/db/native-world-race-ci.test.mjs
           else
             node --test scripts/repair-scope.test.mjs
           fi
@@ -72,7 +74,7 @@ jobs:
         # never the full historical repair-scope suite. Every other plan keeps its existing route below.
         run: |
           if [ '${{ steps.plan.outputs.native_race }}' = true ]; then
-            node --test --test-name-pattern='native world race static' scripts/db/native-world-race-ci.test.mjs
+            node --test --test-name-pattern='native world race static: affected' scripts/db/native-world-race-ci.test.mjs
           elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ]; then
             node --test scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
@@ -81,6 +83,8 @@ jobs:
             node --test --test-name-pattern='targeted regression transitive' scripts/repair-scope.test.mjs
           elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
             node --test --test-name-pattern='mounted|collector|report|browser project|browser groups|Playwright' scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.affected }}' = true ]; then
+            node --test --test-name-pattern='native world race static: affected' scripts/db/native-world-race-ci.test.mjs
           else
             node --test scripts/repair-scope.test.mjs
           fi

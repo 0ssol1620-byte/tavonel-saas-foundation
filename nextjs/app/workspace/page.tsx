@@ -636,7 +636,9 @@ export default function WorkspacePage() {
   const [askQuestion, setAskQuestion] = useState("");
   const [askResult, setAskResult] = useState<GroundedAnswer | null>(null);
   const [askBusy, setAskBusy] = useState(false);
-  const [askEvidenceId, setAskEvidenceId] = useState<string | null>(null);
+  /* undefined: no source region opened. null: World Studio stays open with nothing selected, so
+     picking a graph object or pressing Clear there does not unmount the inspector. */
+  const [askEvidenceId, setAskEvidenceId] = useState<string | null | undefined>(undefined);
 
   const getAuthToken = async () => {
     const client = getSupabaseBrowserClient();
@@ -664,7 +666,7 @@ export default function WorkspacePage() {
     setActiveWorld(null);
     setWorldVersions([]);
     setAskResult(null);
-    setAskEvidenceId(null);
+    setAskEvidenceId(undefined);
   };
 
   const loadWorldState = async (collectionId: string, token?: string, selectionSequence?: number): Promise<ActiveWorld | null | undefined> => {
@@ -687,7 +689,7 @@ export default function WorkspacePage() {
     setActiveWorld(json.activeWorld);
     setWorldVersions(json.versions);
     setAskResult(null);
-    setAskEvidenceId(null);
+    setAskEvidenceId(undefined);
     return json.activeWorld;
   };
 
@@ -2155,9 +2157,13 @@ export default function WorkspacePage() {
     looking at the page region that justifies it, which is the only position from which someone
     can tell whether the compiled label is right.
   */
-  const reviewEvidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
-    ?? worldReadModel?.evidence[0]
-    ?? null;
+  const reviewEvidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId) ?? null;
+  /* A decision belongs to the evidence it was opened for, so a new selection drops any open draft. */
+  const selectReviewEvidence = (evidenceId: string | null) => {
+    if (evidenceId === reviewEvidenceId) return;
+    setReviewEvidenceId(evidenceId);
+    setEvidenceReviewAction(null); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter("");
+  };
   const correctableObjects = (worldReadModel?.objects ?? []).filter((object) =>
     (object.type === "Topic" || object.type === "Entity" || object.type === "Claim")
     && reviewEvidence !== null
@@ -2169,8 +2175,7 @@ export default function WorkspacePage() {
     reason: string,
     patch?: { objectId: string; before: string; after: string },
   ) => {
-    const evidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
-      ?? worldReadModel?.evidence[0];
+    const evidence = reviewEvidence;
     if (!collectionResult || !evidence || reason.trim().length < 8) return;
     if (worldReadModel?.world.id !== collectionResult.collectionId || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest) {
       setNotice("Read this exact revision and its source-bound evidence before recording a decision."); return;
@@ -3142,10 +3147,7 @@ export default function WorkspacePage() {
                 <ReviewQueue
                   input={reviewQueueInput}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
-                  onSelectDocument={(documentId) => {
-                    const first = worldReadModel?.evidence.find((item) => item.sourceId === documentId);
-                    if (first) setReviewEvidenceId(first.id);
-                  }}
+                  onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
               </section>
               <section className="card review-comparison" aria-labelledby="review-comparison-title">
@@ -3155,9 +3157,10 @@ export default function WorkspacePage() {
                     <WorldStudioUltimate
                       model={worldReadModel}
                       initialLens="evidence"
-                      selectedEvidenceId={reviewEvidenceId ?? worldReadModel.evidence[0].id}
-                      onEvidenceSelect={(selection) => setReviewEvidenceId(selection?.id ?? null)}
+                      selectedEvidenceId={reviewEvidenceId}
+                      onEvidenceSelect={(selection) => selectReviewEvidence(selection?.id ?? null)}
                     />
+                    {reviewEvidence ? null : <p className="fine" role="status">Select an evidence record above to accept, correct, request a change or reject it.</p>}
                     {/*
                       Two different acts, named differently, because they are.
 
@@ -3169,11 +3172,11 @@ export default function WorkspacePage() {
                       which set a reviewer up to believe they had corrected something.
                     */}
                     <div className="review-decision-actions" aria-label="Review decision">
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => void recordEvidenceReview("accept", ACCEPTED_WITHOUT_NOTE)}>Accept</button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("accept"); setEvidenceReviewReason(""); }}>Accept with note</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => void recordEvidenceReview("accept", ACCEPTED_WITHOUT_NOTE)}>Accept</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => { setEvidenceReviewAction("accept"); setEvidenceReviewReason(""); }}>Accept with note</button>
                       <button
                         type="button"
-                        disabled={evidenceReviewBusy || correctableObjects.length === 0}
+                        disabled={evidenceReviewBusy || !reviewEvidence || correctableObjects.length === 0}
                         onClick={() => {
                           setEvidenceReviewAction("edit");
                           setEvidenceReviewReason("");
@@ -3184,10 +3187,10 @@ export default function WorkspacePage() {
                       >
                         Correct
                       </button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter(""); }}>Request change</button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter(""); }}>Request change</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
                     </div>
-                    {evidenceReviewAction ? (
+                    {evidenceReviewAction && reviewEvidence ? (
                       <form
                         className="review-decision-form"
                         onSubmit={(event) => {
@@ -3433,7 +3436,7 @@ export default function WorkspacePage() {
                     ) : null}
                   </div>
                 ) : null}
-                {askEvidenceId ? (
+                {askEvidenceId !== undefined ? (
                   <WorldStudioUltimate model={worldReadModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
               </section>

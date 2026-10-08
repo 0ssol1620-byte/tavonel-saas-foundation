@@ -272,6 +272,42 @@ async function withCompiledWorld(page: Page, manifest = candidateManifest) {
 
 const NARROW_STAGE_MAX = 820;
 
+type Locator = { click: () => Promise<void>; count: () => Promise<number>; getByRole: (role: string, options?: { name?: string | RegExp; exact?: boolean }) => Locator };
+type UiPage = Pick<Locator, "getByRole"> & { locator: (selector: string) => Locator };
+
+/* Review never picks evidence for the reviewer: every decision starts from an explicit choice. */
+async function chooseReviewEvidence(page: UiPage, excerpt: RegExp) {
+  await page.locator('section[aria-labelledby="review-comparison-title"]').getByRole("button", { name: excerpt }).click();
+}
+
+/* Selects an object through the graph's list reading, which every viewport and motion setting can reach. */
+async function selectListedObject(page: UiPage, label: string) {
+  await page.getByRole("tab", { name: "Graph", exact: true }).click();
+  await expect(page.getByRole("searchbox", { name: "Search" })).toBeVisible();
+  const table = page.getByRole("table", { name: /Compiled objects and the relations/ });
+  if (await table.count() === 0) await page.getByRole("button", { name: "Table", exact: true }).click();
+  await table.getByRole("button", { name: label, exact: true }).click();
+}
+
+/*
+  The same World with one object bound to three resolvable records across two sources, one object
+  bound only to an id this revision does not hold, and one bound to nothing.
+*/
+const boundEvidenceModel = {
+  ...worldModel,
+  objects: worldModel.objects.map(object => ({
+    ...object,
+    evidenceRefs: object.id === "object-claim" ? ["evidence-1", "evidence-page-one", "evidence-other-source"]
+      : object.id === "object-entity" ? ["evidence-missing"]
+      : object.evidenceRefs,
+  })),
+  evidence: [
+    ...worldModel.evidence,
+    { ...worldModel.evidence[0], id: "evidence-page-one", page: 1, bbox: [50, 60, 700, 160], blockId: "block-2", excerpt: "Segment revenue table, page one." },
+    { ...worldModel.evidence[0], id: "evidence-other-source", sourceId: "doc-b", sourceVersionId: "version-2", page: 1, bbox: [10, 20, 500, 400], blockId: "block-3", excerpt: "Other filing confirms the increase." },
+  ],
+};
+
 for (const action of ["activation", "rollback"] as const) {
   test(`${action} lost response preserves input and reports an uncertain outcome`, async ({ page }, testInfo) => {
     const errors: string[] = [];
@@ -315,6 +351,7 @@ test("a lost correction response retains the proposed edit and never announces a
   });
   await page.route(`**/api/collections/${collectionId}?manifest=**`, route => route.abort("connectionfailed"));
   await page.goto(`/workspace/review?collection=${collectionId}`);
+  await chooseReviewEvidence(page, /Total net sales increased/);
   await page.getByRole("button", { name: "Correct", exact: true }).click();
   await page.getByLabel("What should it say?").fill("Corrected synthetic source label");
   await page.getByLabel("What needs to change?").fill("The synthetic source supports this corrected label.");
@@ -490,6 +527,222 @@ test("source preview reuses bytes across pages and clears the previous document 
     await page.screenshot({ path: testInfo.outputPath("source-preview.png"), fullPage: true });
     expect(pageErrors).toEqual([]);
   } finally { finishOther?.(); }
+});
+
+test("an object selected after evidence replaces it, and empty or missing refs never borrow it", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: { model: boundEvidenceModel } }));
+  await page.goto(`/workspace/world?collection=${collectionId}`);
+  const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+  const evidenceA = page.getByRole("button", { name: /Total net sales increased/ });
+  const selectA = async () => {
+    await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+    await evidenceA.click();
+    await expect(inspector).toContainText("Selected evidence");
+    await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+  };
+  const expectNoBorrowedEvidence = async () => {
+    await expect(inspector).toContainText("Selected object");
+    await expect(inspector).not.toContainText("Selected evidence");
+    await expect(inspector).not.toContainText("Total net sales increased.");
+    await expect(inspector.locator("canvas")).toHaveCount(0);
+  };
+
+  // A -> object B with one resolvable ref: B is shown, not A.
+  await selectA();
+  await selectListedObject(page, "Annual filing");
+  await expectNoBorrowedEvidence();
+  await expect(inspector).toContainText("Annual filing");
+  await expect(inspector.getByRole("button", { name: "Open evidence evidence-1, doc-a page 2", exact: true })).toBeVisible();
+
+  // A -> an object with no refs.
+  await selectA();
+  await selectListedObject(page, "Reportable segments");
+  await expectNoBorrowedEvidence();
+  await expect(inspector).toContainText("No evidence is bound to this object.");
+
+  // A -> an object whose only ref is not in this revision: named, unresolved, and not openable.
+  await selectA();
+  await selectListedObject(page, "Apple Inc.");
+  await expectNoBorrowedEvidence();
+  await expect(inspector.locator('[data-state="unresolved"]')).toContainText("evidence-missing");
+  await expect(inspector.locator('[data-state="unresolved"]')).toContainText("Not in this compiled World; no source is shown.");
+  await expect(inspector.getByRole("button", { name: /evidence-missing/ })).toHaveCount(0);
+
+  // Evidence after an object replaces the object.
+  await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+  await expect(evidenceA).toHaveAttribute("aria-pressed", "false");
+  await evidenceA.click();
+  await expect(inspector).toContainText("Selected evidence");
+  await expect(inspector).not.toContainText("Selected object");
+  await expect(inspector).not.toContainText("Apple Inc.");
+  expect(pageErrors).toEqual([]);
+});
+
+test("every evidence ref bound to an object opens that exact record from the keyboard", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: { model: boundEvidenceModel } }));
+  const reads: string[] = [];
+  await page.route("**/api/documents/*/source?**", route => {
+    reads.push(route.request().url());
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+  });
+  await page.goto(`/workspace/world?collection=${collectionId}`);
+  const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+  const claim = boundEvidenceModel.objects.find(object => object.id === "object-claim")!;
+  expect(claim.evidenceRefs).toHaveLength(3);
+  for (const ref of claim.evidenceRefs) {
+    const evidence = boundEvidenceModel.evidence.find(item => item.id === ref)!;
+    await selectListedObject(page, claim.label);
+    const control = inspector.getByRole("group", { name: "Evidence bound to this object" })
+      .getByRole("button", { name: `Open evidence ${ref}, ${evidence.sourceId} page ${evidence.page}`, exact: true });
+    await control.focus();
+    await page.keyboard.press("Enter");
+    // The control just pressed leaves the DOM; focus lands on the evidence it opened, not on the body.
+    await expect(inspector.getByRole("heading", { name: "Selected evidence", exact: true })).toBeFocused();
+    await expect(inspector.locator(":scope > strong")).toHaveText(evidence.sourceId);
+    await expect(inspector.locator("dd")).toHaveText([evidence.sourceVersionId, String(evidence.page), `[${evidence.bbox.join(", ")}]`]);
+    await expect(inspector.locator("blockquote")).toHaveText(evidence.excerpt);
+    await expect(inspector.getByRole("group", { name: `Source ${evidence.sourceId}, page ${evidence.page}, exact evidence region`, exact: true })).toHaveAttribute("data-state", "ready");
+    const read = new URL(reads[reads.length - 1]);
+    expect(read.pathname).toBe(`/api/documents/${evidence.sourceId}/source`);
+    expect(read.searchParams.get("version")).toBe(evidence.sourceVersionId);
+  }
+  expect(pageErrors).toEqual([]);
+});
+
+test("a failed source preview retries the identical source and version", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await withCompiledWorld(page);
+  const reads: string[] = [];
+  let releaseRetry: (() => void) | undefined;
+  const retryHeld = new Promise<void>(resolve => { releaseRetry = resolve; });
+  await page.route("**/api/documents/*/source?**", async route => {
+    reads.push(route.request().url());
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    if (reads.length === 1) return route.fulfill({ status: 503, json: { code: "SOURCE_STORE_UNAVAILABLE" } });
+    await retryHeld;
+    return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
+  });
+  try {
+    await page.goto(`/workspace/world?collection=${collectionId}`);
+    await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+    await page.getByRole("button", { name: /Total net sales increased/ }).click();
+    const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+    const status = inspector.getByRole("status");
+    await expect(inspector).toContainText("Preview unavailable · page 2");
+    await expect(status).toHaveText("Preview unavailable · page 2");
+    await expect(status).toHaveAttribute("aria-busy", "false");
+    await expect(inspector.locator("canvas")).toHaveCount(0);
+    expect(reads).toHaveLength(1);
+    const retry = inspector.getByRole("button", { name: "Retry", exact: true });
+    await retry.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(() => reads.length).toBe(2);
+    // While the retry is in flight its control stays where the keyboard left it, and says it is busy.
+    await expect(retry).toBeFocused();
+    await expect(retry).toHaveAttribute("aria-disabled", "true");
+    await expect(status).toHaveText("Opening source page…");
+    await expect(status).toHaveAttribute("aria-busy", "true");
+    // A second press while loading does not start a duplicate read.
+    await page.keyboard.press("Enter");
+    releaseRetry!();
+    await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
+    await expect(retry).toHaveCount(0);
+    await expect(inspector.getByRole("heading", { name: "Selected evidence", exact: true })).toBeFocused();
+    expect(reads).toHaveLength(2);
+    expect(reads[1]).toBe(reads[0]);
+    expect(new URL(reads[0]).pathname).toBe("/api/documents/doc-a/source");
+    expect(new URL(reads[0]).searchParams.get("version")).toBe("version-1");
+    expect(pageErrors).toEqual([]);
+  } finally { releaseRetry?.(); }
+});
+
+test("a late source read cannot overwrite the object selected after it", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await installSession(page);
+  await mockWorkspace(page);
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => route.fulfill({ json: { model: boundEvidenceModel } }));
+  let entered = false;
+  let settled = false;
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/documents/*/source?**", async route => {
+    entered = true;
+    await gate;
+    // The page aborts this read when the selection moves; a refused fulfil is that abort.
+    await route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() }).catch(() => undefined);
+    settled = true;
+  });
+  try {
+    await page.goto(`/workspace/world?collection=${collectionId}`);
+    await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+    await page.getByRole("button", { name: /Total net sales increased/ }).click();
+    const inspector = page.getByRole("complementary", { name: "World selection inspector" });
+    await expect(inspector.getByText("Opening source page…")).toBeVisible();
+    await expect.poll(() => entered).toBe(true);
+    await selectListedObject(page, "Reportable segments");
+    await expect(inspector).toContainText("Selected object");
+    release!();
+    await expect.poll(() => settled).toBe(true);
+    // Let any late completion reach React before reading the inspector.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect(inspector).toContainText("Reportable segments");
+    await expect(inspector).not.toContainText("Selected evidence");
+    await expect(inspector).not.toContainText("Total net sales increased.");
+    await expect(inspector.locator("canvas")).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
+  } finally { release?.(); }
+});
+
+test("Review decisions stay closed until evidence is chosen, and Clear closes them again", async ({ page }) => {
+  await installSession(page);
+  await mockWorkspace(page);
+  await withCompiledWorld(page);
+  let posts = 0;
+  await page.route("**/api/v1/reviews", route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    posts++;
+    return route.fulfill({ status: 201, json: { code: "RECORDED" } });
+  });
+  await page.goto(`/workspace/review?collection=${collectionId}`);
+  const comparison = page.locator('section[aria-labelledby="review-comparison-title"]');
+  const evidenceCard = comparison.getByRole("button", { name: /Total net sales increased/ });
+  const decisions = ["Accept", "Accept with note", "Correct", "Request change", "Reject"].map(name => comparison.getByRole("button", { name, exact: true }));
+  const prompt = comparison.getByText("Select an evidence record above", { exact: false });
+
+  // Nothing is chosen on arrival, so nothing can be decided.
+  await expect(evidenceCard).toHaveAttribute("aria-pressed", "false");
+  for (const decision of decisions) await expect(decision).toBeDisabled();
+  await expect(prompt).toBeVisible();
+
+  await evidenceCard.click();
+  for (const decision of decisions) await expect(decision).toBeEnabled();
+  await comparison.getByRole("button", { name: "Reject", exact: true }).click();
+  await page.getByLabel("Why does this not match the source?").fill("Draft written against the chosen evidence record.");
+
+  await comparison.getByRole("complementary", { name: "World selection inspector" }).getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(evidenceCard).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByLabel("Why does this not match the source?")).toHaveCount(0);
+  await expect(comparison.getByRole("button", { name: "Record rejection" })).toHaveCount(0);
+  for (const decision of decisions) await expect(decision).toBeDisabled();
+  await expect(prompt).toBeVisible();
+
+  // Choosing again starts a new decision; the cleared draft does not come back.
+  await evidenceCard.click();
+  await expect(page.getByLabel("Why does this not match the source?")).toHaveCount(0);
+  expect(posts).toBe(0);
 });
 
 test("the workspace World offers the same composition as an accessible list", async ({ page }) => {
@@ -783,6 +1036,7 @@ test("pins correction, evidence, activation and browser history to the selected 
   });
   await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
   await expect(page.getByText("Original revision evidence.", { exact: true }).first()).toBeVisible();
+  await chooseReviewEvidence(page, /Original revision evidence/);
   await page.getByRole("button", { name: "Correct", exact: true }).click();
   await page.getByLabel("What should it say?").fill("Corrected selected-revision label");
   await page.getByLabel("What needs to change?").fill("This correction is bound to the source revision.");
@@ -807,6 +1061,9 @@ test("pins correction, evidence, activation and browser history to the selected 
   await page.reload();
   await expect(page.getByText("Corrected revision evidence.", { exact: true }).first()).toBeVisible();
   expect(reads).toContain(candidateManifest); expect(reads).toContain(corrected);
+  // A reload selects nothing; the preview opens only for evidence the reviewer chose.
+  await expect(page.getByRole("complementary", { name: "World selection inspector" }).locator("canvas")).toHaveCount(0);
+  await chooseReviewEvidence(page, /Corrected revision evidence/);
   await expect(page.getByRole("complementary", { name: "World selection inspector" }).locator('[data-state="ready"] canvas')).toBeVisible();
   const inspector = page.getByRole("complementary", { name: "World selection inspector" });
   const sourceLabel = await inspector.locator('[data-state="ready"] canvas').locator("xpath=..").getAttribute("aria-label");
@@ -842,6 +1099,7 @@ test("a hydrated acceptance refreshes the exact revision ledger before publishin
   });
   await page.goto(`/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
   await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
+  await chooseReviewEvidence(page, /Total net sales increased/);
   expect((await acceptEvidenceThroughUi(page, collectionId, candidateManifest)).status()).toBe(201);
   await expect(page.getByText("First review decision", { exact: false }).first()).toBeVisible();
   await page.route(`**/api/collections/${collectionId}/promote`, route => route.fulfill({ status: 409, json: { code: "ACTIVE_WORLD_CONFLICT" } }));
@@ -865,6 +1123,7 @@ test("a late correction reply cannot replace a revision selected through Back", 
   await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
   await page.evaluate(url => { history.pushState(null, "", url); dispatchEvent(new PopStateEvent("popstate")); }, `/workspace/review?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
   await expect(page.getByLabel("Human review record")).toBeVisible();
+  await chooseReviewEvidence(page, /Total net sales increased/);
   await page.getByRole("button", { name: "Correct", exact: true }).click();
   await page.getByLabel("What should it say?").fill("A reviewed correction");
   await page.getByLabel("What needs to change?").fill("Correct the exact evidence-bound label.");

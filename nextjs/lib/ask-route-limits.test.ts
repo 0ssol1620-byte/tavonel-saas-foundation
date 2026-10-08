@@ -184,6 +184,36 @@ describe("idempotency", () => {
     expect(sourceAccess).toHaveBeenCalledTimes(3);
     expect(sourceAccess.mock.calls).toEqual(Array.from({ length: 3 }, () => [WORKSPACE, ["source-fixture"], "user-1"]));
   });
+  it("does not cache an answer whose source is revoked while the pipeline is in flight", async () => {
+    const defaultPipeline = pipeline.getMockImplementation()!;
+    let entered = () => {};
+    const pipelineEntered = new Promise<void>((resolve) => { entered = () => resolve(); });
+    let unblock = () => {};
+    const parked = new Promise<void>((resolve) => { unblock = () => resolve(); });
+    pipeline.mockImplementationOnce(async (...args: unknown[]) => {
+      entered();
+      await parked;
+      return defaultPipeline(...args);
+    });
+
+    const inFlight = ask(question("what changed in the filing?", "source-inflight-0001"), { params });
+    await pipelineEntered;
+    expect(sourceAccess).toHaveBeenCalled();
+    expect(await sourceAccess.mock.results[0].value).toEqual({ ok: true });
+
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    unblock();
+    const denied = await inFlight;
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(denied.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+
+    sourceAccess.mockResolvedValue({ ok: true });
+    const retry = await ask(question("what changed in the filing?", "source-inflight-0001"), { params });
+    expect(retry.status).toBe(200);
+    expect(retry.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    expect(pipeline).toHaveBeenCalledTimes(2);
+  });
   it("does not run either answer path when the source binding cannot be resolved", async () => {
     sourceIds.mockResolvedValue({ ok: false, code: "COLLECTION_SOURCE_BINDING_INVALID" });
     const denied = await ask(question("what changed in the filing?"), { params });

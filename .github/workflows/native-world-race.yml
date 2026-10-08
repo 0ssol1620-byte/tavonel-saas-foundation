@@ -18,9 +18,39 @@ env:
   NWR_HELPER: nextjs/scripts/db/native-world-race-ci.mjs
 
 jobs:
+  classify:
+    name: classify Native World routing
+    if: github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_cases: ${{ steps.route.outputs.run_cases }}
+      reason: ${{ steps.route.outputs.reason }}
+    steps:
+      - name: Check out the dispatched commit only
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the PR 141 head commit only
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify baseline and classify fresh versus historical Native inputs
+        id: route
+        run: node "$NWR_HELPER" classify-native
+
   race:
     name: race (${{ matrix.case }})
-    if: github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
+    needs: classify
+    if: needs.classify.outputs.run_cases == 'true' && github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
     runs-on: ubuntu-24.04
     # Covers CLI install, image pull, staging and the full-chain reset. The harness keeps its own
     # 15-second case and 120-second run bounds; this job timeout is not the runner limit.
@@ -132,8 +162,8 @@ jobs:
           retention-days: 14
 
   aggregate:
-    needs: race
-    if: always() && github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
+    needs: [classify, race]
+    if: always() && needs.classify.outputs.run_cases == 'true' && github.repository == '0ssol1620-byte/tavonel-saas-foundation' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.ref == 'refs/pull/141/merge' && github.event.pull_request.number == 141 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.base.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.repo.full_name == '0ssol1620-byte/tavonel-saas-foundation' && github.event.pull_request.head.ref == 'codex/masterplan-checkpoint-2026-09-30'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -166,3 +196,12 @@ jobs:
         env:
           NWR_MATRIX_RESULT: ${{ needs.race.result }}
         run: node "$NWR_HELPER" aggregate --dir "$RUNNER_TEMP/native-world-race-receipts"
+
+      - name: Upload aggregate evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-world-race-aggregate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/native-world-race/aggregate.json
+          if-no-files-found: warn
+          retention-days: 30

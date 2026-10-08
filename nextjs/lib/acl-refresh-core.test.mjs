@@ -227,6 +227,42 @@ test("work aborted after the 38-second cutoff retries without starting capture o
   }
 });
 
+test("a deadline already expired at invocation defers without lease, token, capture or store work", async () => {
+  const realNow = Date.now;
+  Date.now = () => 61_000;
+  let leaseChecks = 0;
+  let tokenReads = 0;
+  let captures = 0;
+  let stores = 0;
+  let retries = 0;
+  let retryCode;
+  try {
+    const result = await runAclRefreshBatch([binding()], {
+      leaseStillOwned: async () => { leaseChecks++; return true; },
+      customerDataAdmitted: async () => { throw new Error("must not check admission after deadline"); },
+      connectionStillActive: async () => { throw new Error("must not check connection after deadline"); },
+      sourceVersionStillCurrent: async () => { throw new Error("must not check source version after deadline"); },
+      refreshConnectionAccessToken: async () => { tokenReads++; return "token"; },
+      capturePermissions: async () => { captures++; return { complete: true, principals: [] }; },
+      storeCompleteSnapshot: async () => { stores++; return true; },
+      complete: async () => {}, cancel: async () => {},
+      retry: async (_claim, _delay, code) => { retries++; retryCode = code; },
+      recordIncompleteSnapshot: async () => {}, cooldownConnection: async () => {},
+    }, { nowMs: now, deadlineAtMs: 60_000 });
+    assert.equal(result.length, 1);
+    assert.equal(result[0].state, "deferred");
+    assert.equal(result[0].code, "ACL_REFRESH_DEADLINE_REACHED");
+    assert.equal(retries, 1);
+    assert.equal(retryCode, "ACL_REFRESH_DEADLINE_REACHED");
+    assert.equal(leaseChecks, 0);
+    assert.equal(tokenReads, 0);
+    assert.equal(captures, 0);
+    assert.equal(stores, 0);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
 test("source version or connection changing during provider pagination prevents snapshot storage", async () => {
   let currentChecks = 0;
   let stores = 0;

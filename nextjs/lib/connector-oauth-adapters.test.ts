@@ -28,9 +28,33 @@ describe("OAuth source adapters", () => {
   it("uses Dropbox continuation cursors without accepting credentials in target config", async () => {
     const fetcher = vi.fn(async () => Response.json({ entries: [{ ".tag": "deleted", id: "id:gone", name: "gone.pdf", path_lower: "/gone.pdf" }], cursor: "dropbox-cursor", has_more: false })) as unknown as typeof fetch;
     const result = await listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: "prior-cursor", target: { rootPath: "/Research" }, fetcher });
-    expect(result.items[0]).toMatchObject({ nativeId: "id:gone", kind: "deleted" });
+    expect(result.items[0]).toMatchObject({ nativeId: "id:gone", kind: "deleted", providerPath: "/gone.pdf" });
     const body = JSON.parse(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]?.body));
     expect(body).toEqual({ cursor: "prior-cursor" });
+  });
+
+  it("keeps a Dropbox path beside the genuine id and never promotes it to one", async () => {
+    const fetcher = vi.fn(async () => Response.json({ entries: [
+      { ".tag": "file", id: "id:A", name: "a.pdf", path_lower: "/a.pdf", rev: "015a", size: 3 },
+      // Real DeletedMetadata: name and path, no id.
+      { ".tag": "deleted", name: "a.pdf", path_lower: "/a.pdf" },
+    ], cursor: "next", has_more: true })) as unknown as typeof fetch;
+    const result = await listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: null, fetcher });
+    expect(result.items).toEqual([
+      expect.objectContaining({ nativeId: "id:A", providerPath: "/a.pdf", kind: "file" }),
+      expect.objectContaining({ nativeId: null, providerPath: "/a.pdf", kind: "deleted", revision: "deleted:/a.pdf" }),
+    ]);
+  });
+
+  it("refuses a live Dropbox entry without an id or any entry without a path instead of fabricating identity", async () => {
+    for (const entry of [
+      { ".tag": "file", name: "a.pdf", path_lower: "/a.pdf", rev: "015a" },
+      { ".tag": "deleted", name: "a.pdf" },
+    ]) {
+      const fetcher = vi.fn(async () => Response.json({ entries: [entry], cursor: "next", has_more: false })) as unknown as typeof fetch;
+      await expect(listOAuthSourcePage({ provider: "dropbox", accessToken: "access", cursor: null, fetcher }))
+        .rejects.toThrow("OAUTH_SOURCE_PAGE_INVALID");
+    }
   });
 
   it("accepts only graph.microsoft.com delta links", async () => {

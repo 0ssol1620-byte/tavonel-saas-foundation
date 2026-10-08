@@ -11,13 +11,13 @@ import { REPOSITORY, MAIN_REF, PR_NUMBER, PR_REF, PR_BASE_REF, PR_HEAD_REF, BASE
   validateEvidence, validateServerSettings, validatePgTap, captureTarget, markerCommand, writeMarker, setupPgTap, prepareTarget, harnessEnv,
   ownerCleanup, buildCaseReceipt, caseProblems, aggregateReceipts, admitRaceSource, MAIN_OVERLAY_PR, MAIN_OVERLAY_COMMIT, MAIN_OVERLAY_PINS, main,
   STATUS_ARGS, parsePorcelainStatus, verifyCandidateStatus, RACE_SUCCESSOR_PARENT, RACE_SUCCESSOR_PARENT_TREE, RACE_HELPER, RACE_HELPER_TEST,
-  RACE_SUCCESSOR_PATHS } from './native-world-race-ci.mjs';
+  RACE_SUCCESSOR_PATHS, nativeRaceRunDecision } from './native-world-race-ci.mjs';
 import { NATIVE_RACE_PROFILE, NATIVE_RACE_PARENT, NATIVE_RACE_PARENT_TREE, NATIVE_RACE_ADDITIONS, NATIVE_RACE_PARENT_OWNER_BLOBS, NATIVE_RACE_CONFIG_PATHS,
   NATIVE_RACE_UNCHANGED_OWNERS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PATHS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE,
   nativeRaceMainOverlayEvidence, EXPLORE_SUCCESSOR_PARENT, EXPLORE_SUCCESSOR_PARENT_TREE, EXPLORE_SUCCESSOR_PATHS,
   EXPLORE_REPAIR_PARENT, EXPLORE_REPAIR_TREE_SOURCES, SOLUTIONS_PARENT, SOLUTIONS_PARENT_TREE, SOLUTIONS_CONFIG_PATHS, NATIVE_WORLD_PARENT,
   FULL_ANCHOR, NATIVE_RACE_SUCCESSOR_PARENT, NATIVE_RACE_SUCCESSOR_PARENT_TREE, NATIVE_RACE_SUCCESSOR_KIND, NATIVE_RACE_SUCCESSOR_PATHS,
-  NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS, NATIVE_RACE_SUCCESSOR_FINAL_SHA256 } from '../repair-collector-only.mjs';
+  NATIVE_RACE_SUCCESSOR_UNCHANGED_PATHS, NATIVE_RACE_SUCCESSOR_FINAL_SHA256, AFFECTED_BASELINE, AFFECTED_PROFILE } from '../repair-collector-only.mjs';
 
 const HEAD='9'.repeat(40),RUN_ID='101',ATTEMPT='1';
 const env={GITHUB_ACTIONS:'true',RUNNER_ENVIRONMENT:'github-hosted',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REPOSITORY:REPOSITORY,
@@ -457,7 +457,11 @@ test('candidate status in a real Git checkout tolerates only an unstaged byte-id
 
 // ---- PR 141 race successor over exact c61: the centralized collector proof, delegated to and restated by the helper ----
 const SUCCESSOR_HEAD='5'.repeat(40),C61=RACE_SUCCESSOR_PARENT;
-const workspaceBytes=p=>RACE_SUCCESSOR_PATHS.includes(p)?readFileSync(path.join(REPO_ROOT,p)):c61Bytes(p);
+// Historic pins: the successor's final bytes are those published at the verified affected baseline, never this working tree.
+const BASELINE_BYTES=new Map(),baselineBytes=p=>{
+  if(!BASELINE_BYTES.has(p)) BASELINE_BYTES.set(p,execFileSync('git',['-C',REPO_ROOT,'show',`${AFFECTED_BASELINE.commit}:${p}`],{maxBuffer:64*1024*1024,stdio:'pipe'}));
+  return BASELINE_BYTES.get(p);};
+const workspaceBytes=p=>RACE_SUCCESSOR_PATHS.includes(p)?baselineBytes(p):c61Bytes(p);
 // The actual c61 preimage bytes of the six owners, read lazily from the checkout's history (the collector proof re-derives them the same way).
 const C61_BYTES=new Map(),c61Bytes=p=>{
   if(!C61_BYTES.has(p)) {const r=spawnSync('git',['-C',REPO_ROOT,'show',`${C61}:${p}`],{maxBuffer:64*1024*1024,windowsHide:true});
@@ -492,7 +496,7 @@ test('PR 141 race successor final pins bind the actual helper and test bytes whi
   assert.deepEqual(Object.keys(NATIVE_RACE_SUCCESSOR_FINAL_SHA256).sort(),[RACE_HELPER,RACE_HELPER_TEST]);
   // Computed from the bytes, never restated: this file and the helper carry no literal of their own final digests.
   assert.equal(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[RACE_HELPER],digest(workspaceBytes(RACE_HELPER)));
-  assert.equal(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[RACE_HELPER_TEST],digest(readFileSync(fileURLToPath(import.meta.url))));
+  assert.equal(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[RACE_HELPER_TEST],digest(workspaceBytes(RACE_HELPER_TEST)));
   for (const p of [RACE_HELPER,RACE_HELPER_TEST]) {
     assert.equal(digest(c61Bytes(p)),NATIVE_RACE_ADDITIONS[p],'c61 bytes are the historical2bb addition: '+p);
     assert.notEqual(NATIVE_RACE_SUCCESSOR_FINAL_SHA256[p],NATIVE_RACE_ADDITIONS[p],'the successor edits '+p+' in place');
@@ -1112,6 +1116,7 @@ test('PR 141 case and aggregate receipts bind the PR head SHA and pass',()=>{
   for (const c of CASES) {const r=prReceipt(c);assert.equal(r.pass,true,r.problems.join('; '));assert.equal(r.head,HEAD);assert.equal(r.event,'pull_request');assert.equal(r.ref,PR_REF);}
   const result=aggregateReceipts(prSeven(),prExpect);
   assert.deepEqual(result.problems,[]);assert.equal(result.gate,'passed-seven-synthetic-cross-session-cases');
+  assert.equal(result.job,'aggregate','aggregate receipt owner is explicit');
   assert.deepEqual([result.event,result.ref,result.head],['pull_request',PR_REF,HEAD]);
   assert.equal(result.fullQualification,'pending');assert.equal(result.reservationExpiryCrossSession,'UNRUN');
   // Manual dispatch receipts keep event/ref/head = workflow_dispatch/main/github.sha.
@@ -1237,4 +1242,63 @@ test('native world race static: admission and the source verifier pin the exact 
 
 test('PR 141 race successor native initial admission refuses even a correctly named generated final-gate plan',()=>{
  const {error}=admitSuccessor({untracked:'nextjs/repair-plan.json\0'});assert.match(error?.message??'',/untracked files/);
+});
+
+// ---- Affected integration: verified-baseline descendants are admitted by the collector's fail-closed incremental map ----
+const affectedMap=(head,edit=()=>{})=>{const m={headSha:head,changedPaths:['nextjs/scripts/db/native-world-race-ci.mjs'],groups:['ci-selector'],failures:[],
+  nativeEvidence:{disposition:'fresh-seven-case-native-run-required',invalidatingPaths:['nextjs/scripts/db/native-world-race-ci.mjs'],freshRunClaimed:false}};edit(m);return m;};
+function affectedStub({source=args=>({eligible:true,profile:AFFECTED_PROFILE,headSha:args.headSha,baseline:{...AFFECTED_BASELINE},map:affectedMap(args.headSha)})}={}) {
+  const log=[];
+  return {log,race:{exec:()=>{throw Error('stubbed affected admission runs no git');},
+    classifyAffected:args=>{log.push('classifyAffected');return {classification:'intended',intended:true,headSha:args.headSha,repoRoot:ROOT,profile:AFFECTED_PROFILE};},
+    affected:args=>{log.push('affected');assert.equal(args.intent.headSha,args.headSha);return source(args);},
+    classify:()=>{log.push('classify');throw Error('exact race classifier reached');},verify:()=>{log.push('verify');throw Error('exact2bb verifier reached');},
+    successor:()=>{log.push('successor');throw Error('c61 successor proof reached');}}};
+}
+test('affected admission routes a verified-baseline descendant to the collector map before any exact race classifier',()=>{
+  const {log,race}=affectedStub(),a=admitRaceSource(SUCCESSOR_HEAD,race);
+  assert.deepEqual(log,['classifyAffected','affected']);
+  assert.deepEqual(a,{profile:AFFECTED_PROFILE,headSha:SUCCESSOR_HEAD,baseline:{...AFFECTED_BASELINE},changedPaths:['nextjs/scripts/db/native-world-race-ci.mjs'],groups:['ci-selector'],
+    nativeEvidence:affectedMap(SUCCESSOR_HEAD).nativeEvidence});
+  assert.equal(a.nativeEvidence.freshRunClaimed,false,'admission never claims the fresh run it precedes');
+  const calls=[],reads=[],admitted=admitPr({git:recordGit(calls),read:recordRead(reads),race:affectedStub().race});
+  assert.equal(admitted.nativeRaceSource.profile,AFFECTED_PROFILE);assert.equal(admitted.nativeRaceSource.headSha,HEAD);
+  assert.deepEqual(calls.slice(0,2),['rev-parse --verify HEAD^{commit}',`rev-parse --verify ${BASE_COMMIT}^{commit}`]);
+});
+for (const [label,source,pattern] of [
+  ['a failed-closed map',()=>({eligible:false,reason:'Affected map failed closed: unmapped changed endpoint: nextjs/next.config.ts'}),/affected integration source refused: Affected map failed closed: unmapped/],
+  ['an unverified result',()=>null,/affected integration source refused: unverified/],
+  ['a map for another head',args=>({eligible:true,profile:AFFECTED_PROFILE,headSha:args.headSha,baseline:{...AFFECTED_BASELINE},map:affectedMap('8'.repeat(40))}),/exact baseline-to-head map/],
+  ['another baseline',args=>({eligible:true,profile:AFFECTED_PROFILE,headSha:args.headSha,baseline:{...AFFECTED_BASELINE,tree:ZERO},map:affectedMap(args.headSha)}),/exact baseline-to-head map/],
+  ['an eligible result still carrying map failures',args=>({eligible:true,profile:AFFECTED_PROFILE,headSha:args.headSha,baseline:{...AFFECTED_BASELINE},map:affectedMap(args.headSha,m=>{m.failures=['unsupported change status T: x'];})}),/exact baseline-to-head map/]]) {
+  test('affected admission refuses '+label+' before 623 checks, pins or any race verifier',()=>{
+    const calls=[],reads=[],{log,race}=affectedStub({source});
+    assert.throws(()=>admitPr({git:recordGit(calls),read:recordRead(reads),race}),pattern);
+    assert.deepEqual(log,['classifyAffected','affected']);assert.deepEqual(calls,['rev-parse --verify HEAD^{commit}']);assert.deepEqual(reads,[]);
+  });
+}
+test('native world race static: affected admission precedes race classification and delegates to the collector map',()=>{
+  const helper=readFileSync(fileURLToPath(new URL('./native-world-race-ci.mjs',import.meta.url)),'utf8');
+  const source=helper.slice(helper.indexOf('export function admitRaceSource('),helper.indexOf('export function admitRaceSuccessor('));
+  assert.ok(source.indexOf('const baselineIntent=classifyAffected({headSha:head,exec});')<source.indexOf('const intent=classify({headSha:head,exec});'),'affected routing first');
+  assert.ok(source.indexOf("'Released-main overlay pins differ from the native World race verifier'")<source.indexOf('const baselineIntent='),'race identity pins still checked first');
+  const affected=helper.slice(helper.indexOf('export function admitAffectedSource('),helper.indexOf('export function admitRaceSource('));
+  assert.ok(affected.includes('const source=verify({headSha:head,intent,exec});'),'the helper delegates to the collector map');
+  assert.doesNotMatch(affected,/exec\(|'diff'|'ls-tree'|'show'|freshRunClaimed:true/,'no local git proof and no claimed fresh run');
+});
+
+test('native World routing runs manual dispatch and fails closed outside the authenticated affected baseline',()=>{
+  assert.deepEqual(nativeRaceRunDecision({event:'workflow_dispatch'}),{runCases:true,reason:'manual-dispatch'});
+  assert.throws(()=>nativeRaceRunDecision({event:'pull_request',head:HEAD,exec:()=>'',
+    classifyAffected:()=>({classification:'normal',reason:'baseline missing'})}),/outside or unverified against the authenticated affected baseline/);
+});
+test('native World routing skips only verified docs/UI historical reuse and requires fresh cases for migration changes',()=>{
+  const head=HEAD,exec=()=>'',classifyAffected=()=>({classification:'intended',headSha:head,profile:AFFECTED_PROFILE});
+  const affected=disposition=>({eligible:true,map:{headSha:head,nativeEvidence:{disposition}}});
+  assert.deepEqual(nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected,affected:()=>affected('historical-input-reuse')}),
+    {runCases:false,reason:'historical-input-reuse',headSha:head});
+  assert.deepEqual(nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected,affected:()=>affected('fresh-seven-case-native-run-required')}),
+    {runCases:true,reason:'fresh-seven-case-native-run-required',headSha:head});
+  assert.throws(()=>nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected,affected:()=>affected('unknown')}),/Unknown Native World evidence disposition/);
+  assert.throws(()=>nativeRaceRunDecision({event:'pull_request',head,exec,classifyAffected:()=>({classification:'unsupported'})}),/Unsupported or unverified PR head/);
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import PdfEvidenceViewer from "@/components/pdf-evidence-viewer";
 import WorldGraphCanvas from "@/components/world-graph-canvas";
@@ -14,7 +14,8 @@ export type WorldStudioLens = "overview" | "graph" | "directory" | "ontology" | 
 
 type SourcePreview = { sourceId: string; versionId: string } & (
   | { state: "ready"; bytes: Uint8Array }
-  | { state: "loading" | "unavailable" }
+  | { state: "loading"; retry?: boolean }
+  | { state: "unavailable" }
 );
 
 type Props = {
@@ -63,21 +64,39 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
   const [localEvidenceId, setLocalEvidenceId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [sourcePreview, setSourcePreview] = useState<SourcePreview | null>(null);
+  /* Bumped by Retry so the same source/version is read again; a page change never touches it. */
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const activeEvidenceId = selectedEvidenceId === undefined ? localEvidenceId : selectedEvidenceId;
-  const selection = selectWorldEvidence(model, activeEvidenceId);
+  // Only the exact id asked for. An id this model does not hold stays unresolved, never a neighbour.
+  const selection = model?.evidence.find((item) => item.id === activeEvidenceId) ?? null;
   const selectedObject = model?.objects.find((object) => object.id === selectedObjectId) ?? null;
   const selectedSourceId = selection?.sourceId ?? null;
   const selectedSourceVersionId = selection?.sourceVersionId ?? null;
   const currentPreview = sourcePreview?.sourceId === selectedSourceId && sourcePreview?.versionId === selectedSourceVersionId ? sourcePreview : null;
+  const previewBusy = !currentPreview || currentPreview.state === "loading";
+  // A retry keeps its control in place, so the keyboard never loses it while the read is in flight.
+  const previewRetryable = currentPreview?.state === "unavailable" || (currentPreview?.state === "loading" && currentPreview.retry === true);
+  const evidenceHeadingRef = useRef<HTMLSpanElement>(null);
+  const focusEvidenceHeading = useRef(false);
 
   useEffect(() => { setLens(initialLens); }, [initialLens]);
+  // Only once the control that asked has left the DOM: focus the reader moved elsewhere is never taken.
+  useEffect(() => {
+    if (!focusEvidenceHeading.current || !evidenceHeadingRef.current) return;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    focusEvidenceHeading.current = false;
+    evidenceHeadingRef.current.focus();
+  }, [selection, currentPreview?.state]);
+  // Evidence chosen from outside (a controlled parent) replaces an object selection too.
+  useEffect(() => { if (activeEvidenceId) setSelectedObjectId(null); }, [activeEvidenceId]);
 
   useEffect(() => {
     if (!selectedSourceId || !selectedSourceVersionId) { setSourcePreview(null); return; }
     let cancelled = false;
     const controller = new AbortController();
     const identity = { sourceId: selectedSourceId, versionId: selectedSourceVersionId };
-    setSourcePreview({ ...identity, state: "loading" });
+    // An in-flight read of this same source (a Retry) keeps its state, including the retry flag.
+    setSourcePreview((previous) => previous?.state === "loading" && previous.sourceId === identity.sourceId && previous.versionId === identity.versionId ? previous : { ...identity, state: "loading" });
     void (async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -91,13 +110,24 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
       setSourcePreview({ ...identity, bytes, state: "ready" });
     })().catch(() => { if (!cancelled) setSourcePreview({ ...identity, state: "unavailable" }); });
     return () => { cancelled = true; controller.abort(); };
-  }, [selectedSourceId, selectedSourceVersionId]);
+  }, [selectedSourceId, selectedSourceVersionId, previewAttempt]);
 
   const selectEvidence = (evidence: WorldEvidence) => {
+    setSelectedObjectId(null);
     if (selectedEvidenceId === undefined) setLocalEvidenceId(evidence.id);
     onEvidenceSelect?.(selectWorldEvidence(model, evidence.id));
   };
+  const retryPreview = () => {
+    if (currentPreview?.state !== "unavailable") return;
+    focusEvidenceHeading.current = true;
+    setSourcePreview({ sourceId: currentPreview.sourceId, versionId: currentPreview.versionId, state: "loading", retry: true });
+    setPreviewAttempt((attempt) => attempt + 1);
+  };
   const clearEvidence = () => { if (selectedEvidenceId === undefined) setLocalEvidenceId(null); onEvidenceSelect?.(null); };
+  const selectObject = (objectId: string | null) => {
+    setSelectedObjectId(objectId);
+    if (activeEvidenceId) clearEvidence();
+  };
 
   const overview = useMemo(() => {
     if (!model) return null;
@@ -143,8 +173,8 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
             )
           )}
 
-          {lens === "graph" && <WorldGraphCanvas model={model} selectedObjectId={selectedObjectId} onObjectSelect={setSelectedObjectId} onEvidenceSelect={(evidenceId) => { const evidence = model?.evidence.find((item) => item.id === evidenceId); if (evidence) selectEvidence(evidence); }} />}
-          {lens === "directory" && <WorldDirectoryTree entries={model?.directory ?? []} objects={model?.objects ?? []} selectedObjectId={selectedObjectId} onObjectSelect={setSelectedObjectId} />}
+          {lens === "graph" && <WorldGraphCanvas model={model} selectedObjectId={selectedObjectId} onObjectSelect={selectObject} onEvidenceSelect={(evidenceId) => { const evidence = model?.evidence.find((item) => item.id === evidenceId); if (evidence) selectEvidence(evidence); }} />}
+          {lens === "directory" && <WorldDirectoryTree entries={model?.directory ?? []} objects={model?.objects ?? []} selectedObjectId={selectedObjectId} onObjectSelect={selectObject} />}
           {lens === "ontology" && <WorldOntologyViewer ontology={model?.ontology ?? null} />}
           {lens === "evidence" && (!model || model.evidence.length === 0 ? <EmptyState title="No evidence yet">Compile a World to inspect the exact page and region behind its objects.</EmptyState> : <div className={styles.evidenceGrid}>{model.evidence.map((evidence) => <EvidenceCard key={evidence.id} evidence={evidence} selected={selection?.id === evidence.id} onSelect={selectEvidence} />)}</div>)}
           {lens === "versions" && <WorldVersionDiffPanel model={model} onRollback={onRollback} rollbackBusy={rollbackBusy} />}
@@ -153,9 +183,21 @@ export default function WorldStudioUltimate({ model, initialLens = "overview", s
 
         <aside className={styles.inspector} aria-label="World selection inspector">
           {selection ? (
-            <><div className={styles.inspectorTitle}><span>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>Page</dt><dd>{selection.page}</dd></div><div><dt>Region</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span>{!currentPreview || currentPreview.state === "loading" ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>}</div></>
+            <><div className={styles.inspectorTitle}><span ref={evidenceHeadingRef} role="heading" aria-level={3} tabIndex={-1}>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><strong>{selection.sourceId}</strong><dl><div><dt>Version</dt><dd>{selection.sourceVersionId}</dd></div><div><dt>Page</dt><dd>{selection.page}</dd></div><div><dt>Region</dt><dd>[{selection.bbox.join(", ")}]</dd></div></dl><blockquote className={styles.excerpt} data-sensitive="content">{selection.excerpt}</blockquote><div className={styles.pagePreview} aria-label={`Actual source page ${selection.page} with evidence bounding box`}>{currentPreview?.state === "ready" ? <PdfEvidenceViewer key={JSON.stringify([selection.sourceId, selection.sourceVersionId, selection.page])} data={currentPreview.bytes} page={selection.page} bbox={selection.bbox} label={`Source ${selection.sourceId}, page ${selection.page}, exact evidence region`} /> : <span><span role="status" aria-busy={previewBusy}>{previewBusy ? "Opening source page…" : `Preview unavailable · page ${selection.page}`}</span>{previewRetryable && <button type="button" aria-disabled={previewBusy} onClick={retryPreview}>Retry</button>}</span>}</div></>
+          ) : activeEvidenceId && model ? (
+            <><div className={styles.inspectorTitle}><span>Selected evidence</span><button type="button" onClick={clearEvidence}>Clear</button></div><EmptyState title="Evidence not in this revision">{`${activeEvidenceId} is not part of this compiled World, so no source page is shown.`}</EmptyState></>
           ) : selectedObject ? (
-            <><div className={styles.inspectorTitle}><span>Selected object</span></div><strong data-sensitive="content">{selectedObject.label}</strong><dl><div><dt>Type</dt><dd>{selectedObject.type}</dd></div><div><dt>State</dt><dd>{selectedObject.readState === "read" ? "READY" : "NEEDS REVIEW"}</dd></div><div><dt>Relations</dt><dd>{selectedObject.relations.length}</dd></div><div><dt>Evidence</dt><dd>{selectedObject.evidenceRefs.length}</dd></div></dl></>
+            <><div className={styles.inspectorTitle}><span>Selected object</span></div><strong data-sensitive="content">{selectedObject.label}</strong><dl><div><dt>Type</dt><dd>{selectedObject.type}</dd></div><div><dt>State</dt><dd>{selectedObject.readState === "read" ? "READY" : "NEEDS REVIEW"}</dd></div><div><dt>Relations</dt><dd>{selectedObject.relations.length}</dd></div><div><dt>Evidence</dt><dd>{selectedObject.evidenceRefs.length}</dd></div></dl>
+              <div className={styles.objectEvidence} role="group" aria-label="Evidence bound to this object">
+                {selectedObject.evidenceRefs.length === 0 ? <p>No evidence is bound to this object.</p> : (
+                  <ul>{selectedObject.evidenceRefs.map((ref, index) => {
+                    const evidence = model?.evidence.find((item) => item.id === ref);
+                    return <li key={`${ref}-${index}`}>{evidence
+                      ? <button type="button" aria-label={`Open evidence ${ref}, ${evidence.sourceId} page ${evidence.page}`} onClick={() => { focusEvidenceHeading.current = true; selectEvidence(evidence); }}><b>{ref}</b><small>{evidence.sourceId} · p.{evidence.page}</small></button>
+                      : <p data-state="unresolved"><b>{ref}</b><small>Not in this compiled World; no source is shown.</small></p>}</li>;
+                  })}</ul>
+                )}
+              </div></>
           ) : lens === "overview" ? (
             <div className={styles.inspectorHint}><span>World overview</span><p>Select Graph, Directory, Ontology or Evidence when you want to inspect an individual object.</p></div>
           ) : <EmptyState title="Nothing selected">Select a compiled object or evidence record to inspect it here.</EmptyState>}

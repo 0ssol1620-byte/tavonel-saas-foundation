@@ -203,6 +203,7 @@ const browserProjectsByFile = new Map([
   ['e2e/marketing-consent.spec.ts', ['1440', '390']],
   ['e2e/workspace-intake-triage.spec.ts', ['audit']],
   ['e2e/workspace-intake-layout.spec.ts', ['1440']],
+  ['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];
@@ -463,6 +464,18 @@ export function planBrowserRuns(files, runDetailIntegrity) {
     if (projectFiles) runs.push({ kind: 'project', project, files: [...new Set(projectFiles)].sort() });
   }
   return runs;
+}
+
+// The final gate re-reads the reports this runner wrote for an affected plan; a step outcome alone is not accepted.
+export function readAffectedExecution(workspaceRoot, plan) {
+  const reportDir = resolve(workspaceRoot, 'node_modules/.cache/repair-scope-reports');
+  const vitestFiles = plan.unitFiles.filter(file => !nodeUnitTestPaths.has(file));
+  const units = vitestFiles.length ? readAndValidateVitestReport(resolve(reportDir, 'vitest.json'), vitestFiles) : null;
+  const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map((planned, index) => ({
+    project: planned.project ?? planned.kind, files: planned.files,
+    ...readAndValidatePlaywrightReport(resolve(reportDir, `playwright-${index + 1}.json`), planned.files, workspaceRoot, planned.projects ?? [planned.project]),
+  }));
+  return { units, browsers };
 }
 
 export function requireUnitFiles(files) {

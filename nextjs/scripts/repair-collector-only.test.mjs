@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { buildRepairReceipt } from './repair-scope-gate.mjs';
 import { isInsideWorkspace, planBrowserRuns, WORKSPACE_INTAKE_CAPTURE_NAMES } from './run-repair-check.mjs';
+import { AFFECTED_BASELINE, buildAffectedMap } from './repair-scope.mjs';
 
 const head = 'e'.repeat(40);
 const gitBlob = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
@@ -114,12 +115,15 @@ const published28d='28d675b2ed3f8bf93ba439caca61940d477423e5',published28dBlobs=
   "nextjs/scripts/repair-test-report.mjs": "4e3878f8b6311f06879415d6fa87ad25de0d7254",
   "nextjs/vitest.repair-scope.config.ts": "67844b0446fb9e1e94d17ec235c1423faac535b6"
 },published28dCache=process.env.PUBLIC_PAGES_PARENT_FIXTURE_ARCHIVE?JSON.parse(gunzipSync(readFileSync(process.env.PUBLIC_PAGES_PARENT_FIXTURE_ARCHIVE))):{};
-function published28dBytes(p){if(p==='nextjs/lib/db-rehearsal-workflow.test.ts')return published852Bytes(p);if(!Object.hasOwn(published28dBlobs,p))return readFileSync(resolve(nativeRoot,p));const b=published28dCache[p]?Buffer.from(published28dCache[p],'base64'):execFileSync('git',['show',published28d+':'+p],{stdio:'pipe'});assert.equal(gitBlob(b),published28dBlobs[p],'Original28d fixture byte identity: '+p);return b;}
+function published28dBytes(p){if(p==='nextjs/lib/db-rehearsal-workflow.test.ts')return published852Bytes(p);if(!Object.hasOwn(published28dBlobs,p))return baselineBytes(p);const b=published28dCache[p]?Buffer.from(published28dCache[p],'base64'):execFileSync('git',['show',published28d+':'+p],{stdio:'pipe'});assert.equal(gitBlob(b),published28dBlobs[p],'Original28d fixture byte identity: '+p);return b;}
 const nativeModuleRoot=mkdtempSync(resolve(tmpdir(),'repair-native28d-module-'));after(()=>rmSync(nativeModuleRoot,{recursive:true,force:true}));
 writeFileSync(resolve(nativeModuleRoot,'repair-collector-only.mjs'),published28dBytes('nextjs/scripts/repair-collector-only.mjs'));
 let nativeKnownSource=published28dBytes('nextjs/scripts/repair-known-regression.mjs').toString();for(const name of ['run-repair-check.mjs','repair-test-report.mjs'])nativeKnownSource=nativeKnownSource.replace('./'+name,pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)),name)).href);writeFileSync(resolve(nativeModuleRoot,'repair-known-regression.mjs'),nativeKnownSource);
 const native=await import(pathToFileURL(resolve(nativeModuleRoot,'repair-collector-only.mjs')).href);
 const nativeRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
+// Historic pins: these fixtures model heads whose sealed owners are the bytes published at the verified affected baseline, never this
+// working tree, so later CI-owner edits cannot move a historical profile's expected seals.
+const baselineCache=new Map(),baselineBytes=p=>{if(!baselineCache.has(p))baselineCache.set(p,execFileSync('git',['-C',nativeRoot,'show',`${AFFECTED_BASELINE.commit}:${p}`],{stdio:'pipe',maxBuffer:64*1024*1024}));return baselineCache.get(p);};
 
 // Frozen exact852 seal boundary: all thirteen sealed paths resolve only from authenticated historical bytes.
 const published852='852ffbee9b71ee75ce2ee047874731596c13e837',published852Blobs={
@@ -138,7 +142,7 @@ const published852='852ffbee9b71ee75ce2ee047874731596c13e837',published852Blobs=
   "nextjs/vitest.repair-scope.config.ts": "67844b0446fb9e1e94d17ec235c1423faac535b6",
   "nextjs/lib/db-rehearsal-workflow.test.ts": "3e723a40e1bf09e8be44bb6de96b74d77663ff75"
 },published852Sealed=Object.freeze(['.github/workflows/repair-scope.yml','nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-scope.mjs','nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repair-scope-gate.mjs','nextjs/scripts/verify-repair-workflows.mjs','nextjs/scripts/repair-collector-only.test.mjs','nextjs/scripts/repair-known-regression.mjs','nextjs/scripts/repair-known-regression.test.mjs','.github/workflows/db-rehearsal.yml','nextjs/scripts/run-repair-check.mjs','nextjs/scripts/repair-test-report.mjs','nextjs/vitest.repair-scope.config.ts']),published852Cache=process.env.NATIVE_WORLD_PARENT_FIXTURE_ARCHIVE?JSON.parse(gunzipSync(readFileSync(process.env.NATIVE_WORLD_PARENT_FIXTURE_ARCHIVE))):{};
-function historical852Bytes(p,{cache=published852Cache,show=q=>execFileSync('git',['show',published852+':'+q],{stdio:'pipe'}),current=q=>readFileSync(resolve(nativeRoot,q))}={}){if(!Object.hasOwn(published852Blobs,p)){if(published852Sealed.includes(p))throw Error('Sealed852 fixture lacks an exact pin: '+p);return current(p);}const b=cache[p]?Buffer.from(cache[p],'base64'):show(p);assert.equal(gitBlob(b),published852Blobs[p],'Original852 fixture byte identity: '+p);return b;}
+function historical852Bytes(p,{cache=published852Cache,show=q=>execFileSync('git',['show',published852+':'+q],{stdio:'pipe'}),current=q=>baselineBytes(q)}={}){if(!Object.hasOwn(published852Blobs,p)){if(published852Sealed.includes(p))throw Error('Sealed852 fixture lacks an exact pin: '+p);return current(p);}const b=cache[p]?Buffer.from(cache[p],'base64'):show(p);assert.equal(gitBlob(b),published852Blobs[p],'Original852 fixture byte identity: '+p);return b;}
 function published852Bytes(p){return historical852Bytes(p);}
 const pageModuleRoot=mkdtempSync(resolve(tmpdir(),'repair-pages852-module-'));after(()=>rmSync(pageModuleRoot,{recursive:true,force:true}));writeFileSync(resolve(pageModuleRoot,'repair-collector-only.mjs'),published852Bytes('nextjs/scripts/repair-collector-only.mjs'));let pageKnown=published852Bytes('nextjs/scripts/repair-known-regression.mjs').toString();for(const name of ['run-repair-check.mjs','repair-test-report.mjs'])pageKnown=pageKnown.replace('./'+name,pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)),name)).href);writeFileSync(resolve(pageModuleRoot,'repair-known-regression.mjs'),pageKnown);const pages=await import(pathToFileURL(resolve(pageModuleRoot,'repair-collector-only.mjs')).href);
 import * as world from './repair-collector-only.mjs';
@@ -628,8 +632,8 @@ function worldGitFixture(options={}) {
     if(args[0]==='rev-list')return p===world.NATIVE_WORLD_PARENT?`${p} ${options.grandparent??world.NATIVE_WORLD_PARENT_BASE}`:`${head} ${options.parent??world.NATIVE_WORLD_PARENT}`;
     if(args[0]==='merge-base'){if(options.ancestor===false)throw Error('Missing ancestry');return '';}
     if(args[0]==='diff'){if(args[1]==='--raw'){if(options.dirty)throw Error('Dirty World');return '';}return (options.paths??[...world.NATIVE_WORLD_CHANGED_SOURCES,...configs]).join('\0')+'\0';}
-    if(args[0]==='ls-tree'){const parent=args[2]===world.NATIVE_WORLD_PARENT,pin=sources[p];let oid=pin?pin[parent?'before':'after']:parent?world.NATIVE_WORLD_PARENT_CONFIG_BLOBS[p]??dependencies[p]:configs.includes(p)||world.CONFIG_PATHS.includes(p)||worldRepairPaths.includes(p)?gitBlob(readFileSync(resolve(nativeRoot,p))):dependencies[p];if(options.badBlob===p)oid='f'.repeat(40);return oid?`${options.unsafe===p?'120000':'100644'} blob ${oid}\t${p}`:'';}
-    if(args[0]==='show'){const p=args[1].slice(41),b=readFileSync(resolve(nativeRoot,p));return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}throw Error('Unexpected World Git query '+args.join(' '));
+    if(args[0]==='ls-tree'){const parent=args[2]===world.NATIVE_WORLD_PARENT,pin=sources[p];let oid=pin?pin[parent?'before':'after']:parent?world.NATIVE_WORLD_PARENT_CONFIG_BLOBS[p]??dependencies[p]:configs.includes(p)||world.CONFIG_PATHS.includes(p)||worldRepairPaths.includes(p)?gitBlob(baselineBytes(p)):dependencies[p];if(options.badBlob===p)oid='f'.repeat(40);return oid?`${options.unsafe===p?'120000':'100644'} blob ${oid}\t${p}`:'';}
+    if(args[0]==='show'){const p=args[1].slice(41),b=baselineBytes(p);return options.mutated===p?Buffer.concat([b,Buffer.from('\n')]):b;}throw Error('Unexpected World Git query '+args.join(' '));
   };
 }
 function worldEvidenceFixture(){const record=process.env.NATIVE_WORLD_UI_EVIDENCE?JSON.parse(readFileSync(process.env.NATIVE_WORLD_UI_EVIDENCE)):Object.fromEntries([['run','actions/runs/37408812981'],['job','actions/jobs/112092360049'],['artifact','actions/artifacts/11388921618'],['captures','actions/artifacts/11388152745']].map(([k,p])=>[k,JSON.parse(execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/'+p],{encoding:'utf8',timeout:20000}))]));return {...record,archive:process.env.NATIVE_WORLD_UI_ARCHIVE?readFileSync(process.env.NATIVE_WORLD_UI_ARCHIVE):execFileSync('gh',['api','repos/0ssol1620-byte/tavonel-saas-foundation/actions/artifacts/11388921618/zip'],{timeout:20000})};}
@@ -850,7 +854,7 @@ test('DB decision after a failed successor admission re-derives exact454 intent 
 // Native World race over exact2bb: one direct child, exactly seven additions, seven in-place CI owner edits and four released-main
 // overlay pairs (18 paths), PR 141 at the event head.
 const race=await import('./repair-collector-only.mjs');
-const raceHead='c'.repeat(40),raceRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),workspaceBytes=p=>race.NATIVE_RACE_SUCCESSOR_PATHS.includes(p)?readFileSync(resolve(raceRoot,p)):raceC61Bytes(p);
+const raceHead='c'.repeat(40),raceRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),workspaceBytes=p=>race.NATIVE_RACE_SUCCESSOR_PATHS.includes(p)?baselineBytes(p):raceC61Bytes(p);
 // The c61 successor edits the helper and its test in place; the exact2bb increment is exercised with their immutable c61 bytes.
 const raceC61Cache=new Map(),raceC61Bytes=p=>{if(!raceC61Cache.has(p))raceC61Cache.set(p,execFileSync('git',['-C',raceRoot,'show',`${race.NATIVE_RACE_SUCCESSOR_PARENT}:${p}`],{stdio:'pipe',maxBuffer:64*1024*1024}));return raceC61Cache.get(p);};
 const raceBytes=p=>Object.hasOwn(race.NATIVE_RACE_ADDITIONS,p)&&race.NATIVE_RACE_SUCCESSOR_PATHS.includes(p)?raceC61Bytes(p):workspaceBytes(p);
@@ -1278,4 +1282,241 @@ cp.execFileSync=(file,args,options)=>{if(file!=='gh')return actual(file,args,opt
     const partial=commit([succHelper]);assert.equal(race.classifyNativeRaceIntent({headSha:partial}).intended,true);assert.match(race.verifyNativeRaceCandidateSource({headSha:partial}).reason,/six CI owners/);assert.throws(()=>helper.admitRaceSource(partial,{exec:execFileSync}));
     const wrong=commit(SUCC,race.NATIVE_RACE_PARENT);assert.equal(race.classifyNativeRaceIntent({headSha:wrong}).intended,true);assert.equal(race.verifyNativeRaceCandidateSource({headSha:wrong}).eligible,false);
   }finally{process.chdir(previous);rmSync(root,{recursive:true,force:true});rmSync(support,{recursive:true,force:true});}
+});
+
+// ---- Affected integration: verified-baseline descendants, planned from a fail-closed incremental map ----
+const affectedHead='a'.repeat(40);
+const affectedRaw=records=>records.map(([status,paths,modes=['100644','100644']])=>[`:${modes[0]} ${modes[1]} ${'1'.repeat(40)} ${'2'.repeat(40)} ${status}`,...paths].join('\0')+'\0').join('');
+const affectedExec=({diff='',tree=AFFECTED_BASELINE.tree,ancestor=true,absent=[],head=affectedHead,untracked='',trackedPath='',worktreeDiff='',worktreeHash='',staged=''}={})=>(_command,args,options={})=>{
+  if(args[0]==='-C'){assert.equal(args[1],'fixture-root');args=args.slice(2);}
+  if(args[0]==='diff'&&args[1]==='--cached'){assert.deepEqual(args.slice(2),['--name-only','--no-relative','-z',head]);return staged;}
+  if(args[0]==='rev-parse'&&args[1]==='--show-toplevel')return 'fixture-root\n';
+  if(args[0]==='rev-parse'&&args[1]==='HEAD')return head+'\n';
+  if(args[0]==='rev-parse'&&args[1]===`${AFFECTED_BASELINE.commit}^{tree}`)return tree+'\n';
+  if(args[0]==='merge-base'){assert.deepEqual(args.slice(1),['--is-ancestor',AFFECTED_BASELINE.commit,affectedHead]);if(!ancestor){const e=Error('not ancestor');e.status=1;throw e;}return '';}
+  if(args[0]==='diff'){if(args.includes('--raw')&&args.slice(-2).join(' ')===`${AFFECTED_BASELINE.commit} ${affectedHead}`)return options.encoding==='buffer'?Buffer.from(diff):diff;if(args.includes('--raw'))return options.encoding==='buffer'?Buffer.from(worktreeDiff):worktreeDiff;assert.deepEqual(args.slice(-2),[AFFECTED_BASELINE.commit,affectedHead]);return options.encoding==='buffer'?Buffer.from(diff):diff;}
+  if(args[0]==='ls-files'&&args[1]==='--others')return untracked;
+  if(args[0]==='ls-tree'&&trackedPath&&args.at(-1)===trackedPath)return `100644 blob ${'1'.repeat(40)}\t${trackedPath}\n`;
+  if(args[0]==='hash-object'&&trackedPath)return worktreeHash;
+  if(args[0]==='cat-file'){if(absent.includes(args[2].slice(41)))throw Error('missing');return '';}
+  throw Error('Unexpected affected git command: '+args.join(' '));
+};
+const affectedNormal=()=>({schemaVersion:1,repository:'0ssol1620-byte/tavonel-saas-foundation',pullRequest:141,pullRequestBaseSha:'b'.repeat(40),repairAnchorSha:world.FULL_ANCHOR,headSha:affectedHead,
+  selector:'foundation-repair-anchor-6401-v2',changedPaths:['nextjs/app/page.tsx'],groups:['unknown'],unitFiles:[],browserFiles:[],unknownPaths:['app/page.tsx'],broaderQualificationRequired:true,
+  runFullHermeticVitest:true,qualificationReasons:['normal'],pendingQualificationDebt:['database-contract'],pendingFullDebt:['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair']});
+const affectedProof=records=>{const map=buildAffectedMap({headSha:affectedHead,records});return {eligible:map.failures.length===0,profile:world.AFFECTED_PROFILE,headSha:affectedHead,baseline:{...AFFECTED_BASELINE},map};};
+const affectedEdit=path=>({oldMode:'100644',newMode:'100644',status:'M',paths:[path]});
+test('affected classification routes only verified-baseline descendants and leaves every other head to the exact classifiers',()=>{
+  const classify=o=>world.classifyAffectedIntent({headSha:affectedHead,exec:affectedExec(o)});
+  assert.deepEqual(classify(),{classification:'intended',intended:true,headSha:affectedHead,repoRoot:'fixture-root',profile:world.AFFECTED_PROFILE});
+  assert.equal(classify({ancestor:false}).classification,'normal');
+  assert.equal(classify({tree:'0'.repeat(40)}).classification,'unavailable');
+  assert.equal(world.classifyAffectedIntent({headSha:AFFECTED_BASELINE.commit,exec:affectedExec()}).classification,'normal','the baseline itself stays with its exact profile');
+  assert.equal(world.classifyAffectedIntent({headSha:affectedHead,exec:()=>{throw Error('no git');}}).classification,'unavailable');
+  assert.equal(classify({untracked:'new-untracked.txt\0'}).classification,'unavailable','initial untracked paths fail closed');
+  assert.equal(classify({head:'f'.repeat(40)}).classification,'unavailable','checkout HEAD mismatch fails closed');
+  // Index-only drift: the worktree diff is clean, yet a staged blob differs from HEAD.
+  const staged=classify({staged:'nextjs/lib/docs-content.ts\0'});
+  assert.equal(staged.classification,'unavailable');assert.match(staged.reason,/staged changes: nextjs\/lib\/docs-content\.ts/);
+  const source=readFileSync(fileURLToPath(new URL('./repair-collector-only.mjs',import.meta.url)),'utf8'),cli=source.slice(source.lastIndexOf('if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))'));
+  assert.ok(cli.indexOf('classifyAffectedIntent({headSha})')>=0&&cli.indexOf('classifyAffectedIntent({headSha})')<cli.indexOf('classifyNativeRaceIntent({headSha})'),'affected routing precedes every exact profile');
+});
+test('affected source fails closed on unmapped, unsupported or absent-owner changes with no broad fallback',()=>{
+  const verify=o=>world.verifyAffectedSource({headSha:affectedHead,intent:world.classifyAffectedIntent({headSha:affectedHead,exec:affectedExec(o)}),exec:affectedExec(o)});
+  const clean=verify({diff:affectedRaw([['M',['nextjs/lib/docs-content.ts']]])});
+  assert.equal(clean.eligible,true,clean.reason);assert.deepEqual(clean.map.groups,['docs']);assert.equal(clean.map.nativeEvidence.disposition,'historical-input-reuse');
+  for(const [label,o,pattern] of [
+    ['an unmapped toolchain path',{diff:affectedRaw([['M',['nextjs/next.config.ts']]])},/unmapped changed endpoint: nextjs\/next\.config\.ts/],
+    ['a type change',{diff:affectedRaw([['T',['nextjs/lib/docs-content.ts'],['100644','120000']]])},/unsupported change status T/],
+    ['a deleted owner suite',{diff:affectedRaw([['D',['nextjs/lib/dropbox-source-reconciliation.test.ts'],['100644','000000']]]),absent:['nextjs/lib/dropbox-source-reconciliation.test.ts']},/absent at head: lib\/dropbox-source-reconciliation\.test\.ts/],
+    ['a renamed endpoint leaving owner scope',{diff:affectedRaw([['R100',['nextjs/lib/docs-content.ts','nextjs/lib/unowned.ts']]])},/unmapped changed endpoint: nextjs\/lib\/unowned\.ts/],
+  ]){const r=verify(o);assert.equal(r.eligible,false,label);assert.match(r.reason,pattern,label);}
+  const dirtyExec=affectedExec({diff:affectedRaw([['M',['nextjs/lib/docs-content.ts']]]),trackedPath:'nextjs/lib/docs-content.ts',worktreeDiff:`:100644 100644 ${'1'.repeat(40)} ${'2'.repeat(40)} M\0nextjs/lib/docs-content.ts\0`,worktreeHash:'2'.repeat(40)});
+  const dirtyIntent=world.classifyAffectedIntent({headSha:affectedHead,exec:dirtyExec});assert.equal(dirtyIntent.classification,'unavailable');
+  assert.match(world.verifyAffectedSource({headSha:affectedHead,intent:{classification:'intended',profile:world.AFFECTED_PROFILE,headSha:affectedHead,repoRoot:'fixture-root'},exec:dirtyExec}).reason,/Tracked checkout content changed/);
+  const plan=world.failedCollectorPlan({headSha:affectedHead,reason:'Affected map failed closed: x',intent:{profile:world.AFFECTED_PROFILE}});
+  assert.equal(plan.currentAdmission.status,'failed');assert.ok(plan.pendingQualificationDebt.includes('affected-integration-eligibility'));
+  assert.equal(plan.runFullHermeticVitest,false);assert.deepEqual(plan.unitFiles,[]);assert.deepEqual(plan.inheritedChecks,{});
+});
+test('affected plan keeps cumulative release debt separate, defers fresh native and DB runs and claims neither',()=>{
+  const normal=affectedNormal(),proof=affectedProof([affectedEdit('nextjs/lib/docs-content.ts'),{oldMode:'000000',newMode:'100644',status:'A',paths:['supabase/tests/new_case.sql']}]);
+  const plan=world.affectedPlan(normal,proof);
+  assert.deepEqual(plan.groups,['database-contract','docs','native-world-race-fresh-run']);
+  assert.deepEqual(plan.deferredGroups,['database-contract','native-world-race-fresh-run']);
+  assert.deepEqual(plan.unitFiles,['lib/docs-content.test.ts','lib/docs-navigation.test.ts','lib/pgtap-fixtures.test.ts','lib/retrieval-docs-parity.test.ts']);
+  assert.deepEqual(plan.browserFiles,['e2e/docs-reading-layout.spec.ts']);
+  assert.equal(plan.runFullHermeticVitest,false);assert.equal(plan.runDatabaseRehearsal,false);assert.deepEqual(plan.inheritedChecks,{});
+  assert.deepEqual(plan.pendingFullDebt,normal.pendingFullDebt);
+  assert.deepEqual([plan.cumulativeRelease.anchor,plan.cumulativeRelease.groups,plan.cumulativeRelease.changedPaths,plan.cumulativeRelease.broaderQualificationRequired],[world.FULL_ANCHOR,['unknown'],['nextjs/app/page.tsx'],true]);
+  assert.equal(plan.affectedIntegration.nativeEvidence.disposition,'fresh-seven-case-native-run-required');assert.equal(plan.affectedIntegration.nativeEvidence.freshRunClaimed,false);
+  for(const debt of ['database-contract','native-world-race-fresh-run','native-world-real-concurrency'])assert.ok(plan.pendingQualificationDebt.includes(debt),debt);
+  const receipt=buildRepairReceipt(plan,{headSha:affectedHead});
+  assert.equal(receipt.gate,'passed-scoped-only');assert.equal(receipt.fullQualification,'pending');
+  assert.equal(receipt.runResults['native-world-race-fresh-run'],'pending-deferred');assert.equal(receipt.runResults['database-contract'],'pending-deferred');
+  assert.match(receipt.databaseObservation,/no fresh native run is executed or claimed by Repair/);
+  const docsOnly=world.affectedPlan(normal,affectedProof([affectedEdit('nextjs/app/docs/page.tsx')]));
+  assert.deepEqual(docsOnly.deferredGroups,[]);assert.deepEqual(docsOnly.affectedIntegration.databaseTests,[]);assert.equal(docsOnly.affectedIntegration.nativeEvidence.disposition,'historical-input-reuse');
+  assert.throws(()=>world.affectedPlan(normal,affectedProof([affectedEdit('nextjs/next.config.ts')])),/clean fail-closed map/);
+  assert.throws(()=>world.affectedPlan({...normal,headSha:'f'.repeat(40)},proof),/clean fail-closed map/);
+});
+test('affected final-gate lineage and DB decision re-derive from the head, never from plan flags',()=>{
+  const plan=world.affectedPlan(affectedNormal(),affectedProof([affectedEdit('nextjs/app/docs/page.tsx')])),owned={eligible:true,headSha:affectedHead,generatedPlan:'owner-qualified'};
+  assert.match(world.affectedLineageFailures(plan,{eligible:false,reason:'x'})[0],/source\/map unavailable: x/);
+  assert.match(world.affectedLineageFailures(plan,{eligible:true,headSha:affectedHead})[0],/not qualified by the final-gate owner/);
+  assert.deepEqual(world.affectedLineageFailures(plan,owned),[]);
+  assert.match(world.affectedLineageFailures({...plan,affectedIntegration:undefined},owned)[0],/does not name the current head/);
+  // Outside the final-gate owner, eligibility is the source proof alone and can never satisfy lineage.
+  const proof=world.verifyAffectedEligibility({headSha:affectedHead,exec:affectedExec({diff:affectedRaw([['M',['nextjs/app/docs/page.tsx']]])})});
+  assert.equal(proof.eligible,true,proof.reason);assert.equal(proof.generatedPlan,undefined);
+  const normalDecision=world.nativeDbJobDecision({classifierResult:'success',intended:'false',eligible:'false',nativeDatabase:'false',nativeRace:''});
+  assert.deepEqual([normalDecision.runDatabase,normalDecision.runTransport],[true,true]);
+  assert.equal(world.nativeRaceDecisionHolds({headSha:affectedHead,nativeRace:'',decision:normalDecision,exec:affectedExec()}),true);
+  const raced=world.nativeDbJobDecision({classifierResult:'success',intended:'true',eligible:'true',nativeDatabase:'false',nativeRace:'true'});
+  assert.equal(world.nativeRaceDecisionHolds({headSha:affectedHead,nativeRace:'true',decision:raced,exec:affectedExec()}),false,'an affected head never takes the race disposition');
+});
+// The integrated PR 141 delta (43 paths): 26 reviewed product paths, the 15 CI-owner paths of this change and 2 SQL compatibility fixtures.
+const AFFECTED_PRODUCT_PATHS=Object.freeze([
+  'nextjs/lib/intake-triage.test.ts','nextjs/lib/acl-refresh-core.test.mjs','nextjs/lib/ask-route-limits.test.ts','supabase/tests/google_viewer_principal_boundary.sql',
+  'nextjs/lib/billing-product-access.ts','nextjs/lib/billing-product-access.test.ts','README.md','nextjs/lib/docs-content.ts','nextjs/lib/docs-content.test.ts',
+  'nextjs/app/docs/[section]/page.tsx','nextjs/components/world-studio-ultimate.tsx','nextjs/components/world-studio-ultimate.module.css','nextjs/app/workspace/page.tsx',
+  'nextjs/e2e/world-lifecycle.spec.ts','quarantine-sidecar/foundation-cdr-worker/src/sanitize.ts','quarantine-sidecar/foundation-cdr-worker/src/sanitize.test.ts',
+  'nextjs/lib/connector-oauth-adapters.ts','nextjs/lib/connector-oauth-adapters.test.ts','nextjs/lib/connector-sync-page.ts','nextjs/lib/connector-sync-page.test.ts',
+  'nextjs/lib/sync-worker.ts','nextjs/lib/sync-worker.test.ts','nextjs/lib/dropbox-source-reconciliation.ts','nextjs/lib/dropbox-source-reconciliation.test.ts',
+  'supabase/migrations/20261007100000_dropbox_source_path_reconciliation.sql','supabase/tests/dropbox_source_reconciliation.sql',
+]);
+const AFFECTED_CI_OWNER_PATHS=Object.freeze([
+  '.github/workflows/db-rehearsal.yml','.github/workflows/native-world-race.yml','.github/workflows/repair-scope.yml','AFFECTED-INTEGRATION-MANIFEST.md',
+  'nextjs/scripts/db/dropbox-source-stream-race.mjs','nextjs/scripts/db/dropbox-source-stream-race.test.mjs','nextjs/scripts/db/native-world-race-ci.mjs',
+  'nextjs/scripts/db/native-world-race-ci.test.mjs','nextjs/scripts/repair-collector-only.mjs','nextjs/scripts/repair-collector-only.test.mjs','nextjs/scripts/repair-scope-gate.mjs',
+  'nextjs/scripts/repair-scope.mjs','nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/run-repair-check.mjs','nextjs/scripts/verify-repair-workflows.mjs',
+]);
+// Existing Dropbox dependency contracts edited for compatibility; neither product owner nor CI owner.
+const AFFECTED_SQL_FIXTURE_PATHS=Object.freeze(['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_sync_page_snapshots.sql']);
+// CI owners carry their actual candidate bytes. Product and SQL fixture leaves are path-exact stand-ins (baseline bytes plus one line, or a marker when
+// absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel product task.
+const affectedLeafBytes=p=>{
+  if(AFFECTED_CI_OWNER_PATHS.includes(p))return readFileSync(resolve(nativeRoot,p));
+  let base;try{base=baselineBytes(p);}catch{return Buffer.from(`affected fixture stand-in for ${p}\n`);}
+  return Buffer.concat([base,Buffer.from('\n')]);
+};
+// Every fixture commit is built in a private index as a direct child of the exact verified baseline and then checked out, so the
+// tracked worktree is materialized and clean, exactly as a CI checkout of that head would be.
+function affectedRealGitFixture(){
+  const root=mkdtempSync(resolve(tmpdir(),'affected-real-git-')),B=AFFECTED_BASELINE.commit,index=resolve(root,'.git/affected-fixture-index'),written={};
+  const git=(args,options={})=>execFileSync('git',['-C',root,...args],{encoding:'utf8',stdio:'pipe',maxBuffer:64*1024*1024,...options});
+  const staging=args=>git(args,{env:{...process.env,GIT_INDEX_FILE:index}});
+  const sourceGit=args=>execFileSync('git',['-C',nativeRoot,...args],{encoding:'utf8',stdio:'pipe'}).trim();
+  const author={...process.env,GIT_AUTHOR_NAME:'affected fixture',GIT_AUTHOR_EMAIL:'fixture@example.invalid',GIT_COMMITTER_NAME:'affected fixture',GIT_COMMITTER_EMAIL:'fixture@example.invalid'};
+  try{
+    git(['init','--quiet']);git(['config','core.autocrlf','false']);git(['config','core.eol','lf']);
+    writeFileSync(resolve(root,'.git/objects/info/alternates'),sourceGit(['rev-parse','--path-format=absolute','--git-path','objects'])+'\n');
+    // A shallow source checkout keeps its boundary, so ancestry walks stop at the baseline instead of a missing parent.
+    try{writeFileSync(resolve(root,'.git/shallow'),readFileSync(sourceGit(['rev-parse','--path-format=absolute','--git-path','shallow'])));}catch{/* full history */}
+  }catch(error){rmSync(root,{recursive:true,force:true});throw error;}
+  const checkout=head=>{
+    git(['-c','advice.detachedHead=false','checkout','--quiet','--force','--detach',head]);
+    assert.equal(git(['rev-parse','HEAD']).trim(),head);
+    assert.equal(git(['diff','--cached','--name-only','-z',head]),'','fixture index equals its commit');
+    assert.equal(git(['ls-files','--others','--exclude-standard','-z']),'','fixture checkout has no untracked path');
+    return head;
+  };
+  const put=(p,bytes,mode='100644')=>()=>{
+    const blob=git(['hash-object','-w',mode==='100644'?`--path=${p}`:'--no-filters','--stdin'],{input:bytes}).trim();
+    staging(['update-index','--add','--cacheinfo',`${mode},${blob},${p}`]);written[p]=blob;
+  };
+  const move=(from,to)=>()=>{const blob=git(['rev-parse',`${B}:${from}`]).trim();staging(['update-index','--force-remove','--',from]);staging(['update-index','--add','--cacheinfo',`100644,${blob},${to}`]);};
+  const remove=p=>()=>staging(['update-index','--force-remove','--',p]);
+  const commit=(...ops)=>{
+    staging(['read-tree',B]);for(const op of ops)op();
+    const tree=staging(['write-tree']).trim(),head=git(['commit-tree',tree,'-p',B],{input:'affected fixture\n',env:author}).trim();
+    assert.equal(git(['rev-list','--parents','-n','1',head]).trim(),`${head} ${B}`,'fixture head is a direct child of the exact baseline');
+    assert.equal(git(['rev-parse',`${head}^{tree}`]).trim(),tree);
+    return checkout(head);
+  };
+  try{checkout(B);}catch(error){rmSync(root,{recursive:true,force:true});throw error;}
+  return {root,B,git,put,move,remove,commit,checkout,written,cleanup:()=>rmSync(root,{recursive:true,force:true})};
+}
+test('affected real Git map covers the integrated 43-path delta and its rename, deletion, index-only and owner-output edges from clean checkouts',()=>{
+  const previous=process.cwd();let fixture;
+  try{
+    fixture=affectedRealGitFixture();const {root,B,git,put,move,remove,commit,checkout,written}=fixture;
+    process.chdir(root);
+    const map=head=>{const intent=world.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return world.verifyAffectedSource({headSha:head,intent});};
+    const all=[...AFFECTED_PRODUCT_PATHS,...AFFECTED_CI_OWNER_PATHS,...AFFECTED_SQL_FIXTURE_PATHS].sort(),leaves=paths=>paths.map(p=>put(p,affectedLeafBytes(p)));
+    assert.equal(all.length,43);
+    const integrated=commit(...leaves(all));
+    // Exact target tree: the baseline child differs from the baseline in exactly the 43 written leaves.
+    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),all);
+    for(const p of all)assert.equal(git(['rev-parse',`${integrated}:${p}`]).trim(),written[p],p);
+    const full=map(integrated);
+    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,all);
+    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
+    assert.deepEqual(full.map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
+      'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
+    assert.deepEqual(Object.keys(full.map.databaseDependencyReasons),['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql',
+      'supabase/tests/connector_source_suspensions.sql','supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/foundation_jobs.sql']);
+    // A selected owner suite or dependency fixture missing at the head fails the whole map closed.
+    assert.match(map(commit(...leaves(all.filter(p=>p!=='nextjs/lib/dropbox-source-reconciliation.test.ts')))).reason,/absent at head: lib\/dropbox-source-reconciliation\.test\.ts/);
+    assert.match(map(commit(...leaves(all),remove('supabase/tests/connector_checkpoints.sql'))).reason,/selected database fixture is absent at head: supabase\/tests\/connector_checkpoints\.sql/);
+    // Index-only drift: a staged blob while the worktree bytes still equal HEAD.
+    checkout(integrated);
+    const drift=git(['hash-object','-w','--stdin'],{input:'staged drift\n'}).trim();git(['update-index','--cacheinfo',`100644,${drift},nextjs/lib/docs-content.ts`]);
+    assert.ok(readFileSync(resolve(root,'nextjs/lib/docs-content.ts')).equals(git(['show',`${integrated}:nextjs/lib/docs-content.ts`],{encoding:'buffer'})),'worktree bytes still equal HEAD');
+    const staged=world.classifyAffectedIntent({headSha:integrated});
+    assert.equal(staged.classification,'unavailable');assert.match(staged.reason,/staged changes: nextjs\/lib\/docs-content\.ts/);
+    checkout(integrated);
+    // Outside the final-gate owner, a generated plan is an untracked path like any other.
+    writeFileSync(resolve(root,'nextjs/repair-plan.json'),'{}\n');
+    assert.match(world.classifyAffectedIntent({headSha:integrated}).reason,/untracked paths: nextjs\/repair-plan\.json/);
+    rmSync(resolve(root,'nextjs/repair-plan.json'));
+    const docs=map(commit(put('nextjs/lib/docs-content.ts','export const docs = 1;\n'),move('nextjs/app/docs/page.tsx','nextjs/app/docs/moved/page.tsx')));
+    assert.equal(docs.eligible,true,docs.reason);assert.deepEqual(docs.map.groups,['docs']);
+    assert.ok(docs.map.entries.some(e=>/^R\d{3}$/.test(e.status)&&e.paths.join(' ')==='nextjs/app/docs/page.tsx nextjs/app/docs/moved/page.tsx'),'both rename endpoints are mapped');
+    assert.equal(docs.map.nativeEvidence.disposition,'historical-input-reuse');
+    const sql=map(commit(put('supabase/tests/affected_fixture.sql','select 1;\n'),put('.github/workflows/repair-scope.yml','name: x\n')));
+    assert.equal(sql.eligible,true,sql.reason);assert.deepEqual(sql.map.groups,['ci-selector','database-contract']);
+    assert.deepEqual([sql.map.databaseChanged,sql.map.runSelectorContracts,sql.map.nativeEvidence.disposition,sql.map.databaseTests],[true,true,'fresh-seven-case-native-run-required',[]]);
+    assert.match(map(commit(put('nextjs/lib/docs-content.ts','docs-content.test.ts','120000'))).reason,/unsupported (?:change status T|file mode)/);
+    assert.match(map(commit(put('nextjs/next.config.ts','export default {};\n'))).reason,/unmapped changed endpoint: nextjs\/next\.config\.ts/);
+  }finally{process.chdir(previous);fixture?.cleanup();}
+});
+test('affected real Git plan and final gate qualify only the regular owner plan and refuse planted receipts, plan links and mismatches',t=>{
+  const previous=process.cwd();let fixture,support;
+  try{
+    fixture=affectedRealGitFixture();const {root,B,git,put,commit}=fixture;
+    // The unchanged cumulative selector needs the exact 6401 anchor history; a shallow archive without it cannot run this path.
+    try{git(['cat-file','-e',`${world.FULL_ANCHOR}^{commit}`]);}catch{t.skip('unavailable: the 6401 full-anchor history required by the normal selector is absent from this checkout');return;}
+    process.chdir(root);support=mkdtempSync(resolve(tmpdir(),'affected-final-support-'));
+    // The CI-owner half of the integrated delta selects no unit or browser suite, so the final gate needs no fabricated report.
+    const head=commit(...AFFECTED_CI_OWNER_PATHS.map(p=>put(p,affectedLeafBytes(p))));
+    const eventPath=resolve(support,'event.json');writeFileSync(eventPath,JSON.stringify({number:141,pull_request:{number:141,base:{sha:B},head:{sha:head}}}));
+    const env={...process.env,GITHUB_EVENT_PATH:eventPath,PR_BASE_SHA:B,PR_NUMBER:'141',REPAIR_ANCHOR_SHA:world.FULL_ANCHOR,REPAIR_HEAD_SHA:head,HEAD_SHA:head,GITHUB_OUTPUT:resolve(support,'outputs.txt')};
+    for(const k of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT'])env[k]='success';
+    const cli=(name,args=[])=>spawnSync(process.execPath,[resolve(root,'nextjs/scripts/'+name),...args],{cwd:resolve(root,'nextjs'),env:{...env,RUN_REPAIR_SCOPE:name==='repair-collector-only.mjs'?'1':'0'},encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+    const planned=cli('repair-collector-only.mjs',['plan']);assert.equal(planned.status,0,planned.stderr);
+    const planPath=resolve(root,'nextjs/repair-plan.json'),receiptPath=resolve(root,'nextjs/repair-receipt.json'),plannedBytes=readFileSync(planPath),plan=JSON.parse(plannedBytes);
+    assert.equal(plan.selector,'affected-integration-v1');assert.equal(plan.headSha,head);assert.deepEqual(plan.affectedIntegration.changedPaths,[...AFFECTED_CI_OWNER_PATHS].sort());
+    assert.deepEqual(plan.affectedIntegration.groups,['ci-selector','repository-docs']);
+    assert.deepEqual([plan.unitFiles,plan.browserFiles,plan.runFullHermeticVitest,plan.runDatabaseRehearsal,plan.affectedIntegration.databaseTests],[[],[],false,false,[]]);
+    assert.match(readFileSync(env.GITHUB_OUTPUT,'utf8'),/affected=true/);
+    assert.match(world.classifyAffectedIntent({headSha:head}).reason,/untracked paths: nextjs\/repair-plan\.json/,'only the final-gate owner may see its plan');
+    const gated=cli('repair-scope-gate.mjs');assert.equal(gated.status,0,gated.stderr+gated.stdout);
+    const receipt=JSON.parse(readFileSync(receiptPath,'utf8'));
+    assert.deepEqual([receipt.gate,receipt.fullQualification,receipt.executedChecks.affectedUnits,receipt.executedChecks.affectedBrowserReports,receipt.runResults['native-world-race-fresh-run']],
+      ['passed-scoped-only','pending','none selected','none selected','pending-deferred']);
+    rmSync(receiptPath);
+    const refusal=pattern=>{const r=cli('repair-scope-gate.mjs');assert.equal(r.status,1,r.stdout);assert.match(r.stderr,pattern);};
+    const link=(target,path,name)=>{if(process.platform==='win32'){const junction=resolve(support,name);mkdirSync(junction);symlinkSync(junction,path,'junction');}else symlinkSync(target,path,'file');};
+    // A receipt in any form is refused before runGate can read plan flags or write through it.
+    writeFileSync(receiptPath,'planted\n');refusal(/preexisting nextjs\/repair-receipt\.json/);assert.equal(readFileSync(receiptPath,'utf8'),'planted\n');rmSync(receiptPath);
+    const receiptTarget=resolve(support,'receipt-target.json');writeFileSync(receiptTarget,'sentinel\n');link(receiptTarget,receiptPath,'receipt-junction');
+    refusal(/preexisting nextjs\/repair-receipt\.json/);assert.equal(readFileSync(receiptTarget,'utf8'),'sentinel\n');rmSync(receiptPath);
+    // The plan must be the regular owner output, byte-equal to the independent recomputation.
+    const planTarget=resolve(support,'plan-target.json');writeFileSync(planTarget,plannedBytes);rmSync(planPath);link(planTarget,planPath,'plan-junction');
+    refusal(/regular non-symlink owner output/);rmSync(planPath);
+    writeFileSync(planPath,Buffer.concat([plannedBytes,Buffer.from(' ')]));refusal(/differs from the independently recomputed current-head plan/);
+    writeFileSync(planPath,JSON.stringify({...plan,affectedIntegration:undefined,groups:[]},null,2)+'\n');refusal(/differs from the independently recomputed current-head plan/);
+    writeFileSync(planPath,plannedBytes);const again=cli('repair-scope-gate.mjs');assert.equal(again.status,0,again.stderr);
+  }finally{process.chdir(previous);fixture?.cleanup();if(support)rmSync(support,{recursive:true,force:true});}
 });

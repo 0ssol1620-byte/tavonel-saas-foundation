@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const sha = value => /^[0-9a-f]{40}$/i.test(value ?? '');
 export const AUDITED_REPAIR_ANCHOR_SHA = '6401c3524b5294f3a395acede35e4632eb89c0fb';
@@ -1608,7 +1610,193 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
   return plan;
 }
 
-if (process.env.RUN_REPAIR_SCOPE === '1') {
+// ---- Incremental affected-group map: verified baseline to head ----
+// The cumulative 6401-anchor selection above stays the PR/full release debt record; this map neither runs nor clears it.
+// Every changed endpoint since the verified baseline (both sides of a rename) must map to an owner group. An unsupported
+// status, mode, path spelling, unmapped endpoint or absent owner check fails the whole map closed.
+export const AFFECTED_PROFILE = 'affected-integration';
+export const AFFECTED_BASELINE = Object.freeze({
+  commit: '5dd95ed815719656fe09f1af10213a9ecf1119a8',
+  tree: 'c0773387cfffdd334076c66a1f2013a6662c6578',
+});
+// Historical inputs at the baseline only: never full release and never current-head evidence.
+export const AFFECTED_HISTORICAL_EVIDENCE = Object.freeze({
+  headSha: '5dd95ed815719656fe09f1af10213a9ecf1119a8', treeSha: 'c0773387cfffdd334076c66a1f2013a6662c6578',
+  repairRunId: 37696210200, repairJobId: 113048455173,
+  databaseClassifierRunId: 37696210339, databaseClassifierJobId: 113048455870,
+  nativeRaceRunId: 37696210268, nativeRaceAttempt: 1, nativeRaceAggregateJobId: 113049715999,
+  nativeCases: Object.freeze({
+    grant_revoke: Object.freeze({jobId:113048455419,receiptSha256:'a3df24b20c130ad98e641aeb42a8d991e3b636d87a2a4bda7231e945d96fef89',stageReceiptSha256:'9e51f2d574d45bc33a68b7dad3cc766b59864a2eb9249e2940480484a0a7775b'}),
+    qualification_revoke: Object.freeze({jobId:113048455432,receiptSha256:'d6af5339255c5fb4bb09d7332c1bd7f259688e659dad464b047a4c71981b6188',stageReceiptSha256:'b3f2df147fc2d5b5f48300e3e23de698a0634250c4f4e661dd5970d53d112cb3'}),
+    epoch: Object.freeze({jobId:113048455206,receiptSha256:'f85a7309999dc58e02bfa7cc3c2ca7de8882062782a9c2e503f2c38c22c9d5b9',stageReceiptSha256:'12be72c1aab9dab0964c4f49db7dd318433b572bbe959cf202a0c052b63768b4'}),
+    delete: Object.freeze({jobId:113048455530,receiptSha256:'59568dea718db5b48e80615a575aede551e436183ab63f6e0f0273e3309a0bba',stageReceiptSha256:'b3f2df147fc2d5b5f48300e3e23de698a0634250c4f4e661dd5970d53d112cb3'}),
+    same_replay: Object.freeze({jobId:113048455630,receiptSha256:'dc818b80b8bc0e6c294659cb1621d795351ec4ed0f9afc0262dc8662517b750d',stageReceiptSha256:'0ced497d8e2687261d8245b32989e9436cace3b996a5103aaf7bc6fddc9fd709'}),
+    changed_replay: Object.freeze({jobId:113048455555,receiptSha256:'8c4e57c3ba2531ca28d27c6d31ba9e50a7d1353c04bd03d5910cd7814666b10f',stageReceiptSha256:'2e7dbf1f7f1b4082e87e166b509766e453b81c66f53fb1749908e5cfa277ed0c'}),
+    member_fk: Object.freeze({jobId:113048455415,receiptSha256:'9d6768e5892f64cfb06f2e6bf595c73a8f951b18208b8cca6c45eedff5a82038',stageReceiptSha256:'12be72c1aab9dab0964c4f49db7dd318433b572bbe959cf202a0c052b63768b4'}),
+  }),
+  nativeDependencyHashes: Object.freeze({
+    harness:'1067e8974bbc6f00c28e4bdbcc55e75f70b29f7ef0e1d1e29a9430b28a629a77',
+    harnessTest:'f521d7f120fd732782f845c20bf1a9123740c337dd6587fe686752c8332d6f6a',
+    harnessDoc:'67710769d4c7a91f04952430dd41c5c7ecc8aa248d3793473f9dcafdf13889e9',
+    fixture:'561d43d6f1f2a6c26a66e7e050db7b196d209939f337d2c773951d23f031cc62',
+    schema:'de039c9204ccb8fcefc659cdc090468ed3f8ae20d97fc18af96228e76897a4db',
+  }),
+  nativeLinuxDbCases: 7, status: 'historical evidence bound to the 5dd baseline only; not full release and not current-head evidence',
+});
+export const NATIVE_FRESH_RUN_REQUIRED = 'fresh-seven-case-native-run-required';
+export const NATIVE_HISTORICAL_INPUT_REUSE = 'historical-input-reuse';
+const affectedGroup = (group, match, { unitFiles = [], browserFiles = [], databaseTests = [], nativeReuse = false, ...flags } = {}) => Object.freeze({
+  group, match, unitFiles: Object.freeze([...unitFiles]), browserFiles: Object.freeze([...browserFiles]), databaseTests: Object.freeze([...databaseTests]), nativeReuse, ...flags,
+});
+// Existing SQL contracts the Dropbox owners execute against. Whenever an affected head needs the fresh DB lane, an affected Dropbox owner
+// also selects these fixtures, each with the reason it is required.
+export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
+  'supabase/tests/connector_checkpoints.sql': 'dropbox-connector: enqueue_connector_sync canonical job resume and checkpoint cursor',
+  'supabase/tests/connector_sync_page_snapshots.sql': 'dropbox-connector: connector_sync_page snapshots read by connector-sync-page and sync-worker',
+  'supabase/tests/foundation_jobs.sql': 'dropbox-connector: foundation_jobs claim/complete lifecycle behind the source_import stream guard',
+  'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
+  'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
+});
+// nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
+// harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
+export const AFFECTED_GROUPS = Object.freeze([
+  affectedGroup('intake-triage', /^nextjs\/(?:app\/api\/(?:v1\/)?uploads\/.+|components\/intake-triage-review[^/]*|lib\/(?:intake-[^/]+|compute-reservation[^/]*|r2-triage-seal[^/]*)|e2e\/workspace-intake-triage\.spec\.ts)$/,
+    { unitFiles: INTAKE_TRIAGE_UNIT_TESTS, browserFiles: [INTAKE_TRIAGE_BROWSER_FILE] }),
+  affectedGroup('acl', /^nextjs\/lib\/(?:(?:connector-source-access|google-drive-acl-capture|source-acl-admission-migration)(?:\.test)?\.ts|acl-refresh-core\.test\.mjs|ask-route-limits\.test\.ts)$/,
+    { unitFiles: ['lib/acl-refresh-core.test.mjs', 'lib/ask-route-limits.test.ts', 'lib/connector-source-access.test.ts', 'lib/google-drive-acl-capture.test.ts', 'lib/source-acl-admission-migration.test.ts', 'lib/pgtap-fixtures.test.ts'],
+      fixtureContract: Object.freeze({ suite: 'lib/pgtap-fixtures.test.ts', declaredCases: 24 }) }),
+  affectedGroup('acl', /^supabase\/(?:migrations|tests|drafts)\/(?:.*\/)?google_viewer_principal_boundary\.sql$/,
+    { unitFiles: ['lib/acl-refresh-core.test.mjs', 'lib/ask-route-limits.test.ts', 'lib/connector-source-access.test.ts', 'lib/google-drive-acl-capture.test.ts', 'lib/source-acl-admission-migration.test.ts', 'lib/pgtap-fixtures.test.ts'],
+      fixtureContract: Object.freeze({ suite: 'lib/pgtap-fixtures.test.ts', declaredCases: 24 }), database: true, databaseTests: ['supabase/tests/google_viewer_principal_boundary.sql'] }),
+  affectedGroup('billing-access-plan-gates', /^nextjs\/lib\/(?:billing-product-access|billing-gate-enforcement|billing-gate-enforce-route|plan-entitlement|world-activation-plan-gate)(?:\.test)?\.ts$/,
+    { unitFiles: ['lib/billing-product-access.test.ts', 'lib/billing-gate-enforcement.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/plan-entitlement.test.ts', 'lib/world-activation-plan-gate.test.ts'] }),
+  affectedGroup('docs', /^(?:README\.md|nextjs\/(?:README\.md|lib\/(?:docs-[a-z-]+|retrieval-docs-parity)(?:\.test)?\.ts|app\/docs\/.+|components\/docs\/.+|e2e\/docs-reading-layout\.spec\.ts))$/,
+    { unitFiles: ['lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/retrieval-docs-parity.test.ts'], browserFiles: ['e2e/docs-reading-layout.spec.ts'], nativeReuse: true }),
+  affectedGroup('workspace-lifecycle', /^nextjs\/(?:app\/workspace\/.+|components\/(?:world-studio-ultimate|world-directory-tree|world-ontology-viewer|world-graph-canvas|workspace-ultimate-shell)(?:\.module\.css|\.tsx)|components\/world-visual\/.+|lib\/(?:visual-world-model|world-graph-layout|workspace-failure-copy|world-directory-and-ontology)(?:\.test)?\.ts|e2e\/world-lifecycle\.spec\.ts)$/,
+    { unitFiles: ['lib/world-directory-and-ontology.test.ts', 'lib/visual-world-model.test.ts', 'lib/world-graph-layout.test.ts', 'lib/workspace-failure-copy.test.ts'], browserFiles: ['e2e/world-lifecycle.spec.ts'], nativeReuse: true }),
+  affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
+  affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
+    { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
+      'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
+      'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  affectedGroup('dropbox-connector', /^supabase\/(?:migrations|tests|drafts)\/(?:.*\/)?(?:[0-9]{14}_)?(?:dropbox_source_path_reconciliation|dropbox_source_reconciliation)\.sql$/,
+    { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
+      'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
+      'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
+      databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
+    { selector: true }),
+  affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
+  affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
+  affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
+]);const regularModes = ['100644', '100755'];
+
+export function parseAffectedRawDiff(output) {
+  const text = Buffer.isBuffer(output) ? output.toString('utf8') : String(output);
+  if (!text) return [];
+  if (!text.endsWith('\0')) throw new Error('Affected raw diff was not NUL terminated.');
+  const fields = text.slice(0, -1).split('\0');
+  const records = [];
+  for (let index = 0; index < fields.length;) {
+    const record = /^:([0-7]{6}) ([0-7]{6}) ([a-f0-9]{40}) ([a-f0-9]{40}) ([A-Z][0-9]{0,3})$/.exec(fields[index++]);
+    if (!record) throw new Error('Unreadable affected raw diff record.');
+    const count = /^[RC]/.test(record[5]) ? 2 : 1;
+    const paths = fields.slice(index, index + count);
+    if (paths.length !== count || paths.some(path => !path)) throw new Error('Affected raw diff record is missing a path.');
+    index += count;
+    records.push({ oldMode: record[1], newMode: record[2], status: record[5], paths });
+  }
+  return records;
+}
+
+export function buildAffectedMap({ headSha, records, headHasFile = () => true }) {
+  if (!sha(headSha)) throw new Error('Affected map requires an exact head SHA.');
+  const failures = [], entries = [], unmappedPaths = [];
+  const groups = new Set(), unitFiles = new Set(), browserFiles = new Set(), databaseTests = new Set(), invalidatingPaths = new Set();
+  const dependencyReasons = new Map();
+  let worker = false, selector = false, database = false;
+  for (const { oldMode, newMode, status, paths } of records) {
+    const label = paths.join(' -> ');
+    if (!/^(?:[AMD]|R[0-9]{3})$/.test(status)) { failures.push(`unsupported change status ${status}: ${label}`); continue; }
+    const modes = status === 'A' ? oldMode === '000000' && regularModes.includes(newMode)
+      : status === 'D' ? regularModes.includes(oldMode) && newMode === '000000'
+        : regularModes.includes(oldMode) && regularModes.includes(newMode);
+    if (!modes) { failures.push(`unsupported file mode ${oldMode} -> ${newMode}: ${label}`); continue; }
+    const entryGroups = new Set();
+    for (const path of paths) {
+      if (!/^[A-Za-z0-9_./\[\]-]+$/.test(path) || path.split('/').some(part => !part || part === '.' || part === '..')) {
+        failures.push(`unsupported path spelling: ${JSON.stringify(path)}`);
+        continue;
+      }
+      const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path));
+      if (!owners.length) { failures.push(`unmapped changed endpoint: ${path}`); unmappedPaths.push(path); continue; }
+      if (!owners.every(owner => owner.nativeReuse)) invalidatingPaths.add(path);
+      for (const owner of owners) {
+        entryGroups.add(owner.group);
+        for (const file of owner.unitFiles) unitFiles.add(file);
+        for (const file of owner.browserFiles) browserFiles.add(file);
+        for (const file of owner.databaseTests ?? []) databaseTests.add(file);
+        for (const [file, reason] of Object.entries(owner.databaseDependencies ?? {})) dependencyReasons.set(file, new Set([...(dependencyReasons.get(file) ?? []), reason]));
+        worker ||= Boolean(owner.worker);
+        selector ||= Boolean(owner.selector);
+        database ||= Boolean(owner.database);
+      }
+    }
+    for (const group of entryGroups) groups.add(group);
+    entries.push({ status, paths: [...paths], groups: [...entryGroups].sort() });
+  }
+  // Dependencies ride only on an already required DB lane; a non-SQL owner change never starts one by itself.
+  const databaseDependencyReasons = database ? Object.fromEntries([...dependencyReasons.keys()].sort().map(file => [file, [...dependencyReasons.get(file)].sort()])) : {};
+  for (const file of Object.keys(databaseDependencyReasons)) databaseTests.add(file);
+  for (const file of [...unitFiles, ...browserFiles].sort()) {
+    if (!headHasFile(`nextjs/${file}`)) failures.push(`selected owner check is absent at head: ${file}`);
+  }
+  for (const file of [...databaseTests].sort()) {
+    if (!headHasFile(file)) failures.push(`selected database fixture is absent at head: ${file}`);
+  }
+  const fresh = invalidatingPaths.size > 0;
+  return {
+    profile: AFFECTED_PROFILE,
+    baseline: { ...AFFECTED_BASELINE },
+    headSha,
+    entries,
+    changedPaths: [...new Set(entries.flatMap(entry => entry.paths))].sort(),
+    groups: [...groups].sort(),
+    unitFiles: [...unitFiles].sort(),
+    browserFiles: [...browserFiles].sort(),
+    runCdrWorkerChecks: worker,
+    runSelectorContracts: selector,
+    databaseChanged: database,
+    databaseTests: [...databaseTests].sort(),
+    databaseDependencyReasons,
+    fixtureContracts: AFFECTED_GROUPS.filter((owner, index, owners) => groups.has(owner.group) && owner.fixtureContract && owners.findIndex(candidate => candidate.group === owner.group && candidate.fixtureContract?.suite === owner.fixtureContract.suite) === index)
+      .map(owner => ({ group: owner.group, ...owner.fixtureContract, enforcement: 'selected as a required executed-passing suite; the declared case count is recorded, not asserted' })),
+    nativeEvidence: {
+      disposition: fresh ? NATIVE_FRESH_RUN_REQUIRED : NATIVE_HISTORICAL_INPUT_REUSE,
+      invalidatingPaths: [...invalidatingPaths].sort(),
+      historical: { ...AFFECTED_HISTORICAL_EVIDENCE },
+      freshRunClaimed: false,
+      status: fresh
+        ? 'historical native evidence is invalidated; only the dedicated native-world-race workflow can supply the fresh seven-case run, which is neither executed nor claimed here'
+        : 'docs/UI-only delta: historical native inputs are reused as historical-input-reuse only; no fresh native run is claimed',
+    },
+    unmappedPaths: [...new Set(unmappedPaths)].sort(),
+    failures,
+  };
+}
+
+export function collectAffectedChanges({ headSha, repoRoot, exec = execFileSync }) {
+  if (!sha(headSha) || headSha === AFFECTED_BASELINE.commit) throw new Error('Affected map requires a head newer than the verified baseline.');
+  const git = (args, encoding = 'utf8') => exec('git', ['-C', repoRoot, ...args], { encoding, stdio: 'pipe', shell: false });
+  if (String(git(['rev-parse', `${AFFECTED_BASELINE.commit}^{tree}`])).trim() !== AFFECTED_BASELINE.tree) throw new Error('Verified affected baseline tree changed.');
+  git(['merge-base', '--is-ancestor', AFFECTED_BASELINE.commit, headSha]);
+  const records = parseAffectedRawDiff(git(['diff', '--raw', '-z', '--no-abbrev', '-M', '--no-relative', '--no-ext-diff', AFFECTED_BASELINE.commit, headSha], 'buffer'));
+  const headHasFile = path => { try { git(['cat-file', '-e', `${headSha}:${path}`]); return true; } catch { return false; } };
+  return buildAffectedMap({ headSha, records, headHasFile });
+}
+
+// Collector and gate import the exports above; only a direct selector run plans.
+if (process.env.RUN_REPAIR_SCOPE === '1' && process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const pullRequestBaseSha = process.env.PR_BASE_SHA;
   const repairAnchorSha = process.env.REPAIR_ANCHOR_SHA;
   const headSha = process.env.REPAIR_HEAD_SHA;

@@ -87,6 +87,45 @@ describe("versioned reviewed intake triage", () => {
     expect(inventory?.selectedFileKeys).toEqual([]);
   });
 
+  it("keeps byte-identical sources with different ACL observations separately selected and charge-covered", () => {
+    const inventory = build([
+      observation("file-b", { relativePath: "shared/copy.pdf", revision: "rev-b1", aclObservationSha256: "e".repeat(64) }),
+      observation("file-a", { relativePath: "private/original.pdf", revision: "rev-a1", aclObservationSha256: "c".repeat(64) }),
+    ], { "file-a": "include", "file-b": "include" });
+
+    expect(inventory?.files.map((file) => [file.fileKey, file.revision, file.aclObservationSha256])).toEqual([
+      ["file-a", "rev-a1", "c".repeat(64)],
+      ["file-b", "rev-b1", "e".repeat(64)],
+    ]);
+    expect(inventory?.files[1]).toMatchObject({ disposition: "include", exactDuplicateOf: "file-a" });
+    expect(inventory?.selectedFileKeys).toEqual(["file-a", "file-b"]);
+    expect(inventory?.estimate.customerChargeCoverage.sourceVersions).toEqual([
+      { fileKey: "file-b", revision: "rev-b1", contentSha256: hash, mode: "new_read" },
+      { fileKey: "file-a", revision: "rev-a1", contentSha256: hash, mode: "new_read" },
+    ]);
+    expect(inventory?.approvalReady).toBe(true);
+    expect(inventory?.approvalBlockers).toEqual([]);
+  });
+
+  it("blocks byte-identical sources with different ACL observations when only one is charge-covered", () => {
+    const inventory = buildIntakeTriage({
+      scope, configurationRevision: "triage-config-1", pricingFingerprint: priceFingerprint,
+      supportedMimeTypes: ["application/pdf"],
+      observations: [
+        observation("file-b", { relativePath: "shared/copy.pdf", revision: "rev-b1", aclObservationSha256: "e".repeat(64) }),
+        observation("file-a", { relativePath: "private/original.pdf", revision: "rev-a1", aclObservationSha256: "c".repeat(64) }),
+      ],
+      choices: { "file-a": "include", "file-b": "include" },
+      estimate: { ...estimate, customerChargeCoverage: {
+        ...estimate.customerChargeCoverage,
+        sourceVersions: [{ fileKey: "file-a", revision: "rev-a1", contentSha256: hash, mode: "new_read" }],
+      } },
+    });
+    expect(inventory?.selectedFileKeys).toEqual(["file-a", "file-b"]);
+    expect(inventory?.approvalReady).toBe(false);
+    expect(inventory?.approvalBlockers).toContain("customer_charge_scope_or_new_read_coverage_incomplete");
+  });
+
   it("does not treat client-claimed or connector-observed hashes as byte proof", () => {
     const inventory = build([
       observation("file-a", { digestEvidence: "client_claimed" }),

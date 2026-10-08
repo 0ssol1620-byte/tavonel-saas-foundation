@@ -22,7 +22,8 @@ $$;
 
 create temporary table sync_page_snapshot_fixture (
   actor_id uuid not null,
-  workspace_key text not null,
+  -- Filled from the actor's bootstrapped workspace after the auth.users insert.
+  workspace_key text,
   connection_id uuid not null,
   job_id text not null,
   worker_a text not null,
@@ -36,7 +37,7 @@ create temporary table sync_page_snapshot_fixture (
 
 insert into sync_page_snapshot_fixture values (
   gen_random_uuid(),
-  'pilot-' || substr(md5(gen_random_uuid()::text), 1, 12),
+  null,
   gen_random_uuid(),
   'job-' || md5(gen_random_uuid()::text),
   'worker-sync-v2-' || substr(md5(gen_random_uuid()::text), 1, 16),
@@ -54,6 +55,23 @@ insert into auth.users (id, email)
 select actor_id, 'sync-page-' || actor_id::text || '@example.invalid'
 from sync_page_snapshot_fixture;
 
+-- Use the workspace the auth.users bootstrap actually created; fail closed unless the actor
+-- is its creator and its single active owner. No workspace or member rows are manufactured.
+do $$
+declare
+  fixture record;
+  ws text;
+begin
+  select * into strict fixture from sync_page_snapshot_fixture;
+  select w.workspace_key into strict ws
+  from public.foundation_workspaces w
+  join public.foundation_workspace_members m on m.workspace_key = w.workspace_key
+  where w.created_by = fixture.actor_id and m.user_id = fixture.actor_id
+    and m.role = 'owner' and m.state = 'active';
+  update sync_page_snapshot_fixture set workspace_key = ws;
+end;
+$$;
+
 insert into public.foundation_oauth_connections (
   oauth_connection_id, workspace_key, provider, display_name, provider_account_id,
   granted_scopes, client_secret_reference, refresh_token_reference, created_by, updated_by
@@ -68,6 +86,9 @@ declare
   fixture record;
 begin
   select * into strict fixture from sync_page_snapshot_fixture;
+  if fixture.workspace_key is null then
+    raise exception 'connector_sync_page_fixture_workspace_unresolved';
+  end if;
   perform set_config('sync_page_fixture.actor_id', fixture.actor_id::text, true);
   perform set_config('sync_page_fixture.workspace_key', fixture.workspace_key, true);
   perform set_config('sync_page_fixture.connection_id', fixture.connection_id::text, true);

@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as repair from './repair-known-regression.mjs';
 import { EXPLORE_REPAIR_BROWSER_FILES, verifyExploreSpecSource } from './run-repair-check.mjs';
+import { AFFECTED_BASELINE, AFFECTED_HISTORICAL_EVIDENCE, AFFECTED_PROFILE, NATIVE_FRESH_RUN_REQUIRED, collectAffectedChanges } from './repair-scope.mjs';
+export { AFFECTED_BASELINE, AFFECTED_PROFILE } from './repair-scope.mjs';
 
 export const COLLECTOR_BASE = 'f082847ccd0eb5e65676f357d86a8025d143377b';
 export const FULL_ANCHOR = '6401c3524b5294f3a395acede35e4632eb89c0fb';
@@ -226,6 +228,11 @@ export function failedCollectorPlan({ headSha, reason, intent }) {
     pendingFullDebt: ['PR-base full CI', 'PR-base full Launch QA', 'Lighthouse', 'full release build and exact Foundation/Core pair'],
     fullQualification: 'pending', inheritedChecks: {}, collectorOnlyFailure: { reason, intent },
     qualificationReasons: ['Collector eligibility failed; no expensive fallback is permitted for an intended or unavailable classification.'],
+  };
+  // A failed affected map keeps its unmapped/unsupported reasons; nothing is inherited and no broad fallback runs.
+  if (intent?.profile === AFFECTED_PROFILE) return { ...plan,
+    currentAdmission: { profile: AFFECTED_PROFILE, headSha, baseline: { ...AFFECTED_BASELINE }, status: 'failed', reason },
+    pendingQualificationDebt: [...plan.pendingQualificationDebt, 'affected-integration-eligibility', ...EXPLORE_REPAIR_PENDING_DEBT],
   };
   // A failed new admission cannot revoke the parent's actual historical repair.
   // Evidence remains unaccepted for this head until its independent proof passes.
@@ -1511,31 +1518,37 @@ const readNativeRaceParentEvidence=api=>{const e=NATIVE_RACE_PARENT_EVIDENCE;ret
 function nativeRaceFinalGateOwnsPlan(intent){
  return intent?.parent===NATIVE_RACE_SUCCESSOR_PARENT&&process.argv[1]&&resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')&&resolve(process.cwd())===resolve(intent.repoRoot,'nextjs');
 }
-function verifyNativeRaceGeneratedPlan({headSha,intent,proof,env,event,exec}){
+// The final gate's generated plan: exact current-PR inputs, the regular owner output bytes and a fresh normal selection. The selector
+// reruns from its exact source owner in a disposable output directory; Git still sees the original current-head checkout, no plan field
+// is used as an input, and the actual workflow output is never overwritten by this check.
+function ownedGeneratedPlan({headSha,intent,env,event,exec,label,prNumber,selectNormal}){
  const root=resolve(intent.repoRoot),cwd=resolve(root,'nextjs'),output=resolve(cwd,'repair-plan.json');
  const payload=event!==undefined?event:JSON.parse(readFileSync(env.GITHUB_EVENT_PATH,'utf8')),base=payload?.pull_request?.base?.sha;
- if(!/^[a-f0-9]{40}$/.test(base??'')||env.PR_BASE_SHA!==base||env.PR_NUMBER!=='141'||env.REPAIR_ANCHOR_SHA!==FULL_ANCHOR||env.REPAIR_HEAD_SHA!==headSha||env.HEAD_SHA!==headSha)throw Error('Native World race final plan inputs differ from the current PR event/head.');
- if(realpathSync(cwd)!==cwd||lstatSync(cwd).isSymbolicLink())throw Error('Native World race final plan directory is not its regular owner path.');
+ if(!/^[a-f0-9]{40}$/.test(base??'')||env.PR_BASE_SHA!==base||env.PR_NUMBER!==(prNumber??String(payload?.number))||payload?.pull_request?.head?.sha!==headSha||env.REPAIR_ANCHOR_SHA!==FULL_ANCHOR||env.REPAIR_HEAD_SHA!==headSha||env.HEAD_SHA!==headSha)throw Error(label+' final plan inputs differ from the current PR event/head.');
+ if(realpathSync(cwd)!==cwd||lstatSync(cwd).isSymbolicLink())throw Error(label+' final plan directory is not its regular owner path.');
  const before=lstatSync(output);
- if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o111)!==0||before.size>1024*1024||realpathSync(output)!==output)throw Error('Native World race final plan must be a regular non-symlink owner output.');
+ if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o111)!==0||before.size>1024*1024||realpathSync(output)!==output)throw Error(label+' final plan must be a regular non-symlink owner output.');
  let fd,bytes;
  try{
   fd=openSync(output,constants.O_RDONLY|(constants.O_NOFOLLOW??0));const opened=fstatSync(fd);
-  if(!opened.isFile()||opened.dev!==before.dev||opened.ino!==before.ino||opened.size!==before.size)throw Error('Native World race final plan changed while opening.');
+  if(!opened.isFile()||opened.dev!==before.dev||opened.ino!==before.ino||opened.size!==before.size)throw Error(label+' final plan changed while opening.');
   bytes=readFileSync(fd);const after=lstatSync(output),held=fstatSync(fd);
-  if(!after.isFile()||after.isSymbolicLink()||after.dev!==opened.dev||after.ino!==opened.ino||after.size!==bytes.length||held.size!==bytes.length||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs)throw Error('Native World race final plan changed while reading.');
+  if(!after.isFile()||after.isSymbolicLink()||after.dev!==opened.dev||after.ino!==opened.ino||after.size!==bytes.length||held.size!==bytes.length||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs)throw Error(label+' final plan changed while reading.');
  }finally{if(fd!==undefined)closeSync(fd);}
- // Re-run the already sealed, unchanged selector from its exact source owner in a disposable output directory. Git still sees the
- // original current-head checkout; no plan field is used as an input, and the actual workflow output is never overwritten by this check.
- const scratch=mkdtempSync(resolve(tmpdir(),'native-race-final-plan-'));
+ // Only API tests inject the cumulative selection (its 6401 anchor history may be absent); the gate CLI always reruns the selector.
+ if(selectNormal)return{bytes,normal:selectNormal()};
+ const scratch=mkdtempSync(resolve(tmpdir(),'owned-final-plan-'));
  try{
   const gitDir=exec('git',['-C',root,'rev-parse','--absolute-git-dir'],{encoding:'utf8'}).trim();
   const childEnv={...env,GIT_DIR:gitDir,GIT_WORK_TREE:root,RUN_REPAIR_SCOPE:'1',GITHUB_OUTPUT:''};delete childEnv.GIT_INDEX_FILE;
   const selected=spawnSync(process.execPath,[resolve(root,'nextjs/scripts/repair-scope.mjs')],{cwd:scratch,env:childEnv,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
-  if(selected.status!==0)throw Error('Native World race final plan selector recomputation failed.');
-  const normal=JSON.parse(readFileSync(resolve(scratch,'repair-plan.json'),'utf8')),expected=Buffer.from(JSON.stringify(nativeRacePlan(normal,proof),null,2)+'\n');
-  if(!bytes.equals(expected))throw Error('Native World race final plan differs from the independently recomputed current-head plan.');
+  if(selected.status!==0)throw Error(label+' final plan selector recomputation failed.');
+  return{bytes,normal:JSON.parse(readFileSync(resolve(scratch,'repair-plan.json'),'utf8'))};
  }finally{rmSync(scratch,{recursive:true,force:true});}
+}
+function verifyNativeRaceGeneratedPlan({headSha,intent,proof,env,event,exec}){
+ const{bytes,normal}=ownedGeneratedPlan({headSha,intent,env,event,exec,label:'Native World race',prNumber:'141'}),expected=Buffer.from(JSON.stringify(nativeRacePlan(normal,proof),null,2)+'\n');
+ if(!bytes.equals(expected))throw Error('Native World race final plan differs from the independently recomputed current-head plan.');
 }
 export function verifyNativeRaceEligibility({headSha,exec=execFileSync,api=solutionsApi,env=process.env,event,intent=classifyNativeRaceIntent({headSha,exec})}){
  const finalGate=nativeRaceFinalGateOwnsPlan(intent),source=verifyNativeRaceCandidateSource({headSha,intent,exec,checkoutOwner:finalGate?NATIVE_RACE_FINAL_GATE_PLAN_OWNER:undefined});if(!source.eligible)return source;
@@ -1546,7 +1559,10 @@ export function verifyNativeRaceEligibility({headSha,exec=execFileSync,api=solut
 }
 // Re-derived from the head, never from outputs: a recognized race head needs the exact race disposition, and only it may carry one.
 export function nativeRaceDecisionHolds({headSha,nativeRace,decision,exec=execFileSync}){
- const recognized=classifyNativeRaceIntent({headSha,exec}).classification!=='normal',raced=decision?.disposition===NATIVE_RACE_DB_DISPOSITION;
+ const raced=decision?.disposition===NATIVE_RACE_DB_DISPOSITION;
+ // An affected-integration head is never a race head: it keeps the normal fresh DB/transport disposition.
+ if(classifyAffectedIntent({headSha,exec}).classification!=='normal')return!raced&&nativeRace!=='true';
+ const recognized=classifyNativeRaceIntent({headSha,exec}).classification!=='normal';
  return recognized?raced&&nativeRace==='true':!raced&&nativeRace!=='true';
 }
 export function authenticateFailedNativeRaceResolution(receipt,{intent,api=solutionsApi}){
@@ -1578,6 +1594,101 @@ export function nativeRacePlan(normal,proof){
 }
 export function nativeRaceLineageFailures(plan,proof){if(!proof?.eligible)return['Native World race source/event/evidence unavailable: '+(proof?.reason??'missing')];let expected;try{expected=nativeRacePlan({...plan,qualificationReasons:[]},proof);}catch(error){return['Native World race plan lineage unavailable: '+error.message];}const keys=['headSha','repairAnchorSha','nativeWorldRacePresentation','nativeWorldRaceSuccessor','exploreRepairPresentation','solutionsPagesPresentation','publicPagesPresentation','nativeDbRehearsal','groups','unitFiles','browserFiles','unknownPaths','catalogueFiles','nativeWorldRaceContractSuites','nativeWorldRaceWorkflow','runApiCatalogueChecks','runFullHermeticVitest','runScriptContracts','runCdrWorkerChecks','runDetailIntegrity','runWorkflowStaticGate','requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','runDatabaseRehearsal','databaseDisposition','databaseBaselineEvidence','databaseRehearsalStatus','deferredGroups','pendingQualificationDebt','pendingDebt','pendingFullDebt','fullQualification','inheritedChecks','parentSkippedJobs','knownRegressionResolution','knownRegressionObservations','historicalUiFailure','historicalBrowserFailure','historicalStaticFailure','collectorOnly','collectorOnlyFailure','knownRegressionRepair','intakePresentation'];return keys.filter(k=>JSON.stringify(plan[k])!==JSON.stringify(expected[k])).map(k=>'Native World race plan changed: '+k);}
 
+// ---- Affected integration: every descendant of the verified baseline, planned from its fail-closed incremental map ----
+// Routed before every exact profile below. The baseline's own Repair, DB classifier and native race runs stay historical inputs.
+export function classifyAffectedIntent({headSha,exec=execFileSync}){
+ if(!/^[a-f0-9]{40}$/.test(headSha??'')||headSha===AFFECTED_BASELINE.commit)return{classification:'normal',intended:false,reason:'Not a head newer than the verified affected-integration baseline.'};
+ let root;
+ try{
+  const git=a=>String(exec('git',a,{encoding:'utf8',stdio:'pipe'})).trim();root=git(['rev-parse','--show-toplevel']);
+  if(git(['-C',root,'rev-parse',`${AFFECTED_BASELINE.commit}^{tree}`])!==AFFECTED_BASELINE.tree)return{classification:'unavailable',intended:true,headSha,repoRoot:root,profile:AFFECTED_PROFILE,reason:'Verified affected-integration baseline commit/tree is missing or mismatched.'};
+  try{git(['-C',root,'merge-base','--is-ancestor',AFFECTED_BASELINE.commit,headSha]);}
+  catch(error){if(error?.status===1)return{classification:'normal',intended:false,reason:'Head is not descended from the verified affected-integration baseline.'};throw error;}
+  assertAffectedCheckout({repoRoot:root,headSha,exec,allowOwnedGeneratedPlan:true});
+  return{classification:'intended',intended:true,headSha,repoRoot:root,profile:AFFECTED_PROFILE};
+ }catch(error){return{classification:'unavailable',intended:true,headSha,repoRoot:root,profile:AFFECTED_PROFILE,reason:'Affected-integration admission failed closed: '+error.message};}
+}
+function assertAffectedCheckout({repoRoot,headSha,exec=execFileSync,allowOwnedGeneratedPlan=false}){
+ const git=a=>exec('git',['-C',repoRoot,...a],{encoding:'utf8',stdio:'pipe'}).toString();
+ if(git(['rev-parse','HEAD']).trim()!==headSha)throw Error('Affected checkout HEAD differs from requested head.');
+ // The worktree-vs-HEAD guard cannot see index-only drift (a staged blob while the worktree bytes still match HEAD).
+ const staged=git(['diff','--cached','--name-only','--no-relative','-z',headSha]).split('\0').filter(Boolean);
+ if(staged.length)throw Error('Affected checkout has staged changes: '+staged.sort().join(', '));
+ verifyTrackedCheckout({repoRoot,headSha,exec});
+ const untracked=git(['ls-files','--others','--exclude-standard','-z']).split('\0').filter(Boolean);
+ // Only the final-gate owner may find its generated plan, and only as a regular file; its bytes are then required to equal the
+ // independent recomputation. The gate writes the receipt after qualification, so a receipt in any form is never pre-exempted.
+ const owner=allowOwnedGeneratedPlan&&affectedFinalGateOwnsPlan({repoRoot});
+ if(owner){
+  const present=path=>{try{return lstatSync(resolve(repoRoot,path));}catch(error){if(error?.code==='ENOENT')return null;throw error;}};
+  if(present('nextjs/repair-receipt.json'))throw Error('Affected final gate refuses a preexisting nextjs/repair-receipt.json (file or link).');
+  const plan=present('nextjs/repair-plan.json');
+  if(plan&&(!plan.isFile()||plan.isSymbolicLink()||plan.nlink!==1))throw Error('Affected final plan must be a regular non-symlink owner output.');
+ }
+ const allowed=owner?new Set(['nextjs/repair-plan.json']):new Set();
+ const unexpected=untracked.filter(path=>!allowed.has(path));
+ if(unexpected.length)throw Error('Affected checkout has untracked paths: '+unexpected.sort().join(', '));
+ return true;
+}
+export function verifyAffectedSource({headSha,intent=classifyAffectedIntent({headSha}),exec=execFileSync}){
+ try{
+  if(intent?.classification!=='intended'||intent.profile!==AFFECTED_PROFILE||intent.headSha!==headSha)throw Error('Affected integration requires a classified descendant of the verified baseline: '+(intent?.reason??'unclassified'));
+  assertAffectedCheckout({repoRoot:intent.repoRoot,headSha,exec,allowOwnedGeneratedPlan:true});
+  const map=collectAffectedChanges({headSha,repoRoot:intent.repoRoot,exec});
+  if(map.failures.length)return{eligible:false,reason:'Affected map failed closed: '+map.failures.join('; '),map};
+  return{eligible:true,profile:AFFECTED_PROFILE,headSha,baseline:{...AFFECTED_BASELINE},map};
+ }catch(error){return{eligible:false,reason:error.message};}
+}
+export function affectedPlan(normal,proof){
+ const map=proof?.map;
+ if(!proof?.eligible||proof.profile!==AFFECTED_PROFILE||!map||map.failures.length||map.headSha!==normal.headSha||proof.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Affected plan requires a clean fail-closed map for the exact head.');
+ const fresh=map.nativeEvidence.disposition===NATIVE_FRESH_RUN_REQUIRED,h=AFFECTED_HISTORICAL_EVIDENCE;
+ // Deferred, never passed here: the race group name stays distinct from the exact race profile's own hosted group.
+ const deferredGroups=[...(map.databaseChanged?['database-contract']:[]),...(fresh?['native-world-race-fresh-run']:[])];
+ const debt=[...new Set([...deferredGroups,...EXPLORE_REPAIR_PENDING_DEBT])].sort();
+ return{schemaVersion:1,repository:normal.repository,pullRequest:normal.pullRequest,pullRequestBaseSha:normal.pullRequestBaseSha,repairAnchorSha:normal.repairAnchorSha,headSha:normal.headSha,
+  selector:'affected-integration-v1',source:'verified-baseline incremental affected map; cumulative PR/full release debt tracked separately',affectedIntegration:map,
+  // The cumulative anchor selection is retained as debt only; none of it is executed, inherited or cleared here.
+  cumulativeRelease:{selector:normal.selector,anchor:normal.repairAnchorSha,pullRequestBaseSha:normal.pullRequestBaseSha,changedPaths:normal.changedPaths,groups:normal.groups,
+   unknownPaths:normal.unknownPaths,broaderQualificationRequired:normal.broaderQualificationRequired,qualificationReasons:normal.qualificationReasons,pendingQualificationDebt:normal.pendingQualificationDebt,
+   status:'cumulative 6401-anchor PR/full release selection; neither executed, inherited nor cleared by the incremental affected run'},
+  changedPaths:[...map.changedPaths],groups:[...new Set([...map.groups,...(map.runSelectorContracts?['selector-config','workflow-static']:[]),...deferredGroups])].sort(),
+  unitFiles:[...map.unitFiles],browserFiles:[...map.browserFiles],unknownPaths:[],catalogueFiles:[],
+  runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:map.runCdrWorkerChecks,runDetailIntegrity:false,runWorkflowStaticGate:map.runSelectorContracts,
+  requireWorkspaceIntakeCapture:false,requirePublicUiScreenshots:false,requireHomePricingCaptures:false,requirePublicProductCaptures:false,requireSolutionsCaptures:false,
+  runDatabaseRehearsal:false,databaseRehearsalStatus:map.databaseChanged?'SQL changed since the verified baseline: the fresh disposable rehearsal belongs to db-rehearsal and is neither executed nor inherited here':`no SQL change since the verified baseline: DB classifier run ${h.databaseClassifierRunId} is historical baseline input only, never current-head DB evidence`,
+  deferredGroups,pendingQualificationDebt:debt,pendingDebt:debt,pendingFullDebt:[...normal.pendingFullDebt],fullQualification:'pending',inheritedChecks:{},
+  qualificationReasons:[`Incremental checks cover only the delta from verified baseline ${AFFECTED_BASELINE.commit} (tree ${AFFECTED_BASELINE.tree}); Repair ${h.repairRunId}, DB classifier ${h.databaseClassifierRunId} and native race ${h.nativeRaceRunId} (${h.nativeLinuxDbCases} Linux DB cases, aggregate job ${h.nativeRaceAggregateJobId}) are historical inputs only, not full release and not current-head evidence.`,
+   map.nativeEvidence.status,'Cumulative PR/full release debt stays pending separately.']};
+}
+// Only the final-gate CLI, at the repository's nextjs cwd, may qualify its generated plan; every other caller gets source proof only.
+function affectedFinalGateOwnsPlan(intent){
+ return Boolean(process.argv[1])&&resolve(process.argv[1])===resolve(intent.repoRoot,'nextjs/scripts/repair-scope-gate.mjs')&&resolve(process.cwd())===resolve(intent.repoRoot,'nextjs');
+}
+export function verifyAffectedEligibility({headSha,exec=execFileSync,env=process.env,event,intent=classifyAffectedIntent({headSha,exec}),selectNormal}){
+ const source=verifyAffectedSource({headSha,intent,exec});if(!source.eligible||!affectedFinalGateOwnsPlan(intent))return source;
+ try{
+  const{bytes,normal}=ownedGeneratedPlan({headSha,intent,env,event,exec,label:'Affected integration',selectNormal}),expected=Buffer.from(JSON.stringify(affectedPlan(normal,source),null,2)+'\n');
+  if(!bytes.equals(expected))throw Error('Affected integration final plan differs from the independently recomputed current-head plan.');
+  return{...source,generatedPlan:'owner-qualified and byte-equal to the independent current-head recomputation'};
+ }catch(error){return{eligible:false,reason:'Affected final plan qualification unavailable: '+error.message};}
+}
+// Byte equality with the recomputed plan binds every routing flag, selection and debt field; anything less is refused.
+export function affectedLineageFailures(plan,proof){
+ if(!proof?.eligible)return['Affected integration source/map unavailable: '+(proof?.reason??'missing')];
+ if(!proof.generatedPlan)return['Affected integration plan was not qualified by the final-gate owner against an independent recomputation.'];
+ return plan?.affectedIntegration?.headSha===proof.headSha?[]:['Affected integration plan does not name the current head.'];
+}
+function runAffectedMode(mode,headSha,intent){
+ const proof=verifyAffectedSource({headSha,intent});
+ if(!proof.eligible){const plan={...failedCollectorPlan({headSha,reason:proof.reason,intent}),...(proof.map?{affectedIntegration:proof.map}:{})},receipt=failedCollectorReceipt(plan);writeFileSync('collector-only-failure-receipt.json',JSON.stringify(receipt,null,2)+'\n');if(mode==='plan'){writeFileSync('repair-plan.json',JSON.stringify(plan,null,2)+'\n');writeFileSync('repair-receipt.json',JSON.stringify(receipt,null,2)+'\n');}console.error('Affected integration map failed closed; no broad fallback is permitted: '+proof.reason);process.exit(1);}
+ // DB rehearsal keeps its normal fresh disposition; nothing is inherited as current-head DB evidence.
+ if(mode==='eligibility'){if(process.env.GITHUB_OUTPUT)writeFileSync(process.env.GITHUB_OUTPUT,`intended=false\neligible=false\nnative_database=false\naffected=true\naffected_database=${proof.map.databaseChanged}\naffected_database_tests=${proof.map.databaseTests.join(',')}\n`,{flag:'a'});console.log(JSON.stringify({profile:AFFECTED_PROFILE,baseline:proof.baseline,databaseChanged:proof.map.databaseChanged,databaseTests:proof.map.databaseTests,nativeEvidence:proof.map.nativeEvidence,runDatabase:proof.map.databaseChanged,databaseInherited:false,fullQualification:'pending'}));return;}
+ const r=spawnSync(process.execPath,['scripts/repair-scope.mjs'],{env:{...process.env,GITHUB_OUTPUT:''},encoding:'utf8'});if(r.status!==0){process.stderr.write(r.stderr??'Normal selector failed.');process.exit(r.status??1);}
+ const plan=affectedPlan(JSON.parse(readFileSync('repair-plan.json','utf8')),proof);emit(plan);
+ console.log(`Affected-only from verified baseline ${AFFECTED_BASELINE.commit}: groups ${plan.affectedIntegration.groups.join(', ')||'none'}; ${plan.unitFiles.length} unit and ${plan.browserFiles.length} browser files; native ${plan.affectedIntegration.nativeEvidence.disposition}; cumulative PR/full release debt pending.`);
+}
+
 function runNativeRaceMode(mode,headSha,intent){
  const proof=verifyNativeRaceEligibility({headSha,intent});
  if(!proof.eligible){const{plan,receipt}=failedNativeRaceReceipt({headSha,reason:proof.reason,intent});writeFileSync('collector-only-failure-receipt.json',JSON.stringify(receipt,null,2)+'\n');if(mode==='plan'){writeFileSync('repair-plan.json',JSON.stringify(plan,null,2)+'\n');writeFileSync('repair-receipt.json',JSON.stringify(receipt,null,2)+'\n');}console.error('Intended native World race admission is unqualified; no DB, transport or broad fallback is permitted: '+proof.reason);process.exit(1);}
@@ -1606,7 +1717,7 @@ function runExploreSuccessorMode(mode,headSha,intent){
 
 function emit(plan) {
   writeFileSync('repair-plan.json', JSON.stringify(plan, null, 2) + '\n');
-  const values = { public_pages: Boolean(plan.publicPagesPresentation), public_product_capture: Boolean(plan.requirePublicProductCaptures), native_database: Boolean(plan.nativeDbRehearsal), broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, home_pricing_capture: Boolean(plan.requireHomePricingCaptures), workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), solutions_pages:Boolean(plan.solutionsPagesPresentation||plan.exploreRepairPresentation),explore_repair:Boolean(plan.exploreRepairPresentation),solutions_capture:Boolean(plan.requireSolutionsCaptures),native_race:Boolean(plan.nativeWorldRacePresentation), head: plan.headSha, groups: plan.groups.join(', ') };
+  const values = { public_pages: Boolean(plan.publicPagesPresentation), public_product_capture: Boolean(plan.requirePublicProductCaptures), native_database: Boolean(plan.nativeDbRehearsal), broader: plan.runFullHermeticVitest, unit: plan.unitFiles.length > 0, cdr_worker: plan.runCdrWorkerChecks, browser: plan.runDetailIntegrity || plan.browserFiles.length > 0, public_ui_capture: plan.requirePublicUiScreenshots, home_pricing_capture: Boolean(plan.requireHomePricingCaptures), workspace_intake_capture: plan.requireWorkspaceIntakeCapture, workflow_static: plan.runWorkflowStaticGate, selector_tests: plan.groups.includes('selector-config'), collector_only: Boolean(plan.collectorOnly), intake_presentation: Boolean(plan.intakePresentation), known_regression_repair: Boolean(plan.knownRegressionRepair), solutions_pages:Boolean(plan.solutionsPagesPresentation||plan.exploreRepairPresentation),explore_repair:Boolean(plan.exploreRepairPresentation),solutions_capture:Boolean(plan.requireSolutionsCaptures),native_race:Boolean(plan.nativeWorldRacePresentation),affected:Boolean(plan.affectedIntegration), head: plan.headSha, groups: plan.groups.join(', ') };
   if (process.env.GITHUB_OUTPUT) for (const [key, value] of Object.entries(values)) writeFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`, { flag: 'a' });
 }
 
@@ -1614,7 +1725,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const mode = process.argv[2];
   if (!['plan', 'eligibility'].includes(mode)) throw new Error('Usage: repair-collector-only.mjs <plan|eligibility>');
   const headSha = process.env.REPAIR_HEAD_SHA;
-  // The exact2bb native World race profile is routed first and never reaches the Explore, Solutions, native DB or broad classifiers.
+  // Descendants of the verified affected-integration baseline are planned from its fail-closed incremental map, before any exact profile.
+  const affectedIntent=classifyAffectedIntent({headSha});if(affectedIntent.classification!=='normal'){runAffectedMode(mode,headSha,affectedIntent);process.exit(0);}
+  // The exact2bb native World race profile is routed next and never reaches the Explore, Solutions, native DB or broad classifiers.
   const raceIntent=classifyNativeRaceIntent({headSha});if(raceIntent.classification!=='normal'){runNativeRaceMode(mode,headSha,raceIntent);process.exit(0);}
   // The unchanged workflow has one Solutions lane; the exact454 successor, then the Explore repair over424, are routed first and reuse that lane.
   const successorIntent=classifyExploreSuccessorIntent({headSha});if(successorIntent.classification!=='normal'){runExploreSuccessorMode(mode,headSha,successorIntent);process.exit(0);}
@@ -1665,6 +1778,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
 // The final gate reads routing flags from the generated plan. Validate its owner output before that read, so deleting those flags
 // cannot evade the race branch. This runs only when the unchanged final-gate file is the CLI entrypoint in its exact nextjs cwd.
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(new URL('./repair-scope-gate.mjs',import.meta.url))&&resolve(process.cwd())===fileURLToPath(new URL('..',import.meta.url)).replace(/[\\/]$/,'')){
+ // An affected head is refused here, before runGate can read plan flags or write repair-receipt.json through a planted path.
+ const affected=classifyAffectedIntent({headSha:process.env.HEAD_SHA});
+ if(affected.classification!=='normal'){
+  const proof=verifyAffectedEligibility({headSha:process.env.HEAD_SHA,intent:affected});
+  if(!proof.eligible)throw Error('Affected integration final-gate owner output refused: '+proof.reason);
+ }
  const intent=classifyNativeRaceIntent({headSha:process.env.HEAD_SHA});
  if(intent.parent===NATIVE_RACE_SUCCESSOR_PARENT&&intent.classification!=='normal'){
   const proof=verifyNativeRaceEligibility({headSha:process.env.HEAD_SHA,intent});
