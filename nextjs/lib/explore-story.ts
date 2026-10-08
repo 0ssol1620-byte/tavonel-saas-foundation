@@ -146,7 +146,17 @@ export const EXPLORE_COPY = {
     "Each step is a full compile of the corpus as it stood, compared with the one before it. Steps run in reporting-period order.",
   askPlaceholder: "Ask this World…",
   askNote:
-    "Choose from the prepared questions above. Each answer is the source text the retriever scored, not a rewrite of it.",
+    "Choose from the prepared questions above. An answer is the complete text of the source regions the retriever selected, not a rewrite of it. When that text is too long to show whole, no answer is shown and the regions stay open to read.",
+  /*
+    What the stage says when the retriever abstained, keyed by the retriever's own reason code.
+    An abstention keeps its citations and shows no partial text, so the sentence says that and
+    points at them. `buildExploreAnswerViews` refuses a reason with no entry here, so a code is
+    never printed at a reader.
+  */
+  askAbstentions: {
+    EVIDENCE_EXCEEDS_ANSWER_LIMIT:
+      "No answer is shown for this question. The evidence selected for it is longer than the complete-answer limit, and a partial answer is not shown in its place. Open the source regions below to read it in full.",
+  },
   /*
     BA-034. What the object, relation and region counts of this sample are counts *of*.
 
@@ -329,12 +339,18 @@ export type ExploreAnswerRegion = {
   relevance: number;
 };
 
+export type ExploreAbstentionReason = keyof typeof EXPLORE_COPY.askAbstentions;
+
+type ExploreAnswerState =
+  /** The complete selected evidence the retriever returned. Never a clipped citation preview. */
+  | { status: "grounded"; answer: string; reason: null }
+  /** No answer text at all; the regions are still there to open. */
+  | { status: "abstained"; answer: ""; reason: ExploreAbstentionReason };
+
 export type ExploreAnswerView = {
   question: string;
-  /** The highest-scored region's own text. The sample quotes the source; it does not rewrite it. */
-  answer: string;
   regions: ExploreAnswerRegion[];
-};
+} & ExploreAnswerState;
 
 /**
  * Bind each cited region to the region the stage can actually open.
@@ -342,12 +358,34 @@ export type ExploreAnswerView = {
  * The retriever cites a source, a page and a box; the renderer addresses a compiled region by
  * id. Matching them here rather than in the component means a citation that no longer resolves
  * fails the build instead of rendering a button that does nothing.
+ *
+ * The status, answer and reason are carried as the retriever returned them, and checked: a
+ * grounded answer has text and no reason, an abstention has no text and a reason the stage can
+ * say in words. Anything else fails the build rather than rendering a guess.
  */
 export function buildExploreAnswerViews(
   answers: ReadonlyArray<ExploreSampleAnswer>,
   evidence: ReadonlyArray<VisualEvidence>,
 ): ExploreAnswerView[] {
   return answers.map((answer) => {
+    let state: ExploreAnswerState;
+    if (
+      answer.status === "grounded" &&
+      answer.reason === null &&
+      typeof answer.answer === "string" &&
+      answer.answer.trim() !== ""
+    ) {
+      state = { status: "grounded", answer: answer.answer, reason: null };
+    } else if (
+      answer.status === "abstained" &&
+      answer.answer === "" &&
+      typeof answer.reason === "string" &&
+      Object.hasOwn(EXPLORE_COPY.askAbstentions, answer.reason)
+    ) {
+      state = { status: "abstained", answer: "", reason: answer.reason as ExploreAbstentionReason };
+    } else {
+      throw new Error(`explore_answer_state_invalid: ${answer.question}`);
+    }
     const regions = answer.citations.map((citation) => {
       const region = evidence.find(
         (item) =>
@@ -367,7 +405,7 @@ export function buildExploreAnswerViews(
       };
     });
     if (regions.length === 0) throw new Error(`explore_answer_has_no_regions: ${answer.question}`);
-    return { question: answer.question, answer: regions[0].excerpt, regions };
+    return { question: answer.question, regions, ...state };
   });
 }
 

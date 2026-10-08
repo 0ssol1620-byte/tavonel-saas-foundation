@@ -1678,6 +1678,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // both keep their own selections. Product Ask behavior, so never nativeReuse: any match requires the fresh native run.
   affectedGroup('grounded-ask', /^nextjs\/(?:app\/workspace\/page\.tsx|lib\/(?:grounded-ask(?:-packet)?\.test|grounded-ask|workspace-ask-copy(?:\.test)?|context-packet\.test|ask-route-limits\.test)\.ts)$/,
     { unitFiles: ['lib/grounded-ask.test.ts', 'lib/grounded-ask-packet.test.ts', 'lib/context-packet.test.ts', 'lib/ask-route-limits.test.ts', 'lib/workspace-ask-copy.test.ts'] }),
+  // Ordinary Explore answer: exactly eight paths. Product UI, so never nativeReuse; its one browser suite runs only in project 1440
+  // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
+  affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:sample|story)(?:\.test)?\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
+    { unitFiles: ['lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.

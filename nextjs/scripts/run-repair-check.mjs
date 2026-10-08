@@ -14,6 +14,7 @@ const registeredUnitTestPaths = new Set([
   'components/intake-triage-review.interaction.test.ts',
   'components/intake-triage-review.test.tsx',
   'components/landing-v2/hero-source-card.test.tsx',
+  'components/explore/evidence-workbench.test.tsx',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs']);
@@ -204,6 +205,7 @@ const browserProjectsByFile = new Map([
   ['e2e/workspace-intake-triage.spec.ts', ['audit']],
   ['e2e/workspace-intake-layout.spec.ts', ['1440']],
   ['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']],
+  ['e2e/explore.spec.ts', ['1440']],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];

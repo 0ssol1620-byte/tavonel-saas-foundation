@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import OriginalSourcePage from "@/components/world-visual/original-source-page";
 import { sourcePageQualifier } from "@/lib/source-page-rasters";
-import type { ExploreAnswerView, ExploreTechnicalRecord } from "@/lib/explore-story";
+import { EXPLORE_COPY, type ExploreAnswerView, type ExploreTechnicalRecord } from "@/lib/explore-story";
 import type { VisualWorldModel } from "@/lib/visual-world-model";
 import styles from "./evidence-workbench.module.css";
 
@@ -75,15 +75,17 @@ export default function EvidenceWorkbench({ model, answers, technical, capturedO
       <div className={styles.reading} data-mobile-pane={mobilePane}>
         <article className={styles.result} aria-label="Selected sample answer">
           <header><span>Retrieved source passage</span><span className={styles.candidate}>Candidate · inspect evidence</span></header>
-          {answer ? <><h2>{answer.question}</h2><blockquote>{answer.answer}</blockquote>
-            <p className={styles.answerNote}>This is a quotation selected by retrieval, not an independently verified conclusion.</p>
+          {answer ? <><h2>{answer.question}</h2>
+            {answer.status === "grounded" ? <><blockquote>{answer.answer}</blockquote>
+              <p className={styles.answerNote}>This is a quotation selected by retrieval, not an independently verified conclusion.</p></>
+              : <p className={styles.answerNote} role="status">{EXPLORE_COPY.askAbstentions[answer.reason]}</p>}
             <div className={styles.citations} aria-label="Source evidence">{regions.map(region => <button type="button" key={region.id} aria-pressed={active?.id === region.id} onClick={() => {setRegionId(region.id); setMobilePane("source");}}><span>{region.filename}</span><strong>Page {region.page} →</strong></button>)}</div>
           </> : <p>No prepared answer is available in this artifact.</p>}
           {active ? <div className={styles.version}><span>Source version</span><code title={active.sourceVersionId}>{active.sourceVersionId}</code><button type="button" onClick={() => onOpenRegion(active.id)}>Open full evidence inspector ↗</button><Link href={`/explore?act=evidence&evidence=${encodeURIComponent(active.id)}` as Route}>Permanent evidence link ↗</Link></div> : <p role="status">No source region is available. Choose another sample question.</p>}
         </article>
         <aside className={styles.source} aria-label="Original source viewer">
           <header><span>{active ? sourcePageQualifier(active.representationKind) : "Source"}</span><span>{active ? `Page ${active.page}` : "Unavailable"}</span></header>
-          {active ? <><OriginalSourcePage active={active} regions={regions} onSelectRegion={setRegionId} /><div className={styles.sourceExcerpt}><p>Exact selected passage</p><blockquote>{active.excerpt}</blockquote></div></> : <p>The sample has no source page for this answer.</p>}
+          {active ? <><OriginalSourcePage active={active} regions={regions} onSelectRegion={setRegionId} /><div className={styles.sourceExcerpt}><p>Source evidence · exact selected passage</p><blockquote>{active.excerpt}</blockquote></div></> : <p>The sample has no source page for this answer.</p>}
         </aside>
       </div>
     </>}
