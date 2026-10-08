@@ -1657,12 +1657,12 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
-// Ordinary Home landing owner: exactly these fifteen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// Ordinary Home landing owner: exactly these sixteen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
 export const HOME_AFFECTED_PATHS = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/compile-stage-player.tsx',
   'components/landing-v2/hero-actions.tsx', 'components/landing-v2/hero-film-disclosure.tsx', 'components/landing-v2/hero-film.tsx',
   'components/landing-v2/hero-source-card.test.tsx', 'components/landing-v2/hero-source-card.tsx', 'components/landing-v2/landing-analytics.tsx',
-  'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'e2e/landing-v2.spec.ts',
+  'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'e2e/landing-v2.spec.ts', 'lib/film-motion-control.test.ts',
   'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts',
 ]);
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
@@ -1744,7 +1744,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the fifteen exact paths above select seven direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the sixteen exact paths above select seven direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),

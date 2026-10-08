@@ -3902,13 +3902,13 @@ test('affected Explore admission: readAffectedExecution rereads the five-unit an
     assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
-// ---- Affected Home admission: fifteen exact paths, seven direct suites and one browser suite in 1440/390/360/reduced-motion; the global
+// ---- Affected Home admission: sixteen exact paths, seven direct suites and one browser suite in 1440/390/360/reduced-motion; the global
 // Vitest config is admitted apart from Home as finite shared test-discovery configuration ----
 import { HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_AFFECTED_BROWSER_FILE, VITEST_DISCOVERY_CONFIG_PATH, VITEST_DISCOVERY_INCLUDES, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
 const AFFECTED_HOME_PATHS=Object.freeze(['nextjs/components/compile-stage-player.mobile-view.test.tsx','nextjs/components/compile-stage-player.tsx','nextjs/components/landing-v2/hero-actions.tsx',
   'nextjs/components/landing-v2/hero-film-disclosure.tsx','nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-source-card.test.tsx','nextjs/components/landing-v2/hero-source-card.tsx',
   'nextjs/components/landing-v2/landing-analytics.tsx','nextjs/components/landing-v2/landing-hero.module.css','nextjs/components/landing-v2/landing-page.tsx','nextjs/e2e/landing-v2.spec.ts',
-  'nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/landing-v2-page.test.ts','nextjs/lib/one-path-contract.test.ts']);
+  'nextjs/lib/film-motion-control.test.ts','nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/landing-v2-page.test.ts','nextjs/lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SUITES=Object.freeze(['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts',
   'lib/landing-v2-page.test.ts','lib/marketing-analytics.test.ts','lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SPEC='e2e/landing-v2.spec.ts',AFFECTED_HOME_TSX='components/compile-stage-player.mobile-view.test.tsx',AFFECTED_HOME_PROJECTS=Object.freeze(['1440','390','360','reduced-motion']);
@@ -3928,8 +3928,11 @@ const AFFECTED_HOME_FRAME_FAILURE='changed outside its include list (root, runti
 const affectedHomeSwap=(text,from,to)=>{assert.ok(text.includes(from),'fixture anchor: '+from);return text.replace(from,to);};
 const affectedHomeConfigMap=(records,source=AFFECTED_HOME_FINAL_CONFIG,headHasFile)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile,
   readHeadFile:path=>{assert.equal(path,VITEST_DISCOVERY_CONFIG_PATH);return source;}});
-test('affected Home admission: exactly fifteen owner paths select home-landing, the seven suites, one browser suite and fresh native debt', () => {
-  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,15);
+test('affected Home admission: exactly sixteen owner paths select home-landing, the seven suites, one browser suite and fresh native debt', () => {
+  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,16);
+  // The film-motion-control suite is both an owner endpoint and one of the seven selected suites; the selection does not grow.
+  assert.ok(AFFECTED_HOME_PATHS.includes('nextjs/lib/film-motion-control.test.ts')&&AFFECTED_HOME_SUITES.includes('lib/film-motion-control.test.ts'));
+  assert.ok(!AFFECTED_HOME_PATHS.includes('nextjs/lib/marketing-analytics.test.ts'),'marketing-analytics stays a selected suite only');
   assert.deepEqual([...HOME_AFFECTED_UNIT_FILES].sort(),AFFECTED_HOME_SUITES);assert.equal(HOME_AFFECTED_BROWSER_FILE,AFFECTED_HOME_SPEC);
   const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing');
   assert.equal(owners.length,1);const [owner]=owners;
@@ -4014,7 +4017,7 @@ test('affected Home admission: unknown siblings, bad spellings, modes, statuses 
     'nextjs/components/landing-v2/landing-hero.css','nextjs/components/landing-v2/landing-hero.module.scss','nextjs/components/landing-v2/hero-film.module.css','nextjs/components/landing-v2/hero-film.tsx.bak',
     'nextjs/components/Landing-v2/hero-film.tsx','nextjs/components/landing-v2/nested/hero-film.tsx','nextjs/components/compile-stage-player.test.tsx','nextjs/components/compile-stage-player.mobile-view.test.ts',
     'nextjs/components/compile-stage-player.mobile.test.tsx','nextjs/components/compile-stage-player.module.css','nextjs/lib/home-evidence-view.tsx','nextjs/lib/home-evidence.ts','nextjs/lib/landing-v2-page.ts',
-    'nextjs/lib/one-path-contract.ts','nextjs/lib/film-motion-control.ts','nextjs/lib/film-motion-control.test.ts','nextjs/lib/marketing-analytics.test.ts','nextjs/e2e/landing-v2-extra.spec.ts',
+    'nextjs/lib/one-path-contract.ts','nextjs/lib/film-motion-control.ts','nextjs/lib/film-motion-control.spec.ts','nextjs/lib/marketing-analytics.test.ts','nextjs/e2e/landing-v2-extra.spec.ts',
     'nextjs/e2e/landing-v2.spec.tsx','nextjs/e2e/landing-hero-mobile.spec.ts','nextjs/app/page.tsx','components/landing-v2/hero-film.tsx','nextjs/nextjs/components/landing-v2/hero-film.tsx']) {
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
