@@ -13,7 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorize, authorizeSession, gate, head, headSignature, assessSource, adminConfig, adminRequest } =
+const { authorize, authorizeSession, gate, head, headSignature, assessSource, adminConfig, adminRequest, readApproval, fingerprint } =
   vi.hoisted(() => ({
     authorize: vi.fn(),
     authorizeSession: vi.fn(),
@@ -23,6 +23,8 @@ const { authorize, authorizeSession, gate, head, headSignature, assessSource, ad
     assessSource: vi.fn(),
     adminConfig: vi.fn(),
     adminRequest: vi.fn(),
+    readApproval: vi.fn(),
+    fingerprint: vi.fn(),
   }));
 
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
@@ -33,6 +35,8 @@ vi.mock("@/lib/supabase-admin", () => ({
   readSupabaseAdminConfig: adminConfig,
   supabaseAdminRequest: adminRequest,
 }));
+vi.mock("@/lib/compute-reservation", () => ({ readFoundationIntakeApproval: readApproval }));
+vi.mock("@/lib/usage-pricing", () => ({ intakePricingFingerprint: fingerprint }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "account", bucket: "bucket", accessKeyId: "key", secretAccessKey: "secret" }),
   headFoundationQuarantineObject: head,
@@ -56,15 +60,27 @@ const documentId = "f07fe147-f52e-4fd0-8afc-79cd848b928d";
 const workspaceKey = "pilot-969dc192daa24119";
 const userId = "969dc192-daa2-4119-a5d9-9a7621f171a1";
 const sourceSha256 = `sha256:${"a".repeat(64)}`;
+const attemptKey = "attempt_0123456789abcdef";
+const scopeDigest = `sha256:${"b".repeat(64)}`;
+const fileKey = "fk_0123456789abcdef01234567";
 
-function request(body: Record<string, unknown> = { documentId, sourceSha256 }) {
+function request(body?: Record<string, unknown>) {
+  const payload = body === undefined
+    ? { documentId, sourceSha256, attemptKey, scopeDigest, fileKey }
+    : { documentId, attemptKey, scopeDigest, fileKey, ...body };
   return new Request("https://tavonel.com/api/uploads/confirm", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer session" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
 }
 
+function approveMember(mimeType = "application/pdf", lineage: Record<string, unknown> = {}) {
+  readApproval.mockResolvedValue({ ok: true, result: {
+    pricingFingerprint: sourceSha256, scopeDigest, ...lineage,
+    files: [{ fileKey, documentId, contentSha256: sourceSha256, byteLength: 4096, mimeType }],
+  } });
+}
 function rpcBody() {
   const call = adminRequest.mock.calls.at(-1) as [unknown, string, RequestInit] | undefined;
   return call ? JSON.parse(String(call[2].body)) as Record<string, unknown> : null;
@@ -97,13 +113,12 @@ beforeEach(() => {
   headSignature.mockReset().mockResolvedValue({ ok: true, exists: true, bytes: LEADING.pdf });
   assessSource.mockReset().mockResolvedValue({ ok: true, status: "allow" });
   adminConfig.mockReset().mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "sb_secret_x" });
+  readApproval.mockReset();
+  approveMember();
+  fingerprint.mockReset().mockResolvedValue(sourceSha256);
   adminRequest.mockReset().mockResolvedValue(new Response(JSON.stringify({
-    status: "confirmed",
-    documentId,
-    confirmedAt: "2026-09-01T12:00:00.000Z",
-    requestedBytes: 4096,
-    declaredMimeType: "application/pdf",
-    sourceSha256,
+    admission: { status: "confirmed", documentId, confirmedAt: "2026-09-01T12:00:00.000Z" },
+    approvedFile: { fileKey, documentId, fileState: "confirmed" },
   }), { status: 200, headers: { "content-type": "application/json" } }));
 });
 
@@ -113,11 +128,14 @@ describe("upload confirmation route", () => {
     expect(response.status).toBe(200);
     expect(adminRequest).toHaveBeenCalledTimes(1);
     const [, path] = adminRequest.mock.calls[0] as [unknown, string, RequestInit];
-    expect(path).toBe("/rest/v1/rpc/confirm_foundation_intake_admission");
+    expect(path).toBe("/rest/v1/rpc/confirm_foundation_intake_approved_upload");
     expect(rpcBody()).toEqual({
       p_workspace_key: workspaceKey,
-      p_document_id: documentId,
       p_user_id: userId,
+      p_attempt_key: attemptKey,
+      p_scope_digest: scopeDigest,
+      p_file_key: fileKey,
+      p_document_id: documentId,
       p_source_sha256: sourceSha256,
       p_observed_bytes: 4096,
       p_observed_mime: "application/pdf",
@@ -133,21 +151,30 @@ describe("upload confirmation route", () => {
     expect(rpcBody()?.p_source_sha256).toBe(sourceSha256);
   });
 
-  it("refuses a free-evaluation upload that carries no digest rather than skipping the gate", async () => {
+  it("refuses a free-evaluation upload whose digest is absent from the approved identity", async () => {
     trial();
     const response = await POST(request({ documentId }));
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ code: "SOURCE_DIGEST_REQUIRED" });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" });
     expect(assessSource).not.toHaveBeenCalled();
     expect(adminRequest).not.toHaveBeenCalled();
   });
 
-  it("confirms a paid source with no digest at all, recorded as absent", async () => {
+  it("refuses a paid confirmation that omits the approved content digest", async () => {
     const response = await POST(request({ documentId }));
-    expect(response.status).toBe(200);
-    expect(rpcBody()?.p_source_sha256).toBeNull();
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" });
+    expect(adminRequest).not.toHaveBeenCalled();
   });
 
+  it("refuses triage lineage that is not enabled for this approval path", async () => {
+    approveMember("application/pdf", { triageReceiptId: "untrusted-receipt" });
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "INTAKE_TRIAGE_ROLLOUT_DISABLED" });
+    expect(head).not.toHaveBeenCalled();
+    expect(adminRequest).not.toHaveBeenCalled();
+  });
   it("rejects a malformed digest instead of dropping it", async () => {
     const response = await POST(request({ documentId, sourceSha256: "sha256:nope" }));
     expect(response.status).toBe(400);
@@ -188,9 +215,8 @@ describe("upload confirmation route", () => {
 
   it("refuses a confirmation receipt that does not describe this document", async () => {
     adminRequest.mockResolvedValue(new Response(JSON.stringify({
-      status: "confirmed",
-      documentId: "00000000-0000-4000-8000-000000000000",
-      confirmedAt: "2026-09-01T12:00:00.000Z",
+      admission: { status: "confirmed", documentId: "00000000-0000-4000-8000-000000000000", confirmedAt: "2026-09-01T12:00:00.000Z" },
+      approvedFile: { fileKey, documentId: "00000000-0000-4000-8000-000000000000", fileState: "confirmed" },
     }), { status: 200, headers: { "content-type": "application/json" } }));
     const response = await POST(request());
     expect(response.status).toBe(503);
@@ -209,6 +235,7 @@ describe("upload confirmation route", () => {
 describe("magic-byte validation at confirmation", () => {
   function stored(contentType: string) {
     head.mockResolvedValue({ ok: true, exists: true, key: "k", sizeBytes: 4096, contentType, etag: "etag" });
+    approveMember(contentType);
   }
 
   it("confirms a file whose leading bytes are the type it was admitted as", async () => {

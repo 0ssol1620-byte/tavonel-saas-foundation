@@ -36,7 +36,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Reproducibility](https://tavonel.com/reproducibility): Frozen public fixtures and digest-bound sample artifacts.
 - [Resources](https://tavonel.com/resources): The hub over the reading, verification and comparison material.
 - [Status](https://tavonel.com/status): Current service status.
-- [Korean entry page](https://tavonel.com/ko): The site's Korean-language entry point — what is compiled, what activating a reviewed World requires today, and which English page is the single source for pricing, documentation and supported formats. The only Korean URL; every other page is English at its existing address.
+- [Korean entry page](https://tavonel.com/ko): The site's Korean-language entry point — what is compiled, what activating a reviewed World requires today, and which English page is the single source for pricing, documentation and supported formats. Korean pricing, inquiry, and document evaluation pages are also available; technical documentation and the public sample remain in English.
 
 ## Product
 
@@ -83,5 +83,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Terms](https://tavonel.com/terms)
 - [Refunds](https://tavonel.com/refunds)
 - [Subprocessors](https://tavonel.com/subprocessors)
+- [Document evaluation](https://tavonel.com/evaluation): Agree on source permissions, scope, retention, costs and evidence checks before processing.
+- [문서 평가](https://tavonel.com/ko/evaluation): Korean-language document evaluation inquiry.
 - [Contact](https://tavonel.com/contact)
 - [Changelog feed (Atom)](https://tavonel.com/changelog/feed.xml)

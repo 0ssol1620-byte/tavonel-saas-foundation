@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  bindConsumerContext,
+  releaseConsumerContext,
+  resolveBoundSnapshot,
+  snapshotOf,
+} from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
@@ -49,6 +55,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!COLLECTION_ID_PATTERN.test(id)) {
     return NextResponse.json({ code: "COLLECTION_ID_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  // A consumer context is bound to the principal just verified, before anything is read.
+  const binding = bindConsumerContext(request.headers, auth.principal, { scope: "ask:read", collectionId: id });
+  if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
+  const bound = binding.bound ? binding : null;
 
   let body: { query?: unknown; limit?: unknown };
   try {
@@ -66,7 +76,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ code: "LIMIT_INVALID" }, { status: 400, headers: NO_STORE });
   }
 
-  const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
+  // A bound context resolves its exact World here, before retrieval; legacy reads the active World
+  // as before. Either way retrieval runs against this one row.
+  const resolution = bound ? await resolveBoundSnapshot(bound, auth.principal.workspaceKey) : null;
+  if (resolution && !resolution.ok) {
+    return NextResponse.json({ code: resolution.code }, { status: resolution.status, headers: NO_STORE });
+  }
+  const active = resolution
+    ? { ok: true as const, world: resolution.world }
+    : await getFoundationActiveWorld(auth.principal.workspaceKey, id);
   if (!active.ok) {
     return NextResponse.json(
       { code: active.code },
@@ -170,56 +188,66 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const publicRoute = buildPublicRetrievalRoute(attemptedRoles, result.diagnostics.degradations);
 
   const freshness = await getWorldFreshness(auth.principal.workspaceKey, id);
-  // Retrieval and freshness can both cross process or provider boundaries. Re-resolve the
-  // session/API key, workspace membership and product access after those awaits so a revocation
-  // that lands while search is running cannot receive the completed evidence packet.
-  const authorizedNow = await revalidateFoundationAuthorization(
-    request, auth.principal, "ask:read", "observer",
-  );
-  if (!authorizedNow.ok) {
-    return NextResponse.json(
-      { code: authorizedNow.code },
-      { status: authorizedNow.status, headers: NO_STORE },
+  const activeWorld = {
+    manifestDigest: active.world.manifestDigest,
+    revision: active.world.revision,
+    worldStateId: active.world.worldStateId,
+  };
+  const payload = {
+    code: result.packet.items.length > 0 ? "SEARCH_RESULTS" : "SEARCH_EMPTY",
+    /*
+      Search only ever runs the compiled pipeline -- there is no excerpt fallback here, which
+      is why a missing index is a 409 rather than a weaker answer. The field is stated anyway,
+      so /search and /ask can be read side by side without inferring which runtime answered
+      from which endpoint you happened to call (audit Q02, M06).
+    */
+    retrievalPath: "compiled-retrieval-v1",
+    // What did not run. A missing embedder degrades this to lexical + structure, and a
+    // reranker outage degrades it to the fused order; both are named rather than silent.
+    degradations: publicRoute.degradationClasses,
+    activeWorld,
+    freshness,
+    // The packet itself is the contract every surface shares (§20). It is returned whole
+    // rather than reshaped per endpoint, so /search, /ask, MCP and the CLI cannot drift
+    // into four subtly different evidence formats.
+    contextPacket: result.packet,
+    // Retrieval telemetry (§39/§46): why these units, and what ran or did not.
+    retrieval: {
+      compileRunId: result.diagnostics.compileRunId,
+      retrievalProfile: result.diagnostics.retrievalProfileId,
+      lexicalCandidates: result.diagnostics.lexicalCandidateCount,
+      denseCandidates: result.diagnostics.denseCandidateCount,
+      structureCandidates: result.diagnostics.structureCandidateCount,
+      fusedCandidates: result.diagnostics.fusedCandidateCount,
+      rerankerApplied: result.diagnostics.rerankerApplied,
+      gateRejections: result.diagnostics.gateRejections,
+      routeClass: publicRoute.routeClass,
+      degradations: publicRoute.degradationClasses,
+    },
+  };
+
+  if (!bound || !resolution) {
+    // Retrieval and freshness can both cross process or provider boundaries. Re-resolve the
+    // session/API key, workspace membership and product access after those awaits so a revocation
+    // that lands while search is running cannot receive the completed evidence packet.
+    const authorizedNow = await revalidateFoundationAuthorization(
+      request, auth.principal, "ask:read", "observer",
     );
+    if (!authorizedNow.ok) {
+      return NextResponse.json(
+        { code: authorizedNow.code },
+        { status: authorizedNow.status, headers: NO_STORE },
+      );
+    }
+    return NextResponse.json(payload, { headers: NO_STORE });
   }
 
-  return NextResponse.json(
-    {
-      code: result.packet.items.length > 0 ? "SEARCH_RESULTS" : "SEARCH_EMPTY",
-      /*
-        Search only ever runs the compiled pipeline -- there is no excerpt fallback here, which
-        is why a missing index is a 409 rather than a weaker answer. The field is stated anyway,
-        so /search and /ask can be read side by side without inferring which runtime answered
-        from which endpoint you happened to call (audit Q02, M06).
-      */
-      retrievalPath: "compiled-retrieval-v1",
-      // What did not run. A missing embedder degrades this to lexical + structure, and a
-      // reranker outage degrades it to the fused order; both are named rather than silent.
-      degradations: publicRoute.degradationClasses,
-      activeWorld: {
-        manifestDigest: active.world.manifestDigest,
-        revision: active.world.revision,
-        worldStateId: active.world.worldStateId,
-      },
-      freshness,
-      // The packet itself is the contract every surface shares (§20). It is returned whole
-      // rather than reshaped per endpoint, so /search, /ask, MCP and the CLI cannot drift
-      // into four subtly different evidence formats.
-      contextPacket: result.packet,
-      // Retrieval telemetry (§39/§46): why these units, and what ran or did not.
-      retrieval: {
-        compileRunId: result.diagnostics.compileRunId,
-        retrievalProfile: result.diagnostics.retrievalProfileId,
-        lexicalCandidates: result.diagnostics.lexicalCandidateCount,
-        denseCandidates: result.diagnostics.denseCandidateCount,
-        structureCandidates: result.diagnostics.structureCandidateCount,
-        fusedCandidates: result.diagnostics.fusedCandidateCount,
-        rerankerApplied: result.diagnostics.rerankerApplied,
-        gateRejections: result.diagnostics.gateRejections,
-        routeClass: publicRoute.routeClass,
-        degradations: publicRoute.degradationClasses,
-      },
-    },
-    { headers: NO_STORE },
-  );
+  // Bound: the same late authorization, plus source admission and a last read of the active
+  // World, all inside the release -- acknowledged with the pair the packet was retrieved from.
+  const released = await releaseConsumerContext({
+    request, principal: auth.principal, scope: "ask:read", bound, snapshot: resolution,
+    served: snapshotOf(activeWorld),
+  });
+  if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
+  return NextResponse.json(payload, { headers: { ...released.headers } });
 }

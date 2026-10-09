@@ -77,6 +77,8 @@ export const EXTRACTION_BUDGET_REACHED = "EXTRACTION_BUDGET_REACHED" as const;
 
 export type CollectionOcrInput = {
   documentId: string;
+  /** Server-resolved logical connector identity; documentId remains the immutable upload UUID. */
+  logicalSourceId?: string;
   versionKey: string;
   sanitizedKey: string;
   ocrJsonKey: string;

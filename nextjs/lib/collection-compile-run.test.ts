@@ -1,5 +1,7 @@
 import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { dispatchProductCoreV2 } from "./core-runtime-v2";
+import type { authorizeCompileJobSourceAccess, classifyCompileJobSources } from "./compile-job-authority";
 
 /*
   D7-03. What the compile route does with a source that was read before regions existed.
@@ -18,10 +20,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const listed = vi.fn();
 const fetched = vi.fn();
 const put = vi.fn();
-const dispatched = vi.fn();
-const sourceAccess = vi.fn();
+const dispatched = vi.fn<(...args: Parameters<typeof dispatchProductCoreV2>) => Promise<unknown>>();
+const jobAuthority = vi.fn<(...args: Parameters<typeof authorizeCompileJobSourceAccess>) => Promise<unknown>>();
+const authorityEnabled = vi.fn(() => true);
+const classifySources = vi.fn<(...args: Parameters<typeof classifyCompileJobSources>) => Promise<unknown>>(async () => ({ ok: true, scope: "direct_upload" }));
 const customerDataGate = vi.fn();
 const sourceScope = vi.fn();
+const compileIdentities = vi.fn();
+vi.mock("./connector-compile-identity", () => ({ readConnectorCompileIdentities: (...args: unknown[]) => compileIdentities(...args) }));
 vi.mock("./customer-source-scope", () => ({ readCustomerSourceScope: (...args: unknown[]) => sourceScope(...args) }));
 
 vi.mock("./r2-synthetic-canary", () => ({
@@ -42,7 +48,7 @@ vi.mock("./world-store", () => ({
 vi.mock("./core-runtime-v2", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./core-runtime-v2")>()),
   readProductCoreV2Env: () => ({ url: "https://core-v2.example", hmac: "x".repeat(32) }),
-  dispatchProductCoreV2: (...args: unknown[]) => dispatched(...args),
+  dispatchProductCoreV2: (...args: Parameters<typeof dispatchProductCoreV2>) => dispatched(...args),
   /*
     Enough of an artifact to reach persistence, and no more: these tests are about which
     request the Core is sent, not about what the projection makes of the answer -- that is
@@ -60,9 +66,7 @@ vi.mock("./core-runtime-v2", async (importOriginal) => ({
     reviewReasons: [],
   }),
 }));
-vi.mock("./connector-source-access", () => ({
-  checkConnectorSourceAccess: (workspaceId: string, documentIds: string[]) => sourceAccess(workspaceId, documentIds),
-}));
+vi.mock("./compile-job-authority", () => ({ authorizeCompileJobSourceAccess: (...args: Parameters<typeof authorizeCompileJobSourceAccess>) => jobAuthority(...args), compileJobAuthorityEnabled: () => authorityEnabled(), classifyCompileJobSources: (...args: Parameters<typeof classifyCompileJobSources>) => classifySources(...args) }));
 vi.mock("./customer-data-admission", () => ({
   readCustomerSourceAuthorization: (...args: unknown[]) => customerDataGate(...args),
 }));
@@ -104,6 +108,7 @@ let signingEnv = receiptSigningEnv();
 
 const WS = "pilot";
 const VERSION = "a".repeat(64);
+const JOB_ID = "cjob-00000000000000000000000000000001";
 const DOCUMENT = "0c0c0c0c-0000-4000-8000-00000000000a";
 const PREFIX = `immutable/${WS}/${WS}/${DOCUMENT}/${VERSION}`;
 const APPROVED_GATE = {
@@ -136,7 +141,10 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  sourceAccess.mockReset().mockResolvedValue({ ok: true });
+  jobAuthority.mockReset().mockResolvedValue({ ok: true });
+  authorityEnabled.mockReset().mockReturnValue(true);
+  classifySources.mockReset().mockResolvedValue({ ok: true, scope: "direct_upload" });
+  compileIdentities.mockReset();
   customerDataGate.mockReset().mockResolvedValue(APPROVED_GATE);
   audited.mockReset().mockResolvedValue({ ok: true, eventId: "00000000-0000-4000-8000-000000000000" });
   registered.mockReset().mockImplementation(async () => ({ ok: true, publishBy: Date.now() + 60_000 }));
@@ -154,12 +162,42 @@ function readyWorkspace() {
   });
 }
 
+describe("default-off compatibility with the authority SQL absent", () => {
+  it("continues the prior direct-upload path without calling the new authority RPC", async () => {
+    vi.stubEnv("TAVONEL_COMPILE_JOB_AUTHORITY_VERSION", "");
+    authorityEnabled.mockReturnValue(false);
+    listed.mockResolvedValueOnce({ ok: false, code: "LEGACY_LIST_RESULT" });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(jobAuthority).not.toHaveBeenCalled();
+    expect(listed).toHaveBeenCalled();
+    expect(run).toMatchObject({ ok: false, code: "LEGACY_LIST_RESULT" });
+  });
+
+  it("denies connector sources while the new actor-bound mode is off", async () => {
+    vi.stubEnv("TAVONEL_COMPILE_JOB_AUTHORITY_VERSION", "");
+    authorityEnabled.mockReturnValue(false);
+    classifySources.mockResolvedValue({ ok: true, scope: "connector" });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, status: 403, code: "CONNECTOR_SOURCE_AUTHORITY_DISABLED" });
+    expect(jobAuthority).not.toHaveBeenCalled();
+    expect(listed).not.toHaveBeenCalled();
+  });
+});
+
 describe("customer-data approval before source access", () => {
+  it("denies a job before any source listing when durable authority is revoked", async () => {
+    jobAuthority.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_DENIED" });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, status: 403, code: "COMPILE_JOB_AUTHORITY_DENIED" });
+    expect(listed).not.toHaveBeenCalled();
+    expect(fetched).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
   it("requires connector scope for a collection with a durable connector origin", async () => {
     vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
     sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
     customerDataGate.mockResolvedValue({ ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" });
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
     expect(run).toMatchObject({ ok: false, code: "SCOPED_WORKSPACE_NOT_FOUND" });
     expect(customerDataGate).toHaveBeenCalledWith(WS, "connector");
     expect(listed).not.toHaveBeenCalled();
@@ -169,14 +207,14 @@ describe("customer-data approval before source access", () => {
   it("refuses an unprovable origin before reading any source content", async () => {
     vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
     sourceScope.mockResolvedValue({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
-    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
     expect(customerDataGate).not.toHaveBeenCalled();
     expect(listed).not.toHaveBeenCalled();
   });
   it("fails closed with the durable gate code before reading customer objects", async () => {
     customerDataGate.mockResolvedValue({ ok: false, code: "CUSTOMER_DATA_GATE_RECEIPT_NOT_FOUND" });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run).toEqual({
       ok: false,
@@ -205,7 +243,7 @@ describe("customer-data approval before source access", () => {
       .mockResolvedValueOnce(APPROVED_GATE)
       .mockResolvedValueOnce({ ok: false, code: "CUSTOMER_DATA_GATE_RECEIPT_REFUSED" });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run).toEqual({
       ok: false,
@@ -219,6 +257,52 @@ describe("customer-data approval before source access", () => {
 });
 
 describe("signed and audited compile receipts (gate preconditions 8 and 12)", () => {
+  it("refuses unresolved connector lineage before Core dispatch", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    compileIdentities.mockResolvedValue({ ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" });
+    compilableSource();
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, code: "CONNECTOR_IDENTITY_UNRESOLVED" });
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("uses the durable logical connector ID for Core while retaining upload UUIDs for source authorization", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    const logical = `src-${"e".repeat(64)}`;
+    compileIdentities.mockResolvedValue({ ok: true, identities: new Map([[DOCUMENT, logical]]) });
+    compilableSource();
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect((dispatched.mock.calls[0] as unknown as [unknown, string, Array<Record<string, unknown>>])[2][0])
+      .toMatchObject({ documentId: DOCUMENT, logicalSourceId: logical });
+    expect(jobAuthority).toHaveBeenCalledWith(expect.objectContaining({
+      jobId: JOB_ID, workspaceKey: WS, documentIds: [DOCUMENT], phase: "before_core",
+    }));
+  });
+
+  it("refuses a superseded connector revision before Core dispatch", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    compileIdentities.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    compilableSource();
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toEqual({ ok: false, status: 409, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED", payload: {} });
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+
+  it("does not persist a candidate when a newer revision is bound while Core runs", async () => {
+    vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
+    sourceScope.mockResolvedValue({ ok: true, scope: "connector" });
+    const resolved = { ok: true, identities: new Map([[DOCUMENT, `src-${"e".repeat(64)}`]]) };
+    // Selection resolve, pre-dispatch revalidation, then the post-dispatch revalidation observes r2.
+    compileIdentities.mockResolvedValueOnce(resolved).mockResolvedValueOnce(resolved)
+      .mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    compilableSource();
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, status: 409, code: "CONNECTOR_SOURCE_REVISION_SUPERSEDED" });
+    expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(put).not.toHaveBeenCalled();
+    expect(registered).not.toHaveBeenCalled();
+  });
   function compilableSource() {
     readyWorkspace();
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
@@ -241,7 +325,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
   it("signs the receipt, audits it, then persists it -- in that order", async () => {
     compilableSource();
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(true);
     if (!run.ok) return;
@@ -291,7 +375,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     customerDataGate.mockResolvedValue({ ok: true, decision });
     compilableSource();
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(true);
     if (!run.ok) return;
@@ -306,7 +390,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
 
   it("labels a v1-receipt compile as production", async () => {
     compilableSource();
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
     expect(run.ok && run.payload.customerDataGateStage).toBe("production");
     expect((audited.mock.calls[0]![0] as { details: Record<string, unknown> }).details.customerDataGateStage)
       .toBe("production");
@@ -316,7 +400,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     compilableSource();
     customerDataGate.mockResolvedValueOnce(APPROVED_GATE).mockResolvedValueOnce(APPROVED_GATE)
       .mockResolvedValueOnce({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
-    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, code: "SCOPED_WORKSPACE_REFUSED" });
     expect(dispatched).toHaveBeenCalledOnce();
     expect(audited).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
@@ -326,7 +410,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     compilableSource();
     audited.mockResolvedValue({ ok: false, code: "ENTERPRISE_AUDIT_WRITE_FAILED" });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run).toEqual({ ok: false, status: 503, code: "ENTERPRISE_AUDIT_WRITE_FAILED", payload: {} });
     expect(put).not.toHaveBeenCalled();
@@ -334,7 +418,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
 
   it("registers the exact artifact provenance after the audit and before the PUT", async () => {
     compilableSource();
-    expect((await runCollectionCompile(WS, [DOCUMENT])).ok).toBe(true);
+    expect((await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).ok).toBe(true);
     expect(registered).toHaveBeenCalledWith({
       workspaceKey: WS,
       collectionId: `collection-${"0".repeat(32)}`,
@@ -348,7 +432,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
   it("stores nothing when the registry refuses a deleted source", async () => {
     compilableSource();
     registered.mockResolvedValue({ ok: false, code: "COLLECTION_ARTIFACT_SOURCE_DELETED", refused: true });
-    expect(await runCollectionCompile(WS, [DOCUMENT])).toEqual({
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toEqual({
       ok: false, status: 409, code: "COLLECTION_ARTIFACT_SOURCE_DELETED", payload: {},
     });
     expect(put).not.toHaveBeenCalled();
@@ -357,14 +441,14 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
   it("stores nothing when the registry cannot be reached", async () => {
     compilableSource();
     registered.mockResolvedValue({ ok: false, code: "COLLECTION_ARTIFACT_PROVENANCE_FAILED", refused: false });
-    expect(await runCollectionCompile(WS, [DOCUMENT])).toMatchObject({ ok: false, status: 503 });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, status: 503 });
     expect(put).not.toHaveBeenCalled();
   });
 
   it("does not start the PUT once the publication lease has run out", async () => {
     compilableSource();
     registered.mockResolvedValue({ ok: true, publishBy: Date.now() - 1 });
-    expect(await runCollectionCompile(WS, [DOCUMENT])).toEqual({
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toEqual({
       ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {},
     });
     expect(put).not.toHaveBeenCalled();
@@ -372,7 +456,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
 
   it("refuses a document id deletion could never name before touching anything", async () => {
     compilableSource();
-    expect(await runCollectionCompile(WS, ["doc-legacy-ocr"])).toEqual({
+    expect(await runCollectionCompile(WS, ["doc-legacy-ocr"], undefined, JOB_ID)).toEqual({
       ok: false, status: 400, code: "DOCUMENT_SET_UNQUALIFIED", payload: {},
     });
     expect(customerDataGate).not.toHaveBeenCalled();
@@ -386,7 +470,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     vi.stubEnv("TAVONEL_EXPORT_SIGNING_KEY_ID", "");
     compilableSource();
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run).toEqual({ ok: false, status: 503, code: "COMPILE_RECEIPT_SIGNER_NOT_CONFIGURED", payload: {} });
     expect(customerDataGate).not.toHaveBeenCalled();
@@ -402,7 +486,7 @@ describe("a source read before region capture", () => {
     // A v1 OCR result: real text, no record of where any of it was on the page.
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v1", undefined) });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -419,7 +503,7 @@ describe("a source read before region capture", () => {
     readyWorkspace();
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", []) });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) expect(run.code).toBe("OCR_REGIONS_REQUIRED");
@@ -440,7 +524,7 @@ describe("a source read before region capture", () => {
       json: { ...ocrResult("tavonel.ocr_result.v2", [{ regionId: "native-p0001" }]), inputSha256: "sha256:not-the-version-key" },
     });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -452,7 +536,7 @@ describe("a source read before region capture", () => {
   it("still waits rather than failing when the reading has not finished", async () => {
     listed.mockResolvedValue({ ok: true, objects: [{ key: `${PREFIX}/sanitized.pdf`, size: 1024 }] });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -470,7 +554,7 @@ describe("a source read before region capture", () => {
         lastModified: "2026-09-10T00:00:00.000Z" },
     ] });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) expect(run.code).toBe("OCR_NOT_READY");
@@ -487,7 +571,7 @@ describe("a source read before region capture", () => {
       { key: `immutable/${WS}/${WS}/${DOCUMENT}/${newer}/ocr.json`, size: 512 },
     ] });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -523,7 +607,7 @@ describe("a source read before region capture", () => {
       },
     ]) });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -570,7 +654,7 @@ describe("a source read before region capture", () => {
       },
     });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) expect(run.code).toBe("SOURCE_VERSION_CHANGED");
@@ -583,19 +667,21 @@ describe("a source read before region capture", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("does not dispatch a source whose connector access was revoked", async () => {
+  it("does not dispatch a source whose job-bound connector authority was revoked", async () => {
     readyWorkspace();
-    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    jobAuthority.mockResolvedValueOnce({ ok: true });
+    jobAuthority.mockResolvedValueOnce({ ok: true });
+    jobAuthority.mockResolvedValueOnce({ ok: false, code: "COMPILE_JOB_AUTHORITY_DENIED" });
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
       regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
       bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
       confidence: 1, authority: "official",
     }]) });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
-    if (!run.ok) expect(run.code).toBe("CONNECTOR_SOURCE_ACCESS_DENIED");
+    if (!run.ok) expect(run.code).toBe("COMPILE_JOB_AUTHORITY_DENIED");
     expect(dispatched).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
@@ -677,7 +763,7 @@ describe("a re-compile of a collection that already has an active World", () => 
     readableSource();
     promotedOnce();
 
-    await runCollectionCompile(WS, [DOCUMENT]);
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(activeWorld).not.toHaveBeenCalled();
     expect(priorCandidate).not.toHaveBeenCalled();
@@ -688,12 +774,45 @@ describe("a re-compile of a collection that already has an active World", () => 
     vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
     readableSource();
     promotedOnce();
-    priorCandidate.mockResolvedValue({ ok: true, json: { revisionCompile: SNAPSHOT } });
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-unused-by-this-assertion", revisionCompile: SNAPSHOT } });
 
-    await runCollectionCompile(WS, [DOCUMENT]);
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(dispatched.mock.calls[0]?.[4]).toEqual(SNAPSHOT);
     vi.unstubAllEnvs();
+  });
+
+  it("looks up the same active collection after a source revision", async () => {
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    readableSource();
+    promotedOnce();
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-unused-by-this-assertion", revisionCompile: SNAPSHOT } });
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    const firstLookup = activeWorld.mock.calls[0];
+    const newer = "e".repeat(64);
+    listed.mockResolvedValue({ ok: true, objects: [
+      { key: `${PREFIX.replace(VERSION, newer)}/sanitized.pdf`, size: 1024 },
+      { key: `${PREFIX.replace(VERSION, newer)}/ocr.json`, size: 512 },
+    ] });
+    const updated = ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]);
+    fetched.mockResolvedValue({ ok: true, json: { ...updated, inputSha256: `sha256:${newer}`, sourceImmutableKey: `${PREFIX.replace(VERSION, newer)}/sanitized.pdf` } });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run.ok).toBe(true);
+    expect(activeWorld.mock.calls[1]).toEqual(firstLookup);
+    expect(dispatched.mock.calls[1]?.[4]).toEqual(SNAPSHOT);
+  });
+
+  it("refuses a parent snapshot stored under another collection", async () => {
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    readableSource();
+    promotedOnce();
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-wrong", revisionCompile: SNAPSHOT } });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, code: "REVISION_COMPILE_PRIOR_WORLD_UNREADABLE" });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 
   it("compiles from scratch when this binding has no active World", async () => {
@@ -701,11 +820,20 @@ describe("a re-compile of a collection that already has an active World", () => 
     readableSource();
     activeWorld.mockResolvedValue({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" });
 
-    await runCollectionCompile(WS, [DOCUMENT]);
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(priorCandidate).not.toHaveBeenCalled();
     expect(dispatched.mock.calls[0]?.[4] ?? null).toBeNull();
     vi.unstubAllEnvs();
+  });
+
+  it("requires explicit migration for an exact legacy active binding", async () => {
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    readableSource();
+    activeWorld.mockResolvedValueOnce({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" })
+      .mockResolvedValueOnce({ ok: true, world: { collectionId: "collection-legacy" } });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false, status: 409, code: "COLLECTION_IDENTITY_MIGRATION_REQUIRED" });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 
   it("refuses instead of compiling from scratch when the prior World cannot be described", async () => {
@@ -715,7 +843,7 @@ describe("a re-compile of a collection that already has an active World", () => 
     // A candidate promoted before the flag existed: no snapshot was persisted with it.
     priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-old" } });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -733,7 +861,7 @@ describe("a re-compile of a collection that already has an active World", () => 
     readableSource();
     activeWorld.mockResolvedValue({ ok: false, code: "WORLD_STORE_READ_FAILED" });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -748,11 +876,11 @@ describe("a re-compile of a collection that already has an active World", () => 
     vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
     readableSource();
     promotedOnce();
-    priorCandidate.mockResolvedValue({ ok: true, json: { revisionCompile: SNAPSHOT } });
+    priorCandidate.mockResolvedValue({ ok: true, json: { collectionId: "collection-unused-by-this-assertion", revisionCompile: SNAPSHOT } });
     // What a Core built before the incremental contract answers: a named refusal, not a World.
     dispatched.mockResolvedValue({ ok: false, code: "CORE_REQUEST_INVALID" });
 
-    const run = await runCollectionCompile(WS, [DOCUMENT]);
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
 
     expect(run.ok).toBe(false);
     if (!run.ok) {
@@ -761,5 +889,51 @@ describe("a re-compile of a collection that already has an active World", () => 
     }
     expect(put).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
+  });
+});
+
+describe("private global compile admission and release binding", () => {
+  const key = `global-corpus/corpus-${"a".repeat(32)}`;
+  function qualifySource(releaseDigest: string) {
+    vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_COMPILE", "1");
+    vi.stubEnv("TAVONEL_CORE_V2_REVISION_COMPILE", "1");
+    vi.stubEnv("TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256", `sha256:${"a".repeat(64)}`);
+    readyWorkspace();
+    activeWorld.mockResolvedValue({ ok: false, code: "ACTIVE_WORLD_NOT_FOUND" });
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    dispatched.mockResolvedValue({ ok: true, result: {
+      status: "completed", runtime: "tavonel-python-core-v2", candidate: { worldStateId: "world-global", reviewReasons: [] },
+      receipt: { requestId: "request-global", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: releaseDigest, candidatePromotion: false },
+    } });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+  it("refuses a global call before source reads when qualification is closed", async () => {
+    expect(await runCollectionCompile(WS, [DOCUMENT], key, JOB_ID)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_COMPILE_DISABLED" });
+    expect(fetched).not.toHaveBeenCalled();
+    expect(dispatched).not.toHaveBeenCalled();
+  });
+  it("refuses output from an unqualified Core release before persistence", async () => {
+    qualifySource(`sha256:${"b".repeat(64)}`);
+    expect(await runCollectionCompile(WS, [DOCUMENT], key, JOB_ID)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH" });
+    expect(put).not.toHaveBeenCalled();
+  });
+  it("preserves all existing signed-receipt gates on a qualified global compile", async () => {
+    qualifySource(`sha256:${"a".repeat(64)}`);
+    expect((await runCollectionCompile(WS, [DOCUMENT], key, JOB_ID)).ok).toBe(true);
+    expect(dispatched.mock.calls[0][7]).toBe(key);
+    expect(dispatched.mock.calls[0][8]).toBeGreaterThanOrEqual(1000);
+    expect(dispatched.mock.calls[0][8]).toBeLessThanOrEqual(52000);
+    expect(audited).toHaveBeenCalledOnce();
+    expect(registered).toHaveBeenCalledOnce();
+  });
+  it("bounds aggregate OCR bytes before dispatch", async () => {
+    qualifySource(`sha256:${"a".repeat(64)}`);
+    fetched.mockResolvedValue({ ok: true, json: { text: "x".repeat(4 * 1024 * 1024 + 1) } });
+    expect(await runCollectionCompile(WS, [DOCUMENT], key, JOB_ID)).toMatchObject({ ok: false, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT" });
+    expect(dispatched).not.toHaveBeenCalled();
   });
 });

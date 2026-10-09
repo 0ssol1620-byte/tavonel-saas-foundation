@@ -195,11 +195,39 @@ function canonicalize(value: unknown): string {
     .join(",")}}`;
 }
 
+function normalizeEvidence(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+// A bounded preview for the citation list only. It is never the answer: clipping at 417
+// characters dropped late qualifiers, following-sentence exceptions, negations, units and dates.
 function excerpt(text: string) {
-  const normalized = text.replace(/\s+/g, " ").trim();
+  const normalized = normalizeEvidence(text);
   return normalized.length <= 420
     ? normalized
     : `${normalized.slice(0, 417)}...`;
+}
+
+/*
+  Answer-length envelopes, counted in normalized characters including the "\n\n" separators.
+  They are the previous DEFAULT answer sizes made explicit -- fallback: 3 previews of 420 plus two
+  separators; compiled: the pipeline's default contextLimit of 10 previews plus nine separators.
+  They are not model token budgets and say nothing about whether an answer is correct.
+*/
+export const FALLBACK_ANSWER_CHARACTER_LIMIT = 3 * 420 + 2 * 2;
+export const COMPILED_ANSWER_CHARACTER_LIMIT = 10 * 420 + 9 * 2;
+export const EVIDENCE_EXCEEDS_ANSWER_LIMIT = "EVIDENCE_EXCEEDS_ANSWER_LIMIT";
+
+/**
+ * The complete selected evidence, in the given order, or null when it does not fit `limit`.
+ * Never clips, drops or reorders an item to make it fit: an answer that is only part of the
+ * selected evidence is an abstention, not a shorter answer. Length is checked before joining.
+ */
+function completeEvidenceAnswer(texts: string[], limit: number): string | null {
+  const normalized = texts.map(normalizeEvidence);
+  const length =
+    normalized.reduce((sum, text) => sum + text.length, 0) + 2 * Math.max(0, normalized.length - 1);
+  return length <= limit ? normalized.join("\n\n") : null;
 }
 
 export function answerGroundedQuestion(
@@ -307,13 +335,23 @@ export function answerGroundedQuestion(
     },
     excerpt: excerpt(chunk.text),
   }));
+  const answer = completeEvidenceAnswer(
+    ranked.map(({ chunk }) => chunk.text),
+    FALLBACK_ANSWER_CHARACTER_LIMIT
+  );
   const status =
-    citations.length > 0 ? ("grounded" as const) : ("abstained" as const);
-  const answer = citations.map(citation => citation.excerpt).join("\n\n");
+    citations.length > 0 && answer !== null ? ("grounded" as const) : ("abstained" as const);
+  // On overflow the citations stay: they are verified evidence, and opening them is the only
+  // complete reading left once no partial answer is returned.
   const unsigned = {
     status,
-    answer,
-    reason: status === "abstained" ? "NO_REGION_BOUND_EVIDENCE_MATCH" : null,
+    answer: answer ?? "",
+    reason:
+      citations.length === 0
+        ? "NO_REGION_BOUND_EVIDENCE_MATCH"
+        : answer === null
+          ? EVIDENCE_EXCEEDS_ANSWER_LIMIT
+          : null,
     citations,
   };
   return {
@@ -340,7 +378,9 @@ export function answerGroundedQuestion(
   answer for the first time in production, and nothing would have caught it.
 
   So both paths now answer the same way and say so: `answerMode: "evidence_excerpts"`. The
-  answer is the cited excerpts, concatenated in rank order. That is the founder default and it
+  answer is the complete text of the cited evidence, concatenated in rank order (the 420-character
+  `excerpt` is only the citation preview); evidence too long for the path's answer envelope
+  abstains with its citations kept rather than being clipped. That is the founder default and it
   is stated rather than implied -- no model generates anything here. There is no LLM in this
   file, no LLM behind the compiled path, and choosing one is a Model Arena decision (masterplan
   Phase 4-5), not something a retrieval fix gets to settle.
@@ -400,8 +440,8 @@ export function answerFromContextPacket(
   packet: ContextPacket,
   meta: { collectionId: string; manifestDigest: string },
 ): PacketAnswer {
-  const citations: PacketCitation[] = packet.items
-    .filter(item => item.evidenceIds.length > 0 && item.text.trim().length > 0)
+  const cited = packet.items.filter(item => item.evidenceIds.length > 0 && item.text.trim().length > 0);
+  const citations: PacketCitation[] = cited
     .map(item => ({
       evidenceId: item.evidenceIds[0]!,
       evidenceIds: [...item.evidenceIds],
@@ -417,18 +457,23 @@ export function answerFromContextPacket(
     }));
 
   const verified = verifyGroundedCitations(citations.map(citation => citation.evidenceId), packet);
-  const status = citations.length > 0 && verified.valid ? ("grounded" as const) : ("abstained" as const);
+  const answer = completeEvidenceAnswer(cited.map(item => item.text), COMPILED_ANSWER_CHARACTER_LIMIT);
+  const status =
+    citations.length > 0 && verified.valid && answer !== null ? ("grounded" as const) : ("abstained" as const);
+  // Verification outranks length: an unverified citation is never retained, overflow or not.
   const reason =
     status === "grounded"
       ? null
       : !verified.valid
         ? "CITED_EVIDENCE_NOT_IN_PACKET"
-        : (packet.abstentionReasons[0] ?? "NO_REGION_BOUND_EVIDENCE_MATCH");
+        : citations.length === 0
+          ? (packet.abstentionReasons[0] ?? "NO_REGION_BOUND_EVIDENCE_MATCH")
+          : EVIDENCE_EXCEEDS_ANSWER_LIMIT;
   const unsigned = {
     status,
-    answer: status === "grounded" ? citations.map(citation => citation.excerpt).join("\n\n") : "",
+    answer: status === "grounded" ? (answer ?? "") : "",
     reason,
-    citations: status === "grounded" ? citations : [],
+    citations: status === "grounded" || reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT ? citations : [],
   };
   return {
     ...unsigned,

@@ -521,3 +521,220 @@ def test_streamed_text_matches_the_result_and_is_bounded() -> None:
         assert box["regionId"] in by_region
         assert by_region[box["regionId"]].startswith(box["text"][:50])
         assert len(box["text"]) <= 400
+
+
+# ---------------------------------------------------------------- per-page native or raster
+#
+# A page with usable native text keeps it; every other page is read from its pixels, whatever the
+# rest of the document carries. These are control-flow and contract tests on synthetic PDFs with
+# a faked RapidOCR: they prove which pages are rasterized, page identity, order and fail-closed
+# behavior. They say nothing about real GPU OCR quality.
+
+SCAN = {"general": [("SCANNED PAGE", 0.97)], "korean": []}
+
+
+def pages_pdf(*texts: str | None, size: tuple[int, int] = (612, 792)) -> bytes:
+    """A str page carries a native text layer; None is a page without one, which is what an
+    image-only scan looks like to the worker. No image is embedded: the OCR reading is faked."""
+    objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"", b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    kids = []
+    for text in texts:
+        content = f"BT /F1 12 Tf 72 {size[1] - 72} Td ({text}) Tj ET".encode("ascii") if text else b""
+        objects.append(b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream")
+        objects.append(
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] /Contents %d 0 R"
+            b" /Resources << /Font << /F1 3 0 R >> >> >>" % (*size, len(objects))
+        )
+        kids.append(b"%d 0 R" % len(objects))
+    objects[1] = b"<< /Type /Pages /Kids [%s] /Count %d >>" % (b" ".join(kids), len(kids))
+    body = b"%PDF-1.4\n"
+    offsets = []
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(body))
+        body += b"%d 0 obj\n" % number + obj + b"\nendobj\n"
+    xref = len(body)
+    body += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    body += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    return body + b"trailer << /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+
+
+def ready_fake_ocr(monkeypatch: pytest.MonkeyPatch, read: dict | None = None) -> tuple[types.ModuleType, list[dict]]:
+    worker, calls = install_fake_rapidocr(monkeypatch, read=read)
+    rapidocr = sys.modules["rapidocr"]
+    monkeypatch.setattr(worker, "_self_test", {"state": "passed", "detail": None})
+    monkeypatch.setattr(worker, "_general_rapidocr", rapidocr.RapidOCR(params={}))
+    monkeypatch.setattr(worker, "_korean_rapidocr", rapidocr.RapidOCR(params={"Rec.lang_type": "korean"}))
+    return worker, calls
+
+
+def rastered_pages(calls: list[dict]) -> int:
+    # Every raster page runs exactly one general and one Korean pass.
+    engine_calls = [call for call in calls if "options" in call]
+    assert len(engine_calls) % 2 == 0
+    return len(engine_calls) // 2
+
+
+def assert_page_ordered(regions: list[dict], expected_ids: list[str]) -> None:
+    assert [region["regionId"] for region in regions] == expected_ids
+    assert [region["order"] for region in regions] == list(range(len(regions)))
+    for region in regions:
+        page = int(region["regionId"].split("-p", 1)[1][:4])
+        assert region["pageNumber1"] == page and region["pageIndex0"] == page - 1
+        x1, y1, x2, y2 = region["bbox1000"]
+        assert 0 <= x1 < x2 <= 1000 and 0 <= y1 < y2 <= 1000
+
+
+def test_text_only_document_is_never_rasterized(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    _, page_count, regions = worker.extract_text(pages_pdf("NATIVE 1", "NATIVE 2"))
+    assert page_count == 2
+    assert_page_ordered(regions, ["native-p0001", "native-p0002"])
+    assert rastered_pages(calls) == 0
+
+
+def test_image_only_document_rasterizes_every_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    _, _, regions = worker.extract_text(pages_pdf(None, None))
+    assert_page_ordered(regions, ["ocr-p0001-l00001", "ocr-p0002-l00001"])
+    assert rastered_pages(calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("texts", "expected_ids"),
+    [
+        (("NATIVE 1", None, "NATIVE 3"), ["native-p0001", "ocr-p0002-l00001", "native-p0003"]),
+        ((None, "NATIVE 2", None), ["ocr-p0001-l00001", "native-p0002", "ocr-p0003-l00001"]),
+    ],
+)
+def test_mixed_document_rasterizes_only_pages_without_native_text(
+    monkeypatch: pytest.MonkeyPatch, texts: tuple, expected_ids: list[str]
+) -> None:
+    # The bug: one native page anywhere suppressed raster OCR for every image-only page.
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    text, page_count, regions = worker.extract_text(pages_pdf(*texts))
+    assert page_count == 3
+    assert_page_ordered(regions, expected_ids)
+    assert [region["text"] for region in regions] == [value or "SCANNED PAGE" for value in texts]
+    assert text == "\n".join(region["text"] for region in regions)
+    assert rastered_pages(calls) == texts.count(None)
+
+
+def test_unusable_native_geometry_is_read_from_pixels(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Stub: page 2 has a text layer whose geometry yields no native region.
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    native_page_region = worker.native_page_region
+    seen: list[str] = []
+
+    def no_geometry_on_page_two(page, textpage, text, index, order):
+        seen.append(text)
+        return None if index == 1 else native_page_region(page, textpage, text, index, order)
+
+    monkeypatch.setattr(worker, "native_page_region", no_geometry_on_page_two)
+    _, _, regions = worker.extract_text(pages_pdf("NATIVE 1", "NATIVE 2", "NATIVE 3"))
+    assert seen == ["NATIVE 1", "NATIVE 2", "NATIVE 3"]
+    assert_page_ordered(regions, ["native-p0001", "ocr-p0002-l00001", "native-p0003"])
+    assert "NATIVE 2" not in [region["text"] for region in regions]
+    assert rastered_pages(calls) == 1
+
+
+def test_blank_page_is_reported_processed_and_empty_without_invented_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = ready_fake_ocr(monkeypatch, {"general": [], "korean": []})
+    events: list[tuple] = []
+    observe = lambda number, count, path, regions: events.append((number, count, path, len(regions)))  # noqa: E731
+
+    text, _, regions = worker.extract_text(pages_pdf("NATIVE 1", None), observe)
+    assert text == "NATIVE 1"
+    assert_page_ordered(regions, ["native-p0001"])
+    assert events == [(1, 2, "native", 1), (2, 2, "native", 0), (2, 2, "raster", 0)]
+    assert rastered_pages(calls) == 1
+
+    events.clear()
+    with pytest.raises(HTTPException) as refused:
+        worker.extract_text(pages_pdf(None), observe)
+    assert refused.value.status_code == 422
+    assert "no extractable text" in refused.value.detail
+    assert events == [(1, 1, "native", 0), (1, 1, "raster", 0)]
+
+
+def test_stream_matches_buffered_for_a_mixed_document(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    ready_fake_ocr(monkeypatch, SCAN)
+    payload = pages_pdf("NATIVE 1", None, "NATIVE 3")
+    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+    buffered = client.post("/v1/ocr", headers=headers(digest), files={"source": ("mixed.pdf", payload, "application/pdf")})
+    streamed = client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": NDJSON},
+        files={"source": ("mixed.pdf", payload, "application/pdf")},
+    )
+    assert buffered.status_code == 200 and streamed.status_code == 200
+    lines = stream_lines(streamed)
+    assert lines[-1] == buffered.json()
+    assert_page_ordered(lines[-1]["regions"], ["native-p0001", "ocr-p0002-l00001", "native-p0003"])
+    pages = [line for line in lines if line.get("type") == "page"]
+    assert [(page["pageNumber1"], page["path"], page["regionCount"]) for page in pages] == [
+        (1, "native", 1),
+        (2, "native", 0),
+        (2, "raster", 1),
+        (3, "native", 1),
+    ]
+    # Native evidence is not repeated by the raster pass: each region is streamed exactly once.
+    streamed_ids = [box["regionId"] for page in pages for box in page["boxes"]]
+    assert sorted(streamed_ids) == sorted(region["regionId"] for region in lines[-1]["regions"])
+
+
+def test_ocr_exception_on_a_mixed_document_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, _ = ready_fake_ocr(monkeypatch, SCAN)
+
+    def engine_fault(*_args, **_kwargs):
+        raise RuntimeError("synthetic engine fault")
+
+    monkeypatch.setattr(worker, "rapidocr_lines", engine_fault)
+    events: list[tuple] = []
+    with pytest.raises(RuntimeError, match="synthetic engine fault"):
+        worker.extract_text(pages_pdf("NATIVE 1", None), lambda *event: events.append(event[:3]))
+    assert (2, 2, "raster") not in events
+    assert not worker._engine_lock.locked()
+
+
+def test_failed_qualification_refuses_a_mixed_document_instead_of_native_only_ok(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    worker, calls = install_fake_rapidocr(monkeypatch)
+    monkeypatch.setattr(worker, "_self_test", {"state": "failed", "detail": "synthetic"})
+    payload = pages_pdf("NATIVE 1", None, "NATIVE 3")
+    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+
+    buffered = client.post("/v1/ocr", headers=headers(digest), files={"source": ("mixed.pdf", payload, "application/pdf")})
+    assert buffered.status_code == 503
+    assert "self-test" in buffered.json()["detail"]
+
+    lines = stream_lines(client.post(
+        "/v1/ocr",
+        headers={**headers(digest), "accept": NDJSON},
+        files={"source": ("mixed.pdf", payload, "application/pdf")},
+    ))
+    assert lines[-1]["type"] == "refused" and lines[-1]["status"] == 503
+    assert all(line.get("status") != "ok" for line in lines)
+    assert calls == []  # no engine was constructed or run
+
+    # A document that needs no raster page is unaffected, as before.
+    native_only = pages_pdf("NATIVE 1")
+    digest = "sha256:" + hashlib.sha256(native_only).hexdigest()
+    response = client.post("/v1/ocr", headers=headers(digest), files={"source": ("text.pdf", native_only, "application/pdf")})
+    assert response.status_code == 200 and response.json()["status"] == "ok"
+
+
+def test_page_limit_accepts_80_pages_and_rejects_81_before_any_ocr(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = ready_fake_ocr(monkeypatch, SCAN)
+    assert worker.MAX_PAGES == 80
+    _, page_count, regions = worker.extract_text(pages_pdf(*[None] * 80, size=(306, 396)))
+    assert page_count == 80
+    assert_page_ordered(regions, [f"ocr-p{page:04d}-l00001" for page in range(1, 81)])
+    assert rastered_pages(calls) == 80
+
+    calls.clear()
+    with pytest.raises(HTTPException) as refused:
+        worker.extract_text(pages_pdf(*[None] * 81, size=(306, 396)))
+    assert refused.value.status_code == 422
+    assert "page count" in refused.value.detail
+    assert calls == []

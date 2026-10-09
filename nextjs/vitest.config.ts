@@ -21,6 +21,8 @@ export default defineConfig({
     // scripts/router/*, scripts/billing/*: operator CLIs whose pure planning/aggregation half is unit tested here.
     include: [
       "lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts",
+      "components/explore/evidence-workbench.test.tsx", "components/landing-v2/hero-source-card.test.tsx", "components/evaluation-page.test.tsx",
+      "components/compile-stage-player.mobile-view.test.tsx",
       "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs",
     ],
   },

@@ -11,6 +11,7 @@ import {
   type RevisionCompileSnapshot,
 } from "./collection-compiler";
 import { CORE_CLIENT_TIMEOUT_MS, CORE_MAX_LATENCY_MS } from "./execution-budget";
+import { canonicalJsonWireField } from "./canonical-json-wire";
 
 export const PRODUCT_CORE_REQUEST_SCHEMA = "tavonel.product_core.compile_request.v2" as const;
 export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_response.v2" as const;
@@ -155,7 +156,7 @@ function canonicalize(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   return `{${Object.entries(value as Record<string, unknown>)
     .filter(([, item]) => item !== undefined)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
     .map(([key, item]) => `${JSON.stringify(key)}:${canonicalize(item)}`)
     .join(",")}}`;
 }
@@ -183,20 +184,45 @@ function documentBinding(workspaceId: string, documents: CollectionOcrInput[]) {
 }
 
 /**
- * The collection id this document set compiles under, derived the one way the request derives it.
- *
- * Exported so `collection-compile-run.ts` can look up the active World under the same id the
- * dispatch will send, instead of a second derivation that can drift from it.
- *
- * Worth knowing before reading TM01: this id is a hash of the document/version binding, so a
- * source revision produces a *different* collection id and therefore finds no prior active
- * World. A revision compile is reachable here only for a re-compile of an identical binding.
- * Carrying a collection's identity across a source revision needs a stable collection key that
- * this wire does not have, and that gap is written up in the lane report rather than papered
- * over with a looser lookup.
+ * Historical identity, for explicit migration mappings only. Never use a similarity lookup
+ * to manufacture a parent: an old collection must be mapped by its exact immutable binding.
  */
-export function productCoreV2CollectionId(workspaceId: string, documents: CollectionOcrInput[]) {
+export function legacyProductCoreV2CollectionId(workspaceId: string, documents: CollectionOcrInput[]) {
   return `collection-${sha256(documentBinding(workspaceId, documents)).slice(0, 32)}`;
+}
+
+/**
+ * A stable logical selection survives source revisions. Explicit logical keys also survive
+ * membership edits; existing document-only callers use a deterministic selection identity.
+ * A copy with another document ID remains separate even when its bytes are identical.
+ */
+export function productCoreV2CollectionId(
+  workspaceId: string,
+  documents: CollectionOcrInput[],
+  logicalCollectionKey?: string,
+) {
+  if (logicalCollectionKey !== undefined && (!logicalCollectionKey.trim() || logicalCollectionKey.length > 256)) {
+    throw new Error("COLLECTION_IDENTITY_INVALID");
+  }
+  const identity = logicalCollectionKey === undefined
+    ? { kind: "selection", documentIds: [...new Set(documents.map((document) => document.logicalSourceId ?? document.documentId))].sort() }
+    : { kind: "logical", key: logicalCollectionKey };
+  return `collection-${sha256(canonicalize({ schemaVersion: "tavonel.collection_identity.v1", workspaceId, identity })).slice(0, 32)}`;
+}
+
+/** All accepted OCR inputs, including parser output, participate in revision identity. */
+export function productCoreV2RevisionId(
+  workspaceId: string,
+  documents: CollectionOcrInput[],
+  logicalCollectionKey?: string,
+) {
+  const collectionId = productCoreV2CollectionId(workspaceId, documents, logicalCollectionKey);
+  return `sha256:${sha256(canonicalize({
+    schemaVersion: "tavonel.collection_input_revision.v1",
+    workspaceId,
+    collectionId,
+    documents: [...documents].sort((left, right) => left.documentId < right.documentId ? -1 : left.documentId > right.documentId ? 1 : 0),
+  }))}`;
 }
 
 export function buildProductCoreV2Request(
@@ -207,9 +233,14 @@ export function buildProductCoreV2Request(
   previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null,
   customerDataGate?: CustomerDataAuthorization,
   expectedSourceScope?: CustomerDataScope,
+  logicalCollectionKey?: string,
 ): ProductCoreV2CompileRequest {
-  const binding = documentBinding(workspaceId, documents);
-  const collectionId = productCoreV2CollectionId(workspaceId, documents);
+  const nativeIds = documents.map(document => document.logicalSourceId ?? document.documentId);
+  if (nativeIds.some(id => !IDENTIFIER.test(id)) || new Set(nativeIds).size !== nativeIds.length) {
+    throw new Error("COLLECTION_SOURCE_IDENTITY_INVALID");
+  }
+  const binding = productCoreV2RevisionId(workspaceId, documents, logicalCollectionKey);
+  const collectionId = productCoreV2CollectionId(workspaceId, documents, logicalCollectionKey);
   return {
     schemaVersion: PRODUCT_CORE_REQUEST_SCHEMA,
     requestId,
@@ -230,7 +261,7 @@ export function buildProductCoreV2Request(
       compile of the same documents, and the key now says so.
     */
     idempotencyKey: `compile-${sha256(
-      previousActiveWorld ? `${binding}\n${previousActiveWorld.manifestDigest}` : binding,
+      previousActiveWorld ? `${binding}\n${previousActiveWorld.worldStateId}\n${previousActiveWorld.manifestDigest}` : binding,
     ).slice(0, 40)}`,
     tenantId: workspaceId,
     workspaceId,
@@ -249,7 +280,7 @@ export function buildProductCoreV2Request(
     documents: [...documents]
       .sort((left, right) => left.documentId.localeCompare(right.documentId))
       .map((document) => ({
-        nativeId: document.documentId,
+        nativeId: document.logicalSourceId ?? document.documentId,
         connectorType: "foundation-r2" as const,
         immutableObjectKey: document.sourceImmutableKey,
         ocrObjectKey: document.ocrJsonKey,
@@ -585,7 +616,7 @@ const isStringArray = (value: unknown) => Array.isArray(value) && value.every((i
 
 export function readRevisionCompileSnapshot(
   stored: unknown,
-  expected: { worldStateId: string; manifestDigest: string },
+  expected: { worldStateId: string; manifestDigest: string; collectionId?: string },
 ): ProductCoreV2CompileRequest["previousActiveWorld"] | null {
   const artifact = stored && typeof stored === "object" ? stored as Record<string, unknown> : null;
   const snapshot = artifact?.revisionCompile && typeof artifact.revisionCompile === "object"
@@ -597,16 +628,27 @@ export function readRevisionCompileSnapshot(
     ? snapshot.artifactHashes as Record<string, unknown>
     : null;
   if (
+    (expected.collectionId !== undefined && artifact?.collectionId !== expected.collectionId) ||
+    !IDENTIFIER.test(expected.worldStateId) ||
+    !SHA256.test(expected.manifestDigest) ||
     snapshot.worldStateId !== expected.worldStateId ||
     snapshot.manifestDigest !== expected.manifestDigest ||
     !units ||
     units.length === 0 ||
     !hashes ||
+    Array.isArray(hashes) ||
+    Object.keys(hashes).length === 0 ||
+    new Set(units.map((unit) => (unit as Record<string, unknown>)?.logicalId)).size !== units.length ||
     !Object.values(hashes).every((digest) => typeof digest === "string" && SHA256.test(digest)) ||
     !units.every((unit) => Boolean(unit) && typeof unit === "object" &&
       ["logicalId", "sourceId", "sourceVersionId", "sourceContentSha256", "text", "anchor", "evidenceId", "identityState"]
         .every((field) => typeof (unit as Record<string, unknown>)[field] === "string") &&
       Number.isSafeInteger((unit as Record<string, unknown>).pageNumber1) &&
+      Number((unit as Record<string, unknown>).pageNumber1) > 0 &&
+      SHA256.test(String((unit as Record<string, unknown>).sourceContentSha256)) &&
+      ["logicalId", "sourceId", "sourceVersionId", "evidenceId"].every((field) => IDENTIFIER.test(String((unit as Record<string, unknown>)[field]))) &&
+      ["matched", "new", "unresolved"].includes(String((unit as Record<string, unknown>).identityState)) &&
+      String((unit as Record<string, unknown>).text).length > 0 &&
       /*
         `documentPath` and `neighbourAnchors` are `tuple[str, ...]` on `PreviousUnit`, so the
         element type is checked here too: a corrupted stored unit is refused with this lane's
@@ -635,6 +677,8 @@ export async function dispatchProductCoreV2(
   previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null,
   customerDataGate?: CustomerDataAuthorization,
   expectedSourceScope?: CustomerDataScope,
+  logicalCollectionKey?: string,
+  remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS,
 ): Promise<{ ok: true; result: ProductCoreV2CompileResponse } | { ok: false; code: string }> {
   if (customerDataGate && !authorizationAdmitsCustomerData(customerDataGate, workspaceId, workspaceId, now, expectedSourceScope)) {
     return { ok: false, code: "CUSTOMER_DATA_GATE_DECISION_INVALID" };
@@ -647,7 +691,10 @@ export async function dispatchProductCoreV2(
     previousActiveWorld,
     customerDataGate,
     expectedSourceScope,
+    logicalCollectionKey,
   );
+  if (!Number.isSafeInteger(remainingLatencyMs) || remainingLatencyMs < 1000) return { ok: false, code: "CORE_V2_TIME_BUDGET_INVALID" };
+  envelope.route.maxLatencyMs = Math.min(envelope.route.maxLatencyMs, remainingLatencyMs);
   const body = JSON.stringify(envelope);
   const inputSha256 = `sha256:${sha256(body)}`;
   const timestamp = String(Math.floor(now.getTime() / 1000));
@@ -666,7 +713,7 @@ export async function dispatchProductCoreV2(
         "x-tavonel-core-signature": signature,
       },
       body,
-      signal: AbortSignal.timeout(CORE_CLIENT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(envelope.route.maxLatencyMs),
     });
   } catch (cause) {
     /*
@@ -682,12 +729,15 @@ export async function dispatchProductCoreV2(
       && (cause.name === "TimeoutError" || cause.name === "AbortError");
     return { ok: false, code: timedOut ? "CORE_V2_TIMEOUT" : "CORE_V2_UNAVAILABLE" };
   }
-  const json = await response.json().catch(() => null) as ProductCoreV2CompileResponse | { code?: unknown } | null;
+  const responseText = await response.text().catch(() => "");
+  let json: ProductCoreV2CompileResponse | { code?: unknown } | null;
+  try { json = JSON.parse(responseText); } catch { json = null; }
   if (!response.ok || !json) {
     const errorCode = (json as { code?: unknown } | null)?.code;
     return { ok: false, code: typeof errorCode === "string" ? errorCode : `CORE_V2_HTTP_${response.status}` };
   }
   const result = json as ProductCoreV2CompileResponse;
+  const canonicalCandidate = canonicalJsonWireField(responseText, "candidate");
   const lifecycleStatus = {
     completed: "candidate",
     review_required: "review_required",
@@ -701,9 +751,17 @@ export async function dispatchProductCoreV2(
     !Array.isArray(result.artifacts) ||
     result.artifacts.length < 5 ||
     result.artifacts.some((artifact) => !IDENTIFIER.test(artifact.artifactId) || !SHA256.test(artifact.contentSha256) || !Number.isSafeInteger(artifact.byteLength) || artifact.byteLength < 0) ||
+    result.candidate.canonicalKnowledgeModel.collectionId !== envelope.collectionId ||
+    (result.candidate.parentWorldStateId ?? null) !== (envelope.previousActiveWorld?.worldStateId ?? null) ||
+    !result.receipt ||
+    ![result.receipt.totalArtifacts, result.receipt.rebuiltArtifacts, result.receipt.workAvoidedArtifacts]
+      .every((count) => Number.isSafeInteger(count) && count >= 0) ||
+    !["passed", "failed", "not_run"].includes(result.receipt.equivalence) ||
+    (result.status === "completed" && envelope.previousActiveWorld !== undefined && result.receipt.equivalence !== "passed") ||
     result.receipt.requestId !== envelope.requestId ||
     result.receipt.inputSha256 !== inputSha256 ||
-    result.receipt.outputSha256 !== `sha256:${sha256(canonicalize(result.candidate))}` ||
+    canonicalCandidate === null ||
+    result.receipt.outputSha256 !== `sha256:${sha256(canonicalCandidate)}` ||
     !SHA256.test(result.receipt.coreReleaseDigest) ||
     result.receipt.matchingPolicy !== "legacy" ||
     result.receipt.candidatePromotion !== false ||

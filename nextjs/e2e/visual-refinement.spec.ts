@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { activationPolicy } from "../lib/activation-policy";
+import { EXPLORE_CTA } from "../lib/site-navigation";
 
 test("filled navigation and hero actions keep readable labels", async ({ page }) => {
   await page.goto("/");
@@ -26,18 +28,18 @@ test("filled navigation and hero actions keep readable labels", async ({ page })
   source-linked explanation in Scene 02 keep the wordmark's measured outer edge.
 */
 for (const path of ["/", "/ko"]) {
-  test(`${path} shares a measured outer edge and gives the film a readable width`, async ({ page }) => {
+  test(`${path} shares a measured outer edge and gives source evidence a readable width`, async ({ page }) => {
     await page.goto(path);
     const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
     const filmWrap = await page.locator("#s2 .lv2-wrap").boundingBox();
     const mark = await page.locator("header .wordmark").boundingBox();
-    const film = await page.locator("#s1 .compile-film-viewport").boundingBox();
+    const film = await page.locator("#s1 .paper-source").boundingBox();
     expect(wrap && filmWrap && mark && film).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(filmWrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     const viewportWidth = page.viewportSize()!.width;
-    const cap = viewportWidth >= 1600 ? 1280 : 1120;
-    expect(film!.width).toBeGreaterThanOrEqual(Math.min(cap, wrap!.width) - 2);
+    // The source and copy share two desktop columns; narrow screens stack full-width evidence.
+    expect(film!.width).toBeGreaterThanOrEqual(wrap!.width * (viewportWidth >= 1024 ? 0.5 : 1) - 2);
     expect(film!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
     expect(film!.x + film!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
   });
@@ -45,7 +47,7 @@ for (const path of ["/", "/ko"]) {
 
 test("every source has matching upright typography, not a substituted italic face", async ({ page }) => {
   await page.goto("/");
-  const typography = await page.locator("h1 .lv2-emphasis").evaluate(element => {
+  const typography = await page.locator("h1 span").evaluate(element => {
     const style = getComputedStyle(element);
     const parent = getComputedStyle(element.closest("h1")!);
     return { family: style.fontFamily, parentFamily: parent.fontFamily, size: style.fontSize,
@@ -114,4 +116,46 @@ test("the first developer request remains keyboard reachable on a narrow screen"
   await expect(strip).toHaveCount(4);
   expect(await strip.evaluateAll(buttons => buttons.map(button => button.tabIndex)))
     .toEqual([0, -1, -1, -1]);
+});
+
+/*
+  UX01. The closed customer-data gate, stated where the journey ends and before the first
+  authenticated read.
+
+  Measured at 390, where the reason and its two actions wrap the most. Order is document order
+  rather than position on screen, because that is the order a keyboard or screen-reader user meets
+  them in. The server half is read through `page.request`, because the note is a standing fact
+  and has to be in what the server sent, not only in what the browser ends up showing.
+*/
+test("the closed customer-data gate precedes the first developer request on a narrow screen", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "390", "the narrow-screen contract is measured at 390");
+  expect(activationPolicy.customerData.enabled, "this test describes the closed gate").toBe(false);
+
+  const served = (await (await page.request.get("/developers")).text())
+    .match(/<p [^>]*data-capability-gate="customerData"[^>]*>([\s\S]*?)<\/p>/)?.[1];
+  expect(served, "the note is in the server HTML").toBeDefined();
+  expect(served).toContain(activationPolicy.customerData.reason);
+
+  await page.goto("/developers");
+  const gate = page.locator('[data-capability-gate="customerData"]');
+  await expect(gate).toBeVisible();
+  await expect(gate).toContainText(activationPolicy.customerData.reason);
+
+  const explore = gate.getByRole("link", { name: EXPLORE_CTA.label, exact: true });
+  const contact = gate.getByRole("link", { name: "Discuss your sources", exact: true });
+  await expect(explore).toHaveAttribute("href", EXPLORE_CTA.href);
+  await expect(contact).toHaveAttribute("href", "/contact");
+  for (const action of [explore, contact]) {
+    await action.focus();
+    await expect(action).toBeFocused();
+  }
+
+  const order = await gate.getByRole("link").evaluateAll(links => {
+    const examples = document.querySelector('[role="tablist"][aria-label="First API request example"]');
+    return links.map(link =>
+      examples !== null && Boolean(link.compareDocumentPosition(examples) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(order, "both actions come before the First API request tablist").toEqual([true, true]);
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

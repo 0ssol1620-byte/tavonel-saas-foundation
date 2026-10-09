@@ -54,16 +54,34 @@
 }
 
 /*
-  The public header is normally fixed at the viewport edge. While this notice is present, make
-  that header sticky in its page wrapper instead: it begins after the notice, follows it out of
-  view, and then resumes its usual pinned position. The negative block margin preserves the
-  existing 64px hero/header composition; sticky positioning otherwise adds a second 64px spacer
-  that every public route already accounts for in its first section.
+  The public header is normally fixed at the viewport edge. While this notice is present, keep
+  the header sticky in normal flow after the notice. Its real height then separates the header
+  from the first line of page content instead of letting the two occupy the same band. The
+  document routes reduce their existing fixed-header offset below; the home hero keeps its
+  availability statement below the header.
 */
 :global(body):has(.panel) :global(header.nav) {
   position: sticky;
   top: 0;
-  margin-bottom: -64px;
+  margin-bottom: 0;
+}
+
+/*
+  A sticky header now owns its normal flow height. Public document sections already reserve an
+  offset for the fixed header, so only the first section gives that offset back while the consent
+  panel is present. The home hero is intentionally excluded: its availability sentence must begin
+  below the newly in-flow header.
+*/
+:global(body):has(.panel) :global(.public-page) :global(main > .scene:first-child) {
+  --doc-section-padding-top: max(0px, calc(clamp(112px, 11vw, 156px) - var(--chrome-header-height, 64px)));
+}
+:global(body):has(.panel) :global(.pricing-page) :global(main > .scene:first-child) {
+  padding-top: max(0px, calc(76px - var(--chrome-header-height, 64px)));
+}
+@media (max-width: 720px) {
+  :global(body):has(.panel) :global(.public-page) :global(main > .scene:first-child) {
+    --doc-section-padding-top: max(0px, calc(92px - var(--chrome-header-height, 56px)));
+  }
 }
 
 .panel p {

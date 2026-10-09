@@ -42,6 +42,8 @@ export type PromoteWorldMutation = WorldMutation & {
   candidateObjectKey: string;
   worldStateId: string;
   coreOutputSha256: string;
+  /** The candidate's source document (upload) ids; the transition re-checks connector currency under lock. */
+  sourceDocumentIds: string[];
 };
 
 export type RollbackWorldMutation = WorldMutation & {
@@ -130,7 +132,10 @@ export function validatePromoteWorldMutation(value: PromoteWorldMutation) {
     SHA256.test(value.manifestDigest) &&
     SHA256.test(value.coreOutputSha256) &&
     WORLD_STATE_ID.test(value.worldStateId) &&
-    value.candidateObjectKey === expectedCandidateKey(value)
+    value.candidateObjectKey === expectedCandidateKey(value) &&
+    Array.isArray(value.sourceDocumentIds) &&
+    value.sourceDocumentIds.length >= 1 && value.sourceDocumentIds.length <= 1000 &&
+    value.sourceDocumentIds.every((id) => typeof id === "string" && SOURCE_DOCUMENT_ID.test(id))
   );
 }
 
@@ -149,7 +154,12 @@ type AtomicWorldTransitionResult = {
   receiptSha256: string;
 };
 
+// The promote route's DOCUMENT_ID_PATTERN; non-UUID ids are direct sources with no connector lineage.
+const SOURCE_DOCUMENT_ID = /^[A-Za-z0-9_-]{1,80}$/;
+
 type WorldTransitionErrorCode =
+  | "WORLD_SOURCE_REVISION_SUPERSEDED"
+  | "WORLD_SOURCE_REVISION_AMBIGUOUS"
   | "ACTIVE_WORLD_CONFLICT"
   | "AUTHORIZATION_CHANGED_RETRY"
   | "ROLLBACK_TARGET_CONFLICT"
@@ -160,6 +170,10 @@ type WorldTransitionErrorCode =
   | "WORLD_STORE_WRITE_FAILED";
 
 function transitionErrorCode(message: string): WorldTransitionErrorCode {
+  if (message.includes("world_source_revision_superseded"))
+    return "WORLD_SOURCE_REVISION_SUPERSEDED";
+  if (message.includes("world_source_revision_ambiguous"))
+    return "WORLD_SOURCE_REVISION_AMBIGUOUS";
   if (message.includes("world_transition_compare_and_swap_conflict"))
     return "ACTIVE_WORLD_CONFLICT";
   if (message.includes("world_active_pointer_missing"))
@@ -212,7 +226,14 @@ async function transitionRpc(
     candidateObjectKey: string | null;
     worldStateId: string | null;
     coreOutputSha256: string | null;
-  }
+  },
+  /*
+    Forward promotion goes through transition_foundation_world_atomic_current, which verifies, under
+    the same per-source locks the binding writer takes and in the same transaction as the pointer
+    move, that every connector-bound source document is still its logical source's latest revision.
+    Historical rollback keeps the unchanged transition.
+  */
+  sourceDocumentIds: string[] | null = null
 ) {
   const config = readSupabaseAdminConfig();
   if (!config)
@@ -221,10 +242,11 @@ async function transitionRpc(
   try {
     response = await supabaseAdminRequest(
       config,
-      "/rest/v1/rpc/transition_foundation_world_atomic",
+      sourceDocumentIds ? "/rest/v1/rpc/transition_foundation_world_atomic_current" : "/rest/v1/rpc/transition_foundation_world_atomic",
       {
         method: "POST",
         body: JSON.stringify({
+          ...(sourceDocumentIds ? { p_source_document_ids: sourceDocumentIds } : {}),
           p_operation_id: value.operationId,
           p_action: action,
           p_workspace_key: value.workspaceKey,
@@ -268,7 +290,7 @@ export async function promoteFoundationCandidate(value: PromoteWorldMutation) {
     candidateObjectKey: value.candidateObjectKey,
     worldStateId: value.worldStateId,
     coreOutputSha256: value.coreOutputSha256,
-  });
+  }, value.sourceDocumentIds);
 }
 
 export async function rollbackFoundationWorld(value: RollbackWorldMutation) {
@@ -395,6 +417,70 @@ export async function listFoundationWorldVersions(
       return { ok: false as const, code: "WORLD_VERSION_BINDING_INVALID" };
     }
     return { ok: true as const, versions: versions as WorldVersionRow[] };
+  } catch {
+    return { ok: false as const, code: "WORLD_STORE_READ_FAILED" };
+  }
+}
+
+/**
+ * One promoted version of a collection, looked up by its exact opaque world_state_id -- however
+ * long ago it was promoted, where listFoundationWorldVersions stops at the 50 most recent.
+ *
+ * Read-only. All three keys are server-provided (the workspace from the authorized principal) and
+ * validated before any request is built; every request carries all three exact filters, so it can
+ * never widen into a history scan or reach another workspace or collection. At most two rows are
+ * read: one is the version, none is an explicit not-found, and two -- or a row that does not parse
+ * or names another world_state_id -- is refused rather than guessed between.
+ */
+export async function getFoundationWorldVersion(
+  workspaceKey: string,
+  collectionId: string,
+  worldStateId: string
+) {
+  // RegExp.test coerces, and String(undefined) is a valid workspace key and world_state_id.
+  if (
+    typeof workspaceKey !== "string" ||
+    !WORKSPACE_ID_PATTERN.test(workspaceKey) ||
+    typeof collectionId !== "string" ||
+    !COLLECTION_ID_PATTERN.test(collectionId) ||
+    typeof worldStateId !== "string" ||
+    !WORLD_STATE_ID.test(worldStateId)
+  ) {
+    return { ok: false as const, code: "WORLD_ID_INVALID" };
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config)
+    return { ok: false as const, code: "WORLD_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    select:
+      "manifest_digest,world_state_id,lifecycle_status,first_promoted_at,last_activated_at,activation_count",
+    workspace_key: `eq.${workspaceKey}`,
+    collection_id: `eq.${collectionId}`,
+    world_state_id: `eq.${worldStateId}`,
+    limit: "2",
+  });
+  try {
+    const response = await supabaseAdminRequest(
+      config,
+      `/rest/v1/foundation_world_versions?${query}`
+    );
+    if (!response.ok)
+      return { ok: false as const, code: "WORLD_STORE_READ_FAILED" };
+    const rows = (await response.json()) as unknown;
+    if (!Array.isArray(rows))
+      return { ok: false as const, code: "WORLD_VERSION_BINDING_INVALID" };
+    if (rows.length === 0) return { ok: true as const, found: false as const };
+    if (rows.length > 1)
+      return { ok: false as const, code: "WORLD_VERSION_AMBIGUOUS" };
+    const row = rows[0];
+    const version =
+      row !== null && typeof row === "object"
+        ? parseWorldVersion(row as Record<string, unknown>)
+        : null;
+    if (!version || version.world_state_id !== worldStateId) {
+      return { ok: false as const, code: "WORLD_VERSION_BINDING_INVALID" };
+    }
+    return { ok: true as const, found: true as const, version };
   } catch {
     return { ok: false as const, code: "WORLD_STORE_READ_FAILED" };
   }

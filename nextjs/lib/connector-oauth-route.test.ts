@@ -23,6 +23,7 @@ const environmentKeys = [
   "TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF",
   "TAVONEL_OAUTH_SECRET_BROKER_URL",
   "TAVONEL_OAUTH_SECRET_BROKER_TOKEN",
+  "TAVONEL_GOOGLE_VIEWER_LINK_ENABLED",
   "NEXT_PUBLIC_SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
 ] as const;
@@ -39,15 +40,24 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function request() {
+function request(body: Record<string, unknown> = { provider: "google_drive", displayName: "Research Drive" }) {
   return new Request("https://tavonel.com/api/v1/oauth-connectors/authorize", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ provider: "google_drive", displayName: "Research Drive" }),
+    body: JSON.stringify(body),
   });
 }
 
 describe("OAuth authorization route", () => {
+  it("keeps Google viewer linking disabled until its explicit consent UI is enabled", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const response = await authorizeOAuthConnector(request({ provider: "google_drive", displayName: "My Google identity", purpose: "viewer_acl_link" }));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "GOOGLE_VIEWER_LINK_NOT_ENABLED" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("refuses direct-upload-only workspaces before creating provider credentials", async () => {
     gate.mockResolvedValue(false);
     const fetcher = vi.fn();
@@ -91,5 +101,34 @@ describe("OAuth authorization route", () => {
     const authorizationWrite = fetcher.mock.calls.find(([input]) => String(input).includes("foundation_oauth_authorizations"));
     const stored = JSON.parse(String((authorizationWrite?.[1] as RequestInit | undefined)?.body));
     expect(stored.authorization_revision).toBe(17);
+  });
+
+  it("uses only Drive metadata read scope for an explicitly enabled viewer-link consent", async () => {
+    vi.stubEnv("TAVONEL_GOOGLE_VIEWER_LINK_ENABLED", "true");
+    vi.stubEnv("TAVONEL_PUBLIC_ORIGIN", "https://tavonel.com");
+    vi.stubEnv("TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_ID", "google-client");
+    vi.stubEnv("TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF", "gcp-sm://tavonel/oauth/google");
+    vi.stubEnv("TAVONEL_OAUTH_SECRET_BROKER_URL", "https://vault.test");
+    vi.stubEnv("TAVONEL_OAUTH_SECRET_BROKER_TOKEN", "x".repeat(40));
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://oauth-test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"x".repeat(40)}`);
+    const fetcher = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/v1/secrets/write")) return Response.json({ reference: "vault://tavonel/oauth/pkce/state" });
+      if (url.includes("foundation_oauth_authorizations")) return Response.json([{ authorization_id: "49d42924-a3cc-4a09-b92d-9c86b58901a1" }]);
+      if (url.includes("foundation_developer_audit_events")) return new Response(null, { status: 201 });
+      return Response.json({}, { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const response = await authorizeOAuthConnector(request({ provider: "google_drive", displayName: "My Google identity", purpose: "viewer_acl_link" }));
+    expect(response.status).toBe(200);
+    const { authorizationUrl } = await response.json() as { authorizationUrl: string };
+    const url = new URL(authorizationUrl);
+    expect(url.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/drive.metadata.readonly");
+    expect(url.searchParams.has("access_type")).toBe(false);
+    const authorizationWrite = fetcher.mock.calls.find(([input]) => String(input).includes("foundation_oauth_authorizations"));
+    expect(JSON.parse(String((authorizationWrite?.[1] as RequestInit | undefined)?.body))).toMatchObject({
+      authorization_purpose: "viewer_acl_link", requested_scopes: ["https://www.googleapis.com/auth/drive.metadata.readonly"],
+    });
   });
 });

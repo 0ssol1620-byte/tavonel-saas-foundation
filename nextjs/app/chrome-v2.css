@@ -1,7 +1,8 @@
 
 :root {
-  --chrome-gutter: clamp(20px, 3vw, 64px);
-  --chrome-measure: 1600px;
+  --chrome-gutter: clamp(20px, 2.5vw, 32px);
+  --chrome-measure: 1280px;
+  --chrome-header-height: 64px;
 }
 
 
@@ -14,23 +15,67 @@
 }
 .nav.chrome-v2-header {
   height: 64px;
+  min-height: 64px;
   padding-block: 0;
   padding-inline: max(var(--chrome-gutter), calc((100% - var(--chrome-measure)) / 2));
-  background: transparent;
-  border-bottom: 1px solid transparent;
+  background: #f7f5ef;
+  border-bottom: 1px solid #d8ddd9;
+  color: #171c20;
+  --text-hi: #171c20;
+  --text-mid: #53606a;
+  --text-lo: #53606a;
+  --source: #2447b3;
 }
 .nav.chrome-v2-header[data-scrolled="1"] {
-  background: rgba(9, 13, 20, 0.94);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background: #f7f5ef;
+  border-bottom-color: #d8ddd9;
+}
+
+/* The disclosure panel is a public reading surface, including on dark product routes. */
+.nav.chrome-v2-header .one-path-mobile-nav {
+  --ground: #fff;
+  --seam: #d8ddd9;
+  --g1: #f7f5ef;
+  --text-hi: #171c20;
+  --text-mid: #53606a;
+  --text-lo: #53606a;
+  --hairline: #d8ddd9;
+  --hairline-hi: #d8ddd9;
+  --border-dark: #d8ddd9;
+}
+/* Author display:grid on the panel overrides the browser's closed-details default. */
+.nav.chrome-v2-header .one-path-mobile-nav:not([open]) > nav {
+  display: none;
+}
+@media (max-width: 767px) {
+  :root { --chrome-header-height: 56px; }
+  .nav.chrome-v2-header { height: 56px; min-height: 56px; }
+  body:not(:has([data-marketing-consent-panel])) .paper-product .lv2-hero { padding-top: 76px; }
 }
 @media (max-width: 1249px) {
   .nav > .one-path-primary-nav { display: none; }
   .mobile-primary-nav.one-path-mobile-nav { display: block; }
   .nav-signin.chrome-v2-signin { display: none; }
 }
-.nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; }
+.nav-signin.chrome-v2-signin { min-width: 44px; justify-content: center; color: #53606a; }
+
+/* The phone disclosure stays legible on paper, scrolled, and unscrolled public headers. */
+.nav.chrome-v2-header .one-path-mobile-nav > summary {
+  min-height: 44px;
+  border-radius: 6px;
+  border-color: #88928d;
+  background: #f7f5ef;
+  color: #111519;
+  transition: color .15s ease, border-color .15s ease;
+}
+@media (max-width: 400px) {
+  .nav.chrome-v2-header .one-path-mobile-nav > summary::before,
+  .nav.chrome-v2-header .one-path-mobile-nav > summary::after {
+    color: #111519;
+    background: currentColor;
+  }
+}
+.nav.chrome-v2-header .nav-actions .btn { color: #fff; background: #2447b3; border-color: #2447b3; }
 @media (min-width: 1250px) {
   .mobile-primary-nav.one-path-mobile-nav { display: none; }
 }
@@ -57,10 +102,11 @@
 @media (hover: hover) and (pointer: fine) {
   .one-path-primary-nav .site-nav-direct:hover { color: var(--text-hi); }
 }
-.one-path-primary-nav .site-nav-direct[aria-current="page"] {
+.one-path-primary-nav .site-nav-direct[aria-current="page"],
+.one-path-primary-nav .site-nav-direct[aria-current="location"] {
   color: var(--text-hi);
   text-decoration: underline;
-  text-decoration-color: var(--verified);
+  text-decoration-color: #2447b3;
   text-decoration-thickness: 2px;
   text-underline-offset: 7px;
 }
@@ -73,9 +119,11 @@
   font-size: 15px;
   letter-spacing: 0;
 }
-.one-path-mobile-nav .mobile-nav-direct[aria-current="page"] {
+/* Section ownership uses the same blue selection cue on phone as the desktop underline. */
+.one-path-mobile-nav .mobile-nav-direct[aria-current="page"],
+.one-path-mobile-nav .mobile-nav-direct[aria-current="location"] {
   color: var(--text-hi);
-  box-shadow: inset 2px 0 0 var(--verified);
+  box-shadow: inset 2px 0 0 #2447b3;
 }
 .one-path-mobile-nav .mobile-nav-signin {
   border-top: 1px solid var(--border-dark, var(--hairline));
@@ -118,7 +166,7 @@
     margin: 0;
     background: currentColor;
     color: var(--text-hi);
-    transition: transform .18s ease, box-shadow .18s ease;
+    transition: none;
   }
   .one-path-mobile-nav > summary::before { transform: translateY(-5.5px); box-shadow: 0 5px 0 currentColor; }
   .one-path-mobile-nav > summary::after { transform: translateY(4.5px); }
@@ -130,7 +178,14 @@
   }
 }
 footer.site.chrome-v2-footer {
-  border-top: 1px solid var(--border-dark, var(--hairline));
+  border-top: 1px solid #d8ddd9;
+  background: #f7f5ef;
+  color: #171c20;
+  --text-hi: #171c20;
+  --text-mid: #53606a;
+  --text-lo: #53606a;
+  --hairline: #d8ddd9;
+  --border-dark: #d8ddd9;
 }
 .chrome-v2-footer .site-footer-tagline {
   font-family: var(--f-sans);

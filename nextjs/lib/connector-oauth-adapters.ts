@@ -15,10 +15,19 @@ export type OAuthSourceItem = {
   sizeBytes: number | null;
   modifiedAt: string | null;
   kind: "file" | "folder" | "deleted";
+  /** Dropbox `path_lower`: where the item was observed, never its identity. */
+  providerPath?: string;
+};
+
+/** Dropbox DeletedMetadata: a path and no id. Resolved by dropbox-source-reconciliation, never imported. */
+export type OAuthPathTombstone = Omit<OAuthSourceItem, "nativeId" | "kind" | "providerPath"> & {
+  nativeId: null;
+  kind: "deleted";
+  providerPath: string;
 };
 
 export type OAuthSourcePage = {
-  items: OAuthSourceItem[];
+  items: Array<OAuthSourceItem | OAuthPathTombstone>;
   cursor: string | null;
   complete: boolean;
 };
@@ -69,9 +78,9 @@ function sourceRows(payload: Record<string, unknown>, key: string): Record<strin
   return rows;
 }
 
-function completeObservations(items: Array<OAuthSourceItem | null>): OAuthSourceItem[] {
+function completeObservations<T>(items: Array<T | null>): T[] {
   if (items.some(item => item === null)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
-  return items as OAuthSourceItem[];
+  return items as T[];
 }
 
 function boundedString(value: unknown, maximum: number) {
@@ -168,15 +177,18 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     LIST_POLICY.dropbox,
   );
   const rows = sourceRows(payload, "entries");
-  const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
+  const items = completeObservations(rows.map((row): OAuthSourceItem | OAuthPathTombstone | null => {
     if (!readableRow(row)) return null;
     const tag = row[".tag"];
-    const nativeId = boundedString(row.id, 512) ?? boundedString(row.path_lower, 1_024);
-    const name = boundedString(row.name, 512);
-    if (!nativeId || !name || !["file", "folder", "deleted"].includes(String(tag))) return null;
     const deleted = tag === "deleted";
-    const revision = deleted ? `deleted:${boundedString(row.path_lower, 1_024) ?? nativeId}` : boundedString(row.rev, 512) ?? `folder:${nativeId}`;
-    return { nativeId, name, revision, mimeType: null, sizeBytes: tag === "file" ? boundedSize(row.size) : null, modifiedAt: boundedString(row.server_modified, 64), kind: tag as OAuthSourceItem["kind"] };
+    // DeletedMetadata has path_lower and no id. The path travels beside the id, never as one.
+    const nativeId = boundedString(row.id, 512);
+    const providerPath = boundedString(row.path_lower, 1_024);
+    const name = boundedString(row.name, 512);
+    if ((!nativeId && !deleted) || !providerPath || !name || !["file", "folder", "deleted"].includes(String(tag))) return null;
+    const revision = deleted ? `deleted:${providerPath}` : boundedString(row.rev, 512) ?? `folder:${nativeId}`;
+    const observed = { name, revision, providerPath, mimeType: null, sizeBytes: tag === "file" ? boundedSize(row.size) : null, modifiedAt: boundedString(row.server_modified, 64) };
+    return nativeId ? { ...observed, nativeId, kind: tag as OAuthSourceItem["kind"] } : { ...observed, nativeId: null, kind: "deleted" };
   }));
   const next = safeOpaqueContinuation(payload.cursor, 4_096);
   if (typeof payload.has_more !== "boolean") throw new Error("OAUTH_SOURCE_PAGE_INVALID");

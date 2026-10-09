@@ -8,11 +8,36 @@ import {
   pageCountLabel,
   pageEstimateConfidence,
   quoteCompilePages,
+  quoteIntakeManifest,
   reservationPageCeiling,
   weakestConfidence,
 } from "./usage-pricing";
 
 describe("page-based compile pricing", () => {
+  it("approves the complete manifest and includes unknown files at the full processing ceiling", () => {
+    const pdf = "application/pdf";
+    const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const known = quoteIntakeManifest([{ bytes: 80_000, mimeType: pdf, claimedPages: 4, claimedBasis: "pdf_page_tree" }]);
+    expect(known.ok && known.quote.files[0]?.pageBasis).toBe("measured");
+    expect(known.ok && known.quote.maximumCredits).toBe(24);
+
+    const staleDocx = quoteIntakeManifest([{ bytes: 80_000, mimeType: docx, claimedPages: 75, claimedBasis: "docx_declared" }]);
+    expect(staleDocx.ok && staleDocx.quote.files[0]?.pageBasis).toBe("declared");
+    expect(staleDocx.ok && staleDocx.quote.maximumCredits).toBe(450);
+
+    const unknownSheet = quoteIntakeManifest([{ bytes: 80_000, mimeType: xlsx, claimedPages: null, claimedBasis: null }]);
+    expect(unknownSheet.ok && unknownSheet.quote.files[0]?.approvedMaxPages).toBe(80);
+    expect(unknownSheet.ok && unknownSheet.quote.maximumCredits).toBe(480);
+
+    const mixed = quoteIntakeManifest([
+      { bytes: 80_000, mimeType: pdf, claimedPages: 4, claimedBasis: "pdf_page_tree" },
+      { bytes: 80_000, mimeType: xlsx, claimedPages: null, claimedBasis: null },
+    ]);
+    expect(mixed.ok && mixed.quote.maximumPages).toBe(84);
+    expect(mixed.ok && mixed.quote.maximumCredits).toBe(504);
+  });
+
   it("quotes standard and hard maximum usage in pages and dollars", () => {
     expect(quoteCompilePages(348)).toEqual({
       pages: 348,
@@ -170,18 +195,26 @@ describe("what an uncounted source reserves", () => {
   });
 
   /*
-    Both server call sites, asserted as call sites. A ceiling that only one of them reads is the
-    same defect in half the places, and the `?? 1` it replaces was identical in both files.
+    Both server call sites, asserted as call sites. The upload capability now reserves the
+    approved per-file quote, bound to the pricing fingerprint the customer approved; the connector
+    import has no approval and still reserves the ceiling. Neither may go back to the `?? 1` that
+    was once identical in both files.
   */
-  it("is what both reservation call sites use, and neither falls back to one page", () => {
-    const sites = [
-      readFileSync(new URL("../app/api/uploads/capability/route.ts", import.meta.url), "utf8"),
-      readFileSync(new URL("./source-import.ts", import.meta.url), "utf8"),
-    ];
-    for (const source of sites) {
-      expect(source).toContain("reservationPageCeiling(");
-      expect(source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, " "))
-        .not.toContain("?.pages ?? 1");
+  it("is what the unapproved call site uses, the approved one reserves its quote, and neither falls back to one page", () => {
+    const code = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, " ");
+    const capability = code("../app/api/uploads/capability/route.ts");
+    const sourceImport = code("./source-import.ts");
+
+    const approvedCall = capability.match(/\breserveFoundationIntakeApprovedFile\(\{([^}]*)\}\)/);
+    expect(approvedCall).not.toBeNull();
+    expect(approvedCall![1]).toMatch(/\bpricingFingerprint\b/);
+    expect(capability).not.toContain("reservationPageCeiling(");
+
+    expect(sourceImport).toContain("reservationPageCeiling(");
+
+    for (const source of [capability, sourceImport]) {
+      expect(source).not.toContain("?.pages ?? 1");
     }
   });
 

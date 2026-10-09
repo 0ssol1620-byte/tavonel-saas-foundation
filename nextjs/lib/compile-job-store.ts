@@ -2,7 +2,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { CORPUS_ID_PATTERN, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
 import { corpusIdFor } from "./corpus-id";
+import { globalCollectionCompileEnabled } from "./global-collection-compile";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
+import { googleDriveAclMaxAgeSeconds } from "./connector-source-access";
+import { compileJobAuthorityEnabled } from "./compile-job-authority";
 
 /*
   The application's view of durable compile orchestration (migration 0038).
@@ -84,8 +87,13 @@ export type CompileBlocker = {
 export type CompileJob = {
   jobId: string;
   workspaceKey: string;
+  /** Requesting member persisted at enqueue; never inferred from a connector owner. */
+  createdByUserId: string | null;
+  /** Membership authority epoch captured at enqueue; NULL means legacy and is denied. */
+  authorizationRevision: number | null;
   documentIds: string[];
   state: CompileState;
+  compilationMode?: "document_batch" | "global_collection";
   collectionId: string | null;
   errorCode: string | null;
   blocked: CompileBlocker[];
@@ -260,6 +268,8 @@ async function rpc(name: string, body: unknown): Promise<CompileJobResult<unknow
 type CompileJobRow = {
   job_id: string;
   workspace_key: string;
+  created_by_user_id?: string | null;
+  authorization_revision?: number | null;
   document_ids: string[];
   state: string;
   collection_id: string | null;
@@ -292,8 +302,12 @@ function toJob(row: CompileJobRow): CompileJob | null {
   return {
     jobId: row.job_id,
     workspaceKey: row.workspace_key,
+    createdByUserId: typeof row.created_by_user_id === "string" ? row.created_by_user_id : null,
+    authorizationRevision: typeof row.authorization_revision === "number" && Number.isSafeInteger(row.authorization_revision) && row.authorization_revision > 0
+      ? row.authorization_revision : null,
     documentIds: Array.isArray(row.document_ids) ? row.document_ids : [],
     state: row.state,
+    compilationMode: (row as CompileJobRow & { compilation_mode?: string }).compilation_mode === "global_collection" ? "global_collection" : "document_batch",
     collectionId: row.collection_id,
     errorCode: row.error_code,
     blocked: parseBlocked(row.blocked),
@@ -357,14 +371,18 @@ async function workspaceCompileCapacity(
 export async function enqueueCompileJob(input: {
   workspaceKey: string;
   createdByUserId: string;
+  authorizationRevision: number;
+  connectorViewerEnabled: boolean;
   documentIds: readonly string[];
   /* Present when this job is one part of a corpus compile. */
   corpus?: { corpusId: string; batchIndex: number; batchCount: number };
+  globalCollection?: boolean;
 }): Promise<CompileJobResult<{ jobId: string; state: CompileState; created: boolean }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
   if (!UUID.test(input.createdByUserId)) return fail("COMPILE_JOB_SCOPE_INVALID");
   const documentIds = [...new Set(input.documentIds)];
-  if (documentIds.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (documentIds.length === 0 || documentIds.length > CORPUS_MAX_DOCUMENTS) return fail("COMPILE_JOB_SCOPE_INVALID");
+  if (input.globalCollection && (!globalCollectionCompileEnabled() || !input.corpus || input.corpus.batchIndex !== 0 || input.corpus.batchCount !== 1)) return fail("COMPILE_JOB_SCOPE_INVALID");
   // See CANONICAL_DOCUMENT_ID: an id the deletion guard cannot match is worse than a rejected
   // compile, so it is rejected here, where every caller converges, rather than at the route.
   if (documentIds.some((id) => !CANONICAL_DOCUMENT_ID.test(id))) return fail("COMPILE_JOB_SCOPE_INVALID");
@@ -380,25 +398,42 @@ export async function enqueueCompileJob(input: {
   if (!capacity.ok) return capacity;
   if (!capacity.value.allowed) return fail("COMPILE_JOB_WORKSPACE_LIMIT_REACHED");
 
-  const result = await rpc("enqueue_foundation_compile_job", {
-    p_job_id: newCompileJobId(),
-    p_workspace_key: input.workspaceKey,
-    p_created_by_user_id: input.createdByUserId,
-    p_document_ids: documentIds,
-    p_idempotency_key: idempotencyKey,
-    p_corpus_id: input.corpus?.corpusId ?? null,
-    p_batch_index: input.corpus?.batchIndex ?? null,
-    p_batch_count: input.corpus?.batchCount ?? null,
-  });
+  const authorityEnabled = compileJobAuthorityEnabled();
+  if (authorityEnabled && (!Number.isSafeInteger(input.authorizationRevision) || input.authorizationRevision <= 0 || typeof input.connectorViewerEnabled !== "boolean")) return fail("COMPILE_JOB_SCOPE_INVALID");
+
+  // Default-off keeps the deployed enqueue RPC contract intact. Once enabled, the additive RPC
+  // must exist and bind actor epoch plus connector evidence in one transaction; never fall back.
+  const enqueueRpc = authorityEnabled
+    ? await rpc("enqueue_foundation_compile_job_with_authority", {
+        p_job_id: newCompileJobId(), p_workspace_key: input.workspaceKey,
+        p_created_by_user_id: input.createdByUserId, p_authorization_revision: input.authorizationRevision,
+        p_connector_viewer_enabled: input.connectorViewerEnabled, p_document_ids: documentIds,
+        p_idempotency_key: idempotencyKey, p_corpus_id: input.corpus?.corpusId ?? null,
+        p_batch_index: input.corpus?.batchIndex ?? null, p_batch_count: input.corpus?.batchCount ?? null,
+        p_global_collection: input.globalCollection === true,
+        // This is server configuration, never accepted from the enqueue request.
+        p_max_age_seconds: googleDriveAclMaxAgeSeconds(),
+      })
+    : await rpc(input.globalCollection ? "enqueue_foundation_global_collection_job" : "enqueue_foundation_compile_job", {
+        p_job_id: newCompileJobId(), p_workspace_key: input.workspaceKey,
+        p_created_by_user_id: input.createdByUserId, p_document_ids: documentIds,
+        p_idempotency_key: idempotencyKey, p_corpus_id: input.corpus?.corpusId ?? null,
+        p_batch_index: input.corpus?.batchIndex ?? null, p_batch_count: input.corpus?.batchCount ?? null,
+      });
+  const result = enqueueRpc;
   if (!result.ok) return result;
 
   const row = Array.isArray(result.value) ? result.value[0] : result.value;
   const record = row as {
     job_id?: unknown; state?: unknown; created?: unknown;
     corpus_id?: unknown; batch_index?: unknown; idempotency_key?: unknown;
+    created_by_user_id?: unknown; authorization_revision?: unknown;
   } | null;
   if (!record || typeof record.job_id !== "string" || !isCompileState(record.state)) {
     return fail("COMPILE_JOB_STORE_WRITE_FAILED");
+  }
+  if (authorityEnabled && (record.created_by_user_id !== input.createdByUserId || record.authorization_revision !== input.authorizationRevision)) {
+    return fail("COMPILE_JOB_SLOT_CONFLICT");
   }
 
   /*
@@ -770,6 +805,8 @@ export async function readOpenCompileJobs(limit = 20): Promise<CompileJobResult<
 export async function enqueueCorpusCompile(input: {
   workspaceKey: string;
   createdByUserId: string;
+  authorizationRevision: number;
+  connectorViewerEnabled: boolean;
   documentIds: readonly string[];
 }): Promise<CompileJobResult<{
   corpusId: string;
@@ -778,17 +815,30 @@ export async function enqueueCorpusCompile(input: {
   incompleteReason: CompileJobFailure | null;
 }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
-  const batches: CorpusBatch[] = planCorpusBatches(input.documentIds);
+  const globalCollection = globalCollectionCompileEnabled();
+  const ordered = [...new Set(input.documentIds)].sort();
+  if (ordered.length > CORPUS_MAX_DOCUMENTS) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const batches: CorpusBatch[] = globalCollection
+    ? [{ index: 0, count: 1, documentIds: ordered }]
+    : planCorpusBatches(input.documentIds);
   if (batches.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
-  const corpusId = corpusIdFor(input.workspaceKey, input.documentIds);
+  if (ordered.length === 0) return fail("COMPILE_JOB_SCOPE_INVALID");
+  const baseCorpusId = corpusIdFor(input.workspaceKey, input.documentIds);
+  // A new namespace prevents adopting a legacy batch slot as a whole-collection job.
+  const corpusId = globalCollection
+    ? `corpus-${createHash("sha256").update(`global-collection/1\n${baseCorpusId}`).digest("hex").slice(0, 32)}`
+    : baseCorpusId;
 
   const parts: Array<{ jobId: string; batchIndex: number; state: CompileState; created: boolean }> = [];
   for (const batch of batches) {
     const enqueued = await enqueueCompileJob({
       workspaceKey: input.workspaceKey,
       createdByUserId: input.createdByUserId,
+      authorizationRevision: input.authorizationRevision,
+      connectorViewerEnabled: input.connectorViewerEnabled,
       documentIds: batch.documentIds,
       corpus: { corpusId, batchIndex: batch.index, batchCount: batch.count },
+      ...(globalCollection ? { globalCollection: true } : {}),
     });
     if (!enqueued.ok) {
       if (parts.length === 0) return enqueued;

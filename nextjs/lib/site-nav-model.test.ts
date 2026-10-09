@@ -5,6 +5,8 @@ import sitemap from "@/app/sitemap";
 import { exploreSampleDocuments } from "./explore-sample";
 import {
   CUSTOMER_NAV,
+  customerNavCurrent,
+  customerNavOwns,
   EXPLORE_CTA,
   FOOTER_GROUPS,
   FOOTER_LEGAL_ROW,
@@ -181,7 +183,7 @@ describe("the global menu's destinations", () => {
 });
 
 /*
-  Landing V2, 2026-09-19 (blueprint §8, contract D2). The bar a reader actually sees.
+  Landing V2, 2026-09-19 (blueprint §8, contract D2). The public destinations a reader actually sees.
 
   Everything above this describes `NAV_GROUPS`, which is the 2026-09-11 IA model and is rendered
   by nothing today -- `app/tavonel.css` records where its disclosures used to be. `CUSTOMER_NAV`
@@ -190,7 +192,16 @@ describe("the global menu's destinations", () => {
   are silent in a browser: a bar link to a route the site does not publish, and a /ko header with
   an English label in it because the Korean table was not extended with the bar.
 */
-describe("the five destinations in the bar", () => {
+describe("the four destinations in the bar", () => {
+  it("shows Product, Explore, Developers and Pricing in the requested order", () => {
+    expect(CUSTOMER_NAV).toEqual([
+      { href: "/product", label: "Product" },
+      { href: "/explore", label: "Explore" },
+      { href: "/developers", label: "Developers" },
+      { href: "/pricing", label: "Pricing" },
+    ]);
+  });
+
   it("offers no link the site cannot answer", () => {
     for (const item of CUSTOMER_NAV) {
       expect(SITEMAP_PATHS.has(item.href), `${item.href} is not in app/sitemap.ts`).toBe(true);
@@ -312,5 +323,43 @@ describe("which bar item owns the page being read", () => {
   it("reads a trailing slash as the same page", () => {
     expect(navSectionForPath("/docs/mcp/")).toBe("developers");
     expect(navSectionForPath("/pricing/")).toBe("pricing");
+  });
+});
+
+describe("the customer navigation's current page and section", () => {
+  it.each(CUSTOMER_NAV)("marks the exact $href destination as the current page", ({ href }) => {
+    expect(customerNavCurrent(href, href)).toBe("page");
+    expect(customerNavCurrent(href, `${href}/`)).toBe("page");
+    expect(customerNavOwns(href, href)).toBe(true);
+  });
+
+  it.each([
+    ["/product/compiled-world", "/product"],
+    ["/solutions", "/product"],
+    ["/solutions/source-grounded-assistants", "/product"],
+    ["/sources", "/product"],
+    ["/integrations", "/product"],
+    ["/knowledge-compiler", "/product"],
+    ["/docs", "/developers"],
+    ["/docs/mcp", "/developers"],
+    ["/api", "/developers"],
+    ["/changelog", "/developers"],
+    ["/cookbooks", "/developers"],
+  ])("marks %s as a location within %s, with one owner", (path, owner) => {
+    expect(customerNavCurrent(owner, path)).toBe("location");
+    expect(customerNavCurrent(owner, `${path}/`)).toBe("location");
+    expect(CUSTOMER_NAV.filter(({ href }) => customerNavOwns(href, path)).map(({ href }) => href)).toEqual([owner]);
+  });
+
+  it.each([
+    "/", "/research", "/trust", "/contact", "/privacy", "/workspace",
+    "/productivity", "/solutions-extra", "/sources-extra", "/integrations-old",
+    "/knowledge-compiler-extra", "/developers-guide", "/docs-old", "/apidocs",
+    "/changelog-extra", "/cookbookshelf", "/explorers", "/pricing-extra",
+  ])("gives %s no false page or section owner", (path) => {
+    for (const { href } of CUSTOMER_NAV) {
+      expect(customerNavCurrent(href, path)).toBeUndefined();
+      expect(customerNavOwns(href, path)).toBe(false);
+    }
   });
 });

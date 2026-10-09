@@ -142,4 +142,38 @@ describe("connection sync batch", () => {
       events: forgedEvents,
     }, workspaceKey)).resolves.toBeNull();
   });
+
+  it("lets server-minted UUIDv4 approved identities reach transactional sync binding", async () => {
+    const workspaceKey = "pilot-1234567890abcdef";
+    const attemptKey = "att_0123456789abcdef0123456789abcdef";
+    const fileKey = "fk_0123456789abcdef0123456789abcdef01234567";
+    const sourceIdempotencyKey = await (async () => {
+      const bytes = new TextEncoder().encode(["tavonel-approved-source-v1", attemptKey, fileKey].join("\x1f"));
+      const hash = await crypto.subtle.digest("SHA-256", bytes);
+      return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    })();
+    const events = [{
+      kind: "added" as const,
+      nativeId: "folder/report.pdf",
+      revision: "sha256:source",
+      contentSha256: "a".repeat(64),
+      sizeBytes: 128,
+      mimeType: "application/pdf",
+      documentId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
+      sourceIdempotencyKey,
+    }];
+    const input = {
+      batchId: "49d42924-a3cc-4a09-b92d-9c86b58901a1",
+      previousCursorSha256: null,
+      nextCursorSha256: `sha256:${"b".repeat(64)}`,
+      manifestSha256: await sha256Prefixed(canonicalJson(events)),
+      events,
+    };
+
+    // Syntactic parsing leaves the identity decision to apply_foundation_connection_batch,
+    // which binds the v4 document ID to the stored approval under its transaction locks.
+    await expect(parseConnectionBatchInput(input)).resolves.not.toBeNull();
+    // Existing workspace-aware validation remains strict for legacy callers.
+    await expect(parseConnectionBatchInput(input, workspaceKey)).resolves.toBeNull();
+  });
 });

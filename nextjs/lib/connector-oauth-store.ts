@@ -10,6 +10,7 @@ export type OAuthAuthorizationRecord = {
   requestedScopes: string[];
   userId: string;
   authorizationRevision: number;
+  authorizationPurpose: "connector_connection" | "viewer_acl_link";
 };
 
 export type OAuthConnection = {
@@ -72,6 +73,7 @@ export async function createOAuthAuthorization(input: {
   redirectUri: string;
   requestedScopes: readonly string[];
   authorizationRevision: number;
+  authorizationPurpose?: "connector_connection" | "viewer_acl_link";
 }) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "OAUTH_STORE_NOT_CONFIGURED" };
@@ -90,6 +92,7 @@ export async function createOAuthAuthorization(input: {
         requested_scopes: input.requestedScopes,
         created_by: input.userId,
         authorization_revision: input.authorizationRevision,
+        authorization_purpose: input.authorizationPurpose ?? "connector_connection",
         expires_at: expiresAt,
       }),
     });
@@ -122,13 +125,46 @@ export async function consumeOAuthAuthorization(stateSha256: string, provider: O
       body: JSON.stringify({ p_state_sha256: stateSha256, p_provider: provider }),
     });
     const row = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes) || !Number.isSafeInteger(row.authorizationRevision) || Number(row.authorizationRevision) < 1) {
+    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes) || !Number.isSafeInteger(row.authorizationRevision) || Number(row.authorizationRevision) < 1 || (row.authorizationPurpose !== "connector_connection" && row.authorizationPurpose !== "viewer_acl_link")) {
       return { ok: false as const, code: "OAUTH_AUTHORIZATION_INVALID" };
     }
     return { ok: true as const, authorization: row as unknown as OAuthAuthorizationRecord };
   } catch {
     return { ok: false as const, code: "OAUTH_AUTHORIZATION_INVALID" };
   }
+}
+
+export async function recordGoogleDriveViewerPrincipal(authorizationId: string, permissionId: string) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authorizationId) || typeof permissionId !== "string" ||
+      permissionId.length < 1 || permissionId.length > 512 || /[\u0000-\u001f\u007f]/.test(permissionId)) {
+    return { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" };
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/record_google_drive_viewer_principal", {
+      method: "POST", body: JSON.stringify({ p_authorization_id: authorizationId, p_permission_id: permissionId }),
+    });
+    return response.ok ? { ok: true as const } : { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" };
+  } catch { return { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" }; }
+}
+
+export async function revokeGoogleDriveViewerPrincipals(input: {
+  workspaceKey: string; userId: string; authorizationRevision: number;
+}) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/revoke_google_drive_viewer_principals", {
+      method: "POST", body: JSON.stringify({ p_workspace_key: input.workspaceKey,
+        p_actor_user_id: input.userId, p_authorization_revision: input.authorizationRevision }),
+    });
+    if (!response.ok) return { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" };
+    const count: unknown = await response.json();
+    return Number.isSafeInteger(count) && Number(count) >= 0
+      ? { ok: true as const, revokedCount: Number(count) }
+      : { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" };
+  } catch { return { ok: false as const, code: "GOOGLE_VIEWER_LINK_STORE_FAILED" }; }
 }
 
 export async function listOAuthConnections(workspaceKey: string) {

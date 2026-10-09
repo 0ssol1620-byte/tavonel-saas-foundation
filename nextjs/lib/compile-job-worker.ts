@@ -1,3 +1,4 @@
+import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX } from "./global-collection-compile";
 import { isCompileWaitingOnReading, runCollectionCompile } from "./collection-compile-run";
 import {
   advanceCompileJob,
@@ -12,6 +13,7 @@ import {
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
 import { listImmutableWorkspaceObjects } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
+import { authorizeCompileJobSourceAccess, classifyCompileJobSources, compileJobAuthorityEnabled } from "./compile-job-authority";
 
 /*
   The half of the compile that no longer needs a browser.
@@ -94,11 +96,15 @@ const READING_LISTING_DISAGREEMENT = "READING_LISTING_DISAGREEMENT";
  * row has no attempt column to hold it until the migration that gives it one.
  */
 const MAX_READING_DEFERRALS = 10;
+/** Temporary policy-store outages retry with the same bounded, durable deferral ledger. */
+const MAX_AUTHORITY_DEFERRALS = 10;
 
 export type CompileJobTurn = {
   jobId: string;
   state: CompileState;
   note: "waiting" | "advanced" | "blocked" | "compiled" | "failed" | "resting" | "skipped";
+  /** True when a temporary authority-store failure should not consume the runnable batch width. */
+  retryable?: true;
   documentsReady: number;
   blocked: CompileBlocker[];
 };
@@ -166,7 +172,8 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     state: CompileState,
     documentsReady: number,
     blocked: CompileBlocker[],
-  ): CompileJobTurn => ({ jobId: job.jobId, state, note, documentsReady, blocked });
+    retryable = false,
+  ): CompileJobTurn => ({ jobId: job.jobId, state, note, documentsReady, blocked, ...(retryable ? { retryable: true as const } : {}) });
 
   /*
     A resting state is not an unfinished one.
@@ -180,6 +187,56 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
   */
   if (isRestingCompileState(job.state)) return rest("resting", job.state, job.documentsReady, job.blocked);
 
+  if (job.compilationMode === "global_collection" && !globalCollectionCompileEnabled()) {
+    return rest("skipped", job.state, job.documentsReady, job.blocked);
+  }
+  const settleAuthorityFailure = async (errorCode: string) => {
+    const settled = await advanceCompileJob({ workspaceKey: job.workspaceKey, jobId: job.jobId, state: "failed",
+      documentsReady: job.documentsReady, errorCode });
+    if (!settled.ok || !settled.value.changed) {
+      // Keep a denied job unread, but let the bounded batch scan past it until terminal state can
+      // be durably recorded. Never report failed as settled when the store refused the write.
+      return rest("waiting", job.state, job.documentsReady, job.blocked, true);
+    }
+    return rest("failed", "failed", job.documentsReady, job.blocked);
+  };
+  const deferAuthorityUnavailable = async () => {
+    const reason = "COMPILE_SOURCE_AUTHORITY_UNAVAILABLE";
+    const seen = await countCompileJobDeferrals(job.workspaceKey, job.jobId, reason, MAX_AUTHORITY_DEFERRALS + 1);
+    // An unreadable ledger is not evidence of exhaustion. Keep the job blocked and retry once
+    // the store answers; no protected source read is permitted on this path.
+    const attempt = (seen.ok ? seen.value : 0) + 1;
+    if (seen.ok && attempt > MAX_AUTHORITY_DEFERRALS) return settleAuthorityFailure(reason);
+    const recorded = await recordCompileJobDeferral({ job, state: job.state, documentsReady: job.documentsReady,
+      blocked: job.blocked, reason, attempt });
+    // Try the independent queue timestamp update even when event recording failed. Each write is
+    // checked; if either is unavailable, mark this turn retryable so the batch can scan past it.
+    const bumped = await advanceCompileJob({ workspaceKey: job.workspaceKey, jobId: job.jobId, state: job.state,
+      documentsReady: job.documentsReady });
+    if (!recorded.ok || !bumped.ok || !bumped.value.changed) {
+      return rest("waiting", job.state, job.documentsReady, job.blocked, true);
+    }
+    return rest("waiting", job.state, job.documentsReady, job.blocked, true);
+  };
+  if (compileJobAuthorityEnabled()) {
+    if (!job.createdByUserId || !job.authorizationRevision) {
+      return settleAuthorityFailure("COMPILE_SOURCE_AUTHORITY_MISSING");
+    }
+    // Enabled mode requires the durable actor-bound RPC before protected reads; unavailable RPC
+    // fails closed and never falls back to the enqueue creator as a provider principal.
+    const authority = await authorizeCompileJobSourceAccess({ jobId: job.jobId,
+      workspaceKey: job.workspaceKey, documentIds: job.documentIds, phase: "before_source_read" });
+    if (!authority.ok) {
+      if (authority.code === "COMPILE_JOB_AUTHORITY_DENIED") return settleAuthorityFailure("COMPILE_SOURCE_AUTHORITY_REVOKED");
+      return deferAuthorityUnavailable();
+    }
+  } else {
+    // The default-off path preserves existing direct-upload jobs. Connector bindings are
+    // explicitly denied until actor-bound processing authority is enabled.
+    const source = await classifyCompileJobSources({ workspaceKey: job.workspaceKey, documentIds: job.documentIds });
+    if (!source.ok) return deferAuthorityUnavailable();
+    if (source.scope === "connector") return settleAuthorityFailure("COMPILE_SOURCE_AUTHORITY_DISABLED");
+  }
   const signer = readR2SignerEnv();
   if (!signer) return rest("skipped", job.state, job.documentsReady, job.blocked);
 
@@ -268,7 +325,9 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
     return rest("skipped", job.state, classified.ready.length, classified.blocked);
   }
 
-  const run = await runCollectionCompile(job.workspaceKey, classified.ready);
+  const run = job.compilationMode === "global_collection"
+    ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`, job.jobId)
+    : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId);
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
       /*
@@ -358,11 +417,20 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
 
 /** One turn across the queue: pick up whatever is due and advance each by one step. */
 export async function runCompileJobBatch(limit = 5): Promise<CompileJobTurn[]> {
-  const open = await readOpenCompileJobs(limit);
+  // Read a bounded scan window so a handful of policy-store outages cannot monopolize the
+  // oldest-first runnable window when their event or timestamp write fails. This is one metadata
+  // query; retryable jobs still perform no R2 listing, OCR read, or Core dispatch.
+  const workLimit = Math.min(Math.max(Math.trunc(limit) || 1, 1), 100);
+  const open = await readOpenCompileJobs(Math.min(workLimit * 2, 100));
   if (!open.ok) return [];
   const turns: CompileJobTurn[] = [];
+  let attempted = 0;
   for (const job of open.value) {
-    turns.push(await runCompileJobTurn(job));
+    const turn = await runCompileJobTurn(job);
+    turns.push(turn);
+    if (turn.retryable || turn.note === "resting") continue;
+    attempted += 1;
+    if (attempted >= workLimit) break;
   }
   return turns;
 }

@@ -38,19 +38,18 @@ const isNarrow = (page: Page) => (page.viewportSize()?.width ?? 1440) <= NARROW_
 
 async function enterWorld(page: Page) {
   await page.goto("/explore");
-  await page.getByRole("button", { name: "ENTER WORLD" }).click();
+  await page.getByRole("button", { name: "Relations ↗" }).click();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "world");
 }
 
-test("the entry is one way in, with the world already behind it", async ({ page }) => {
+test("the entry offers source evidence before graph navigation", async ({ page }) => {
   await page.goto("/explore");
-  await expect(page.getByRole("heading", { name: "Step inside a Compiled World." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Follow it to the source/ })).toBeVisible();
   await expect(
-    page.getByText(/Explore how knowledge, relationships and answers remain connected/),
+    page.getByLabel("Find a sample question"),
   ).toBeVisible();
   await expect(page.locator(STAGE)).toHaveAttribute("data-world-act", "entry");
-  // The sample declares itself once, in the header badge, and never argues with itself again.
-  await expect(page.getByText("INTERACTIVE SAMPLE")).toHaveCount(1);
+  await expect(page.getByText(/Read-only sample · sources captured/)).toBeVisible();
   // §49: none of this is on the default surface.
   await expect(page.locator("body")).not.toContainText(/sha256:/);
   await expect(page.locator("body")).not.toContainText(/BBOX|not_yet/i);
@@ -409,15 +408,20 @@ test("Ask quotes the source and its citation lands in the Evidence act", async (
   const panel = page.getByRole("dialog", { name: "Ask this World" });
   await expect(panel).toBeVisible();
 
-  // Prepared questions must show a source excerpt that actually answers each question.
+  // Supported prepared questions quote their complete selected evidence.
   await expect(panel.getByRole("button", { name: /\?$/ })).toHaveCount(3);
   await expect(panel).toContainText("Choose from the prepared questions above.");
   await panel.getByRole("button", { name: "What were operating expenses for research and development?" }).click();
   await expect(panel.locator("blockquote")).toContainText("Research and development 10,887");
   await panel.getByRole("button", { name: "What were Products and Services net sales for the three months ended in December?" }).click();
   await expect(panel.locator("blockquote")).toContainText("Net sales: Products $ 113,743");
+  // The Company Background evidence exceeds the complete-answer limit: no quotation, the reason in
+  // words, and its source regions still there to open.
   await panel.getByRole("button", { name: "What products does Apple's Company Background say it designs and markets?" }).click();
-  await expect(panel.locator("blockquote")).toContainText("designs, manufactures and markets smartphones");
+  await expect(panel.locator("blockquote")).toHaveCount(0);
+  await expect(panel.getByRole("status")).toContainText("No answer is shown for this question.");
+  await expect(panel.getByRole("status")).toContainText("longer than the complete-answer limit");
+  await expect(panel).not.toContainText("EVIDENCE_EXCEEDS_ANSWER_LIMIT");
   await expect(panel.getByText(/^\d+ SOURCE REGIONS?$/)).toBeVisible();
   await expect(panel.getByRole("button", { name: /^apple-.*\.pdf/ }).first()).toBeVisible();
   // §49 keeps the relevance decimal off the stage.
@@ -552,15 +556,27 @@ test("the deep links land on the acts they name", async ({ page }) => {
     ["?act=evidence", "evidence"],
     ["?act=change", "change_compare"],
     ["?act=constructor", "entry"],
-    // §28 P0's other half is a region, not an act. An id no compiled World holds cannot be
-    // honoured, and it lands on the entry rather than on an empty source sheet.
-    ["?evidence=region-that-never-existed", "entry"],
-    ["?evidence=constructor", "entry"],
     ["", "entry"],
   ] as const) {
     await page.goto(`/explore${query}`);
     const expected = act === "evidence" && isNarrow(page) ? "evidence" : act;
     await expect(page.locator(STAGE), query || "(no query)").toHaveAttribute("data-world-act", expected);
+  }
+  /*
+    §28 P0's other half is a region, not an act. An id no compiled World holds cannot be honoured:
+    Foundation 424 lands it on a deliberate unavailable state in the Evidence act, with generic
+    copy that does not echo the id, and no other passage's source sheet stands in for it.
+  */
+  for (const id of ["region-that-never-existed", "constructor"]) {
+    await page.goto(`/explore?evidence=${id}`);
+    await expect(page.locator(STAGE), id).toHaveAttribute("data-world-act", "evidence");
+    const unavailable = page.locator('[role="alert"][data-evidence-unavailable]');
+    await expect(unavailable, id).toHaveCount(1);
+    await expect(unavailable, id).toBeVisible();
+    await expect(unavailable, id).toContainText("This passage is not available here");
+    await expect(unavailable, id).not.toContainText(id);
+    await expect(page.locator("[data-source-sheet]"), id).toHaveCount(0);
+    await expect(page.locator("[data-active-region]:visible"), id).toHaveCount(0);
   }
 });
 

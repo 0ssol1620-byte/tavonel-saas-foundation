@@ -34,6 +34,7 @@
  * attribution reports every conversion as "direct".
  */
 
+import type { BillingOfferCode } from "@/lib/billing-catalog";
 import { COOKBOOK_SLUGS, RECIPE_VERSION as COOKBOOK_RECIPE_VERSION } from "@/lib/cookbook-slugs";
 
 /** The six cookbook slugs, read from the module that owns them rather than typed again here. */
@@ -109,6 +110,51 @@ export function loginUrlForRecipe(recipeId: RecipeId, returnTo: ReturnToPath = d
   return `/login?${params.toString()}`;
 }
 
+/**
+ * Where each recipe's first step lives once a reader is signed in -- or null, said honestly,
+ * when the workspace has no control that starts it.
+ *
+ * Keyed by the closed id, so nothing a reader can edit chooses the destination: the URL names a
+ * recipe and this table names the surface. A surface is a place to act, not a permission -- the
+ * workspace still asks the server what this account may do there, and nothing on the way in
+ * uploads, compiles, activates or charges. Two recipes are null on purpose: the financial-report
+ * recipe's own next step is a conversation rather than a trial upload, and the workspace has no
+ * package download control for the portable-package one.
+ */
+export const RECIPE_START: Record<RecipeId, "/workspace/sources" | "/workspace/developer" | null> = {
+  "documents-to-grounded-work": "/workspace/sources",
+  "financial-report-figures-with-provenance": null,
+  "manual-grounded-support-answers": "/workspace/sources",
+  "connect-external-ai-mcp-api": "/workspace/developer",
+  "portable-package-local-ai": null,
+  "source-revision-reuse": "/workspace/sources",
+};
+
+/**
+ * Where a confirmed session goes next, given the intents that were consumed to get there.
+ *
+ * Checkout keeps precedence because it is the narrower, paying one -- except for an owner, whose
+ * access never reaches checkout. A recipe goes to the sign-in page's continuation step, rebuilt
+ * from the validated intent rather than from anything stored verbatim; that page renders the
+ * preflight and waits for a click, and it never redirects a signed-in recipe again, so the hop
+ * cannot loop. `checkout` is typed to the closed offer list, and every runtime caller passes a
+ * value its own module validated (`takeCheckoutIntent`, `readOfferParam`); the destination is
+ * always a same-origin path built here, never a URL anyone supplied.
+ */
+export function resumeDestination({
+  checkout,
+  ownerBillingExempt = false,
+  recipe,
+}: {
+  checkout: BillingOfferCode | null;
+  ownerBillingExempt?: boolean;
+  recipe: RecipeIntent | null;
+}): string {
+  if (checkout && !ownerBillingExempt) return `/workspace?checkout=${encodeURIComponent(checkout)}`;
+  const safe = parseRecipeIntent(recipe);
+  return safe ? loginUrlForRecipe(safe.recipeId, safe.returnTo) : "/workspace";
+}
+
 /** Reads an intent out of a query string, returning null for anything off the lists. */
 export function readRecipeParams(search: string): RecipeIntent | null {
   const params = new URLSearchParams(search);
@@ -123,13 +169,20 @@ export function readRecipeParams(search: string): RecipeIntent | null {
 
 const KEY = "tavonel.recipe-intent";
 
-export function rememberRecipeIntent(intent: RecipeIntent) {
+/**
+ * Returns whether the intent is actually held for the sign-in round trip, so the page can say so
+ * instead of promising a resume a blocked browser cannot deliver (no silent fallback).
+ */
+export function rememberRecipeIntent(intent: RecipeIntent): boolean {
   try {
     // Serialise the parsed object, never the caller's: an extra field cannot reach storage.
     const safe = parseRecipeIntent(intent);
-    if (safe) window.sessionStorage.setItem(KEY, JSON.stringify(safe));
+    if (!safe) return false;
+    window.sessionStorage.setItem(KEY, JSON.stringify(safe));
+    return true;
   } catch {
     // A browser with site data blocked still gets a working sign-in; it just forgets the recipe.
+    return false;
   }
 }
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
 
 const { getUser, pilotAccess, productAccess, getCandidate, listObjects, promote, sourceAccess, ensureIndex } = vi.hoisted(() => ({
@@ -22,7 +23,9 @@ vi.mock("@/lib/r2-objects", async (importOriginal) => ({
 vi.mock("@/lib/r2-synthetic-canary", () => ({
   readR2SignerEnv: () => ({ accountId: "account", bucket: "tavonel-foundation", accessKeyId: "key", secretAccessKey: "secret" }),
 }));
-vi.mock("@/lib/world-store", () => ({ promoteFoundationCandidate: promote }));
+vi.mock("@/lib/world-store", async (original) => ({
+  ...(await original<typeof import("./world-store")>()), promoteFoundationCandidate: promote,
+}));
 /*
   The FD-02 self-serve ceiling, passed through: it is asserted in
   `lib/activation-rate-limit.test.ts` and exercised per route in
@@ -30,7 +33,7 @@ vi.mock("@/lib/world-store", () => ({ promoteFoundationCandidate: promote }));
   would answer every case with a transport error instead of the behaviour under test.
 */
 vi.mock("@/lib/activation-rate-limit", () => ({ checkActivationRateLimit: async () => ({ ok: true }) }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 vi.mock("@/lib/retrieval-index-status", () => ({ ensureRetrievalIndexForActiveWorld: ensureIndex }));
 
 import { POST } from "../app/api/collections/[id]/promote/route";
@@ -120,11 +123,34 @@ beforeEach(() => {
 });
 
 describe("World promotion source-version gate", () => {
+  it("refuses an evidence-free package even when its file hash and passed statuses are valid", async () => {
+    const empty = "";
+    getCandidate.mockResolvedValue({ ok: true, json: { ...artifact, package: {
+      ...artifact.package, files: artifact.package.files.map(file => file.path === "rag/chunks.jsonl"
+        ? { ...file, content: empty, sizeBytes: 0, sha256: `sha256:${createHash("sha256").update(empty).digest("hex")}` }
+        : file),
+    } } });
+    const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ code: "WORLD_CANDIDATE_EVIDENCE_REQUIRED" });
+    expect(promote).not.toHaveBeenCalled();
+    expect(ensureIndex).not.toHaveBeenCalled();
+  });
   it("activates only while every compiled source version is current", async () => {
     const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
     expect(response.status).toBe(200);
     expect(promote).toHaveBeenCalledOnce();
+    // The transition re-checks these under the source locks in its own transaction.
+    expect(promote.mock.calls[0][0].sourceDocumentIds).toEqual(artifact.sourceDocuments.map(item => item.documentId));
   });
+
+  it.each(["WORLD_SOURCE_REVISION_SUPERSEDED", "WORLD_SOURCE_REVISION_AMBIGUOUS"])(
+    "reports the transition's %s refusal as a conflict", async code => {
+      promote.mockResolvedValue({ ok: false, code });
+      const response = await POST(request(), { params: Promise.resolve({ id: artifact.collectionId }) });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ code });
+    });
 
   it("refuses a candidate after a newer source version arrives", async () => {
     const current = artifact.sourceDocuments[0]!;

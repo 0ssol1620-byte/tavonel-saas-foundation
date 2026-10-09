@@ -11,6 +11,7 @@ import {
 import {
   EXPLORE_SAMPLE_BASELINE_DIGEST,
   EXPLORE_SAMPLE_DIGEST,
+  EXPLORE_SAMPLE_QUESTIONS,
   EXPLORE_SAMPLE_W1_DIGEST,
   EXPLORE_SAMPLE_W2_DIGEST,
   EXPLORE_SAMPLE_W3_DIGEST,
@@ -26,6 +27,12 @@ import {
   exploreSampleWorld,
 } from "./explore-sample";
 import { validateCollectionOcrInput } from "./collection-compiler";
+import {
+  EVIDENCE_EXCEEDS_ANSWER_LIMIT,
+  FALLBACK_ANSWER_CHARACTER_LIMIT,
+  answerGroundedQuestion,
+  parseChunks,
+} from "./grounded-ask";
 
 /** The shape of a catalog entry this file reads. The generator is untyped JavaScript on purpose. */
 type SourceDocument = {
@@ -313,13 +320,73 @@ describe("the World is compiled output", () => {
   });
 });
 
+const COMPANY_QUESTION = "What products does Apple's Company Background say it designs and markets?";
+const CHUNKS = parseChunks(exploreSampleArtifact);
+type SampleCitation = (typeof exploreSampleAnswers)[number]["citations"][number];
+
+/** The cited region's whole text, normalized the way the answer builder normalizes it. */
+function fullTextOf(citation: SampleCitation) {
+  const matches = CHUNKS.filter(
+    (chunk) =>
+      chunk.sourceId === citation.sourceId &&
+      chunk.pageNumber1 === citation.pageNumber1 &&
+      chunk.bbox1000.join(",") === citation.bbox1000.join(","),
+  );
+  expect(matches, `${citation.sourceId} p${citation.pageNumber1}`).toHaveLength(1);
+  return matches[0].text.replace(/\s+/g, " ").trim();
+}
+
 describe("the Ask panel is answered by the retriever", () => {
-  it("gets a grounded answer to every question the page offers", () => {
-    expect(exploreSampleAnswers.length).toBeGreaterThan(0);
+  it("carries the retriever's own status, answer, reason and citations for every question", () => {
+    expect(exploreSampleAnswers.map((answer) => answer.question)).toEqual([...EXPLORE_SAMPLE_QUESTIONS]);
     for (const answer of exploreSampleAnswers) {
-      expect(answer.status, answer.question).toBe("grounded");
+      const direct = answerGroundedQuestion(exploreSampleArtifact, answer.question);
+      expect(direct, answer.question).not.toBeNull();
+      expect(answer, answer.question).toEqual({
+        question: answer.question,
+        status: direct!.status,
+        answer: direct!.answer,
+        reason: direct!.reason,
+        citations: direct!.citations,
+      });
+      // Every prepared question, answered or not, leaves regions a reader can open.
       expect(answer.citations.length, answer.question).toBeGreaterThan(0);
     }
+  });
+
+  it("answers the supported questions with the complete selected evidence, never a preview", () => {
+    const grounded = exploreSampleAnswers.filter((answer) => answer.question !== COMPANY_QUESTION);
+    expect(grounded).toHaveLength(EXPLORE_SAMPLE_QUESTIONS.length - 1);
+    for (const answer of grounded) {
+      expect(answer.status, answer.question).toBe("grounded");
+      expect(answer.reason, answer.question).toBeNull();
+      const full = answer.citations.map(fullTextOf);
+      expect(answer.answer, answer.question).toBe(full.join("\n\n"));
+      expect(answer.answer.length, answer.question).toBeLessThanOrEqual(FALLBACK_ANSWER_CHARACTER_LIMIT);
+      // The citation excerpt stays the list's bounded preview of the same text, not the answer.
+      for (const [index, citation] of answer.citations.entries()) {
+        expect(citation.excerpt, answer.question).toBe(
+          full[index].length <= 420 ? full[index] : `${full[index].slice(0, 417)}...`,
+        );
+      }
+    }
+  });
+
+  it("keeps the Company Background question as an explicit overflow abstention with its citations", () => {
+    /*
+      The regression this sample once failed at import on. Its selected evidence is measured here
+      to exceed the fallback answer limit, so the only truthful states are an abstention with no
+      answer text and the reason the retriever gave -- not a clipped preview standing in for one.
+    */
+    const company = exploreSampleAnswers.find((answer) => answer.question === COMPANY_QUESTION);
+    expect(company).toBeTruthy();
+    expect(company!.status).toBe("abstained");
+    expect(company!.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(company!.answer).toBe("");
+    expect(company!.citations.length).toBeGreaterThan(0);
+    const full = company!.citations.map(fullTextOf);
+    const length = full.reduce((total, text) => total + text.length, 0) + 2 * (full.length - 1);
+    expect(length).toBeGreaterThan(FALLBACK_ANSWER_CHARACTER_LIMIT);
   });
 
   it("cites regions that exist in the World, at the same coordinates", () => {
@@ -334,7 +401,7 @@ describe("the Ask panel is answered by the retriever", () => {
     }
   });
 
-  it("quotes answer-bearing top regions for every public sample question", () => {
+  it("pins the answer-bearing top region for every public sample question", () => {
     const expected = [
       { sourceId: "apple-2026-q1-10-q", page: 4, bbox: [64, 476, 932, 538], contains: "Research and development 10,887" },
       { sourceId: "apple-2026-q1-10-q", page: 4, bbox: [64, 249, 932, 352], contains: "Net sales: Products $ 113,743" },

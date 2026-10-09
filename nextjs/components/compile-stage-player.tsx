@@ -163,6 +163,19 @@ const MOBILE_FILM_VIEW = {
   },
 } as const;
 
+/*
+  Which mobile view the player opens on. The shared default is "fit": a narrow frame opens on the
+  whole composition, and "Focus details" stays one tap away. A caller that wants the readable pane
+  above first asks for "focus". Only the starting state changes: the toggle below still moves
+  between the two.
+*/
+export type MobileFilmView = "fit" | "focus";
+
+/** The mobile-tools toggle, Fit full frame <-> Focus details. Pure, so the transition is tested without a DOM. */
+export function toggleMobileFilmFit(fit: boolean): boolean {
+  return !fit;
+}
+
 export const FILM_TEXT = {
   en: { stages: "Compilation stages", error: FILM_ERROR, errorLong: `${FILM_ERROR.slice(0, -1)}; try another stage or inspect the public sample.` },
   ko: { stages: "컴파일 단계", error: FILM_ERROR_KO, errorLong: `${FILM_ERROR_KO} 다른 단계를 선택하거나 공개 샘플을 확인해 보세요.` },
@@ -177,6 +190,7 @@ export default function CompileStagePlayer({
   stageDisclosureLabel,
   priorityPoster = false,
   korean = false,
+  initialMobileFilmView = "fit",
 }: {
   stages?: readonly CompileStage[];
   onStageChange?: (stage: CompileStage, index: number) => void;
@@ -192,6 +206,8 @@ export default function CompileStagePlayer({
   priorityPoster?: boolean;
   /** BQ-013. Name the controls and the fallback in the page's language. The stage list carries its own. */
   korean?: boolean;
+  /** The view a narrow frame opens on. Defaults to "fit"; the visitor's toggle still switches it. */
+  initialMobileFilmView?: MobileFilmView;
 }) {
   const text = korean ? FILM_TEXT.ko : FILM_TEXT.en;
   const instanceId = useId().replaceAll(":", "");
@@ -206,7 +222,7 @@ export default function CompileStagePlayer({
   const [ended, setEnded] = useState(false);
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
-  const [mobileFilmFit, setMobileFilmFit] = useState(false);
+  const [mobileFilmFit, setMobileFilmFit] = useState(initialMobileFilmView === "fit");
   const [videoError, setVideoError] = useState(false);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
@@ -505,7 +521,7 @@ export default function CompileStagePlayer({
           className="compile-film-focus-control"
           aria-controls={panelId}
           aria-pressed={!mobileFilmFit}
-          onClick={() => setMobileFilmFit(value => !value)}
+          onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
         >
           {mobileFilmFit
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus

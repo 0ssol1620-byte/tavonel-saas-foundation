@@ -27,6 +27,7 @@ import { DOCS_GROUPS, DOCS_SECTIONS } from "./docs-content";
 /* Line endings are normalised so a multi-line expectation below does not depend on them. */
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8").replace(/\r\n/g, "\n");
 const sectionPage = read("../app/docs/[section]/page.tsx");
+const docsHub = read("../app/docs/page.tsx");
 const docsToc = read("../components/docs/docs-toc.tsx");
 const tocCss = read("../components/docs/docs-toc.module.css");
 
@@ -229,6 +230,23 @@ describe("an eyebrow that survives reads as its own clauses", () => {
     */
     const source = read(surface).replace('<p className="slate">{WORKFLOW_LABEL[record.workflowId]}</p>', "");
     expect(source).not.toMatch(/<p className="(?:slate|one-path-eyebrow)">[\s\S]*?<\/p>\s*<h1/);
+  });
+});
+
+describe("Docs hub reading layout", () => {
+  it("keeps two layout children and puts the jump list inside the index column", () => {
+    const start = docsHub.indexOf('<div className="body docs-hub-body">');
+    const end = docsHub.indexOf("\n      </div></div></section>", start);
+    expect(start, "the Docs hub body has its named layout wrapper").toBeGreaterThanOrEqual(0);
+    expect(end, "the Docs hub body closes").toBeGreaterThan(start);
+    const body = docsHub.slice(start, end);
+    const directChildren = body.split("\n")
+      .filter((line) => /^        <[A-Za-z]/.test(line))
+      .map((line) => line.trim().match(/^<([A-Za-z][\w.]*)/)?.[1]);
+    expect(directChildren, "the body keeps its two-column layout contract").toEqual(["div", "div"]);
+    expect(body).toContain('<div className="stack docs-hub-intro">');
+    expect(body).toContain('<div className="stack docs-hub-index">\n          <PageToc entries={groups} />');
+    expect([...body.matchAll(/<PageToc entries=\{groups\} \/>/g)]).toHaveLength(1);
   });
 });
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
-import { HEADER_NAV, KO_CHROME, customerNavOwns } from "@/lib/site-navigation";
+import { HEADER_NAV, KO_CHROME, customerNavCurrent } from "@/lib/site-navigation";
 
 /**
  * Native disclosure works without JavaScript. Escape returns focus; Tab never gets trapped.
@@ -72,7 +72,7 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false }: {
       <nav aria-label={korean ? "모바일 섹션" : "Mobile sections"}>
         {HEADER_NAV.map((item) => (
           <a key={item.href} className="mobile-nav-direct" href={item.href}
-            aria-current={customerNavOwns(item.href, pathname) ? "page" : undefined}
+            aria-current={customerNavCurrent(item.href, pathname)}
             onClick={close}>{korean ? KO_CHROME.nav[item.href] ?? item.label : item.label}</a>
         ))}
         {/*

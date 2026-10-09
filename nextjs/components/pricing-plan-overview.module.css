@@ -1,0 +1,25 @@
+/* A compact index into the existing plans; detail and purchase conditions stay on the page. */
+@layer reset, tokens, base, components, utilities, overrides;
+
+@layer components {
+  .overview { display: none; }
+  /* The root scroll-padding-top already reserves the header and its reading gap. */
+  .destination { scroll-margin-block-start: 0; }
+  .destination:focus-visible { outline: 3px solid #2447b3; outline-offset: -3px; }
+
+  @media (max-width: 700px) {
+    .overview { display: block; min-width: 0; margin-block: 0 20px; color: #171c20; background: #f7f5ef; }
+    .caption { margin: 0 0 10px; padding-inline: 12px; font: 500 13px/1.5 var(--f-sans); color: #46545e; }
+    .list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin: 0; padding: 0; list-style: none; border-block: 1px solid #88928d; }
+    .list li { min-width: 0; margin: 0; padding: 0; }
+    .list li:nth-child(even) { border-inline-start: 1px solid #d8ddd9; }
+    .list li:nth-child(n + 3) { border-block-start: 1px solid #d8ddd9; }
+    .list a { position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 44px; height: 100%; padding: 12px 26px 12px 12px; box-sizing: border-box; color: #171c20; background: #f7f5ef; text-decoration: none; overflow-wrap: anywhere; }
+    .list a:hover { background: #f0eee6; }
+    .list a:focus-visible { outline: 3px solid #2447b3; outline-offset: -3px; }
+    .name { font: 550 15px/1.4 var(--f-sans); color: #2447b3; text-decoration: underline; text-underline-offset: 3px; }
+    .price { font: 550 17px/1.4 var(--f-sans); }
+    .unit { font: 400 13px/1.5 var(--f-sans); color: #46545e; }
+    .arrow { position: absolute; top: 12px; right: 10px; color: #2447b3; font-size: 15px; }
+  }
+}

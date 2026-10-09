@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { PublicSitePage } from "@/components/public-site-chrome";
+import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "@/components/pricing-plan-overview";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { pageMetadata } from "@/lib/page-seo";
@@ -18,6 +19,16 @@ export const metadata: Metadata = pageMetadata({
 
 const developer = BILLING_OFFERS.observer_access;
 const team = BILLING_OFFERS.studio_access;
+// Reuse the existing Korean card presentation in the overview, including its public-sample posture.
+const publicSample = { name: "공개 샘플", price: "무료", unit: "" };
+const enterprise = { name: "Enterprise", price: "별도 협의", unit: "" };
+const monthlyUnit = "/월, USD";
+const planSummaries = [
+  publicSample,
+  { name: developer.label, price: `$${developer.priceUsd}`, unit: monthlyUnit },
+  { name: team.label, price: `$${team.priceUsd}`, unit: monthlyUnit },
+  enterprise,
+];
 const standardPageUsd = STANDARD_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 const maximumPageUsd = MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD;
 
@@ -43,30 +54,31 @@ export default function KoreanPricingPage() {
             </div>
             <div className={styles.plans} aria-labelledby="ko-pricing-plans">
               <h2 id="ko-pricing-plans">요금제</h2>
+              <PricingPlanOverview plans={planSummaries} korean />
               <div className={styles.grid}>
-                <article className={styles.card}>
-                  <h3>공개 샘플</h3>
-                  <p className={styles.price}>무료</p>
+                <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(0)} tabIndex={-1}>
+                  <h3>{publicSample.name}</h3>
+                  <p className={styles.price}>{publicSample.price}</p>
                   <p>완성된 World의 결과와 연결된 원문을 직접 확인합니다. 자체 자료 체험과는 다릅니다.</p>
                   <Link href="/explore" hrefLang="en">공개 World 살펴보기 (영문)</Link>
                 </article>
-                <article className={styles.card}>
+                <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(1)} tabIndex={-1}>
                   <h3>{developer.label}</h3>
-                  <p className={styles.price}>${developer.priceUsd}<span className={styles.unit}> /월, USD</span></p>
+                  <p className={styles.price}>${developer.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
                   <p>월 {developer.includedPages.toLocaleString("en-US")} 표준 페이지, 증거 연결·Ask·서명된 내보내기, API·MCP 접근.</p>
                   <p className="fine">자체 자료 컴파일은 승인된 시범 운영 범위에서만 진행합니다.</p>
                   <Link href="/ko/contact?plan=Developer">Developer 도입 상담</Link>
                 </article>
-                <article className={styles.card}>
+                <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(2)} tabIndex={-1}>
                   <h3>{team.label}</h3>
-                  <p className={styles.price}>${team.priceUsd}<span className={styles.unit}> /월, USD</span></p>
+                  <p className={styles.price}>${team.priceUsd}<span className={styles.unit}> {monthlyUnit}</span></p>
                   <p>월 {team.includedPages.toLocaleString("en-US")} 표준 페이지, 검토 대기열·버전 기록·자료 도입 안내.</p>
                   <p className="fine">현재 단일 사용자 워크스페이스입니다. 여러 사용자·역할·사용자별 원문 권한은 제공하지 않습니다.</p>
                   <Link href="/ko/contact?plan=Team">Team 도입 상담</Link>
                 </article>
-                <article className={styles.card}>
-                  <h3>Enterprise</h3>
-                  <p className={styles.price}>별도 협의</p>
+                <article className={`${styles.card} ${pricingPlanDestinationClass}`} id={pricingPlanId(3)} tabIndex={-1}>
+                  <h3>{enterprise.name}</h3>
+                  <p className={styles.price}>{enterprise.price}</p>
                   <p>자료 범위, 보안 검토, 운영 방식과 계약 조건을 함께 정합니다.</p>
                   <Link href="/ko/contact?plan=Enterprise">Enterprise 도입 상담</Link>
                 </article>

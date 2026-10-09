@@ -33,7 +33,25 @@ export type ProgressPage = {
   boxes: ProgressBox[];
 };
 
+/** Identity returned by the authorized progress route from its selected immutable inventory row. */
+export type SourceVersionDescriptor = {
+  documentId: string;
+  versionKey: string;
+  sourceImmutableKey: string;
+  /** Digest of the sanitized PDF bytes that OCR reads, not the original uploaded source. */
+  sourceSha256: string;
+};
+
+export type VerifiedSourceObservation = SourceVersionDescriptor & {
+  pdfBytes: Uint8Array;
+  progress: OcrProgress | null;
+};
+
 export type OcrProgress = {
+  documentId: string;
+  versionKey: string;
+  sourceImmutableKey: string;
+  sourceSha256: string;
   state: "reading" | "read" | "refused";
   pagesRead: number;
   pageCount: number | null;
@@ -42,6 +60,26 @@ export type OcrProgress = {
 };
 
 const SCHEMA = "tavonel.ocr_progress.v1";
+const SHA256 = /^sha256:([a-f0-9]{64})$/i;
+
+export function matchesSanitizedSourceDigest(expected: string, actual: string): boolean {
+  return SHA256.test(expected) && SHA256.test(actual) && expected.toLowerCase() === actual.toLowerCase();
+}
+
+/** Qualifies only identity fields returned by the authorized progress route. */
+export function qualifySourceVersionDescriptor(value: unknown, expectedDocumentId: string): SourceVersionDescriptor | null {
+  if (!value || typeof value !== "object") return null;
+  const body = value as Record<string, unknown>;
+  if (body.documentId !== expectedDocumentId || typeof body.versionKey !== "string"
+    || typeof body.sourceImmutableKey !== "string" || typeof body.sourceSha256 !== "string") return null;
+  const descriptor = {
+    documentId: body.documentId,
+    versionKey: body.versionKey,
+    sourceImmutableKey: body.sourceImmutableKey,
+    sourceSha256: body.sourceSha256,
+  } as SourceVersionDescriptor;
+  return qualifiedDescriptor(descriptor) ? descriptor : null;
+}
 
 function number(value: unknown, min: number, max: number): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null;
@@ -84,11 +122,25 @@ function qualifyPage(value: unknown): ProgressPage | null {
   };
 }
 
-/** Returns null for anything that is not a progress document this version understands. */
-export function qualifyProgress(value: unknown): OcrProgress | null {
+function qualifiedDescriptor(value: SourceVersionDescriptor): boolean {
+  return /^[A-Za-z0-9_-]{1,200}$/.test(value.documentId)
+    && /^[a-f0-9]{64}$/i.test(value.versionKey)
+    && value.sourceImmutableKey.endsWith(`/${value.documentId}/${value.versionKey}/sanitized.pdf`)
+    && matchesSanitizedSourceDigest(value.sourceSha256, `sha256:${value.versionKey}`);
+}
+
+/**
+ * Returns null unless the mutable v1 observation matches the server-selected source version.
+ * The descriptor must come from the authorized progress response and its digest must name the
+ * sanitized PDF version. V1 objects without either binding field remain unbound and are not drawn.
+ */
+export function qualifyProgress(value: unknown, expected: SourceVersionDescriptor): OcrProgress | null {
+  if (!qualifiedDescriptor(expected)) return null;
   if (!value || typeof value !== "object") return null;
   const body = value as Record<string, unknown>;
   if (body.schemaVersion !== SCHEMA) return null;
+  if (body.sourceImmutableKey !== expected.sourceImmutableKey || typeof body.inputSha256 !== "string"
+    || !matchesSanitizedSourceDigest(expected.sourceSha256, body.inputSha256)) return null;
   if (body.state !== "reading" && body.state !== "read" && body.state !== "refused") return null;
   const pagesRead = number(body.pagesRead, 0, 100_000);
   const regionsFound = number(body.regionsFound, 0, 1_000_000);
@@ -101,7 +153,77 @@ export function qualifyProgress(value: unknown): OcrProgress | null {
     const qualified = qualifyPage(page);
     return qualified ? [qualified] : [];
   });
-  return { state: body.state, pagesRead, pageCount, regionsFound, pages };
+  return {
+    documentId: expected.documentId,
+    versionKey: expected.versionKey.toLowerCase(),
+    sourceImmutableKey: expected.sourceImmutableKey,
+    sourceSha256: expected.sourceSha256,
+    state: body.state,
+    pagesRead,
+    pageCount,
+    regionsFound,
+    pages,
+  };
+}
+
+/** A response may commit only while both its selection and authority generation are still current. */
+export function isCurrentSourceObservation(
+  response: Pick<OcrProgress, "documentId" | "versionKey">,
+  selected: { documentId: string; versionKey: string } | null,
+  responseAuthority: number,
+  currentAuthority: number,
+  responseSequence = 0,
+  currentSequence = 0,
+): boolean {
+  return responseAuthority === currentAuthority
+    && responseSequence === currentSequence
+    && selected?.documentId === response.documentId
+    && selected.versionKey.toLowerCase() === response.versionKey.toLowerCase();
+}
+
+export type SourceVersionIdentity = { documentId: string; versionKey: string };
+
+/** A temporary read failure only blocks polling the exact immutable version that failed. */
+export function markSourceVersionUnavailable(
+  unavailable: Map<string, string>,
+  source: SourceVersionIdentity,
+): void {
+  unavailable.set(source.documentId, source.versionKey.toLowerCase());
+}
+
+/** A successful issue/read clears only its own version's temporary unavailable marker. */
+export function clearSourceVersionUnavailable(
+  unavailable: Map<string, string>,
+  source: SourceVersionIdentity,
+): void {
+  if (unavailable.get(source.documentId) === source.versionKey.toLowerCase()) {
+    unavailable.delete(source.documentId);
+  }
+}
+
+/** Drop markers when inventory moves to another immutable version or removes the source. */
+export function pruneUnavailableSourceVersions(
+  unavailable: Map<string, string>,
+  currentSources: readonly SourceVersionIdentity[],
+): void {
+  const currentVersions = new Map(currentSources.map((source) => [source.documentId, source.versionKey.toLowerCase()]));
+  for (const [documentId, failedVersion] of unavailable) {
+    if (currentVersions.get(documentId) !== failedVersion) unavailable.delete(documentId);
+  }
+}
+
+/** Filter the current inventory, pruning an obsolete marker when the source version advances. */
+export function filterPollableSourceVersions<T extends SourceVersionIdentity>(
+  sources: readonly T[],
+  unavailable: Map<string, string>,
+): T[] {
+  return sources.filter((source) => {
+    const failedVersion = unavailable.get(source.documentId);
+    if (!failedVersion) return true;
+    if (failedVersion === source.versionKey.toLowerCase()) return false;
+    unavailable.delete(source.documentId);
+    return true;
+  });
 }
 
 /** The page to draw: the latest one reported. Null when nothing has been read yet. */

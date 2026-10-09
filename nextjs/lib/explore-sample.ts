@@ -6,7 +6,11 @@ import {
   type CollectionCandidateArtifact,
   type CollectionOcrInput,
 } from "./collection-compiler";
-import { answerGroundedQuestion, type GroundedAnswer } from "./grounded-ask";
+import {
+  EVIDENCE_EXCEEDS_ANSWER_LIMIT,
+  answerGroundedQuestion,
+  type GroundedAnswer,
+} from "./grounded-ask";
 import { buildWorldReadModel, type WorldReadModel } from "./world-read-model";
 import rawBaselineInputs from "./explore-sample.w0.inputs.json";
 import rawW1Inputs from "./explore-sample.w1.inputs.json";
@@ -322,11 +326,11 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
 
   Not a scripted answer with a citation drawn on afterwards: `answerGroundedQuestion` reads
   `rag/chunks.jsonl` out of this artifact and returns the regions it scored, and the page shows
-  whichever region came first along with the score that put it there. Picking the questions is a
-  demo choice; the answers are not a choice.
+  exactly what it returned -- its status, its complete answer and its reason -- beside the
+  regions it cited. Picking the questions is a demo choice; the answers are not a choice.
 
   These reach two different filings: a quarterly income statement and the annual filing's
-  Company Background. The public sample offers only questions whose top-ranked excerpt answers
+  Company Background. The public sample offers only questions whose top-ranked region answers
   the question. A grounded citation alone is not proof of answer relevance; the segment and
   Board-oversight questions were removed when the retriever returned a paragraph without the
   requested figures and a table-of-contents fragment, respectively. Reintroducing those
@@ -339,8 +343,14 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
   region that merely contains the words. Asking it here would put a confident citation under an
   answer nothing computed. It stays out until Ask can reach the diff.
 
-  Fail-closed: if the retriever abstains on any of them, the build stops. The accompanying tests
-  also pin each top-ranked source region and answer-bearing excerpt.
+  An answer is the complete text of the selected evidence or it is nothing. The Company
+  Background question's selected evidence is longer than the fallback answer limit, so the
+  retriever abstains with EVIDENCE_EXCEEDS_ANSWER_LIMIT and keeps its citations; the sample
+  carries that abstention as it is rather than showing a clipped citation preview as the answer,
+  and the tests hold it there as the overflow regression.
+
+  Fail-closed: a null result, an abstention with nothing to cite, or an abstention for any other
+  reason stops the build. The accompanying tests also pin each top-ranked source region.
 */
 /*
   The research-and-development question leads because its passage opens on the table's own label
@@ -359,13 +369,27 @@ export const EXPLORE_SAMPLE_QUESTIONS = [
 export type ExploreSampleAnswer = {
   question: string;
   status: GroundedAnswer["status"];
+  /** The complete selected evidence when grounded; "" when the retriever abstained. */
+  answer: GroundedAnswer["answer"];
+  /** Why the retriever abstained; null when grounded. */
+  reason: GroundedAnswer["reason"];
   citations: GroundedAnswer["citations"];
 };
 
 export const exploreSampleAnswers: ExploreSampleAnswer[] = EXPLORE_SAMPLE_QUESTIONS.map((question) => {
   const answer = answerGroundedQuestion(sample.artifact, question);
-  if (!answer || answer.status !== "grounded" || answer.citations.length === 0) {
-    throw new Error(`explore_sample_answer_not_grounded: ${question}`);
+  if (
+    !answer ||
+    answer.citations.length === 0 ||
+    (answer.status !== "grounded" && answer.reason !== EVIDENCE_EXCEEDS_ANSWER_LIMIT)
+  ) {
+    throw new Error(`explore_sample_answer_not_citable: ${question}`);
   }
-  return { question, status: answer.status, citations: answer.citations };
+  return {
+    question,
+    status: answer.status,
+    answer: answer.answer,
+    reason: answer.reason,
+    citations: answer.citations,
+  };
 });

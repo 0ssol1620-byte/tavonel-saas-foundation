@@ -1,3 +1,5 @@
+import { contactErrorCopy } from "../lib/contact-locale";
+
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -46,7 +48,7 @@ test("the consent notice never covers homepage or pricing actions at 1440 and 39
     expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(headerBox!.y + 1);
 
     const target = route === "/"
-      ? page.getByRole("link", { name: "Explore a Compiled World", exact: true }).first()
+      ? page.getByRole("link", { name: "Open the public sample", exact: true }).first()
       : page.locator(".plan-action a").first();
     await expect(target).toBeVisible();
     const targetBox = await target.boundingBox();
@@ -117,7 +119,10 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   await page.getByRole("textbox", { name: /^What are you trying to do\?/ }).fill("Test inquiry with no production delivery.");
   await page.clock.fastForward(2_000);
   await page.getByRole("button", { name: "Send inquiry" }).click();
-  await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
+  // UX06: the status picks the public copy; the server's `error` string is never shown.
+  const failure = page.locator('form [aria-live="polite"] [data-state="error"]');
+  await expect(failure).toContainText(contactErrorCopy(503).message);
+  await expect(failure).not.toContainText("Unavailable");
   const records = () => page.evaluate(() => JSON.parse(sessionStorage.getItem("tavonel.funnel-log") ?? "[]"));
   expect(await records()).not.toContainEqual({ event: "generate_lead" });
   success = true;

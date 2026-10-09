@@ -3,8 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/public-page-shell";
 import PublicPrimaryCta from "@/components/public-primary-cta";
-import SolutionProofSample from "@/components/solution-proof-sample";
-import DesignPartners from "@/components/design-partners";
+import SolutionWorkflowProof from "../solution-workflow-proof";
 import { EXPLORE_CTA, RESOURCE_TAG_LABELS, resourceFilterHref, type ResourceTag } from "@/lib/site-navigation";
 import styles from "../solutions.module.css";
 
@@ -24,7 +23,12 @@ export const SOLUTIONS = {
     audience: "AI and platform engineers",
     eyebrow: "AI-ready knowledge",
     name: "AI-ready knowledge",
-    title: "Give every AI project the same grounded knowledge asset.",
+    title: "Reuse one collection across AI projects.",
+    task: {
+      input: "A document collection",
+      action: "Compile and review once",
+      output: "A portable World and retrieval projection",
+    },
     lede: "Compile document collections into a versioned World before retrieval, assistants or agent workflows consume them.",
     problem: "Teams repeatedly clean, chunk and index the same sources for each model or application. Identity, relationships and provenance drift between projects.",
     /*
@@ -54,7 +58,12 @@ export const SOLUTIONS = {
     audience: "Document and operations teams",
     eyebrow: "Document intelligence",
     name: "Document intelligence",
-    title: "Read the source before asking AI to reason over it.",
+    title: "Review what a PDF actually says.",
+    task: {
+      input: "PDFs and scans",
+      action: "Read the regions and review uncertainty",
+      output: "Source-linked text with inspectable locators",
+    },
     /*
       BA-048. The lede and the second flow step still published the PDF locator as the general
       shape of evidence -- "without losing the page and region each result came from", "Read pages
@@ -97,7 +106,12 @@ export const SOLUTIONS = {
     audience: "Data and knowledge architects",
     eyebrow: "Knowledge graph",
     name: "Knowledge graph",
-    title: "Compile a graph people can inspect and machines can reuse.",
+    title: "Export a graph with its source evidence.",
+    task: {
+      input: "Facts in your documents",
+      action: "Inspect objects and evidence-bound relations",
+      output: "Turtle, JSON-LD and CSV exports",
+    },
     lede: "Turn document facts into stable semantic objects and evidence-bound relations inside a versioned World.",
     problem: "A graph that cannot show why an edge exists is difficult to review, govern or trust downstream.",
     /*
@@ -138,7 +152,12 @@ export const SOLUTIONS = {
     audience: "Application and agent developers",
     eyebrow: "Grounded assistants",
     name: "Source-grounded assistants",
-    title: "Let an answer travel all the way back to the source.",
+    title: "Answer a question. Open its source.",
+    task: {
+      input: "A question and the current World",
+      action: "Ask, then inspect the returned evidence",
+      output: "A version-bound answer and source locators",
+    },
     lede: "Ask, API and MCP consume the same current World and return evidence from the same version.",
     problem: "An answer can sound confident while depending on stale, conflicting or untraceable source material.",
     flow: ["Ask the active World", "Retrieve qualified objects", "Generate with version context", "Attach evidence", "Decline when nothing matched"],
@@ -149,7 +168,7 @@ export const SOLUTIONS = {
     proof: {
       form: "10-Q",
       match: /Segment Operating Performance The following table shows net sales by reportable segment/,
-      framing: "The region behind one of the sample questions on /explore — an answer's citation, opened at the exact place in the filing it was read from.",
+      framing: "A source region from the quarterly filing. The workflow proof uses the curated question’s actual returned passage.",
     },
     /*
       BA-042. The outcome read "Explicit abstention" and the limitation forty lines below said
@@ -171,7 +190,12 @@ export const SOLUTIONS = {
     audience: "Knowledge owners and security reviewers",
     eyebrow: "Knowledge operations",
     name: "Knowledge operations",
-    title: "Review, activate and govern knowledge as an operational asset.",
+    title: "Review a revision before it becomes current.",
+    task: {
+      input: "A new or updated collection",
+      action: "Compile a candidate, review and activate explicitly",
+      output: "A reviewed revision with change history",
+    },
     lede: "Separate candidate compilation from the active World, preserve change history and keep human decisions explicit.",
     problem: "Automated extraction becomes operational risk when updates silently replace the knowledge used by production systems.",
     flow: ["Compile a candidate", "Route review reasons", "Inspect source versus result", "Activate explicitly", "Rollback when needed"],
@@ -195,7 +219,7 @@ export const SOLUTIONS = {
         with us rather than bought at a checkout. The roadmap half belongs in the pricing footnote
         where a reader is comparing plans, and goes to `copy-commerce-legal` as a cross-lane item.
       */
-      "Team workspaces are set up with us rather than bought at a checkout — we provision the tenant and the roles with you.",
+      "Team setup is arranged with us rather than bought at a checkout. This deployment supports a single-member workspace; shared roles, invitations and organization administration are not available.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },
@@ -241,26 +265,21 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
 
   return (
     <PublicPageShell>
-      <section className="scene doc solution-page"><div className="shell">
-        <div className="body solution-hero">
-          <div className="stack">
-            <h1 className="document-title">{solution.title}</h1>
-          </div>
-          <div className="stack solution-hero-copy">
-            {/*
-              Audit B02. Five solution pages repeat the same concepts and the same sample figures,
-              and nothing told a reader which of the five answers *their* question -- a developer,
-              an operations owner and a security reviewer were handed the same five doors. The
-              audience is a field on the solution rather than a sentence written into each page, so
-              it cannot drift from the copy under it, and it renders as a wrapping paragraph rather
-              than a mono label because the longest of them is wider than a 360px phone.
-            */}
-            <p className="fine">For: {solution.audience}</p>
-            <p className="lede">{solution.lede}</p>
-            <p>{solution.problem}</p>
-          </div>
-          <SolutionProofSample pick={solution.proof} variant="excerpt" />
+      <section className={`scene doc solution-page ${styles.surface}`}><div className="shell">
+        <div className={`solution-hero ${styles.hero}`}>
+          <h1 className="document-title">{solution.title}</h1>
+          <p className={styles.audience}>For: {solution.audience}</p>
+          <p className="lede">{solution.lede}</p>
+          <p className={styles.problem}>{solution.problem}</p>
+          <dl className={styles.task} aria-label="Input, action and output">
+            <div><dt>Input</dt><dd>{solution.task.input}</dd></div>
+            <div><dt>Action</dt><dd>{solution.task.action}</dd></div>
+            <div><dt>Output</dt><dd>{solution.task.output}</dd></div>
+          </dl>
         </div>
+
+        <div className={styles.detailGrid}>
+        <div className={styles.workflow}>
 
         <section className="solution-section" aria-labelledby="solution-flow-title">
           <div className="solution-section-heading">
@@ -304,6 +323,10 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           </ul>
         </section>
 
+        </div>
+        <SolutionWorkflowProof kind={slug as SolutionSlug} pick={solution.proof} />
+        </div>
+
         {/*
           BA-044. The fold was titled by an absence on all five pages -- "WHERE THIS STOPS" is
           how we talk about scope internally and reads as a warning label to a buyer. Same
@@ -334,8 +357,9 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           sentence ("build on it", "use a world somewhere else") and a 73x14px tap target on a
           phone. It is above the actions now, in the text face, and it names its destinations.
         */}
-        {/* SD-10. What a design partner gets, where a logo wall would otherwise go. */}
-        <DesignPartners className="solution-section" />
+        <p className={styles.next}>
+          Planning a first compile? <Link href="/solutions#design-partners-title">See how a design partnership works</Link>.
+        </p>
 
         <p className={styles.next}>
           Next:{" "}

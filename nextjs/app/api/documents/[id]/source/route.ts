@@ -4,7 +4,7 @@ import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { getWorkspaceSanitizedPdf, listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
   const match = (version ? candidates.find((item) => item.versionKey === version) : selected.documents[0]) ?? null;
   if (!match?.sanitizedKey) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
-  const sourceAccess = await checkConnectorSourceAccess(access.membership.workspaceId, [id]);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(access.membership.workspaceId, [id], user.id);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
@@ -57,7 +57,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!currentUser || currentUser.id !== user.id) return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401 });
     const currentAccess = await authorizeFoundationProduct(access.membership.workspaceId, user.id, "observer");
     if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, { status: currentAccess.status });
-    const currentSource = await checkConnectorSourceAccess(access.membership.workspaceId, [id]);
+      const currentSource = await checkConnectorSourceAccessForViewer(access.membership.workspaceId, [id], user.id);
     if (!currentSource.ok) return NextResponse.json({ code: currentSource.code }, {
       status: currentSource.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: { "Cache-Control": "no-store" },
     });

@@ -4,6 +4,8 @@ import { API_ERROR_CODES, apiErrorCode } from "@/lib/api-error-codes";
 import { DEVELOPER_SCOPES } from "../../../lib/developer-contracts";
 import { resolveOpenApiOrigin } from "../../../lib/openapi-origin";
 import { qualifiedDocumentInputs } from "../../../lib/qualified-input";
+import { MAX_APPROVAL_FILES, MAX_APPROVAL_METADATA_BYTES } from "@/lib/intake-approval";
+import { intakePricingFingerprint, quoteIntakeManifest } from "@/lib/usage-pricing";
 
 // The published server URL must be the origin the caller actually reached, and this route
 // used to be force-static: Next.js evaluated the handler once at build time, so
@@ -73,10 +75,17 @@ const str = { type: "string" } as const;
 const nullableStr = { type: ["string", "null"] } as const;
 const int = { type: "integer" } as const;
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   if (request.headers.get("accept")?.includes("text/html")) {
     return NextResponse.redirect(new URL("/api", request.url), 302);
   }
+  const sampleQuoteResult = quoteIntakeManifest([
+    { bytes: 184320, mimeType: "application/pdf", claimedPages: null, claimedBasis: null },
+  ]);
+  if (!sampleQuoteResult.ok) throw new Error("The OpenAPI unknown-page quote fixture is invalid.");
+  const sampleQuote = sampleQuoteResult.quote;
+  const sampleFileQuote = sampleQuote.files[0]!;
+  const pricingFingerprint = await intakePricingFingerprint();
   const origin = resolveOpenApiOrigin(request.url);
   const v1 = `${origin}/api/v1`;
   /*
@@ -191,57 +200,130 @@ export function GET(request: Request) {
           },
         },
       },
+      "/uploads/quote": {
+        post: {
+          operationId: "quoteApprovedUploadSet",
+          summary: "Quote a complete upload set before approval",
+          tags: ["Documents"],
+          "x-tavonel-scope": "documents:intake",
+          description: "Returns a no-hold quote for the complete selected manifest. It creates no approval, admission reservation, or compute ledger entry. The caller must compare maximumCredits with its own explicitly authorized budget and present any changed or higher quote for review. POST /uploads/approval recomputes price and refuses a stale quote.",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: {
+              type: "object", required: ["clientManifestDigest", "files"], additionalProperties: false,
+              properties: {
+                clientManifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+                files: { type: "array", minItems: 1, maxItems: MAX_APPROVAL_FILES, items: { $ref: "#/components/schemas/IntakeManifestEntry" } },
+              },
+            }, examples: { default: { value: { clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", originalFilename: "manual.pdf", contentSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", byteLength: 184320, mimeType: "application/pdf", claimedPages: null, claimedBasis: null }] } } } } } },
+          responses: {
+            "200": ok("A no-hold quote for every member and the aggregate maximum. Persist this response with the same attempt and manifest before asking for approval.", { $ref: "#/components/schemas/IntakeQuote" }, { code: "INTAKE_QUOTE", clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pricingFingerprint, metadataLimitBytes: MAX_APPROVAL_METADATA_BYTES, quote: { maximumPages: sampleQuote.maximumPages, reservedCredits: sampleQuote.reservedCredits, maximumCredits: sampleQuote.maximumCredits, estimatedUsd: sampleQuote.estimatedUsd, maximumUsd: sampleQuote.maximumUsd }, files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", pageBasis: sampleFileQuote.pageBasis, approvedMaxPages: sampleFileQuote.approvedMaxPages, reservedCredits: sampleFileQuote.reservedCredits, maximumCredits: sampleFileQuote.maximumCredits }] }),
+            "400": err("INTAKE_APPROVAL_INVALID", "INTAKE_APPROVAL_DUPLICATE_FILE", "INTAKE_APPROVAL_MIME_NOT_NORMALIZED", "INTAKE_APPROVAL_MANIFEST_MISMATCH", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "INVALID_FILENAME"),
+            "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+            "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
+            "413": err("METADATA_ONLY_ENDPOINT", "SOURCE_EXCEEDS_PROCESSING_CEILING", "TRIAL_FILE_TOO_LARGE"),
+            "503": err("INTAKE_DISABLED", "INTAKE_APPROVAL_UNKNOWN_CEILING_REQUIRED"),
+          },
+        },
+      },
+      "/uploads/approval": {
+        get: {
+          operationId: "getUploadApproval",
+          summary: "Read an upload attempt's approval state",
+          description: "Read the caller's saved attempt by its stable attemptKey. Use this after reload or an uncertain approval or confirmation reply before retrying; the response preserves the committed scope, pricing fingerprint and per-file document identities.",
+          tags: ["Documents"],
+          "x-tavonel-scope": "documents:intake",
+          parameters: [{ name: "attemptKey", in: "query", required: true, schema: { type: "string", minLength: 16, maxLength: 128 } }],
+          responses: {
+            "200": ok("The current state of this caller's attempt, including its stable approval, scope and per-file document identities. Read after a reload or an uncertain approval/confirmation reply.", { type: "object", required: ["code", "approval"], properties: { code: { const: "INTAKE_APPROVAL" }, approval: { $ref: "#/components/schemas/UploadApproval" } } }, { code: "INTAKE_APPROVAL", approval: { approvalId: "22222222-2222-4222-8222-222222222222", attemptKey: "att_0123456789abcdef0123456789abcdef", clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", pricingFingerprint, state: "approved", aggregateMaximumCredits: sampleQuote.maximumCredits, files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "approved", approvedMaximumCredits: sampleFileQuote.maximumCredits }] } }),
+            "400": err("INTAKE_APPROVAL_INVALID"),
+            "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+          },
+        },
+        post: {
+          operationId: "createUploadApproval",
+          summary: "Approve one complete quoted upload set",
+          tags: ["Documents"],
+          "x-tavonel-scope": "documents:intake",
+          description: "The caller supplies the exact whole-set manifest, the quoted pricing fingerprint and its exact aggregate maximum. The server recomputes pricing and atomically records one approval and all file identities. A changed quote is returned as a conflict and is never approved implicitly.",
+          requestBody: { required: true, content: { "application/json": { schema: {
+            type: "object", required: ["attemptKey", "clientManifestDigest", "pricingFingerprint", "aggregateMaximumCredits", "files"], additionalProperties: false,
+            properties: { attemptKey: { type: "string", minLength: 16, maxLength: 128 }, clientManifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, aggregateMaximumCredits: { type: "integer", minimum: 0 }, files: { type: "array", minItems: 1, maxItems: MAX_APPROVAL_FILES, items: { $ref: "#/components/schemas/IntakeManifestEntry" } } },
+            }, examples: { default: { value: { attemptKey: "att_0123456789abcdef0123456789abcdef", clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pricingFingerprint, aggregateMaximumCredits: sampleQuote.maximumCredits, files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", originalFilename: "manual.pdf", contentSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", byteLength: 184320, mimeType: "application/pdf", claimedPages: null, claimedBasis: null }] } } } } } },
+          responses: {
+            "200": ok("The committed approval, stable document ids, and exact quote the caller approved.", { type: "object", required: ["code", "approval", "quote"], properties: { code: { const: "INTAKE_APPROVED" }, approval: { $ref: "#/components/schemas/UploadApproval" }, quote: { $ref: "#/components/schemas/UploadQuoteTotals" } } }, { code: "INTAKE_APPROVED", approval: { approvalId: "22222222-2222-4222-8222-222222222222", attemptKey: "att_0123456789abcdef0123456789abcdef", clientManifestDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", pricingFingerprint, state: "approved", aggregateMaximumCredits: sampleQuote.maximumCredits, files: [{ fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "approved", approvedMaximumCredits: sampleFileQuote.maximumCredits }] }, quote: { maximumPages: sampleQuote.maximumPages, reservedCredits: sampleQuote.reservedCredits, maximumCredits: sampleQuote.maximumCredits, estimatedUsd: sampleQuote.estimatedUsd, maximumUsd: sampleQuote.maximumUsd } }),
+            "400": err("INTAKE_APPROVAL_INVALID", "INTAKE_APPROVAL_DUPLICATE_FILE", "INTAKE_APPROVAL_MIME_NOT_NORMALIZED", "INTAKE_APPROVAL_MANIFEST_MISMATCH", "INTAKE_APPROVAL_AGGREGATE_MISMATCH", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "INVALID_FILENAME"),
+            "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+            "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_AGGREGATE_MISMATCH", "INTAKE_APPROVAL_AGGREGATE_EXCEEDED", "INTAKE_APPROVAL_CONFLICT"),
+            "503": err("INTAKE_DISABLED", "INTAKE_APPROVAL_UNKNOWN_CEILING_REQUIRED", "COMPUTE_LEDGER_NOT_CONFIGURED", "INTAKE_APPROVAL_LEDGER_FAILED", "INTAKE_APPROVAL_RECEIPT_INVALID"),
+          },
+        },
+      },
+      "/uploads/approval/cancel": {
+        post: {
+          operationId: "cancelApprovedUploadSet",
+          summary: "Cancel the approved set after a definitive PUT refusal",
+          tags: ["Documents"],
+          "x-tavonel-scope": "documents:intake",
+          description: "Cancels the complete approved set after a definitive storage PUT refusal for the named member. fileKey identifies the triggering member; the server revalidates the caller, attempt, scope digest and file key against the stored approval, then cancels the set and releases its remaining reserved members. Call once for the approval set. A lost or uncertain PUT must be retried and confirmed, not cancelled. A reconciliation-required result means a member may already have settled and needs operator review.",
+          requestBody: { required: true, content: { "application/json": { schema: {
+            type: "object", required: ["attemptKey", "scopeDigest", "fileKey"], additionalProperties: false,
+            properties: { attemptKey: { type: "string", minLength: 16, maxLength: 128 }, scopeDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, fileKey: { type: "string", minLength: 8, maxLength: 128 } },
+            }, examples: { default: { value: { attemptKey: "att_0123456789abcdef0123456789abcdef", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", fileKey: "fk_0123456789abcdef0123456789abcdef01234567" } } } } } },
+          responses: {
+            "200": ok("The complete approval was cancelled. A reconciliationRequired result flags a member that may already have settled.", { type: "object", required: ["code", "result"], properties: { code: { enum: ["INTAKE_SET_CANCELLED", "INTAKE_SET_CANCELLED_RECONCILIATION_REQUIRED"] }, result: { type: "object", required: ["status", "reconciliationRequired"], properties: { status: { type: "string" }, reconciliationRequired: { type: "boolean" } } } } }, { code: "INTAKE_SET_CANCELLED", result: { status: "cancelled", reconciliationRequired: false } }),
+            "400": err("INTAKE_APPROVAL_CANCEL_INVALID"),
+            "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
+            "403": err("API_SCOPE_REQUIRED"),
+            "409": err("INTAKE_APPROVAL_CONFLICT", "INTAKE_APPROVAL_FILE_OUT_OF_SCOPE"),
+            "503": err("COMPUTE_LEDGER_NOT_CONFIGURED", "INTAKE_APPROVAL_LEDGER_FAILED", "INTAKE_APPROVAL_RECEIPT_INVALID"),
+          },
+        },
+      },
       "/uploads/capability": {
         post: {
           operationId: "createDirectUploadCapability",
-          summary: "Request a direct upload URL",
+          summary: "Request an approved direct upload URL",
           tags: ["Documents"],
           "x-tavonel-scope": "documents:intake",
-          description: "Returns a short-lived browser/agent-direct R2 PUT URL only when this workspace is approved for source processing. A closed workspace receives 403 CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE before any URL or compute reservation is issued. Document bytes never pass through the application server. `requestedBytes` is checked against the deployment's per-source ceiling here, before any byte is stored: above it the answer is 413 SOURCE_EXCEEDS_PROCESSING_CEILING carrying `maxBytes`, `maxPages` and a sentence you can show a customer. Send `x-tavonel-source-idempotency-key` (a sha256 hex digest of the source event) to make the document id deterministic, so a retried intake converges on one document rather than two.",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { type: "object", required: ["originalFilename", "declaredMimeType", "requestedBytes"], properties: { originalFilename: { type: "string", maxLength: 512 }, declaredMimeType: { type: "string", enum: Object.keys(qualifiedDocumentInputs) }, requestedBytes: { type: "integer", minimum: 1, maximum: 524288000 }, estimatedPages: { type: "integer", minimum: 1 } }, additionalProperties: false },
-                examples: { default: { value: { originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184320 } } },
-              },
-            },
-          },
+          description: "Returns a short-lived direct PUT URL only for an exact member of an approved complete set. Send the approval's attemptKey, scopeDigest, pricingFingerprint, fileKey and exact contentSha256, and the stable x-tavonel-source-idempotency-key derived from attemptKey and fileKey. The API key authenticates this call only; never send it to storage. Document bytes never pass through the application server.",
+          requestBody: { required: true, content: { "application/json": { schema: {
+            type: "object", required: ["originalFilename", "declaredMimeType", "requestedBytes", "attemptKey", "scopeDigest", "pricingFingerprint", "fileKey", "contentSha256"], additionalProperties: false,
+            properties: { originalFilename: { type: "string", minLength: 1, maxLength: 255 }, declaredMimeType: { type: "string", enum: Object.keys(qualifiedDocumentInputs) }, requestedBytes: { type: "integer", minimum: 1, maximum: 524288000 }, attemptKey: { type: "string", minLength: 16, maxLength: 128 }, scopeDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, fileKey: { type: "string", minLength: 8, maxLength: 128 }, contentSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" } },
+            }, examples: { default: { value: { originalFilename: "manual.pdf", declaredMimeType: "application/pdf", requestedBytes: 184320, attemptKey: "att_0123456789abcdef0123456789abcdef", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", pricingFingerprint, fileKey: "fk_0123456789abcdef0123456789abcdef01234567", contentSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } } } } } },
           parameters: [{ $ref: "#/components/parameters/SourceIdempotencyKey" }],
           responses: {
-            "200": ok(
-              "A qualified direct upload capability and the immutable document id the bytes will be registered under. PUT the bytes to `url` with the headers in `headers` and nothing else; the URL is the credential and it is short-lived.",
-              {
-                type: "object",
-                required: ["documentId", "url", "method", "expiresAt"],
-                properties: {
-                  documentId: { type: "string", format: "uuid" },
-                  url: { type: "string", format: "uri", description: "Presigned object-storage URL. Unauthenticated: do not send the API key to it." },
-                  method: { const: "PUT" },
-                  headers: { type: "object", additionalProperties: str, description: "Every header the PUT must carry, and no others." },
-                  expiresAt: { type: "string", format: "date-time" },
-                  objectKey: str,
-                  ...bestEffort,
-                },
-                ...bestEffort,
-              },
-              {
-                documentId: "00000000-0000-4000-8000-000000000000",
-                url: "https://<storage-host>/quarantine/...?X-Amz-Signature=...",
-                method: "PUT",
-                headers: { "content-type": "application/pdf", "content-length": "184320" },
-                expiresAt: "2026-09-16T00:15:00.000Z",
-              },
-            ),
-            "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "FILE_NAME_INVALID", "SOURCE_IDEMPOTENCY_KEY_INVALID"),
+            "200": ok("An approved member's direct PUT capability and its already-persisted document identity.", { type: "object", required: ["code", "documentId", "uploadUrl", "contentLength", "declaredMimeType", "computeReservation"], properties: { code: { const: "QUALIFIED" }, documentId: { type: "string", format: "uuid" }, uploadUrl: { type: "string", format: "uri", description: "Presigned object-storage URL. The API key is never sent to it." }, contentLength: { type: "integer" }, declaredMimeType: str, computeReservation: { type: "object", required: ["reservationId", "maximumCredits"], properties: { reservationId: str, maximumCredits: int, reservedCredits: int, billingSource: str, expiresAt: { type: "string", format: "date-time" }, quote: bestEffort }, ...bestEffort } } }, { code: "QUALIFIED", documentId: "33333333-3333-4333-8333-333333333333", uploadUrl: "https://<storage-host>/quarantine/...?X-Amz-Signature=...", contentLength: 184320, declaredMimeType: "application/pdf", computeReservation: { reservationId: "reservation_example", maximumCredits: sampleFileQuote.maximumCredits, reservedCredits: sampleFileQuote.reservedCredits, billingSource: "subscription" } }),
+            "400": err("UNQUALIFIED_INPUT", "UNQUALIFIED_MIME", "FILENAME_MIME_MISMATCH", "INVALID_FILENAME", "INTAKE_APPROVAL_INVALID"),
             "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"),
-            "402": err("STUDIO_SUBSCRIPTION_REQUIRED", "TRIAL_ARCHIVE_NOT_INCLUDED", "TRIAL_FILE_LIMIT_EXCEEDED", "GPU_CREDITS_REQUIRED"),
-            "403": err("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
-            "409": err("INTAKE_IDEMPOTENCY_CONFLICT", "COMPUTE_IDEMPOTENCY_CONFLICT"),
+            "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"),
+            "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_SCOPE_MISMATCH", "INTAKE_APPROVAL_RESERVATION_EXPIRED", "SOURCE_IDEMPOTENCY_KEY_INVALID", "INTAKE_APPROVAL_CONFLICT"),
             "413": err("SOURCE_EXCEEDS_PROCESSING_CEILING", "TRIAL_FILE_TOO_LARGE"),
-            "429": err("API_RATE_LIMITED", "INTAKE_RATE_LIMITED", "INTAKE_DAILY_QUOTA_EXCEEDED"),
-            "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_DISABLED", "API_RATE_LIMIT_UNAVAILABLE"),
+            "428": err("INTAKE_APPROVAL_REQUIRED"),
+            "503": err("SIGNER_NOT_CONFIGURED", "INTAKE_DISABLED"),
           },
+        },
+      },
+      "/uploads/confirm": {
+        post: {
+          operationId: "confirmApprovedUpload",
+          summary: "Atomically confirm stored bytes for an approved member",
+          tags: ["Documents"],
+          "x-tavonel-scope": "documents:intake",
+          description: "After the direct PUT succeeds, submit its digest with the same attempt, scope and member identity. The server verifies the stored object and commits confirmation and ledger state atomically. Do not treat the PUT response as confirmation.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentId", "sourceSha256", "attemptKey", "scopeDigest", "fileKey"], additionalProperties: false, properties: { documentId: { type: "string", format: "uuid" }, sourceSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, attemptKey: { type: "string", minLength: 16, maxLength: 128 }, scopeDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, fileKey: { type: "string", minLength: 8, maxLength: 128 } } }, examples: { default: { value: { documentId: "33333333-3333-4333-8333-333333333333", sourceSha256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", attemptKey: "att_0123456789abcdef0123456789abcdef", scopeDigest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", fileKey: "fk_0123456789abcdef0123456789abcdef01234567" } } } } } },
+          responses: { "200": ok("The confirmed approval member and atomic admission receipt.", { type: "object", required: ["code", "approvedFile"], properties: { code: { const: "UPLOAD_CONFIRMED" }, approvedFile: { $ref: "#/components/schemas/UploadApprovalFile" }, result: bestEffort } }, { code: "UPLOAD_CONFIRMED", approvedFile: { fileKey: "fk_0123456789abcdef0123456789abcdef01234567", documentId: "33333333-3333-4333-8333-333333333333", fileState: "confirmed" }, result: { documentId: "33333333-3333-4333-8333-333333333333", status: "confirmed" } }), "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"), "403": err("API_SCOPE_REQUIRED", "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE"), "409": err("INTAKE_PRICE_STALE", "INTAKE_APPROVAL_SCOPE_MISMATCH", "QUARANTINE_ADMISSION_NOT_FOUND", "QUARANTINE_OBJECT_NOT_FOUND", "CONTENT_LENGTH_MISMATCH", "OBSERVED_MIME_MISMATCH", "SOURCE_DIGEST_CONFLICT"), "428": err("INTAKE_APPROVAL_REQUIRED") },
+        },
+      },
+      "/uploads/release": {
+        post: {
+          operationId: "releaseFailedApprovedUpload",
+          summary: "Release an approved hold after a definitive PUT refusal",
+          tags: ["Documents"],
+          "x-tavonel-scope": "documents:intake",
+          description: "A client may call this only after a definitive storage PUT refusal. The server checks storage for an already-landed object before cancelling the approved member. A lost or uncertain PUT response must be retried and confirmed, never released.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["documentId", "attemptKey", "fileKey"], additionalProperties: false, properties: { documentId: { type: "string", format: "uuid" }, attemptKey: { type: "string", minLength: 16, maxLength: 128 }, fileKey: { type: "string", minLength: 8, maxLength: 128 } } }, examples: { default: { value: { documentId: "33333333-3333-4333-8333-333333333333", attemptKey: "att_0123456789abcdef0123456789abcdef", fileKey: "fk_0123456789abcdef0123456789abcdef01234567" } } } } } },
+          responses: { "200": ok("The approved hold was released after the object store confirmed the object was absent.", { type: "object", required: ["code", "result"], properties: { code: { const: "UPLOAD_CREDITS_RELEASED" }, result: bestEffort } }, { code: "UPLOAD_CREDITS_RELEASED", result: { fileKey: "fk_0123456789abcdef0123456789abcdef01234567", fileState: "cancelled" } }), "401": err("AUTH_REQUIRED", "API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_REVOKED"), "409": err("INTAKE_APPROVAL_SCOPE_MISMATCH", "INTAKE_APPROVAL_RESERVATION_EXPIRED", "UPLOAD_ALREADY_STORED"), "428": err("INTAKE_APPROVAL_REQUIRED"), "503": err("SIGNER_NOT_CONFIGURED", "COMPUTE_LEDGER_NOT_CONFIGURED", "INTAKE_APPROVAL_LEDGER_FAILED", "INTAKE_APPROVAL_RECEIPT_INVALID") },
         },
       },
       "/documents": {
@@ -1097,16 +1179,16 @@ export function GET(request: Request) {
       "/connections/{id}/sync": {
         post: {
           operationId: "applyConnectionBatch",
-          summary: "Advance a connection cursor",
+          summary: "Advance a connection cursor or report a complete inventory scan",
           tags: ["Connections"],
           "x-tavonel-scope": "connections:sync",
           parameters: [{ $ref: "#/components/parameters/ConnectionId" }],
-          description: "Applies one batch of source events and advances the cursor. `previousCursorSha256` must match the committed cursor, so two collectors cannot both advance it; a mismatch is a 409 and nothing is applied. Replaying an identical `batchId` is idempotent — delivery is at-least-once and this is the consumer that makes it exactly-once.",
+          description: "Applies one batch of source events and advances the cursor. `previousCursorSha256` must match the committed cursor, so two collectors cannot both advance it; a mismatch is a 409 and nothing is applied. Replaying an identical `batchId` is idempotent — delivery is at-least-once and this is the consumer that makes it exactly-once.\n\nA body with an `operation` field is instead one step of a complete inventory scan: `inventory.begin` (compare-and-set on `expectedHeadEpoch`; `scanEpoch` must exceed every open scan's, and a newer one supersedes it), `inventory.page` (an identical page is an idempotent replay), `inventory.finalize` (requires `complete: true` and every declared page). An item missing from a finalized scan is marked unobserved — a deletion candidate, never a deletion — and `aclObservationSha256` is recorded as an observation that grants no access. An open scan expires six hours after begin.",
           requestBody: {
             required: true,
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/ConnectionBatch" },
+                schema: { oneOf: [{ $ref: "#/components/schemas/ConnectionBatch" }, { $ref: "#/components/schemas/ConnectionInventoryRequest" }] },
                 examples: {
                   default: {
                     value: {
@@ -1117,28 +1199,41 @@ export function GET(request: Request) {
                       events: [{ kind: "added", nativeId: "s3://contracts/2026/a.pdf", revision: "\"etag\"", contentSha256: "<64 hex>", sizeBytes: 184320, mimeType: "application/pdf", documentId: "00000000-0000-4000-8000-000000000001", sourceIdempotencyKey: "<64 hex>" }],
                     },
                   },
+                  inventoryBegin: {
+                    value: { operation: "inventory.begin", scanId: "00000000-0000-4000-8000-000000000002", scanEpoch: 1, expectedHeadEpoch: 0, itemCount: 1, pageCount: 1 },
+                  },
+                  inventoryPage: {
+                    value: { operation: "inventory.page", scanId: "00000000-0000-4000-8000-000000000002", pageIndex: 0, items: [{ nativeId: "contracts/2026/a.pdf", revision: "mtime:1790000000", contentSha256: "<64 hex>", sizeBytes: 184320, mimeType: "application/pdf", aclObservationSha256: null }] },
+                  },
+                  inventoryFinalize: {
+                    value: { operation: "inventory.finalize", scanId: "00000000-0000-4000-8000-000000000002", complete: true, itemCount: 1, pageCount: 1 },
+                  },
                 },
               },
             },
           },
           responses: {
             "200": ok(
-              "The cursor transition, applied or idempotently replayed. `status: replayed` means this exact batch had already been applied and nothing changed.",
+              "The cursor transition, applied or idempotently replayed. `status: replayed` means this exact batch had already been applied and nothing changed. An inventory step answers `status` begun, staged, finalized or replayed with its own fields (`scanId`, `scanEpoch`, `headEpoch`, `pageIndex`, `itemCount`, or the finalize `receipt`).",
               {
                 type: "object",
-                required: ["code", "status", "batchId"],
-                properties: { code: { const: "OK" }, status: { enum: ["applied", "replayed"] }, batchId: str, cursorSha256: nullableStr, eventCount: int },
+                required: ["code", "status"],
+                properties: { code: { const: "OK" }, status: { enum: ["applied", "replayed", "begun", "staged", "finalized"] }, batchId: str, cursorSha256: nullableStr, eventCount: int, scanId: str, scanEpoch: int, headEpoch: int, pageIndex: int, itemCount: int, receipt: { type: "object" } },
                 ...bestEffort,
               },
               { code: "OK", status: "applied", batchId: "00000000-0000-4000-8000-000000000000", cursorSha256: "sha256:<64 hex>", eventCount: 1 },
             ),
-            "400": err("CONNECTION_BATCH_INVALID", "CONNECTION_ID_INVALID", "SOURCE_IDENTITY_INVALID", "SOURCE_DIGEST_REQUIRED", "SOURCE_METADATA_INVALID", "INVALID_JSON"),
+            "400": err("CONNECTION_BATCH_INVALID", "CONNECTION_ID_INVALID", "SOURCE_IDENTITY_INVALID", "SOURCE_DIGEST_REQUIRED", "SOURCE_METADATA_INVALID", "INVALID_JSON",
+              "INVENTORY_CONTRACT_INVALID", "INVENTORY_ITEM_INVALID", "INVENTORY_PAGE_INDEX_INVALID", "INVENTORY_NOT_ATTESTED_COMPLETE"),
             "401": err("AUTH_REQUIRED"),
+            "403": err("CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", "INVENTORY_ACTOR_INVALID"),
             "404": err("CONNECTION_NOT_FOUND"),
-            "409": err("CONNECTION_BATCH_CONFLICT", "CONNECTION_CURSOR_CONFLICT", "SOURCE_CURSOR_STALE", "SOURCE_DIGEST_CONFLICT", "SOURCE_DIGEST_MISMATCH", "SOURCE_VERSION_DIGEST_CONFLICT"),
-            "413": err("REQUEST_TOO_LARGE", "SOURCE_CURSOR_TOO_LARGE"),
+            "409": err("CONNECTION_BATCH_CONFLICT", "CONNECTION_CURSOR_CONFLICT", "SOURCE_CURSOR_STALE", "SOURCE_DIGEST_CONFLICT", "SOURCE_DIGEST_MISMATCH", "SOURCE_VERSION_DIGEST_CONFLICT",
+              "INVENTORY_HEAD_STALE", "INVENTORY_EPOCH_STALE", "INVENTORY_SCAN_CONFLICT", "INVENTORY_SCAN_NOT_FOUND", "INVENTORY_SCAN_NOT_OPEN", "INVENTORY_SCAN_EXPIRED",
+              "INVENTORY_PAGE_CONFLICT", "INVENTORY_COUNT_MISMATCH", "INVENTORY_PAGES_INCOMPLETE", "INVENTORY_DUPLICATE_ITEM", "INVENTORY_FINALIZE_CONFLICT"),
+            "413": err("REQUEST_TOO_LARGE", "SOURCE_CURSOR_TOO_LARGE", "INVENTORY_LIMIT_EXCEEDED"),
             "423": err("CONNECTION_NOT_SYNCABLE", "SOURCE_LIFECYCLE_REVIEW_REQUIRED"),
-            "503": err("CONNECTION_BATCH_FAILED"),
+            "503": err("CONNECTION_BATCH_FAILED", "INVENTORY_UNAVAILABLE"),
           },
         },
       },
@@ -1323,6 +1418,22 @@ export function GET(request: Request) {
           type: "object",
           required: ["collectionId", "manifestDigest"],
           properties: { collectionId: str, manifestDigest: str, revision: int, activatedAt: nullableStr },
+        },
+        IntakeManifestEntry: {
+          type: "object", required: ["fileKey", "originalFilename", "contentSha256", "byteLength", "mimeType", "claimedPages", "claimedBasis"], additionalProperties: false,
+          properties: { fileKey: { type: "string", minLength: 8, maxLength: 128 }, originalFilename: { type: "string", minLength: 1, maxLength: 255 }, contentSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, byteLength: { type: "integer", minimum: 1 }, mimeType: str, claimedPages: { type: ["integer", "null"], minimum: 1 }, claimedBasis: { type: ["string", "null"], enum: ["pdf_page_tree", "image", "pptx_slides", "docx_declared", null] } },
+        },
+        UploadQuoteTotals: {
+          type: "object", required: ["maximumPages", "reservedCredits", "maximumCredits", "estimatedUsd", "maximumUsd"], properties: { maximumPages: int, reservedCredits: int, maximumCredits: int, estimatedUsd: { type: "number" }, maximumUsd: { type: "number" } },
+        },
+        IntakeQuote: {
+          type: "object", required: ["code", "clientManifestDigest", "pricingFingerprint", "metadataLimitBytes", "quote", "files"], properties: { code: { const: "INTAKE_QUOTE" }, clientManifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, metadataLimitBytes: int, quote: { $ref: "#/components/schemas/UploadQuoteTotals" }, files: { type: "array", items: { type: "object", required: ["fileKey", "pageBasis", "approvedMaxPages", "reservedCredits", "maximumCredits"], properties: { fileKey: str, pageBasis: { type: "string", enum: ["unknown", "declared", "pdf_page_tree", "image", "pptx_slides", "docx_declared"] }, approvedMaxPages: int, reservedCredits: int, maximumCredits: int } } }, ...bestEffort },
+        },
+        UploadApprovalFile: {
+          type: "object", required: ["fileKey", "documentId", "fileState"], properties: { fileKey: str, documentId: { type: "string", format: "uuid" }, fileState: { type: "string", enum: ["approved", "reserved", "confirmed", "cancelled"] }, contentSha256: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, byteLength: int, mimeType: str, approvedMaximumCredits: int },
+        },
+        UploadApproval: {
+          type: "object", required: ["approvalId", "attemptKey", "clientManifestDigest", "scopeDigest", "pricingFingerprint", "state", "files"], properties: { approvalId: { type: "string", format: "uuid" }, attemptKey: str, clientManifestDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, scopeDigest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, pricingFingerprint: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" }, state: str, aggregateMaximumCredits: int, files: { type: "array", items: { $ref: "#/components/schemas/UploadApprovalFile" } }, ...bestEffort },
         },
         CapabilityManifest: {
           type: "object",
@@ -1554,6 +1665,42 @@ export function GET(request: Request) {
             events: { type: "array", maxItems: 5000, items: { $ref: "#/components/schemas/ConnectionEvent" } },
           },
           additionalProperties: false,
+        },
+        ConnectionInventoryItem: {
+          type: "object",
+          required: ["nativeId", "revision", "contentSha256", "sizeBytes", "mimeType", "aclObservationSha256"],
+          properties: {
+            nativeId: { type: "string", minLength: 1, description: "1-1024 UTF-8 bytes, no C0 control or DEL." },
+            revision: { type: "string", minLength: 1, description: "1-512 UTF-8 bytes, no C0 control or DEL." },
+            contentSha256: { type: ["string", "null"], pattern: "^[a-f0-9]{64}$" },
+            sizeBytes: { type: "integer", minimum: 0, maximum: 1099511627776 },
+            mimeType: { type: ["string", "null"], pattern: "^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$", maxLength: 127 },
+            aclObservationSha256: { type: ["string", "null"], pattern: "^[a-f0-9]{64}$", description: "An opaque digest of the permissions the agent observed. Recorded, never enforced as access." },
+          },
+          additionalProperties: false,
+        },
+        ConnectionInventoryRequest: {
+          description: "One step of a complete inventory scan. The workspace is always the caller's; the body cannot name one.",
+          oneOf: [
+            {
+              type: "object",
+              required: ["operation", "scanId", "scanEpoch", "expectedHeadEpoch", "itemCount", "pageCount"],
+              properties: { operation: { const: "inventory.begin" }, scanId: { type: "string", format: "uuid" }, scanEpoch: { type: "integer", minimum: 1 }, expectedHeadEpoch: { type: "integer", minimum: 0 }, itemCount: { type: "integer", minimum: 0, maximum: 100000 }, pageCount: { type: "integer", minimum: 1, maximum: 400 } },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["operation", "scanId", "pageIndex", "items"],
+              properties: { operation: { const: "inventory.page" }, scanId: { type: "string", format: "uuid" }, pageIndex: { type: "integer", minimum: 0, maximum: 399 }, items: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/ConnectionInventoryItem" } } },
+              additionalProperties: false,
+            },
+            {
+              type: "object",
+              required: ["operation", "scanId", "complete", "itemCount", "pageCount"],
+              properties: { operation: { const: "inventory.finalize" }, scanId: { type: "string", format: "uuid" }, complete: { const: true }, itemCount: { type: "integer", minimum: 0, maximum: 100000 }, pageCount: { type: "integer", minimum: 1, maximum: 400 } },
+              additionalProperties: false,
+            },
+          ],
         },
       },
     },

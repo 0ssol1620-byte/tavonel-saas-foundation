@@ -10,6 +10,7 @@
   --lv2-meta: 13px;
   --lv2-gutter: var(--chrome-gutter);
   --space-section: clamp(56px, 5.2vw, 88px);
+  --lv2-film-summary-accent: #2447b3;
   --lv2-paper-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
   color: var(--text-hi);
   font-family: var(--f-sans);
@@ -289,6 +290,32 @@
   text-align: center;
 }
 .lv2-hero-intake-tail { white-space: nowrap; }
+.lv2-film-story {
+  width: min(100%, 1120px);
+  margin: 28px auto 0;
+}
+.lv2-film-story > summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-block: 1px solid var(--border-dark);
+  color: var(--lv2-film-summary-accent);
+  cursor: pointer;
+  font: 600 15px/22px var(--f-sans);
+  list-style: none;
+}
+.lv2-film-story > summary::-webkit-details-marker { display: none; }
+.lv2-film-story > summary::after {
+  content: "+";
+  flex: none;
+  color: var(--text-mid);
+  font: 400 20px/1 var(--f-mono);
+}
+.lv2-film-story[open] > summary::after { content: "−"; }
+.lv2-film-story .lv2-film { margin-top: 16px; }
 .lv2-film {
   margin-top: 40px;
   --lv2-film-w: 1120px;

@@ -28,7 +28,8 @@ type Operation = {
 const METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
 async function operations() {
-  const spec = await openApiRoute(new Request("https://tavonel.com/api/openapi")).json() as {
+  const response = await openApiRoute(new Request("https://tavonel.com/api/openapi"));
+  const spec = await response.json() as {
     tags: Array<{ name: string }>;
     paths: Record<string, Record<string, unknown>>;
   };
@@ -42,7 +43,7 @@ describe("OpenAPI completeness", () => {
   it("gives every operation an id, a summary, a known tag and a description", async () => {
     const { spec, list } = await operations();
     const tagNames = new Set(spec.tags.map((tag) => tag.name));
-    expect(list.length).toBe(33);
+    expect(list.length).toBe(39);
     for (const { path, method, operation } of list) {
       const where = `${method.toUpperCase()} ${path}`;
       expect(operation.operationId, where).toBeTruthy();

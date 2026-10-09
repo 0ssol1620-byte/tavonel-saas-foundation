@@ -11,7 +11,9 @@ import {
   exploreSampleArtifact,
   exploreSampleDocuments,
   exploreSampleWorld,
+  type ExploreSampleAnswer,
 } from "./explore-sample";
+import { EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./grounded-ask";
 import { STATE_WORD } from "../components/explore/parallel-view";
 import {
   DEEP_LINK_ACTS,
@@ -221,8 +223,31 @@ describe("every citation the Ask offers can be opened", () => {
     }
   });
 
-  it("quotes the source rather than composing an answer", () => {
-    for (const view of views) expect(view.answer).toBe(view.regions[0].excerpt);
+  it("carries the retriever's status, complete answer and reason rather than a preview", () => {
+    for (const [index, view] of views.entries()) {
+      const source = exploreSampleAnswers[index];
+      expect(view.question).toBe(source.question);
+      expect(view.status, view.question).toBe(source.status);
+      expect(view.answer, view.question).toBe(source.answer);
+      expect(view.reason, view.question).toBe(source.reason);
+      expect(view.regions.map((region) => region.excerpt)).toEqual(source.citations.map((citation) => citation.excerpt));
+    }
+    // The prepared Company Background question is the overflow regression: no text, its reason, its regions.
+    const company = views.find((view) => view.question.includes("Company Background"));
+    expect(company?.status).toBe("abstained");
+    expect(company?.answer).toBe("");
+    expect(company?.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(company!.regions.length).toBeGreaterThan(0);
+    expect(views.filter((view) => view.status === "grounded").length).toBe(views.length - 1);
+  });
+
+  it("has words for every abstention reason it accepts, keyed by the retriever's own code", () => {
+    expect(Object.keys(EXPLORE_COPY.askAbstentions)).toEqual([EVIDENCE_EXCEEDS_ANSWER_LIMIT]);
+    const overflow = EXPLORE_COPY.askAbstentions.EVIDENCE_EXCEEDS_ANSWER_LIMIT;
+    expect(overflow).toContain("evidence selected");
+    expect(overflow).toContain("complete-answer limit");
+    expect(overflow).toContain("partial answer is not shown");
+    expect(overflow).not.toContain(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
   });
 
   it("has an object to select for every cited region", () => {
@@ -234,6 +259,101 @@ describe("every citation the Ask offers can be opened", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe("the answer adapter carries the retriever's state and refuses a malformed one", () => {
+  /*
+    Bounded fixtures over one real shipped region, so the binding is the stage's own and only the
+    answer state varies. The qualifier sits past character 417 -- exactly what a clipped preview
+    loses -- so a view that fell back to the preview would drop it.
+  */
+  const region = model.evidence[0];
+  const FULL = `${"Net sales rose in every reportable segment during the quarter. ".repeat(7)}except Greater China, where net sales declined 3% to $15.4 billion in the three months ended December 27, 2025.`;
+  const PREVIEW = `${FULL.slice(0, 417)}...`;
+  const citation = (overrides: Partial<ExploreSampleAnswer["citations"][number]> = {}) => ({
+    evidenceId: "evidence-fixture",
+    sourceId: region.sourceId,
+    sourceVersionId: region.sourceVersionId,
+    pageNumber1: region.page,
+    bbox1000: [...region.bbox1000] as [number, number, number, number],
+    authority: "official",
+    relevance: 1,
+    claimIds: [],
+    entityIds: [],
+    authorityTier: "official",
+    relevanceBreakdown: { lexical: 1, graph: 0, temporal: 0, authority: 1 },
+    excerpt: PREVIEW,
+    ...overrides,
+  });
+  const fixture = (overrides: Partial<ExploreSampleAnswer>): ExploreSampleAnswer => ({
+    question: "Fixture question?",
+    status: "grounded",
+    answer: FULL,
+    reason: null,
+    citations: [citation()],
+    ...overrides,
+  });
+
+  it("shows a grounded answer whole, with the qualifier the preview cut off", () => {
+    expect(FULL.indexOf("except Greater China")).toBeGreaterThan(417);
+    const [view] = buildExploreAnswerViews([fixture({})], model.evidence);
+    expect(view.status).toBe("grounded");
+    expect(view.reason).toBeNull();
+    expect(view.answer).toBe(FULL);
+    expect(view.answer).toContain("except Greater China, where net sales declined 3% to $15.4 billion");
+    expect(view.answer).toContain("December 27, 2025");
+    expect(view.regions[0].excerpt).toBe(PREVIEW);
+    expect(view.regions[0].excerpt).not.toContain("except Greater China");
+    expect(view.regions[0].evidenceId).toBe(region.id);
+  });
+
+  it("carries an overflow abstention with no answer text and its source links still resolved", () => {
+    const [view] = buildExploreAnswerViews(
+      [fixture({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT })],
+      model.evidence,
+    );
+    expect(view.status).toBe("abstained");
+    expect(view.answer).toBe("");
+    expect(view.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(view.regions).toEqual([
+      {
+        evidenceId: region.id,
+        sourceId: region.sourceId,
+        filename: region.filename,
+        page: region.page,
+        excerpt: PREVIEW,
+        relevance: 1,
+      },
+    ]);
+  });
+
+  it.each([
+    ["grounded with no answer text", { answer: "" }],
+    ["grounded with whitespace only", { answer: "  \n " }],
+    ["grounded with a reason", { reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT }],
+    ["abstained with a preview standing in as the answer", { status: "abstained", answer: PREVIEW, reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT }],
+    ["abstained without a reason", { status: "abstained", answer: "", reason: null }],
+    ["abstained for a reason the stage cannot say", { status: "abstained", answer: "", reason: "NO_REGION_BOUND_EVIDENCE_MATCH" }],
+    ["abstained for a prototype key", { status: "abstained", answer: "", reason: "constructor" }],
+    ["an unknown status", { status: "maybe" }],
+    ["a missing answer", { answer: undefined }],
+  ] as unknown as Array<[string, Partial<ExploreSampleAnswer>]>)("refuses a view that is %s", (_label, overrides) => {
+    expect(() => buildExploreAnswerViews([fixture(overrides)], model.evidence)).toThrow(/explore_answer_state_invalid/);
+  });
+
+  it("refuses an unresolved citation and an answer with nothing to cite", () => {
+    const unresolved = fixture({ citations: [citation({ sourceId: "source-that-is-not-shipped" })] });
+    expect(() => buildExploreAnswerViews([unresolved], model.evidence)).toThrow(/explore_answer_citation_unresolved/);
+    const abstainedUnresolved = fixture({
+      status: "abstained",
+      answer: "",
+      reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT,
+      citations: [citation({ bbox1000: [0, 0, 1, 1] })],
+    });
+    expect(() => buildExploreAnswerViews([abstainedUnresolved], model.evidence)).toThrow(/explore_answer_citation_unresolved/);
+    expect(() => buildExploreAnswerViews([fixture({ citations: [] })], model.evidence)).toThrow(/explore_answer_has_no_regions/);
+    expect(() => buildExploreAnswerViews([fixture({ citations: [] })], [])).toThrow(/explore_answer_has_no_regions/);
   });
 });
 

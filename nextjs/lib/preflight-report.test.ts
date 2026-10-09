@@ -153,24 +153,34 @@ describe("the preflight denominators", () => {
       CAPABILITY_MANIFEST.entries.filter((entry) => isAcceptedAtUpload(entry.status)).length,
     );
     expect(describePreflightSummary(summary))
-      .toContain(`0 of ${summary.acceptedFormatCount} accepted formats carry a qualification receipt`);
-    expect(describePreflightSummary(summary)).toContain("2 of 3 staged files accepted");
+      .toContain(`0 of ${summary.acceptedFormatCount} supported formats carry a qualification receipt`);
+    expect(describePreflightSummary(summary)).toContain("2 of 3 selected files supported by format checks");
   });
 
   it("says nothing at all rather than something reassuring when nothing is staged", () => {
     const empty = buildPreflightSummary([]);
     expect(empty.files).toEqual([]);
-    expect(describePreflightSummary(empty)).toContain("0 of 0 staged files accepted");
+    expect(describePreflightSummary(empty)).toContain("0 of 0 selected files supported by format checks");
   });
 
   it("renders one line per file in the audit's vocabulary", () => {
     const line = describePreflightFile(summary.files[0]);
-    expect(line).toContain("accepted as BEST_EFFORT");
-    expect(line).toContain("preserved page, paragraph text, bbox1000");
-    expect(line).toContain("converted to PDF before reading");
-    expect(line).toContain("omitted sheet names, cell addresses, formulas");
-    expect(line).toContain("review required");
-    expect(describePreflightFile(summary.files[2])).toBe("refused · no review required");
+    expect(line).toContain("Format support: Supported with limitations");
+    expect(line).toContain("Expected output: page, paragraph text, Locations on the source page");
+    expect(line).toContain("Planned conversion to PDF before reading");
+    expect(line).toContain("Not extracted: sheet names, cell addresses, formulas");
+    expect(line).toContain("Source marked for review");
+    expect(describePreflightFile(summary.files[2])).toBe("refused by format checks · Source safety not assessed by this format lookup");
+  });
+
+  it("does not turn an absent review flag into a file-safety verdict", () => {
+    const report = buildPreflightFileReport({ fileName: "scan.pdf", mime: "application/pdf" });
+    const line = describePreflightFile(report);
+    expect(line).toContain("Source safety not assessed by this format lookup");
+    expect(line).not.toContain("no review required");
+    const summaryLine = describePreflightSummary(buildPreflightSummary([{ fileName: "scan.pdf" }]));
+    expect(summaryLine).toContain("this report does not inspect file bytes or assess safety");
+    expect(summaryLine).not.toContain("0 awaiting review");
   });
 });
 
@@ -202,11 +212,11 @@ describe("the workspace preflight section", () => {
   it("shows a per-file row with its preservation and omission, not only a source count", () => {
     const html = render(["forecast.xlsx", "drawing.dwg"]);
     expect(html).toContain("forecast.xlsx");
-    expect(html).toContain("preserved page, paragraph text, bbox1000");
-    expect(html).toContain("omitted sheet names, cell addresses, formulas");
+    expect(html).toContain("Expected output: page, paragraph text, Locations on the source page");
+    expect(html).toContain("Not extracted: sheet names, cell addresses, formulas");
     expect(html).toContain("drawing.dwg");
     expect(html).toContain("refused");
-    expect(html).toContain("accepted formats carry a qualification receipt");
+    expect(html).toContain("supported formats carry a qualification receipt");
   });
 
   it("counts a source whose filename this device does not hold instead of calling it refused", () => {
@@ -230,13 +240,13 @@ describe("the workspace preflight section", () => {
       gates: [],
     }));
     expect(html).toContain("this browser holds no filename to report on");
-    expect(html).not.toContain("accepted as BEST_EFFORT");
-    expect(html).not.toContain("refused · no review required");
+    expect(html).not.toContain("Format support: Supported with limitations");
+    expect(html).not.toContain("refused by format checks · Source safety not assessed by this format lookup");
   });
 
   it("draws no per-file table when no file has been staged", () => {
     const html = render([]);
-    expect(html).not.toContain("accepted as BEST_EFFORT");
+    expect(html).not.toContain("Format support: Supported with limitations");
     expect(html).toContain("No source run has been observed");
   });
 });

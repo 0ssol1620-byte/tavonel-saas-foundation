@@ -39,7 +39,7 @@ function landingComponents(): string[] {
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) return walk(full);
-      return /\.tsx?$/.test(entry.name) ? [relative(root, full).split(sep).join("/")] : [];
+      return /\.tsx?$/.test(entry.name) && !/\.(test|spec)\.tsx?$/.test(entry.name) ? [relative(root, full).split(sep).join("/")] : [];
     });
   return walk(root).sort();
 }

@@ -1,3 +1,6 @@
+import { CORPUS_MAX_DOCUMENTS } from "./compile-limits";
+import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX, GLOBAL_COLLECTION_MAX_BYTES, GLOBAL_COLLECTION_MAX_REGIONS, judgeGlobalCollectionInput } from "./global-collection-compile";
+import { CORE_MAX_LATENCY_MS } from "./execution-budget";
 import { OCR_REGIONS_REQUIRED, documentsWithoutRegions } from "../../shared/compiledWorldValidation";
 import { authorizationStage, type CustomerDataAuthorization } from "../../shared/customerDataAuthorization";
 import type { ReleaseStage } from "../../shared/scopedCustomerDataGate";
@@ -9,11 +12,13 @@ import {
   type SignedCompileReceipt,
 } from "./compile-receipt-signing";
 import { CANONICAL_DOCUMENT_ID, mayPublish, registerCollectionArtifact } from "./compile-artifact-provenance";
-import { checkConnectorSourceAccess } from "./connector-source-access";
+import { authorizeCompileJobSourceAccess, classifyCompileJobSources, compileJobAuthorityEnabled } from "./compile-job-authority";
+import { readConnectorCompileIdentities } from "./connector-compile-identity";
 import { dispatchCoreCompile, readCoreRuntimeEnv } from "./core-runtime";
 import {
   dispatchProductCoreV2,
   productCoreV2CollectionId,
+  legacyProductCoreV2CollectionId,
   projectProductCoreV2Candidate,
   readProductCoreV2Env,
   readRevisionCompileSnapshot,
@@ -89,11 +94,35 @@ async function readCompileAuthorization(workspaceId: string, documentIds: readon
 export async function runCollectionCompile(
   workspaceId: string,
   documentIds: readonly string[],
+  logicalCollectionKey?: string,
+  compileJobId?: string,
 ): Promise<CollectionCompileRun> {
+  const startedAt = Date.now();
+  const globalCollection = logicalCollectionKey?.startsWith(GLOBAL_COLLECTION_KEY_PREFIX) === true;
+  if (globalCollection && documentIds.length > CORPUS_MAX_DOCUMENTS) {
+    return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+  }
+  if (globalCollection && !globalCollectionCompileEnabled()) {
+    return { ok: false, status: 503, code: "GLOBAL_COLLECTION_COMPILE_DISABLED", payload: {} };
+  }
   // A candidate is registered under its document ids before it is stored, and source deletion
   // can only name a UUID. An id it could never name is refused here, before anything is paid for.
-  if (documentIds.length === 0 || !documentIds.every((id) => CANONICAL_DOCUMENT_ID.test(id))) {
+  if (documentIds.length === 0 || new Set(documentIds).size !== documentIds.length || !documentIds.every((id) => CANONICAL_DOCUMENT_ID.test(id))) {
     return { ok: false, status: 400, code: "DOCUMENT_SET_UNQUALIFIED", payload: {} };
+  }
+  if (compileJobAuthorityEnabled()) {
+    if (!compileJobId) return { ok: false, status: 403, code: "COMPILE_JOB_AUTHORITY_DENIED", payload: {} };
+    const beforeRead = await authorizeCompileJobSourceAccess({ jobId: compileJobId, workspaceKey: workspaceId,
+      documentIds, phase: "before_source_read" });
+    if (!beforeRead.ok) return { ok: false, status: beforeRead.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: beforeRead.code, payload: {} };
+  } else {
+    const source = await classifyCompileJobSources({ workspaceKey: workspaceId, documentIds });
+    if (!source.ok) return { ok: false, status: 503, code: source.code, payload: {} };
+    if (source.scope === "connector") return { ok: false, status: 403, code: "CONNECTOR_SOURCE_AUTHORITY_DISABLED", payload: {} };
+  }
+  if (logicalCollectionKey !== undefined && (!logicalCollectionKey.trim() || logicalCollectionKey.length > 256)) {
+    return { ok: false, status: 400, code: "COLLECTION_IDENTITY_INVALID", payload: {} };
   }
   const signer = readR2SignerEnv();
   if (!signer) return { ok: false, status: 503, code: "SIGNER_NOT_CONFIGURED", payload: {} };
@@ -132,7 +161,30 @@ export async function runCollectionCompile(
     return { ok: false, status: 409, code: "OCR_NOT_READY", payload: {}, retryAfterSeconds: 5 };
   }
 
-  const fetched = await Promise.all(selected.map((item) => getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
+  const fetched: Awaited<ReturnType<typeof getWorkspaceOcrJson>>[] = [];
+  // Recheck immediately before reading source content. The earlier worker check only permits
+  // metadata listing and cannot authorize this later protected read by itself.
+  if (compileJobAuthorityEnabled()) {
+    const beforeOcr = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+      documentIds, phase: "before_source_read" });
+    if (!beforeOcr.ok) return { ok: false, status: beforeOcr.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: beforeOcr.code, payload: {} };
+  }
+  let fetchedBytes = 0;
+  let fetchedRegions = 0;
+  const fanout = globalCollection ? 1 : 4;
+  // Global reads consume the remaining byte budget sequentially; legacy reads use fan-out 4.
+  for (let offset = 0; offset < selected.length; offset += fanout) {
+    const batch = await Promise.all(selected.slice(offset, offset + fanout).map((item) => globalCollection
+      ? getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!, new Date(), GLOBAL_COLLECTION_MAX_BYTES - fetchedBytes)
+      : getWorkspaceOcrJson(signer, workspaceId, item!.ocrJsonKey!)));
+    fetched.push(...batch);
+    if (globalCollection) {
+      fetchedBytes += batch.reduce((sum, result) => sum + (result.ok ? (result.byteLength ?? Buffer.byteLength(JSON.stringify(result.json), "utf8")) : 0), 0);
+      fetchedRegions += batch.reduce((sum, result) => sum + (result.ok && result.json && typeof result.json === "object" && Array.isArray((result.json as { regions?: unknown }).regions) ? ((result.json as { regions: unknown[] }).regions.length) : 0), 0);
+      if (fetchedBytes > GLOBAL_COLLECTION_MAX_BYTES || fetchedRegions > GLOBAL_COLLECTION_MAX_REGIONS || batch.some((result) => !result.ok && result.code === "JSON_TOO_LARGE")) return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+    }
+  }
   // An OCR result that could not be read at all is a binding failure, not a missing-region one.
   const bodies = fetched.map((result) => (result.ok ? result.json : null));
   if (bodies.some((body) => body === null || typeof body !== "object")) {
@@ -181,17 +233,28 @@ export async function runCollectionCompile(
   }
 
   const verifiedInputs = inputs.filter((item) => item !== null);
+  if (gate.scope === "connector") {
+    const bindings = await readConnectorCompileIdentities(workspaceId, documentIds);
+    if (!bindings.ok) return { ok: false, status: 409, code: bindings.code, payload: {} };
+    for (const input of verifiedInputs) input.logicalSourceId = bindings.identities.get(input.documentId)!;
+  }
+  if (globalCollection && !judgeGlobalCollectionInput(verifiedInputs)) {
+    return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
+  }
 
   const expectedVersions = selected.map((item) => ({ documentId: item!.documentId, versionKey: item!.versionKey }));
-  const revalidate = async (): Promise<CollectionCompileRun | null> => {
-    const sourceAccess = await checkConnectorSourceAccess(workspaceId, expectedVersions.map((item) => item.documentId));
-    if (!sourceAccess.ok) {
-      return {
-        ok: false,
-        status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
-        code: sourceAccess.code,
-        payload: {},
-      };
+  const revalidate = async (phase: "before_core" | "after_core"): Promise<CollectionCompileRun | null> => {
+    if (compileJobAuthorityEnabled()) {
+      const jobAuthority = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+        documentIds, phase });
+      if (!jobAuthority.ok) return { ok: false, status: jobAuthority.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+        code: jobAuthority.code, payload: {} };
+    }
+    // A newer revision of a selected logical source bound while this compile was in flight
+    // makes the result stale in the same way a changed byte version does.
+    if (gate.scope === "connector") {
+      const rebound = await readConnectorCompileIdentities(workspaceId, documentIds);
+      if (!rebound.ok) return { ok: false, status: 409, code: rebound.code, payload: {} };
     }
     const relisted = await listImmutableWorkspaceObjects(signer, workspaceId);
     if (!relisted.ok) return { ok: false, status: 503, code: relisted.code, payload: {} };
@@ -209,7 +272,7 @@ export async function runCollectionCompile(
   // Check immediately before the paid Core dispatch, then again after it returns. The first
   // avoids known stale work; the second prevents a source update during Core execution from
   // becoming a persisted candidate.
-  const preDispatchVersionFailure = await revalidate();
+  const preDispatchVersionFailure = await revalidate("before_core");
   if (preDispatchVersionFailure) return preDispatchVersionFailure;
 
   /*
@@ -227,19 +290,29 @@ export async function runCollectionCompile(
     (same defect, with a receipt attached), and it is off unless an operator turns it on --
     nothing here verifies that the deployed Core accepts `incremental_recompile`.
 
-    The lookup is exact: the collection id is a hash of the document/version binding, so this
-    finds a prior World only for a re-compile of an identical binding. That is enough to
-    exercise the equivalence path and not enough for the economic claim; the missing piece is a
-    collection identity that survives a source revision, written up in the lane report.
+    The lookup is exact and revision-independent: the logical selection identity excludes
+    versionKey. A source revision therefore finds the actual active parent, while unrelated
+    collections are never joined by content similarity. Historical version-key identities
+    require an explicit migration mapping; this path does not guess their lineage.
   */
   let previousActiveWorld: ProductCoreV2CompileRequest["previousActiveWorld"] | null = null;
   if (coreV2 && revisionCompileEnabled()) {
     const active = await getFoundationActiveWorld(
       workspaceId,
-      productCoreV2CollectionId(workspaceId, verifiedInputs),
+      productCoreV2CollectionId(workspaceId, verifiedInputs, logicalCollectionKey),
     );
     if (!active.ok && active.code !== "ACTIVE_WORLD_NOT_FOUND") {
       return { ok: false, status: 503, code: active.code, payload: {} };
+    }
+    if (!active.ok && logicalCollectionKey === undefined) {
+      // An exact old binding is evidence of a legacy collection, not permission to migrate
+      // its history. Refuse instead of silently presenting the same work as a new collection.
+      const legacy = await getFoundationActiveWorld(workspaceId, legacyProductCoreV2CollectionId(workspaceId, verifiedInputs));
+      if (legacy.ok) return {
+        ok: false, status: 409, code: "COLLECTION_IDENTITY_MIGRATION_REQUIRED",
+        payload: { legacyCollectionId: legacy.world.collectionId },
+      };
+      if (legacy.code !== "ACTIVE_WORLD_NOT_FOUND") return { ok: false, status: 503, code: legacy.code, payload: {} };
     }
     if (active.ok) {
       const stored = await getWorkspaceCollectionCandidate(signer, workspaceId, active.world.candidateObjectKey);
@@ -264,6 +337,8 @@ export async function runCollectionCompile(
       return { ok: false, status: 503, code: currentGate.code, payload: {} };
     }
     customerDataGate = currentGate.decision;
+    const remainingMs = globalCollection ? CORE_MAX_LATENCY_MS - (Date.now() - startedAt) : CORE_MAX_LATENCY_MS;
+    if (remainingMs < 1000) return { ok: false, status: 503, code: "GLOBAL_COLLECTION_TIME_BUDGET_EXHAUSTED", payload: {} };
     const compiled = await dispatchProductCoreV2(
       coreV2,
       workspaceId,
@@ -272,8 +347,13 @@ export async function runCollectionCompile(
       previousActiveWorld,
       customerDataGate,
       currentGate.scope,
+      logicalCollectionKey,
+      remainingMs,
     );
     if (!compiled.ok) return { ok: false, status: 503, code: compiled.code, payload: {} };
+    if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
+      return { ok: false, status: 502, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH", payload: {} };
+    }
     if (compiled.result.status === "rejected") {
       return {
         ok: false,
@@ -307,11 +387,17 @@ export async function runCollectionCompile(
     };
   }
 
-  const postDispatchVersionFailure = await revalidate();
+  const postDispatchVersionFailure = await revalidate("after_core");
   if (postDispatchVersionFailure) return postDispatchVersionFailure;
   // A revoked or expired approval cannot publish the result of a job already in flight.
   const persistenceGate = await readCompileAuthorization(workspaceId, documentIds);
   if (!persistenceGate.ok) return { ok: false, status: 503, code: persistenceGate.code, payload: {} };
+  if (compileJobAuthorityEnabled()) {
+    const beforePersist = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+      documentIds, phase: "before_persist" });
+    if (!beforePersist.ok) return { ok: false, status: beforePersist.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: beforePersist.code, payload: {} };
+  }
 
   const key = collectionCandidateKey(workspaceId, artifact.collectionId, artifact.manifestDigest.replace("sha256:", ""));
   if (!key) return { ok: false, status: 500, code: "COLLECTION_KEY_INVALID", payload: {} };
@@ -371,6 +457,12 @@ export async function runCollectionCompile(
   const storedArtifact = { ...artifact, coreExecution, signedReceipt: signed.receipt };
   if (!mayPublish(registered)) {
     return { ok: false, status: 503, code: "COLLECTION_ARTIFACT_PUBLICATION_LEASE_EXPIRED", payload: {} };
+  }
+  if (compileJobAuthorityEnabled()) {
+    const finalAuthority = await authorizeCompileJobSourceAccess({ jobId: compileJobId!, workspaceKey: workspaceId,
+      documentIds, phase: "before_persist" });
+    if (!finalAuthority.ok) return { ok: false, status: finalAuthority.code === "COMPILE_JOB_AUTHORITY_DENIED" ? 403 : 503,
+      code: finalAuthority.code, payload: {} };
   }
   const stored = await putWorkspaceCollectionCandidate(signer, workspaceId, key, storedArtifact);
   if (!stored.ok) return { ok: false, status: 503, code: stored.code, payload: {} };

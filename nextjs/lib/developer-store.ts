@@ -417,6 +417,9 @@ export async function applyFoundationConnectionBatch(workspaceKey: string, conne
       if (message.includes("connection_cursor_conflict")) return { ok: false as const, code: "CONNECTION_CURSOR_CONFLICT" };
       if (message.includes("connection_batch_idempotency_conflict")) return { ok: false as const, code: "CONNECTION_BATCH_CONFLICT" };
       if (message.includes("connection_not_syncable")) return { ok: false as const, code: "CONNECTION_NOT_SYNCABLE" };
+      if (message.includes("connection_batch_approved_source_invalid") || message.includes("connection_batch_approved_source_unavailable")) {
+        return { ok: false as const, code: "CONNECTION_BATCH_CONFLICT" };
+      }
       return { ok: false as const, code: "CONNECTION_BATCH_FAILED" };
     }
     return { ok: true as const, result: await response.json() as Record<string, unknown> };

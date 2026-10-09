@@ -9,6 +9,8 @@ import { PageToc, tocEntries } from "@/components/docs/page-toc";
 import { PACKAGE_CONTENTS } from "@/lib/package-contents";
 import { MCP_TOOL_COUNT_WORD, MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { FIRST_CALL_SNIPPETS } from "@/lib/developer-snippets";
+import { activationPolicy } from "@/lib/activation-policy";
+import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -143,6 +145,21 @@ export default function DevelopersPage() {
                   </li>
                 ))}
               </ol>
+              {/*
+                UX01. The journey's first step -- upload or connect sources -- is the one a reader
+                cannot take alone while `activationPolicy.customerData` is closed, and the first
+                example below is an authenticated read. So the gate is stated between the two, in
+                the policy's own words (the sentence /pricing and /api/status carry), with the two
+                actions /pricing's Evaluation card offers in the same state. It renders only while
+                the gate is closed, so opening it needs no edit here.
+              */}
+              {activationPolicy.customerData.enabled ? null : (
+                <p className="fine" data-capability-gate="customerData">
+                  {activationPolicy.customerData.reason}{" "}
+                  <Link href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link> ·{" "}
+                  <Link href="/contact">Discuss your sources</Link>
+                </p>
+              )}
 
               <p className="fine">
                 The endpoint reference, the error catalogue and the package format are in{" "}

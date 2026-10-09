@@ -20,6 +20,8 @@ const requestConnectorSourceDeletion = vi.fn<(...args: any[]) => any>();
 const loadConnectorSyncPage = vi.fn<(...args: any[]) => any>();
 vi.mock("./connector-sync-page", () => ({ loadConnectorSyncPage }));
 vi.mock("./connector-source-access", () => ({ requestConnectorSourceDeletion, suspendConnectorSource }));
+const reconcileDropboxSourcePage = vi.fn<(...args: any[]) => any>();
+vi.mock("./dropbox-source-reconciliation", () => ({ reconcileDropboxSourcePage }));
 const refreshOAuthAccessToken = vi.fn<(...args: any[]) => Promise<any>>(async () => ({ accessToken: "at-1" }));
 const readOAuthProviderRuntime = vi.fn<(...args: any[]) => any>(() => ({ clientSecretReference: "vault://client" }));
 const readOAuthSecretBrokerConfig = vi.fn<(...args: any[]) => any>(() => ({ kind: "vault" }));
@@ -66,6 +68,7 @@ beforeEach(() => {
   canAdmitCustomerSource.mockResolvedValue(true);
   loadConnectorSyncPage.mockImplementation(async (_job, _worker, _cursor, _offset, list) => list());
   suspendConnectorSource.mockResolvedValue({ ok: true });
+  reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: [] });
   requestConnectorSourceDeletion.mockResolvedValue({ ok: true, receiptId: `sha256:${"d".repeat(64)}`, replayed: false, held: false });
   completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "leased" as const } });
   // Files-listing tests run on Dropbox; Google jobs must name the lifecycle reader (see GOOGLE).
@@ -136,6 +139,7 @@ describe("cursor safety", () => {
 
   it("acknowledges a durably tombstoned source held from physical purge", async () => {
     listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("held"), kind: "deleted" }], cursor: "next", complete: true });
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: ["held"] });
     requestConnectorSourceDeletion.mockResolvedValue({ ok: true, receiptId: `sha256:${"d".repeat(64)}`,
       replayed: false, held: true });
     const result = await runSourceImportBatch(JOB, "worker-1");
@@ -147,6 +151,7 @@ describe("cursor safety", () => {
 
   it("retries an unknown hold state without advancing the cursor", async () => {
     listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("unknown"), kind: "deleted" }], cursor: "next", complete: false });
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: ["unknown"] });
     requestConnectorSourceDeletion.mockResolvedValue({ ok: false, code: "SOURCE_LEGAL_HOLD_STATE_UNKNOWN" });
     const result = await runSourceImportBatch(JOB, "worker-1");
     expect(result).toEqual({ ok: false, code: "SOURCE_LEGAL_HOLD_STATE_UNKNOWN" });
@@ -173,6 +178,7 @@ describe("cursor safety", () => {
   it.each(["dropbox", "microsoft_graph"])("retains %s removal events before importing any page bytes", async provider => {
     getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider, refreshTokenReference: "vault://refresh" });
     const removed = { ...sourceItem("removed"), kind: "deleted" };
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: ["removed"] });
     listOAuthSourcePage.mockResolvedValue({
       items: [...Array.from({ length: SYNC_IMPORT_LIMIT }, (_, i) => sourceItem(`file-${i}`)), removed],
       cursor: "next", complete: true,
@@ -189,6 +195,7 @@ describe("cursor safety", () => {
 
   it("surfaces failure to persist the lifecycle stop without committing progress", async () => {
     listOAuthSourcePage.mockResolvedValue({ items: [{ ...sourceItem("gone"), kind: "deleted" }], cursor: "next", complete: false });
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: ["gone"] });
     requestConnectorSourceDeletion.mockResolvedValue({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
     expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
     expect(importSourceObject).not.toHaveBeenCalled();
@@ -314,6 +321,30 @@ describe("batching", () => {
     expect(result.ok && result.value.imported).toBe(1);
     expect(result.ok && result.value.skipped).toEqual([{ nativeId: "bad", code: "SOURCE_TOO_LARGE" }]);
     expect((completeJobBatch.mock.calls[0][3] as { outcome: string }).outcome).toBe("succeeded");
+  });
+
+  it("skips a revision the provider names as superseded instead of retrying the stored page forever", async () => {
+    importSourceObject.mockImplementation(async (_ctx: unknown, item: { nativeId: string }) =>
+      item.nativeId === "edited"
+        ? { ok: false, nativeId: "edited", code: "SOURCE_REVISION_SUPERSEDED" }
+        : { ok: true, nativeId: item.nativeId, documentId: "doc", filename: "f.pdf" });
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("edited"), sourceItem("good")], cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch(JOB, "worker-1");
+
+    expect(result.ok && result.value.skipped).toEqual([{ nativeId: "edited", code: "SOURCE_REVISION_SUPERSEDED" }]);
+    expect(importSourceObject).toHaveBeenCalledTimes(2);
+    expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ itemsSeen: 2, itemsDone: 1, cursorToken: "next" });
+  });
+
+  it("still retries an unexplained revision mismatch rather than skipping it", async () => {
+    importSourceObject.mockResolvedValue({ ok: false, nativeId: "odd", code: "SOURCE_REVISION_MISMATCH" });
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("odd")], cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch(JOB, "worker-1");
+
+    expect(result).toEqual({ ok: false, code: "SOURCE_REVISION_MISMATCH" });
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({ outcome: "retry", errorCode: "SOURCE_REVISION_MISMATCH" });
   });
 
   it("does not advance past a transient import failure", async () => {
@@ -462,6 +493,87 @@ describe("failure classification", () => {
   it("fails a job that names no connection", async () => {
     await runSourceImportBatch({ ...JOB, oauthConnectionId: null }, "worker-1");
     expect(completeJobBatch.mock.calls[0][3]).toMatchObject({ outcome: "failed", errorCode: "JOB_CONNECTION_MISSING" });
+  });
+});
+
+describe("Dropbox path-only removals", () => {
+  const tombstone = (path: string) => ({ nativeId: null, providerPath: path, name: "x.pdf", revision: `deleted:${path}`,
+    mimeType: null, sizeBytes: null, modifiedAt: null, kind: "deleted" as const });
+
+  it("stages a path-only removal without suspending, and still advances past the reconciled page", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [tombstone("/a.pdf"), { ...sourceItem("id:A"), providerPath: "/b.pdf" }],
+      cursor: "page-2", complete: false });
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "page-1" }, "worker-1");
+    expect(result.ok).toBe(true);
+    expect(reconcileDropboxSourcePage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ jobId: JOB.jobId }), "worker-1", "page-1");
+    expect(suspendConnectorSource).not.toHaveBeenCalled();
+    expect(requestConnectorSourceDeletion).not.toHaveBeenCalled();
+    expect(importSourceObject.mock.calls.map(call => call[1].nativeId)).toEqual(["id:A"]);
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "progress", itemsSeen: 2, cursorToken: "page-2" });
+  });
+
+  it("suspends the ids reconciliation releases at the listing boundary before committing", async () => {
+    const order: string[] = [];
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: ["id:A"] });
+    suspendConnectorSource.mockImplementation(async (input: { nativeId: string }) => { order.push(`suspend:${input.nativeId}`); return { ok: true }; });
+    completeJobBatch.mockImplementation(async (_ws, _id, _worker, batch: { outcome: string }) => {
+      order.push(`commit:${batch.outcome}`);
+      return { ok: true as const, value: { state: "succeeded" as const } };
+    });
+    listOAuthSourcePage.mockResolvedValue({ items: [tombstone("/a.pdf")], cursor: "end", complete: true });
+    expect((await runSourceImportBatch(JOB, "worker-1")).ok).toBe(true);
+    expect(requestConnectorSourceDeletion).toHaveBeenCalledWith(expect.objectContaining({
+      nativeId: "id:A", provider: "dropbox", reason: "provider_deleted" }));
+    expect(order).toEqual(["suspend:id:A", "commit:succeeded"]);
+  });
+
+  it.each([
+    ["DROPBOX_SOURCE_PATH_UNRESOLVED", "failed"],
+    ["DROPBOX_SOURCE_IDENTITY_LEGACY", "failed"],
+    ["DROPBOX_SOURCE_STREAM_INVALID", "failed"],
+    ["DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE", "retry"],
+  ])("fails closed on %s without importing, suspending or advancing", async (code, outcome) => {
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: false, code });
+    listOAuthSourcePage.mockResolvedValue({ items: [tombstone("/never-seen"), sourceItem("id:B")], cursor: "next", complete: true });
+    expect(await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1")).toEqual({ ok: false, code });
+    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(suspendConnectorSource).not.toHaveBeenCalled();
+    expect(completeJobBatch).toHaveBeenCalledExactlyOnceWith(JOB.workspaceKey, JOB.jobId, "worker-1", { outcome, errorCode: code });
+  });
+
+  it("replays an interrupted boundary page from the same page and repeats the same suspension", async () => {
+    reconcileDropboxSourcePage.mockResolvedValue({ ok: true, suspend: ["id:A"] });
+    loadConnectorSyncPage.mockResolvedValue({ items: [tombstone("/a.pdf")], cursor: "end", complete: true });
+    requestConnectorSourceDeletion.mockResolvedValueOnce({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
+    const job = { ...JOB, cursorToken: "before" };
+    expect(await runSourceImportBatch(job, "worker-1")).toEqual({ ok: false, code: "SOURCE_DELETION_WRITE_FAILED" });
+    expect(completeJobBatch.mock.calls[0][3]).not.toHaveProperty("cursorToken");
+    expect((await runSourceImportBatch(job, "worker-2")).ok).toBe(true);
+    expect(reconcileDropboxSourcePage.mock.calls.map(call => call[2])).toEqual(["before", "before"]);
+    expect(requestConnectorSourceDeletion.mock.calls[1][0]).toEqual(requestConnectorSourceDeletion.mock.calls[0][0]);
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "succeeded", cursorToken: "end" });
+  });
+
+  it("applies same-page order: an entry removed later on its page is consumed, never imported", async () => {
+    listOAuthSourcePage.mockResolvedValue({ items: [
+      { ...sourceItem("id:B"), providerPath: "/a.pdf" },      // removed by the exact-path tombstone below
+      { ...sourceItem("id:C"), providerPath: "/d/c.pdf" },    // removed with its folder below
+      { ...sourceItem("id:E"), providerPath: "/dx.pdf" },     // name-prefix sibling, not a descendant
+      tombstone("/a.pdf"), tombstone("/d"),
+      { ...sourceItem("id:F"), providerPath: "/a.pdf" },      // reoccupies /a.pdf after the removal
+    ], cursor: "end", complete: true });
+    completeJobBatch.mockResolvedValue({ ok: true as const, value: { state: "succeeded" as const } });
+    expect((await runSourceImportBatch(JOB, "worker-1")).ok).toBe(true);
+    expect(importSourceObject.mock.calls.map(call => call[1].nativeId)).toEqual(["id:E", "id:F"]);
+    expect(completeJobBatch.mock.calls.at(-1)![3]).toMatchObject({ outcome: "succeeded", itemsSeen: 6, itemsDone: 2, cursorToken: "end" });
+  });
+
+  it("refuses a path-only removal from a provider without a reconciler", async () => {
+    getOAuthConnectionSecretReference.mockResolvedValue({ ok: true, provider: "microsoft_graph", refreshTokenReference: "vault://refresh" });
+    listOAuthSourcePage.mockResolvedValue({ items: [tombstone("/a.pdf")], cursor: "next", complete: true });
+    expect(await runSourceImportBatch(JOB, "worker-1")).toEqual({ ok: false, code: "CONNECTOR_PAGE_INVALID" });
+    expect(reconcileDropboxSourcePage).not.toHaveBeenCalled();
+    expect(completeJobBatch).toHaveBeenCalledExactlyOnceWith(JOB.workspaceKey, JOB.jobId, "worker-1", { outcome: "failed", errorCode: "CONNECTOR_PAGE_INVALID" });
   });
 });
 

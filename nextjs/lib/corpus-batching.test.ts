@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { MAX_FILES } from "./archive-expand";
 import { corpusIdFor } from "./corpus-id";
+import { compilableDocumentIds, type ApprovalPayload } from "./intake-approval";
 import {
   CORPUS_ID_PATTERN,
   describeCorpusStart,
@@ -330,7 +331,17 @@ describe("where the corpus path is wired in", () => {
     */
     expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok}");
     expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(");
-    expect(workspace).toContain("if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);");
+    // The approved complete set is compiled only after the server returns every approved member.
+    expect(workspace).toContain("await uploadDocuments(files, counts);");
+    expect(workspace).toContain("const expectedKeys = triageApproval.quote.files.map((entry) => entry.fileKey);");
+    expect(workspace).toContain("processingManifest = manifest.filter((entry) => expected.has(entry.fileKey));");
+    expect(workspace).toContain("if (processingManifest.length !== expectedKeys.length)");
+    expect(workspace).toContain("const fileKeys = processingManifest.map((entry) => entry.fileKey);");
+    expect(workspace).toContain('const complete = settled.length === processingManifest.length && settled.every((item) => item.ok && item.value.status === "confirmed");');
+    expect(workspace).toMatch(/if \(!complete\) \{[\s\S]*?return;\s*\}\s*const final = await readApprovalStatus/);
+    expect(workspace).toContain("const ids = approvedCompilableDocumentIds(final, fileKeys);");
+    expect(workspace).toMatch(/if \(!ids \|\| ids.length !== processingManifest.length \|\| !judgeCorpusSet\(ids.length\).ok\) \{[\s\S]*?return;\s*\}\s*await startDurableCompile\(ids\);/);
+    expect(workspace).toContain("await startDurableCompile(ids);");
   });
 
   it("follows a corpus by following one part at a time", () => {
@@ -345,5 +356,56 @@ describe("where the corpus path is wired in", () => {
     // /api/collections/compile still runs inside one request. It is the primitive, and the
     // corpus path is not a reason to let a hundred documents into it.
     expect(read("app/api/collections/compile/route.ts")).toContain("judgeCompileSet");
+  });
+});
+
+describe("the approved corpus is the complete processing set", () => {
+  const fileKeys = ["file-" + "a".repeat(32), "file-" + "b".repeat(32)];
+  const approved = (): ApprovalPayload => ({
+    approvalId: "approval", attemptKey: "attempt", clientManifestDigest: "digest", scopeDigest: "scope",
+    pricingFingerprint: "pricing", triageReceiptId: "receipt", triageVersion: "v1",
+    triageInventoryDigest: "inventory", configurationRevision: "revision", state: "approved",
+    expiresAt: "2099-01-01T00:00:00.000Z", expired: false, fileCount: 2,
+    aggregateMaximumPages: 2, aggregateReservedCredits: 2, aggregateMaximumCredits: 2,
+    compilable: true, idempotentReplay: false,
+    files: fileKeys.map((fileKey, index) => ({
+      fileKey, documentId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      fileState: "confirmed", contentSha256: "sha256:" + "a".repeat(64), byteLength: 1,
+      mimeType: "application/pdf", pageBasis: "measured", approvedMaxPages: 1,
+      approvedReservedCredits: 1, approvedMaximumCredits: 1, reservationId: "reservation",
+      reservationState: "reserved", reservationExpiresAt: "2099-01-01T00:00:00.000Z",
+    })),
+  });
+
+  it("accepts every approved member without counting an excluded staged file", () => {
+    const excluded = "file-" + "c".repeat(32);
+    const stagedFileKeys = [...fileKeys, excluded];
+    const documentIds = compilableDocumentIds(approved(), fileKeys);
+    expect(documentIds).toEqual(approved().files.map((file) => file.documentId));
+    expect(documentIds).toHaveLength(fileKeys.length);
+    expect(documentIds!.length).toBeLessThan(stagedFileKeys.length);
+    expect(judgeCorpusSet(documentIds!.length).ok).toBe(true);
+    // An excluded member is outside the approval; demanding it would block the approved set.
+    expect(compilableDocumentIds(approved(), stagedFileKeys)).toBeNull();
+  });
+
+  it("refuses a missing or substituted approved member even at the same count", () => {
+    const missing = approved();
+    missing.files.pop();
+    expect(compilableDocumentIds(missing, fileKeys)).toBeNull();
+    expect(compilableDocumentIds(approved(), [fileKeys[0]!, "file-" + "d".repeat(32)])).toBeNull();
+  });
+
+  it.each(["approved", "cancelled"] as const)("refuses an approved member that is %s rather than confirmed", (fileState) => {
+    const incomplete = approved();
+    incomplete.files[1]!.fileState = fileState;
+    expect(compilableDocumentIds(incomplete, fileKeys)).toBeNull();
+  });
+
+  it("refuses a failed reservation or a server refusal to compile", () => {
+    const failed = approved();
+    failed.files[1]!.reservationState = "failed";
+    expect(compilableDocumentIds(failed, fileKeys)).toBeNull();
+    expect(compilableDocumentIds({ ...approved(), compilable: false }, fileKeys)).toBeNull();
   });
 });

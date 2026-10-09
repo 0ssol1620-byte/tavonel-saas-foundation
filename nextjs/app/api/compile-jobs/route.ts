@@ -9,13 +9,15 @@ import {
 } from "@/lib/compile-job-store";
 import { CORPUS_MAX_DOCUMENTS, judgeCorpusSet, needsCorpusCompile } from "@/lib/corpus-batching";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
+import { googleDriveViewerLinkEnabled } from "@/lib/connector-oauth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readCustomerSourceScope } from "@/lib/customer-source-scope";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { checkTrialCompileCapacity } from "@/lib/self-service-trial";
+import { assertFoundationIntakeCompileSet } from "@/lib/compute-reservation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -67,6 +69,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const intakeSet = await assertFoundationIntakeCompileSet({ workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, documentIds });
+  if (!intakeSet.ok) return NextResponse.json({ code: intakeSet.code }, { status: intakeSet.status, headers: HEADERS });
+
   // Do not enqueue work the compiler must later reject for a missing or revoked receipt.
   let sourceScope: "direct_upload" | "connector" = "direct_upload";
   if (process.env.TAVONEL_CUSTOMER_DATA_GATE_VERSION === "v2") {
@@ -80,12 +85,17 @@ export async function POST(request: Request) {
 
   // A deleted or suspended source would be refused by the worker anyway, but a queued job for it
   // also holds its deletion inventory open ("not quiescent") until the job is terminal.
-  const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(
+    auth.principal.workspaceKey, documentIds, auth.principal.userId,
+  );
   if (!sourceAccess.ok) {
     return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: HEADERS,
     });
   }
+  // The processing actor is the authenticated requester, and the membership epoch is durable.
+  // The enqueue RPC also captures connector binding and ACL evidence transactionally; this
+  // preflight is only an early rejection and is never the worker's authority.
 
   // The evaluation includes one Compiled World. A retry of the exact same document set must
   // remain idempotent rather than becoming "World #2", so the capacity check is given the same
@@ -109,6 +119,8 @@ export async function POST(request: Request) {
     const corpus = await enqueueCorpusCompile({
       workspaceKey: auth.principal.workspaceKey,
       createdByUserId: auth.principal.userId,
+      authorizationRevision: auth.principal.authorizationRevision,
+      connectorViewerEnabled: googleDriveViewerLinkEnabled(),
       documentIds,
     });
     if (!corpus.ok) {
@@ -151,6 +163,8 @@ export async function POST(request: Request) {
   const enqueued = await enqueueCompileJob({
     workspaceKey: auth.principal.workspaceKey,
     createdByUserId: auth.principal.userId,
+    authorizationRevision: auth.principal.authorizationRevision,
+    connectorViewerEnabled: googleDriveViewerLinkEnabled(),
     documentIds,
   });
   if (!enqueued.ok) {

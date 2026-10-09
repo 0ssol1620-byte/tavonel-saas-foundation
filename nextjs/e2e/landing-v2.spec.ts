@@ -1,24 +1,47 @@
 /**
- * Landing V2 browser contract after the 2026-09-20 six-beat edit.
+ * Landing V2 browser contract for the structural Home candidate.
  *
- * The home page is one short narrative: film, compiler explanation, proof, change, trust, action.
- * The hero uses the four approved film cuts; the deterministic CompilerSpecimen follows in its
- * own semantic section so the explanation does not compete with the opening statement.
+ * Six beats: a short lead over one full-width workbench (source -> highlighted passage ->
+ * record), why that passage is hard, what a reader receives, what changed in the sources, trust,
+ * and the close. The workbench selects among its regions with native buttons, cites each one
+ * exactly, shows the source page straight under its name (on a phone, in the first viewport, ahead
+ * of the passage), and links the full SEC filing beside that page. Scene 02 keeps the four approved film
+ * cuts behind a native disclosure that is closed on load -- no player, poster or video is
+ * requested until a reader opens it. The retired CompilerSpecimen, proof tabs and Evidence
+ * Inspector are not on Home.
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import {
-  COMPILER_SPECIMEN_SOURCE,
-  COMPILER_SPECIMEN_STAGES,
-} from "../lib/compiler-specimen";
 
 const HEADLINE = "Your documents. Knowledge you can verify.";
 const REQUIRED_WIDTHS = new Set(["1920", "1440", "1280", "1024", "768", "390", "360"]);
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"] as const;
-/* The four film cuts are the first visual in Scene 01; the inspector follows in Scene 02. */
-const FILM = "#s1 .compile-film-sequence";
-const HERO_POSTER = "/film/poster-1-hero-2x.webp";
+/* The four film cuts sit in Scene 02, after the difficulty list, behind a disclosure closed on load. */
+const FILM_DISCLOSURE = '#s2 [data-testid="landing-film-disclosure"]';
+const FILM = "#s2 .compile-film-sequence";
+const FILM_SUMMARY = "Watch the illustrative product walkthrough";
+const HERO_SOURCE = "#s1 article[data-source-digest]";
 const HERO_VIDEO = "/film/compile-cut.mp4";
+/* The default sample's one verified official filing (main2065 sources metadata). */
+const SEC_FILING = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000006/aapl-20251227.htm";
+const STATUS = {
+  "/": "Prepared demonstration / processing not yet run",
+  "/ko": "준비된 시연 / 아직 처리를 실행하지 않음",
+} as const;
+const FULL_FILING = { "/": "Open full filing (SEC)", "/ko": "전체 공시 열기 (SEC)" } as const;
+const OPEN_REGION = { "/": "Open this region in Explore", "/ko": "Explore에서 이 영역 열기" } as const;
+/* While the server resolves access to /contact, the hero offers the document evaluation instead. */
+const EVALUATION = {
+  "/": { href: "/evaluation", label: "Evaluate your documents" },
+  "/ko": { href: "/ko/evaluation", label: "내 문서 평가 상담" },
+} as const;
+
+async function openFilm(page: Page) {
+  const disclosure = page.locator(FILM_DISCLOSURE);
+  await disclosure.locator("summary", { hasText: FILM_SUMMARY }).click();
+  await expect(disclosure).toHaveJSProperty("open", true);
+  return page.locator(FILM);
+}
 
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(
@@ -26,12 +49,15 @@ async function horizontalOverflow(page: Page): Promise<number> {
   );
 }
 
-async function selectedStage(page: Page): Promise<number> {
-  const selected = page.locator('#s2 [data-compiler-specimen] [role="tab"][aria-selected="true"]');
-  await expect(selected).toHaveCount(1);
-  return page.locator('#s2 [data-compiler-specimen] [role="tab"]').evaluateAll(
-    (tabs, selectedId) => tabs.findIndex(tab => tab.id === selectedId),
-    await selected.getAttribute("id"),
+/** The workbench's region buttons, in order, as the native list renders them. */
+function regionButtons(page: Page) {
+  return page.locator(`${HERO_SOURCE} ul button[aria-pressed]`);
+}
+
+/** Every region's exact Explore link, in region order, read from the card's Source details. */
+async function regionHrefs(page: Page): Promise<string[]> {
+  return page.locator(`${HERO_SOURCE} details li a[href]`).evaluateAll(links =>
+    links.map(link => link.getAttribute("href") ?? ""),
   );
 }
 
@@ -53,25 +79,89 @@ test.describe("six-beat page structure", () => {
     }
   });
 
-  for (const path of ["/", "/ko"]) {
-    test(`${path} offers the next action before the How it compiles explanation`, async ({ page }) => {
+  for (const path of ["/", "/ko"] as const) {
+    test(`${path} leads with the actions over one full-width workbench, before the difficulty and the film`, async ({ page }) => {
       await page.goto(path);
       const actions = page.locator("#s1 .lv2-actions");
-      const film = page.locator(FILM);
-      const heading = page.locator("#s2 .lv2-how-head");
-      const specimen = page.locator("#s2 [data-compiler-specimen]");
+      const source = page.locator(HERO_SOURCE);
+      const evidence = source.locator("[data-hero-evidence]");
+      const heading = page.locator("#lv2-difficulty-title");
+      const disclosure = page.locator(FILM_DISCLOSURE);
+      await expect(actions.locator('[data-analytics="hero-primary"]')).toHaveCount(1);
+      await expect(actions.locator('[data-analytics="hero-secondary"]')).toHaveCount(1);
+      await expect(source).toHaveCount(1);
+      await expect(evidence).toHaveCount(1);
+      await expect(evidence).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
+      await expect(page.locator("[data-compiler-specimen]")).toHaveCount(0);
+      await expect(page.locator("main [role='tablist']")).toHaveCount(0);
       const actionBox = await actions.boundingBox();
-      const filmBox = await film.boundingBox();
+      const sourceBox = await source.boundingBox();
+      const evidenceBox = await evidence.boundingBox();
       const headingBox = await heading.boundingBox();
-      const specimenBox = await specimen.boundingBox();
+      const disclosureBox = await disclosure.boundingBox();
       expect(actionBox).not.toBeNull();
-      expect(filmBox).not.toBeNull();
+      expect(sourceBox).not.toBeNull();
+      expect(evidenceBox).not.toBeNull();
       expect(headingBox).not.toBeNull();
-      expect(specimenBox).not.toBeNull();
+      expect(disclosureBox).not.toBeNull();
       expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-      expect(actionBox!.y + actionBox!.height).toBeLessThan(filmBox!.y);
-      expect(filmBox!.y + filmBox!.height).toBeLessThan(headingBox!.y);
-      expect(headingBox!.y + headingBox!.height).toBeLessThan(specimenBox!.y);
+      // Under the lead at every width, and as wide as the hero's content box.
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(sourceBox!.y);
+      const spare = await source.evaluate(node => {
+        const layout = node.parentElement!;
+        const style = getComputedStyle(layout);
+        const content = layout.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+        return content - node.getBoundingClientRect().width;
+      });
+      expect(Math.abs(spare), "the workbench takes the hero's full content width").toBeLessThanOrEqual(1);
+      expect(evidenceBox!.y).toBeGreaterThanOrEqual(sourceBox!.y);
+      expect(evidenceBox!.y + evidenceBox!.height).toBeLessThanOrEqual(sourceBox!.y + sourceBox!.height);
+      expect(sourceBox!.y + sourceBox!.height).toBeLessThan(headingBox!.y);
+      expect(headingBox!.y + headingBox!.height).toBeLessThan(disclosureBox!.y);
+    });
+
+    test(`${path} says the workbench is prepared and not run, and labels the passage as extracted`, async ({ page }) => {
+      await page.goto(path);
+      const source = page.locator(HERO_SOURCE);
+      await expect(source).toHaveAttribute("data-case-status", "extracted");
+      const status = source.locator('[data-run="not_run"]');
+      await expect(status).toHaveCount(1);
+      expect((await status.innerText()).trim()).toBe(STATUS[path]);
+      await expect(source.getByText(path === "/ko" ? "기존 추출 구절" : "Existing extracted passage", { exact: true })).toBeVisible();
+      await expect(source.locator("blockquote")).toHaveCount(1);
+      await expect(source.locator("blockquote")).toHaveAttribute("lang", "en");
+      const text = await source.innerText();
+      expect(text).not.toMatch(/verified answer/i);
+      expect(text).not.toContain(path === "/ko" ? "준비된 시연 ·" : "Prepared demonstration ·");
+    });
+
+    test(`${path} links the full SEC filing beside the page, and keeps the page and region links`, async ({ page }) => {
+      await page.goto(path);
+      const source = page.locator(HERO_SOURCE);
+      const filing = source.locator("a[data-full-filing]");
+      await expect(filing).toHaveCount(1);
+      await expect(filing).toBeVisible();
+      await expect(filing).toHaveAttribute("href", SEC_FILING);
+      expect((await filing.innerText()).replace("↗", "").trim()).toBe(FULL_FILING[path]);
+      // The provenance sentence is in Source details, closed on load.
+      await expect(source.locator("details", { hasText: path === "/ko" ? "원본 HTML 공시" : "original HTML filing" })).toHaveCount(1);
+      // Beside the page: under its window, in the full page's own link row, outside the closed details.
+      const filingBox = await filing.boundingBox();
+      const windowBox = await source.locator("[data-page-window]").boundingBox();
+      expect(filingBox).not.toBeNull();
+      expect(windowBox).not.toBeNull();
+      expect(filingBox!.y).toBeGreaterThanOrEqual(windowBox!.y + windowBox!.height - 1);
+      expect(filingBox!.height).toBeGreaterThanOrEqual(43.99);
+      await expect(source.locator("details a[data-full-filing]")).toHaveCount(0);
+      // The full-page overview and every exact region link are still there.
+      const pageSrc = await source.locator("img").first().getAttribute("src");
+      await expect(source.locator(`a[href="${pageSrc}"]`)).toHaveCount(1);
+      await expect(source.locator("p", { has: page.locator("a[data-full-filing]") }).locator(`a[href="${pageSrc}"]`)).toHaveCount(1);
+      const hrefs = await regionHrefs(page);
+      expect(hrefs.length).toBeGreaterThan(1);
+      for (const href of hrefs) expect(href).toMatch(/^\/explore\?act=evidence&evidence=/);
+      await expect(source.locator("[data-region-id]")).toHaveCount(hrefs.length);
+      await expect(source.getByRole("link", { name: OPEN_REGION[path] }).first()).toBeVisible();
     });
   }
 
@@ -130,67 +220,178 @@ test.describe("six-beat page structure", () => {
   }
 });
 
-test("prepared proof tabs show answer-bearing source regions", async ({ page }, testInfo) => {
-  await page.goto("/");
-  const proof = page.locator("#s3");
-  const tabs = proof.getByRole("tab");
-  await expect(tabs).toHaveCount(3);
-
-  await tabs.nth(1).click();
-  const sales = proof.getByRole("tabpanel").filter({ visible: true });
-  await expect(sales.getByText("Net sales: Products $ 113,743", { exact: false })).toBeVisible();
-  await expect(sales.getByText("Source page · reference render")).toBeVisible();
-  const salesCrop = sales.locator('img[src*="r64-249-932-352"]');
-  await expect(salesCrop).toBeVisible();
-  await salesCrop.scrollIntoViewIfNeeded();
-  await expect.poll(() => salesCrop.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
-  if (process.env.TAVONEL_CAPTURE_EXPLORE_QA === "1") {
-    await proof.screenshot({ path: testInfo.outputPath("proof-sales.png") });
-    await page.screenshot({ path: testInfo.outputPath("proof-sales-viewport.png") });
-  }
-
-  await tabs.nth(2).click();
-  const background = proof.getByRole("tabpanel").filter({ visible: true });
-  await expect(background.getByText("designs, manufactures and markets smartphones", { exact: false })).toBeVisible();
-  await expect(background.getByText("Source page · original PDF")).toBeVisible();
-  await expect(background.getByRole("link", { name: /Open the source region/ })).toHaveAttribute("href", /\/explore\?act=evidence/);
-});
-
-for (const [path, label] of [["/", "Inspect all source regions"], ["/ko", "모든 원문 영역 살펴보기"]] as const) {
-  test(`${path} opens the source index by keyboard and keeps regions linked to evidence`, async ({ page }) => {
+for (const path of ["/", "/ko"] as const) {
+  test(`${path} selects workbench regions with native buttons, by pointer and keyboard, and moves the citation with them`, async ({ page }) => {
     await page.goto(path);
-    const regionName = path === "/ko" ? /^근거 영역/ : /^Evidence region/;
-    const openLabel = path === "/ko" ? "Explore에서 이 영역 열기" : "Open this region in Explore";
-    const inspector = page.locator("#s2 [data-progressive='1']");
-    const summary = inspector.locator("summary");
-    await expect(summary).toContainText(`${label} (10)`);
-    await expect(inspector.getByRole("button", { name: regionName })).toHaveCount(0);
-    await summary.focus();
-    await page.keyboard.press("Enter");
-    const regions = inspector.getByRole("button", { name: regionName });
-    await expect(regions).toHaveCount(10);
-    await regions.nth(1).click();
-    await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
-    await expect(inspector.getByRole("link", { name: openLabel })).toHaveAttribute("href", /\/explore\?act=evidence/);
+    const source = page.locator(HERO_SOURCE);
+    const buttons = regionButtons(page);
+    const hrefs = await regionHrefs(page);
+    await expect(buttons).toHaveCount(hrefs.length);
+    await expect(source.locator('button[aria-pressed="true"]')).toHaveCount(1);
+    const pane = source.locator('[aria-live="polite"]');
+    const paneId = await pane.getAttribute("id");
+    expect(paneId).toBeTruthy();
+    const evidence = source.locator("[data-hero-evidence]");
+    const quote = source.locator("blockquote");
+
+    for (let index = 0; index < hrefs.length; index += 1) {
+      const button = buttons.nth(index);
+      await expect(button).toHaveAttribute("type", "button");
+      await expect(button).toHaveAttribute("aria-controls", paneId!);
+      const before = await quote.innerText();
+      // Pointer, Enter and Space in turn: a native button answers all three.
+      const how = (["click", "Enter", "Space"] as const)[index % 3]!;
+      if (how === "click") {
+        await button.click();
+      } else {
+        await button.focus();
+        await page.keyboard.press(how);
+      }
+      await expect(button).toHaveAttribute("aria-pressed", "true");
+      await expect(source.locator('button[aria-pressed="true"]')).toHaveCount(1);
+      await expect(evidence).toHaveAttribute("href", hrefs[index]!);
+      const regionId = decodeURIComponent(hrefs[index]!.split("evidence=").pop()!);
+      await expect(source.locator('[data-region-id][data-selected="1"]')).toHaveAttribute("data-region-id", regionId);
+      const where = (await button.innerText()).match(/bbox [\d,]+/)?.[0] ?? "";
+      expect(where, "each button names its region's place").not.toBe("");
+      await expect(source.locator("p", { hasText: where }).first()).toBeVisible();
+      if (index > 0) expect(await quote.innerText()).not.toBe(before);
+    }
+  });
+
+  test(`${path} opens the selected region at its exact place in Explore`, async ({ page }) => {
+    await page.goto(path);
+    const evidence = page.locator(`${HERO_SOURCE} [data-hero-evidence]`);
+    const href = await evidence.getAttribute("href");
+    expect(href).toMatch(/^\/explore\?act=evidence&evidence=/);
+    await evidence.click();
+    await expect(page).toHaveURL(new RegExp(`evidence=${href!.split("evidence=").pop()!.split("%3A")[0]}`));
+    await expect(page.locator("main")).toContainText("apple-2026-q1-10-q-reference.pdf");
+  });
+
+  test(`${path} points every difficulty at a region the workbench shows`, async ({ page }) => {
+    await page.goto(path);
+    const hrefs = await regionHrefs(page);
+    const links = page.locator("#s2 ol a[href]");
+    await expect(links).toHaveCount(hrefs.length);
+    for (const href of await links.evaluateAll(nodes => nodes.map(node => node.getAttribute("href") ?? ""))) {
+      expect(hrefs).toContain(href);
+    }
+    await expect(page.locator("#s2").getByText(
+      path === "/ko"
+        ? "아직 처리, 적격 판정, 권리 허가를 거치지 않았으므로 그 내용은 보여 주지 않습니다."
+        : "It has not been processed, qualified or rights-cleared, so nothing from it is shown.",
+      { exact: false },
+    )).toBeVisible();
+  });
+
+  test(`${path} opens the received record at its region and its original page`, async ({ page }) => {
+    await page.goto(path);
+    const record = page.locator("#s3 article");
+    await expect(record).toHaveCount(1);
+    await expect(record.locator("blockquote")).toHaveAttribute("lang", "en");
+    await expect(record.locator('[data-analytics="source-open"]')).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
+    await expect(record.locator('a[href^="/explore-sample/"]')).toHaveAttribute("href", /\.pdf#page=\d+$/);
+    await expect(record.locator("code")).toHaveText(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  test(`${path} links the source change to the actual change record and its contract`, async ({ page }) => {
+    await page.goto(path);
+    const change = page.locator("#s4");
+    await expect(change.locator("a.lv2-text-link")).toHaveCount(1);
+    await expect(change.locator("a.lv2-text-link")).toHaveAttribute("href", "/explore?act=change");
+    await expect(change.locator("a.lv2-inline-link")).toHaveAttribute("href", "/product/continuous-knowledge");
+    await change.locator("a.lv2-text-link").click();
+    await expect(page).toHaveURL(/\/explore\?act=change$/);
+  });
+
+  /*
+    The hero's access action follows the server's commercial state. The Korean close prints that
+    resolved action unmapped (`/ko/contact` while access is by inquiry), so the state is read there
+    rather than assumed: by inquiry, the hero maps it to the localized document evaluation; live,
+    the hero keeps the resolved action and offers no evaluation link.
+  */
+  test(`${path} maps the hero's access action from the commercial state to a locale-correct destination`, async ({ page }) => {
+    await page.goto("/ko");
+    const resolved = await page.locator('#s6 [data-scene-next="start"]').getAttribute("href");
+    expect(resolved).toMatch(/^\/[a-z]/);
+
+    await page.goto(path);
+    const actions = page.locator("#s1 .lv2-actions");
+    const hrefs = await actions.locator("a").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));
+    expect(hrefs).toHaveLength(2);
+    expect(hrefs).toContain("/explore");
+    const access = actions.locator('a:not([href="/explore"])');
+    await expect(access).toHaveCount(1);
+    if (path === "/ko") expect(await access.getAttribute("href"), "the Korean hero never sends a reader to the English inquiry").not.toBe("/contact");
+
+    if (resolved === "/ko/contact") {
+      const evaluation = EVALUATION[path];
+      await expect(access).toHaveAttribute("href", evaluation.href);
+      await expect(access).toHaveText(evaluation.label);
+      expect((await page.request.get(evaluation.href)).status(), `${evaluation.href} is a real route`).toBe(200);
+      await access.click();
+      await expect(page).toHaveURL(new RegExp(`${evaluation.href.replace(/\//g, "\\/")}$`));
+    } else {
+      await expect(access).toHaveAttribute("href", resolved!);
+      await expect(page.locator('main a[href$="/evaluation"]')).toHaveCount(0);
+    }
   });
 }
 
 test.describe("HeroFilm", () => {
-  test("opens with visible four-cut film controls and aligned captions", async ({ page }) => {
+  test("stays closed and unrequested on load, then opens the four-cut player in scene 02", async ({ page }) => {
+    const filmRequests: string[] = [];
+    page.on("request", request => {
+      if (new URL(request.url()).pathname.startsWith("/film/")) filmRequests.push(request.url());
+    });
     await page.goto("/");
-    const film = page.locator(FILM);
+    const disclosure = page.locator(FILM_DISCLOSURE);
+    await expect(disclosure).toHaveCount(1);
+    await expect(disclosure).toHaveJSProperty("open", false);
+    await expect(page.locator(".compile-film-sequence")).toHaveCount(0);
+    await expect(page.locator("main video")).toHaveCount(0);
+    await expect(page.locator('main img[src*="/film/"]')).toHaveCount(0);
+    /*
+      Film bytes can only come from the player (mounted by onToggle, after open) or from rendered
+      media/preloads, and the listener above records every /film/ request from before navigation.
+      So the invariant needs render readiness, not network idleness: the closed disclosure in view
+      (where any lazy or observer-driven load would fire), the images of the scenes up to it settled,
+      and the frames after the scroll painted. "networkidle" waits on unrelated traffic -- consent,
+      CSP reports, prefetches, dev-server connections -- and never settles while any of it repeats.
+      (Images further down may be lazily deferred and never complete here, so they are not waited on.)
+    */
+    await disclosure.scrollIntoViewIfNeeded();
+    await expect(disclosure).toBeInViewport();
+    await expect.poll(() => page.locator("#s1 img, #s2 img").evaluateAll(images =>
+      images.every(image => (image as HTMLImageElement).complete),
+    )).toBe(true);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect(disclosure).toHaveJSProperty("open", false);
+    await expect(page.locator(".compile-film-sequence")).toHaveCount(0);
+    await expect(page.locator("main video")).toHaveCount(0);
+    await expect(page.locator('main img[src*="/film/"]')).toHaveCount(0);
+    expect(filmRequests, "a closed film requests no poster or video").toEqual([]);
+
+    const film = await openFilm(page);
     await expect(film).toHaveCount(1);
     await expect(film.locator(".compile-film-viewport")).toBeVisible();
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+    await expect(film.getByRole("button", { name: /the compilation film$/ })).toHaveCount(1);
+    await expect(film).toHaveAttribute("data-mobile-view", "fit");
+    await expect.poll(() => filmRequests.length, { message: "the opened film paints its poster or video" })
+      .toBeGreaterThan(0);
     await expect(page.getByText("Choose a film cut")).toHaveCount(0);
-    await expect(page.locator("#s2 [data-compiler-specimen]")).toHaveCount(1);
-    await expect(page.locator("#s2 .compile-film-sequence")).toHaveCount(0);
+    /* The film follows the difficulty list in its own landmark; the retired specimen and inspector are gone. */
+    await expect(page.locator("#s2 #lv2-difficulty-title")).toHaveCount(1);
+    await expect(page.locator("[data-compiler-specimen]")).toHaveCount(0);
+    await expect(page.locator(".lv2-hero-inspector")).toHaveCount(0);
+    await expect(page.locator("#s1 .compile-film-sequence")).toHaveCount(0);
     await expect(page.locator("#s2 .lv2-film-note")).toHaveCount(0);
-    /* The hero's own visual, in the landmark the film left. */
-    await expect(page.locator("#s2 .lv2-hero-inspector")).toHaveCount(1);
     await expect(page.locator("#s1 canvas")).toHaveCount(0);
-    const edges = await page.locator("#s1 .lv2-film").evaluate(root => {
+    await expect(page.locator("#s2 .compile-film-sequence canvas")).toHaveCount(0);
+    const edges = await page.locator("#s2 .lv2-film").evaluate(root => {
       const caption = root.querySelector(".compile-film-caption")!.getBoundingClientRect();
       const note = root.querySelector(":scope > .fine")!.getBoundingClientRect();
       return { caption: caption.left, note: note.left, width: caption.width - note.width };
@@ -202,28 +403,168 @@ test.describe("HeroFilm", () => {
     );
   });
 
-  test("server-renders the high-resolution first poster", async ({ page }) => {
+  test("opens phones on the full frame and toggles Focus details and back", async ({ page }, testInfo) => {
+    test.skip(!["390", "360"].includes(testInfo.project.name), "the mobile film tools");
+    await page.goto("/");
+    const film = await openFilm(page);
+    const toggle = film.locator(".compile-film-focus-control");
+    await expect(toggle).toHaveCount(1);
+    await expect(film).toHaveAttribute("data-mobile-view", "fit");
+    await expect(toggle).toHaveText("Focus details");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    const controls = await toggle.getAttribute("aria-controls");
+    expect(controls, "the framing control names what it frames").toBeTruthy();
+    await expect(page.locator(`[id="${controls}"]`)).toHaveCount(1);
+    await toggle.click();
+    await expect(film).toHaveAttribute("data-mobile-view", "focus");
+    await expect(toggle).toHaveText("Fit full frame");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await toggle.click();
+    await expect(film).toHaveAttribute("data-mobile-view", "fit");
+    await expect(toggle).toHaveText("Focus details");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    // The same round trip from the keyboard.
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(film).toHaveAttribute("data-mobile-view", "focus");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Space");
+    await expect(film).toHaveAttribute("data-mobile-view", "fit");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    // The workbench adds no framing control of its own; Fit/Focus is the film's alone.
+    await expect(page.locator(`${HERO_SOURCE} .compile-film-focus-control`)).toHaveCount(0);
+    await expect(page.locator(".compile-film-focus-control")).toHaveCount(1);
+  });
+
+  test("closes and reopens from the keyboard and keeps roving cut selection", async ({ page }) => {
+    await page.goto("/");
+    const disclosure = page.locator(FILM_DISCLOSURE);
+    const summary = disclosure.locator("summary", { hasText: FILM_SUMMARY });
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    await expect(disclosure).toHaveJSProperty("open", true);
+    await expect(page.locator(FILM)).toHaveCount(1);
+    await expect(summary).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(disclosure).toHaveJSProperty("open", false);
+    await expect(page.locator(".compile-film-sequence")).toHaveCount(0);
+    await page.keyboard.press("Enter");
+    await expect(disclosure).toHaveJSProperty("open", true);
+    const tabs = page.locator(FILM).getByRole("tab");
+    await expect(tabs).toHaveCount(4);
+    await tabs.first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tabs.nth(1)).toBeFocused();
+    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("End");
+    await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("reduced motion opens on a still with a Play control", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "reduced-motion", "the reduced-motion project");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+    const film = await openFilm(page);
+    await expect(film.getByRole("button", { name: "Play the compilation film" })).toBeVisible();
+    await expect(film.locator("video")).toHaveCount(0);
+    await expect(film.locator("img.compile-film-still")).toHaveCount(1);
+  });
+
+  test("server-renders the hero source evidence and no closed-film poster", async ({ page }) => {
     const response = await page.request.get("/");
     expect(response.status()).toBe(200);
     const html = await response.text();
-    const poster = html.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
-    expect(poster).toContain(HERO_POSTER);
-    expect(poster).toMatch(/ width="[1-9]\d*"/);
-    expect(poster).toMatch(/ height="[1-9]\d*"/);
-    expect(poster).toMatch(/fetchpriority="high"/i);
-    expect(poster).toMatch(/loading="eager"/i);
-    const heroCrop = html.match(/<img[^>]*data-source-image="region"[^>]*>/)?.[0] ?? "";
-    expect(heroCrop, "the hero server-renders no source-linked crop").not.toBe("");
-    expect(heroCrop).toMatch(/loading="lazy"/i);
-    expect(heroCrop).not.toMatch(/fetchpriority="high"/i);
-    expect(heroCrop).toMatch(/ width="[1-9]\d*"/);
-    expect(heroCrop).toMatch(/ height="[1-9]\d*"/);
+    const disclosure = html.match(/<details[^>]*data-testid="landing-film-disclosure"[^>]*>/)?.[0] ?? "";
+    expect(disclosure, "the film disclosure is server-rendered").not.toBe("");
+    expect(disclosure, "and closed").not.toMatch(/\sopen(?:=|\s|>)/);
+    /* The RSC payload may serialize the poster prop; only rendered media and preloads must not name a film asset. */
+    const mediaTags = (html.match(/<(?:img|video|source|link)\b[^>]*>/gi) ?? []).filter(
+      (tag) => !/^<link\b/i.test(tag) || /\srel="preload"/i.test(tag),
+    );
+    for (const tag of mediaTags) {
+      expect(tag, "the closed film renders no poster media or preload").not.toMatch(
+        /\s(?:src|srcset|poster|href|imagesrcset)="[^"]*\/film\//i,
+      );
+    }
+    expect(html).not.toContain('class="compile-film-still"');
+    expect(html).not.toMatch(/<video/i);
+    for (const prioritized of html.match(/<img[^>]*fetchpriority="high"[^>]*>/gi) ?? []) {
+      expect(prioritized, "a film poster may not take the eager image slot").not.toContain("/film/");
+    }
+
+    const card = html.match(/<article[^>]*data-source-digest="[^"]+"[^>]*>[\s\S]*?<\/article>/)?.[0] ?? "";
+    expect(card, "the hero server-renders its source card").not.toBe("");
+    const sourceImage = card.match(/<img[^>]*>/)?.[0] ?? "";
+    expect(sourceImage, "the source page raster is the hero's paint").not.toBe("");
+    expect(sourceImage).toMatch(/ width="[1-9]\d*"/);
+    expect(sourceImage).toMatch(/ height="[1-9]\d*"/);
+    expect(sourceImage).toMatch(/fetchpriority="high"/i);
+    expect(sourceImage).toMatch(/loading="eager"/i);
+    expect(sourceImage).toMatch(/decoding="async"/i);
+    /* One drawn box per region button, each placed inside the page; exactly one is the selected one. */
+    const regions = [...card.matchAll(/<span[^>]*data-region-id="([^"]+)"[^>]*>/g)];
+    const regionIds = regions.map(match => match[1]!);
+    expect(regionIds.length, "every evidence region is drawn on the page").toBeGreaterThan(1);
+    expect(regionIds.length).toBe((card.match(/<button[^>]*aria-pressed="(?:true|false)"/g) ?? []).length);
+    expect(new Set(regionIds).size, "each drawn region is a distinct region").toBe(regionIds.length);
+    for (const [tag] of regions) {
+      const style = Object.fromEntries(
+        (tag.match(/ style="([^"]*)"/)?.[1] ?? "").split(";").map(rule => rule.split(":").map(part => part.trim())),
+      );
+      const [left, top, width, height] = ["left", "top", "width", "height"].map(edge => {
+        expect(style[edge], `${edge} of ${tag}`).toMatch(/^[\d.]+%$/);
+        return Number.parseFloat(style[edge]!);
+      });
+      expect(width!).toBeGreaterThan(0);
+      expect(height!).toBeGreaterThan(0);
+      expect(left! + width!, "the region box stays on the page").toBeLessThanOrEqual(100.01);
+      expect(top! + height!, "the region box stays on the page").toBeLessThanOrEqual(100.01);
+    }
+    const selected = regions.filter(([tag]) => / data-selected="1"/.test(tag)).map(match => match[1]!);
+    expect(selected, "exactly one region is drawn as selected").toHaveLength(1);
+    const link = card.match(/<a[^>]*data-hero-evidence[^>]*>/)?.[0] ?? "";
+    expect(link, "the card links its exact evidence").toMatch(/ href="\/explore\?act=evidence&amp;evidence=[^"]+"/);
+    expect(decodeURIComponent(link.match(/evidence=([^"&]+)"/)![1]!), "the evidence link opens the selected region").toBe(selected[0]);
+    const filing = card.match(/<a[^>]*data-full-filing[^>]*>/)?.[0] ?? "";
+    expect(filing, "the card server-renders its full filing link").toContain(` href="${SEC_FILING}"`);
+    expect(card).toContain('data-run="not_run"');
+
+    /* The source page holds the priority slot; the retired specimen crop is not rendered. */
+    expect(html).not.toContain('data-source-image="region"');
+    expect(html.match(/<img[^>]*fetchpriority="high"[^>]*>/gi) ?? []).toContain(sourceImage);
+
+    await page.goto("/");
+    const source = page.locator(HERO_SOURCE);
+    const image = source.locator("img").first();
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+    /* Hydration keeps the server's regions, in order, with the same one selected. */
+    const boxes = source.locator("[data-region-id]");
+    expect(await boxes.evaluateAll(nodes => nodes.map(node => node.getAttribute("data-region-id")))).toEqual(regionIds);
+    await expect(source.locator('[data-region-id][data-selected="1"]')).toHaveAttribute("data-region-id", selected[0]!);
+    const imageBox = await image.boundingBox();
+    const evidenceBox = await source.locator("[data-hero-evidence]").boundingBox();
+    for (const box of [imageBox, evidenceBox]) {
+      expect(box, "the hero evidence is laid out").not.toBeNull();
+      expect(box!.width).toBeGreaterThan(0);
+      expect(box!.height).toBeGreaterThan(0);
+    }
+    for (let index = 0; index < regionIds.length; index += 1) {
+      const box = await boxes.nth(index).boundingBox();
+      expect(box, `region ${regionIds[index]} is laid out`).not.toBeNull();
+      expect(box!.width).toBeGreaterThan(0);
+      expect(box!.height).toBeGreaterThan(0);
+      // Drawn on the page raster, not beside it.
+      expect(box!.x).toBeGreaterThanOrEqual(imageBox!.x - 1);
+      expect(box!.y).toBeGreaterThanOrEqual(imageBox!.y - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(imageBox!.x + imageBox!.width + 1);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(imageBox!.y + imageBox!.height + 1);
+    }
   });
 
   test("selects the verified locked master on desktop", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440", "the desktop source-selection contract");
     await page.goto("/");
-    const film = page.locator(FILM);
+    const film = await openFilm(page);
     await film.scrollIntoViewIfNeeded();
     await expect(film).toHaveAttribute("data-video-primary-src", HERO_VIDEO);
   });
@@ -231,69 +572,38 @@ test.describe("HeroFilm", () => {
   test("keeps the verified locked master on phones", async ({ page }, testInfo) => {
     test.skip(!["390", "360"].includes(testInfo.project.name), "the required phone sources");
     await page.goto("/");
-    const film = page.locator(FILM);
+    const film = await openFilm(page);
     await film.scrollIntoViewIfNeeded();
     await expect(film).toHaveAttribute("data-video-primary-src", HERO_VIDEO);
   });
 });
 
-test.describe("lower CompilerSpecimen explanation", () => {
-  test("keeps all Korean stages and panel names localized while retaining one source", async ({ page }) => {
-    await page.goto("/ko");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    const labels = ["원문", "구조", "근거", "지식", "활용"];
-    await expect(tabs).toHaveText(labels);
-    for (let index = 0; index < labels.length; index += 1) {
-      await tabs.nth(index).click();
-      await expect(specimen.getByRole("tabpanel", { name: labels[index] })).toBeVisible();
-      await expect(specimen).toContainText(COMPILER_SPECIMEN_SOURCE.id);
-    }
-    await expect(specimen.getByRole("tabpanel")).toContainText("백만 달러 · 2025년 12월 27일");
-    await tabs.first().focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(tabs.nth(1)).toBeFocused();
-    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
-  });
-
-  test("renders five selectable stages and preserves one source identity through them", async ({ page }) => {
-    await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    await expect(tabs).toHaveCount(COMPILER_SPECIMEN_STAGES.length);
-    await expect(tabs).toHaveText(COMPILER_SPECIMEN_STAGES.map(stage => stage.label));
-    await expect(specimen.getByRole("tabpanel")).toHaveCount(1);
-
-    const sourceIdentity = specimen.locator("span[data-derived='1']", {
-      hasText: COMPILER_SPECIMEN_SOURCE.id,
+test.describe("source identity and commercial destinations", () => {
+  for (const path of ["/", "/ko"] as const) {
+    test(`${path} prints the source's identity and digest from the data, with the long hash behind Source details`, async ({ page }) => {
+      await page.goto(path);
+      const source = page.locator(HERO_SOURCE);
+      const digest = await source.getAttribute("data-source-digest");
+      expect(digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+      await expect(source.locator("[data-derived='1']", { hasText: "apple-2026-q1-10-q-reference.pdf" }).first()).toBeVisible();
+      await expect(source.locator("code[data-derived='1']", { hasText: digest!.slice(0, 15) }).first()).toBeVisible();
+      const details = source.locator("details");
+      await expect(details).toHaveJSProperty("open", false);
+      await expect(details.locator("code", { hasText: digest! })).toBeHidden();
+      await details.locator("summary").click();
+      await expect(details.locator("code", { hasText: digest! })).toBeVisible();
+      // Every digit the card prints is inside an element that says it was read, not typed.
+      const undeclared = await source.evaluate(root => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const found: string[] = [];
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (/\d/.test(node.textContent ?? "") && !node.parentElement?.closest("[data-derived]")) found.push(node.textContent!.trim());
+        }
+        return found;
+      });
+      expect(undeclared).toEqual([]);
     });
-    await expect(sourceIdentity).toHaveCount(1);
-
-    for (let index = 0; index < COMPILER_SPECIMEN_STAGES.length; index += 1) {
-      await tabs.nth(index).click();
-      await expect(tabs.nth(index)).toHaveAttribute("aria-selected", "true");
-      await expect(specimen.getByRole("tabpanel")).toHaveAttribute(
-        "aria-labelledby",
-        `compiler-stage-${COMPILER_SPECIMEN_STAGES[index]!.id}`,
-      );
-      await expect(sourceIdentity).toHaveText(new RegExp(COMPILER_SPECIMEN_SOURCE.id));
-      await expect(specimen.locator("[data-stage-composition]")).toHaveAttribute(
-        "data-stage-composition",
-        COMPILER_SPECIMEN_STAGES[index]!.id,
-      );
-    }
-
-    await tabs.nth(2).click();
-    await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.excerpt);
-    await expect(specimen.locator("[data-stage-composition] details")).not.toHaveAttribute("open", "");
-    await specimen.locator("[data-stage-composition] summary").click();
-    await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.digest);
-    await tabs.nth(3).click();
-    await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);
-    await tabs.last().click();
-    await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.filename);
-    await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);
-  });
+  }
 
   test("Korean pricing carries the selected plan into the inquiry", async ({ page }) => {
     await page.goto("/ko/pricing");
@@ -303,125 +613,15 @@ test.describe("lower CompilerSpecimen explanation", () => {
     await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");
   });
 
-  test("opens the exact source region from the specimen answer", async ({ page }) => {
+  test("the English close keeps its start action on an English destination", async ({ page }) => {
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    await specimen.getByRole("tab", { name: "Intelligence" }).click();
-    await specimen.getByRole("link", { name: /Open the source in Explore/ }).click();
-    await expect(page).toHaveURL(new RegExp(`evidence=${COMPILER_SPECIMEN_SOURCE.exploreEvidenceId.split(":")[0]}`));
-    await expect(page.locator("main")).toContainText(COMPILER_SPECIMEN_SOURCE.filename);
-    await expect(page.locator("main")).toContainText("Research and development 10,887");
+    const close = page.locator("#s6");
+    const start = close.locator('[data-scene-next="start"]');
+    await expect(start).toHaveCount(1);
+    const href = await start.getAttribute("href");
+    expect(href).toMatch(/^\/[a-z]/);
+    expect(href, "the English close never sends a reader to the Korean pages").not.toMatch(/^\/ko(\/|$)/);
   });
-
-  test("supports roving-tab keyboard selection", async ({ page }) => {
-    await page.goto("/");
-    const tabs = page.locator('#s2 [data-compiler-specimen] [role="tab"]');
-    await tabs.first().focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(tabs.nth(1)).toBeFocused();
-    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
-    await page.keyboard.press("End");
-    await expect(tabs.last()).toBeFocused();
-    await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
-    await page.keyboard.press("Home");
-    await expect(tabs.first()).toBeFocused();
-    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
-    await page.keyboard.press("ArrowLeft");
-    await expect(tabs.last()).toBeFocused();
-  });
-
-  test("moves from the actual page render to its exact region crop", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "1440", "one desktop browser verifies the camera contract");
-    await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    await specimen.scrollIntoViewIfNeeded();
-    await tabs.first().click();
-    const pageAsset = specimen.locator('[data-source-image="page"]');
-    const regionAsset = specimen.locator('[data-source-image="region"]');
-    const fullFrame = pageAsset.locator("..");
-    const cropFrame = regionAsset.locator("..");
-    await expect(pageAsset).toHaveJSProperty("complete", true);
-    await expect(regionAsset).toHaveJSProperty("complete", true);
-    expect(await pageAsset.evaluate(node => (node as HTMLImageElement).currentSrc)).toContain(
-      "apple-2026-q1-10-q-reference-p004-",
-    );
-    expect(await regionAsset.evaluate(node => (node as HTMLImageElement).currentSrc)).toContain(
-      "apple-2026-q1-10-q-reference-p004-r64-476-932-538-",
-    );
-    await expect(fullFrame).toHaveCSS("opacity", "1");
-    await expect(cropFrame).toHaveCSS("opacity", "0");
-    const pageTransform = await fullFrame.evaluate(node => getComputedStyle(node).transform);
-    const stagedCropTransform = await cropFrame.evaluate(node => getComputedStyle(node).transform);
-
-    await tabs.nth(1).click();
-    await expect(fullFrame).toHaveCSS("opacity", "0");
-    await expect(cropFrame).toHaveCSS("opacity", "1");
-    await expect(cropFrame).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
-    const structureTransform = await cropFrame.evaluate(node => getComputedStyle(node).transform);
-    await tabs.nth(2).click();
-    const evidenceTransform = await cropFrame.evaluate(node => getComputedStyle(node).transform);
-    expect(pageTransform).not.toBe("none");
-    expect(stagedCropTransform).not.toBe(structureTransform);
-    expect(evidenceTransform).toBe(structureTransform);
-  });
-
-  test("manual selection pauses playback and remains paused after leaving and returning", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "1440", "one desktop browser settles the finite timer contract");
-    await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    await specimen.scrollIntoViewIfNeeded();
-    await tabs.nth(2).click();
-    await expect(specimen.getByRole("button", { name: "Play" })).toBeVisible();
-    await expect(specimen.locator('[data-source-image="page"]').locator("..")).toHaveCSS(
-      "transition-duration",
-      "0s",
-    );
-    await page.waitForTimeout(2_850);
-    expect(await selectedStage(page)).toBe(2);
-    await page.locator("section#s5").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(2_850);
-    await specimen.scrollIntoViewIfNeeded();
-    expect(await selectedStage(page)).toBe(2);
-  });
-
-  test("auto-advance sleeps offscreen and resumes only after returning", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "1440", "one desktop browser settles the observer contract");
-    await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    await specimen.scrollIntoViewIfNeeded();
-    await tabs.first().click();
-    await specimen.getByRole("button", { name: "Play" }).click();
-    await page.locator("section#s5").scrollIntoViewIfNeeded();
-    await page.waitForTimeout(2_850);
-    expect(await selectedStage(page)).toBe(0);
-    await specimen.scrollIntoViewIfNeeded();
-    await expect.poll(() => selectedStage(page), { timeout: 5_000 }).toBe(1);
-  });
-
-  test("auto-advance sleeps while the document is hidden", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "1440", "one desktop browser settles the visibility contract");
-    await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    await specimen.scrollIntoViewIfNeeded();
-    const tabs = specimen.getByRole("tab");
-    await tabs.first().click();
-    await specimen.getByRole("button", { name: "Play" }).click();
-    await page.evaluate(() => {
-      Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await page.waitForTimeout(2_850);
-    expect(await selectedStage(page)).toBe(0);
-    await page.evaluate(() => {
-      Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await expect.poll(() => selectedStage(page), { timeout: 5_000 }).toBe(1);
-  });
-
 });
 
 test.describe("responsive and reduced-motion parity", () => {
@@ -440,68 +640,118 @@ test.describe("responsive and reduced-motion parity", () => {
     });
   }
 
-  test("all specimen controls clear the phone touch floor", async ({ page }, testInfo) => {
-    test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
-    await page.goto("/");
-    const short = await page.locator("#s2 [data-compiler-specimen] button").evaluateAll(nodes =>
-      nodes.map(node => ({ text: node.textContent?.trim(), height: node.getBoundingClientRect().height }))
-        .filter(item => item.height < 43.99),
-    );
-    expect(short).toEqual([]);
-    const rail = page.locator("#s2 [data-compiler-specimen] [role='tablist']");
-    const railHeight = await rail.evaluate(node => node.getBoundingClientRect().height);
-    expect(railHeight, "the phone stage picker should leave room for the source visual").toBeLessThanOrEqual(100);
-  });
-
-  test("each stage keeps source values inside its phone viewport", async ({ page }, testInfo) => {
-    test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
-    await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    await specimen.scrollIntoViewIfNeeded();
-
-    for (let index = 0; index < COMPILER_SPECIMEN_STAGES.length; index += 1) {
-      await tabs.nth(index).click();
-      const clipped = await specimen.locator("[data-critical-value]").evaluateAll(nodes =>
-        nodes.flatMap(node => {
-          const boundary = node.closest("[data-camera-stage], [data-stage-composition]");
-          if (!boundary) return [node.textContent?.trim() ?? "unknown"];
-          const value = node.getBoundingClientRect();
-          const box = boundary.getBoundingClientRect();
-          return value.left < box.left - 1 || value.right > box.right + 1
-            ? [node.textContent?.trim() ?? "unknown"]
-            : [];
-        }),
+  for (const path of ["/", "/ko"] as const) {
+    test(`${path} keeps every workbench control on the phone touch floor`, async ({ page }, testInfo) => {
+      test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
+      await page.goto(path);
+      // Region buttons, and every link outside the closed Source details (filing, region, page).
+      const short = await page.locator(`${HERO_SOURCE} button, ${HERO_SOURCE} a[href]:not(details a)`).evaluateAll(nodes =>
+        nodes.map(node => ({ text: node.textContent?.trim(), height: node.getBoundingClientRect().height }))
+          .filter(item => item.height < 43.99),
       );
-      expect(clipped, `${COMPILER_SPECIMEN_STAGES[index]!.label} clips a critical value`).toEqual([]);
-      const sourceFrame = specimen.locator("[data-camera-stage]");
-      const sourceClipping = await sourceFrame.locator("picture").evaluateAll((nodes, boundary) => {
-        const frame = (boundary as Element).getBoundingClientRect();
-        return nodes.flatMap(node => {
-          if (Number.parseFloat(getComputedStyle(node).opacity) < 0.5) return [];
-          const box = node.getBoundingClientRect();
-          const image = node.querySelector("img");
-          return box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1 || getComputedStyle(image!).objectFit !== "contain"
-            ? [image?.getAttribute("data-source-image") ?? "unknown"]
-            : [];
-        });
-      }, await sourceFrame.elementHandle());
-      expect(sourceClipping, `${COMPILER_SPECIMEN_STAGES[index]!.label} clips the active source asset`).toEqual([]);
-    }
-  });
+      expect(short).toEqual([]);
+    });
 
-  test("reduced motion keeps every stage selectable and starts static", async ({ page }, testInfo) => {
+    /*
+      The phone's first screen holds the real page, not only its name. Readiness and evidence are
+      kept apart: readiness is the raster's own decode() resolving and two frames painting (not
+      `complete` or naturalWidth alone); evidence is a screenshot of the page window where it sits
+      in the unscrolled first viewport, decoded by the browser itself, counting ink outside the
+      drawn region boxes and their letters. A blank white raster under the boxes fails it.
+    */
+    test(`${path} shows the decoded source page in the phone's first viewport, ahead of the passage`, async ({ page }, testInfo) => {
+      test.skip(!["390", "360"].includes(testInfo.project.name), "the two required phone widths");
+      await page.goto(path);
+      const source = page.locator(HERO_SOURCE);
+      const image = source.locator("[data-page-window] img");
+      await expect(image).toHaveCount(1);
+      await image.evaluate((node: HTMLImageElement) => node.decode());
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+      const at = await source.evaluate(root => {
+        const frame = root.querySelector<HTMLElement>("[data-page-window]")!;
+        const box = frame.getBoundingClientRect();
+        const marks = [...frame.querySelectorAll("[data-region-id], [data-region-id] > *")].map(node => {
+          const rect = node.getBoundingClientRect();
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        });
+        return {
+          scrollY,
+          name: root.querySelector("p[data-derived]")!.getBoundingClientRect().bottom,
+          quote: root.querySelector("blockquote")!.getBoundingClientRect().top,
+          // Inside the window's own rule, which is not page ink.
+          inner: { x: box.x + frame.clientLeft, y: box.y + frame.clientTop, width: frame.clientWidth, height: frame.clientHeight },
+          marks,
+        };
+      });
+      const viewport = page.viewportSize()!;
+      expect(at.scrollY).toBe(0);
+      expect(at.inner.y, "the page follows the source's name").toBeGreaterThanOrEqual(at.name);
+      expect(at.inner.y + at.inner.height, "and precedes the passage").toBeLessThanOrEqual(at.quote);
+      const shown = Math.min(at.inner.height, viewport.height - at.inner.y);
+      expect(shown, "the page window reaches well into the first viewport").toBeGreaterThanOrEqual(Math.min(at.inner.height, 120));
+
+      const clip = { x: at.inner.x, y: at.inner.y, width: at.inner.width, height: shown };
+      const png = (await page.screenshot({ clip })).toString("base64");
+      const ink = await page.evaluate(async ({ png, clip, marks }) => {
+        const bytes = Uint8Array.from(atob(png), char => char.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const context = canvas.getContext("2d")!;
+        context.drawImage(bitmap, 0, 0);
+        const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+        const scale = bitmap.width / clip.width;
+        const pad = 4; // a box's 2px outline, its 1px offset, and antialiasing
+        const covered = marks.map(mark => ({
+          x0: (mark.x - clip.x - pad) * scale,
+          y0: (mark.y - clip.y - pad) * scale,
+          x1: (mark.x + mark.width - clip.x + pad) * scale,
+          y1: (mark.y + mark.height - clip.y + pad) * scale,
+        }));
+        let sampled = 0;
+        let nonwhite = 0;
+        for (let y = 0; y < bitmap.height; y += 1) {
+          for (let x = 0; x < bitmap.width; x += 1) {
+            if (covered.some(c => x >= c.x0 && x < c.x1 && y >= c.y0 && y < c.y1)) continue;
+            const i = (y * bitmap.width + x) * 4;
+            sampled += 1;
+            if (Math.min(data[i]!, data[i + 1]!, data[i + 2]!) < 235) nonwhite += 1;
+          }
+        }
+        return { sampled, nonwhite };
+      }, { png, clip, marks: at.marks });
+      expect(ink.sampled, "page pixels outside the region boxes").toBeGreaterThan(0);
+      expect(ink.nonwhite / ink.sampled, "document ink, not a blank sheet under the boxes").toBeGreaterThan(0.01);
+    });
+
+    test(`${path} keeps the passage, page, filing link and regions inside the workbench at every width`, async ({ page }, testInfo) => {
+      test.skip(!REQUIRED_WIDTHS.has(testInfo.project.name), "the seven required width projects");
+      await page.goto(path);
+      const source = page.locator(HERO_SOURCE);
+      const clipped = await source.evaluate(root => {
+        const bench = root.getBoundingClientRect();
+        const targets = root.querySelectorAll("blockquote, img, a[data-full-filing], a[data-hero-evidence], button[aria-pressed]");
+        return [...targets].flatMap(node => {
+          const box = node.getBoundingClientRect();
+          return box.left < bench.left - 1 || box.right > bench.right + 1 ? [node.tagName + " " + (node.textContent ?? "").trim().slice(0, 40)] : [];
+        });
+      });
+      expect(clipped).toEqual([]);
+      expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test("reduced motion keeps every workbench region selectable at once", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "reduced-motion", "the reduced-motion project");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
-    const specimen = page.locator("#s2 [data-compiler-specimen]");
-    const tabs = specimen.getByRole("tab");
-    await expect(tabs).toHaveCount(COMPILER_SPECIMEN_STAGES.length);
-    await expect(specimen.getByRole("button", { name: "Play" })).toHaveCount(0);
-    await page.waitForTimeout(2_850);
-    expect(await selectedStage(page)).toBe(2);
-    await tabs.last().click();
-    await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
-    await expect(specimen.getByRole("tabpanel")).toContainText(COMPILER_SPECIMEN_SOURCE.regionId);
+    const buttons = regionButtons(page);
+    const hrefs = await regionHrefs(page);
+    await expect(buttons).toHaveCount(hrefs.length);
+    await buttons.last().click();
+    await expect(buttons.last()).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(`${HERO_SOURCE} [data-hero-evidence]`)).toHaveAttribute("href", hrefs[hrefs.length - 1]!);
+    await expect(page.locator(FILM_DISCLOSURE)).toHaveJSProperty("open", false);
+    await expect(page.locator("main video")).toHaveCount(0);
   });
 });

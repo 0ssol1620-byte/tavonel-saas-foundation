@@ -7,6 +7,7 @@ import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import { failureSentence } from "@/lib/workspace-failure-copy";
+import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useCheckout } from "@/lib/use-checkout";
@@ -17,17 +18,36 @@ import {
   estimateBillablePages,
   formatUsd,
   pageCountLabel,
-  quoteCompilePages,
+  quoteIntakeManifest,
+  intakePricingFingerprint,
   weakestConfidence,
   type PageEstimate,
   type PageEstimateConfidence,
 } from "@/lib/usage-pricing";
+import {
+  deriveFileKey,
+  intakeManifestDigest,
+  newAttemptKey,
+  uploadApprovedMember,
+  cancelFailedIntakeSetMember,
+  saveIntakeAttempt,
+  loadIntakeAttempt,
+  clearIntakeAttempt,
+  readApprovalStatus,
+  readApprovalStatusResult,
+  postApprovalAndReconcile,
+  reconcilePriorAttemptForNewLineage,
+  matchReselection,
+  shouldReuseAttemptKey,
+  compilableDocumentIds as approvedCompilableDocumentIds,
+  type IntakeAttemptRecord,
+} from "@/lib/intake-approval";
+import type { TriageProcessingQuote } from "@/lib/intake-triage-client";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
-import { sourceFamilyChips, uploadAcceptAttribute } from "@/lib/qualified-input";
+import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
-import { qualifyProgress, type OcrProgress } from "@/lib/ocr-progress";
-import { advanceProgressPoll, type ProgressPollState } from "@/lib/progress-poll";
+import { clearSourceVersionUnavailable, filterPollableSourceVersions, isCurrentSourceObservation, markSourceVersionUnavailable, matchesSanitizedSourceDigest, pruneUnavailableSourceVersions, qualifyProgress, qualifySourceVersionDescriptor, type OcrProgress, type VerifiedSourceObservation } from "@/lib/ocr-progress";
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
@@ -39,6 +59,7 @@ import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
+import IntakeTriageReview from "@/components/intake-triage-review";
 import workspaceStateStyles from "./workspace-states.module.css";
 import {
   deriveAttentionItems,
@@ -130,15 +151,16 @@ type GroundedAnswer = {
   status: "grounded" | "abstained";
   answer: string;
   reason: string | null;
+  /* Both builders' citations: the compiled one sends no sourceId or relevance, and may send a null page or box. */
   citations: Array<{
     evidenceId: string;
-    sourceId: string;
+    sourceId?: string;
     sourceVersionId: string;
-    pageNumber1: number;
-    bbox1000: [number, number, number, number];
+    pageNumber1: number | null;
+    bbox1000: [number, number, number, number] | null;
     authority: string;
     authorityTier?: string;
-    relevance: number;
+    relevance?: number;
     claimIds?: string[];
     entityIds?: string[];
     relevanceBreakdown?: {
@@ -149,7 +171,7 @@ type GroundedAnswer = {
     };
     excerpt: string;
   }>;
-  receipt: { manifestDigest: string; retrieval: string; outputSha256: string };
+  receipt: { collectionId: string; manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
 /*
@@ -270,8 +292,6 @@ function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
-  /** Distinguishes two uploads of the same file in one session. */
-  const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
@@ -331,6 +351,7 @@ export default function WorkspacePage() {
   */
   const followRef = useRef<AbortController | null>(null);
   const [stagedSelection, setStagedSelection] = useState<WorkspaceSelection | null>(null);
+  const [stagedSelectionRevision, setStagedSelectionRevision] = useState("");
   /*
     Real page counts for the staged selection, measured before anything is uploaded.
 
@@ -386,11 +407,13 @@ export default function WorkspacePage() {
   }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
+  const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
-    if (!collectionId) {
-      setWorldReadModel(null);
+    const manifest = collectionResult?.manifestDigest;
+    setWorldReadModel(null);
+    if (!collectionId || !manifest) {
       return;
     }
     const controller = new AbortController();
@@ -399,7 +422,7 @@ export default function WorkspacePage() {
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
       if (!token) return null;
-      const response = await fetch(`/api/v1/world/${encodeURIComponent(collectionId)}`, {
+      const response = await fetch(`/api/v1/world/${encodeURIComponent(collectionId)}?manifest=${encodeURIComponent(manifest)}`, {
         cache: "no-store",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
@@ -407,12 +430,14 @@ export default function WorkspacePage() {
       });
       return response.ok ? await response.json() as { model?: WorldReadModel } : null;
     })()
-      .then((body) => setWorldReadModel(body?.model ?? null))
+      .then((body) => {
+        if (!controller.signal.aborted) setWorldReadModel(body?.model?.world.id === collectionId && body.model.world.manifestDigest === manifest ? body.model : null);
+      })
       .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
+        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
       });
     return () => controller.abort();
-  }, [collectionResult?.collectionId]);
+  }, [collectionResult?.collectionId, collectionResult?.manifestDigest]);
   /*
     The two server facts the review queue needs and the candidate artifact does not carry.
 
@@ -428,11 +453,14 @@ export default function WorkspacePage() {
   const [compileRecord, setCompileRecord] = useState<
     { documentIds: string[]; blocked: CompileBlocker[]; settledAt: string | null } | null
   >(null);
-  const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string }>; truncated: boolean }>({ decisions: [], truncated: false });
+  const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated: boolean }>({ decisions: [], truncated: false });
+  const [reviewLedgerEpoch, setReviewLedgerEpoch] = useState(0);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
-    if (!collectionId) {
-      setCompileRecord(null);
+    const manifest = collectionResult?.manifestDigest;
+    setCompileRecord(null);
+    setReviewDecisions({ decisions: [], truncated: false });
+    if (!collectionId || !manifest) {
       setReviewDecisions({ decisions: [], truncated: false });
       return;
     }
@@ -450,7 +478,7 @@ export default function WorkspacePage() {
             : null),
         fetch(`/api/v1/reviews?collectionId=${encodeURIComponent(collectionId)}`, { cache: "no-store", headers, signal: controller.signal })
           .then((response) => response.ok
-            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string }>; truncated?: boolean }>
+            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated?: boolean }>
             : null),
       ]);
       if (controller.signal.aborted) return;
@@ -467,11 +495,11 @@ export default function WorkspacePage() {
         first, instead of showing them as measured.
       */
       setReviewDecisions(reviews.status === "fulfilled"
-        ? { decisions: reviews.value?.decisions ?? [], truncated: reviews.value?.truncated === true }
+        ? { decisions: (reviews.value?.decisions ?? []).filter((decision) => decision.manifestDigest === manifest), truncated: reviews.value?.truncated === true }
         : { decisions: [], truncated: false });
     })();
     return () => controller.abort();
-  }, [collectionResult?.collectionId]);
+  }, [collectionResult?.collectionId, collectionResult?.manifestDigest, reviewLedgerEpoch]);
   const [downloading, setDownloading] = useState(false);
   // A setup guide or downloaded package is not proof of a working external AI connection.
   // Keep the success state false until an authenticated consumer receipt can establish it.
@@ -506,6 +534,14 @@ export default function WorkspacePage() {
    * path this product tells people it never travels.
    */
   const [reading, setReading] = useState<Record<string, OcrProgress>>({});
+  const [sourceObservation, setSourceObservation] = useState<VerifiedSourceObservation | null>(null);
+  const progressAuthorityRef = useRef<{ token: string | null; epoch: number }>({ token: null, epoch: 0 });
+  const progressGenerationRef = useRef(0);
+  const progressSequenceRef = useRef(new Map<string, number>());
+  const sourceBytesCacheRef = useRef(new Map<string, { epoch: number; bytes: Uint8Array }>());
+  const unavailableSourceVersionsRef = useRef(new Map<string, string>());
+  const focusedSourceIdentityRef = useRef<string | null>(null);
+  const focusedSourceIdentityLiveRef = useRef<string | null>(null);
 
   /* The board is derived, never stored. Storing it would let it disagree with the objects. */
   const pipelineRows = buildPipeline(
@@ -513,6 +549,54 @@ export default function WorkspacePage() {
     documents,
     collectionResult?.sourceDocuments.map((item) => item.documentId) ?? [],
   );
+  const focusedObservationRow = pipelineRows.find((row) => row.transfer)
+    ?? pipelineRows.find((row) => row.stages.some((stage) => stage.state === "active"))
+    ?? pipelineRows[pipelineRows.length - 1]
+    ?? null;
+  const focusedObservationSourceId = focusedObservationRow?.id ?? null;
+  const focusedObservationVersionKey = documents?.find((item) => item.documentId === focusedObservationSourceId)?.versionKey ?? null;
+  const focusedObservationIdentity = focusedObservationSourceId && focusedObservationVersionKey
+    ? `${focusedObservationSourceId}:${focusedObservationVersionKey}`
+    : null;
+  focusedSourceIdentityLiveRef.current = focusedObservationIdentity;
+  const readingForCurrentVersions = Object.fromEntries(Object.entries(reading).filter(([documentId, progress]) =>
+    documents?.some((item) => item.documentId === documentId && item.versionKey.toLowerCase() === progress.versionKey.toLowerCase()),
+  ));
+  const selectedObservationVersion = documents?.find((item) => item.documentId === focusedObservationSourceId)?.versionKey;
+  const selectedObservationState = documents?.find((item) => item.documentId === focusedObservationSourceId)?.processingState ?? null;
+  const sourceObservationForDisplay = sourceObservation
+    && sourceObservation.documentId === focusedObservationSourceId
+    && sourceObservation.versionKey.toLowerCase() === selectedObservationVersion?.toLowerCase()
+      ? sourceObservation
+      : null;
+
+  useEffect(() => {
+    if (focusedSourceIdentityRef.current === focusedObservationIdentity) return;
+    focusedSourceIdentityRef.current = focusedObservationIdentity;
+    sourceBytesCacheRef.current.clear();
+    setSourceObservation(null);
+  }, [focusedObservationIdentity]);
+
+  useEffect(() => {
+    if (documents) pruneUnavailableSourceVersions(unavailableSourceVersionsRef.current, documents);
+    // Inventory identity is the dependency; the effect reads the current records, not watches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documents?.map((item) => `${item.documentId}:${item.versionKey}`).join("|")]);
+
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, nextSession) => {
+      const token = nextSession?.access_token ?? null;
+      if (progressAuthorityRef.current.token === token) return;
+      progressAuthorityRef.current = { token, epoch: progressAuthorityRef.current.epoch + 1 };
+      sourceBytesCacheRef.current.clear();
+       unavailableSourceVersionsRef.current.clear();
+      setReading({});
+      setSourceObservation(null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   /**
    * Until this resolves the workspace knows nothing, and it must not fill that gap with
    * plausible-looking values. A signed-out visitor previously saw the whole shell -- tabs, a
@@ -524,6 +608,11 @@ export default function WorkspacePage() {
   const signOut = async () => {
     const client = getSupabaseBrowserClient();
     if (!client) return;
+    progressAuthorityRef.current = { token: null, epoch: progressAuthorityRef.current.epoch + 1 };
+    sourceBytesCacheRef.current.clear();
+    unavailableSourceVersionsRef.current.clear();
+    setReading({});
+    setSourceObservation(null);
     await client.auth.signOut();
     window.location.replace("/");
   };
@@ -549,7 +638,14 @@ export default function WorkspacePage() {
   const [askQuestion, setAskQuestion] = useState("");
   const [askResult, setAskResult] = useState<GroundedAnswer | null>(null);
   const [askBusy, setAskBusy] = useState(false);
-  const [askEvidenceId, setAskEvidenceId] = useState<string | null>(null);
+  /* undefined: no source region opened. null: World Studio stays open with nothing selected, so
+     picking a graph object or pressing Clear there does not unmount the inspector. */
+  const [askEvidenceId, setAskEvidenceId] = useState<string | null | undefined>(undefined);
+  /* The read model of the World that answered, or null: the loaded model, the selected collection
+     and the current answer receipt must name one collection and manifest. Both source resolution
+     and the Ask inspector read only this, so a cleared answer, a changed selection, a loading or
+     absent model, or a candidate beside the answering active World opens nothing. */
+  const askWorldModel = qualifyAskWorldModel(worldReadModel, collectionResult, askResult?.receipt);
 
   const getAuthToken = async () => {
     const client = getSupabaseBrowserClient();
@@ -577,10 +673,10 @@ export default function WorkspacePage() {
     setActiveWorld(null);
     setWorldVersions([]);
     setAskResult(null);
-    setAskEvidenceId(null);
+    setAskEvidenceId(undefined);
   };
 
-  const loadWorldState = async (collectionId: string, token?: string): Promise<ActiveWorld | null | undefined> => {
+  const loadWorldState = async (collectionId: string, token?: string, selectionSequence?: number): Promise<ActiveWorld | null | undefined> => {
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
     const accessToken = token ?? await getAuthToken();
     if (!accessToken) return;
@@ -588,6 +684,7 @@ export default function WorkspacePage() {
       headers: { authorization: `Bearer ${accessToken}` },
     });
     const json = await response.json() as { code?: string; activeWorld?: ActiveWorld; versions?: WorldVersion[] };
+    if (selectionSequence !== undefined && selectionSequence !== candidateLoadSequence.current) return;
     if (response.status === 404 && json.code === "ACTIVE_WORLD_NOT_FOUND") {
       clearWorldState();
       return null;
@@ -599,7 +696,7 @@ export default function WorkspacePage() {
     setActiveWorld(json.activeWorld);
     setWorldVersions(json.versions);
     setAskResult(null);
-    setAskEvidenceId(null);
+    setAskEvidenceId(undefined);
     return json.activeWorld;
   };
 
@@ -657,7 +754,8 @@ export default function WorkspacePage() {
   };
 
   const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string) => {
-    if (!/^collection-[a-f0-9]{32}$/.test(collectionId)) return;
+    const sequence = ++candidateLoadSequence.current;
+    if (!/^collection-[a-f0-9]{32}$/.test(collectionId) || (manifestDigest && !/^sha256:[a-f0-9]{64}$/.test(manifestDigest))) return;
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
     const token = data.session?.access_token;
@@ -675,6 +773,7 @@ export default function WorkspacePage() {
         package?: { roots?: unknown; files?: Array<{ path?: unknown }> };
       };
     };
+    if (sequence !== candidateLoadSequence.current) return;
     const artifact = json.artifact;
     const paths = artifact?.package?.files?.map((file) => file.path).filter((path): path is string => typeof path === "string") ?? [];
     if (
@@ -682,6 +781,7 @@ export default function WorkspacePage() {
       !artifact ||
       artifact.schemaVersion !== "tavonel.collection_candidate.v1" ||
       artifact.collectionId !== collectionId ||
+      (manifestDigest !== undefined && artifact.manifestDigest !== manifestDigest) ||
       artifact.candidatePromotion !== false ||
       json.candidatePromotion !== false ||
       !(
@@ -697,7 +797,14 @@ export default function WorkspacePage() {
       return;
     }
     setCollectionResult({ ...artifact, artifactKey: json.artifactKey ?? "" });
-    const loadedActiveWorld = await loadWorldState(collectionId, token);
+    // Resolve a latest-candidate link once, then make reload/history immutable.
+    const selectedUrl = new URL(window.location.href);
+    if (selectedUrl.searchParams.get("collection") === collectionId && !selectedUrl.searchParams.has("manifest")) {
+      selectedUrl.searchParams.set("manifest", artifact.manifestDigest);
+      window.history.replaceState(null, "", selectedUrl);
+    }
+    const loadedActiveWorld = await loadWorldState(collectionId, token, sequence);
+    if (sequence !== candidateLoadSequence.current) return;
     if (loadedActiveWorld === undefined) return artifact.lifecycle;
     const verifiedPackage = "Its required package entries and state were checked.";
     setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
@@ -713,6 +820,28 @@ export default function WorkspacePage() {
     */
     return artifact.lifecycle;
   };
+
+  // Browser history selects artifact identity as well as the visible surface.
+  useEffect(() => {
+    const restoreRevision = () => {
+      const params = new URLSearchParams(window.location.search);
+      const collection = params.get("collection");
+      setCollectionResult(null); setWorldReadModel(null);
+      if (collection) void loadCollectionCandidate(collection, params.get("manifest") ?? undefined)
+        .catch(() => setNotice("The selected revision could not be read. Reload to recheck access; no revision was changed."));
+      else { ++candidateLoadSequence.current; setCollectionResult(null); setWorldReadModel(null); }
+    };
+    window.addEventListener("popstate", restoreRevision);
+    return () => window.removeEventListener("popstate", restoreRevision);
+    // Reads current URL; the loader only uses auth and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!collectionResult?.manifestDigest) return;
+    setReviewReason(""); setRollbackReason(""); setReviewEvidenceId(null);
+    setEvidenceReviewAction(null); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter("");
+  }, [collectionResult]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -738,9 +867,10 @@ export default function WorkspacePage() {
       setSession("signed-in");
       const documentLoad = loadDocuments();
       void loadBilling();
-      const collectionId = params.get("collection");
+      const selectedParams = new URLSearchParams(window.location.search);
+      const collectionId = selectedParams.get("collection");
       const collectionLoad = collectionId
-        ? loadCollectionCandidate(collectionId, params.get("manifest") ?? undefined)
+        ? loadCollectionCandidate(collectionId, selectedParams.get("manifest") ?? undefined)
         : Promise.resolve();
       void Promise.allSettled([documentLoad, collectionLoad]).then(() => setWorkspaceStartupReady(true));
 
@@ -814,22 +944,32 @@ export default function WorkspacePage() {
     if (session !== "signed-in" || !documents) return;
     let readingNow = documents
       .filter((item) => item.sanitizedKey && !item.hasOcrJson && item.processingState !== "operator_review")
-      .map((item) => item.documentId);
+      .map((item) => ({ documentId: item.documentId, versionKey: item.versionKey }));
     if (readingNow.length === 0) return;
 
     let cancelled = false;
-    const pollStates = new Map<string, ProgressPollState>();
+    const generation = ++progressGenerationRef.current;
     const tick = async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
       if (!token || cancelled) return;
-      const observed = await Promise.all(readingNow.map((documentId) => readProgressFor(documentId, token)));
-      readingNow = readingNow.filter((documentId, index) => {
-        const decision = advanceProgressPoll(pollStates.get(documentId), observed[index] ?? null);
-        pollStates.set(documentId, decision.state);
-        return decision.continuePolling;
-      });
+      if (progressAuthorityRef.current.token !== token) {
+        progressAuthorityRef.current = { token, epoch: progressAuthorityRef.current.epoch + 1 };
+        sourceBytesCacheRef.current.clear();
+        unavailableSourceVersionsRef.current.clear();
+        setReading({});
+        setSourceObservation(null);
+      }
+      const authority = progressAuthorityRef.current.epoch;
+      await Promise.all(readingNow.map(({ documentId, versionKey }) =>
+        readProgressFor(documentId, token, versionKey, generation, authority, documentId === focusedObservationSourceId),
+      ));
+      if (cancelled || generation !== progressGenerationRef.current || authority !== progressAuthorityRef.current.epoch) return;
+      // The mutable stream may be absent (JSON-only OCR), read, or refused before the durable
+      // receipt appears. Keep checking the actual document inventory; its immutable OCR/review
+      // state ends this effect, never a timer or an invented page-growth signal.
+      readingNow = filterPollableSourceVersions(readingNow, unavailableSourceVersionsRef.current);
       if (!cancelled) await loadDocuments();
       if (readingNow.length === 0) {
         cancelled = true;
@@ -841,10 +981,11 @@ export default function WorkspacePage() {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      if (progressGenerationRef.current === generation) progressGenerationRef.current += 1;
     };
     // The identity of what is being read is the dependency; the handlers are read, not watched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, documents?.map((item) => `${item.documentId}:${item.hasOcrJson}:${item.processingState}`).join("|")]);
+  }, [session, documents?.map((item) => `${item.documentId}:${item.versionKey}:${item.hasOcrJson}:${item.processingState}`).join("|"), focusedObservationSourceId]);
 
   const openBillingPortal = async () => {
     setBillingBusy(true);
@@ -874,186 +1015,124 @@ export default function WorkspacePage() {
   /**
    * Reads one document's progress object.
    *
-   * Two hops on purpose: this server issues a capability, the bucket serves the bytes. A failure
-   * at either hop is silent, because progress is a view and losing a frame of it must never
-   * surface as an error about the document itself.
+   * Progress text still travels directly from the bucket through its short-lived read capability.
+   * The selected source preview uses the existing authorized exact-version PDF route and is
+   * checked against the sanitized-output digest before it can accompany that text. A lost frame
+   * stays a missing observation, never an error about the source itself.
    */
-  const readProgressFor = async (documentId: string, token: string): Promise<OcrProgress | null> => {
+  const readProgressFor = async (
+    documentId: string,
+    token: string,
+    expectedVersionKey: string | null,
+    generation: number,
+    authority: number,
+    includePreview: boolean,
+  ): Promise<OcrProgress | null> => {
+    const sequence = (progressSequenceRef.current.get(documentId) ?? 0) + 1;
+    progressSequenceRef.current.set(documentId, sequence);
+    const current = () => generation === progressGenerationRef.current
+      && authority === progressAuthorityRef.current.epoch
+      && progressSequenceRef.current.get(documentId) === sequence
+      && (!includePreview || focusedSourceIdentityLiveRef.current === `${documentId}:${expectedVersionKey}`);
+    const clearDocument = () => {
+      setReading((previous) => { const next = { ...previous }; delete next[documentId]; return next; });
+      if (includePreview) setSourceObservation(null);
+    };
+    const revoke = () => {
+      if (authority !== progressAuthorityRef.current.epoch) return;
+      progressAuthorityRef.current = { token, epoch: authority + 1 };
+      sourceBytesCacheRef.current.clear();
+      if (expectedVersionKey) markSourceVersionUnavailable(unavailableSourceVersionsRef.current, { documentId, versionKey: expectedVersionKey });
+      setReading({});
+      setSourceObservation(null);
+    };
     try {
-      const issued = await fetch(`/api/documents/${documentId}/progress`, {
+      if (!expectedVersionKey) { if (current()) clearDocument(); return null; }
+      const issued = await fetch(`/api/documents/${encodeURIComponent(documentId)}/progress`, {
         headers: { authorization: `Bearer ${token}` },
         cache: "no-store",
       });
-      if (!issued.ok) return null;
-      const { readUrl } = await issued.json() as { readUrl?: string };
-      if (!readUrl) return null;
-      const object = await fetch(readUrl, { cache: "no-store" });
-      if (!object.ok) return null;
-      const progress = qualifyProgress(await object.json());
-      if (!progress) return null;
-      setReading((current) => ({ ...current, [documentId]: progress }));
+      if (issued.status === 401 || issued.status === 403) { revoke(); return null; }
+      if (!issued.ok) {
+        if (current() && (issued.status === 404 || issued.status === 409) && expectedVersionKey) {
+          markSourceVersionUnavailable(unavailableSourceVersionsRef.current, { documentId, versionKey: expectedVersionKey });
+        }
+        if (current()) clearDocument();
+        return null;
+      }
+      const response = await issued.json() as { readUrl?: unknown };
+      const descriptor = qualifySourceVersionDescriptor(response, documentId);
+      if (!descriptor || descriptor.versionKey.toLowerCase() !== expectedVersionKey.toLowerCase()
+        || typeof response.readUrl !== "string" || !response.readUrl) {
+        if (current()) clearDocument();
+        return null;
+      }
+      if (!isCurrentSourceObservation(
+        descriptor,
+        { documentId, versionKey: expectedVersionKey },
+        authority,
+        progressAuthorityRef.current.epoch,
+        sequence,
+        progressSequenceRef.current.get(documentId) ?? 0,
+      )) { if (current()) clearDocument(); return null; }
+      if (!current()) return null;
+      clearSourceVersionUnavailable(unavailableSourceVersionsRef.current, descriptor);
+
+      const cacheKey = `${documentId}:${descriptor.versionKey}`;
+      for (const key of sourceBytesCacheRef.current.keys()) {
+        if (key.startsWith(`${documentId}:`) && key !== cacheKey) sourceBytesCacheRef.current.delete(key);
+      }
+      let pdfBytes: Uint8Array | null = null;
+      if (includePreview) {
+        const cached = sourceBytesCacheRef.current.get(cacheKey);
+        if (cached?.epoch === authority) {
+          pdfBytes = cached.bytes;
+        } else {
+          const source = await fetch(
+            `/api/documents/${encodeURIComponent(documentId)}/source?version=${encodeURIComponent(descriptor.versionKey)}&format=pdf`,
+            { headers: { authorization: `Bearer ${token}` }, cache: "no-store" },
+          );
+          if (source.status === 401 || source.status === 403) { revoke(); return null; }
+          if (!source.ok || !source.headers.get("content-type")?.startsWith("application/pdf")) {
+            if (current() && source.status === 404) {
+              markSourceVersionUnavailable(unavailableSourceVersionsRef.current, descriptor);
+            }
+            if (current()) clearDocument();
+            return null;
+          }
+          pdfBytes = new Uint8Array(await source.arrayBuffer());
+          const digest = await crypto.subtle.digest("SHA-256", pdfBytes.slice().buffer as ArrayBuffer);
+          const sourceSha256 = `sha256:${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+          if (!matchesSanitizedSourceDigest(descriptor.sourceSha256, sourceSha256)) {
+            if (current()) clearDocument();
+            return null;
+          }
+          if (!current()) return null;
+          sourceBytesCacheRef.current.set(cacheKey, { epoch: authority, bytes: pdfBytes });
+        }
+      }
+
+      const object = await fetch(response.readUrl, { cache: "no-store" });
+      const progress = object.ok ? qualifyProgress(await object.json(), descriptor) : null;
+      if (!current()) return null;
+      setReading((previous) => {
+        if (!current()) return previous;
+        if (!progress) { const next = { ...previous }; delete next[documentId]; return next; }
+        return { ...previous, [documentId]: progress };
+      });
+      if (includePreview && pdfBytes) {
+        setSourceObservation({ ...descriptor, pdfBytes, progress });
+      }
       return progress;
     } catch {
       // A dropped frame of a live view is not an error about the document.
+      if (current()) clearDocument();
       return null;
     }
   };
 
   const patchUpload = (localId: string, patch: Partial<LocalUpload>) =>
     setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
-
-  const uploadDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
-    if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
-    const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
-    if (manageBusy) setBusy(true);
-    // The id is local until the capability call returns one. The board needs a row immediately,
-    // because issuing the capability is itself a wait the visitor should be able to see.
-    const localId = `local-${file.name}-${file.size}-${uploadSeq.current++}`;
-    /*
-      Every refusal path below already wrote its reason onto the upload row; `refuse` is that same
-      write with a second reader. The reason existed and was reachable -- it was on the board and in
-      a notice this function set -- and then the batch summary overwrote the one notice slot
-      milliseconds later, so the sentence that survived was a count. A visitor over the file ceiling
-      was told one file did not upload and never told it was too large, which is the only fact that
-      says what to do next.
-    */
-    const refuse = (reason: string) => {
-      patchUpload(localId, { phase: "failed", reason });
-      onRefusal?.(reason);
-    };
-    setUploads((current) => [
-      ...current,
-      { localId, filename: sourceLabel, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
-    ]);
-    try {
-      const client = getSupabaseBrowserClient();
-      if (!client) {
-        refuse("not signed in");
-        setNotice("Sign in with Google first.");
-        return null;
-      }
-      const { data } = await client.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) {
-        refuse("not signed in");
-        setNotice("Sign in with Google first.");
-        return null;
-      }
-      const capability = await fetch("/api/uploads/capability", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          originalFilename: file.name,
-          declaredMimeType: file.type || "application/pdf",
-          requestedBytes: file.size,
-          estimatedPages: estimateBillablePages({
-            bytes: file.size,
-            mimeType: file.type || "application/pdf",
-          })?.pages,
-        }),
-      });
-      const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string };
-      if (!capability.ok || !json.uploadUrl) {
-        if (json.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
-        refuse(failureSentence(json.code, capability.status));
-        setNotice(`Upload was not issued. ${failureSentence(json.code, capability.status)}`);
-        return null;
-      }
-
-      /*
-       * The PUT moved from `fetch` to `XMLHttpRequest` for one reason: fetch cannot report upload
-       * progress, so a large scan was a frozen button for as long as it took. These are bytes the
-       * transport acknowledged on the way to the quarantine bucket -- the application server is
-       * not in this path, and showing the transfer did not put it there.
-       */
-      patchUpload(localId, { documentId: json.documentId ?? null, phase: "sending", loaded: 0 });
-      // The one moment both halves exist in the same scope: the id the server just issued, and
-      // the name the visitor picked the file by.
-      if (json.documentId) setNames(rememberDocumentName(json.documentId, sourceLabel));
-      const transfer = putWithProgress(
-        json.uploadUrl,
-        file,
-        json.declaredMimeType ?? file.type,
-        ({ loaded }) => patchUpload(localId, { loaded }),
-      );
-      const result = await transfer.done;
-      if (!result.ok) {
-        const reason = result.reason === "http"
-          ? `secure upload failed (${result.status})`
-          : result.reason === "aborted" ? "transfer cancelled" : "network did not complete the transfer";
-        if (json.documentId) {
-          const client = getSupabaseBrowserClient();
-          const { data } = client ? await client.auth.getSession() : { data: { session: null } };
-          const token = data.session?.access_token;
-          if (token) {
-            await fetch("/api/uploads/release", {
-              method: "POST",
-              headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-              body: JSON.stringify({ documentId: json.documentId }),
-            }).catch(() => undefined);
-          }
-        }
-        refuse(reason);
-        setNotice(`${reason}. The file never entered the app server.`);
-        return null;
-      }
-      if (json.documentId) {
-        /*
-         * The digest travels with the confirmation, taken by SubtleCrypto over the very bytes the
-         * transfer sent. It is what lets the server compare the stored object against the
-         * capability it issued without downloading the source back onto the application server --
-         * which is how free evaluation used to be fingerprinted, through a 5 MiB-capped read that
-         * refused every larger trial upload with a 503 the board showed as "needs review".
-         *
-         * A page served without a secure context has no SubtleCrypto and reports null; the server
-         * records that as absent rather than inventing one, and refuses the trial gate outright
-         * instead of quietly skipping it.
-         */
-        const confirmed = await fetch("/api/uploads/confirm", {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            documentId: json.documentId,
-            ...(result.sourceSha256 ? { sourceSha256: result.sourceSha256 } : {}),
-          }),
-        });
-        if (!confirmed.ok) {
-          // "Needs review" was the wrong word for every one of these: confirmation refuses with a
-          // typed code, and calling that a review invented a queue nobody is working. Say the
-          // code, and say that the source stops here until it succeeds.
-          const failure = await confirmed.json().catch(() => null) as { code?: string } | null;
-          const code = failure?.code ?? `HTTP ${confirmed.status}`;
-          if (code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
-          refuse(failureSentence(code, confirmed.status));
-          setNotice(`${file.name} reached storage but was not confirmed. ${failureSentence(code, confirmed.status)} It is not queued for processing.`);
-          await loadDocuments();
-          return json.documentId;
-        }
-      }
-      patchUpload(localId, { phase: "stored", loaded: file.size });
-      // Stored, not issued: a capability that was never transferred is not a source.
-      trackFunnelOnce("workspace_first_source_added", { mode: "upload" });
-
-      /*
-       * What finished is the transfer, and that is all this may claim.
-       *
-       * It used to announce that TAVONEL was preparing and reading the source the moment the PUT
-       * returned -- before the CDR worker had seen the object, and regardless of whether it would
-       * refuse it seconds later. For everything above the processing ceiling that sentence was
-       * simply false, and it was the last thing the customer was told before the row went quiet.
-       * The board is now the place an outcome appears, because it is the only place that reads
-       * one, so this points there instead of guessing.
-       */
-      setNotice(activationPolicy.cdr.enabled && activationPolicy.ocrGpu.enabled
-        ? `${file.name} reached quarantine storage. Preparation has started; the source pipeline shows whether it is accepted or refused.`
-        : `${file.name} reached quarantine storage. This source needs operator review before reading can continue.`);
-      await loadDocuments();
-      return json.documentId ?? null;
-    } finally {
-      if (manageBusy) setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
 
   const sessionToken = async () => {
     const client = getSupabaseBrowserClient();
@@ -1459,42 +1538,290 @@ export default function WorkspacePage() {
    * failure and silently abandoned the rest; the ones already in the bucket are still there and
    * still being read, so the report now names the failure and keeps going.
    */
-  const uploadDocuments = async (files: File[]) => {
+  const uploadDocuments = async (files: File[], measured = stagedPageCounts, triageApproval?: { quote: TriageProcessingQuote }): Promise<true | "stale" | "uncertain" | undefined> => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
     try {
-      setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
-      const refusals: string[] = [];
-      const settled = await runBounded(files, UPLOAD_CEILING, (file) =>
-        uploadDocument(file, false, (reason) => { refusals.push(reason); }));
-      const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
-      const lost = files.length - ids.length;
-      if (lost > 0) {
-        // Deduplicated: twenty files over the same ceiling is one fact, not twenty sentences.
-        const why = [...new Set(refusals)].join("; ");
-        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why}.` : ""}`);
+      if (files.length > 128) { setNotice("This approval supports at most 128 files. Reduce the selected set and review its new maximum."); return; }
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) { setNotice("Sign in again before approving this intake. This attempt has not submitted a new processing approval."); return; }
+      setNotice(`Hashing all ${files.length} selected files and preparing this processing approval. This preparation step does not upload file bytes.`);
+      const manifest = await Promise.all(files.map(async (file, index) => {
+        const contentSha256 = `sha256:${bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())))}`;
+        const relativePath = (file as WorkspaceUploadFile).tavonelRelativePath || file.webkitRelativePath || file.name;
+        const declared = normalizeDocumentMimeType(file.type);
+        const mimeType = declared && validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: declared }).valid
+          ? declared
+          : Object.keys(qualifiedDocumentInputs).find((candidate) => validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: candidate }).valid) ?? "";
+        const measuredFile = triageApproval ? null : measured?.[index];
+        const claimedPages = measuredFile?.pages ?? null;
+        const claimedBasis = measuredFile && "basis" in measuredFile ? measuredFile.basis : null;
+        return {
+          file,
+          relativePath,
+          contentSha256,
+          byteLength: file.size,
+          mimeType,
+          claimedPages,
+          claimedBasis,
+          fileKey: await deriveFileKey({ relativePath, contentSha256, byteLength: file.size, mimeType }),
+        };
+      }));
+      if (manifest.some((entry) => !entry.mimeType)) {
+        setNotice("A selected file has no supported filename and MIME pairing. This attempt stopped before submitting a new processing approval.");
+        return;
       }
-      /*
-        One uploaded file is a compile.
-
-        This gate compared the uploaded count against two, the last place the old floor
-        survived. The route accepts one, the compiler accepts one, and the preflight panel
-        offers one -- and then a visitor who dropped a single PDF watched it upload, sanitize
-        and read, and nothing happened. No error: the batch simply ended. Judging the set with
-        the shared verdict means this path cannot drift from the route again.
-      */
-      if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);
+      let processingManifest = manifest;
+      if (triageApproval) {
+        const expectedKeys = triageApproval.quote.files.map((entry) => entry.fileKey);
+        if (new Set(expectedKeys).size !== expectedKeys.length) {
+          setNotice("The server quote contains duplicate sources. This attempt stopped before submitting a new processing approval.");
+          return;
+        }
+        const expected = new Set(expectedKeys);
+        processingManifest = manifest.filter((entry) => expected.has(entry.fileKey));
+        if (processingManifest.length !== expectedKeys.length) {
+          setNotice("The selected browser files no longer match the server-qualified receipt. Refresh source review before approving.");
+          return;
+        }
+      }
+      const localQuote = triageApproval ? null : quoteIntakeManifest(processingManifest.map((entry) => ({
+        bytes: entry.byteLength, mimeType: entry.mimeType,
+        claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
+      })));
+      if (localQuote && !localQuote.ok) { setNotice(`This selected set cannot be approved (${localQuote.code}). This attempt stopped before submitting a new processing approval.`); return; }
+      const clientManifestDigest = await intakeManifestDigest(processingManifest);
+      const pricingFingerprint = await intakePricingFingerprint();
+      if (triageApproval && (clientManifestDigest !== triageApproval.quote.clientManifestDigest
+        || pricingFingerprint !== triageApproval.quote.pricingFingerprint)) {
+        setNotice("The selected source bytes or published pricing changed after the quote. No processing approval was submitted; review and quote again.");
+        return "stale";
+      }
+      const maximumCredits = triageApproval?.quote.quote.maximumCredits
+        ?? (localQuote?.ok ? localQuote.quote.maximumCredits : 0);
+      const previous = loadIntakeAttempt(window.localStorage);
+      const fileKeys = processingManifest.map((entry) => entry.fileKey);
+      const lineageMatches = triageApproval
+        ? previous?.triageReceiptId === triageApproval.quote.triageReceiptId
+        : previous?.triageReceiptId == null;
+      if (previous && !lineageMatches && matchReselection(previous, fileKeys).ok) {
+        const prior = await reconcilePriorAttemptForNewLineage({ fetch, token: async () => token }, previous.attemptKey);
+        if (prior.kind === "safe_to_replace") {
+          clearIntakeAttempt(window.localStorage);
+        } else {
+          setNotice(prior.reason === "unavailable"
+            ? "The saved approval status could not be checked. The prior attempt is preserved; retry only after status is available. No new approval was submitted."
+            : "A saved approval for these exact source bytes belongs to another receipt or intake path. Reconcile that attempt before creating a new approval; this prevents duplicate reservations or charges.");
+          return "uncertain";
+        }
+      }
+      const sameCandidate = !!previous && lineageMatches && matchReselection(previous, fileKeys).ok
+        && Date.parse(previous.expiresAt) > Date.now();
+      const needsPreviousRead = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint;
+      const previousRead = needsPreviousRead
+        ? await readApprovalStatusResult({ fetch, token: async () => token }, previous!.attemptKey)
+        : { kind: "not_found" as const };
+      if (previousRead.kind === "unavailable") {
+        setNotice("The saved approval status is temporarily unavailable. The attempt is preserved; no duplicate approval was submitted.");
+        return "uncertain";
+      }
+      const previousApproval = previousRead.kind === "found" ? previousRead.approval : null;
+      const sameReselection = sameCandidate && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint
+        && shouldReuseAttemptKey(previousApproval);
+      const attemptKey = sameReselection && previous!.clientManifestDigest === clientManifestDigest
+        && previous!.pricingFingerprint === pricingFingerprint ? previous!.attemptKey : newAttemptKey();
+      const pendingRecord: IntakeAttemptRecord = {
+        version: 1, attemptKey, approvalId: sameReselection ? previous!.approvalId : crypto.randomUUID(),
+        scopeDigest: sameReselection ? previous!.scopeDigest : `sha256:${"0".repeat(64)}`,
+        pricingFingerprint, clientManifestDigest, triageReceiptId: triageApproval?.quote.triageReceiptId ?? null,
+        aggregateMaximumCredits: maximumCredits,
+        expiresAt: sameReselection ? previous!.expiresAt : new Date(Date.now() + 10 * 60_000).toISOString(),
+        files: processingManifest.map((entry) => ({
+          fileKey: entry.fileKey, relativePath: entry.relativePath, contentSha256: entry.contentSha256,
+          byteLength: entry.byteLength, mimeType: entry.mimeType,
+          documentId: sameReselection ? previous!.files.find((file) => file.fileKey === entry.fileKey)?.documentId ?? null : null,
+          phase: "approved", code: null,
+        })),
+      };
+      // Persist the stable attempt identity before the write. A reload after a lost approval
+      // response can reselect, hash and replay this exact manifest under the same attempt key.
+      if (!saveIntakeAttempt(window.localStorage, pendingRecord)) {
+        setNotice("This browser cannot save the attempt identity. This attempt stopped before submitting a new processing approval.");
+        return;
+      }
+      const approvalBody = {
+        attemptKey, clientManifestDigest, pricingFingerprint,
+        aggregateMaximumCredits: maximumCredits,
+        ...(triageApproval ? { triageReceiptId: triageApproval.quote.triageReceiptId } : {}),
+        ...(!triageApproval ? { files: processingManifest.map((entry) => ({
+          fileKey: entry.fileKey, contentSha256: entry.contentSha256, byteLength: entry.byteLength,
+          mimeType: entry.mimeType, claimedPages: entry.claimedPages, claimedBasis: entry.claimedBasis,
+          originalFilename: entry.file.name,
+        })) } : {}),
+      };
+      let approval = sameReselection ? previousApproval : null;
+      if (approval && (approval.clientManifestDigest !== clientManifestDigest || approval.pricingFingerprint !== pricingFingerprint
+        || approval.triageReceiptId !== (triageApproval?.quote.triageReceiptId ?? null))) {
+        setNotice("The saved attempt no longer matches this content or pricing. Review and approve the current selection again.");
+        return;
+      }
+      if (!approval) {
+        const submitted = await postApprovalAndReconcile({ fetch, token: async () => token }, attemptKey, approvalBody);
+        if (submitted.kind === "approved") approval = submitted.approval;
+        else if (submitted.kind === "unavailable") {
+          setNotice("Approval status is unavailable after the request. The pending attempt is preserved; retry the same receipt and quote after status can be reconciled.");
+          return "uncertain";
+        } else if (submitted.kind === "rejected") {
+          if (triageApproval && (submitted.code === "INTAKE_PRICE_STALE"
+            || submitted.code === "INTAKE_RETRIAGE_REQUIRED" || submitted.code === "INTAKE_TRIAGE_RECEIPT_STALE")) {
+            const prior = await readApprovalStatusResult({ fetch, token: async () => token }, attemptKey);
+            if (prior.kind === "not_found") {
+              clearIntakeAttempt(window.localStorage);
+              setNotice("The quote or receipt is stale and no approval was created. Start source review again to get a fresh receipt and quote.");
+              return "stale";
+            }
+            setNotice("The quote or receipt was rejected, but the saved attempt could not be safely cleared. Keep it for reconciliation; do not submit another approval until status is confirmed.");
+            return "uncertain";
+          }
+          setNotice(submitted.code === "INTAKE_PRICE_STALE"
+            ? "Pricing changed since this estimate. This approval request was rejected. Review the refreshed maximum and approve again."
+            : submitted.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
+              ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. This approval request was rejected. Review and approve the refreshed quote again.`
+              : "This approval request for the complete set was rejected. Review the reason and retry the complete set.");
+          return;
+        }
+      }
+      if (!approval || approval.files.length !== processingManifest.length
+        || approval.triageReceiptId !== (triageApproval?.quote.triageReceiptId ?? null)) {
+        setNotice("Approval result is uncertain. Recover this same attempt after reload; nothing compiles until every member is confirmed.");
+        return;
+      }
+      const record: IntakeAttemptRecord = {
+        version: 1, attemptKey, approvalId: approval.approvalId, scopeDigest: approval.scopeDigest,
+        pricingFingerprint: approval.pricingFingerprint, clientManifestDigest,
+        triageReceiptId: triageApproval?.quote.triageReceiptId ?? null,
+        aggregateMaximumCredits: approval.aggregateMaximumCredits, expiresAt: approval.expiresAt,
+        files: processingManifest.map((entry) => ({
+          fileKey: entry.fileKey, relativePath: entry.relativePath, contentSha256: entry.contentSha256,
+          byteLength: entry.byteLength, mimeType: entry.mimeType,
+          documentId: approval!.files.find((member) => member.fileKey === entry.fileKey)?.documentId ?? null,
+          phase: "approved", code: null,
+        })),
+      };
+      saveIntakeAttempt(window.localStorage, record);
+      setNotice(triageApproval
+        ? `Approved maximum ${formatUsd(approval.aggregateMaximumCredits / 100)} for ${processingManifest.length} qualified sources. Reusing the server-sealed objects; no second upload is sent.`
+        : `Approved maximum ${formatUsd(approval.aggregateMaximumCredits / 100)} for all ${processingManifest.length} files. Uploading the complete set.`);
+      const settled = await runBounded(processingManifest, UPLOAD_CEILING, async (entry) => {
+        const localId = `approved-${entry.fileKey}`;
+        const approvedFile = approval!.files.find((member) => member.fileKey === entry.fileKey);
+        if (!approvedFile) return { status: "failed" as const, code: "INTAKE_APPROVAL_FILE_MISSING", documentId: null };
+        setUploads((current) => current.some((upload) => upload.localId === localId) ? current : [
+          ...current, { localId, filename: entry.relativePath, bytes: entry.byteLength, documentId: null, phase: "issuing", loaded: 0 },
+        ]);
+        const result = await uploadApprovedMember({
+          attempt: { attemptKey, scopeDigest: approval!.scopeDigest, pricingFingerprint,
+            triageReceiptId: triageApproval?.quote.triageReceiptId ?? null },
+          member: {
+            fileKey: entry.fileKey, originalFilename: entry.file.name, contentSha256: entry.contentSha256,
+            byteLength: entry.byteLength, mimeType: entry.mimeType,
+            approvedPageBasis: approvedFile.pageBasis, approvedMaxPages: approvedFile.approvedMaxPages,
+            approvedReservedCredits: approvedFile.approvedReservedCredits,
+            approvedMaximumCredits: approvedFile.approvedMaximumCredits,
+          },
+        }, {
+          fetch, token: async () => token,
+          put: async (url, contentType) => {
+            const outcome = await putWithProgress(url, entry.file, contentType, ({ loaded }) => patchUpload(localId, { loaded })).done;
+            return outcome.ok ? { ok: true as const, sourceSha256: outcome.sourceSha256 ?? null }
+              : { ok: false as const, reason: outcome.reason, status: outcome.status };
+          },
+          onPhase: (phase, documentId, code) => {
+            const viewPhase = phase === "confirmed" ? "stored" : phase === "uncertain" ? "uncertain" : phase === "failed" ? "failed" : phase === "put_sent" ? "sending" : "issuing";
+            patchUpload(localId, { phase: viewPhase, ...(documentId ? { documentId } : {}), ...(code ? { reason: code } : {}) });
+            if (documentId) setNames(rememberDocumentName(documentId, entry.relativePath));
+          },
+        });
+        if (result.status !== "confirmed") {
+          patchUpload(localId, {
+            phase: result.status === "uncertain" ? "uncertain" : "failed",
+            ...(result.documentId ? { documentId: result.documentId } : {}),
+            reason: result.code,
+          });
+        }
+        const updated = record.files.find((file) => file.fileKey === entry.fileKey);
+        if (updated) { updated.phase = result.status === "confirmed" ? "confirmed" : result.status; updated.code = result.status === "confirmed" ? null : result.code; updated.documentId = result.documentId; saveIntakeAttempt(window.localStorage, record); }
+        return result;
+      });
+      settled.forEach((item, index) => {
+        if (item.ok) return;
+        const entry = processingManifest[index];
+        const saved = record.files.find((file) => file.fileKey === entry?.fileKey);
+        if (saved) { saved.phase = "uncertain"; saved.code = "CLIENT_REQUEST_INTERRUPTED"; saveIntakeAttempt(window.localStorage, record); }
+        if (entry) patchUpload(`approved-${entry.fileKey}`, { phase: "uncertain", reason: "CLIENT_REQUEST_INTERRUPTED" });
+      });
+      const failedMemberIndex = settled.findIndex((item) => item.ok && item.value.status === "failed");
+      if (failedMemberIndex >= 0) {
+        const failedEntry = processingManifest[failedMemberIndex]!;
+        const cancelled = await cancelFailedIntakeSetMember(
+          { attemptKey, scopeDigest: approval.scopeDigest, fileKey: failedEntry.fileKey },
+          { fetch, token: async () => token },
+        );
+        if (cancelled.status !== "cancelled") {
+          setNotice("A member failed and whole-set cancellation is not yet confirmed. Reselect the exact same files to reconcile; no partial set will compile.");
+          return;
+        }
+        record.files.forEach((file) => {
+          file.phase = "cancelled";
+          file.code = cancelled.reconciliationRequired ? "BILLING_RECONCILIATION_REQUIRED" : "DEPENDENT_MEMBER_FAILED";
+        });
+        saveIntakeAttempt(window.localStorage, record);
+        processingManifest.forEach((entry) => patchUpload(`approved-${entry.fileKey}`, {
+          phase: "failed", reason: "DEPENDENT_MEMBER_FAILED",
+        }));
+        setNotice(cancelled.reconciliationRequired
+          ? "The approved set was cancelled and safe active holds were returned. A reservation needs billing reconciliation; the set cannot compile or retry until that is resolved."
+          : "One member failed. The approved set was cancelled, safe active holds were returned, and any completed charges were preserved; approve a fresh complete set to retry.");
+        return;
+      }
+      const complete = settled.length === processingManifest.length && settled.every((item) => item.ok && item.value.status === "confirmed");
+      if (!complete) {
+        const uncertain = settled.some((item) => item.ok && item.value.status === "uncertain");
+        setNotice(uncertain
+          ? "Intake outcome is uncertain. Reselect the exact same files to recover status. No partial set will compile."
+          : "At least one approved file failed. No reduced corpus was compiled; resolve the failed member and approve a new complete set.");
+        return;
+      }
+      const final = await readApprovalStatus({ fetch, token: async () => token }, attemptKey);
+      const ids = approvedCompilableDocumentIds(final, fileKeys);
+      if (!ids || ids.length !== processingManifest.length || !judgeCorpusSet(ids.length).ok) {
+        setNotice("The server has not confirmed the complete approved set. Nothing was compiled.");
+        return;
+      }
+      await startDurableCompile(ids);
+      return true;
+    } catch {
+      setNotice("Intake stopped before a verified complete result. Re-select the exact same files to recover the server's attempt status; nothing compiles while status is uncertain.");
     } finally {
       setBusy(false);
     }
   };
 
   const stageWorkspaceFiles = async (files: File[]) => {
-    if (files.length === 0) return;
+    if (files.length === 0 || busy) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
+    // Invalidate triage state as soon as a new selection starts preparing.
+    setStagedSelection(null);
+    setStagedSelectionRevision(crypto.randomUUID());
+    // A prior selection's measurements cannot price this newly chosen file set.
+    setStagedPageCounts(null);
     expanderRef.current ??= createArchiveExpander();
     stagingAbortRef.current?.abort();
     const controller = new AbortController();
@@ -1508,22 +1835,28 @@ export default function WorkspacePage() {
       if (controller.signal.aborted) return;
       if (prepared.files.length === 0) {
         setStagedSelection(prepared);
-        setNotice("No supported files were found. Nothing was uploaded or processed.");
+        setStagedSelectionRevision(crypto.randomUUID());
+        setNotice("No supported files were found in this selection. File selection does not upload bytes or authorize processing.");
         return;
       }
       setStagedSelection(prepared);
-      setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} ready for preflight. Nothing has been uploaded or processed yet.`);
+      setStagedSelectionRevision(crypto.randomUUID());
+      setNotice(`${prepared.files.length} supported file${prepared.files.length === 1 ? "" : "s"} selected for source review. Upload checks and full processing require separate approvals.`);
     } catch (error) {
+      if (controller.signal.aborted) return;
       setStagedSelection(null);
+      setStagedSelectionRevision("");
       const reason = error instanceof Error ? error.message : "INVALID_SELECTION";
       // Cancelling is something the visitor did, not something that went wrong.
       setNotice(reason === "ARCHIVE_CANCELLED" || reason === "SELECTION_CANCELLED"
-        ? "Selection cancelled. Nothing was uploaded."
-        : `Preflight blocked this selection (${reason}). Nothing was uploaded.`);
+        ? "File selection cancelled. Selection does not upload bytes or authorize processing."
+        : `File selection was blocked (${reason}). Selection does not upload bytes or authorize processing.`);
     } finally {
-      setStaging(null);
-      if (fileRef.current) fileRef.current.value = "";
-      if (folderRef.current) folderRef.current.value = "";
+      if (stagingAbortRef.current === controller) {
+        setStaging(null);
+        if (fileRef.current) fileRef.current.value = "";
+        if (folderRef.current) folderRef.current.value = "";
+      }
     }
   };
 
@@ -1549,8 +1882,17 @@ export default function WorkspacePage() {
   */
   const stagedCounted = stagedEstimates.filter((estimate): estimate is PageEstimate => estimate !== null);
   const stagedUncounted = stagedEstimates.length - stagedCounted.length;
-  const stagedPages = stagedCounted.reduce((sum, estimate) => sum + estimate.pages, 0);
-  const stagedQuote = quoteCompilePages(stagedPages);
+  // Files with an available page estimate only. Unknown files remain in the quote's maximum.
+  const stagedPages = stagedCounted.reduce((total, estimate) => total + estimate.pages, 0);
+  const stagedManifestQuote = stagedSelection && stagedPageCounts?.length === stagedSelection.files.length
+    ? quoteIntakeManifest(stagedSelection.files.map((entry, index) => ({
+      bytes: entry.file.size,
+      mimeType: entry.file.type || "application/octet-stream",
+      claimedPages: stagedPageCounts[index]?.pages ?? null,
+      claimedBasis: stagedPageCounts[index] && "basis" in stagedPageCounts[index] ? stagedPageCounts[index].basis : null,
+    })))
+    : null;
+  const stagedQuote = stagedManifestQuote?.ok ? stagedManifestQuote.quote : null;
   /*
     Audit D10. The counts above say how many files there are; this says what each one loses.
 
@@ -1638,6 +1980,10 @@ export default function WorkspacePage() {
     const url = new URL(window.location.href);
     url.pathname = next === "home" ? "/workspace" : `/workspace/${next}`;
     url.searchParams.delete("tab");
+    if (collectionResult) {
+      url.searchParams.set("collection", collectionResult.collectionId);
+      url.searchParams.set("manifest", collectionResult.manifestDigest);
+    }
     window.history.pushState(null, "", url.toString());
     /*
       Every surface now starts with its own content under the state hero, so a change of
@@ -1646,7 +1992,7 @@ export default function WorkspacePage() {
       exist, so Changes and Activity silently did nothing.
     */
     window.scrollTo({ top: 0 });
-  }, []);
+  }, [collectionResult]);
 
   const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
 
@@ -1658,7 +2004,10 @@ export default function WorkspacePage() {
     const verdict = judgeCorpusSet(stagedSelection.files.length);
     if (!verdict.ok) { setNotice(verdict.message); return; }
     const files = stagedSelection.files.map((entry) => entry.file);
+    // The counts the accepted quote was formed from. Clearing the selection resets the state.
+    const counts = stagedPageCounts;
     setStagedSelection(null);
+    setStagedSelectionRevision("");
 
     /*
       Make the product experience match the promise the visitor just saw on the landing page.
@@ -1674,7 +2023,21 @@ export default function WorkspacePage() {
     */
     navigateSurface("sources");
 
-    await uploadDocuments(files);
+    await uploadDocuments(files, counts);
+  };
+
+  const startTriageCompile = async (quote: TriageProcessingQuote): Promise<"completed" | "stale" | "uncertain" | "blocked"> => {
+    if (!stagedSelection?.files.length || quote.triageReceiptId === "") return "blocked";
+    const files = stagedSelection.files.map((entry) => entry.file);
+    const completed = await uploadDocuments(files, null, { quote });
+    if (completed === true) {
+      setStagedSelection(null);
+      setStagedSelectionRevision("");
+      navigateSurface("sources");
+      return "completed";
+    }
+    if (completed === "stale" || completed === "uncertain") return completed;
+    return "blocked";
   };
 
   const uploadPublicProof = async () => {
@@ -1692,7 +2055,10 @@ export default function WorkspacePage() {
         setNotice("Public proof PDF digest did not match. Nothing entered quarantine.");
         return;
       }
-      await uploadDocument(new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" }));
+      const proofFile = new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" });
+      const quote = quoteIntakeManifest([{ bytes: proofFile.size, mimeType: proofFile.type, claimedPages: null, claimedBasis: null }]);
+      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`)) return;
+      await uploadDocuments([proofFile], null);
     } catch {
       setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
     } finally {
@@ -1721,7 +2087,11 @@ export default function WorkspacePage() {
         }
         files.push(new File([bytes], proof.filename, { type: "application/pdf" }));
       }
-      await uploadDocuments(files);
+      const quote = quoteIntakeManifest(files.map((file) => ({
+        bytes: file.size, mimeType: file.type || "application/pdf", claimedPages: null, claimedBasis: null,
+      })));
+      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`)) return;
+      await uploadDocuments(files, null);
     } catch {
       setNotice("The public collection proof could not be prepared. Nothing was activated.");
     } finally {
@@ -1794,9 +2164,13 @@ export default function WorkspacePage() {
     looking at the page region that justifies it, which is the only position from which someone
     can tell whether the compiled label is right.
   */
-  const reviewEvidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
-    ?? worldReadModel?.evidence[0]
-    ?? null;
+  const reviewEvidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId) ?? null;
+  /* A decision belongs to the evidence it was opened for, so a new selection drops any open draft. */
+  const selectReviewEvidence = (evidenceId: string | null) => {
+    if (evidenceId === reviewEvidenceId) return;
+    setReviewEvidenceId(evidenceId);
+    setEvidenceReviewAction(null); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter("");
+  };
   const correctableObjects = (worldReadModel?.objects ?? []).filter((object) =>
     (object.type === "Topic" || object.type === "Entity" || object.type === "Claim")
     && reviewEvidence !== null
@@ -1808,13 +2182,17 @@ export default function WorkspacePage() {
     reason: string,
     patch?: { objectId: string; before: string; after: string },
   ) => {
-    const evidence = worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)
-      ?? worldReadModel?.evidence[0];
+    const evidence = reviewEvidence;
     if (!collectionResult || !evidence || reason.trim().length < 8) return;
+    if (worldReadModel?.world.id !== collectionResult.collectionId || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest) {
+      setNotice("Read this exact revision and its source-bound evidence before recording a decision."); return;
+    }
+    const selectionSequence = candidateLoadSequence.current;
     setEvidenceReviewBusy(true);
     try {
       const token = await getAuthToken();
       if (!token) { setNotice("Sign in before recording a review decision."); return; }
+      if (selectionSequence !== candidateLoadSequence.current) return;
       const response = await fetch("/api/v1/reviews", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -1834,10 +2212,16 @@ export default function WorkspacePage() {
           : `Review decision could not be recorded. ${failureSentence(body.code, response.status)}`);
         return;
       }
-      setEvidenceReviewAction(null);
-      setEvidenceReviewReason("");
-      setPatchObjectId(null);
-      setPatchAfter("");
+      if (selectionSequence !== candidateLoadSequence.current) {
+        setNotice("The decision was recorded for the previously selected revision. Your current selection is retained; return to that revision to inspect the record.");
+        return;
+      }
+      const clearReviewInput = () => {
+        setEvidenceReviewAction(null);
+        setEvidenceReviewReason("");
+        setPatchObjectId(null);
+        setPatchAfter("");
+      };
       if (body.resultingManifestDigest) {
         /*
           A correction produced a new candidate, so move to it.
@@ -1846,15 +2230,21 @@ export default function WorkspacePage() {
           is immutable artifact truth, and a patch writes a second artifact rather than
           replacing the first.
         */
-        await loadCollectionCandidate(collectionResult.collectionId, body.resultingManifestDigest);
+        const loaded = await loadCollectionCandidate(collectionResult.collectionId, body.resultingManifestDigest);
+        if (!loaded) { setNotice("The correction was recorded, but its resulting revision could not be verified. Reload before reviewing it; your input is kept."); return; }
         const url = new URL(window.location.href);
         url.searchParams.set("collection", collectionResult.collectionId);
         url.searchParams.set("manifest", body.resultingManifestDigest);
-        window.history.replaceState(null, "", url);
+        window.history.pushState(null, "", url);
+        clearReviewInput();
         setNotice(`Corrected. A new candidate was compiled at ${body.resultingManifestDigest.slice(0, 19)}… and the change was recorded against the evidence it was reviewed under. The previous candidate is unchanged.`);
         return;
       }
+      setReviewLedgerEpoch(epoch => epoch + 1);
+      clearReviewInput();
       setNotice(`${action === "accept" ? "Accepted" : action === "edit" ? "Change requested" : "Rejected"}. The evidence-bound human decision was recorded.`);
+    } catch {
+      setNotice("The review response could not be confirmed. Your input is kept. Check the review record before submitting again; the server may have recorded the decision.");
     } finally {
       setEvidenceReviewBusy(false);
     }
@@ -1862,6 +2252,9 @@ export default function WorkspacePage() {
 
   const promoteCandidate = async () => {
     if (!collectionResult || reviewReason.trim().length < 8) return;
+    if (!worldReadModel || worldReadModel.world.id !== collectionResult.collectionId || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest || worldReadModel.evidence.length === 0) {
+      setNotice("Read this exact revision and its source-bound evidence before activation. Reload to recheck access."); return;
+    }
     if (
       collectionResult.lifecycle !== "candidate" ||
       collectionResult.validation.status !== "passed" ||
@@ -1901,6 +2294,8 @@ export default function WorkspacePage() {
       trackFunnel("workspace_world_activated");
       setReviewReason("");
       setNotice("Human review recorded. This revision is now the active World.");
+    } catch {
+      setNotice("The activation response could not be confirmed. Your review reason is kept. Reload the World state before trying again; the active pointer may have changed.");
     } finally {
       setWorldBusy(false);
     }
@@ -1936,6 +2331,8 @@ export default function WorkspacePage() {
       await loadWorldState(collectionResult.collectionId, token);
       setRollbackReason("");
       setNotice(`Rollback recorded. ${targetManifestDigest} is active again; all immutable versions and the audit event remain retained.`);
+    } catch {
+      setNotice("The rollback response could not be confirmed. Your reason is kept. Reload the World state before trying again; the active pointer may have changed.");
     } finally {
       setWorldBusy(false);
     }
@@ -1945,6 +2342,7 @@ export default function WorkspacePage() {
     if (!collectionResult || !activeWorld || askQuestion.trim().length < 3) return;
     setAskBusy(true);
     setAskResult(null);
+    setAskEvidenceId(undefined);
     try {
       const token = await getAuthToken();
       if (!token) {
@@ -1966,7 +2364,9 @@ export default function WorkspacePage() {
       trackFunnelOnce("workspace_first_ask", { status: json.status });
       setNotice(json.status === "grounded"
         ? `Answer returned from ${json.citations.length} exact source region(s) in active revision ${activeWorld.revision}.`
-        : "The active world abstained because no region-bound evidence matched the question.");
+        : askAbstentionCopy(json.reason, navigator.languages).notice);
+    } catch {
+      setNotice("The answer response could not be read. Your question is kept. No answer is shown; retry when the connection is available.");
     } finally {
       setAskBusy(false);
     }
@@ -2124,10 +2524,14 @@ export default function WorkspacePage() {
     travel together so Home never shows a progress row without its picture or a picture without
     its counts.
   */
-  const compileBlock = compileJob || hasActiveSourceWork(pipelineRows) ? (
+  const showCompileStage = Boolean(compileJob || hasActiveSourceWork(pipelineRows) || sourceObservationForDisplay);
+  const compileBlock = showCompileStage ? (
     <div className="workspace-compile-block">
-      {compileJob || hasActiveSourceWork(pipelineRows) ? (
-        <CompileStage rows={pipelineRows} reading={reading} names={names} world={worldReadModel} state={compileJob?.state ?? null} resultId={compileJob?.collectionId ?? null} />
+      {showCompileStage ? (
+        <CompileStage rows={pipelineRows} reading={readingForCurrentVersions} sourceObservation={sourceObservationForDisplay}
+          selectedSourceVersion={focusedObservationSourceId && selectedObservationVersion ? { documentId: focusedObservationSourceId, versionKey: selectedObservationVersion } : null}
+          selectedSourceState={selectedObservationState}
+          names={names} world={worldReadModel} state={compileJob?.state ?? null} resultId={compileJob?.collectionId ?? null} runProgress={compileJob ? { jobId: compileJob.jobId, documentsTotal: compileJob.documentsTotal, documentsReady: compileJob.documentsReady } : null} />
       ) : null}
       {compileJob ? (
         <CompileJobPanel
@@ -2361,7 +2765,7 @@ export default function WorkspacePage() {
                     ? <h1 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : sourcePending === "terms_acceptance_required" ? "Start with your documents" : "See how a source becomes usable knowledge"}</h1>
                     : <h2 id="workspace-intake-title">{customerDataAccess === "checking" ? "Checking source access…" : "See a compiled World"}</h2>}
                   <p>{customerDataAccess === "checking"
-                    ? "We are checking whether this workspace can receive files. Nothing is being uploaded."
+                    ? "We are checking whether this workspace can receive files. This access check does not upload file bytes."
                     : customerDataAccess === "closed"
                       ? sourcePending === "terms_acceptance_required"
                         ? "Your account is ready. To process your own files, review and accept the processing terms."
@@ -2474,7 +2878,7 @@ export default function WorkspacePage() {
                   <p className="eyebrow">Opening archive</p>
                   <p>{staging.archive}</p>
                   <progress max={staging.total} value={staging.done} aria-label={`${staging.done} of ${staging.total} entries expanded`} />
-                  <p className="fine">{staging.done} of {staging.total} entries. Nothing has been uploaded.</p>
+                  <p className="fine">{staging.done} of {staging.total} entries. This local expansion step does not upload file bytes.</p>
                   <button type="button" onClick={() => stagingAbortRef.current?.abort()}>Cancel</button>
                 </div>
               ) : null}
@@ -2482,8 +2886,8 @@ export default function WorkspacePage() {
                 <div className="workspace-preflight" role="region" aria-label="Compile preflight">
                   <p className="eyebrow">Preflight</p>
                   <p className="workspace-staged-summary">
-                    <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} staged.</strong>{" "}
-                    Nothing has been uploaded yet. Review the estimate, then upload and compile.
+                    <strong>{stagedSelection.files.length} file{stagedSelection.files.length === 1 ? "" : "s"} selected.</strong>{" "}
+                    Review files and the preliminary estimate below. The preliminary maximum covers every selected file, including files whose pages are unknown. Upload checks and full processing require separate approvals; bounded upload checks do not authorize OCR, parsing, or compile.
                   </p>
                   <dl>
                     <div><dt>Files</dt><dd>{stagedSelection.files.length}</dd></div>
@@ -2492,13 +2896,13 @@ export default function WorkspacePage() {
                       <dd>{stagedCounted.length > 0 ? stagedPages : !stagedPageCounts ? "Counting…" : "Counted when read"}</dd>
                     </div>
                     <div><dt>Archives</dt><dd>{stagedSelection.archiveCount}</dd></div>
-                    <div><dt>Warnings</dt><dd>{stagedSelection.unsupported.length}</dd></div>
+                    <div><dt>Unsupported files</dt><dd>{stagedSelection.unsupported.length}</dd></div>
                     <div><dt>Estimated</dt><dd>{stagedQuote ? formatUsd(stagedQuote.estimatedUsd) : "—"}</dd></div>
                     <div><dt>Maximum</dt><dd>{stagedQuote ? formatUsd(stagedQuote.maximumUsd) : "—"}</dd></div>
                   </dl>
                   <p className="fine" aria-live="polite">
                     {!stagedPageCounts
-                      ? "Counting the pages in these files. Nothing has been uploaded."
+                      ? "Counting pages in this browser. This page-count step does not upload file bytes."
                       : stagedCounted.length === 0
                         ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
                         : stagedConfidence === "verified"
@@ -2518,11 +2922,12 @@ export default function WorkspacePage() {
                       {stagedUncounted - stagedSpreadsheets === 1
                         ? "One other file states no page count"
                         : `${stagedUncounted - stagedSpreadsheets} other files state no page count`} before being read,
-                      so they are not in the total either. Their pages are counted while the documents are processed.
+                      each is included in the approved maximum at the full 80-page processing ceiling.
                     </p>
                   ) : null}
                   {stagedPreflight.files.length > 0 ? (
                     <>
+                      <h3>Format support and limitations</h3>
                       <p className="fine" role="status">{describePreflightSummary(stagedPreflight)}.</p>
                       <ul className="workspace-preflight-files" aria-label="What each staged file will carry">
                         {stagedPreflight.files.map((file, index) => (
@@ -2559,8 +2964,28 @@ export default function WorkspacePage() {
                       blocks is a corpus the compile step would refuse and a count still in
                       flight, both of which are answers rather than the absence of one.
                     */}
-                    <button type="button" disabled={busy || !stagedPageCounts || !stagedVerdict.ok || !intakeOpen} onClick={() => void startStagedCompile()}>{busy ? "Uploading & compiling…" : "Upload & compile"}</button>
-                    <button type="button" onClick={() => setStagedSelection(null)}>Clear</button>
+                    <IntakeTriageReview
+                      files={stagedSelection.files.map(({ file }) => ({
+                        file,
+                        relativePath: (file as WorkspaceUploadFile).tavonelRelativePath || file.webkitRelativePath || file.name,
+                        mimeType: (() => {
+                          const declared = normalizeDocumentMimeType(file.type);
+                          if (declared && validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: declared }).valid) return declared;
+                          return Object.keys(qualifiedDocumentInputs).find((candidate) => validateQualifiedDocumentInput({ originalFilename: file.name, declaredMimeType: candidate }).valid) ?? "";
+                        })(),
+                      }))}
+                      initialEstimate={stagedQuote ? { minimumUsd: stagedQuote.estimatedUsd, maximumUsd: stagedQuote.maximumUsd } : null}
+                      selectionRevision={stagedSelectionRevision}
+                      disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen}
+                      getToken={async () => {
+                        const client = getSupabaseBrowserClient();
+                        const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+                        return data.session?.access_token ?? null;
+                      }}
+                      onLegacyFallback={() => void startStagedCompile()}
+                      onProcessingApproval={startTriageCompile}
+                    />
+                    <button type="button" disabled={busy} onClick={() => { setStagedSelection(null); setStagedSelectionRevision(""); }}>Clear</button>
                   </div>
                 </div>
               ) : null}
@@ -2587,7 +3012,7 @@ export default function WorkspacePage() {
           <div id="workspace-board">
             <PipelineBoard
               rows={pipelineRows}
-              reading={reading}
+              reading={readingForCurrentVersions}
               names={names}
               customerDataAccess={customerDataAccess}
               noComputeAccess={accessSource === "unentitled"}
@@ -2596,7 +3021,7 @@ export default function WorkspacePage() {
               onToggleSelected={(documentId) => setSelectedDocumentIds((current) => current.includes(documentId)
                 ? current.filter((id) => id !== documentId)
                 : [...current, documentId])}
-              onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); } : undefined}
+              onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); setSourceObservation(null); sourceBytesCacheRef.current.clear(); } : undefined}
             />
           </div>
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
@@ -2730,10 +3155,7 @@ export default function WorkspacePage() {
                 <ReviewQueue
                   input={reviewQueueInput}
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
-                  onSelectDocument={(documentId) => {
-                    const first = worldReadModel?.evidence.find((item) => item.sourceId === documentId);
-                    if (first) setReviewEvidenceId(first.id);
-                  }}
+                  onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
               </section>
               <section className="card review-comparison" aria-labelledby="review-comparison-title">
@@ -2743,9 +3165,10 @@ export default function WorkspacePage() {
                     <WorldStudioUltimate
                       model={worldReadModel}
                       initialLens="evidence"
-                      selectedEvidenceId={reviewEvidenceId ?? worldReadModel.evidence[0].id}
-                      onEvidenceSelect={(selection) => setReviewEvidenceId(selection?.id ?? null)}
+                      selectedEvidenceId={reviewEvidenceId}
+                      onEvidenceSelect={(selection) => selectReviewEvidence(selection?.id ?? null)}
                     />
+                    {reviewEvidence ? null : <p className="fine" role="status">Select an evidence record above to accept, correct, request a change or reject it.</p>}
                     {/*
                       Two different acts, named differently, because they are.
 
@@ -2757,11 +3180,11 @@ export default function WorkspacePage() {
                       which set a reviewer up to believe they had corrected something.
                     */}
                     <div className="review-decision-actions" aria-label="Review decision">
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => void recordEvidenceReview("accept", ACCEPTED_WITHOUT_NOTE)}>Accept</button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("accept"); setEvidenceReviewReason(""); }}>Accept with note</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => void recordEvidenceReview("accept", ACCEPTED_WITHOUT_NOTE)}>Accept</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => { setEvidenceReviewAction("accept"); setEvidenceReviewReason(""); }}>Accept with note</button>
                       <button
                         type="button"
-                        disabled={evidenceReviewBusy || correctableObjects.length === 0}
+                        disabled={evidenceReviewBusy || !reviewEvidence || correctableObjects.length === 0}
                         onClick={() => {
                           setEvidenceReviewAction("edit");
                           setEvidenceReviewReason("");
@@ -2772,10 +3195,10 @@ export default function WorkspacePage() {
                       >
                         Correct
                       </button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter(""); }}>Request change</button>
-                      <button type="button" disabled={evidenceReviewBusy} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => { setEvidenceReviewAction("edit"); setEvidenceReviewReason(""); setPatchObjectId(null); setPatchAfter(""); }}>Request change</button>
+                      <button type="button" disabled={evidenceReviewBusy || !reviewEvidence} onClick={() => { setEvidenceReviewAction("reject"); setEvidenceReviewReason(""); }}>Reject</button>
                     </div>
-                    {evidenceReviewAction ? (
+                    {evidenceReviewAction && reviewEvidence ? (
                       <form
                         className="review-decision-form"
                         onSubmit={(event) => {
@@ -2883,7 +3306,7 @@ export default function WorkspacePage() {
                       <div className="world-actions">
                         <small>{reviewReason.trim().length}/500 · minimum 8 characters</small>
                         <button
-                          disabled={worldBusy || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
+                          disabled={worldBusy || !worldReadModel?.evidence.length || worldReadModel.world.manifestDigest !== collectionResult.manifestDigest || reviewReason.trim().length < 8 || collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" || collectionResult.coreExecution.runtime !== "tavonel-python-core-v2" || !collectionResult.coreExecution.worldStateId || activeWorld?.manifestDigest === collectionResult.manifestDigest}
                           onClick={() => void promoteCandidate()}
                         >
                           {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision…" : "Activate reviewed candidate"}
@@ -2983,17 +3406,21 @@ export default function WorkspacePage() {
                 {askResult ? (
                   <div className={`ask-result ${askResult.status}`} role="status">
                     <strong>{askResult.status === "grounded" ? "Grounded answer" : "Abstained"}</strong>
-                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : "No region-bound evidence matched this question."}</p>
+                    <p data-sensitive="content">{askResult.status === "grounded" ? askResult.answer : askAbstentionCopy(askResult.reason, navigator.languages).result}</p>
                     {askResult.citations.length > 0 ? (
                       <ol data-sensitive="content">
-                        {askResult.citations.map((citation) => (
-                          <li key={`${citation.evidenceId}-${citation.pageNumber1}`}>
+                        {askResult.citations.map((citation, index) => {
+                          // One strict resolver for both availability and the click; null keeps the button disabled.
+                          const regionId = resolveCitationRegion(citation, askWorldModel?.evidence);
+                          const sourceCopy = askSourceCopy(navigator.languages);
+                          return (
+                          <li key={`${index}-${citation.evidenceId}`}>
                             <b>{citation.evidenceId}</b>
                             <span>
-                              Page {citation.pageNumber1} · bbox [{citation.bbox1000.join(", ")}] · {citation.authorityTier ?? citation.authority}
+                              Page {citation.pageNumber1 ?? sourceCopy.missing} · bbox {citation.bbox1000 ? `[${citation.bbox1000.join(", ")}]` : sourceCopy.missing} · {citation.authorityTier ?? citation.authority}
                               {citation.claimIds?.length ? ` · ${citation.claimIds.length} claim${citation.claimIds.length === 1 ? "" : "s"}` : ""}
                             </span>
-                            {citation.relevanceBreakdown ? (
+                            {citation.relevanceBreakdown && citation.relevance !== undefined ? (
                               <span>
                                 score {citation.relevance.toFixed(3)} · lexical {citation.relevanceBreakdown.lexical.toFixed(2)} · graph {citation.relevanceBreakdown.graph.toFixed(2)} · time {citation.relevanceBreakdown.temporal.toFixed(2)} · authority {citation.relevanceBreakdown.authority.toFixed(2)}
                               </span>
@@ -3001,19 +3428,23 @@ export default function WorkspacePage() {
                             <q>{citation.excerpt}</q>
                             <button
                               type="button"
-                              onClick={() => {
-                                const evidence = worldReadModel?.evidence.find((item) => item.id === citation.evidenceId)
-                                  ?? worldReadModel?.evidence.find((item) => item.sourceId === citation.sourceId && item.page === citation.pageNumber1);
-                                setAskEvidenceId(evidence?.id ?? null);
-                              }}
-                              disabled={!worldReadModel?.evidence.some((item) => item.id === citation.evidenceId || (item.sourceId === citation.sourceId && item.page === citation.pageNumber1))}
+                              onClick={() => { if (regionId !== null) setAskEvidenceId(regionId); }}
+                              disabled={regionId === null}
                             >Open source region</button>
+                            {regionId === null ? <small>{askWorldModel ? sourceCopy.unavailable : sourceCopy.unverified}</small> : null}
                           </li>
-                        ))}
+                          );
+                        })}
                       </ol>
                     ) : null}
                     <small>Citations verified against the active World revision.</small>
-                    {askResult.status === "abstained" ? (
+                    {askResult.status === "abstained" && askResult.reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT ? (
+                      <div className="workspace-intake-actions">
+                        <button type="button" onClick={() => document.getElementById("ask-question")?.focus()}>
+                          {askAbstentionCopy(askResult.reason, navigator.languages).action}
+                        </button>
+                      </div>
+                    ) : askResult.status === "abstained" ? (
                       <div className="workspace-intake-actions">
                         <button type="button" onClick={() => navigateSurface("sources")}>Add the source that would answer this</button>
                         <button type="button" onClick={() => navigateSurface("review")}>Check what is waiting for review</button>
@@ -3021,8 +3452,8 @@ export default function WorkspacePage() {
                     ) : null}
                   </div>
                 ) : null}
-                {askEvidenceId ? (
-                  <WorldStudioUltimate model={worldReadModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
+                {askWorldModel && askEvidenceId !== undefined ? (
+                  <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
               </section>
               ) : null}

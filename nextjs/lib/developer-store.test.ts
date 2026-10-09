@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   authenticateDeveloperApiKey,
+  applyFoundationConnectionBatch,
   consumeDeveloperApiRateLimit,
   createDeveloperApiKey,
   rotateDeveloperApiKey,
@@ -22,6 +23,32 @@ afterEach(() => {
 });
 
 describe("developer credential store", () => {
+  it("maps approved-source binding refusals to a retryable batch conflict", async () => {
+    configure();
+    const requestBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      expect(String(input)).toContain("apply_foundation_connection_batch");
+      requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Response.json({ message: "connection_batch_approved_source_invalid" }, { status: 400 });
+    }));
+
+    const result = await applyFoundationConnectionBatch(workspaceKey, "39d42924-a3cc-4a09-b92d-9c86b58901a1", { keyId }, {
+      batchId: "49d42924-a3cc-4a09-b92d-9c86b58901a1",
+      previousCursorSha256: null,
+      nextCursorSha256: `sha256:${"b".repeat(64)}`,
+      manifestSha256: `sha256:${"c".repeat(64)}`,
+      events: [],
+    });
+
+    expect(result).toEqual({ ok: false, code: "CONNECTION_BATCH_CONFLICT" });
+    expect(requestBodies).toHaveLength(1);
+    expect(requestBodies[0]).toMatchObject({
+      p_workspace_key: workspaceKey,
+      p_actor_key_id: keyId,
+      p_event_count: 0,
+    });
+  });
+
   it("returns plaintext once while persisting only its digest", async () => {
     configure();
     let persisted: Record<string, unknown> | null = null;

@@ -13,7 +13,7 @@ describe("2026-09-20 visual refinement", () => {
     expect(landing).not.toMatch(/--lv2-film-w:[^;]*(?:svh|vh)/);
   });
   it("shares the outer measure across navigation, landing and public articles", () => {
-    expect(chrome).toContain("--chrome-measure: 1600px");
+    expect(chrome).toContain("--chrome-measure: 1280px");
     expect(landing).toContain("--lv2-gutter: var(--chrome-gutter)");
     expect(chrome).toContain(".public-page main .shell");
     expect(landing).toContain("width: min(var(--chrome-measure)");
@@ -42,7 +42,7 @@ describe("2026-09-20 visual refinement", () => {
   it("leaves source data and the four-cut player as the source of the hero", () => {
     const component = read("components/landing-v2/hero-film.tsx");
     expect(component).toContain("COMPILE_STAGES.map");
-    expect(component).toContain("CompileStagePlayer");
+    expect(component).toContain("HeroFilmDisclosure");
     expect(read("components/landing-v2/hero-statement.tsx")).toContain("copy.headline.split");
   });
 });

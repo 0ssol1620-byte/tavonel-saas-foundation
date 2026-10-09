@@ -37,7 +37,7 @@ async function openExploreAsk(page: import("@playwright/test").Page) {
   // cannot return to a control that left the DOM. Enter the World and use the persistent Ask bar.
   const dismiss = page.getByRole("button", { name: "No thanks", exact: true });
   if (await dismiss.isVisible()) await dismiss.click();
-  await page.getByRole("button", { name: "ENTER WORLD", exact: true }).click();
+  await page.getByRole("button", { name: "Relations ↗", exact: true }).click();
   const opener = askBar(page);
   await expect(opener).toBeVisible();
   await opener.click();

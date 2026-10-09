@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FILM_CONTROL_LABEL, filmMotionControl } from "@/components/compile-stage-player";
+import { FILM_CONTROL_LABEL, filmMotionControl, toggleMobileFilmFit } from "@/components/compile-stage-player";
 
 /*
   The one control on the landing film (film-01, film-02).
@@ -67,5 +67,21 @@ describe("film motion control", () => {
     // `playRequested` has exactly one writer, and it is the control's own click handler.
     expect(source.match(/setPlayRequested\(/g)).toHaveLength(1);
     expect(source).toContain("const autoplay = (!reducedMotion && !saveData) || playRequested;");
+  });
+
+  it("starts fitted and focuses details only after an explicit toggle", () => {
+    // The shared default is "fit"; a caller may open on "focus" by asking for it.
+    expect(source).toContain('initialMobileFilmView = "fit",');
+    expect(source).toContain('const [mobileFilmFit, setMobileFilmFit] = useState(initialMobileFilmView === "fit");');
+    expect(source).toContain('data-mobile-view={mobileFilmFit ? "fit" : "focus"}');
+    // The button flips the view through the named pure toggle, and only that.
+    expect(source).toContain("onClick={() => setMobileFilmFit(toggleMobileFilmFit)}");
+    expect(toggleMobileFilmFit(true)).toBe(false);
+    expect(toggleMobileFilmFit(false)).toBe(true);
+    expect(source).toContain('aria-pressed={!mobileFilmFit}');
+    expect(source).toContain("if (!viewport || !narrow || mobileFilmFit) return;");
+    expect(source).toContain('const NARROW_FRAME = "(max-width: 899px), (pointer: coarse) and (max-width: 1023px)";');
+    // This setter belongs only to the explicit button: tabs and viewport changes preserve the choice.
+    expect(source.match(/setMobileFilmFit\(/g)).toHaveLength(1);
   });
 });

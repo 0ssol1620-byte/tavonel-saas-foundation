@@ -46,8 +46,9 @@ test.describe("visual continuity — locked film side", () => {
       Scene 02, and the public question tabs remain in Scene 03. The retired One-Path markup
       (.one-path-world-stage, one-path-works-film) still stays out.
     */
-    await expect(page.getByRole("tablist")).toHaveCount(3);
-    await expect(page.locator("#s1 .compile-film-stages").getByRole("tab")).toHaveCount(4);
+    await expect(page.getByRole("tablist")).toHaveCount(2);
+    await expect(page.locator("#s1 .compile-film-stages").getByRole("tab")).toHaveCount(0);
+    await expect(page.locator("#s1 .paper-source").locator("blockquote")).not.toBeEmpty();
     await expect(page.locator("#s1 .compile-film-stage-disclosure")).toHaveCount(0);
     await expect(page.locator("#s2 [data-compiler-specimen]").getByRole("tab")).toHaveCount(5);
     await expect(page.locator("#s3").getByRole("tab")).toHaveCount(3);

@@ -1,4 +1,4 @@
-import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
+import { listOAuthSourcePage, OAUTH_SOURCE_PAGE_SIZE, type OAuthSourcePage, type OAuthSourceTarget } from "./connector-oauth-adapters";
 import { canAdmitCustomerSource } from "./customer-data-admission";
 import { readOAuthProviderRuntime, refreshOAuthAccessToken } from "./connector-oauth";
 import { readOAuthSecret, readOAuthSecretBrokerConfig } from "./connector-oauth-secrets";
@@ -9,6 +9,7 @@ import { importSourceObject } from "./source-import";
 import { requestConnectorSourceDeletion, suspendConnectorSource } from "./connector-source-access";
 import { loadConnectorSyncPage } from "./connector-sync-page";
 import { listGoogleDriveLifecyclePage } from "./google-drive-lifecycle";
+import { reconcileDropboxSourcePage } from "./dropbox-source-reconciliation";
 
 // The worker that actually moves a connector sync forward.
 //
@@ -59,6 +60,12 @@ const PERMANENT_SOURCE_SKIPS = new Set([
   "SOURCE_TOO_LARGE",
   "SOURCE_NATIVE_TYPE_UNSUPPORTED",
   "SOURCE_SIZE_UNQUALIFIED",
+  /*
+    The provider affirmatively named a different current revision, or no longer has the file. The
+    page is a stored snapshot, so retrying it would refuse the same stale entry forever; the change
+    feed delivers the newer revision or the deletion after this page's cursor. Nothing is bound.
+  */
+  "SOURCE_REVISION_SUPERSEDED",
 ]);
 const DAILY_QUOTA_RETRY_SECONDS = 60 * 60;
 
@@ -82,6 +89,14 @@ function encodeSyncCursor(providerCursor: string | null, pageOffset: number): st
   if (pageOffset === 0) return providerCursor;
   const encoded = `${SYNC_CURSOR_PREFIX}${pageOffset}:${providerCursor ?? ""}`;
   return encoded.length <= MAX_SYNC_CURSOR_CHARS ? encoded : null;
+}
+
+// Mirrors reconcile_dropbox_source_page: a DeletedMetadata removes its path and every descendant.
+function removedLaterOnPage(page: OAuthSourcePage, index: number): boolean {
+  const path = page.items[index]?.providerPath;
+  if (!path) return false;
+  return page.items.slice(index + 1).some(later => later.kind === "deleted" && later.providerPath !== undefined
+    && (path === later.providerPath || path.startsWith(`${later.providerPath}/`)));
 }
 
 // Runs one batch for a claimed source_import job and reports the outcome through the queue.
@@ -201,7 +216,7 @@ export async function runSourceImportBatch(
     return { ok: false, code: "JOB_CURSOR_INVALID" };
   }
 
-  let page: { items: OAuthSourceItem[]; cursor: string | null; complete: boolean };
+  let page: OAuthSourcePage;
   try {
     page = await loadConnectorSyncPage(job, workerId, resume.providerCursor, resume.pageOffset, () => {
       if (lifecycleReader) {
@@ -232,31 +247,57 @@ export async function runSourceImportBatch(
   // A removal may also mean lost access. Until source identity and revocation are
   // durably connected, consuming it as an unsupported file would lose the event.
   // Inspect the remaining page before admitting bytes or advancing any checkpoint.
-  if (page.items.slice(resume.pageOffset).some(item => item.kind === "deleted")) {
-    for (const item of page.items.slice(resume.pageOffset).filter(item => item.kind === "deleted")) {
-      const suspended = await suspendConnectorSource({ workspaceKey: job.workspaceKey,
-        connectionId: job.oauthConnectionId, provider: binding.provider, nativeId: item.nativeId });
-      if (!suspended.ok) {
-        const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-          outcome: "retry", errorCode: suspended.code,
-        });
-        return { ok: false, code: reported.ok ? suspended.code : reported.code };
-      }
-      const deleted = await requestConnectorSourceDeletion({
-        workspaceKey: job.workspaceKey,
-        connectionId: job.oauthConnectionId,
-        provider: binding.provider,
-        nativeId: item.nativeId,
-        reason: "removalReason" in item && item.removalReason === "removed_or_inaccessible"
-          ? "provider_inaccessible"
-          : "provider_deleted",
+  //
+  // Dropbox names a removal by path alone. Its whole stored page goes through reconciliation on
+  // every turn (a replay returns the page's receipt): removals resolve to the id observed at that
+  // path and wait for the listing boundary, so a move split across pages keeps its source. Every
+  // other provider removes by stable id, immediately.
+  let removals: Array<{ nativeId: string; reason: "provider_deleted" | "provider_inaccessible" }> = [];
+  if (binding.provider === "dropbox") {
+    const reconciled = await reconcileDropboxSourcePage(job, workerId, resume.providerCursor);
+    if (!reconciled.ok) {
+      // An unresolved or legacy path is not retryable into meaning; neither outcome moves the cursor.
+      const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+        // A non-canonical stream (DROPBOX_SOURCE_STREAM_INVALID) is refused the same way.
+        outcome: reconciled.code === "DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE" ? "retry" : "failed",
+        errorCode: reconciled.code,
       });
-      if (!deleted.ok) {
-        const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
-          outcome: "retry", errorCode: deleted.code,
-        });
-        return { ok: false, code: reported.ok ? deleted.code : reported.code };
+      return { ok: false, code: reported.ok ? reconciled.code : reported.code };
+    }
+    removals = reconciled.suspend.map(nativeId => ({ nativeId, reason: "provider_deleted" as const }));
+  } else {
+    for (const item of page.items.slice(resume.pageOffset)) {
+      if (item.kind !== "deleted") continue;
+      if (item.nativeId === null) {
+        // Only Dropbox has a reconciler for path-only removals; never acknowledge one silently.
+        await completeJobBatch(job.workspaceKey, job.jobId, workerId, { outcome: "failed", errorCode: "CONNECTOR_PAGE_INVALID" });
+        return { ok: false, code: "CONNECTOR_PAGE_INVALID" };
       }
+      removals.push({ nativeId: item.nativeId,
+        reason: "removalReason" in item && item.removalReason === "removed_or_inaccessible" ? "provider_inaccessible" : "provider_deleted" });
+    }
+  }
+  for (const removal of removals) {
+    const suspended = await suspendConnectorSource({ workspaceKey: job.workspaceKey,
+      connectionId: job.oauthConnectionId, provider: binding.provider, nativeId: removal.nativeId });
+    if (!suspended.ok) {
+      const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+        outcome: "retry", errorCode: suspended.code,
+      });
+      return { ok: false, code: reported.ok ? suspended.code : reported.code };
+    }
+    const deleted = await requestConnectorSourceDeletion({
+      workspaceKey: job.workspaceKey,
+      connectionId: job.oauthConnectionId,
+      provider: binding.provider,
+      nativeId: removal.nativeId,
+      reason: removal.reason,
+    });
+    if (!deleted.ok) {
+      const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, {
+        outcome: "retry", errorCode: deleted.code,
+      });
+      return { ok: false, code: reported.ok ? deleted.code : reported.code };
     }
   }
   const batch = page.items.slice(resume.pageOffset, resume.pageOffset + SYNC_BATCH_SIZE);
@@ -264,10 +305,17 @@ export async function runSourceImportBatch(
   let imported = 0;
   let processed = 0;
 
-  for (const item of batch) {
+  for (const [index, item] of batch.entries()) {
     if (item.kind === "deleted") {
       // Suspension and the legal-hold-gated tombstone were committed in the pre-pass above.
       // Counting the event advances the durable page offset without ever treating it as bytes.
+      processed += 1;
+      continue;
+    }
+    // list_folder is ordered: a removal of this path (or an ancestor) later on the same page
+    // ends this entry, and reconciliation already staged it. Importing it would bind a source
+    // the boundary has already judged.
+    if (binding.provider === "dropbox" && removedLaterOnPage(page, resume.pageOffset + index)) {
       processed += 1;
       continue;
     }

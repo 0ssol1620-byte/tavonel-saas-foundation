@@ -131,7 +131,9 @@ describe("solution proof sample", () => {
     expect(source).toContain('data-proof-variant="excerpt"');
     expect(source).toContain('data-proof-variant="crop"');
     const solutions = readFileSync(join(process.cwd(), "app/solutions/[slug]/page.tsx"), "utf8");
-    expect(solutions).toContain('<SolutionProofSample pick={solution.proof} variant="excerpt" />');
+    expect(solutions).toContain('<SolutionWorkflowProof kind={slug as SolutionSlug} pick={solution.proof} />');
+    const workflow = readFileSync(join(process.cwd(), "app/solutions/solution-workflow-proof.tsx"), "utf8");
+    expect(workflow).toContain('<SolutionProofSample pick={selectedPick} variant="excerpt" />');
     const read = readFileSync(join(process.cwd(), "app/product/document-understanding/page.tsx"), "utf8");
     expect(read).toContain('variant="crop"');
     // BQ-077: and at the content width, not inside the 420px title rail.

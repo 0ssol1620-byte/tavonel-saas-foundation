@@ -1,0 +1,333 @@
+name: Repair scope
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: repair-scope-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  repair-scope:
+    name: Repair scope validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: nextjs
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      REPAIR_ANCHOR_SHA: 6401c3524b5294f3a395acede35e4632eb89c0fb
+      REPAIR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - name: Plan changes since the authenticated full-pass anchor
+        id: plan
+        env:
+          RUN_REPAIR_SCOPE: "1"
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/repair-collector-only.mjs plan
+      - name: Verify workflow and selector contracts
+        id: workflow-static
+        if: steps.plan.outputs.workflow_static == 'true'
+        run: node scripts/verify-repair-workflows.mjs
+      - name: Run selector regression tests
+        id: selector-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        if: steps.plan.outputs.selector_tests == 'true'
+        run: |
+          if [ '${{ steps.plan.outputs.native_race }}' = true ]; then
+            node --test scripts/db/native-world-race.test.mjs scripts/db/native-world-race-ci.test.mjs
+            node --test --test-name-pattern='native world race' scripts/repair-collector-only.test.mjs
+          elif [ '${{ steps.plan.outputs.native_database }}' = true ] || [ '${{ steps.plan.outputs.public_pages }}' = true ] || [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
+            node --test scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs scripts/repair-known-regression.test.mjs
+          elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ] || [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+            node --test scripts/repair-known-regression.test.mjs scripts/repair-collector-only.test.mjs scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
+            node --test scripts/repair-collector-only.test.mjs
+          elif [ '${{ steps.plan.outputs.affected }}' = true ]; then
+            node --test --test-name-pattern='^affected ' scripts/repair-scope.test.mjs scripts/repair-collector-only.test.mjs scripts/db/native-world-race-ci.test.mjs
+          else
+            node --test scripts/repair-scope.test.mjs
+          fi
+      - name: Run browser report and screenshot regressions
+        id: browser-report-tests
+        if: steps.plan.outputs.workflow_static == 'true'
+        # The native World race plan selects no browser file: only the race helper's static workflow/route contracts run here,
+        # never the full historical repair-scope suite. Every other plan keeps its existing route below.
+        run: |
+          if [ '${{ steps.plan.outputs.native_race }}' = true ]; then
+            node --test --test-name-pattern='native world race static: affected' scripts/db/native-world-race-ci.test.mjs
+          elif [ '${{ steps.plan.outputs.intake_presentation }}' = true ]; then
+            node --test scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.solutions_pages }}' = true ]; then
+            node --test scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.known_regression_repair }}' = true ]; then
+            node --test --test-name-pattern='targeted regression transitive' scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.collector_only }}' = true ]; then
+            node --test --test-name-pattern='mounted|collector|report|browser project|browser groups|Playwright' scripts/repair-scope.test.mjs
+          elif [ '${{ steps.plan.outputs.affected }}' = true ]; then
+            node --test --test-name-pattern='native world race static: affected' scripts/db/native-world-race-ci.test.mjs
+          else
+            node --test scripts/repair-scope.test.mjs
+          fi
+      - run: pnpm install --frozen-lockfile
+      - name: Scan repository secrets
+        id: secrets
+        run: pnpm scan:secrets
+        continue-on-error: true
+      - name: Run TypeScript and lint checks
+        id: check
+        run: pnpm check
+        continue-on-error: true
+      # The exact producer package adds its ninth suite to this same normal npm test; no second install.
+      - name: Run the normal CDR worker unit suite and types for reviewed OCR safety
+        id: cdr-worker
+        if: >-
+          steps.plan.outputs.cdr_worker == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success'
+        working-directory: quarantine-sidecar/foundation-cdr-worker
+        # Preserve the actual failure for the final gate while independent browser checks continue.
+        continue-on-error: true
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          node node_modules/typescript/bin/tsc --noEmit
+      - name: Run Foundation focused unit checks
+        id: targeted-vitest
+        if: steps.plan.outputs.broader != 'true' && steps.plan.outputs.unit == 'true'
+        run: node scripts/run-repair-check.mjs unit
+        continue-on-error: true
+      - name: Run hermetic full Vitest for shared or unknown changes
+        id: full-vitest
+        if: steps.plan.outputs.broader == 'true'
+        run: node scripts/run-hermetic-vitest.mjs
+        continue-on-error: true
+      - name: Run the exact repair API catalogue readers separately
+        id: known-repair-catalogue
+        if: steps.plan.outputs.known_regression_repair == 'true'
+        run: node scripts/repair-known-regression.mjs catalogue
+        continue-on-error: true
+      - name: Run script contract suite for shared or unknown changes
+        id: full-scripts
+        if: steps.plan.outputs.broader == 'true'
+        run: pnpm test:scripts
+        continue-on-error: true
+      - name: Install Chromium for detail-integrity coverage
+        id: browser-install
+        if: >-
+          steps.plan.outputs.browser == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success' &&
+          ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
+           (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
+          (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
+        run: pnpm exec playwright install --with-deps chromium
+        continue-on-error: true
+      - name: Build the isolated live-commerce test bundle after scoped checks
+        id: browser-build
+        if: >-
+          steps.plan.outputs.browser == 'true' &&
+          steps.plan.outcome == 'success' &&
+          steps.secrets.outcome == 'success' &&
+          steps.check.outcome == 'success' &&
+          ((steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome == 'success' && steps.full-scripts.outcome == 'success') ||
+           (steps.plan.outputs.broader != 'true' && (steps.plan.outputs.unit != 'true' || steps.targeted-vitest.outcome == 'success'))) &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.workflow-static.outcome == 'success') &&
+          (steps.plan.outputs.workflow_static != 'true' || steps.browser-report-tests.outcome == 'success') &&
+          (steps.plan.outputs.selector_tests != 'true' || steps.selector-tests.outcome == 'success')
+        env:
+          COMMERCIAL_MODE: live
+          TAVONEL_BILLING_LAUNCH_APPROVED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: foundation-browser-e2e-anon-key
+          PLAYWRIGHT_LOCAL_HTTP: "1"
+        run: pnpm exec next build
+        continue-on-error: true
+      - name: Run selected browser checks against one production server
+        id: browser
+        if: steps.browser-build.outcome == 'success'
+        env:
+          COMMERCIAL_MODE: live
+          TAVONEL_BILLING_LAUNCH_APPROVED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: foundation-browser-e2e-anon-key
+          PLAYWRIGHT_LOCAL_HTTP: "1"
+        run: node scripts/run-repair-check.mjs browser
+        continue-on-error: true
+      - name: Require the four synthetic mounted intake preflight capture pairs
+        id: workspace-intake-captures
+        if: always() && steps.plan.outputs.workspace_intake_capture == 'true'
+        run: node scripts/run-repair-check.mjs intake-captures
+      - name: Upload only the four named synthetic mounted intake preflight capture pairs
+        if: always() && steps.workspace-intake-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-mounted-intake-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-1440x900.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-1440x900.json
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-390x844.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-review-390x844.json
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-1440x900.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-1440x900.json
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-390x844.png
+            nextjs/test-results/repair-scope-intake-mounted/intake-mounted-receipt-390x844.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require screenshots for the exact paired public UI candidate
+        id: public-ui-screenshots
+        if: always() && steps.plan.outputs.public_ui_capture == 'true'
+        shell: bash
+        run: |
+          mapfile -t screenshots < <(find test-results/repair-scope-playwright-* -type f -name 'public-ui-*.png' -printf '%f\n' 2>/dev/null | sort)
+          expected=(
+            public-ui-desktop-1440x900-docs-mcp.png
+            public-ui-desktop-1440x900-home.png
+            public-ui-desktop-1440x900-pricing.png
+            public-ui-mobile-390x844-docs-mcp.png
+            public-ui-mobile-390x844-home.png
+            public-ui-mobile-390x844-pricing.png
+          )
+          if (( ${#screenshots[@]} != ${#expected[@]} )) || ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${screenshots[@]}"); then
+            echo "::error::Expected the exact six paired public-ui PNGs; found ${#screenshots[@]}."
+            exit 1
+          fi
+      - name: Upload bounded public UI screenshots
+        if: always() && steps.public-ui-screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-ui-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: nextjs/test-results/**/public-ui-*.png
+          if-no-files-found: warn
+          retention-days: 3
+      # Only the local intake fixture's rendered failure context and screenshots.
+      # Exclude traces, auth/storage state, uploads, reports and other workspace files.
+      - name: Upload bounded synthetic intake browser failure diagnostics
+        if: always() && steps.browser.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intake-browser-failure-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/error-context.md
+            nextjs/test-results/repair-scope-playwright-*/workspace-intake-triage-*/test-failed-*.png
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Require exact file-backed Home and Pricing captures
+        id: home-pricing-captures
+        if: always() && steps.plan.outputs.home_pricing_capture == 'true'
+        run: node scripts/run-repair-check.mjs home-pricing-captures
+      - name: Upload only the ten named public Home and Pricing captures
+        if: always() && steps.home-pricing-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-pricing-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-home-pricing/home-source-phone-360.png
+            nextjs/test-results/repair-scope-home-pricing/home-source-phone-390.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-1440-consent-visible.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-1440-consent-dismissed.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-390-consent-visible.png
+            nextjs/test-results/repair-scope-home-pricing/home-first-screen-390-consent-dismissed.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-en-390.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-en-1440.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-ko-390.png
+            nextjs/test-results/repair-scope-home-pricing/pricing-overview-ko-1440.png
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require sixteen exact file-backed public product captures
+        id: public-product-captures
+        if: always() && steps.plan.outputs.public_product_capture == 'true'
+        run: node scripts/run-repair-check.mjs public-product-captures
+      - name: Upload only sixteen named public product captures
+        if: steps.plan.outputs.public_product_capture == 'true' && steps.public-product-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-product-captures-${{ github.event.pull_request.head.sha }}
+          path: |
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-320px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-320px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-360px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-360px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-390px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-390px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-768px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-768px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-1440px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-1440px.png
+            nextjs/test-results/repair-scope-public-product/package-proof-initial-canonical-open-1440px-at-200-percent.png
+            nextjs/test-results/repair-scope-public-product/package-proof-content-scrolled-1440px-at-200-percent.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-default-390.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-expanded-390.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-default-1440.png
+            nextjs/test-results/repair-scope-public-product/continuous-knowledge-expanded-1440.png
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require exactly 104 named Solutions captures
+        id: solutions-captures
+        if: always() && steps.plan.outputs.solutions_capture == 'true'
+        run: node scripts/run-repair-check.mjs solutions-captures
+      - name: Upload only named Solutions captures
+        if: always() && steps.solutions-captures.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: solutions-workflows-${{ github.event.pull_request.head.sha }}
+          path: nextjs/test-results/repair-scope-solutions/
+          if-no-files-found: error
+          retention-days: 3
+      - name: Fail closed on missing or failed scoped checks
+        id: gate
+        if: always()
+        env:
+          PLAN_RESULT: ${{ steps.plan.outcome }}
+          API_CATALOGUE_RESULT: ${{ steps.known-repair-catalogue.outcome }}
+          TARGETED_REPAIR_UNIT_RESULT: ${{ steps.targeted-vitest.outcome }}
+          TRANSITIVE_TEST_RESULT: ${{ steps.browser-report-tests.outcome }}
+          GH_TOKEN: ${{ github.token }}
+          SECRET_RESULT: ${{ steps.secrets.outcome }}
+          CHECK_RESULT: ${{ steps.check.outcome }}
+          VITEST_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-vitest.outcome || (steps.plan.outputs.unit == 'true' && steps.targeted-vitest.outcome) || 'success' }}
+          AUX_RESULT: ${{ steps.plan.outputs.broader == 'true' && steps.full-scripts.outcome || 'success' }}
+          WORKFLOW_RESULT: ${{ steps.plan.outputs.workflow_static == 'true' && steps.workflow-static.outcome || 'success' }}
+          CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}
+          WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}
+          PUBLIC_UI_CAPTURE_RESULT: ${{ steps.public-ui-screenshots.outcome }}
+          PUBLIC_PRODUCT_CAPTURE_RESULT: ${{ steps.public-product-captures.outcome }}
+          SOLUTIONS_CAPTURE_RESULT: ${{ steps.solutions-captures.outcome }}
+          HOME_PRICING_CAPTURE_RESULT: ${{ steps.home-pricing-captures.outcome }}
+          SELECTOR_TEST_RESULT: ${{ steps.plan.outputs.selector_tests == 'true' && steps.selector-tests.outcome || 'success' }}
+          BROWSER_BUILD_RESULT: ${{ steps.browser-build.outcome }}
+          BROWSER_INSTALL_RESULT: ${{ steps.browser-install.outcome }}
+          BROWSER_RESULT: ${{ steps.browser.outcome }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/repair-scope-gate.mjs
+      - name: Publish exact-head scope receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-scope-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: nextjs/repair-receipt.json
+          if-no-files-found: error
+          retention-days: 30

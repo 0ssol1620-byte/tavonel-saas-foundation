@@ -1,8 +1,9 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS } from "@/lib/compile-limits";
-import type { RecipeIntent } from "@/lib/recipe-intent";
+import { RECIPE_START, type RecipeIntent } from "@/lib/recipe-intent";
 import {
   MAX_UNITS_PER_PAGE,
   PROCESSING_UNIT_USD,
@@ -31,9 +32,16 @@ import {
 export function RecipePreflight({
   intent,
   pages = null,
+  omitLanding = false,
 }: {
   intent: RecipeIntent;
   pages?: number | null;
+  /**
+   * Drops the "where you land" row where it is not the next thing that happens: after sign-in it
+   * gives way to the continuation, and where storage is blocked the resume it promises cannot
+   * happen.
+   */
+  omitLanding?: boolean;
 }) {
   const team = BILLING_OFFERS.studio_access;
   const developer = BILLING_OFFERS.observer_access;
@@ -79,7 +87,7 @@ export function RecipePreflight({
         )}
         . A free evaluation compiles, reviews and exports; its activation request is refused.
       </li>
-      <li>
+      {omitLanding ? null : <li>
         {/*
           A plain anchor, not `next/link`. `returnTo` is one of `RETURN_TO_PATHS`, and the cookbook
           half of that list is typed-routes-unknown until the cookbook route exists -- so a `Link`
@@ -87,9 +95,63 @@ export function RecipePreflight({
           destination is still a closed allow-list, which is the property that matters, and a
           full navigation is what the sign-in hop does anyway.
         */}
-        <b>Where you land.</b> Signing in brings you back to{" "}
-        <a href={intent.returnTo}>the page you started from</a>, with the same recipe.
-      </li>
+        <b>Where you land.</b> Signing in brings you to this recipe&rsquo;s first step with nothing
+        run, and <a href={intent.returnTo}>the page you started from</a> stays one link away.
+      </li>}
     </ul>
+  );
+}
+
+/**
+ * The same recipe, once the reader is signed in.
+ *
+ * The sign-in used to end on the cookbook page, which is server-rendered text that cannot know a
+ * sign-in just happened -- so the reader was shown the same "Start this recipe" button again, and
+ * pressing it bounced them to an empty workspace. This is the step that was missing: the same
+ * preflight, then one link to where the recipe's first step actually lives.
+ *
+ * Every action is a link the reader presses. Nothing here uploads, compiles, activates or opens a
+ * checkout, and the destination comes from `RECIPE_START` by the closed recipe id -- the URL that
+ * brought the reader here cannot name it. `processing` is the deployment's customer-processing
+ * gate from `/api/status`; until it has answered `true`, a recipe that needs the reader's files
+ * points at the workspace home rather than at a file picker the deployment would refuse.
+ */
+export function RecipeContinuation({
+  intent,
+  processing,
+}: {
+  intent: RecipeIntent;
+  processing: boolean | null;
+}) {
+  const start = RECIPE_START[intent.recipeId];
+  const needsFiles = start === "/workspace/sources";
+  const ready = start !== null && (!needsFiles || processing === true);
+  const href = (ready && start) || "/workspace";
+  const label = !ready ? "Open your workspace"
+    : needsFiles ? "Choose your documents"
+      : "Open the developer page";
+  const next = start === null
+    ? "This recipe has no starting control in the workspace yet. Its page lists the next steps, including who to talk to."
+    : needsFiles && processing === null
+      ? "Checking whether this deployment accepts customer files."
+      : needsFiles && processing === false
+        ? "Customer file processing is not open on this deployment yet, so this recipe cannot take your files here today. The workspace shows where your access stands."
+        : needsFiles
+          ? "Files you choose are counted and quoted before anything is processed, and nothing runs until you confirm the quote."
+          : "Keys are issued there only if your plan includes them.";
+
+  return (
+    <>
+      <p className="notice static" role="status">
+        <strong>You are signed in, and nothing has run.</strong> Signing in did not upload,
+        compile, activate or charge anything, and it did not change your plan.
+      </p>
+      <RecipePreflight intent={intent} omitLanding />
+      <p className="fine">{next}</p>
+      <div className="auth-actions">
+        <Link className="btn" href={href as Route}>{label}</Link>
+        <a className="btn ghost" href={intent.returnTo}>Back to the recipe</a>
+      </div>
+    </>
   );
 }

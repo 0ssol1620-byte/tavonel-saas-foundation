@@ -94,13 +94,13 @@ describe("the solutions hub", () => {
     first impression -- five cards that end on a complaint under a rule line, that look clickable
     and are not, under a heading whose descriptor slot is filled with our own brand name.
   */
-  it("ends each card on the product rather than on the difficulty", () => {
+  it("makes the task concrete before a reader opens a detail", () => {
     const card = shipped.match(/<article className=\{`tile \$\{styles\.card\}`\}[\s\S]*?<\/article>/)?.[0] ?? "";
     expect(card, "the card markup is still where this can read it").not.toBe("");
-    expect(card.indexOf("styles.problem"), "the problem comes before what the workflow gives you")
-      .toBeLessThan(card.indexOf("{solution.lede}"));
-    // The hairline that closed each card, and stopped 15% short of its edge at 390 (BA-055).
-    expect(read("../app/solutions/solutions.module.css")).not.toMatch(/\.problem \{[^}]*border-top/);
+    expect(card).toContain('aria-label="Input, action and output"');
+    for (const field of ["input", "action", "output"]) expect(card).toContain(`{solution.task.${field}}`);
+    expect(card).toContain('variant="thumb"');
+    expect(card).not.toContain("{solution.problem}");
   });
 
   it("makes the whole card the target it looks like", () => {

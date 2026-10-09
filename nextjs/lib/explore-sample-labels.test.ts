@@ -26,7 +26,7 @@ describe("the Explore sample says what it is", () => {
   });
 
   it("prints the capture date, the scope and the words read-only sample", () => {
-    const stage = read("../components/explore/explore-stage.tsx");
+    const stage = read("../components/explore/evidence-workbench.tsx");
     expect(stage).toContain("Read-only sample · sources captured {capturedOn}");
     expect(stage).toContain("{technical.documents.length} public");
   });

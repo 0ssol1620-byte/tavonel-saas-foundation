@@ -19,27 +19,14 @@
 export type SiteLink = { href: string; label: string };
 
 /*
-  Customer entry points. Technical and trust destinations remain in the footer and docs.
-
-  Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five, and the bar is the
-  reader's map of the site rather than the three destinations a pilot visitor was steered to.
-
-  "How it works" moves off /product and onto /knowledge-compiler. /product is a hub of four
-  surface cards -- it says what the parts are called, not how the thing works -- while the compile
-  contract, the four stages and the comparison with RAG, graphs and search are all written on
-  /knowledge-compiler. /product takes its own name back, which is also the label its <title> and
-  its H1 already use.
-
-  Integrations leaves the bar. It is one Product-group destination among several and it was
-  holding a top-level slot while Docs and Resources -- the two things an evaluating engineer looks
-  for first -- had none. It is still a footer row, still linked from /sources, and its URL has not
-  moved.
+  Customer entry points. Keep the four first questions visible: what it is, what the public sample
+  shows, where developers can start, and what access costs. All destinations already exist; the
+  navigation names routes without creating a new page hierarchy.
 */
 export const CUSTOMER_NAV: readonly SiteLink[] = [
   { href: "/product", label: "Product" },
-  { href: "/knowledge-compiler", label: "How it works" },
-  { href: "/resources", label: "Resources" },
-  { href: "/docs", label: "Docs" },
+  { href: "/explore", label: "Explore" },
+  { href: "/developers", label: "Developers" },
   { href: "/pricing", label: "Pricing" },
 ] as const;
 
@@ -47,27 +34,25 @@ export const CUSTOMER_NAV: readonly SiteLink[] = [
 export const HEADER_NAV: readonly SiteLink[] = CUSTOMER_NAV.filter((link) => link.href !== "/pricing");
 
 /*
-  The routes a bar item speaks for that do not sit underneath it.
-
-  /sources used to be here, under Integrations, and it is deliberately not reassigned: no item in
-  the five-link bar is the section /sources belongs to, so marking one of them current while a
-  reader is on that page would tell them something false about where they are. It stays reachable
-  from the footer's Product group and from /integrations itself.
-
-  Resources owns the five pages its hub collects that have no bar item of their own. /explore,
-  /docs, /api and /knowledge-compiler are excluded on purpose: two of them are bar items in their
-  own right (Docs owns /docs and everything under it), /explore is the product, and /api is a
-  Developers page the bar does not carry.
+  A bar item also owns the pages nested under its section. Product carries its use cases and
+  source routes; Developers carries its documentation, API reference, changelog and cookbooks.
+  Research and trust routes stay in the footer directory.
 */
 const NAV_ALSO_OWNS: Readonly<Record<string, readonly string[]>> = {
-  "/resources": ["/research", "/evidence", "/reproducibility", "/benchmarks", "/changelog"],
+  "/product": ["/solutions", "/sources", "/integrations", "/knowledge-compiler"],
+  "/developers": ["/docs", "/api", "/changelog", "/cookbooks"],
 };
 
-export function customerNavOwns(href: string, pathname: string): boolean {
+export function customerNavCurrent(href: string, pathname: string): "page" | "location" | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
   // A prefix is only a prefix at a segment boundary: /productivity is not under /product.
   const under = (prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
-  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href);
+  if (path === href) return "page";
+  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href) ? "location" : undefined;
+}
+
+export function customerNavOwns(href: string, pathname: string): boolean {
+  return customerNavCurrent(href, pathname) !== undefined;
 }
 
 /* ==================================================================== BA-232 / BA-252: vocabulary
@@ -141,20 +126,11 @@ export const BRAND_LINE = {
 export const KO_CHROME = {
   cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
   signIn: "로그인",
-  /*
-    BQ-013 / D12. The three primary destinations, keyed by href for the same reason the two CTA
-    labels are: a label exists here only where `CUSTOMER_NAV` already points, so this table cannot
-    invent a sixth section. Literal translations of the English labels -- a translation is not a
-    new claim, and the primary nav vocabulary itself is the founder's. The spellings are the ones
-    `footerLinks` below already uses, with one deliberate difference: /knowledge-compiler carries
-    the bar's label ("How it works" / 작동 방식) rather than the page's name, because that is what
-    the English bar says there too.
-  */
+  /* Labels follow the same hrefs as the English primary navigation. */
   nav: {
     "/product": "제품",
-    "/knowledge-compiler": "작동 방식",
-    "/resources": "자료",
-    "/docs": "문서",
+    "/explore": "둘러보기",
+    "/developers": "개발자",
     "/pricing": "요금",
   } as Record<string, string>,
   menu: "메뉴",

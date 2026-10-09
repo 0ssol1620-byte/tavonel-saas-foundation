@@ -28,9 +28,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import Logomark from "@/components/logomark";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
-import { chooseExploreEntryProof, excerptPreview } from "@/lib/explore-entry-proof";
-import { sourcePageQualifier } from "@/lib/source-page-rasters";
+
+
 import WorldAct from "./world-act";
+import EvidenceWorkbench from "./evidence-workbench";
 import EvidenceAct from "./evidence-act";
 import ChangeAct from "./change-act";
 import AskOverlay from "./ask-overlay";
@@ -80,8 +81,6 @@ type Props = {
 export default function ExploreStage({ model, layout, change, answers, technical, capturedOn }: Props) {
   const reduced = useReducedMotion();
   const narrow = useNarrowStage();
-  const entryProof = useMemo(() => chooseExploreEntryProof(model.evidence, answers), [model.evidence, answers]);
-  const proofPreview = entryProof ? excerptPreview(entryProof.excerpt) : null;
 
   const opening = useMemo(() => {
     const claim = model.focus.find((id) => model.nodes.find((node) => node.id === id)?.kind === "Claim");
@@ -101,6 +100,17 @@ export default function ExploreStage({ model, layout, change, answers, technical
     const node = model.nodes.find((item) => item.id === opening);
     return node?.evidenceRefs[0] ?? model.evidence[0]?.id ?? "";
   });
+  /*
+    An `evidence` link that names a region this model cannot open. That is not the same as no
+    `evidence` parameter: an absent one lets `act` decide, but an explicit ID that does not resolve
+    must not be filled with the seeded fallback or a page-mate, because that shows a reader a
+    passage they did not ask for as if it were the one they did. The Evidence act says so instead,
+    and this clears when the URL is restored to something valid or the reader moves on.
+
+    Foundation 424: a flag, not the ID. The query string is untrusted input, so the stage never
+    echoes it back onto the page; the unavailable state is the same generic copy for every link.
+  */
+  const [evidenceUnavailable, setEvidenceUnavailable] = useState(false);
   const [askIndex, setAskIndex] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const returnAct = useRef<ExploreAct>("world");
@@ -109,6 +119,12 @@ export default function ExploreStage({ model, layout, change, answers, technical
     // Every act change goes through here -- the rail, the entry CTA, the deep link and the
     // openers -- so the change act is counted once rather than once per way in.
     if (next === "change_compare") trackFunnel("explore_change_opened");
+    const url = new URL(window.location.href);
+    if (next === "entry") url.searchParams.delete("act");
+    else url.searchParams.set("act", next);
+    url.searchParams.delete("evidence");
+    if (url.href !== window.location.href) window.history.pushState(null, "", url);
+    setEvidenceUnavailable(false);
     setAct(next);
     setSettled(true);
   }, []);
@@ -134,55 +150,68 @@ export default function ExploreStage({ model, layout, change, answers, technical
     [enter, narrow, selectNode],
   );
 
+  // The object a region is opened under: a Claim that holds it if one shipped, else any holder.
+  const ownerOf = useCallback(
+    (regionId: string) =>
+      model.nodes.find((node) => node.kind === "Claim" && node.evidenceRefs.includes(regionId)) ??
+      model.nodes.find((node) => node.evidenceRefs.includes(regionId)),
+    [model.nodes],
+  );
+
   const openRegion = useCallback(
     (regionId: string) => {
-      const owner =
-        model.nodes.find((node) => node.kind === "Claim" && node.evidenceRefs.includes(regionId)) ??
-        model.nodes.find((node) => node.evidenceRefs.includes(regionId));
+      const owner = ownerOf(regionId);
       if (owner) setSelectedId(owner.id);
       setEvidenceId(regionId);
       trackFunnel("explore_evidence_opened", { from: "region" });
       enter("evidence");
+      const url = new URL(window.location.href);
+      url.searchParams.set("evidence", regionId);
+      window.history.replaceState(null, "", url);
     },
-    [enter, model.nodes],
+    [enter, ownerOf],
   );
 
-  /*
-    What the URL asked for, read once after mount.
-
-    It sits below `openRegion` because a region link resolves through the same opener a click
-    does -- the region's owning object gets selected, the evidence id is set, and the act change
-    is counted once. A hand-rolled second path here would be the place the two drift apart.
-
-    `?evidence=<regionId>` wins over `?act=` when both are present: naming a region is the more
-    specific request, and it is always an Evidence-act request. An id the shipped World does not
-    hold resolves to `null` and the page falls through to the act (or to entry), so a stale link
-    still lands somewhere real rather than on an empty source sheet.
-  */
-  useEffect(() => {
+  // Reading a URL must not call the click openers: their pushState would discard the browser's
+  // forward entries when an evidence page is re-mounted after Back. Use the same restoration
+  // for initial links and popstate; only an explicit user action creates a history entry.
+  const restoreFromUrl = useCallback(() => {
     const query = new URLSearchParams(window.location.search);
-    const region = evidenceIdFromQuery(query.get("evidence") ?? undefined, model.evidence);
-    const requested = region ? "evidence" : actFromQuery(query.get("act") ?? undefined);
-    trackFunnel("explore_entered", { act: requested });
-    if (region) {
-      openRegion(region);
-      return;
-    }
-    if (requested !== "entry") {
-      enter(requested);
-      return;
-    }
+    const asked = query.get("evidence");
+    const found = evidenceIdFromQuery(asked ?? undefined, model.evidence);
     /*
-      The world settles behind the hero rather than after it (§17).
-
-      Arriving from the landing's last frame, the reader should be looking at the same world
-      through the entry copy, not at a black panel that turns into one when they click. So the
-      composition settles on mount and ENTER WORLD only lifts the scrim -- which is also why
-      entering costs nothing: there is no animation left to wait for.
+      Only the region the link names counts as resolved; any other answer would be a substitute.
+      And the exact region is not enough on its own: it resolves only together with a retained
+      owner that holds it, so the source sheet never opens under an object it does not belong to.
+      Either half missing is the unavailable state, not a nearby passage.
     */
-    const frame = window.requestAnimationFrame(() => setSettled(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, [enter, model.evidence, openRegion]);
+    const owner = asked !== null && found === asked ? ownerOf(found) : undefined;
+    const region = owner ? found ?? undefined : undefined;
+    const requested: ExploreAct = asked !== null ? "evidence" : actFromQuery(query.get("act") ?? undefined);
+    if (region && owner) {
+      setSelectedId(owner.id);
+      setEvidenceId(region);
+    } else if (asked !== null) {
+      setSelectedId(null);
+    }
+    setEvidenceUnavailable(asked !== null && !region);
+    setAct(requested);
+    setSettled(true);
+    return { requested, region };
+  }, [model.evidence, ownerOf]);
+
+  useEffect(() => {
+    const { requested, region } = restoreFromUrl();
+    trackFunnel("explore_entered", { act: requested });
+    if (region) trackFunnel("explore_evidence_opened", { from: "region" });
+    if (requested === "change_compare") trackFunnel("explore_change_opened");
+  }, [restoreFromUrl]);
+
+  useEffect(() => {
+    const restore = () => { restoreFromUrl(); };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [restoreFromUrl]);
 
   useEffect(() => {
     /*
@@ -291,7 +320,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
   const scene = act === "entry" ? "world" : act === "ask" ? returnAct.current : act;
   const railAct: ExploreAct = scene === "object_focus" ? "evidence" : scene;
   const selectedNode = model.nodes.find((node) => node.id === selectedId) ?? model.nodes[0];
-  const activeRegion = model.evidence.find((item) => item.id === evidenceId) ?? null;
+  const activeRegion =
+    evidenceUnavailable ? null : model.evidence.find((item) => item.id === evidenceId) ?? null;
 
   const selection: TechnicalSelection = {
     objectId: selectedNode.id,
@@ -304,7 +334,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
   };
 
   return (
-    <main id="main" className={styles.page}>
+    <main id="main" className={`${styles.page} paper-product`}>
       <header className={styles.header}>
         {/*
           chrome-01. One wordmark everywhere. The header, the footer and the share card set
@@ -364,6 +394,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
         {act === "entry" ? null : (
           <div className={styles.railRow}>
             <nav className={styles.rail} aria-label="Acts">
+              <button type="button" onClick={() => enter("entry")}>Content &amp; evidence</button>
               {EXPLORE_ACTS.map((entry) => (
                 <button
                   key={entry.act}
@@ -381,8 +412,8 @@ export default function ExploreStage({ model, layout, change, answers, technical
           </div>
         )}
 
-        <div className={styles.acts} inert={act === "entry"}>
-          {scene === "world" ? (
+        <div className={styles.acts} hidden={act === "entry"}>
+          {scene === "world" && act !== "entry" ? (
             <WorldAct
               model={model}
               layout={layout}
@@ -395,7 +426,24 @@ export default function ExploreStage({ model, layout, change, answers, technical
             />
           ) : null}
 
-          {scene === "object_focus" || scene === "evidence" ? (
+          {/*
+            Foundation 424. Generic copy: the requested ID is never rendered. The recovery action
+            reuses `.paneBack` -- the Evidence act's own back control, with its 44px minimum target
+            -- and returns through `enter("entry")`, the same sample navigation the rail uses, which
+            also clears the unavailable flag.
+          */}
+          {(scene === "object_focus" || scene === "evidence") && evidenceUnavailable ? (
+            <div role="alert" data-evidence-unavailable="1">
+              <h2>This passage is not available here</h2>
+              <p>
+                The link names a source region this sample cannot open. No other passage is shown in
+                its place.
+              </p>
+              <button type="button" className={styles.paneBack} onClick={() => enter("entry")}>
+                Browse the evidence in this sample
+              </button>
+            </div>
+          ) : scene === "object_focus" || scene === "evidence" ? (
             <EvidenceAct
               model={model}
               selectedId={selectedNode.id}
@@ -423,80 +471,7 @@ export default function ExploreStage({ model, layout, change, answers, technical
           ) : null}
         </div>
 
-        {act === "entry" ? (
-          <div className={styles.entry}>
-            <div className={styles.entryLayout}>
-              <div className={styles.entryCopy}>
-                <p className={styles.entryEyebrow}>Explore · no login required</p>
-                <h1>{EXPLORE_COPY.hero}</h1>
-                <p className={styles.entrySub}>{EXPLORE_COPY.sub}</p>
-                <button type="button" className={`btn ${styles.entryCta}`} onClick={() => enter("world")}>
-                  {EXPLORE_COPY.enter}
-                </button>
-                <div className={styles.entryPaths} aria-label="Other ways to explore">
-                  <button type="button" onClick={() => enter("change_compare")}>Compare filings</button>
-                  <button type="button" onClick={openAsk}>Try sample questions</button>
-                </div>
-              </div>
-              {entryProof && proofPreview ? (
-                <aside className={styles.entryProof} aria-label="Excerpt from the sample source" data-entry-proof="source-bound">
-                  <div className={styles.proofHeading}>
-                    <span>From the source</span>
-                  </div>
-                  <p className={styles.proofFiling}>
-                    {entryProof.form ?? "Public filing"}
-                    {entryProof.filingDate ? <span>Filed {entryProof.filingDate}</span> : null}
-                  </p>
-                  {/* BQ-072: the excerpt stops on a word boundary and says so with an ellipsis. */}
-                  <blockquote>{proofPreview.text}{proofPreview.truncated ? "…" : ""}</blockquote>
-                  <div className={styles.proofFoot}>
-                    <span>Page {entryProof.page} · {sourcePageQualifier(entryProof.representationKind)}</span>
-                    <button type="button" onClick={() => openRegion(entryProof.id)}>Open this source page</button>
-                  </div>
-                </aside>
-              ) : null}
-            </div>
-            {/*
-              WG-034 asks for three facts before anything else on this page: when the sources were
-              captured, how much material is in scope, and that this is a sample you read rather
-              than a compile you are watching. The first two are read off the fixture -- the
-              acquisition manifest's own timestamp and the documents actually compiled -- so
-              neither can drift from what the page is built from.
-            */}
-            <p className={styles.entryScope}>
-              Read-only sample · sources captured {capturedOn} · {technical.documents.length} public
-              filings · Follow the evidence back to its source
-            </p>
-            {/*
-              Audit E04 and G06, at the sample rather than two pages away, rewritten by BA-037.
-
-              Six scoping clauses in 11px type sat directly under the page's central promise --
-              one issuer, in English, cleanly scanned, one permission level, not a mixed internal
-              corpus, not a degraded scan -- and half of them were the page auditing itself in
-              front of a buyer. Both facts survive, in two sentences at a readable size, because
-              both are still load-bearing: the corpus is public so the result is re-derivable, and
-              what the read recovers is published in full rather than summarised here. The
-              capability manifest is the one document that carries the whole of the second half,
-              which is why one link can replace four clauses without losing anything.
-
-              The representativeness limit keeps one sentence rather than none. The audit's
-              replacement dropped it entirely, and nothing else on the site states it: /sources
-              publishes what the *read* recovers and /reproducibility publishes what the manifest
-              establishes, and neither says that this particular corpus is one clean English
-              issuer. A limitation is moved to where it belongs or compressed, never deleted -- so
-              the four clauses become one sentence that leads with what the corpus shows.
-            */}
-            <p className={styles.entryNote}>
-              This World is compiled from Apple’s public SEC filings, so you can re-derive every
-              result: the same inputs are downloadable as a{" "}
-              <Link href="/reproducibility">reproducibility manifest</Link>. One issuer’s clean,
-              English-language filings at a single permission level show the mechanism; they are
-              not a claim about a mixed internal corpus or a degraded scan. What this read
-              recovers, and what it does not, is published in full in the{" "}
-              <Link href="/sources">capability manifest</Link>.
-            </p>
-          </div>
-        ) : null}
+        {act === "entry" ? <EvidenceWorkbench model={model} answers={answers} technical={technical} capturedOn={capturedOn} onOpenRegion={openRegion} onRelations={() => enter("world")} onChanges={() => enter("change_compare")} /> : null}
 
         {act === "ask" ? (
           <AskOverlay

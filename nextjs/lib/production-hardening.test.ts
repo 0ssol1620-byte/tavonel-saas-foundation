@@ -34,7 +34,11 @@ describe("2026-09-05 production hardening", () => {
     expect(workspace).not.toContain("!activeWorld && !candidateNeedsDecision ? (");
     expect(workspace).toContain("Add more files while your published knowledge stays available.");
     expect(workspace).toContain("Add more files while the prepared version waits for your review.");
-    expect(workspace).toContain("Upload & compile");
+    const triageReview = workspace.replace(/\/\*[\s\S]*?\*\//g, "").match(/<IntakeTriageReview\b[\s\S]*?\n\s*\/>/)?.[0];
+    expect(triageReview).toBeDefined();
+    expect(triageReview).toContain("disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen}");
+    expect(triageReview).toContain("onLegacyFallback={() => void startStagedCompile()}");
+    expect(triageReview).toContain("onProcessingApproval={startTriageCompile}");
     expect(workspace).toContain("Compile one or more ready sources");
     expect(workspace).not.toContain("Compile at least two ready sources");
     expect(workspace).toContain('navigateSurface("connections")');
@@ -86,8 +90,8 @@ describe("2026-09-05 production hardening", () => {
     expect(stage).toContain("state?: CompileState | null");
     // Four chapters, and a position in them taken from the job record.
     expect(read("lib/compile-stage-view.ts")).toContain("const POSITION: Record<CompileState, number>");
-    expect(stage).toContain("PIPELINE_STAGES.forEach((stage, i)");
-    expect(stage).toContain('stopped ? "STOPPED" : "WAITING"');
+    expect(stage).toContain("PIPELINE_STAGES.map((stage, index)");
+    expect(stage).toContain('const stageState = failed ? "stopped" : attention ? "attention"');
   });
 
   /*

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const DISTRIBUTION_VERSION = "2026.9.20.1";
+const DISTRIBUTION_VERSION = "2026.10.2.1";
 const API_VERSION = "1";
 const SEARCH_LIMIT_MAX = 25;
 const PAGE_LIMIT_MAX = 50;
@@ -52,6 +52,9 @@ get_object, get_relation, get_evidence and download_package.
 Environment:
   TAVONEL_API_KEY   Scoped tvnl_live_... token (required except status)
   TAVONEL_BASE_URL  Defaults to https://tavonel.com
+  TAVONEL_CONSUMER_CONTEXT           Optional consumer-context JSON (needs consumer-context.mjs beside this file)
+  TAVONEL_CONSUMER_CONTEXT_REQUIRED  true refuses every API read without a usable, acknowledged context (unset, blank or false: off)
+  Consumer-context enforcement is local synthetic evidence only, not production API support.
 
 Version: ${DISTRIBUTION_VERSION} (API v${API_VERSION})`;
 }
@@ -60,11 +63,32 @@ function requireKey() {
   if (!apiKey.startsWith("tvnl_live_")) throw new Error("TAVONEL_API_KEY is required and must be a TAVONEL scoped key.");
 }
 
+/* Loaded only when a consumer context is configured, so the legacy CLI stays a single file. */
+let consumerContextBinding;
+async function consumerContext() {
+  if (consumerContextBinding !== undefined) return consumerContextBinding;
+  // consumer-context.mjs's own rule: a nonblank context, or a required flag that is neither blank
+  // nor false (trimmed, any case). An invalid flag still loads the module, which refuses it.
+  const flag = String(process.env.TAVONEL_CONSUMER_CONTEXT_REQUIRED ?? "").trim().toLowerCase();
+  const configured = String(process.env.TAVONEL_CONSUMER_CONTEXT ?? "").trim() !== "" || (flag !== "" && flag !== "false");
+  if (!configured) return (consumerContextBinding = null);
+  let module;
+  try {
+    module = await import(new URL("./consumer-context.mjs", import.meta.url).href);
+  } catch {
+    throw new Error("CONSUMER_CONTEXT_MODULE_UNAVAILABLE: consumer-context.mjs must sit beside tavonel-cli.mjs");
+  }
+  return (consumerContextBinding = module.createConsumerContextBinding({ env: process.env }));
+}
+
 async function request(path, options = {}) {
   requireKey();
+  const binding = await consumerContext();
+  const contextRequest = { method: options.method ?? "GET", path };
+  const contextHeaders = binding ? binding.prepare(contextRequest) : {};
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
-    headers: { authorization: `Bearer ${apiKey}`, accept: "application/vnd.tavonel.v1+json", ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers },
+    headers: { authorization: `Bearer ${apiKey}`, accept: "application/vnd.tavonel.v1+json", ...(options.body ? { "content-type": "application/json" } : {}), ...contextHeaders, ...options.headers },
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) {
@@ -73,6 +97,7 @@ async function request(path, options = {}) {
   }
   const responseVersion = response.headers.get("x-tavonel-api-version");
   if (responseVersion && responseVersion !== API_VERSION) throw new Error(`Unsupported API version ${responseVersion}; this CLI requires v${API_VERSION}.`);
+  if (binding) binding.verify(contextRequest, response);
   return response;
 }
 

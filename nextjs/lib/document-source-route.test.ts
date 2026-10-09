@@ -10,7 +10,7 @@ const { getUser, pilotAccess, productAccess, listObjects, signPdf, sourceAccess,
   acquire: vi.fn(), release: vi.fn(),
 }));
 vi.mock("@/lib/workspace-operation-guard", () => ({ acquireWorkspaceOperation: acquire }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: getUser, foundationPilotAccess: pilotAccess }));
 vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: productAccess }));

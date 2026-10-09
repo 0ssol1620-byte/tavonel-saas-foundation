@@ -13,6 +13,9 @@ import {
   PRODUCT_CORE_RESPONSE_SCHEMA,
   buildProductCoreV2Request,
   dispatchProductCoreV2,
+  productCoreV2CollectionId,
+  productCoreV2RevisionId,
+  legacyProductCoreV2CollectionId,
   projectProductCoreV2Candidate,
   readProductCoreV2Env,
   readRevisionCompileSnapshot,
@@ -59,6 +62,17 @@ function inputs(): CollectionOcrInput[] {
   });
 }
 
+it("keeps connector collection and Core native identity stable while immutable upload revisions change", () => {
+  const first = { ...inputs()[0], logicalSourceId: `src-${"a".repeat(64)}` };
+  const next = { ...first, documentId: "replacement-upload", versionKey: "b".repeat(64), inputSha256: sha("b"),
+    sourceImmutableKey: "immutable/new-upload/sanitized.pdf", sanitizedKey: "immutable/new-upload/sanitized.pdf", ocrJsonKey: "immutable/new-upload/ocr.json" };
+  expect(productCoreV2CollectionId("pilot-acme01", [first])).toBe(productCoreV2CollectionId("pilot-acme01", [next]));
+  expect(productCoreV2RevisionId("pilot-acme01", [first])).not.toBe(productCoreV2RevisionId("pilot-acme01", [next]));
+  expect(buildProductCoreV2Request("pilot-acme01", [next]).documents[0]).toMatchObject({ nativeId: first.logicalSourceId,
+    immutableObjectKey: next.sourceImmutableKey, sourceFilename: "replacement-upload.pdf" });
+  expect(() => buildProductCoreV2Request("pilot-acme01", [first,next])).toThrow("COLLECTION_SOURCE_IDENTITY_INVALID");
+});
+
 /** The validation record the Core sends and the projection now has to read rather than replace. */
 const CORE_CHECKS = {
   deterministicMaterialization: true,
@@ -93,7 +107,7 @@ const requiredPaths = [
 ];
 
 async function candidateFixture() {
-  const collectionId = "collection-00000000000000000000000000000001";
+  const collectionId = productCoreV2CollectionId("pilot", inputs());
   const files = await Promise.all(requiredPaths.map(async (path) => {
     const content = path === "validation/report.json"
       ? `${JSON.stringify({ status: "passed", reviewReasons: [] })}\n`
@@ -843,4 +857,89 @@ describe("the compiler contract clauses this projection has to keep", () => {
       "customer copy may not name an internal flag",
     ).not.toContain(CORE_V2_REVISION_COMPILE_FLAG);
   });
+});
+
+
+describe("K02 logical collection and input revision identities", () => {
+  it("keeps a collection across byte revisions but changes the input revision", () => {
+    const original = inputs();
+    const changed = original.map((document, index) => index ? document : {
+      ...document, versionKey: "c".repeat(64), inputSha256: sha("c"),
+    });
+    expect(productCoreV2CollectionId("pilot", changed)).toBe(productCoreV2CollectionId("pilot", original));
+    expect(productCoreV2RevisionId("pilot", changed)).not.toBe(productCoreV2RevisionId("pilot", original));
+    expect(legacyProductCoreV2CollectionId("pilot", changed)).not.toBe(legacyProductCoreV2CollectionId("pilot", original));
+  });
+
+  it("is invariant to input order, isolated by tenant, and distinguishes copied documents", () => {
+    const original = inputs();
+    expect(productCoreV2CollectionId("pilot", [...original].reverse())).toBe(productCoreV2CollectionId("pilot", original));
+    expect(productCoreV2RevisionId("pilot", [...original].reverse())).toBe(productCoreV2RevisionId("pilot", original));
+    expect(productCoreV2CollectionId("other", original)).not.toBe(productCoreV2CollectionId("pilot", original));
+    expect(productCoreV2CollectionId("pilot", [{ ...original[0], documentId: "copy" }])).not.toBe(productCoreV2CollectionId("pilot", [original[0]]));
+  });
+
+  it("keeps identity and revision ordering across the 12/13 transport boundary", () => {
+    const base = inputs()[0];
+    const thirteen = Array.from({ length: 13 }, (_, index) => ({ ...base, documentId: `source-${index}` }));
+    const ordered = buildProductCoreV2Request("pilot", thirteen);
+    const shuffled = buildProductCoreV2Request("pilot", [...thirteen.slice(12), ...thirteen.slice(0, 12).reverse()]);
+    expect(ordered.documents).toHaveLength(13);
+    expect(shuffled.documents).toEqual(ordered.documents);
+    expect(shuffled.collectionId).toBe(ordered.collectionId);
+    expect(shuffled.idempotencyKey).toBe(ordered.idempotencyKey);
+    // This is a transport contract, not proof of a cross-shard semantic reducer.
+  });
+
+  it("preserves an explicitly named logical collection across membership edits", () => {
+    expect(productCoreV2CollectionId("pilot", inputs(), "manuals")).toBe(productCoreV2CollectionId("pilot", inputs().slice(0, 1), "manuals"));
+    expect(productCoreV2CollectionId("pilot", inputs(), "manuals")).not.toBe(productCoreV2CollectionId("pilot", inputs(), "contracts"));
+    expect(() => productCoreV2CollectionId("pilot", inputs(), " ")).toThrow("COLLECTION_IDENTITY_INVALID");
+  });
+
+  it("invalidates work identity when unchanged source bytes receive new OCR output", () => {
+    const original = inputs();
+    const changed = original.map((document) => ({ ...document, regions: document.regions?.map((region) => ({ ...region, text: `${region.text} corrected` })) }));
+    const first = buildProductCoreV2Request("pilot", original);
+    const next = buildProductCoreV2Request("pilot", changed);
+    expect(first.collectionId).toBe(next.collectionId);
+    expect(first.idempotencyKey).not.toBe(next.idempotencyKey);
+  });
+});
+
+describe("K04 verified incremental response lineage", () => {
+  const prior = {
+    worldStateId: "ws_parent",
+    manifestDigest: sha("1"),
+    units: [],
+    artifactHashes: { model: sha("2") },
+  };
+
+  it.each(["valid", "wrong_collection", "wrong_parent", "unverified", "negative_count", "missing_receipt"])(
+    "checks %s response even with a matching output digest", async (scenario) => {
+      vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init?: RequestInit) => {
+        const envelope = JSON.parse(String(init?.body));
+        const candidate = { ...await candidateFixture(), parentWorldStateId: prior.worldStateId };
+        if (scenario === "wrong_collection") candidate.canonicalKnowledgeModel.collectionId = "collection-foreign";
+        if (scenario === "wrong_parent") candidate.parentWorldStateId = "ws_other_parent";
+        const receipt = {
+          requestId: envelope.requestId,
+          inputSha256: new Headers(init?.headers).get("x-tavonel-input-sha256"),
+          outputSha256: await digest(canonicalize(candidate)),
+          coreReleaseDigest: sha("3"), matchingPolicy: "legacy", candidatePromotion: false,
+          equivalence: scenario === "unverified" ? "not_run" : "passed",
+          totalArtifacts: 5, rebuiltArtifacts: scenario === "negative_count" ? -1 : 5,
+          workAvoidedArtifacts: scenario === "negative_count" ? 6 : 0,
+        };
+        return Response.json({
+          schemaVersion: PRODUCT_CORE_RESPONSE_SCHEMA, status: "completed", runtime: "tavonel-python-core-v2",
+          candidate, artifacts: Array.from({ length: 5 }, (_, index) => ({ artifactId: `artifact-${index}`, kind: "candidate", contentSha256: sha("b"), byteLength: 1 })),
+          ...(scenario === "missing_receipt" ? {} : { receipt }),
+        });
+      }));
+      const result = await dispatchProductCoreV2({ url: "https://core-v2.example", hmac: "x".repeat(32) }, "pilot", inputs(), new Date("2026-09-30T00:00:00Z"), prior);
+      if (scenario === "valid") expect(result.ok).toBe(true);
+      else expect(result).toEqual({ ok: false, code: "CORE_V2_RECEIPT_INVALID" });
+    },
+  );
 });

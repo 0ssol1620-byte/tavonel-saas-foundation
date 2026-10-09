@@ -2,17 +2,19 @@ import { reserveFoundationCompute } from "./compute-reservation";
 import { canAdmitCustomerSource } from "./customer-data-admission";
 import { reservationPageCeiling } from "./usage-pricing";
 import { oauthSourceDownloadRequest, type OAuthSourceItem, type OAuthSourceTarget } from "./connector-oauth-adapters";
-import { type OAuthConnectorProvider } from "./connector-oauth";
+import { googleDriveViewerLinkEnabled, type OAuthConnectorProvider } from "./connector-oauth";
 import { confirmFoundationIntake, reserveFoundationIntake } from "./intake-admission";
 import { validateQualifiedDocumentInput } from "./qualified-input";
 import { FOUNDATION_INTAKE_MAX_BYTES, presignFoundationQuarantinePut } from "./r2-presign";
 import { type R2SignerEnv } from "./r2-synthetic-canary";
 import { connectorSourceIdentity, type ConnectorSourceIdentity } from "./connector-source-identity";
 import { readBoundedSourceBody } from "./bounded-source-body";
-import { recordConnectorDocumentBinding } from "./connector-binding-store";
-import { createHash } from "node:crypto";
+import { readConnectorLatestBinding, recordConnectorDocumentBinding } from "./connector-binding-store";
+import { createHash, randomUUID } from "node:crypto";
 import { verifyDropboxSource } from "./dropbox-source-integrity";
 import { observeSourceVersion, verifySourceVersion, type SourceVersionObservation } from "./source-version-guard";
+import { captureGoogleDriveUserAcl } from "./google-drive-acl-capture";
+import { recordGoogleDriveSourceAclCaptureFailure, recordGoogleDriveSourceAclSnapshot } from "./connector-source-access";
 
 // One source object, taken from a provider to quarantine.
 //
@@ -95,6 +97,12 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   }
   downloadHeaders.set("authorization", `Bearer ${context.accessToken}`);
 
+  // Snapshot the database's newest binding set of this logical source before the first provider read.
+  // The binding is recorded only if that is still the latest, so a revision bound while this one
+  // downloads cannot be overtaken by it.
+  const latest = await readConnectorLatestBinding({ ...context, nativeId: item.nativeId, revision: item.revision });
+  if (!latest.ok) return { ok: false, nativeId: item.nativeId, code: latest.code };
+
   let observedVersion: SourceVersionObservation | null;
   try { observedVersion = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher); }
   catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
@@ -116,15 +124,16 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
   if (!body.ok) return { ok: false, nativeId: item.nativeId, code: body.code };
   const bytes = body.bytes;
   if (context.provider === "dropbox") {
+    // The pinned `rev:` download proves these bytes are the listed revision...
     const rejected = verifyDropboxSource(source, bytes, item);
     if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
-  } else {
-    try {
-      const current = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher);
-      const rejected = verifySourceVersion(observedVersion, current, bytes);
-      if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
-    } catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
   }
+  // ...and the before/after current-version reads prove it was still current across the download.
+  try {
+    const current = await observeSourceVersion(context.provider, item, context.target, context.accessToken, fetcher);
+    const rejected = verifySourceVersion(observedVersion, current, bytes);
+    if (rejected) return { ok: false, nativeId: item.nativeId, code: rejected };
+  } catch (error) { return { ok: false, nativeId: item.nativeId, code: error instanceof Error ? error.message : "SOURCE_VERSION_READ_FAILED" }; }
 
   // Deterministic identity. Same (connection, object, revision) -> same document, so an
   // at-least-once retry re-imports rather than duplicates.
@@ -135,9 +144,31 @@ export async function importSourceObject(context: ImportContext, item: OAuthSour
     workspaceKey: context.workspaceKey, connectionId: context.connectionId, provider: context.provider,
     nativeId: item.nativeId, revision: item.revision,
     contentSha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
-    byteLength: bytes.byteLength, mimeType: descriptor.mimeType,
+    byteLength: bytes.byteLength, mimeType: descriptor.mimeType, expectedLatestSourceVersionIds: latest.sourceVersionIds,
   });
   if (!binding.ok) return { ok: false, nativeId: item.nativeId, code: binding.code };
+
+  // Capture a complete provider ACL against this exact immutable source version. The reader
+  // returns no partial snapshot; unsupported group/domain principals are stored nowhere.
+  if (context.provider === "google_drive" && googleDriveViewerLinkEnabled()) {
+    try {
+      const acl = await captureGoogleDriveUserAcl({ fileId: item.nativeId, accessToken: context.accessToken, fetcher });
+      const stored = await recordGoogleDriveSourceAclSnapshot({ workspaceKey: context.workspaceKey,
+        connectionId: context.connectionId, sourceVersionId: identity.sourceVersionId,
+        principals: acl.principals, snapshotSha256: acl.snapshotSha256 });
+      if (!stored.ok) throw new Error(stored.code);
+    } catch (error) {
+      const markerSha256 = `sha256:${createHash("sha256").update(JSON.stringify([
+        "google-drive-acl-capture-incomplete-v1", context.workspaceKey, context.connectionId,
+        identity.sourceVersionId, randomUUID(),
+      ])).digest("hex")}`;
+      await recordGoogleDriveSourceAclCaptureFailure({ workspaceKey: context.workspaceKey,
+        connectionId: context.connectionId, sourceVersionId: identity.sourceVersionId, markerSha256 }).catch(() => undefined);
+      return { ok: false, nativeId: item.nativeId,
+        code: error instanceof Error && error.message === "GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE"
+          ? error.message : "GOOGLE_DRIVE_ACL_CAPTURE_INCOMPLETE" };
+    }
+  }
 
   const admission = await reserveFoundationIntake({
     workspaceKey: context.workspaceKey,
