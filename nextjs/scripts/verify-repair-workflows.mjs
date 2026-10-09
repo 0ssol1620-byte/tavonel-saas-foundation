@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
-import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
+import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -432,6 +432,26 @@ assert(JSON.stringify(HOME_AFFECTED_PATHS)===JSON.stringify(homePaths)&&JSON.str
     'lib/film-motion-control.ts','lib/marketing-analytics.test.ts'].every(p=>!homeOwner.match.test('nextjs/'+p))
   &&(sharedMap.match(/landing-v2/g)??[]).length===1&&sharedMap.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],")
   &&!AFFECTED_GROUPS.some(owner=>/^home-(?!landing$)|legacy/.test(owner.group)), 'Home enters the affected map only as the exact sixteen-path owner with its seven suites and one four-project shared-map row');
+// Recipe continuation admission (X08), restated independently: one finite seven-path owner (the cookbook route's [slug] matched
+// literally), seven direct suites, and exactly one shared-map row per browser suite -- the continuation spec in 1440, 390, 360 and
+// reduced-motion, the existing login-capability spec in 1440 only. No owner may select a browser suite the shared map cannot route.
+const recipePaths=['app/auth/callback/page.tsx','app/cookbooks/[slug]/page.tsx','app/login/page.tsx','components/recipe-preflight.tsx','e2e/recipe-continuation.spec.ts','lib/recipe-intent.test.ts','lib/recipe-intent.ts'];
+const recipeSuites=['lib/recipe-intent.test.ts','lib/checkout-intent.test.ts','lib/funnel-events.test.ts','lib/client-route-weight.test.ts','lib/product-claims-sync.test.ts','lib/cookbook-content.test.ts','lib/seo-surface.test.ts'];
+const recipeBrowsers=['e2e/recipe-continuation.spec.ts','e2e/login-capability.spec.ts'];
+const recipeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='recipe-continuation'),[recipeOwner]=recipeOwners;
+assert(JSON.stringify(RECIPE_CONTINUATION_AFFECTED_PATHS)===JSON.stringify(recipePaths)&&JSON.stringify(RECIPE_CONTINUATION_AFFECTED_UNIT_FILES)===JSON.stringify(recipeSuites)
+  &&JSON.stringify(RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES)===JSON.stringify(recipeBrowsers)
+  &&recipeOwners.length===1&&JSON.stringify(recipeOwner.unitFiles)===JSON.stringify(recipeSuites)&&JSON.stringify(recipeOwner.browserFiles)===JSON.stringify(recipeBrowsers)
+  &&!recipeOwner.nativeReuse&&!recipeOwner.selector&&!recipeOwner.worker&&!recipeOwner.database&&!recipeOwner.databaseTests.length
+  &&recipePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='recipe-continuation')
+  &&['app/cookbooks/s/page.tsx','app/cookbooks/[id]/page.tsx','app/cookbooks/[slug]/pageXtsx','app/cookbooks/page.tsx','app/login/layout.tsx','app/auth/callback/route.ts','lib/checkout-intent.ts',
+    'lib/recipe-intent.spec.ts','e2e/login-capability.spec.ts','e2e/recipe-continuation-extra.spec.ts'].every(p=>!AFFECTED_GROUPS.some(owner=>owner.match.test('nextjs/'+p)))
+  &&sharedMap.split("\n  ['e2e/recipe-continuation.spec.ts', ['1440', '390', '360', 'reduced-motion']],").length===2&&sharedMap.split("\n  ['e2e/login-capability.spec.ts', ['1440']],").length===2
+  &&recipeBrowsers.every(file=>sharedMap.split(file).length===2)
+  &&[...recipeSuites,...recipeBrowsers].every(file=>existsSync(resolve(repo,'nextjs',file))),
+  'Recipe continuation enters the affected map only as the exact seven-path owner with its seven suites, a four-project continuation row and a 1440-only login-capability row');
+const unroutedAffectedBrowsers=[...new Set(AFFECTED_GROUPS.flatMap(owner=>owner.browserFiles))].filter(file=>!sharedMap.includes(`\n  ['${file}', [`));
+assert(unroutedAffectedBrowsers.length===0, 'every affected owner browser suite needs its reviewed shared-map row: '+unroutedAffectedBrowsers.join(', '));
 // Shared test discovery: the exact global Vitest config is a selector/static owner apart from Home, and its head content must keep every
 // existing include, add only the registered mobile-view suite and leave root, runtime, JSX, alias, environment and env untouched.
 const discoveryOwners=AFFECTED_GROUPS.filter(owner=>owner.match.test(VITEST_DISCOVERY_CONFIG_PATH));

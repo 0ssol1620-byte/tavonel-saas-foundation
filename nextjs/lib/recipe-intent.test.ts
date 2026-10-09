@@ -19,13 +19,14 @@ import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RecipePreflight } from "../components/recipe-preflight";
+import { RecipeContinuation, RecipePreflight } from "../components/recipe-preflight";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { COOKBOOKS, COOKBOOK_SLUGS, RECIPE_VERSION as COOKBOOK_RECIPE_VERSION } from "./cookbook-content";
 import { COOKBOOK_WORKFLOW_IDS, WORKFLOW_IDS } from "./keyword-map";
 import {
   ATTRIBUTION_FIELDS,
   RECIPE_IDS,
+  RECIPE_START,
   RECIPE_VERSION,
   RETURN_TO_PATHS,
   defaultReturnTo,
@@ -37,6 +38,7 @@ import {
   readRecipeParams,
   rememberFirstTouch,
   rememberRecipeIntent,
+  resumeDestination,
   takeRecipeIntent,
   type RecipeId,
   type RecipeIntent,
@@ -181,6 +183,10 @@ describe("recipe intent", () => {
     const map = installStorage();
     rememberRecipeIntent({ ...intentFor(), plan: "studio", priceUsd: 99 } as RecipeIntent);
     expect(JSON.parse(map.get("tavonel.recipe-intent") ?? "{}")).toEqual(intentFor());
+    // And an intent that does not validate is reported as not held, and stores nothing.
+    map.clear();
+    expect(rememberRecipeIntent({ ...intentFor(), recipeVersion: "2026-01-01" } as unknown as RecipeIntent)).toBe(false);
+    expect(map.size).toBe(0);
   });
 
   it("refuses a stored payload that was tampered with or left by an older build", () => {
@@ -337,6 +343,189 @@ describe("recipe preflight", () => {
     // D9: the verb is "activate" in every string a reader sees. The gate itself is unchanged.
     expect(html).toContain("Activation is always an explicit human decision");
     expect(html).toContain(defaultReturnTo(RECIPE_IDS[2]));
+  });
+});
+
+/*
+  X08 / UX10 / UX21. Content -> sign-in -> the same task.
+
+  The gap this closes, read off the callers at 5e17488: the callback resumed a recipe to its bare
+  `returnTo` -- a static cookbook page that cannot know a sign-in happened -- and the sign-in page
+  sent an already-signed-in recipe to an empty workspace. Either way the reader met the start of
+  the funnel again. A recipe now resumes to the sign-in page's continuation for the same validated
+  intent, which renders the preflight and one link the reader presses.
+*/
+describe("continuing a recipe after sign-in", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+
+  const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
+  const searchOf = (url: string) => url.slice(url.indexOf("?"));
+  const continuation = (intent: RecipeIntent, processing: boolean | null) =>
+    renderToStaticMarkup(createElement(RecipeContinuation, { intent, processing }));
+  const hrefs = (html: string) => [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]!);
+
+  it("gives every recipe a start surface from a closed set, keyed by the closed id", () => {
+    expect(Object.keys(RECIPE_START).sort()).toEqual([...RECIPE_IDS].sort());
+    for (const id of RECIPE_IDS) {
+      expect([null, "/workspace/sources", "/workspace/developer"], id).toContain(RECIPE_START[id]);
+    }
+    // Two have no run path today, and that is stated rather than papered over with a guess.
+    expect(RECIPE_START["financial-report-figures-with-provenance"]).toBeNull();
+    expect(RECIPE_START["portable-package-local-ai"]).toBeNull();
+  });
+
+  it("resumes a fresh sign-in to the continuation for the same recipe, not to the cookbook", () => {
+    for (const id of RECIPE_IDS) {
+      for (const returnTo of [defaultReturnTo(id), "/resources", "/explore"] as const) {
+        const intent = { ...intentFor(id), returnTo };
+        const destination = resumeDestination({ checkout: null, recipe: intent });
+        expect(destination.startsWith("/login?"), destination).toBe(true);
+        // The page it lands on reads the same intent back, so it renders the continuation.
+        expect(readRecipeParams(searchOf(destination))).toEqual(intent);
+        expect(destination).not.toMatch(/utm_|plan|price|amount|workspace|checkout/i);
+      }
+    }
+  });
+
+  it("keeps checkout's precedence, and the owner's exemption from it", () => {
+    const recipe = intentFor();
+    expect(resumeDestination({ checkout: "observer_access", recipe })).toBe("/workspace?checkout=observer_access");
+    expect(resumeDestination({ checkout: "observer_access", recipe: null })).toBe("/workspace?checkout=observer_access");
+    // An owner never reaches checkout: the recipe continues, or the workspace opens.
+    expect(resumeDestination({ checkout: "observer_access", ownerBillingExempt: true, recipe }))
+      .toBe(loginUrlForRecipe(recipe.recipeId, recipe.returnTo));
+    expect(resumeDestination({ checkout: "observer_access", ownerBillingExempt: true, recipe: null })).toBe("/workspace");
+    expect(resumeDestination({ checkout: null, recipe: null })).toBe("/workspace");
+  });
+
+  it("sends a stale, unknown or tampered recipe to the workspace rather than resuming it", () => {
+    for (const bad of [
+      { ...intentFor(), recipeVersion: "2026-01-01" },
+      { ...intentFor(), recipeId: "not-a-recipe" },
+      { ...intentFor(), returnTo: "https://evil.example" },
+      { ...intentFor(), returnTo: "//evil.example" },
+      { ...intentFor(), returnTo: "/workspace" },
+    ]) {
+      expect(resumeDestination({ checkout: null, recipe: bad as unknown as RecipeIntent }), JSON.stringify(bad))
+        .toBe("/workspace");
+    }
+  });
+
+  it("does not carry a payload's extra fields into the resume URL", () => {
+    const destination = resumeDestination({
+      checkout: null,
+      recipe: { ...intentFor(), workspaceId: "w-1", plan: "studio", priceUsd: 0 } as RecipeIntent,
+    });
+    expect(destination).toBe(loginUrlForRecipe(FIRST));
+  });
+
+  /*
+    The whole hop against one storage, in the order the two pages run it: /login stores the URL's
+    intent, the callback takes it, /login stores the same intent again from the resume URL and the
+    signed-in branch takes it. Nothing is left behind for a later visit to replay.
+  */
+  it("consumes the carried intent exactly once across the round trip", () => {
+    const map = installStorage();
+    const arriving = readRecipeParams(searchOf(loginUrlForRecipe(FIRST)))!;
+    expect(rememberRecipeIntent(arriving), "the page is told the recipe is held").toBe(true);
+    const destination = resumeDestination({ checkout: null, recipe: takeRecipeIntent() });
+    const resumed = readRecipeParams(searchOf(destination))!;
+    rememberRecipeIntent(resumed);
+    expect(takeRecipeIntent()).toEqual(arriving);
+    expect(map.has("tavonel.recipe-intent")).toBe(false);
+    // A later signed-in visit to plain /login finds nothing to resume.
+    expect(resumeDestination({ checkout: null, recipe: takeRecipeIntent() })).toBe("/workspace");
+  });
+
+  it("stays usable when the browser refuses storage", () => {
+    installBlockedStorage();
+    // The sign-in page is told the recipe is not held, so it can say so (no silent fallback).
+    expect(rememberRecipeIntent(intentFor())).toBe(false);
+    const login = read("../app/login/page.tsx");
+    expect(login).toContain("setRecipeKept(rememberRecipeIntent(startedRecipe))");
+    expect(login).toContain("This browser is not keeping site data.");
+    // The callback cannot carry the recipe, so it opens the workspace and does not throw.
+    expect(resumeDestination({ checkout: null, recipe: takeRecipeIntent() })).toBe("/workspace");
+    // A signed-in reader who clicked from a cookbook still has the recipe in the URL.
+    const fromUrl = readRecipeParams(searchOf(loginUrlForRecipe(FIRST)));
+    expect(fromUrl).toEqual(intentFor());
+    expect(continuation(fromUrl!, true)).toContain("/workspace/sources");
+  });
+
+  it("offers only links the reader presses: no form, no button, no checkout", () => {
+    for (const id of RECIPE_IDS) {
+      for (const processing of [true, false, null]) {
+        const html = continuation(intentFor(id), processing);
+        expect(html, id).not.toMatch(/<form|<button|onclick|checkout/i);
+        expect(html, id).toContain("nothing has run");
+        expect(html, id).toContain("did not upload, compile, activate or charge anything");
+        // The preflight's rows travel with it; a total for a run nobody sized does not.
+        expect(html, id).toContain("Counted from your own files");
+        expect(html, id).not.toMatch(/\$\d+\.\d\d for this run/);
+        // Every destination is a start surface, the workspace, the recipe's own page, or one of
+        // the two links the activation row already carried.
+        for (const href of hrefs(html)) {
+          expect(["/workspace", "/workspace/sources", "/workspace/developer", defaultReturnTo(id), "/pricing", "/contact"], `${id}: ${href}`)
+            .toContain(href);
+        }
+        expect(hrefs(html), id).toContain(defaultReturnTo(id));
+      }
+    }
+  });
+
+  it("points at the file picker only once the deployment says it accepts customer files", () => {
+    const intent = intentFor("documents-to-grounded-work");
+    expect(hrefs(continuation(intent, true))).toContain("/workspace/sources");
+    expect(continuation(intent, true)).toContain("nothing runs until you confirm the quote");
+    for (const processing of [false, null]) {
+      const html = continuation(intent, processing);
+      expect(hrefs(html), String(processing)).not.toContain("/workspace/sources");
+      expect(hrefs(html), String(processing)).toContain("/workspace");
+    }
+    expect(continuation(intent, false)).toContain("not open on this deployment yet");
+  });
+
+  it("says so honestly when a recipe has no start control, and still offers an existing one", () => {
+    for (const id of RECIPE_IDS.filter((recipeId) => RECIPE_START[recipeId] === null)) {
+      const html = continuation(intentFor(id), true);
+      expect(html, id).toContain("no starting control in the workspace yet");
+      expect(hrefs(html), id).toContain("/workspace");
+      expect(hrefs(html), id).not.toContain("/workspace/sources");
+    }
+    expect(hrefs(continuation(intentFor("connect-external-ai-mcp-api"), false))).toContain("/workspace/developer");
+  });
+
+  it("drops the sign-in row once signed in, and where blocked storage makes its promise false", () => {
+    expect(render({ intent: intentFor() })).toContain("Where you land.");
+    expect(render({ intent: intentFor(), omitLanding: true })).not.toContain("Where you land.");
+    expect(continuation(intentFor(), true)).not.toContain("Where you land.");
+    expect(read("../app/login/page.tsx")).toContain("<RecipePreflight intent={recipe} omitLanding={!recipeKept} />");
+  });
+
+  function render(props: { intent: RecipeIntent; omitLanding?: boolean }) {
+    return renderToStaticMarkup(createElement(RecipePreflight, props));
+  }
+
+  it("routes both sign-in pages through the one precedence rule, and never loops", () => {
+    const login = read("../app/login/page.tsx");
+    const callback = read("../app/auth/callback/page.tsx");
+    expect(callback).toContain("resumeDestination({ checkout: resume, ownerBillingExempt, recipe: resumeRecipe })");
+    expect(callback, "the bare returnTo resume is the gap this closed").not.toContain("resumeRecipe.returnTo");
+    expect(login).toContain("resumeDestination({ checkout, recipe: null })");
+    // A signed-in reader with a valid recipe in the URL and no checkout is not redirected.
+    expect(login).toContain("if (checkout || !startedRecipe) {");
+    // The stored copy is still taken on every signed-in arrival, so it cannot replay later.
+    expect(login).toContain("takeRecipeIntent();");
+  });
+
+  it("sends no recipe id, return path or account detail to analytics", () => {
+    for (const page of ["../app/login/page.tsx", "../app/auth/callback/page.tsx", "../components/recipe-preflight.tsx"]) {
+      const calls = [...read(page).matchAll(/trackFunnel\([^)]*\)/g)].map((match) => match[0]);
+      for (const call of calls) {
+        expect(call, page).not.toMatch(/recipeId|returnTo|recipeVersion|session|email|user/i);
+      }
+    }
+    expect(read("../components/recipe-preflight.tsx")).not.toContain("trackFunnel");
   });
 });
 

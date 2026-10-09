@@ -1670,6 +1670,20 @@ export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
 ]);
 export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
+// Recipe continuation owner (X08): exactly these seven nextjs-relative paths, no glob. Product sign-in UI, so never nativeReuse.
+export const RECIPE_CONTINUATION_AFFECTED_PATHS = Object.freeze([
+  'app/auth/callback/page.tsx', 'app/cookbooks/[slug]/page.tsx', 'app/login/page.tsx', 'components/recipe-preflight.tsx',
+  'e2e/recipe-continuation.spec.ts', 'lib/recipe-intent.test.ts', 'lib/recipe-intent.ts',
+]);
+export const RECIPE_CONTINUATION_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/recipe-intent.test.ts', 'lib/checkout-intent.test.ts', 'lib/funnel-events.test.ts', 'lib/client-route-weight.test.ts',
+  'lib/product-claims-sync.test.ts', 'lib/cookbook-content.test.ts', 'lib/seo-surface.test.ts',
+]);
+// The continuation spec runs in 1440, 390, 360 and reduced-motion; the existing sign-in capability spec only in 1440.
+export const RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/recipe-continuation.spec.ts', 'e2e/login-capability.spec.ts']);
+// Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
+// carries a literal [slug] segment that would otherwise be read as a character class.
+const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
 // existing include survives, the one addition is the registered mobile-view suite and nothing outside the include list moved.
 export const VITEST_DISCOVERY_CONFIG_PATH = 'nextjs/vitest.config.ts';
@@ -1748,6 +1762,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),
+  // Recipe continuation: the seven exact paths above select seven direct suites and two browser suites; the continuation spec
+  // runs in 1440, 390, 360 and reduced-motion and login-capability only in 1440 of the shared map.
+  affectedGroup('recipe-continuation', new RegExp(`^nextjs/(?:${exactPathAlternation(RECIPE_CONTINUATION_AFFECTED_PATHS)})$`),
+    { unitFiles: RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, browserFiles: RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.

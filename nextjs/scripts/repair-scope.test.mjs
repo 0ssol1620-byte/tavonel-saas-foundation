@@ -4225,3 +4225,153 @@ test('affected Home admission: collection reads the head config only for a confi
   const home=run('nextjs/components/landing-v2/hero-film.tsx',()=>{throw Error('unexpected show');});
   assert.deepEqual([home.map.failures,home.map.groups,home.shows],[[],['home-landing'],[]]);
 });
+// ---- Affected recipe continuation admission (X08): seven exact paths, seven direct suites, the continuation spec in 1440/390/360/
+// reduced-motion and the existing login-capability spec only in 1440 ----
+import { RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
+// Restated independently of the planner, so a drifted export fails here rather than agreeing with itself.
+const AFFECTED_RECIPE_PATHS=Object.freeze(['nextjs/app/auth/callback/page.tsx','nextjs/app/cookbooks/[slug]/page.tsx','nextjs/app/login/page.tsx','nextjs/components/recipe-preflight.tsx',
+  'nextjs/e2e/recipe-continuation.spec.ts','nextjs/lib/recipe-intent.test.ts','nextjs/lib/recipe-intent.ts']);
+const AFFECTED_RECIPE_SUITES=Object.freeze(['lib/checkout-intent.test.ts','lib/client-route-weight.test.ts','lib/cookbook-content.test.ts','lib/funnel-events.test.ts','lib/product-claims-sync.test.ts',
+  'lib/recipe-intent.test.ts','lib/seo-surface.test.ts']);
+const AFFECTED_RECIPE_SPEC='e2e/recipe-continuation.spec.ts',AFFECTED_LOGIN_SPEC='e2e/login-capability.spec.ts';
+const AFFECTED_RECIPE_BROWSERS=Object.freeze([AFFECTED_LOGIN_SPEC,AFFECTED_RECIPE_SPEC]);
+const AFFECTED_RECIPE_PROJECTS=Object.freeze(['1440','390','360','reduced-motion']);
+const AFFECTED_RECIPE_RUNS=Object.freeze([{kind:'project',project:'1440',files:[AFFECTED_LOGIN_SPEC,AFFECTED_RECIPE_SPEC]},{kind:'project',project:'390',files:[AFFECTED_RECIPE_SPEC]},
+  {kind:'project',project:'360',files:[AFFECTED_RECIPE_SPEC]},{kind:'project',project:'reduced-motion',files:[AFFECTED_RECIPE_SPEC]}]);
+test('affected recipe continuation admission: exactly seven owner paths select recipe-continuation, the seven suites, two browser suites and fresh native debt', () => {
+  assert.deepEqual(RECIPE_CONTINUATION_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_RECIPE_PATHS);assert.equal(new Set(AFFECTED_RECIPE_PATHS).size,7);
+  assert.deepEqual([...RECIPE_CONTINUATION_AFFECTED_UNIT_FILES].sort(),AFFECTED_RECIPE_SUITES);assert.equal(new Set(AFFECTED_RECIPE_SUITES).size,7);
+  assert.deepEqual([...RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES].sort(),AFFECTED_RECIPE_BROWSERS);
+  // recipe-intent.test.ts is both an owner endpoint and a selected suite; login-capability is a selected spec only, never an endpoint.
+  assert.ok(AFFECTED_RECIPE_PATHS.includes('nextjs/lib/recipe-intent.test.ts')&&AFFECTED_RECIPE_SUITES.includes('lib/recipe-intent.test.ts'));
+  assert.ok(!AFFECTED_RECIPE_PATHS.includes(`nextjs/${AFFECTED_LOGIN_SPEC}`),'login-capability stays a selected spec only');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='recipe-continuation');
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles].sort(),[...owner.browserFiles].sort(),owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_RECIPE_SUITES,AFFECTED_RECIPE_BROWSERS,[],false,false,false,false,undefined,undefined]);
+  for (const path of AFFECTED_RECIPE_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['recipe-continuation'],path);
+    for (const [status,oldMode,newMode] of [['A','000000','100644'],['M','100644','100644'],['M','100644','100755'],['D','100644','000000']]) {
+      const map=affectedMap([affectedRecord(status,[path],oldMode,newMode)]),label=`${status} ${path}`;
+      assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['recipe-continuation'],AFFECTED_RECIPE_SUITES,AFFECTED_RECIPE_BROWSERS],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  // The exact seven-path delta is one owner and one combined selection.
+  const delta=affectedMap(AFFECTED_RECIPE_PATHS.map(path=>affectedRecord('M',[path])));
+  assert.deepEqual([delta.failures,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],[[],['recipe-continuation'],[...AFFECTED_RECIPE_PATHS].sort(),AFFECTED_RECIPE_SUITES,AFFECTED_RECIPE_BROWSERS]);
+  assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_RECIPE_PATHS].sort());
+  assert.deepEqual(planBrowserRuns(delta.browserFiles,false),AFFECTED_RECIPE_RUNS);
+  const within=affectedMap([affectedRecord('R100',['nextjs/lib/recipe-intent.ts','nextjs/components/recipe-preflight.tsx'])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.browserFiles],[[],['recipe-continuation'],AFFECTED_RECIPE_SUITES,AFFECTED_RECIPE_BROWSERS]);
+});
+test('affected recipe continuation admission: the regular plan keeps every release debt, defers only the fresh native run and selects no static/selector checks', () => {
+  const plan=affectedAskPlan(affectedMap([affectedRecord('M',['nextjs/app/auth/callback/page.tsx'])]));
+  assert.ok(plan.groups.includes('recipe-continuation')&&plan.groups.includes('native-world-race-fresh-run'),JSON.stringify(plan.groups));
+  assert.deepEqual(plan.browserFiles,AFFECTED_RECIPE_BROWSERS);
+  for (const suite of AFFECTED_RECIPE_SUITES) assert.ok(plan.unitFiles.includes(suite),suite);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runDetailIntegrity','requirePublicUiScreenshots','requireHomePricingCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks],[['native-world-race-fresh-run'],'pending',{}]);
+  assert.deepEqual(plan.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),AFFECTED_RECIPE_RUNS);
+});
+test('affected recipe continuation admission: planBrowserRuns runs the continuation spec in four projects and login-capability only in 1440, without multiplying either', () => {
+  assert.deepEqual(planBrowserRuns([AFFECTED_RECIPE_SPEC],false),AFFECTED_RECIPE_PROJECTS.map(project=>({kind:'project',project,files:[AFFECTED_RECIPE_SPEC]})));
+  assert.deepEqual(planBrowserRuns([AFFECTED_LOGIN_SPEC],false),[{kind:'project',project:'1440',files:[AFFECTED_LOGIN_SPEC]}]);
+  assert.deepEqual(planBrowserRuns([AFFECTED_RECIPE_SPEC,AFFECTED_LOGIN_SPEC,AFFECTED_RECIPE_SPEC,AFFECTED_LOGIN_SPEC],false),AFFECTED_RECIPE_RUNS);
+  const runs=planBrowserRuns(AFFECTED_RECIPE_BROWSERS,false);
+  for (const project of ['1920','1280','1024','768','audit','audit-768','audit-1280','launch-chromium']) assert.ok(!runs.some(run=>run.project===project),project);
+  assert.equal(runs.filter(run=>run.files.includes(AFFECTED_LOGIN_SPEC)).length,1,'login-capability runs once, in 1440');
+  for (const spec of ['e2e/recipe-continuation-extra.spec.ts','e2e/recipe/continuation.spec.ts','e2e/login.spec.ts','e2e/login-capability-extra.spec.ts'])
+    assert.throws(()=>planBrowserRuns([spec],false),/No reviewed Playwright project mapping/,spec);
+  const runner=readFileSync(new URL('./run-repair-check.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  assert.equal(runner.split("\n  ['e2e/recipe-continuation.spec.ts', ['1440', '390', '360', 'reduced-motion']],\n").length-1,1);
+  assert.equal(runner.split("\n  ['e2e/login-capability.spec.ts', ['1440']],\n").length-1,1);
+  assert.equal((runner.match(/recipe-continuation/g)??[]).length,1);assert.equal((runner.match(/login-capability/g)??[]).length,1);
+});
+test('affected recipe continuation admission: the bracketed cookbook route is literal and non-owned lookalikes, spellings and rename endpoints refuse', () => {
+  // [slug] is a literal segment: an unescaped class would admit s, l, u or g, and an unescaped '.' would admit any character.
+  for (const path of ['nextjs/app/cookbooks/s/page.tsx','nextjs/app/cookbooks/g/page.tsx','nextjs/app/cookbooks/[id]/page.tsx','nextjs/app/cookbooks/[slug]/layout.tsx','nextjs/app/cookbooks/[slug]/page.ts',
+    'nextjs/app/cookbooks/[slug]/pageXtsx','nextjs/app/cookbooks/page.tsx','nextjs/app/cookbooks/[slug]/nested/page.tsx','nextjs/app/login/page.test.tsx','nextjs/app/login/layout.tsx','nextjs/app/Login/page.tsx',
+    'nextjs/app/auth/callback/route.ts','nextjs/app/auth/page.tsx','nextjs/components/recipe-preflight.test.tsx','nextjs/components/recipe-preflight.module.css','nextjs/lib/recipe-intent.tsx',
+    'nextjs/lib/recipe-intent.spec.ts','nextjs/lib/recipe-intents.ts','nextjs/lib/checkout-intent.ts','nextjs/lib/checkout-intent.test.ts','nextjs/lib/funnel-events.test.ts','nextjs/lib/seo-surface.test.ts',
+    'nextjs/e2e/login-capability.spec.ts','nextjs/e2e/recipe-continuation.spec.tsx','nextjs/e2e/recipe-continuation-extra.spec.ts','app/login/page.tsx','nextjs/nextjs/app/login/page.tsx']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  for (const path of ['nextjs/app/login/./page.tsx','nextjs//lib/recipe-intent.ts','nextjs/lib/../lib/recipe-intent.ts','nextjs\\app\\login\\page.tsx','nextjs/app/login/page.tsx ','nextjs/app/cookbooks/{slug}/page.tsx'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+    assert.deepEqual(affectedMap([affectedRecord(status,['nextjs/app/login/page.tsx'],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: nextjs/app/login/page.tsx`]);
+  assert.match(affectedMap([affectedRecord('C075',['nextjs/lib/recipe-intent.ts','nextjs/app/login/page.tsx'])]).failures[0],/^unsupported change status C075:/);
+  for (const paths of [['nextjs/lib/recipe-intent.ts','nextjs/lib/recipe-intents.ts'],['nextjs/lib/checkout-intent.ts','nextjs/app/login/page.tsx']]) {
+    const unknown=paths.find(path=>!AFFECTED_RECIPE_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // A known owner path beside an unknown sibling closes the whole map instead of shrinking it.
+  const mixed=affectedMap([affectedRecord('M',['nextjs/app/login/page.tsx']),affectedRecord('A',['nextjs/app/login/recover.tsx'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/app/login/recover.tsx'],['nextjs/app/login/recover.tsx']]);
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+});
+test('affected recipe continuation admission: a selected suite or either browser spec missing at head refuses', () => {
+  for (const file of [...AFFECTED_RECIPE_SUITES,...AFFECTED_RECIPE_BROWSERS]) {
+    const map=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',['nextjs/app/login/page.tsx'])],headHasFile:path=>path!==`nextjs/${file}`});
+    assert.deepEqual([map.groups,map.failures],[['recipe-continuation'],[`selected owner check is absent at head: ${file}`]],file);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,file);
+  }
+  const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',['nextjs/lib/recipe-intent.test.ts'],'100644','000000')],headHasFile:path=>path!=='nextjs/lib/recipe-intent.test.ts'});
+  assert.deepEqual([deleted.groups,deleted.failures],[['recipe-continuation'],['selected owner check is absent at head: lib/recipe-intent.test.ts']]);
+});
+test('affected recipe continuation admission: mixed with Home it unions and dedupes, and existing owners keep their exact selections', () => {
+  const map=affectedMap([affectedRecord('M',['nextjs/components/landing-v2/landing-page.tsx']),affectedRecord('M',['nextjs/app/login/page.tsx']),affectedRecord('M',['nextjs/lib/explore-story.ts'])]);
+  assert.deepEqual([map.failures,map.groups],[[],['explore-answer','home-landing','recipe-continuation']]);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_HOME_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_RECIPE_SUITES));
+  assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,AFFECTED_LOGIN_SPEC,AFFECTED_RECIPE_SPEC]);
+  assert.deepEqual(planBrowserRuns(map.browserFiles,false),[{kind:'project',project:'1440',files:[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,AFFECTED_LOGIN_SPEC,AFFECTED_RECIPE_SPEC]},
+    {kind:'project',project:'390',files:[AFFECTED_HOME_SPEC,AFFECTED_RECIPE_SPEC]},{kind:'project',project:'360',files:[AFFECTED_HOME_SPEC,AFFECTED_RECIPE_SPEC]},
+    {kind:'project',project:'reduced-motion',files:[AFFECTED_HOME_SPEC,AFFECTED_RECIPE_SPEC]}]);
+  // The neighbouring owners are unchanged by this admission.
+  assert.deepEqual(affectedMap([affectedRecord('M',['nextjs/components/landing-v2/landing-page.tsx'])]).unitFiles,AFFECTED_HOME_SUITES);
+  assert.deepEqual(affectedMap([affectedRecord('M',['nextjs/lib/explore-story.ts'])]).browserFiles,[AFFECTED_EXPLORE_SPEC]);
+  assert.deepEqual(planBrowserRuns([AFFECTED_HOME_SPEC],false),AFFECTED_HOME_PROJECTS.map(project=>({kind:'project',project,files:[AFFECTED_HOME_SPEC]})));
+  assert.deepEqual(planBrowserRuns([AFFECTED_EXPLORE_SPEC],false),[{kind:'project',project:'1440',files:[AFFECTED_EXPLORE_SPEC]}]);
+  assert.throws(()=>planBrowserRuns(['e2e/unreviewed.spec.ts'],false),/No reviewed Playwright project mapping/);
+});
+test('affected recipe continuation admission: readAffectedExecution rereads seven units and four project reports, with login-capability required in the 1440 report only', () => {
+  const map=affectedMap([affectedRecord('M',['nextjs/components/recipe-preflight.tsx'])]);assert.deepEqual(map.failures,[]);
+  const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+  const root=mkdtempSync(resolve(tmpdir(),'affected-recipe-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json'),pw=index=>resolve(reports,`playwright-${index}.json`);
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    const pass=projectName=>({projectName,status:'expected',results:[{status:'passed'}]});
+    const playwright=(projectName,files)=>({config:{rootDir:root},stats:{expected:files.length,skipped:0,unexpected:0,flaky:0},
+      suites:[{specs:files.map(file=>({file,title:'continuation fixture',tests:[pass(projectName)]}))}]});
+    const write=(path,value)=>writeFileSync(path,typeof value==='string'?value:JSON.stringify(value));
+    const restore=()=>{write(vitestPath,vitest(AFFECTED_RECIPE_SUITES));AFFECTED_RECIPE_RUNS.forEach((run,index)=>write(pw(index+1),playwright(run.project,run.files)));};
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    write(vitestPath,vitest(AFFECTED_RECIPE_SUITES));
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-1\.json/);
+    AFFECTED_RECIPE_RUNS.slice(0,3).forEach((run,index)=>write(pw(index+1),playwright(run.project,run.files)));
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-4\.json/);
+    write(pw(4),playwright('reduced-motion',[AFFECTED_RECIPE_SPEC]));
+    const result=readAffectedExecution(root,plan);
+    assert.deepEqual(result.units,{files:7,passed:7,skipped:0,failed:0});
+    assert.deepEqual(result.browsers.map(b=>[b.project,b.files,b.passed,b.skipped,b.flaky,b.failed]),[['1440',2,2,0,0,0],['390',1,1,0,0,0],['360',1,1,0,0,0],['reduced-motion',1,1,0,0,0]]);
+    for (const [path,value,pattern] of [
+      [vitestPath,vitest(AFFECTED_RECIPE_SUITES.filter(file=>file!=='lib/seo-surface.test.ts')),/Vitest report omitted selected file\(s\): lib\/seo-surface\.test\.ts/],
+      [pw(1),playwright('1440',[AFFECTED_RECIPE_SPEC]),/Playwright report omitted selected file\(s\): e2e\/login-capability\.spec\.ts/],
+      [pw(1),playwright('1920',AFFECTED_RECIPE_BROWSERS),/ran in an unconfigured project/],
+      [pw(2),playwright('1440',[AFFECTED_RECIPE_SPEC]),/ran in an unconfigured project: e2e\/recipe-continuation\.spec\.ts/],
+      [pw(4),playwright('768',[AFFECTED_RECIPE_SPEC]),/ran in an unconfigured project: e2e\/recipe-continuation\.spec\.ts/],
+    ]) { write(path,value);assert.throws(()=>readAffectedExecution(root,plan),pattern,String(pattern));restore(); }
+    assert.equal(readAffectedExecution(root,plan).units.passed,7,'the restored actual reports qualify again');
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
