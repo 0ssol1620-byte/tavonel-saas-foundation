@@ -181,12 +181,14 @@ test.describe("six-beat page structure", () => {
         const headingId = await section.getAttribute("aria-labelledby");
         expect(headingId, `${id} has no accessible name`).toBeTruthy();
         await expect(page.locator(`#${headingId}`)).toHaveCount(1);
+        expect(await page.locator(`#${headingId}`).evaluate(heading => heading.tagName)).toMatch(/^H[12]$/);
       }
 
       await expect(page.locator("main#main")).toHaveCount(1);
       await expect(page.locator("main section section")).toHaveCount(0);
       await expect(page.locator("h1")).toHaveCount(1);
-      await expect(page.locator("main h2")).toHaveCount(SECTIONS.length);
+      // Scene landmarks and their supporting evidence/reader headings are distinct structures.
+      await expect(page.locator("main h2")).toHaveCount(8);
     });
   }
 
