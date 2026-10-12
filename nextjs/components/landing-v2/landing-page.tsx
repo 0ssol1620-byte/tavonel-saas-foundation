@@ -8,6 +8,7 @@ import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
+import HomeReaderGuide from "./home-reader-guide";
 import heroStyles from "./landing-hero.module.css";
 import LandingAnalytics from "./landing-analytics";
 import RecompileScene from "./scenes/recompile";
@@ -463,6 +464,7 @@ export default function LandingPage({
           sceneIndex={4}
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
+        <HomeReaderGuide korean={korean} />
         <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />

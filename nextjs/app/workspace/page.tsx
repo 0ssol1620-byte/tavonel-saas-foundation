@@ -89,7 +89,14 @@ import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store"
 import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
-import type { ReviewQueueInput } from "@/lib/review-queue";
+import {
+  currentReviewLedger,
+  readReviewLedger,
+  reviewLedgerScope,
+  reviewQueueDecisionInput,
+  type ReviewQueueInput,
+  type ScopedReviewLedger,
+} from "@/lib/review-queue";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
 const UNKNOWN = "not read yet";
@@ -453,51 +460,76 @@ export default function WorkspacePage() {
   const [compileRecord, setCompileRecord] = useState<
     { documentIds: string[]; blocked: CompileBlocker[]; settledAt: string | null } | null
   >(null);
-  const [reviewDecisions, setReviewDecisions] = useState<{ decisions: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated: boolean }>({ decisions: [], truncated: false });
+  /*
+    The decision ledger is held with the collection revision it was read for, and read back
+    through `currentReviewLedger`: a result for another scope -- including the old one during
+    the render before this effect resets it -- reads as loading, never as the new compile's
+    decisions. Only a validated `ready` read can say a document has no decision.
+  */
+  const [reviewLedgerRead, setReviewLedgerRead] = useState<ScopedReviewLedger | null>(null);
+  const reviewLedger = currentReviewLedger(
+    reviewLedgerRead,
+    reviewLedgerScope(collectionResult?.collectionId, collectionResult?.manifestDigest),
+  );
   const [reviewLedgerEpoch, setReviewLedgerEpoch] = useState(0);
   useEffect(() => {
     const collectionId = collectionResult?.collectionId;
     const manifest = collectionResult?.manifestDigest;
     setCompileRecord(null);
-    setReviewDecisions({ decisions: [], truncated: false });
-    if (!collectionId || !manifest) {
-      setReviewDecisions({ decisions: [], truncated: false });
+    const scope = reviewLedgerScope(collectionId, manifest);
+    if (!collectionId || !manifest || scope === null) {
+      setReviewLedgerRead(null);
       return;
     }
+    // A refresh of the same scope starts over as loading too: the previous read is not this one.
+    setReviewLedgerRead({ scope, state: { status: "loading" } });
     const controller = new AbortController();
-    void (async () => {
-      const client = getSupabaseBrowserClient();
-      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
-      const token = data.session?.access_token;
-      if (!token) return;
-      const headers = { authorization: `Bearer ${token}` };
-      const [jobs, reviews] = await Promise.allSettled([
-        fetch("/api/compile-jobs", { cache: "no-store", headers, signal: controller.signal })
-          .then((response) => response.ok
-            ? response.json() as Promise<{ jobs?: Array<{ collectionId: string | null; documentIds?: string[]; blocked?: CompileBlocker[]; settledAt?: string | null }> }>
-            : null),
-        fetch(`/api/v1/reviews?collectionId=${encodeURIComponent(collectionId)}`, { cache: "no-store", headers, signal: controller.signal })
-          .then((response) => response.ok
-            ? response.json() as Promise<{ decisions?: Array<{ evidenceId: string; recordedAt: string; manifestDigest: string }>; truncated?: boolean }>
-            : null),
-      ]);
+    /*
+      One session lookup shared by both reads. It may reject; each consumer catches it -- the
+      job row becomes null and the ledger becomes an error -- so nothing escapes unhandled.
+    */
+    let tokenRead: Promise<string | null> | null = null;
+    const accessToken = () => {
+      if (tokenRead === null) {
+        tokenRead = Promise.resolve().then(async () => {
+          const client = getSupabaseBrowserClient();
+          if (!client) return null;
+          const { data } = await client.auth.getSession();
+          return data.session?.access_token ?? null;
+        });
+      }
+      return tokenRead;
+    };
+    const jobsRead = (async () => {
+      const token = await accessToken();
+      if (!token) return null;
+      const response = await fetch("/api/compile-jobs", { cache: "no-store", headers: { authorization: `Bearer ${token}` }, signal: controller.signal });
+      return response.ok
+        ? await response.json() as { jobs?: Array<{ collectionId: string | null; documentIds?: string[]; blocked?: CompileBlocker[]; settledAt?: string | null }> }
+        : null;
+    })().catch(() => null);
+    /*
+      `truncated` comes from the route, not from counting rows here: the window size is the
+      route's, and a queue that assumed one would go wrong the day it changes. A truncated
+      read is passed through as such so the queue says the first-review times may not be
+      first, instead of showing them as measured. `readReviewLedger` never rejects, and
+      resolves null once this read is aborted.
+    */
+    const ledgerRead = readReviewLedger({
+      collectionId,
+      manifestDigest: manifest,
+      accessToken,
+      fetch: (url, init) => fetch(url, init),
+      signal: controller.signal,
+    });
+    void Promise.all([jobsRead, ledgerRead]).then(([jobs, ledger]) => {
       if (controller.signal.aborted) return;
-      const row = jobs.status === "fulfilled"
-        ? jobs.value?.jobs?.find((job) => job.collectionId === collectionId)
-        : undefined;
+      const row = jobs?.jobs?.find((job) => job.collectionId === collectionId);
       setCompileRecord(row && Array.isArray(row.documentIds)
         ? { documentIds: row.documentIds, blocked: Array.isArray(row.blocked) ? row.blocked : [], settledAt: row.settledAt ?? null }
         : null);
-      /*
-        `truncated` comes from the route, not from counting rows here: the window size is the
-        route's, and a queue that assumed one would go wrong the day it changes. A truncated
-        read is passed through as such so the queue says the first-review times may not be
-        first, instead of showing them as measured.
-      */
-      setReviewDecisions(reviews.status === "fulfilled"
-        ? { decisions: (reviews.value?.decisions ?? []).filter((decision) => decision.manifestDigest === manifest), truncated: reviews.value?.truncated === true }
-        : { decisions: [], truncated: false });
-    })();
+      if (ledger !== null) setReviewLedgerRead({ scope, state: ledger });
+    });
     return () => controller.abort();
   }, [collectionResult?.collectionId, collectionResult?.manifestDigest, reviewLedgerEpoch]);
   const [downloading, setDownloading] = useState(false);
@@ -2452,8 +2484,7 @@ export default function WorkspacePage() {
     })),
     reviewReasons: collectionResult?.reviewReasons ?? [],
     evidence: (worldReadModel?.evidence ?? []).map((item) => ({ id: item.id, sourceId: item.sourceId })),
-    decisions: reviewDecisions.decisions,
-    decisionsTruncated: reviewDecisions.truncated,
+    ...reviewQueueDecisionInput(reviewLedger),
     names,
   };
   /*

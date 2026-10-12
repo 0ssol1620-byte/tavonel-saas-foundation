@@ -260,7 +260,14 @@ const worldModel = {
   history: [],
   files: [],
   signature: "not_yet",
-  review: { state: "not_yet", reasons: [], evidenceRefs: [], impact: null, receipt: null },
+  review: { state: "not_yet", reasons: [], evidenceRefs: [], impact: {
+    state: "not_yet", affectedObjectIds: [],
+    claims: { state: "not_yet", reason: "No review decision is pending." },
+    relations: { state: "not_yet", reason: "No review decision is pending." },
+    answerCaches: { state: "not_yet", reason: "Answer-cache impact is not materialized in the compiled artifact." },
+    activeWorldObjects: { state: "read", value: 0 },
+    researchImpactPath: { status: "research", state: "not_yet", reason: "Selective impact-aware recompilation is a research lens, not a compiled fact." },
+  }, receipt: { state: "not_yet", reason: "No review decision has been recorded." } },
 };
 
 /**
@@ -1520,4 +1527,70 @@ test("an unversioned entry pins its first verified candidate across reload", asy
   await page.reload();
   await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));
   await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
+});
+
+
+/* Scoped local page.route fixtures: these validate browser rendering, not customer processing or ACL qualification. */
+test("directory pagination retains selection and resets search across 22 paths", async ({ page }, testInfo) => {
+  const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+  await installSession(page); await mockWorkspace(page);
+  const directory = [{ path: "Topics/object-doc.md", kind: "topic", sourceIds: ["doc-a"] },
+    ...Array.from({ length: 20 }, (_, i) => ({ path: `Topics/paging-${String(i + 1).padStart(2, "0")}.md`, kind: "topic", sourceIds: ["doc-a"] }))];
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => {
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    return route.fulfill({ json: { model: { ...worldModel, directory } } });
+  });
+  await page.goto(`/workspace/world?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await page.getByRole("tab", { name: "Directory", exact: true }).click();
+  const paging = page.getByRole("navigation", { name: "Directory pages", exact: true });
+  await expect(page.getByRole("status").filter({ hasText: "22 matching paths" })).toContainText("Showing 1–20");
+  await page.locator('[data-path="Topics/object-doc.md"] button').click();
+  await paging.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(paging).toContainText("Page 2 of 2");
+  await expect(page.getByRole("status").filter({ hasText: "22 matching paths" })).toContainText("Showing 21–22");
+  await expect(page.getByText("Selected object: Annual filing (object-doc). Its directory path is outside this page or filter.", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-path="Topics/object-doc.md"]')).toHaveCount(0);
+  await expect(page.locator('[data-path="Topics"][data-context="true"]')).toHaveCount(1);
+  await expect(page.locator('[data-path="Topics/paging-20.md"]')).toBeVisible();
+  await page.getByRole("searchbox", { name: "Filter directory paths or kinds" }).fill("paging-20");
+  await expect(paging).toContainText("Page 1 of 1");
+  await expect(page.getByRole("status").filter({ hasText: "1 matching path" })).toContainText("Showing 1–1");
+  await expect(page.getByText("Selected object: Annual filing (object-doc). Its directory path is outside this page or filter.", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+  await testInfo.attach("directory-paging-local-fixture", { body: await page.screenshot({ path: testInfo.outputPath("directory-paging-local-fixture.png"), fullPage: true }), contentType: "image/png" });
+});
+
+test("version comparison pages 51 changes and resets intersected filters", async ({ page }, testInfo) => {
+  const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+  await installSession(page); await mockWorkspace(page);
+  const additions = Array.from({ length: 51 }, (_, i) => ({ ...worldModel.objects[0],
+    id: `paging-object-${String(i + 1).padStart(2, "0")}`, stableKey: `paging-${i + 1}`, label: `Paging object ${String(i + 1).padStart(2, "0")}` }));
+  const candidate = { ...worldModel, objects: [...worldModel.objects, ...additions], history: [
+    { version: "v1", manifestDigest: activeManifest, status: "superseded", activatedAt: { state: "read", value: "2026-09-01T00:00:00Z" }, activationCount: { state: "read", value: 1 } },
+    { version: "v2", manifestDigest: candidateManifest, status: "candidate", activatedAt: { state: "not_yet", reason: "Not activated" }, activationCount: { state: "not_yet", reason: "Not activated" } },
+  ] };
+  await page.route(`**/api/v1/world/${collectionId}?manifest=**`, route => {
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    const digest = new URL(route.request().url()).searchParams.get("manifest");
+    return route.fulfill({ json: { model: digest === candidateManifest ? candidate : { ...worldModel, world: { ...worldModel.world, manifestDigest: activeManifest, status: "active" } } } });
+  });
+  await page.goto(`/workspace/world?collection=${collectionId}&manifest=${encodeURIComponent(candidateManifest)}`);
+  await page.getByRole("tab", { name: "Versions", exact: true }).click();
+  const paging = page.getByRole("navigation", { name: "Artifact change pages" });
+  const rows = page.locator('section[data-diff-category="objects"] [data-diff-row="true"]');
+  await expect(paging).toContainText("Page 1 of 2"); await expect(rows).toHaveCount(50);
+  await expect(page.getByRole("status").filter({ hasText: "artifact changes" })).toContainText("Rows 1–50 of 51 matching changes");
+  await paging.getByRole("button", { name: "Next changes", exact: true }).click();
+  await expect(paging).toContainText("Page 2 of 2"); await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText("Paging object 51");
+  await page.getByRole("combobox", { name: "Category", exact: true }).selectOption("objects");
+  await page.getByRole("combobox", { name: "Change kind", exact: true }).selectOption("added");
+  await page.getByRole("searchbox", { name: "Find a change", exact: true }).fill("Paging object 01");
+  await expect(paging).toContainText("Page 1 of 1"); await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText("Paging object 01");
+  await page.getByRole("button", { name: "Clear filters", exact: true }).click();
+  await expect(paging).toContainText("Page 1 of 2"); await expect(rows).toHaveCount(50);
+  await expect(page.getByText("Answer-cache effects: unknown (not_yet).", { exact: false })).toBeVisible();
+  expect(errors).toEqual([]);
+  await testInfo.attach("version-paging-local-fixture", { body: await page.screenshot({ path: testInfo.outputPath("version-paging-local-fixture.png"), fullPage: true }), contentType: "image/png" });
 });

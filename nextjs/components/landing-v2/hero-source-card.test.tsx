@@ -265,6 +265,30 @@ describe("the Home workbench -- gates", () => {
 const SEC_FILING_HREF = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000006/aapl-20251227.htm";
 const anchorsOf = (html: string) => [...html.matchAll(/<a(\s[^>]*)>([\s\S]*?)<\/a>/g)];
 
+describe("the Home workbench -- responsive delivery", () => {
+  it.each([false, true])("offers smaller same-origin copies while preserving the evidence image (korean: %s)", korean => {
+    const value = homeCase();
+    const image = value.pages[0]!.image!;
+    const html = render(value, korean);
+    const img = html.match(/<img\s[^>]*>/)![0];
+    const candidates = attr(img, "srcset")!.split(", ");
+    const widths = candidates.map(candidate => Number(candidate.match(/ (\d+)w$/)![1]));
+    expect(widths.some(width => width < image.width)).toBe(true);
+    expect(Math.max(...widths)).toBe(image.width);
+    expect(candidates.at(-1)).toBe(`${escaped(image.src)} ${image.width}w`);
+    for (const candidate of candidates.slice(0, -1)) {
+      const url = new URL(candidate.slice(0, candidate.lastIndexOf(" ")).replace(/&amp;/g, "&"), "https://home.invalid");
+      expect(url.origin).toBe("https://home.invalid");
+      expect(url.pathname).toBe("/_next/image");
+      expect(url.searchParams.get("url")).toBe(image.src);
+    }
+    expect(attr(img, "sizes")).toMatch(/calc\(100vw - \d+px\)/);
+    expect(attr(img, "src")).toBe(escaped(image.src));
+    expect(anchorsOf(html).map(([, open]) => attr(open!, "href"))).toContain(escaped(image.src));
+    expect(html).toContain(`data-source-digest="${escaped(value.sources[0]!.digest)}"`);
+  });
+});
+
 describe("the Home workbench -- full filing", () => {
   it.each([false, true])("links the full SEC filing beside the page, next to the full page, in so many words (korean: %s)", korean => {
     const value = homeCase();

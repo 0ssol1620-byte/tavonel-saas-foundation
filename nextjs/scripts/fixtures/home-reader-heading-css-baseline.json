@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "tavonel.reader_heading_css_source_contract.v1",
+  "boundary": "Exact reviewed CSS source and bounded cascade witness; no browser computed style, pixels or release qualification.",
+  "modulePath": "components/landing-v2/landing-hero.module.css",
+  "globalPath": "app/tavonel.css",
+  "baselineBlob": "6c558dd777a430fdfc770895242b968a35024ac4",
+  "baselineSha256": "356d3ded825627a97e07dcd097f3f9e78f39af536d96634ca06cf8335e173f5b",
+  "baselineBytes": 27250,
+  "reviewedCandidateBlob": "962bc986d1961a00293bdcc3a9214472a16fe6b5",
+  "reviewedCandidateSha256": "0bad1cdd1e5277f5dbae67e16e03b2d434fb17d4e6e18f38b137ad01a49e4c8b",
+  "reviewedCandidateBytes": 27302,
+  "addedDeclarations": 2,
+  "addedBytes": 52,
+  "ink": "#14171a",
+  "paper": "#f6f3ec",
+  "globalHeadingInk": "#f4f6fa",
+  "minimumContrast": 4.5,
+  "headings": [
+    { "name": "reading guide title", "tag": "h2", "selector": ".readerHead h2" },
+    { "name": "sample FAQ title", "tag": "h2", "selector": ".readerFaq h2" },
+    { "name": "reading question headings", "tag": "h3", "selector": ".readerChecks h3" }
+  ]
+}

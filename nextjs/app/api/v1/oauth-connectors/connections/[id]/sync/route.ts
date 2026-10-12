@@ -116,11 +116,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     queued: jobs.value.filter((job) => job.state === "queued").length,
     leased: jobs.value.filter((job) => job.state === "leased").length,
     /*
-      ponytail: counted over the most recent BACKLOG_WINDOW jobs, which is every unfinished one
-      unless a connection has more than fifty jobs newer than its oldest queued job. Say so
-      here rather than in the UI; an exact count needs a separate count query in job-store.
+      What these counts were taken over. `window` is the limit this read asked for, not a count of
+      anything; `rowsRead` is how many recent rows actually came back. Fewer rows than asked for is
+      not evidence that the connection has no other jobs: nothing here verifies that the store
+      returns every matching row up to the requested limit (a lower server-side row cap would look
+      the same), and the read is one snapshot. So every successful read is reported as covering
+      only the recent rows it returned, and the client prints the counts as a lower bound rather
+      than "nothing waiting". There is no "complete" here because nothing here proves a total.
+      ponytail: an exact count needs a separate count query in job-store; this only marks the edge.
     */
     window: BACKLOG_WINDOW,
+    rowsRead: jobs.value.length,
+    coverage: "recent_window",
   };
 
   return NextResponse.json({ code: "OK", jobs: jobs.value.slice(0, LISTED_JOBS), backlog }, { headers: HEADERS });

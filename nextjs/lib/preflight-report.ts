@@ -44,7 +44,10 @@ export type PreflightFileInput = {
   fileName: string;
   /** The declared MIME if the surface has one. The workspace list does not; it has a name. */
   mime?: string | null;
-  /** Bytes, when known. Only a file this browser is still sending reports its size. */
+  /**
+   * Bytes, when known. Only a file this browser is still sending reports its size. Absent or
+   * null means unknown -- the report then stays a format lookup -- and is never read as zero.
+   */
   bytes?: number | null;
   /** Set by the caller from its own held/blocked state; this module never guesses one. */
   reviewRequired?: boolean;
@@ -75,6 +78,7 @@ const OMITTED_BY_FAMILY: Partial<Record<SourceFamily, readonly string[]>> = {
 };
 
 const OVER_CEILING = `over_the_${PROCESSING_CEILING_MIB}_mib_processing_ceiling`;
+const INVALID_SIZE = "empty_or_invalid_file_size";
 const MIME_FROM_EXTENSION = "mime_inferred_from_the_filename_extension";
 
 function extensionOf(fileName: string): string {
@@ -144,8 +148,18 @@ export function buildPreflightFileReport(input: PreflightFileInput): PreflightFi
   if (!isAcceptedAtUpload(entry.status)) {
     return refused(fileName, entry.mime, [...entry.knownLimitations], entry);
   }
-  if (typeof input.bytes === "number" && input.bytes > PROCESSING_CEILING.maxSourceBytes) {
-    return refused(fileName, entry.mime, [OVER_CEILING], entry);
+  // A known size has to be one intake would admit: a whole, safe number of bytes, at least one.
+  // An empty file, a negative or fractional count, NaN, Infinity or a non-number from an untyped
+  // caller is not a smaller file, and reporting it as accepted promises an upload intake refuses.
+  // Unknown (absent or null) is not checked here; the report stays a format lookup for it.
+  const bytes: unknown = input.bytes;
+  if (bytes !== undefined && bytes !== null) {
+    if (typeof bytes !== "number" || !Number.isSafeInteger(bytes) || bytes < 1) {
+      return refused(fileName, entry.mime, [INVALID_SIZE], entry);
+    }
+    if (bytes > PROCESSING_CEILING.maxSourceBytes) {
+      return refused(fileName, entry.mime, [OVER_CEILING], entry);
+    }
   }
 
   return {

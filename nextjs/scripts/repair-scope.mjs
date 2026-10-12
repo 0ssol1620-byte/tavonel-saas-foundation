@@ -1657,11 +1657,12 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
-// Ordinary Home landing owner: exactly these sixteen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// Ordinary Home landing owner: exactly these seventeen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
 export const HOME_AFFECTED_PATHS = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/compile-stage-player.tsx',
   'components/landing-v2/hero-actions.tsx', 'components/landing-v2/hero-film-disclosure.tsx', 'components/landing-v2/hero-film.tsx',
   'components/landing-v2/hero-source-card.test.tsx', 'components/landing-v2/hero-source-card.tsx', 'components/landing-v2/landing-analytics.tsx',
+  'components/landing-v2/home-reader-guide.tsx',
   'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'e2e/landing-v2.spec.ts', 'lib/film-motion-control.test.ts',
   'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts',
 ]);
@@ -1670,6 +1671,17 @@ export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
 ]);
 export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
+// Portable source contracts for the exact reviewed reader-heading CSS correction. Additive to Home's existing owner.
+export const HOME_READER_HEADING_CSS_AFFECTED_PATHS = Object.freeze([
+  'components/landing-v2/landing-hero.module.css', 'app/tavonel.css',
+  'lib/home-reader-heading-css-contract.test.ts', 'lib/home-reader-heading-css-registration.test.ts',
+  'scripts/fixtures/home-reader-heading-css-baseline.json', 'scripts/repair-scope.mjs',
+]);
+export const HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/home-reader-heading-css-contract.test.ts', 'lib/home-reader-heading-css-registration.test.ts',
+]);
+export const REPAIR_NODE_EVIDENCE_CONTRACT_FILE = 'lib/repair-node-evidence.test.mjs';
+export const REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE = 'lib/repair-node-gate-receipt.test.ts';
 // Recipe continuation owner (X08): exactly these seven nextjs-relative paths, no glob. Product sign-in UI, so never nativeReuse.
 export const RECIPE_CONTINUATION_AFFECTED_PATHS = Object.freeze([
   'app/auth/callback/page.tsx', 'app/cookbooks/[slug]/page.tsx', 'app/login/page.tsx', 'components/recipe-preflight.tsx',
@@ -1681,6 +1693,101 @@ export const RECIPE_CONTINUATION_AFFECTED_UNIT_FILES = Object.freeze([
 ]);
 // The continuation spec runs in 1440, 390, 360 and reduced-motion; the existing sign-in capability spec only in 1440.
 export const RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/recipe-continuation.spec.ts', 'e2e/login-capability.spec.ts']);
+// Source agent scope (UX09): exactly the agent, its Python suite, the Vitest wrapper that runs that suite, the served operations
+// doc and the distribution channel, plus the cloud intake plan's Python suite, which the same wrapper discovers and runs.
+// Product code and release integrity, so never nativeReuse; the channel test re-hashes the agent.
+export const SOURCE_AGENT_AFFECTED_PATHS = Object.freeze([
+  'public/developer/tavonel-source-agent.py', 'scripts/source-agent/test_source_agent.py', 'lib/source-agent-runtime.test.ts',
+  'public/developer/source-agent-operations.md', 'public/developer/channel.json',
+  'scripts/source-agent/test_cloud_intake_plan.py',
+]);
+export const SOURCE_AGENT_AFFECTED_UNIT_FILES = Object.freeze(['lib/source-agent-runtime.test.ts', 'lib/developer-distribution.test.ts']);
+// Connector sync progress: exactly the per-connection sync route, its status component and the two direct suites. Product
+// connector code, so never nativeReuse; the route's literal [id] segment is matched through the exact alternation below.
+export const CONNECTOR_PROGRESS_AFFECTED_PATHS = Object.freeze([
+  'app/api/v1/oauth-connectors/connections/[id]/sync/route.ts', 'components/connection-sync-status.tsx',
+  'lib/connection-sync-lag.test.ts', 'lib/connection-sync-polling.test.ts',
+]);
+export const CONNECTOR_PROGRESS_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-sync-polling.test.ts', 'lib/connection-sync-lag.test.ts']);
+// Review queue: exactly the workspace page, the queue model, its component and its direct suite. Product workspace UI, so never
+// nativeReuse. The page stays owned by workspace-lifecycle and grounded-ask too; their selections join this one in the union.
+export const REVIEW_QUEUE_AFFECTED_PATHS = Object.freeze([
+  'app/workspace/page.tsx', 'components/review-queue.tsx', 'lib/review-queue.test.ts', 'lib/review-queue.ts',
+]);
+export const REVIEW_QUEUE_AFFECTED_UNIT_FILES = Object.freeze(['lib/review-queue.test.ts']);
+// Sample analytics admission (UX08): exactly the Google Analytics relay, its suite, the consent banner and the admission suite.
+// Product analytics code, so never nativeReuse. Home keeps selecting the relay suite for its own paths; both join in the union.
+export const SAMPLE_ANALYTICS_AFFECTED_PATHS = Object.freeze([
+  'lib/marketing-analytics.ts', 'lib/marketing-analytics.test.ts', 'components/marketing-consent.tsx', 'lib/sample-analytics-admission.test.ts',
+]);
+export const SAMPLE_ANALYTICS_AFFECTED_UNIT_FILES = Object.freeze(['lib/marketing-analytics.test.ts', 'lib/sample-analytics-admission.test.ts']);
+// Consumer verification: exactly the developer panel, the verification panel, its model and the model's direct suite. Product
+// developer UI, so never nativeReuse. Ownership only: no blob is pinned, so later edits to these four paths keep this one owner.
+export const CONSUMER_VERIFICATION_AFFECTED_PATHS = Object.freeze([
+  'components/developer-panel.tsx', 'components/consumer-verification-panel.tsx', 'lib/consumer-verification.ts', 'lib/consumer-verification.test.ts',
+]);
+export const CONSUMER_VERIFICATION_AFFECTED_UNIT_FILES = Object.freeze(['lib/consumer-verification.test.ts']);
+// World version diff: exactly the existing model/suite, panel/CSS, diff view/suite and comparison-binding suite.
+// Product world model/UI code, so never nativeReuse. Ownership only: no source blob is pinned.
+export const WORLD_VERSION_DIFF_AFFECTED_PATHS = Object.freeze([
+  'lib/world-version-diff.ts', 'lib/world-version-diff.test.ts',
+  'components/world-version-diff.tsx', 'components/world-version-diff.module.css',
+  'lib/world-version-diff-view.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-comparison-binding.test.ts',
+]);
+export const WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/world-version-diff.test.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-comparison-binding.test.ts',
+]);
+// Compile observations: exactly the authenticated route, compile implementation, durable worker and their new Node contract.
+// Product compile code, so never nativeReuse; the existing compile and worker suites remain direct owning checks.
+export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS = Object.freeze([
+  'app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts',
+  'lib/compile-job-worker.ts', 'lib/collection-compile-source-observations.test.mjs',
+]);
+export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/collection-compile-run.test.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs',
+]);
+// Explorer navigation: exactly the existing explorer, its CSS, the navigation model and the direct navigation suite.
+// Product workspace UI, so never nativeReuse; no adjacent world route or model is admitted by this finite owner.
+export const WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS = Object.freeze([
+  'components/world-explorer.tsx', 'components/world-explorer.module.css',
+  'lib/world-explorer-navigation.ts', 'lib/world-explorer-navigation.test.ts',
+]);
+export const WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES = Object.freeze(['lib/world-explorer-navigation.test.ts']);
+// Customer source lifecycle (UX16): exactly the lifecycle model and its direct suite. Product customer-source code, so never
+// nativeReuse. Ownership only: no blob is pinned, so later edits to these two paths keep this one owner. The lifecycle route
+// suite and every deletion, retention, backup, worker, SQL and UI neighbour stay outside this owner.
+export const CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_PATHS = Object.freeze(['lib/customer-source-lifecycle.ts', 'lib/customer-source-lifecycle.test.ts']);
+export const CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_UNIT_FILES = Object.freeze(['lib/customer-source-lifecycle.test.ts']);
+// Preflight report: exactly the per-file preflight report model and its direct suite. Product intake code, so never nativeReuse.
+// Ownership only: no blob is pinned, so later edits to these two paths keep this one owner. The triage client and copy, the
+// operations view, the workspace page, the upload API routes and the shared manifest/ceiling backend stay outside this owner.
+export const PREFLIGHT_REPORT_AFFECTED_PATHS = Object.freeze(['lib/preflight-report.ts', 'lib/preflight-report.test.ts']);
+export const PREFLIGHT_REPORT_AFFECTED_UNIT_FILES = Object.freeze(['lib/preflight-report.test.ts']);
+// Workspace membership (UX19): exactly the membership model and its direct suite. Product access-control code, so never
+// nativeReuse. Ownership only: no blob is pinned, so later edits to these two paths keep this one owner. The request-user and
+// Supabase admin helpers, the auth pages, every list/invite/revoke route, API, SQL, UI and ACL neighbour stay outside this owner.
+export const WORKSPACE_MEMBERSHIP_AFFECTED_PATHS = Object.freeze(['lib/workspace-membership.ts', 'lib/workspace-membership.test.ts']);
+export const WORKSPACE_MEMBERSHIP_AFFECTED_UNIT_FILES = Object.freeze(['lib/workspace-membership.test.ts']);
+// Ontology class rename preview (UX20): exactly the ontology viewer, its stylesheet, the rename preview component, the preview model
+// and the model's direct suite. Product world UI, so never nativeReuse. Ownership only: no blob is pinned, so later edits to these
+// five paths keep this one owner. The viewer and its stylesheet stay owned by workspace-lifecycle too; its four suites and its
+// world-lifecycle browser suite join this selection in the union. Every other ontology, world read-model, route, API, mutation and
+// backend neighbour stays outside this owner.
+export const ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_PATHS = Object.freeze([
+  'components/world-ontology-viewer.tsx', 'components/world-ontology-viewer.module.css', 'components/world-ontology-rename-preview.tsx',
+  'lib/ontology-class-rename-preview.ts', 'lib/ontology-class-rename-preview.test.ts',
+]);
+export const ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_UNIT_FILES = Object.freeze(['lib/ontology-class-rename-preview.test.ts']);
+// Pilot evaluation worksheet: exactly the evaluation page, its two blank static worksheets and the worksheet suite. Product public UI
+// and served files, so never nativeReuse. Ownership only: no blob is pinned, so later edits to these four paths keep this one owner.
+// The existing EvaluationPage suite is selected beside the worksheet suite but its own path stays unregistered. The contact form, the
+// evaluation routes, the public site chrome, every other locale, extension or directory and every API, provider and backend neighbour
+// stay outside this owner.
+export const PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS = Object.freeze([
+  'components/evaluation-page.tsx', 'public/evaluation/pilot-worksheet.en.md', 'public/evaluation/pilot-worksheet.ko.md',
+  'lib/pilot-evaluation-worksheet.test.ts',
+]);
+export const PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES = Object.freeze(['components/evaluation-page.test.tsx', 'lib/pilot-evaluation-worksheet.test.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -1748,7 +1855,8 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: ['lib/billing-product-access.test.ts', 'lib/billing-gate-enforcement.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/plan-entitlement.test.ts', 'lib/world-activation-plan-gate.test.ts'] }),
   affectedGroup('docs', /^(?:README\.md|nextjs\/(?:README\.md|lib\/(?:docs-[a-z-]+|retrieval-docs-parity)(?:\.test)?\.ts|app\/docs\/.+|components\/docs\/.+|e2e\/docs-reading-layout\.spec\.ts))$/,
     { unitFiles: ['lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/retrieval-docs-parity.test.ts'], browserFiles: ['e2e/docs-reading-layout.spec.ts'], nativeReuse: true }),
-  affectedGroup('workspace-lifecycle', /^nextjs\/(?:app\/workspace\/.+|components\/(?:world-studio-ultimate|world-directory-tree|world-ontology-viewer|world-graph-canvas|workspace-ultimate-shell)(?:\.module\.css|\.tsx)|components\/world-visual\/.+|lib\/(?:visual-world-model|world-graph-layout|workspace-failure-copy|world-directory-and-ontology)(?:\.test)?\.ts|e2e\/world-lifecycle\.spec\.ts)$/,
+  // The directory lens reuses the unchanged navigation helper; only this exact source dependency joins lifecycle checks.
+  affectedGroup('workspace-lifecycle', /^nextjs\/(?:app\/workspace\/.+|components\/(?:world-studio-ultimate|world-directory-tree|world-ontology-viewer|world-graph-canvas|workspace-ultimate-shell)(?:\.module\.css|\.tsx)|components\/world-visual\/.+|lib\/(?:visual-world-model|world-graph-layout|workspace-failure-copy|world-directory-and-ontology)(?:\.test)?\.ts|lib\/world-explorer-navigation\.ts|e2e\/world-lifecycle\.spec\.ts)$/,
     { unitFiles: ['lib/world-directory-and-ontology.test.ts', 'lib/visual-world-model.test.ts', 'lib/world-graph-layout.test.ts', 'lib/workspace-failure-copy.test.ts'], browserFiles: ['e2e/world-lifecycle.spec.ts'], nativeReuse: true }),
   // Grounded Ask: exactly eight paths. Overlaps acl on ask-route-limits.test.ts and workspace-lifecycle on app/workspace/page.tsx;
   // both keep their own selections. Product Ask behavior, so never nativeReuse: any match requires the fresh native run.
@@ -1758,14 +1866,55 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the sixteen exact paths above select seven direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the seventeen exact paths above select seven direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),
+  affectedGroup('home-reader-heading-css', new RegExp(`^nextjs/(?:${exactPathAlternation(HOME_READER_HEADING_CSS_AFFECTED_PATHS)})$`),
+    { unitFiles: HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES }),
   // Recipe continuation: the seven exact paths above select seven direct suites and two browser suites; the continuation spec
   // runs in 1440, 390, 360 and reduced-motion and login-capability only in 1440 of the shared map.
   affectedGroup('recipe-continuation', new RegExp(`^nextjs/(?:${exactPathAlternation(RECIPE_CONTINUATION_AFFECTED_PATHS)})$`),
     { unitFiles: RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, browserFiles: RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES }),
+  // Source agent: the six exact paths above select two direct suites only; no browser, database, worker or build lane.
+  affectedGroup('source-agent', new RegExp(`^nextjs/(?:${exactPathAlternation(SOURCE_AGENT_AFFECTED_PATHS)})$`),
+    { unitFiles: SOURCE_AGENT_AFFECTED_UNIT_FILES }),
+  // Connector sync progress: the four exact paths above select two direct suites only; no browser, database, worker or build lane.
+  affectedGroup('connector-progress', new RegExp(`^nextjs/(?:${exactPathAlternation(CONNECTOR_PROGRESS_AFFECTED_PATHS)})$`),
+    { unitFiles: CONNECTOR_PROGRESS_AFFECTED_UNIT_FILES }),
+  // Review queue: the four exact paths above select the one direct suite only; no browser, database, worker or build lane of its own.
+  affectedGroup('review-queue', new RegExp(`^nextjs/(?:${exactPathAlternation(REVIEW_QUEUE_AFFECTED_PATHS)})$`),
+    { unitFiles: REVIEW_QUEUE_AFFECTED_UNIT_FILES }),
+  // Sample analytics admission: the four exact paths above select the two direct suites only; no browser, database, worker or build lane.
+  affectedGroup('sample-analytics-admission', new RegExp(`^nextjs/(?:${exactPathAlternation(SAMPLE_ANALYTICS_AFFECTED_PATHS)})$`),
+    { unitFiles: SAMPLE_ANALYTICS_AFFECTED_UNIT_FILES }),
+  // Consumer verification: the four exact paths above select the one direct suite only; no browser, database, worker or build lane.
+  affectedGroup('consumer-verification', new RegExp(`^nextjs/(?:${exactPathAlternation(CONSUMER_VERIFICATION_AFFECTED_PATHS)})$`),
+    { unitFiles: CONSUMER_VERIFICATION_AFFECTED_UNIT_FILES }),
+  // Compile observations and explorer navigation are finite owners, with no browser, database, worker or build lane of their own.
+  affectedGroup('compile-source-observations', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS)})$`),
+    { unitFiles: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES }),
+  affectedGroup('world-explorer-navigation', new RegExp(`^nextjs/(?:${exactPathAlternation(WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS)})$`),
+    { unitFiles: WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES }),
+  // World version diff: the seven exact paths above select three direct suites only; no browser, database, worker or build lane.
+  affectedGroup('world-version-diff', new RegExp(`^nextjs/(?:${exactPathAlternation(WORLD_VERSION_DIFF_AFFECTED_PATHS)})$`),
+    { unitFiles: WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES }),
+  // Customer source lifecycle: the two exact paths above select the one direct suite only; no browser, database, worker or build lane.
+  affectedGroup('customer-source-lifecycle', new RegExp(`^nextjs/(?:${exactPathAlternation(CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_PATHS)})$`),
+    { unitFiles: CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_UNIT_FILES }),
+  // Preflight report: the two exact paths above select the one direct suite only; no browser, database, worker or build lane.
+  affectedGroup('preflight-report', new RegExp(`^nextjs/(?:${exactPathAlternation(PREFLIGHT_REPORT_AFFECTED_PATHS)})$`),
+    { unitFiles: PREFLIGHT_REPORT_AFFECTED_UNIT_FILES }),
+  // Workspace membership: the two exact paths above select the one direct suite only; no browser, database, worker or build lane.
+  affectedGroup('workspace-membership', new RegExp(`^nextjs/(?:${exactPathAlternation(WORKSPACE_MEMBERSHIP_AFFECTED_PATHS)})$`),
+    { unitFiles: WORKSPACE_MEMBERSHIP_AFFECTED_UNIT_FILES }),
+  // Ontology class rename preview: the five exact paths above select the one direct suite only; no browser, database, worker or build
+  // lane of its own. The viewer and its stylesheet keep workspace-lifecycle, whose selection joins this one in the union.
+  affectedGroup('ontology-class-rename-preview', new RegExp(`^nextjs/(?:${exactPathAlternation(ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_PATHS)})$`),
+    { unitFiles: ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_UNIT_FILES }),
+  // Pilot evaluation worksheet: the four exact paths above select the two direct suites only; no browser, database, worker or build lane.
+  affectedGroup('pilot-evaluation-worksheet', new RegExp(`^nextjs/(?:${exactPathAlternation(PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS)})$`),
+    { unitFiles: PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
@@ -1780,7 +1929,9 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
   affectedGroup('ci-selector', /^(?:\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml|nextjs\/scripts\/(?:repair-[a-z-]+(?:\.test)?\.mjs|run-repair-check\.mjs|verify-repair-workflows\.mjs|db\/(?:native-world-race(?:-ci)?|dropbox-source-stream-race)(?:\.test)?\.mjs|fixtures\/[A-Za-z0-9_.-]+\.json)|nextjs\/vitest\.repair-scope(?:\.async)?\.config\.ts)$/,
-    { selector: true }),
+    { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
+  affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-evidence\.test\.mjs$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
+  affectedGroup('ci-selector', /^nextjs\/lib\/repair-node-gate-receipt\.test\.ts$/, { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   // The exact global Vitest config only: selector/static checks, distinct from the Home owner; its content must pass
   // vitestDiscoveryConfigFailures at head or the map fails closed.
   affectedGroup('shared-test-discovery', /^nextjs\/vitest\.config\.ts$/, { selector: true }),

@@ -3178,7 +3178,7 @@ test('affected owner groups select the initial task checks for every product own
   assert.deepEqual(select('nextjs/lib/world-activation-plan-gate.test.ts').unitFiles,['lib/billing-gate-enforce-route.test.ts','lib/billing-gate-enforcement.test.ts','lib/billing-product-access.test.ts','lib/plan-entitlement.test.ts','lib/world-activation-plan-gate.test.ts']);
   const docs=select('nextjs/app/docs/[section]/page.tsx');
   assert.deepEqual([docs.groups,docs.unitFiles,docs.browserFiles],[['docs'],['lib/docs-content.test.ts','lib/docs-navigation.test.ts','lib/retrieval-docs-parity.test.ts'],['e2e/docs-reading-layout.spec.ts']]);
-  const lifecycle=select('nextjs/components/world-ontology-viewer.tsx');
+  const lifecycle=select('nextjs/components/world-graph-canvas.tsx');
   assert.deepEqual([lifecycle.groups,lifecycle.browserFiles],[['workspace-lifecycle'],['e2e/world-lifecycle.spec.ts']]);
   assert.deepEqual(lifecycle.unitFiles,['lib/visual-world-model.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
   const ocr=select('quarantine-sidecar/foundation-cdr-worker/src/ocr.ts');
@@ -3187,7 +3187,7 @@ test('affected owner groups select the initial task checks for every product own
   assert.deepEqual(dropbox.groups,['dropbox-connector']);assert.equal(dropbox.unitFiles.length,10);
   for (const consumer of ['lib/connector-page-integrity.test.ts','lib/connector-provider-isolation.test.ts','lib/connector-source-identity.test.ts','lib/sync-worker.test.ts','lib/connector-replay-world-currency-migration.test.ts']) assert.ok(dropbox.unitFiles.includes(consumer),consumer);
   const ci=select('.github/workflows/native-world-race.yml');
-  assert.deepEqual([ci.groups,ci.runSelectorContracts,ci.unitFiles],[['ci-selector'],true,[]]);
+  assert.deepEqual([ci.groups,ci.runSelectorContracts,ci.unitFiles],[['ci-selector'],true,['lib/repair-node-evidence.test.mjs','lib/repair-node-gate-receipt.test.ts']]);
   // Product owner suites live in the independently staged product half of this task; this CI-only checkout verifies their exact mapping, not their presence on this intermediate tree.
   const browsers=[...new Set(AFFECTED_GROUPS.flatMap(group=>group.browserFiles))].sort();
   assert.deepEqual(planBrowserRuns(browsers,false).filter(run=>run.files.includes('e2e/world-lifecycle.spec.ts')).map(run=>run.project),['1440','390','reduced-motion']);
@@ -3244,7 +3244,8 @@ test('affected owner map covers all 26 requested product paths and their executi
   for(const path of AFFECTED_CI_OWNER_PATHS){
     const plan=select(path),manifest=path==='AFFECTED-INTEGRATION-MANIFEST.md';assert.deepEqual(plan.failures,[],path);assert.ok(existsSync(resolve(root,path)),'missing CI owner: '+path);
     // The manifest is the one CI-owned document: it maps to repository docs and selects no selector contract by itself.
-    assert.deepEqual(plan.groups,manifest?['repository-docs']:['ci-selector'],path+' CI owner');assert.equal(plan.runSelectorContracts,!manifest,path);
+    const expectedGroups=manifest?['repository-docs']:path==='nextjs/scripts/repair-scope.mjs'?['ci-selector','home-reader-heading-css']:['ci-selector'];
+    assert.deepEqual(plan.groups,expectedGroups,path+' CI owner');assert.equal(plan.runSelectorContracts,!manifest,path);
   }
 });
 test('affected 43-path integrated map selects the Dropbox SQL dependency fixtures with exact reasons and only on a required DB lane', () => {
@@ -3253,7 +3254,7 @@ test('affected 43-path integrated map selects the Dropbox SQL dependency fixture
   assert.equal(records.length,43);
   const map=affectedMap(records);
   assert.deepEqual(map.failures,[]);assert.equal(map.changedPaths.length,43);
-  assert.deepEqual(map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+  assert.deepEqual(map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
   assert.deepEqual([map.databaseChanged,map.runSelectorContracts,map.runCdrWorkerChecks,map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
   assert.deepEqual(map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
     'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
@@ -3334,11 +3335,18 @@ const AFFECTED_INTEGRATED_PATHS=Object.freeze([...AFFECTED_PRODUCT_PATHS,...AFFE
 const AFFECTED_ASK_ANSWER_PATHS=Object.freeze(['nextjs/lib/grounded-ask-packet.test.ts','nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask.ts',
   'nextjs/lib/workspace-ask-copy.test.ts','nextjs/lib/workspace-ask-copy.ts']);
 const AFFECTED_COMBINED_PATHS=Object.freeze([...AFFECTED_INTEGRATED_PATHS,...AFFECTED_ASK_ANSWER_PATHS].sort());
+// These new CI contracts are actual repository bytes, never product stand-ins. Keep the original 43/48 path inventories intact;
+// current CI-bearing fixture heads additionally carry the five leaves required by the additive CSS/Node/gate owners.
+const AFFECTED_CI_CONTRACT_SUPPORT_PATHS=Object.freeze([
+  'nextjs/lib/home-reader-heading-css-contract.test.ts','nextjs/lib/home-reader-heading-css-registration.test.ts',
+  'nextjs/lib/repair-node-evidence.test.mjs','nextjs/lib/repair-node-gate-receipt.test.ts','nextjs/scripts/fixtures/home-reader-heading-css-baseline.json',
+]);
+const AFFECTED_SUPPORTED_COMBINED_PATHS=Object.freeze([...AFFECTED_COMBINED_PATHS,...AFFECTED_CI_CONTRACT_SUPPORT_PATHS].sort());
 // CI owners carry their actual candidate bytes. Product (including the Ask answer leaves) and SQL fixture leaves are path-exact stand-ins (baseline
 // bytes plus one line, or a marker when absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel
 // product task.
 const affectedLeafBytes=path=>{
-  if(AFFECTED_CI_OWNER_PATHS.includes(path))return readFileSync(resolve(affectedRepoRoot,path));
+  if(AFFECTED_CI_OWNER_PATHS.includes(path)||AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path))return readFileSync(resolve(affectedRepoRoot,path));
   let base;try{base=affectedBaselineBytes(path);}catch{return Buffer.from(`affected fixture stand-in for ${path}\n`);}
   return Buffer.concat([base,Buffer.from('\n')]);
 };
@@ -3365,8 +3373,11 @@ function affectedRealGitFixture(){
     try{writeFileSync(resolve(root,'.git/shallow'),readFileSync(sourceGit(['rev-parse','--path-format=absolute','--git-path','shallow'])));}catch{/* full history */}
     checkout(B);
   }catch(error){rmSync(root,{recursive:true,force:true});throw error;}
-  const put=(path,bytes,mode='100644')=>()=>{
-    const blob=git(['hash-object','-w',`--path=${path}`,'--stdin'],{input:bytes}).trim();
+  const put=(path,bytes,mode='100644',raw=false)=>()=>{
+    // The five added contracts prove exact actual source bytes; repository text filters must not rewrite that proof.
+    // Preserve the reviewed original 48-path staging behavior for every other leaf.
+    const hashArgs=raw?['hash-object','-w','--stdin']:['hash-object','-w',`--path=${path}`,'--stdin'];
+    const blob=git(hashArgs,{input:bytes}).trim();
     staging(['update-index','--add','--cacheinfo',`${mode},${blob},${path}`]);written[path]=blob;
   };
   const move=(from,to)=>()=>{const blob=git(['rev-parse',`${B}:${from}`]).trim();staging(['update-index','--force-remove','--',from]);staging(['update-index','--add','--cacheinfo',`100644,${blob},${to}`]);};
@@ -3385,22 +3396,31 @@ const affectedLink=(target,path,support,name)=>{
   if(process.platform==='win32'){const junction=resolve(support,name);mkdirSync(junction);symlinkSync(junction,path,'junction');}
   else symlinkSync(target,path,'file');
 };
-test('affected real Git map binds the combined 48-path head (43-path checkpoint plus the five Ask answer leaves) with rename, deletion and index-only edges from clean baseline checkouts',()=>{
+test('affected real Git map binds the original 48 paths plus current CI contracts with rename, deletion and index-only edges from clean baseline checkouts',()=>{
   const previous=process.cwd();let fixture;
   try{
     fixture=affectedRealGitFixture();const {root,B,git,put,move,remove,commit,checkout,written}=fixture;
     process.chdir(root);
     const source=head=>{const intent=affectedCollector.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return affectedCollector.verifyAffectedSource({headSha:head,intent});};
-    const leaves=paths=>paths.map(path=>put(path,affectedLeafBytes(path)));
+    const leaves=paths=>[...new Set([...paths,...(paths.some(path=>AFFECTED_CI_OWNER_PATHS.includes(path))?AFFECTED_CI_CONTRACT_SUPPORT_PATHS:[])])].map(path=>put(path,affectedLeafBytes(path),'100644',AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)));
     assert.equal(AFFECTED_INTEGRATED_PATHS.length,43);
     assert.equal(AFFECTED_COMBINED_PATHS.length,48);assert.equal(new Set(AFFECTED_COMBINED_PATHS).size,48);
+    assert.equal(AFFECTED_CI_CONTRACT_SUPPORT_PATHS.length,5);assert.equal(AFFECTED_SUPPORTED_COMBINED_PATHS.length,53);
     const integrated=commit(...leaves(AFFECTED_COMBINED_PATHS));
-    // Exact target tree: the baseline child differs from the baseline in exactly the 48 written leaves.
-    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),AFFECTED_COMBINED_PATHS);
-    for(const path of AFFECTED_COMBINED_PATHS)assert.equal(git(['rev-parse',`${integrated}:${path}`]).trim(),written[path],path);
+    // Exact target tree retains all original 48 leaves and adds only the five required current CI contracts.
+    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),AFFECTED_SUPPORTED_COMBINED_PATHS);
+    console.log('affected-current53-diff '+JSON.stringify({head:integrated,baseline:B,paths:git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort()}));
+    for(const path of AFFECTED_SUPPORTED_COMBINED_PATHS)assert.equal(git(['rev-parse',`${integrated}:${path}`]).trim(),written[path],path);
+    for(const path of AFFECTED_CI_CONTRACT_SUPPORT_PATHS){
+      const actual=readFileSync(resolve(affectedRepoRoot,path)),staged=git(['show',`${integrated}:${path}`],{encoding:'buffer'});
+      assert.equal(createHash('sha256').update(staged).digest('hex'),createHash('sha256').update(actual).digest('hex'),path+' actual current CI source');
+      assert.ok(staged.equals(actual),path+' has no stand-in bytes');
+      console.log('affected-current-ci-support '+JSON.stringify({path,bytes:staged.length,sha256:createHash('sha256').update(staged).digest('hex'),gitBlob:written[path]}));
+    }
     const full=source(integrated);
-    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,AFFECTED_COMBINED_PATHS);
-    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,AFFECTED_SUPPORTED_COMBINED_PATHS);
+    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
+    for(const file of ['lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts','lib/repair-node-evidence.test.mjs','lib/repair-node-gate-receipt.test.ts'])assert.ok(full.map.unitFiles.includes(file),file+' current CI contract selected');
     // The page/ask-route-limits overlap selects every grounded-ask suite, and each one is present at the combined head.
     for(const suite of AFFECTED_GROUPS.find(owner=>owner.group==='grounded-ask').unitFiles)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
@@ -3447,6 +3467,11 @@ test('affected real Git map binds the combined 48-path head (43-path checkpoint 
     assert.match(affectedCollector.classifyAffectedIntent({headSha:integrated}).reason,/untracked paths: nextjs\/repair-plan\.json/);
     rmSync(resolve(root,'nextjs/repair-plan.json'));
     assert.equal(source(integrated).eligible,true);
+    // Each added selected contract is still mandatory; support leaves cannot turn absence into admission.
+    for(const path of AFFECTED_CI_CONTRACT_SUPPORT_PATHS.filter(path=>path.endsWith('.test.ts')||path.endsWith('.test.mjs'))){
+      const missing=commit(...leaves(AFFECTED_COMBINED_PATHS),remove(path));
+      assert.match(source(missing).reason,new RegExp('selected owner check is absent at head: '+path.slice(7).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),path);
+    }
   }finally{process.chdir(previous);fixture?.cleanup();}
 });
 // The cumulative 6401-anchor selection is the one unavailable input here (absent from a shallow checkout); the gate's owner, regular-file,
@@ -3459,8 +3484,8 @@ test('affected plan to final gate qualifies only the byte-equal regular owner pl
   try{
     fixture=affectedRealGitFixture();const {root,B,put,commit}=fixture;
     support=mkdtempSync(resolve(tmpdir(),'affected-gate-support-'));
-    // The combined 48-path head: the 43-path checkpoint plus the five Ask answer leaves its grounded-ask selection requires.
-    const head=commit(...AFFECTED_COMBINED_PATHS.map(path=>put(path,affectedLeafBytes(path))));
+    // Retain the original combined 48 leaves and stage only the current five actual CI contract dependencies beside them.
+    const head=commit(...AFFECTED_SUPPORTED_COMBINED_PATHS.map(path=>put(path,affectedLeafBytes(path))));
     const cwd=resolve(root,'nextjs'),planPath=resolve(cwd,'repair-plan.json'),receiptPath=resolve(cwd,'repair-receipt.json');
     const event={number:141,pull_request:{number:141,base:{sha:B},head:{sha:head}}};
     const env={PR_BASE_SHA:B,PR_NUMBER:'141',REPAIR_ANCHOR_SHA:AUDITED_REPAIR_ANCHOR_SHA,REPAIR_HEAD_SHA:head,HEAD_SHA:head};
@@ -3470,7 +3495,7 @@ test('affected plan to final gate qualifies only the byte-equal regular owner pl
     const source=gate();
     assert.equal(source.eligible,true,source.reason);assert.equal(source.generatedPlan,undefined);
     const plan=affectedCollector.affectedPlan(normal,source),planBytes=Buffer.from(JSON.stringify(plan,null,2)+'\n');
-    assert.deepEqual(plan.affectedIntegration.changedPaths,AFFECTED_COMBINED_PATHS);
+    assert.deepEqual(plan.affectedIntegration.changedPaths,AFFECTED_SUPPORTED_COMBINED_PATHS);
     assert.match(affectedCollector.affectedLineageFailures(plan,source)[0],/not qualified by the final-gate owner/);
     assert.equal(buildRepairReceipt(plan,{headSha:head,failures:affectedCollector.affectedLineageFailures(plan,source)}).gate,'failed');
     writeFileSync(planPath,planBytes);
@@ -3622,7 +3647,7 @@ test('affected GPU admission: only the candidate job pins the exact PR head and 
 const AFFECTED_ASK_PATHS=Object.freeze(['nextjs/lib/grounded-ask.ts','nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask-packet.test.ts','nextjs/app/workspace/page.tsx',
   'nextjs/lib/workspace-ask-copy.ts','nextjs/lib/workspace-ask-copy.test.ts','nextjs/lib/context-packet.test.ts','nextjs/lib/ask-route-limits.test.ts']);
 const AFFECTED_ASK_SUITES=Object.freeze(['lib/ask-route-limits.test.ts','lib/context-packet.test.ts','lib/grounded-ask-packet.test.ts','lib/grounded-ask.test.ts','lib/workspace-ask-copy.test.ts']);
-const AFFECTED_ASK_OVERLAPS=Object.freeze({'nextjs/lib/ask-route-limits.test.ts':'acl','nextjs/app/workspace/page.tsx':'workspace-lifecycle'});
+const AFFECTED_ASK_OVERLAPS=Object.freeze({'nextjs/lib/ask-route-limits.test.ts':['acl'],'nextjs/app/workspace/page.tsx':['review-queue','workspace-lifecycle']});
 const AFFECTED_ACL_UNITS=Object.freeze(['lib/acl-refresh-core.test.mjs','lib/ask-route-limits.test.ts','lib/connector-source-access.test.ts','lib/google-drive-acl-capture.test.ts','lib/pgtap-fixtures.test.ts','lib/source-acl-admission-migration.test.ts']);
 const AFFECTED_LIFECYCLE_UNITS=Object.freeze(['lib/visual-world-model.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
 const affectedUnion=(...lists)=>[...new Set(lists.flat())].sort();
@@ -3633,7 +3658,7 @@ test('affected grounded-ask admission: exactly eight owner paths select exactly 
   assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
     [AFFECTED_ASK_SUITES,[],[],false,false,false,false,undefined,undefined]);
   for (const path of AFFECTED_ASK_PATHS)
-    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group).sort(),['grounded-ask',...(AFFECTED_ASK_OVERLAPS[path]?[AFFECTED_ASK_OVERLAPS[path]]:[])].sort(),path);
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group).sort(),['grounded-ask',...(AFFECTED_ASK_OVERLAPS[path]??[])].sort(),path);
   for (const path of AFFECTED_ASK_PATHS.filter(path=>!AFFECTED_ASK_OVERLAPS[path])) {
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['grounded-ask'],AFFECTED_ASK_SUITES,[]],path);
@@ -3658,7 +3683,7 @@ test('affected grounded-ask admission: ask-route-limits.test.ts overlaps acl and
 });
 test('affected grounded-ask admission: workspace page overlaps workspace-lifecycle, world-lifecycle.spec.ts is unchanged and the answer delta unions every selection', () => {
   const page=affectedMap([affectedRecord('M',['nextjs/app/workspace/page.tsx'])]);
-  assert.deepEqual([page.failures,page.groups,page.unitFiles,page.browserFiles],[[],['grounded-ask','workspace-lifecycle'],affectedUnion(AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES),['e2e/world-lifecycle.spec.ts']]);
+  assert.deepEqual([page.failures,page.groups,page.unitFiles,page.browserFiles],[[],['grounded-ask','review-queue','workspace-lifecycle'],affectedUnion(AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES),['e2e/world-lifecycle.spec.ts']]);
   assert.deepEqual([page.nativeEvidence.disposition,page.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',['nextjs/app/workspace/page.tsx']]);
   const spec=affectedMap([affectedRecord('M',['nextjs/e2e/world-lifecycle.spec.ts'])]);
   assert.deepEqual([spec.failures,spec.groups,spec.unitFiles,spec.browserFiles,spec.nativeEvidence.disposition],[[],['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS,['e2e/world-lifecycle.spec.ts'],'historical-input-reuse']);
@@ -3667,8 +3692,8 @@ test('affected grounded-ask admission: workspace page overlaps workspace-lifecyc
     affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('A',['nextjs/lib/workspace-ask-copy.ts'],'000000'),affectedRecord('A',['nextjs/lib/workspace-ask-copy.test.ts'],'000000'),
     affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/e2e/world-lifecycle.spec.ts'])];
   const map=affectedMap(delta);
-  assert.deepEqual([map.failures,map.groups,map.changedPaths.length],[[],['acl','grounded-ask','workspace-lifecycle'],8]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES));assert.equal(map.unitFiles.length,14);
+  assert.deepEqual([map.failures,map.groups,map.changedPaths.length],[[],['acl','grounded-ask','review-queue','workspace-lifecycle'],8]);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,15);
   assert.deepEqual(map.browserFiles,['e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite})=>({group,suite})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts'}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -3775,8 +3800,8 @@ test('affected Explore admission: mixed changes keep the Ask, ACL, workspace and
   const records=[affectedRecord('M',['nextjs/lib/explore-story.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),
     affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
   const map=affectedMap(records);
-  assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','ocr-gpu-worker','workspace-lifecycle']]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES));assert.equal(map.unitFiles.length,18);
+  assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','ocr-gpu-worker','review-queue','workspace-lifecycle']]);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,19);
   assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,'e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -3902,17 +3927,77 @@ test('affected Explore admission: readAffectedExecution rereads the five-unit an
     assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
-// ---- Affected Home admission: sixteen exact paths, seven direct suites and one browser suite in 1440/390/360/reduced-motion; the global
+// ---- Affected Home admission: seventeen exact paths, seven direct suites and one browser suite in 1440/390/360/reduced-motion; the global
 // Vitest config is admitted apart from Home as finite shared test-discovery configuration ----
-import { HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_AFFECTED_BROWSER_FILE, VITEST_DISCOVERY_CONFIG_PATH, VITEST_DISCOVERY_INCLUDES, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
+import { HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_AFFECTED_BROWSER_FILE, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, VITEST_DISCOVERY_CONFIG_PATH, VITEST_DISCOVERY_INCLUDES, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
 const AFFECTED_HOME_PATHS=Object.freeze(['nextjs/components/compile-stage-player.mobile-view.test.tsx','nextjs/components/compile-stage-player.tsx','nextjs/components/landing-v2/hero-actions.tsx',
   'nextjs/components/landing-v2/hero-film-disclosure.tsx','nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-source-card.test.tsx','nextjs/components/landing-v2/hero-source-card.tsx',
-  'nextjs/components/landing-v2/landing-analytics.tsx','nextjs/components/landing-v2/landing-hero.module.css','nextjs/components/landing-v2/landing-page.tsx','nextjs/e2e/landing-v2.spec.ts',
+  'nextjs/components/landing-v2/landing-analytics.tsx','nextjs/components/landing-v2/home-reader-guide.tsx','nextjs/components/landing-v2/landing-hero.module.css','nextjs/components/landing-v2/landing-page.tsx','nextjs/e2e/landing-v2.spec.ts',
   'nextjs/lib/film-motion-control.test.ts','nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/landing-v2-page.test.ts','nextjs/lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SUITES=Object.freeze(['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts',
   'lib/landing-v2-page.test.ts','lib/marketing-analytics.test.ts','lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SPEC='e2e/landing-v2.spec.ts',AFFECTED_HOME_TSX='components/compile-stage-player.mobile-view.test.tsx',AFFECTED_HOME_PROJECTS=Object.freeze(['1440','390','360','reduced-motion']);
 const AFFECTED_HOME_FULL_DEBT=['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair'];
+
+const HOME_READER_GUIDE_PATH='nextjs/components/landing-v2/home-reader-guide.tsx';
+test('affected Home reader guide owner: an exact addition selects existing checks and keeps native and full qualification pending', () => {
+  const map=affectedMap([affectedRecord('A',[HOME_READER_GUIDE_PATH],'000000','100644')]);
+  assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],
+    [[],[],['home-landing'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]]);
+  assert.ok(map.unitFiles.includes('lib/landing-v2-page.test.ts'),'the existing composition suite covers the new guide');
+  assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
+  assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required',[HOME_READER_GUIDE_PATH],false]);
+  const plan=affectedAskPlan(map);
+  assert.deepEqual(plan.unitFiles,AFFECTED_HOME_SUITES);
+  assert.deepEqual(plan.browserFiles,[AFFECTED_HOME_SPEC]);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity).map(run=>run.project),AFFECTED_HOME_PROJECTS);
+  assert.ok(plan.deferredGroups.includes('native-world-race-fresh-run'));
+  assert.equal(plan.fullQualification,'pending');
+  assert.deepEqual(plan.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);
+});
+
+test('affected Home reader guide owner: mixed unknown and rename endpoints still reject the whole plan, without broadening Home', () => {
+  const clean=affectedMap([affectedRecord('A',[HOME_READER_GUIDE_PATH],'000000','100644')]);
+  for (const sibling of ['nextjs/components/landing-v2/home-reader-guide.test.tsx','nextjs/components/landing-v2/home-reader-guide.module.css',
+    'nextjs/components/landing-v2/home-reader-guide-copy.tsx','nextjs/components/landing-v2/home-reader-guide.tsx.bak','nextjs/components/home-reader-guide.tsx']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(owner=>owner.match.test(sibling)).map(owner=>owner.group),[],sibling);
+    for (const records of [
+      [affectedRecord('A',[HOME_READER_GUIDE_PATH],'000000','100644'),affectedRecord('M',[sibling])],
+      [affectedRecord('R100',[HOME_READER_GUIDE_PATH,sibling])],
+    ]) {
+      const map=affectedMap(records);
+      assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${sibling}`],[sibling]],sibling);
+      assert.deepEqual([map.groups,map.unitFiles,map.browserFiles],[clean.groups,clean.unitFiles,clean.browserFiles],sibling);
+      assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,sibling);
+      assert.equal(map.nativeEvidence.freshRunClaimed,false);
+    }
+  }
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('A',[HOME_READER_GUIDE_PATH],'000000','100644')],
+    headHasFile:path=>path!=='nextjs/lib/landing-v2-page.test.ts'});
+  assert.deepEqual(missing.failures,['selected owner check is absent at head: lib/landing-v2-page.test.ts']);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+});
+
+test('affected Home reader guide owner: the six-path successor keeps prior owners and selections while adding only the guide invalidation', () => {
+  const prior=['nextjs/components/landing-v2/hero-source-card.tsx','nextjs/components/landing-v2/hero-source-card.test.tsx',
+    'nextjs/components/landing-v2/landing-hero.module.css','nextjs/components/landing-v2/landing-page.tsx','nextjs/lib/landing-v2-page.test.ts'].map(path=>affectedRecord('M',[path]));
+  const base=affectedMap(prior),combined=affectedMap([...prior,affectedRecord('A',[HOME_READER_GUIDE_PATH],'000000','100644')]);
+  assert.deepEqual([base.failures,combined.failures,combined.unmappedPaths],[[],[],[]]);
+  for (const key of ['groups','unitFiles','browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,[...base.nativeEvidence.invalidatingPaths,HOME_READER_GUIDE_PATH].sort());
+  assert.equal(combined.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
+  assert.equal(combined.nativeEvidence.freshRunClaimed,false);
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  const docs=affectedMap([affectedRecord('M',['README.md'])]),mixed=affectedMap([affectedRecord('M',['README.md']),affectedRecord('A',[HOME_READER_GUIDE_PATH],'000000','100644')]);
+  assert.equal(docs.nativeEvidence.disposition,'historical-input-reuse');
+  assert.deepEqual(mixed.groups,[...docs.groups,'home-landing'].sort());
+  assert.deepEqual(mixed.unitFiles,affectedUnion(docs.unitFiles,AFFECTED_HOME_SUITES));
+  assert.deepEqual(mixed.nativeEvidence.invalidatingPaths,[HOME_READER_GUIDE_PATH]);
+  assert.equal(mixed.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
+  assert.equal(mixed.nativeEvidence.freshRunClaimed,false);
+});
 // The e9c global Vitest config, and the same config with only the registered mobile-view suite added to its include list.
 const affectedHomeConfigHead=['import { defineConfig } from "vitest/config";','import path from "node:path";','','const packageRoot = path.resolve(import.meta.dirname);','','export default defineConfig({',
   '  root: packageRoot,','  // Component render tests use the same automatic JSX runtime as Next.js.','  esbuild: { jsx: "automatic" },','  resolve: {','    alias: { "@": packageRoot },','  },','  test: {',
@@ -3928,8 +4013,8 @@ const AFFECTED_HOME_FRAME_FAILURE='changed outside its include list (root, runti
 const affectedHomeSwap=(text,from,to)=>{assert.ok(text.includes(from),'fixture anchor: '+from);return text.replace(from,to);};
 const affectedHomeConfigMap=(records,source=AFFECTED_HOME_FINAL_CONFIG,headHasFile)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile,
   readHeadFile:path=>{assert.equal(path,VITEST_DISCOVERY_CONFIG_PATH);return source;}});
-test('affected Home admission: exactly sixteen owner paths select home-landing, the seven suites, one browser suite and fresh native debt', () => {
-  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,16);
+test('affected Home admission: exactly seventeen owner paths retain seven suites and add only the exact reader CSS overlap', () => {
+  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,17);
   // The film-motion-control suite is both an owner endpoint and one of the seven selected suites; the selection does not grow.
   assert.ok(AFFECTED_HOME_PATHS.includes('nextjs/lib/film-motion-control.test.ts')&&AFFECTED_HOME_SUITES.includes('lib/film-motion-control.test.ts'));
   assert.ok(!AFFECTED_HOME_PATHS.includes('nextjs/lib/marketing-analytics.test.ts'),'marketing-analytics stays a selected suite only');
@@ -3938,19 +4023,22 @@ test('affected Home admission: exactly sixteen owner paths select home-landing, 
   assert.equal(owners.length,1);const [owner]=owners;
   assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
     [AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC],[],false,false,false,false,undefined,undefined]);
-  assert.ok(!AFFECTED_GROUPS.some(o=>/^home-(?!landing$)|legacy/.test(o.group)),'no legacy Home profile is an affected owner');
+  assert.ok(!AFFECTED_GROUPS.some(o=>(/^home-/.test(o.group)&&!['home-landing','home-reader-heading-css'].includes(o.group))||/legacy/.test(o.group)),'no unregistered Home or legacy profile is an affected owner');
   for (const path of AFFECTED_HOME_PATHS) {
-    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['home-landing'],path);
+    const cssOverlap=path==='nextjs/components/landing-v2/landing-hero.module.css';
+    const expectedGroups=cssOverlap?['home-landing','home-reader-heading-css']:['home-landing'];
+    const expectedSuites=cssOverlap?affectedUnion(AFFECTED_HOME_SUITES,['lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts']):AFFECTED_HOME_SUITES;
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),expectedGroups,path);
     // Added, modified (including an executable-bit change) and deleted regular files in the owner all map the same way.
     for (const [status,oldMode,newMode] of [['A','000000','100644'],['M','100644','100644'],['M','100644','100755'],['D','100644','000000']]) {
       const map=affectedMap([affectedRecord(status,[path],oldMode,newMode)]),label=`${status} ${path}`;
-      assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['home-landing'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]],label);
+      assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],expectedGroups,expectedSuites,[AFFECTED_HOME_SPEC]],label);
       assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
       assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
     }
   }
   const delta=affectedMap(AFFECTED_HOME_PATHS.map(path=>affectedRecord('M',[path])));
-  assert.deepEqual([delta.failures,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],[[],['home-landing'],[...AFFECTED_HOME_PATHS].sort(),AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]]);
+  assert.deepEqual([delta.failures,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],[[],['home-landing','home-reader-heading-css'],[...AFFECTED_HOME_PATHS].sort(),affectedUnion(AFFECTED_HOME_SUITES,['lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts']),[AFFECTED_HOME_SPEC]]);
   assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_HOME_PATHS].sort());
   // Both rename endpoints inside the owner map to it; a rename across owners unions both selections.
   const within=affectedMap([affectedRecord('R100',['nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-film-disclosure.tsx'])]);
@@ -3959,6 +4047,45 @@ test('affected Home admission: exactly sixteen owner paths select home-landing, 
   const across=affectedMap([affectedRecord('R085',['nextjs/lib/home-evidence-view.ts','nextjs/lib/explore-story.ts'])]);
   assert.deepEqual([across.failures,across.groups,across.unitFiles,across.browserFiles],[[],['explore-answer','home-landing'],affectedUnion(AFFECTED_HOME_SUITES,AFFECTED_EXPLORE_SUITES),[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC]]);
 });
+test('affected reader CSS CI alignment: exact finite owner preserves Home selection and requires both registered CI contracts', () => {
+  const paths=['components/landing-v2/landing-hero.module.css','app/tavonel.css','lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts',
+    'scripts/fixtures/home-reader-heading-css-baseline.json','scripts/repair-scope.mjs'];
+  const suites=['lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts'];
+  const ciSuites=['lib/repair-node-evidence.test.mjs','lib/repair-node-gate-receipt.test.ts'];
+  assert.deepEqual(HOME_READER_HEADING_CSS_AFFECTED_PATHS,paths);assert.deepEqual(HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES,suites);
+  assert.equal(REPAIR_NODE_EVIDENCE_CONTRACT_FILE,ciSuites[0]);assert.equal(REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE,ciSuites[1]);
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-reader-heading-css');assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([owner.unitFiles,owner.browserFiles,owner.databaseTests,Boolean(owner.nativeReuse),Boolean(owner.selector),Boolean(owner.worker),Boolean(owner.database),owner.fixtureContract,owner.databaseDependencies],
+    [suites,[],[],false,false,false,false,undefined,undefined]);
+  const homeCss='nextjs/components/landing-v2/landing-hero.module.css',ciCss=['nextjs/scripts/repair-scope.mjs','nextjs/scripts/fixtures/home-reader-heading-css-baseline.json'];
+  for(const relative of paths){
+    const path='nextjs/'+relative,expectedGroups=path===homeCss?['home-landing','home-reader-heading-css']:ciCss.includes(path)?['ci-selector','home-reader-heading-css']:['home-reader-heading-css'];
+    const expectedSuites=path===homeCss?affectedUnion(AFFECTED_HOME_SUITES,suites):ciCss.includes(path)?affectedUnion(ciSuites,suites):suites;
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],expectedGroups,expectedSuites,path===homeCss?[AFFECTED_HOME_SPEC]:[]],path);
+    assert.deepEqual([map.runCdrWorkerChecks,map.databaseChanged,map.databaseTests,map.runSelectorContracts],[false,false,[],ciCss.includes(path)],path);
+    assert.equal(map.nativeEvidence.disposition,'fresh-seven-case-native-run-required');assert.equal(map.nativeEvidence.freshRunClaimed,false);
+  }
+  for(const neighbor of ['app/globals.css','app/tavonel.scss','app/tavonel.css.bak','components/landing-v2/other.module.css','lib/home-reader-heading-css-contract.ts','scripts/fixtures/other.json','scripts/repair-scope.test.mjs'])
+    assert.equal(owner.match.test('nextjs/'+neighbor),false,neighbor+' is not a CSS owner endpoint');
+  const ciOwners=AFFECTED_GROUPS.filter(item=>item.group==='ci-selector');assert.equal(ciOwners.length,3);
+  for(const ci of ciOwners)assert.deepEqual([ci.unitFiles,Boolean(ci.selector),ci.browserFiles,ci.databaseTests,Boolean(ci.worker),Boolean(ci.database),Boolean(ci.nativeReuse)],
+    [ciSuites,true,[],[],false,false,false]);
+  for(const file of ciSuites){
+    const path='nextjs/'+file,map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles,map.runSelectorContracts],[[],['ci-selector'],ciSuites,true],path);
+    assert.equal(ciOwners.filter(item=>item.match.test(path)).length,1,path+' exact endpoint');
+    const absent=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',[path])],headHasFile:leaf=>leaf!==path});
+    assert.deepEqual(absent.failures,['selected owner check is absent at head: '+file]);
+  }
+  for(const neighbor of ['lib/repair-node-evidence.test.ts','lib/repair-node-gate-receipt.test.mjs','lib/repair-node-gate-receipt.ts'])
+    assert.equal(ciOwners.some(item=>item.match.test('nextjs/'+neighbor)),false,neighbor+' is not a CI contract endpoint');
+  for(const file of suites){
+    const absent=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',['nextjs/app/tavonel.css'])],headHasFile:path=>path!=='nextjs/'+file});
+    assert.deepEqual(absent.failures,['selected owner check is absent at head: '+file]);
+  }
+});
+
 test('affected Home admission: the regular plan defers only the fresh native run, keeps every release debt and never selects the static/selector checks', () => {
   const plan=affectedAskPlan(affectedMap([affectedRecord('M',['nextjs/components/landing-v2/landing-page.tsx'])]));
   assert.deepEqual([plan.groups,plan.browserFiles],[['home-landing','native-world-race-fresh-run'],[AFFECTED_HOME_SPEC]]);
@@ -3980,8 +4107,8 @@ test('affected Home admission: mixed changes union and dedupe with the Explore, 
   const records=[affectedRecord('M',['nextjs/components/compile-stage-player.tsx']),affectedRecord('M',['nextjs/lib/explore-story.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),
     affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
   const map=affectedMap(records);
-  assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','home-landing','ocr-gpu-worker','workspace-lifecycle']]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES));assert.equal(map.unitFiles.length,25);
+  assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','home-landing','ocr-gpu-worker','review-queue','workspace-lifecycle']]);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,26);
   assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -4017,7 +4144,7 @@ test('affected Home admission: unknown siblings, bad spellings, modes, statuses 
     'nextjs/components/landing-v2/landing-hero.css','nextjs/components/landing-v2/landing-hero.module.scss','nextjs/components/landing-v2/hero-film.module.css','nextjs/components/landing-v2/hero-film.tsx.bak',
     'nextjs/components/Landing-v2/hero-film.tsx','nextjs/components/landing-v2/nested/hero-film.tsx','nextjs/components/compile-stage-player.test.tsx','nextjs/components/compile-stage-player.mobile-view.test.ts',
     'nextjs/components/compile-stage-player.mobile.test.tsx','nextjs/components/compile-stage-player.module.css','nextjs/lib/home-evidence-view.tsx','nextjs/lib/home-evidence.ts','nextjs/lib/landing-v2-page.ts',
-    'nextjs/lib/one-path-contract.ts','nextjs/lib/film-motion-control.ts','nextjs/lib/film-motion-control.spec.ts','nextjs/lib/marketing-analytics.test.ts','nextjs/e2e/landing-v2-extra.spec.ts',
+    'nextjs/lib/one-path-contract.ts','nextjs/lib/film-motion-control.ts','nextjs/lib/film-motion-control.spec.ts','nextjs/e2e/landing-v2-extra.spec.ts',
     'nextjs/e2e/landing-v2.spec.tsx','nextjs/e2e/landing-hero-mobile.spec.ts','nextjs/app/page.tsx','components/landing-v2/hero-film.tsx','nextjs/nextjs/components/landing-v2/hero-film.tsx']) {
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -4375,3 +4502,2461 @@ test('affected recipe continuation admission: readAffectedExecution rereads seve
     assert.equal(readAffectedExecution(root,plan).units.passed,7,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
+// ---- Affected source agent admission (UX09): six exact paths, two direct suites, no browser/database/worker/selector lane ----
+import { SOURCE_AGENT_AFFECTED_PATHS, SOURCE_AGENT_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated independently of the planner, so a drifted export fails here rather than agreeing with itself.
+const AFFECTED_SOURCE_AGENT='nextjs/public/developer/tavonel-source-agent.py',AFFECTED_SOURCE_AGENT_TEST='nextjs/scripts/source-agent/test_source_agent.py';
+const AFFECTED_SOURCE_AGENT_WRAPPER='nextjs/lib/source-agent-runtime.test.ts';
+const AFFECTED_SOURCE_AGENT_DOC='nextjs/public/developer/source-agent-operations.md',AFFECTED_SOURCE_AGENT_CHANNEL='nextjs/public/developer/channel.json';
+const AFFECTED_SOURCE_AGENT_CLOUD_TEST='nextjs/scripts/source-agent/test_cloud_intake_plan.py';
+const AFFECTED_SOURCE_AGENT_PATHS=Object.freeze([AFFECTED_SOURCE_AGENT,AFFECTED_SOURCE_AGENT_TEST,AFFECTED_SOURCE_AGENT_WRAPPER,AFFECTED_SOURCE_AGENT_DOC,AFFECTED_SOURCE_AGENT_CHANNEL,
+  AFFECTED_SOURCE_AGENT_CLOUD_TEST]);
+const AFFECTED_SOURCE_AGENT_SUITES=Object.freeze(['lib/developer-distribution.test.ts','lib/source-agent-runtime.test.ts']);
+const AFFECTED_DOCS_SUITES=Object.freeze(['lib/docs-content.test.ts','lib/docs-navigation.test.ts','lib/retrieval-docs-parity.test.ts']);
+test('affected source agent admission: exactly six owner paths select source-agent, the two direct suites and fresh native debt', () => {
+  assert.deepEqual(SOURCE_AGENT_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_SOURCE_AGENT_PATHS);assert.equal(new Set(AFFECTED_SOURCE_AGENT_PATHS).size,6);
+  assert.deepEqual([...SOURCE_AGENT_AFFECTED_UNIT_FILES].sort(),AFFECTED_SOURCE_AGENT_SUITES);
+  for (const suite of AFFECTED_SOURCE_AGENT_SUITES) assert.ok(existsSync(fileURLToPath(new URL(`../${suite}`,import.meta.url))),'selected suite exists: '+suite);
+  // The runtime wrapper is both an owner endpoint and a selected suite; the shared distribution test is a selected suite only.
+  assert.ok(AFFECTED_SOURCE_AGENT_PATHS.includes(AFFECTED_SOURCE_AGENT_WRAPPER)&&AFFECTED_SOURCE_AGENT_SUITES.includes('lib/source-agent-runtime.test.ts'));
+  assert.ok(!AFFECTED_SOURCE_AGENT_PATHS.includes('nextjs/lib/developer-distribution.test.ts'),'developer-distribution stays a selected suite only');
+  // Its one test outlives the Python child's own 30 s deadline (35 s), instead of Vitest's 5 s default that cut a 6.5 s run; no global timeout.
+  const wrapper=readFileSync(fileURLToPath(new URL('../lib/source-agent-runtime.test.ts',import.meta.url)),'utf8');
+  assert.deepEqual([(wrapper.match(/timeout: 30_000/g)??[]).length,(wrapper.match(/\}, 35_000\);/g)??[]).length,/testTimeout|setConfig|\.skip|\.todo/.test(wrapper)],[1,1,false]);
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='source-agent');
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_SOURCE_AGENT_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  for (const path of AFFECTED_SOURCE_AGENT_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['source-agent'],path);
+    for (const [status,oldMode,newMode] of [['A','000000','100644'],['M','100644','100644'],['M','100644','100755'],['D','100644','000000']]) {
+      const map=affectedMap([affectedRecord(status,[path],oldMode,newMode)]),label=`${status} ${path}`;
+      assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  // The exact six-path delta is one owner and one combined selection; a rename inside the owner keeps it.
+  const delta=affectedMap(AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])));
+  assert.deepEqual([delta.failures,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],[[],['source-agent'],[...AFFECTED_SOURCE_AGENT_PATHS].sort(),AFFECTED_SOURCE_AGENT_SUITES,[]]);
+  assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_SOURCE_AGENT_PATHS].sort());
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_SOURCE_AGENT_DOC,AFFECTED_SOURCE_AGENT_CHANNEL])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],[[],['source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[{status:'R100',paths:[AFFECTED_SOURCE_AGENT_DOC,AFFECTED_SOURCE_AGENT_CHANNEL],groups:['source-agent']}]]);
+});
+test('affected source agent admission: the regular plan keeps every release debt, defers only the fresh native run and selects no browser, database, build or selector checks', () => {
+  const plan=affectedAskPlan(affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT])]));
+  assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[['native-world-race-fresh-run','source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[]]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+    'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks],[['native-world-race-fresh-run'],'pending',{}]);
+  assert.deepEqual(plan.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),[]);
+});
+test('affected source agent admission: lookalikes, the shared distribution suite, other developer assets, spellings, modes and rename endpoints refuse; the canonical runbook stays repository docs only', () => {
+  // '.' is escaped, the prefix is anchored, the wrapper is matched literally and the distribution suite is a check only, never an endpoint.
+  for (const path of ['nextjs/public/developer/tavonel-source-agent.pyc','nextjs/public/developer/tavonel-source-agent.py.bak','nextjs/public/developer/tavonel-source-agentXpy',
+    'nextjs/public/developer/Tavonel-source-agent.py','nextjs/public/developer/other.py','nextjs/public/developer/tavonel-verify-roundtrip.py','nextjs/public/developer/tavonel-cli.mjs',
+    'nextjs/public/developer/README.md','nextjs/public/developer/source-agent-operations.mdx','nextjs/public/developer/channel.json.bak','nextjs/public/developer/channelXjson',
+    'nextjs/public/developer/nested/channel.json','nextjs/scripts/source-agent/helper.py','nextjs/scripts/source-agent/test_other.py','nextjs/scripts/source-agent/test_source_agent.pyc',
+    'nextjs/scripts/test_source_agent.py','nextjs/lib/developer-distribution.test.ts','public/developer/tavonel-source-agent.py',
+    'nextjs/nextjs/public/developer/channel.json','nextjs/public/developer/channel.json/x','nextjs/lib/source-agent-runtime.test.tsx','nextjs/lib/source-agent-runtime.ts',
+    'nextjs/lib/source-agent-runtime.spec.ts','nextjs/lib/source-agent-runtimeXtest.ts','nextjs/lib/source-agent/runtime.test.ts','nextjs/lib/source-agent-runtime.test.ts.bak',
+    'lib/source-agent-runtime.test.ts','nextjs/scripts/source-agent-runtime.test.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // The canonical runbook is not part of this owner: it keeps its existing docs-only selection and historical native reuse.
+  const runbook=affectedMap([affectedRecord('M',['docs/runbooks/source-agent-operations.md'])]);
+  assert.deepEqual([runbook.failures,runbook.groups,runbook.unitFiles,runbook.browserFiles,runbook.nativeEvidence.disposition],[[],['repository-docs'],[],[],'historical-input-reuse']);
+  for (const path of ['nextjs/public/developer/./channel.json','nextjs//public/developer/channel.json','nextjs/public/developer/../developer/channel.json','nextjs\\public\\developer\\channel.json','nextjs/public/developer/channel.json '])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+    assert.deepEqual(affectedMap([affectedRecord(status,[AFFECTED_SOURCE_AGENT],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${AFFECTED_SOURCE_AGENT}`]);
+  assert.match(affectedMap([affectedRecord('C075',[AFFECTED_SOURCE_AGENT,'nextjs/public/developer/tavonel-source-agent-copy.py'])]).failures[0],/^unsupported change status C075:/);
+  for (const paths of [[AFFECTED_SOURCE_AGENT,'nextjs/public/developer/tavonel-source-agent-v2.py'],['nextjs/public/developer/other.py',AFFECTED_SOURCE_AGENT],[AFFECTED_SOURCE_AGENT_TEST,'nextjs/scripts/source-agent/test_moved.py'],
+    [AFFECTED_SOURCE_AGENT_WRAPPER,'nextjs/lib/source-agent-runtime-moved.test.ts']]) {
+    const unknown=paths.find(path=>!AFFECTED_SOURCE_AGENT_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // A known owner path beside an unknown sibling closes the whole map instead of shrinking it.
+  const mixed=affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT]),affectedRecord('A',['nextjs/scripts/source-agent/conftest.py'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/scripts/source-agent/conftest.py'],['nextjs/scripts/source-agent/conftest.py']]);
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+});
+test('affected source agent admission: either selected suite missing at head refuses, and deleting an owner path still selects both suites', () => {
+  for (const file of AFFECTED_SOURCE_AGENT_SUITES) {
+    const map=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',[AFFECTED_SOURCE_AGENT_CHANNEL])],headHasFile:path=>path!==`nextjs/${file}`});
+    assert.deepEqual([map.groups,map.failures],[['source-agent'],[`selected owner check is absent at head: ${file}`]],file);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,file);
+  }
+  // A deleted agent or Python suite never shrinks the selection: the runtime wrapper and the channel re-hash still run and must pass.
+  for (const path of [AFFECTED_SOURCE_AGENT,AFFECTED_SOURCE_AGENT_TEST]) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    assert.deepEqual([deleted.failures,deleted.groups,deleted.unitFiles,deleted.nativeEvidence.invalidatingPaths],[[],['source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[path]],path);
+  }
+  // Deleting the wrapper maps to its owner but removes a selected suite, so the map refuses rather than dropping the Python run.
+  const wrapperDeleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[AFFECTED_SOURCE_AGENT_WRAPPER],'100644','000000')],headHasFile:file=>file!==AFFECTED_SOURCE_AGENT_WRAPPER});
+  assert.deepEqual([wrapperDeleted.groups,wrapperDeleted.failures],[['source-agent'],['selected owner check is absent at head: lib/source-agent-runtime.test.ts']]);
+  assert.throws(()=>affectedAskPlan(wrapperDeleted),/clean fail-closed map/);
+});
+test('affected source agent admission: shared owners union and dedupe, only the source agent path invalidates native reuse, and existing owners keep their selections', () => {
+  // Root README is shared by docs and repository-docs (both nativeReuse); the agent path alone forces the fresh native run.
+  const docs=affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT]),affectedRecord('M',['README.md'])]);
+  assert.deepEqual([docs.failures,docs.groups,docs.unitFiles,docs.browserFiles],[[],['docs','repository-docs','source-agent'],affectedUnion(AFFECTED_DOCS_SUITES,AFFECTED_SOURCE_AGENT_SUITES),['e2e/docs-reading-layout.spec.ts']]);
+  assert.deepEqual([docs.nativeEvidence.disposition,docs.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',[AFFECTED_SOURCE_AGENT]]);
+  // The served doc and the canonical runbook changed together: two owners, the runbook adds no suite and stays reusable.
+  const runbook=affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT_DOC]),affectedRecord('M',['docs/runbooks/source-agent-operations.md'])]);
+  assert.deepEqual([runbook.failures,runbook.groups,runbook.unitFiles,runbook.nativeEvidence.invalidatingPaths],[[],['repository-docs','source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[AFFECTED_SOURCE_AGENT_DOC]]);
+  const recipe=affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT_CHANNEL]),affectedRecord('M',['nextjs/app/login/page.tsx'])]);
+  assert.deepEqual([recipe.failures,recipe.groups,recipe.unitFiles,recipe.browserFiles],[[],['recipe-continuation','source-agent'],affectedUnion(AFFECTED_RECIPE_SUITES,AFFECTED_SOURCE_AGENT_SUITES),AFFECTED_RECIPE_BROWSERS]);
+  // The neighbouring owners are unchanged by this admission.
+  const readme=affectedMap([affectedRecord('M',['README.md'])]);
+  assert.deepEqual([readme.groups,readme.unitFiles,readme.nativeEvidence.disposition],[['docs','repository-docs'],AFFECTED_DOCS_SUITES,'historical-input-reuse']);
+  assert.deepEqual(affectedMap([affectedRecord('M',['nextjs/app/login/page.tsx'])]).unitFiles,AFFECTED_RECIPE_SUITES);
+});
+test('affected source agent admission: readAffectedExecution rereads exactly the two Vitest suites and requires no Playwright report', () => {
+  const map=affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT])]);assert.deepEqual(map.failures,[]);
+  const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+  const root=mkdtempSync(resolve(tmpdir(),'affected-source-agent-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    writeFileSync(vitestPath,JSON.stringify(vitest(AFFECTED_SOURCE_AGENT_SUITES.filter(file=>file!=='lib/source-agent-runtime.test.ts'))));
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/source-agent-runtime\.test\.ts/);
+    writeFileSync(vitestPath,JSON.stringify(vitest(AFFECTED_SOURCE_AGENT_SUITES)));
+    const result=readAffectedExecution(root,plan);
+    assert.deepEqual([result.units,result.browsers],[{files:2,passed:2,skipped:0,failed:0},[]]);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+// ---- Affected cloud plan admission: the one literal cloud intake plan suite joins the existing source-agent owner ----
+// Head presence is read from the actual files, so the new suite's real postimage and both selected suites must exist.
+const affectedCloudHead=path=>existsSync(fileURLToPath(new URL(`../../${path}`,import.meta.url)));
+const affectedCloudMap=(records,headHasFile=affectedCloudHead)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile});
+const AFFECTED_CLOUD_SIBLING='nextjs/scripts/source-agent/test_cloud_sync.py';
+test('affected cloud plan admission: the literal new suite added (000000 -> 100644) or modified maps to source-agent alone, the two direct suites, no other lane and fresh native debt', () => {
+  assert.ok(affectedCloudHead(AFFECTED_SOURCE_AGENT_CLOUD_TEST),'the actual cloud plan suite exists');
+  for (const suite of AFFECTED_SOURCE_AGENT_SUITES) assert.ok(affectedCloudHead('nextjs/'+suite),suite);
+  // The runtime wrapper discovers every test_*.py beside the agent suite, so it is the suite that executes the cloud plan tests.
+  const wrapper=readFileSync(fileURLToPath(new URL('../lib/source-agent-runtime.test.ts',import.meta.url)),'utf8');
+  assert.ok(wrapper.includes('new URL("../scripts/source-agent", import.meta.url)')&&wrapper.includes('"-p", "test_*.py"'));
+  assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(AFFECTED_SOURCE_AGENT_CLOUD_TEST)).map(o=>o.group),['source-agent']);
+  for (const [status,oldMode,newMode] of [['A','000000','100644'],['M','100644','100644']]) {
+    const map=affectedCloudMap([affectedRecord(status,[AFFECTED_SOURCE_AGENT_CLOUD_TEST],oldMode,newMode)]),label=`${status} ${oldMode} -> ${newMode}`;
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.changedPaths,map.unitFiles,map.browserFiles],[[],['source-agent'],[],[AFFECTED_SOURCE_AGENT_CLOUD_TEST],AFFECTED_SOURCE_AGENT_SUITES,[]],label);
+    assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+    assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[AFFECTED_SOURCE_AGENT_CLOUD_TEST],false],label);
+    const plan=affectedAskPlan(map);
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles,plan.deferredGroups],[['native-world-race-fresh-run','source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[],['native-world-race-fresh-run']],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+      assert.ok(!plan[flag],`${label} ${flag}`);
+    assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),[],label);
+  }
+});
+test('affected cloud plan admission: adjacent cloud tests and siblings stay unknown; malformed spellings, modes and statuses refuse', () => {
+  for (const path of [AFFECTED_CLOUD_SIBLING,'nextjs/scripts/source-agent/test_cloud_intake.py','nextjs/scripts/source-agent/test_cloud_intake_plan_v2.py',
+    'nextjs/scripts/source-agent/test_cloud_intake_plan.pyc','nextjs/scripts/source-agent/test_cloud_intake_plan.py.bak','nextjs/scripts/source-agent/test_cloud_intake_planXpy',
+    'nextjs/scripts/source-agent/Test_cloud_intake_plan.py','nextjs/scripts/source-agent/cloud/test_cloud_intake_plan.py','nextjs/scripts/source-agent/test_cloud_intake_plan.py/x',
+    'nextjs/scripts/test_cloud_intake_plan.py','nextjs/public/developer/test_cloud_intake_plan.py','scripts/source-agent/test_cloud_intake_plan.py']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedCloudMap([affectedRecord('A',[path],'000000','100644')]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  for (const path of ['nextjs/scripts/source-agent/./test_cloud_intake_plan.py','nextjs//scripts/source-agent/test_cloud_intake_plan.py',
+    'nextjs/scripts/source-agent/../source-agent/test_cloud_intake_plan.py','nextjs\\scripts\\source-agent\\test_cloud_intake_plan.py','nextjs/scripts/source-agent/test_cloud_intake_plan.py ']) {
+    const map=affectedCloudMap([affectedRecord('A',[path],'000000','100644')]);
+    assert.deepEqual(map.failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['A','000000','160000'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']]) {
+    const map=affectedCloudMap([affectedRecord(status,[AFFECTED_SOURCE_AGENT_CLOUD_TEST],oldMode,newMode)]);
+    assert.deepEqual(map.failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${AFFECTED_SOURCE_AGENT_CLOUD_TEST}`],`${status} ${oldMode} -> ${newMode}`);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,`${status} ${oldMode} -> ${newMode}`);
+  }
+  for (const [status,paths] of [['C075',[AFFECTED_SOURCE_AGENT_TEST,AFFECTED_SOURCE_AGENT_CLOUD_TEST]],['T',[AFFECTED_SOURCE_AGENT_CLOUD_TEST]],['U',[AFFECTED_SOURCE_AGENT_CLOUD_TEST]],
+    ['R',[AFFECTED_SOURCE_AGENT_TEST,AFFECTED_SOURCE_AGENT_CLOUD_TEST]],['R1000',[AFFECTED_SOURCE_AGENT_TEST,AFFECTED_SOURCE_AGENT_CLOUD_TEST]]]) {
+    const map=affectedCloudMap([affectedRecord(status,paths)]);
+    assert.deepEqual([map.failures,map.groups],[[`unsupported change status ${status}: ${paths.join(' -> ')}`],[]],status);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,status);
+  }
+});
+test('affected cloud plan admission: the new suite beside an unknown path refuses the whole map and yields no partial plan', () => {
+  for (const records of [[affectedRecord('A',[AFFECTED_SOURCE_AGENT_CLOUD_TEST],'000000'),affectedRecord('A',[AFFECTED_CLOUD_SIBLING],'000000')],
+    [affectedRecord('A',[AFFECTED_CLOUD_SIBLING],'000000'),affectedRecord('M',[AFFECTED_SOURCE_AGENT_CLOUD_TEST])]]) {
+    const map=affectedCloudMap(records),label=records.map(record=>record.paths[0]).join(' + ');
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${AFFECTED_CLOUD_SIBLING}`],[AFFECTED_CLOUD_SIBLING]],label);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,label);
+  }
+  // A known path beside a malformed record closes the map the same way.
+  const malformed=affectedCloudMap([affectedRecord('A',[AFFECTED_SOURCE_AGENT_CLOUD_TEST],'000000'),affectedRecord('M',[AFFECTED_SOURCE_AGENT],'100644','120000')]);
+  assert.deepEqual(malformed.failures,[`unsupported file mode 100644 -> 120000: ${AFFECTED_SOURCE_AGENT}`]);
+  assert.throws(()=>affectedAskPlan(malformed),/clean fail-closed map/);
+});
+test('affected cloud plan admission: renames and deletes keep fail-closed semantics and either selected suite missing at head refuses', () => {
+  // A rename between two owner paths stays inside source-agent; a rename to or from an unknown sibling refuses.
+  const within=affectedCloudMap([affectedRecord('R100',[AFFECTED_SOURCE_AGENT_TEST,AFFECTED_SOURCE_AGENT_CLOUD_TEST])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],['source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[{status:'R100',paths:[AFFECTED_SOURCE_AGENT_TEST,AFFECTED_SOURCE_AGENT_CLOUD_TEST],groups:['source-agent']}]]);
+  for (const paths of [[AFFECTED_SOURCE_AGENT_CLOUD_TEST,AFFECTED_CLOUD_SIBLING],[AFFECTED_CLOUD_SIBLING,AFFECTED_SOURCE_AGENT_CLOUD_TEST]]) {
+    const map=affectedCloudMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${AFFECTED_CLOUD_SIBLING}`],[AFFECTED_CLOUD_SIBLING]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // Deleting the cloud suite never shrinks the selection: both selected suites still run and must pass.
+  const deleted=affectedCloudMap([affectedRecord('D',[AFFECTED_SOURCE_AGENT_CLOUD_TEST],'100644','000000')],path=>path!==AFFECTED_SOURCE_AGENT_CLOUD_TEST&&affectedCloudHead(path));
+  assert.deepEqual([deleted.failures,deleted.groups,deleted.unitFiles,deleted.nativeEvidence.invalidatingPaths],[[],['source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[AFFECTED_SOURCE_AGENT_CLOUD_TEST]]);
+  for (const file of AFFECTED_SOURCE_AGENT_SUITES) {
+    const map=affectedCloudMap([affectedRecord('A',[AFFECTED_SOURCE_AGENT_CLOUD_TEST],'000000')],path=>path!==`nextjs/${file}`&&affectedCloudHead(path));
+    assert.deepEqual([map.groups,map.failures],[['source-agent'],[`selected owner check is absent at head: ${file}`]],file);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,file);
+  }
+});
+test('affected cloud plan admission: execution reports must include both the source runtime and the distribution suite', () => {
+  const map=affectedCloudMap([affectedRecord('A',[AFFECTED_SOURCE_AGENT_CLOUD_TEST],'000000')]);assert.deepEqual(map.failures,[]);
+  const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+  const root=mkdtempSync(resolve(tmpdir(),'affected-cloud-plan-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    writeFileSync(vitestPath,JSON.stringify(vitest(['lib/developer-distribution.test.ts'])));
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/source-agent-runtime\.test\.ts/);
+    writeFileSync(vitestPath,JSON.stringify(vitest(['lib/source-agent-runtime.test.ts'])));
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/developer-distribution\.test\.ts/);
+    writeFileSync(vitestPath,JSON.stringify(vitest(AFFECTED_SOURCE_AGENT_SUITES)));
+    const result=readAffectedExecution(root,plan);
+    assert.deepEqual([result.units,result.browsers],[{files:2,passed:2,skipped:0,failed:0},[]]);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+// ---- Affected connector progress admission: four exact paths, two direct suites, no browser/database/worker/selector lane ----
+import { CONNECTOR_PROGRESS_AFFECTED_PATHS, CONNECTOR_PROGRESS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (frozen connector tree b04161fa16962cff5cd788cb25e587de248e85b7, mode 100644 postimages).
+const AFFECTED_CONNECTOR_ROUTE='nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/route.ts',AFFECTED_CONNECTOR_STATUS='nextjs/components/connection-sync-status.tsx';
+const AFFECTED_CONNECTOR_LAG='nextjs/lib/connection-sync-lag.test.ts',AFFECTED_CONNECTOR_POLLING='nextjs/lib/connection-sync-polling.test.ts';
+const AFFECTED_CONNECTOR_PATHS=Object.freeze([AFFECTED_CONNECTOR_ROUTE,AFFECTED_CONNECTOR_STATUS,AFFECTED_CONNECTOR_LAG,AFFECTED_CONNECTOR_POLLING]);
+const AFFECTED_CONNECTOR_BLOBS=Object.freeze({[AFFECTED_CONNECTOR_ROUTE]:'0fec7f23bdd38c15ff999db52cbec56d383dc61c',[AFFECTED_CONNECTOR_STATUS]:'0d982d1ba2b591da93ddb7678964bacd06ef25a4',
+  [AFFECTED_CONNECTOR_LAG]:'76c143b25ff72200ec755bff9fec97c795295859',[AFFECTED_CONNECTOR_POLLING]:'a49fdb2209827f162dc51ec396a3f190a00f9939'});
+const AFFECTED_CONNECTOR_SUITES=Object.freeze(['lib/connection-sync-lag.test.ts','lib/connection-sync-polling.test.ts']);
+// The final raw delta: three modified files and the polling suite as the only added leaf. The map never reads preimage oids, so the
+// modified records carry a stand-in preimage; the postimage blobs and modes are the root-verified ones.
+const affectedConnectorRaw=()=>parseAffectedRawDiff(AFFECTED_CONNECTOR_PATHS.map(path=>path===AFFECTED_CONNECTOR_POLLING
+  ?`:000000 100644 ${'0'.repeat(40)} ${AFFECTED_CONNECTOR_BLOBS[path]} A\0${path}\0`
+  :`:100644 100644 ${'1'.repeat(40)} ${AFFECTED_CONNECTOR_BLOBS[path]} M\0${path}\0`).join(''));
+test('affected connector progress admission: the exact four-path delta selects connector-progress, exactly the two direct suites and fresh native debt', () => {
+  assert.deepEqual(CONNECTOR_PROGRESS_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_CONNECTOR_PATHS);
+  assert.deepEqual([...CONNECTOR_PROGRESS_AFFECTED_UNIT_FILES].sort(),AFFECTED_CONNECTOR_SUITES);
+  for (const suite of AFFECTED_CONNECTOR_SUITES) assert.ok(existsSync(fileURLToPath(new URL(`../${suite}`,import.meta.url))),'selected suite exists: '+suite);
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'both suites are discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='connector-progress');
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_CONNECTOR_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedConnectorRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),
+    AFFECTED_CONNECTOR_PATHS.map(path=>path===AFFECTED_CONNECTOR_POLLING?['A','000000','100644',[path]]:['M','100644','100644',[path]]));
+  for (const record of records) {
+    const [path]=record.paths,map=affectedMap([record]);
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['connector-progress'],path);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],['connector-progress'],AFFECTED_CONNECTOR_SUITES,[]],path);
+    assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],path);
+    assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],path);
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],['connector-progress'],[...AFFECTED_CONNECTOR_PATHS].sort(),AFFECTED_CONNECTOR_SUITES,[]]);
+  assert.deepEqual([delta.entries.map(entry=>entry.status),delta.nativeEvidence.invalidatingPaths],[['M','M','M','A'],[...AFFECTED_CONNECTOR_PATHS].sort()]);
+});
+test('affected connector progress admission: the regular plan defers only the fresh native run and selects no browser, database, build or selector checks', () => {
+  const plan=affectedAskPlan(affectedMap(affectedConnectorRaw()));
+  assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[['connector-progress','native-world-race-fresh-run'],AFFECTED_CONNECTOR_SUITES,[]]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+    'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT]);
+});
+test('affected connector progress admission: the literal [id] route is accepted while id lookalikes, adjacent connector routes, components and test siblings stay unknown; spellings, statuses and modes refuse', () => {
+  // An unescaped [id] would be a character class matching 'i' or 'd'; brackets, case and segment names must match literally.
+  for (const path of ['nextjs/app/api/v1/oauth-connectors/connections/id/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/i/sync/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/d/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[ID]/sync/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/[connectionId]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[id/sync/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/id]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/[[id]]/sync/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/[id]/route.ts','nextjs/app/api/v1/oauth-connectors/connections/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/route.test.ts','nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/routeXts',
+    'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/status/route.ts','nextjs/app/api/v1/oauth-connectors/authorize/route.ts',
+    'nextjs/app/api/oauth-connectors/connections/[id]/sync/route.ts','app/api/v1/oauth-connectors/connections/[id]/sync/route.ts',
+    'nextjs/components/connections-panel.tsx','nextjs/components/connection-sync-status.test.tsx','nextjs/components/connection-sync-status.module.css',
+    'nextjs/components/connection-sync-statusXtsx','nextjs/components/connection-sync-status.tsx.bak','components/connection-sync-status.tsx',
+    'nextjs/lib/connection-sync-lag.ts','nextjs/lib/connection-sync-polling.ts','nextjs/lib/connection-sync-retry.test.ts','nextjs/lib/connection-sync-lag.test.tsx',
+    'nextjs/lib/connection-sync-polling.spec.ts','nextjs/lib/connection-sync/polling.test.ts','lib/connection-sync-polling.test.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+  }
+  for (const path of ['nextjs/app/api/v1/oauth-connectors/connections/[id]/./sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections//[id]/sync/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/[id]/../[id]/sync/route.ts','nextjs/app/api/v1/oauth-connectors/connections/{id}/sync/route.ts',
+    'nextjs/app/api/v1/oauth-connectors/connections/(id)/sync/route.ts','nextjs\\components\\connection-sync-status.tsx','nextjs/lib/connection-sync-polling.test.ts '])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+    assert.deepEqual(affectedMap([affectedRecord(status,[AFFECTED_CONNECTOR_ROUTE],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${AFFECTED_CONNECTOR_ROUTE}`]);
+  for (const [status,paths] of [['C075',[AFFECTED_CONNECTOR_ROUTE,'nextjs/app/api/v1/oauth-connectors/connections/[id]/sync/copy.ts']],['T',[AFFECTED_CONNECTOR_STATUS]],['U',[AFFECTED_CONNECTOR_LAG]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected connector progress admission: a known batch with an unknown sibling or an unowned rename endpoint closes the whole map with no partial selection', () => {
+  const mixed=affectedMap([...affectedConnectorRaw(),affectedRecord('A',['nextjs/lib/connection-sync-retry.test.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/connection-sync-retry.test.ts'],['nextjs/lib/connection-sync-retry.test.ts']]);
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_CONNECTOR_ROUTE,'nextjs/app/api/v1/oauth-connectors/connections/[connectionId]/sync/route.ts'],['nextjs/components/connections-panel.tsx',AFFECTED_CONNECTOR_STATUS]]) {
+    const unknown=paths.find(path=>!AFFECTED_CONNECTOR_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+});
+test('affected connector progress admission: either selected suite missing at head refuses, and deleting the route or component still selects both suites', () => {
+  for (const file of AFFECTED_CONNECTOR_SUITES) {
+    const map=buildAffectedMap({headSha:affectedHeadSha,records:affectedConnectorRaw(),headHasFile:path=>path!==`nextjs/${file}`});
+    assert.deepEqual([map.groups,map.failures],[['connector-progress'],[`selected owner check is absent at head: ${file}`]],file);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,file);
+  }
+  for (const path of AFFECTED_CONNECTOR_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const suite=path.slice('nextjs/'.length),expected=AFFECTED_CONNECTOR_SUITES.includes(suite)?[`selected owner check is absent at head: ${suite}`]:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[['connector-progress'],AFFECTED_CONNECTOR_SUITES,expected,[path]],path);
+  }
+});
+test('affected connector progress admission: shared owners union and dedupe while the prior source-agent, docs and Dropbox connector owners keep their selections', () => {
+  const agent=affectedMap([...affectedConnectorRaw(),affectedRecord('M',[AFFECTED_SOURCE_AGENT])]);
+  assert.deepEqual([agent.failures,agent.groups,agent.unitFiles,agent.browserFiles],[[],['connector-progress','source-agent'],affectedUnion(AFFECTED_CONNECTOR_SUITES,AFFECTED_SOURCE_AGENT_SUITES),[]]);
+  const docs=affectedMap([affectedRecord('M',[AFFECTED_CONNECTOR_STATUS]),affectedRecord('M',['README.md'])]);
+  assert.deepEqual([docs.failures,docs.groups,docs.unitFiles,docs.browserFiles],[[],['connector-progress','docs','repository-docs'],affectedUnion(AFFECTED_DOCS_SUITES,AFFECTED_CONNECTOR_SUITES),['e2e/docs-reading-layout.spec.ts']]);
+  assert.deepEqual([docs.nativeEvidence.disposition,docs.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',[AFFECTED_CONNECTOR_STATUS]]);
+  assert.deepEqual(affectedMap([affectedRecord('M',[AFFECTED_SOURCE_AGENT])]).unitFiles,AFFECTED_SOURCE_AGENT_SUITES);
+  const readme=affectedMap([affectedRecord('M',['README.md'])]);
+  assert.deepEqual([readme.groups,readme.unitFiles,readme.nativeEvidence.disposition],[['docs','repository-docs'],AFFECTED_DOCS_SUITES,'historical-input-reuse']);
+  // 'connector-' stays the Dropbox owner; the 'connection-' suites are not folded into it.
+  const dropbox=affectedMap([affectedRecord('M',['nextjs/lib/connector-sync-page.ts'])]);
+  assert.deepEqual([dropbox.groups,AFFECTED_CONNECTOR_SUITES.some(file=>dropbox.unitFiles.includes(file))],[['dropbox-connector'],false]);
+});
+test('affected connector progress admission: readAffectedExecution requires both selected Vitest suites and no Playwright report', () => {
+  const map=affectedMap(affectedConnectorRaw());assert.deepEqual(map.failures,[]);
+  const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+  const root=mkdtempSync(resolve(tmpdir(),'affected-connector-progress-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    for (const omitted of AFFECTED_CONNECTOR_SUITES) {
+      writeFileSync(vitestPath,JSON.stringify(vitest(AFFECTED_CONNECTOR_SUITES.filter(file=>file!==omitted))));
+      assert.throws(()=>readAffectedExecution(root,plan),new RegExp(`Vitest report omitted selected file\\(s\\): ${omitted.replaceAll('.','\\.')}`),omitted);
+    }
+    writeFileSync(vitestPath,JSON.stringify(vitest(AFFECTED_CONNECTOR_SUITES)));
+    const result=readAffectedExecution(root,plan);
+    assert.deepEqual([result.units,result.browsers],[{files:2,passed:2,skipped:0,failed:0},[]]);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+// ---- Affected review queue admission: four exact paths, one direct suite; the workspace page keeps its lifecycle and Ask owners ----
+import { REVIEW_QUEUE_AFFECTED_PATHS, REVIEW_QUEUE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR final product tree c7fb3fb19cf19ea8edcb1ae41cab00d4b9a0a94c, mode 100644 postimages).
+const AFFECTED_REVIEW_PAGE='nextjs/app/workspace/page.tsx',AFFECTED_REVIEW_COMPONENT='nextjs/components/review-queue.tsx';
+const AFFECTED_REVIEW_TEST='nextjs/lib/review-queue.test.ts',AFFECTED_REVIEW_MODEL='nextjs/lib/review-queue.ts';
+const AFFECTED_REVIEW_PATHS=Object.freeze([AFFECTED_REVIEW_PAGE,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST,AFFECTED_REVIEW_MODEL]);
+const AFFECTED_REVIEW_BLOBS=Object.freeze({[AFFECTED_REVIEW_PAGE]:'d0f6a0ab8b3b4ebf0d5f2dd7f1e83c86fbd7d1b9',[AFFECTED_REVIEW_COMPONENT]:'31a6e245672623b7878f303b0d558f5698391e90',
+  [AFFECTED_REVIEW_TEST]:'49fac0dc756d35b9dd2e93a670b42e180564f08d',[AFFECTED_REVIEW_MODEL]:'17ebbb4ab3de5a2d0bbff074b5854eedd1196f11'});
+const AFFECTED_REVIEW_SUITES=Object.freeze(['lib/review-queue.test.ts']);
+// The page alone also carries the existing workspace-lifecycle and grounded-ask selections, so the delta reports their actual union.
+const AFFECTED_REVIEW_PAGE_UNITS=Object.freeze(affectedUnion(AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_REVIEW_SUITES));
+// The final raw delta: four modified tracked files. The map never reads preimage oids, so the records carry a stand-in preimage;
+// the postimage blobs and modes are the root-verified final ones and are pinned nowhere in the selector.
+const affectedReviewRaw=()=>parseAffectedRawDiff(AFFECTED_REVIEW_PATHS.map(path=>`:100644 100644 ${'1'.repeat(40)} ${AFFECTED_REVIEW_BLOBS[path]} M\0${path}\0`).join(''));
+test('affected review queue admission: each exact path selects review-queue and its direct suite; the page keeps its lifecycle and Ask owners in the union', () => {
+  assert.deepEqual(REVIEW_QUEUE_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_REVIEW_PATHS);assert.equal(new Set(AFFECTED_REVIEW_PATHS).size,4);
+  assert.deepEqual([...REVIEW_QUEUE_AFFECTED_UNIT_FILES],AFFECTED_REVIEW_SUITES);
+  assert.ok(existsSync(fileURLToPath(new URL('../lib/review-queue.test.ts',import.meta.url))),'selected suite exists: lib/review-queue.test.ts');
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group==='review-queue');
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_REVIEW_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedReviewRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_REVIEW_PATHS.map(path=>['M','100644','100644',[path]]));
+  for (const record of records) {
+    const [path]=record.paths,map=affectedMap([record]),page=path===AFFECTED_REVIEW_PAGE;
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group).sort(),page?['grounded-ask','review-queue','workspace-lifecycle']:['review-queue'],path);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],
+      page?[[],['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS,['e2e/world-lifecycle.spec.ts']]:[[],['review-queue'],AFFECTED_REVIEW_SUITES,[]],path);
+    assert.ok(map.unitFiles.includes('lib/review-queue.test.ts'),path);
+    assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],path);
+    assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],path);
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],['grounded-ask','review-queue','workspace-lifecycle'],[...AFFECTED_REVIEW_PATHS].sort(),AFFECTED_REVIEW_PAGE_UNITS,['e2e/world-lifecycle.spec.ts']]);
+  assert.equal(delta.unitFiles.length,10);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_REVIEW_PATHS.map(path=>['M',path===AFFECTED_REVIEW_PAGE?['grounded-ask','review-queue','workspace-lifecycle']:['review-queue']]));
+  assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_REVIEW_PATHS].sort());
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],[[],['review-queue'],AFFECTED_REVIEW_SUITES,[{status:'R100',paths:[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT],groups:['review-queue']}]]);
+});
+test('affected review queue admission: the regular plan defers only the fresh native run and the owner adds no browser, database, build or selector lane', () => {
+  const plan=affectedAskPlan(affectedMap([affectedRecord('M',[AFFECTED_REVIEW_MODEL])]));
+  assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[['native-world-race-fresh-run','review-queue'],AFFECTED_REVIEW_SUITES,[]]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+    'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT]);
+  // The full four-path delta keeps the page's existing world-lifecycle browser suite; the review owner contributes only its unit suite.
+  const map=affectedMap(affectedReviewRaw()),full=affectedAskPlan(map);
+  for (const group of ['grounded-ask','native-world-race-fresh-run','review-queue','workspace-lifecycle']) assert.ok(full.groups.includes(group),group);
+  for (const file of map.unitFiles) assert.ok(full.unitFiles.includes(file),file);
+  assert.deepEqual([full.browserFiles,full.fullQualification,full.affectedIntegration.changedPaths],[['e2e/world-lifecycle.spec.ts'],'pending',[...AFFECTED_REVIEW_PATHS].sort()]);
+  assert.ok(full.deferredGroups.includes('native-world-race-fresh-run'));
+});
+test('affected review queue admission: lookalikes and adjacent paths stay unknown, workspace siblings stay lifecycle-only; spellings, statuses and modes refuse', () => {
+  // Every '.' is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/components/review-queues.tsx','nextjs/components/review-queue.ts','nextjs/components/review-queue.test.tsx','nextjs/components/review-queue.module.css',
+    'nextjs/components/review-queueXtsx','nextjs/components/review-queue.tsx.bak','nextjs/components/workspace/review-queue.tsx','nextjs/components/Review-Queue.tsx',
+    'nextjs/lib/review-queue-neighbor.ts','nextjs/lib/review-queues.ts','nextjs/lib/review-queue.tsx','nextjs/lib/review-queueXts','nextjs/lib/review-queue.ts.bak',
+    'nextjs/lib/review-queue/index.ts','nextjs/lib/review-queue.test.tsx','nextjs/lib/review-queue.spec.ts','nextjs/lib/review-queueXtest.ts','nextjs/lib/review-queue-copy.test.ts',
+    'nextjs/e2e/review-queue.spec.ts','nextjs/app/review-queue/page.tsx','nextjs/nextjs/lib/review-queue.ts','lib/review-queue.ts','components/review-queue.tsx','app/workspace/page.tsx']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Other workspace paths keep only their existing lifecycle owner; the review suite is never folded into them.
+  for (const path of ['nextjs/app/workspace/pageXtsx','nextjs/app/workspace/page.test.tsx','nextjs/app/workspace/review-queue/page.tsx','nextjs/app/workspace/layout.tsx']) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS],path);
+  }
+  for (const path of ['nextjs/lib/./review-queue.ts','nextjs//lib/review-queue.ts','nextjs/lib/../lib/review-queue.ts','nextjs\\components\\review-queue.tsx',
+    'nextjs/lib/review-queue.test.ts ','nextjs/components/review queue.tsx'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+    assert.deepEqual(affectedMap([affectedRecord(status,[AFFECTED_REVIEW_MODEL],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${AFFECTED_REVIEW_MODEL}`]);
+  for (const [status,paths] of [['C075',[AFFECTED_REVIEW_MODEL,'nextjs/lib/review-queue-copy.ts']],['T',[AFFECTED_REVIEW_COMPONENT]],['U',[AFFECTED_REVIEW_TEST]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected review queue admission: a known batch with an unknown sibling or an unowned rename endpoint closes the whole map with no partial selection', () => {
+  const mixed=affectedMap([...affectedReviewRaw(),affectedRecord('A',['nextjs/lib/review-queue-neighbor.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/review-queue-neighbor.ts'],['nextjs/lib/review-queue-neighbor.ts']]);
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_REVIEW_MODEL,'nextjs/lib/review-queue-neighbor.ts'],['nextjs/components/review-queues.tsx',AFFECTED_REVIEW_COMPONENT],[AFFECTED_REVIEW_PAGE,'nextjs/app/review/page.tsx']]) {
+    const unknown=paths.find(path=>!AFFECTED_REVIEW_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+});
+test('affected review queue admission: the selected suite missing at head refuses, and deleting any owner path still selects it', () => {
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedReviewRaw(),headHasFile:path=>path!==AFFECTED_REVIEW_TEST});
+  assert.deepEqual([missing.groups,missing.failures],[['grounded-ask','review-queue','workspace-lifecycle'],['selected owner check is absent at head: lib/review-queue.test.ts']]);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+  for (const path of AFFECTED_REVIEW_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const page=path===AFFECTED_REVIEW_PAGE,expected=path===AFFECTED_REVIEW_TEST?['selected owner check is absent at head: lib/review-queue.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],
+      [page?['grounded-ask','review-queue','workspace-lifecycle']:['review-queue'],page?AFFECTED_REVIEW_PAGE_UNITS:AFFECTED_REVIEW_SUITES,expected,[path]],path);
+  }
+});
+test('affected review queue admission: shared owners union and dedupe while the source-agent, cloud intake, connector, docs and Ask owners keep their selections', () => {
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_REVIEW_COMPONENT]),affectedRecord('M',[AFFECTED_SOURCE_AGENT_CLOUD_TEST]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([shared.failures,shared.groups,shared.unitFiles,shared.browserFiles],
+    [[],['connector-progress','review-queue','source-agent'],affectedUnion(AFFECTED_REVIEW_SUITES,AFFECTED_SOURCE_AGENT_SUITES,AFFECTED_CONNECTOR_SUITES),[]]);
+  const docs=affectedMap([affectedRecord('M',[AFFECTED_REVIEW_TEST]),affectedRecord('M',['README.md'])]);
+  assert.deepEqual([docs.failures,docs.groups,docs.unitFiles,docs.browserFiles],[[],['docs','repository-docs','review-queue'],affectedUnion(AFFECTED_DOCS_SUITES,AFFECTED_REVIEW_SUITES),['e2e/docs-reading-layout.spec.ts']]);
+  assert.deepEqual([docs.nativeEvidence.disposition,docs.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',[AFFECTED_REVIEW_TEST]]);
+  // The page together with the other Ask paths dedupes into one union; ask-route-limits.test.ts keeps its ACL owner and fixture contract.
+  const ask=affectedMap([...affectedReviewRaw(),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts'])]);
+  assert.deepEqual([ask.failures,ask.groups,ask.unitFiles,ask.browserFiles],
+    [[],['acl','grounded-ask','review-queue','workspace-lifecycle'],affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_REVIEW_SUITES),['e2e/world-lifecycle.spec.ts']]);
+  assert.deepEqual(ask.fixtureContracts.map(({group,suite})=>({group,suite})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts'}]);
+  // None of the prior owners picks up the review suite on its own.
+  for (const path of [AFFECTED_SOURCE_AGENT_CLOUD_TEST,AFFECTED_CONNECTOR_STATUS,'nextjs/lib/grounded-ask.ts','nextjs/components/world-ontology-viewer.tsx','README.md'])
+    assert.ok(!affectedMap([affectedRecord('M',[path])]).unitFiles.includes('lib/review-queue.test.ts'),path);
+});
+test('affected review queue admission: readAffectedExecution requires the review suite and accepts the satisfied shared unit union', () => {
+  const sole=affectedMap([affectedRecord('M',[AFFECTED_REVIEW_MODEL])]);assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union: the review owner with a non-page Ask owner, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_REVIEW_COMPONENT]),affectedRecord('M',['nextjs/lib/grounded-ask.ts'])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],[[],[],affectedUnion(AFFECTED_ASK_SUITES,AFFECTED_REVIEW_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-review-queue-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // The omission case keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      if (map===union) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!=='lib/review-queue.test.ts'))));
+        assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/review-queue\.test\.ts/);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+// ---- Affected sample analytics admission: four exact paths, two direct suites; Home keeps selecting the relay suite for its own paths ----
+import { SAMPLE_ANALYTICS_AFFECTED_PATHS, SAMPLE_ANALYTICS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR product tree 17129698449b8989b2cd58db4f5d507fe392069a): three modified 100644 files and
+// the new 100644 admission suite.
+const AFFECTED_ANALYTICS_RELAY='nextjs/lib/marketing-analytics.ts',AFFECTED_ANALYTICS_RELAY_TEST='nextjs/lib/marketing-analytics.test.ts';
+const AFFECTED_ANALYTICS_CONSENT='nextjs/components/marketing-consent.tsx',AFFECTED_ANALYTICS_ADMISSION='nextjs/lib/sample-analytics-admission.test.ts';
+const AFFECTED_ANALYTICS_PATHS=Object.freeze([AFFECTED_ANALYTICS_RELAY,AFFECTED_ANALYTICS_RELAY_TEST,AFFECTED_ANALYTICS_CONSENT,AFFECTED_ANALYTICS_ADMISSION]);
+const AFFECTED_ANALYTICS_BLOBS=Object.freeze({[AFFECTED_ANALYTICS_RELAY]:'c6520b49893b6063030128f457d7210b33b1342d',[AFFECTED_ANALYTICS_RELAY_TEST]:'021f1e551924b97b30f540eee8253100c2c7fbb0',
+  [AFFECTED_ANALYTICS_CONSENT]:'b7b908446f876156d3cd8783812adfedad04c36d',[AFFECTED_ANALYTICS_ADMISSION]:'0e7e7b9444029e8c277dc21062f129eecf67c3e5'});
+const AFFECTED_ANALYTICS_SUITES=Object.freeze(['lib/marketing-analytics.test.ts','lib/sample-analytics-admission.test.ts']);
+const AFFECTED_ANALYTICS_GROUP='sample-analytics-admission',AFFECTED_HOME_PAGE_PATH='nextjs/components/landing-v2/landing-page.tsx';
+// The final raw delta. The map never reads preimage oids, so the modified records carry a stand-in preimage and the added suite the zero oid;
+// the postimage blobs and modes are the root-verified final ones and are pinned nowhere in the selector.
+const affectedAnalyticsRaw=()=>parseAffectedRawDiff(AFFECTED_ANALYTICS_PATHS.map(path=>{
+  const added=path===AFFECTED_ANALYTICS_ADMISSION;
+  return `:${added?'000000':'100644'} 100644 ${(added?'0':'1').repeat(40)} ${AFFECTED_ANALYTICS_BLOBS[path]} ${added?'A':'M'}\0${path}\0`;
+}).join(''));
+test('affected sample analytics admission: the actual four-literal M and new-suite A delta selects the owner and exactly the two physically present direct suites', () => {
+  assert.deepEqual(SAMPLE_ANALYTICS_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_ANALYTICS_PATHS);assert.equal(new Set(AFFECTED_ANALYTICS_PATHS).size,4);
+  assert.deepEqual([...SAMPLE_ANALYTICS_AFFECTED_UNIT_FILES].sort(),AFFECTED_ANALYTICS_SUITES);
+  for (const suite of AFFECTED_ANALYTICS_SUITES) assert.ok(existsSync(fileURLToPath(new URL('../'+suite,import.meta.url))),'selected suite exists: '+suite);
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'both suites are discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_ANALYTICS_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_ANALYTICS_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedAnalyticsRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),
+    AFFECTED_ANALYTICS_PATHS.map(path=>path===AFFECTED_ANALYTICS_ADMISSION?['A','000000','100644',[path]]:['M','100644','100644',[path]]));
+  for (const path of AFFECTED_ANALYTICS_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_ANALYTICS_GROUP],path);
+    // The actual record, plus added, modified and executable-bit regular files, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],[AFFECTED_ANALYTICS_GROUP],[...AFFECTED_ANALYTICS_PATHS].sort(),AFFECTED_ANALYTICS_SUITES,[]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_ANALYTICS_PATHS.map(path=>[path===AFFECTED_ANALYTICS_ADMISSION?'A':'M',[AFFECTED_ANALYTICS_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',[...AFFECTED_ANALYTICS_PATHS].sort()]);
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_ANALYTICS_RELAY,AFFECTED_ANALYTICS_CONSENT])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,[{status:'R100',paths:[AFFECTED_ANALYTICS_RELAY,AFFECTED_ANALYTICS_CONSENT],groups:[AFFECTED_ANALYTICS_GROUP]}]]);
+});
+test('affected sample analytics admission: the regular plan defers only the normal fresh native run and the owner adds no browser, build, database, worker or selector lane', () => {
+  const plan=affectedAskPlan(affectedMap([affectedRecord('M',[AFFECTED_ANALYTICS_RELAY])]));
+  assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[['native-world-race-fresh-run',AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,[]]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+    'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT]);
+  assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'));
+  // The full four-path delta, including the added suite, plans the same unit-only selection with the same single deferral.
+  const full=affectedAskPlan(affectedMap(affectedAnalyticsRaw()));
+  assert.deepEqual([full.groups,full.unitFiles,full.browserFiles,full.deferredGroups,full.fullQualification,full.affectedIntegration.changedPaths],
+    [['native-world-race-fresh-run',AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,[],['native-world-race-fresh-run'],'pending',[...AFFECTED_ANALYTICS_PATHS].sort()]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runDetailIntegrity']) assert.ok(!full[flag],flag);
+});
+test('affected sample analytics admission: adjacent lookalikes, new CSS, vendor, provider, OAuth and collector paths stay unknown; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/lib/marketing-analytics.tsx','nextjs/lib/marketing-analytics.js','nextjs/lib/marketing-analytics.ts.bak','nextjs/lib/marketing-analyticsXts',
+    'nextjs/lib/marketing-analytic.ts','nextjs/lib/marketing-analytics-v2.ts','nextjs/lib/marketing-analytics/index.ts','nextjs/lib/Marketing-Analytics.ts',
+    'nextjs/lib/marketing-analytics.spec.ts','nextjs/lib/marketing-analytics.test.tsx','nextjs/lib/marketing-analyticsXtest.ts','nextjs/lib/marketing-analytics-copy.test.ts',
+    'nextjs/components/marketing-consent.module.css','nextjs/components/marketing-consent.css','nextjs/app/chrome-v2.css','nextjs/components/marketing-consent.ts',
+    'nextjs/components/marketing-consent.test.tsx','nextjs/components/marketing-consent.tsx.bak','nextjs/components/marketing-consentXtsx','nextjs/components/marketing-consent-banner.tsx',
+    'nextjs/components/consent/marketing-consent.tsx','nextjs/components/Marketing-Consent.tsx','nextjs/e2e/marketing-consent.spec.ts',
+    'nextjs/lib/sample-analytics-admission.ts','nextjs/lib/sample-analytics-admission.spec.ts','nextjs/lib/sample-analytics-admission.test.tsx','nextjs/lib/sample-analytics.test.ts',
+    'nextjs/lib/sample-analytics-admissionXtest.ts','nextjs/lib/sample-analytics-admission/index.test.ts',
+    'nextjs/public/vendor/gtag.js','nextjs/lib/gtag.ts','nextjs/lib/google-analytics.ts','nextjs/lib/analytics-provider.ts','nextjs/app/api/analytics/route.ts',
+    'nextjs/lib/oauth-google-analytics.ts','nextjs/lib/analytics-source-collector.ts','nextjs/package.json',
+    'nextjs/nextjs/lib/marketing-analytics.ts','lib/marketing-analytics.ts','lib/sample-analytics-admission.test.ts','components/marketing-consent.tsx']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  for (const path of ['nextjs/lib/./marketing-analytics.ts','nextjs//lib/marketing-analytics.ts','nextjs/lib/../lib/marketing-analytics.ts','nextjs\\components\\marketing-consent.tsx',
+    'nextjs/lib/sample-analytics-admission.test.ts ','nextjs/components/marketing consent.tsx','nextjs/lib/marketing-analytics.test.ts\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of [AFFECTED_ANALYTICS_RELAY,AFFECTED_ANALYTICS_ADMISSION])
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_ANALYTICS_RELAY,'nextjs/lib/marketing-analytics-copy.ts']],['T',[AFFECTED_ANALYTICS_CONSENT]],['U',[AFFECTED_ANALYTICS_ADMISSION]],['X',[AFFECTED_ANALYTICS_RELAY_TEST]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected sample analytics admission: a known batch with an unknown sibling or an unowned rename endpoint refuses the whole execution plan', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedAnalyticsRaw(),affectedRecord('A',['nextjs/lib/marketing-analytics-v2.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/marketing-analytics-v2.ts'],['nextjs/lib/marketing-analytics-v2.ts']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_ANALYTICS_RELAY,'nextjs/lib/marketing-analytics-v2.ts'],['nextjs/components/marketing-consent-banner.tsx',AFFECTED_ANALYTICS_CONSENT],
+    [AFFECTED_ANALYTICS_ADMISSION,'nextjs/lib/sample-analytics.test.ts'],[AFFECTED_ANALYTICS_RELAY_TEST,'nextjs/lib/google-analytics.test.ts']]) {
+    const unknown=paths.find(path=>!AFFECTED_ANALYTICS_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.deepEqual(map.entries.map(entry=>entry.groups),[[AFFECTED_ANALYTICS_GROUP]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // An unknown sibling beside a Home path and the relay closes the union too.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',['nextjs/components/marketing-consent.module.css'])]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/marketing-consent.module.css'],['nextjs/components/marketing-consent.module.css']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+});
+test('affected sample analytics admission: either selected suite missing at head refuses, and deleting any owner path still selects both or fails closed', () => {
+  for (const suite of AFFECTED_ANALYTICS_SUITES) {
+    const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedAnalyticsRaw(),headHasFile:path=>path!==`nextjs/${suite}`});
+    assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,[`selected owner check is absent at head: ${suite}`]],suite);
+    assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/,suite);
+  }
+  for (const path of AFFECTED_ANALYTICS_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const suite=path.slice('nextjs/'.length),expected=AFFECTED_ANALYTICS_SUITES.includes(suite)?[`selected owner check is absent at head: ${suite}`]:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+  }
+  // Deleting the relay suite also fails the Home selection closed; Home never drops it silently.
+  const home=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])],headHasFile:file=>file!==AFFECTED_ANALYTICS_RELAY_TEST});
+  assert.deepEqual([home.groups,home.failures],[['home-landing'],['selected owner check is absent at head: lib/marketing-analytics.test.ts']]);
+});
+test('affected sample analytics admission: shared Home, review page, source-agent, cloud intake, connector and docs owners keep their selections and union exactly', () => {
+  // Home keeps its seven suites; the relay suite it already selects dedupes with the new owner's pair.
+  const home=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY])]);
+  assert.deepEqual([home.failures,home.groups,home.unitFiles,home.browserFiles],[[],['home-landing',AFFECTED_ANALYTICS_GROUP],affectedUnion(AFFECTED_HOME_SUITES,AFFECTED_ANALYTICS_SUITES),[AFFECTED_HOME_SPEC]]);
+  assert.equal(home.unitFiles.length,8);
+  const homeAlone=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])]);
+  assert.deepEqual([homeAlone.groups,homeAlone.unitFiles,homeAlone.browserFiles],[['home-landing'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]]);
+  // The relay suite path itself belongs only to the new owner, never to Home.
+  assert.deepEqual(affectedMap([affectedRecord('M',[AFFECTED_ANALYTICS_RELAY_TEST])]).groups,[AFFECTED_ANALYTICS_GROUP]);
+  const page=affectedMap([affectedRecord('M',[AFFECTED_REVIEW_PAGE]),affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT])]);
+  assert.deepEqual([page.failures,page.groups,page.unitFiles,page.browserFiles],
+    [[],['grounded-ask','review-queue',AFFECTED_ANALYTICS_GROUP,'workspace-lifecycle'],affectedUnion(AFFECTED_REVIEW_PAGE_UNITS,AFFECTED_ANALYTICS_SUITES),['e2e/world-lifecycle.spec.ts']]);
+  const agents=affectedMap([affectedRecord('A',[AFFECTED_ANALYTICS_ADMISSION],'000000'),affectedRecord('M',[AFFECTED_SOURCE_AGENT_CLOUD_TEST]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS]),affectedRecord('M',[AFFECTED_REVIEW_COMPONENT])]);
+  assert.deepEqual([agents.failures,agents.groups,agents.unitFiles,agents.browserFiles],
+    [[],['connector-progress','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent'],affectedUnion(AFFECTED_ANALYTICS_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_SOURCE_AGENT_SUITES,AFFECTED_CONNECTOR_SUITES),[]]);
+  const docs=affectedMap([affectedRecord('M',[AFFECTED_ANALYTICS_RELAY_TEST]),affectedRecord('M',['README.md'])]);
+  assert.deepEqual([docs.failures,docs.groups,docs.unitFiles,docs.browserFiles],[[],['docs','repository-docs',AFFECTED_ANALYTICS_GROUP],affectedUnion(AFFECTED_DOCS_SUITES,AFFECTED_ANALYTICS_SUITES),['e2e/docs-reading-layout.spec.ts']]);
+  assert.deepEqual([docs.nativeEvidence.disposition,docs.nativeEvidence.invalidatingPaths],['fresh-seven-case-native-run-required',[AFFECTED_ANALYTICS_RELAY_TEST]]);
+  // Everything at once: every owner and overlap survives, the union dedupes and the ACL fixture contract stays the only one.
+  const all=affectedMap([...affectedAnalyticsRaw(),...affectedReviewRaw(),affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_SOURCE_AGENT_CLOUD_TEST]),
+    affectedRecord('M',[AFFECTED_CONNECTOR_STATUS]),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts'])]);
+  assert.deepEqual([all.failures,all.groups],[[],['acl','connector-progress','docs','grounded-ask','home-landing','repository-docs','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle']]);
+  assert.deepEqual(all.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_HOME_SUITES,AFFECTED_ANALYTICS_SUITES,
+    AFFECTED_SOURCE_AGENT_SUITES,AFFECTED_CONNECTOR_SUITES,AFFECTED_DOCS_SUITES));
+  assert.deepEqual(all.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual(all.fixtureContracts.map(({group,suite})=>({group,suite})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts'}]);
+  assert.deepEqual([all.runCdrWorkerChecks,all.runSelectorContracts,all.databaseChanged,all.databaseTests],[false,false,false,[]]);
+  // None of the prior owners picks up the admission suite or the new owner on its own.
+  for (const path of [AFFECTED_HOME_PAGE_PATH,AFFECTED_REVIEW_PAGE,AFFECTED_REVIEW_COMPONENT,AFFECTED_SOURCE_AGENT_CLOUD_TEST,AFFECTED_CONNECTOR_STATUS,'nextjs/lib/grounded-ask.ts','README.md']) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.ok(!map.groups.includes(AFFECTED_ANALYTICS_GROUP)&&!map.unitFiles.includes('lib/sample-analytics-admission.test.ts'),path);
+  }
+});
+test('affected sample analytics admission: readAffectedExecution requires both direct suites and accepts the satisfied shared unit union', () => {
+  const sole=affectedMap(affectedAnalyticsRaw());assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union with the review and connector owners, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT]),affectedRecord('M',[AFFECTED_REVIEW_MODEL]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],[[],[],affectedUnion(AFFECTED_ANALYTICS_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_CONNECTOR_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-sample-analytics-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // Each omission keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      for (const omitted of AFFECTED_ANALYTICS_SUITES) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!==omitted))));
+        assert.throws(()=>readAffectedExecution(root,plan),new RegExp(`Vitest report omitted selected file\\(s\\): ${omitted.replaceAll('.','\\.')}`),omitted);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+// ---- Affected consumer verification admission: four exact paths, one direct suite; no browser, database, worker, build or selector lane ----
+import { CONSUMER_VERIFICATION_AFFECTED_PATHS, CONSUMER_VERIFICATION_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR product tree 2590fc79da8053821746d3bffa8e68698a9c49fe on selector base
+// 7082ed63eebacdec31036bf24c821c85ff081c37): the modified 100644 developer panel and three new 100644 files.
+const AFFECTED_CONSUMER_PANEL='nextjs/components/developer-panel.tsx',AFFECTED_CONSUMER_VIEW='nextjs/components/consumer-verification-panel.tsx';
+const AFFECTED_CONSUMER_MODEL='nextjs/lib/consumer-verification.ts',AFFECTED_CONSUMER_TEST='nextjs/lib/consumer-verification.test.ts';
+const AFFECTED_CONSUMER_PATHS=Object.freeze([AFFECTED_CONSUMER_PANEL,AFFECTED_CONSUMER_VIEW,AFFECTED_CONSUMER_MODEL,AFFECTED_CONSUMER_TEST]);
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_CONSUMER_BLOBS=Object.freeze({[AFFECTED_CONSUMER_PANEL]:'f9f02fd05826eff4d65f069a1879f9f6fbb36e87',[AFFECTED_CONSUMER_VIEW]:'112a8ed4918c35a91d246ecc92ce2cbae041da7a',
+  [AFFECTED_CONSUMER_MODEL]:'5f6d52aaefd56e273f07077adc5f06243ea28f2c',[AFFECTED_CONSUMER_TEST]:'22b79c3fe3f28f27539289da59a3cd63a9f378d5'});
+const AFFECTED_CONSUMER_SUITES=Object.freeze(['lib/consumer-verification.test.ts']);
+const AFFECTED_CONSUMER_GROUP='consumer-verification';
+// The final raw delta: one M (100644 -> 100644) and three A (000000 -> 100644) records.
+const affectedConsumerRaw=()=>parseAffectedRawDiff(AFFECTED_CONSUMER_PATHS.map(path=>{
+  const added=path!==AFFECTED_CONSUMER_PANEL;
+  return `:${added?'000000':'100644'} 100644 ${added?'0'.repeat(40):'5e26798d5f62449cbd623e7e3b01afa7ca434c1c'} ${AFFECTED_CONSUMER_BLOBS[path]} ${added?'A':'M'}\0${path}\0`;
+}).join(''));
+test('affected consumer verification admission: the actual one-M and three-new-A four-literal delta selects the sole owner and exactly the one physically present direct suite', () => {
+  assert.deepEqual(CONSUMER_VERIFICATION_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_CONSUMER_PATHS);assert.equal(new Set(AFFECTED_CONSUMER_PATHS).size,4);
+  assert.deepEqual([...CONSUMER_VERIFICATION_AFFECTED_UNIT_FILES],AFFECTED_CONSUMER_SUITES);
+  assert.ok(existsSync(fileURLToPath(new URL('../lib/consumer-verification.test.ts',import.meta.url))),'selected suite exists: lib/consumer-verification.test.ts');
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_CONSUMER_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_CONSUMER_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedConsumerRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),
+    AFFECTED_CONSUMER_PATHS.map(path=>path===AFFECTED_CONSUMER_PANEL?['M','100644','100644',[path]]:['A','000000','100644',[path]]));
+  for (const path of AFFECTED_CONSUMER_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_CONSUMER_GROUP],path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],[AFFECTED_CONSUMER_GROUP],[...AFFECTED_CONSUMER_PATHS].sort(),AFFECTED_CONSUMER_SUITES,[]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_CONSUMER_PATHS.map(path=>[path===AFFECTED_CONSUMER_PANEL?'M':'A',[AFFECTED_CONSUMER_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[...AFFECTED_CONSUMER_PATHS].sort(),false]);
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_CONSUMER_MODEL,AFFECTED_CONSUMER_VIEW])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES,[{status:'R100',paths:[AFFECTED_CONSUMER_MODEL,AFFECTED_CONSUMER_VIEW],groups:[AFFECTED_CONSUMER_GROUP]}]]);
+});
+test('affected consumer verification admission: the regular plan defers only the normal fresh native run and the owner adds no browser, build, database, worker or selector lane', () => {
+  const plan=affectedAskPlan(affectedMap([affectedRecord('M',[AFFECTED_CONSUMER_PANEL])]));
+  assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[[AFFECTED_CONSUMER_GROUP,'native-world-race-fresh-run'].sort(),AFFECTED_CONSUMER_SUITES,[]]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+    'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+    assert.ok(!plan[flag],flag);
+  assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT]);
+  assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'));
+  // The full four-path delta, including the three added files, plans the same unit-only selection with the same single deferral.
+  const full=affectedAskPlan(affectedMap(affectedConsumerRaw()));
+  assert.deepEqual([full.groups,full.unitFiles,full.browserFiles,full.deferredGroups,full.fullQualification,full.affectedIntegration.changedPaths],
+    [[AFFECTED_CONSUMER_GROUP,'native-world-race-fresh-run'].sort(),AFFECTED_CONSUMER_SUITES,[],['native-world-race-fresh-run'],'pending',[...AFFECTED_CONSUMER_PATHS].sort()]);
+  for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runDetailIntegrity']) assert.ok(!full[flag],flag);
+});
+test('affected consumer verification admission: lookalikes, backend routes and developer siblings stay unknown, prior source-agent, UX08 and other owners keep only their selections; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions, CSS, server, API and provider paths never match.
+  for (const path of ['nextjs/components/developer-panel.ts','nextjs/components/developer-panel.module.css','nextjs/components/developer-panel.css','nextjs/components/developer-panel.test.tsx',
+    'nextjs/components/developer-panel.tsx.bak','nextjs/components/developer-panelXtsx','nextjs/components/developer-panels.tsx','nextjs/components/Developer-Panel.tsx',
+    'nextjs/components/developer/developer-panel.tsx','nextjs/components/developer-keys-panel.tsx','nextjs/components/developer-settings.tsx',
+    'nextjs/components/consumer-verification-panel.ts','nextjs/components/consumer-verification-panel.module.css','nextjs/components/consumer-verification-panel.test.tsx',
+    'nextjs/components/consumer-verification-panelXtsx','nextjs/components/consumer-verification.tsx','nextjs/components/consumer-verification-panel-v2.tsx',
+    'nextjs/lib/consumer-verification.tsx','nextjs/lib/consumer-verification.js','nextjs/lib/consumer-verification.ts.bak','nextjs/lib/consumer-verificationXts',
+    'nextjs/lib/consumer-verifications.ts','nextjs/lib/consumer-verification/index.ts','nextjs/lib/consumer-verification-v2.ts','nextjs/lib/Consumer-Verification.ts',
+    'nextjs/lib/consumer-verification.spec.ts','nextjs/lib/consumer-verification.test.tsx','nextjs/lib/consumer-verificationXtest.ts','nextjs/lib/consumer-verification-copy.test.ts',
+    'nextjs/e2e/consumer-verification.spec.ts','nextjs/app/api/v1/consumer-verification/route.ts','nextjs/app/api/consumer-verification/route.ts','nextjs/app/api/v1/ask/route.ts',
+    'nextjs/app/developer/page.tsx','nextjs/lib/consumer-verification-server.ts','nextjs/lib/consumer-verification-provider.ts','nextjs/lib/api-keys.ts','nextjs/package.json',
+    'nextjs/lib/developer-distribution.test.ts','nextjs/public/developer/consumer-verification.md',
+    'nextjs/nextjs/lib/consumer-verification.ts','lib/consumer-verification.ts','lib/consumer-verification.test.ts','components/developer-panel.tsx']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Known paths of earlier owners keep exactly their prior selection; the consumer owner and its suite never join them.
+  const prior=[...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES]),
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES]),
+    ...[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST].map(path=>[path,['review-queue'],AFFECTED_REVIEW_SUITES]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS],[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES]];
+  for (const [path,groups,units] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],groups,[...units].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_CONSUMER_GROUP)&&!map.unitFiles.includes('lib/consumer-verification.test.ts'),path);
+  }
+  for (const path of ['nextjs/lib/./consumer-verification.ts','nextjs//lib/consumer-verification.ts','nextjs/lib/../lib/consumer-verification.ts','nextjs\\components\\developer-panel.tsx',
+    'nextjs/lib/consumer-verification.test.ts ','nextjs/components/consumer verification-panel.tsx','nextjs/components/developer-panel.tsx\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of [AFFECTED_CONSUMER_PANEL,AFFECTED_CONSUMER_TEST])
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_CONSUMER_MODEL,'nextjs/lib/consumer-verification-copy.ts']],['T',[AFFECTED_CONSUMER_PANEL]],['U',[AFFECTED_CONSUMER_TEST]],['X',[AFFECTED_CONSUMER_VIEW]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected consumer verification admission: known plus unknown or an unowned rename endpoint refuses the whole execution plan, and deleting an owned path still selects and checks the suite at head', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedConsumerRaw(),affectedRecord('A',['nextjs/lib/consumer-verification-v2.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/consumer-verification-v2.ts'],['nextjs/lib/consumer-verification-v2.ts']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_CONSUMER_MODEL,'nextjs/lib/consumer-verification-v2.ts'],['nextjs/components/developer-keys-panel.tsx',AFFECTED_CONSUMER_PANEL],
+    [AFFECTED_CONSUMER_VIEW,'nextjs/app/api/v1/consumer-verification/route.ts'],[AFFECTED_CONSUMER_TEST,'nextjs/lib/consumer-verification.spec.ts']]) {
+    const unknown=paths.find(path=>!AFFECTED_CONSUMER_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.deepEqual(map.entries.map(entry=>entry.groups),[[AFFECTED_CONSUMER_GROUP]],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // An unknown sibling beside Home, UX08 and the consumer owner closes the union too.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),
+    affectedRecord('A',['nextjs/components/developer-panel.module.css'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/developer-panel.module.css'],['nextjs/components/developer-panel.module.css']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting any owned path keeps the owner and still checks the actual suite at head.
+  for (const path of AFFECTED_CONSUMER_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const expected=path===AFFECTED_CONSUMER_TEST?['selected owner check is absent at head: lib/consumer-verification.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+  }
+  const panelGone=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[AFFECTED_CONSUMER_PANEL],'100644','000000')],
+    headHasFile:file=>file!==AFFECTED_CONSUMER_PANEL&&file!==AFFECTED_CONSUMER_TEST});
+  assert.deepEqual([panelGone.groups,panelGone.failures],[[AFFECTED_CONSUMER_GROUP],['selected owner check is absent at head: lib/consumer-verification.test.ts']]);
+  assert.throws(()=>affectedAskPlan(panelGone),/clean fail-closed map/);
+});
+test('affected consumer verification admission: the suite missing at head and readAffectedExecution without its coverage fail closed while the satisfied shared unit union succeeds', () => {
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedConsumerRaw(),headHasFile:path=>path!==AFFECTED_CONSUMER_TEST});
+  assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES,['selected owner check is absent at head: lib/consumer-verification.test.ts']]);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+  // Beside present UX08 and review suites the consumer suite alone still closes the map.
+  const sharedMissing=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedConsumerRaw(),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_REVIEW_MODEL])],
+    headHasFile:path=>path!==AFFECTED_CONSUMER_TEST});
+  assert.deepEqual(sharedMissing.failures,['selected owner check is absent at head: lib/consumer-verification.test.ts']);
+  assert.throws(()=>affectedAskPlan(sharedMissing),/clean fail-closed map/);
+  const sole=affectedMap(affectedConsumerRaw());assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union with the UX08, review and connector owners, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT]),affectedRecord('M',[AFFECTED_REVIEW_MODEL]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],[[],[],affectedUnion(AFFECTED_CONSUMER_SUITES,AFFECTED_ANALYTICS_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_CONNECTOR_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-consumer-verification-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // The omission keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      if (map===union) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!=='lib/consumer-verification.test.ts'))));
+        assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/consumer-verification\.test\.ts/);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected consumer verification admission: the combined workspace page, consumer, UX08, connector, source-agent, docs and Home delta is the prior map plus only the new owner and its one suite', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier.
+  const prior=[...affectedReviewRaw(),...affectedAnalyticsRaw(),...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/app/docs/page.tsx']),
+    affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedConsumerRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of ['connector-progress','docs','grounded-ask','home-landing','repository-docs','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_CONSUMER_GROUP)&&!base.unitFiles.includes('lib/consumer-verification.test.ts'));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_CONSUMER_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_CONSUMER_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_CONSUMER_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>entry.groups),AFFECTED_CONSUMER_PATHS.map(()=>[AFFECTED_CONSUMER_GROUP]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_CONSUMER_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_CONSUMER_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_CONSUMER_SUITES));
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  // No prior path picks up the consumer owner or its suite on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_CONSUMER_GROUP)&&!alone.unitFiles.includes('lib/consumer-verification.test.ts'),record.paths.join(' -> '));
+  }
+});
+// ---- Affected world diff admission: two exact paths, one direct suite; no browser, database, worker, build or selector lane ----
+import { WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR product tree f395bbf4b7646df4ca775672aa812a19b7899aa4 on selector base
+// 91bf15c0508b611c0d280148ae2940b03a47db01): the two modified 100644 files.
+const AFFECTED_WORLD_DIFF_MODEL='nextjs/lib/world-version-diff.ts',AFFECTED_WORLD_DIFF_TEST='nextjs/lib/world-version-diff.test.ts';
+const AFFECTED_WORLD_DIFF_PATHS=Object.freeze([AFFECTED_WORLD_DIFF_MODEL,AFFECTED_WORLD_DIFF_TEST]);
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_WORLD_DIFF_BLOBS=Object.freeze({
+  [AFFECTED_WORLD_DIFF_MODEL]:{prior:'efb62079a6ae5e1dd0d7a2ad23d4960e9e4a0afe',final:'9c00ce849c5068c3151012b8a8a79722f7df58cb'},
+  [AFFECTED_WORLD_DIFF_TEST]:{prior:'608744ddd8238e71eeecbd60ae0a8c05e574e7f1',final:'3b0646c801f6b1f7b0818b3b83d18ef4c45760ea'}});
+const AFFECTED_WORLD_DIFF_SUITES=Object.freeze(['lib/world-version-diff.test.ts']);
+const AFFECTED_WORLD_DIFF_GROUP='world-version-diff';
+// The final raw delta: two M (100644 -> 100644) records.
+const affectedWorldDiffRaw=()=>parseAffectedRawDiff(AFFECTED_WORLD_DIFF_PATHS.map(path=>
+  `:100644 100644 ${AFFECTED_WORLD_DIFF_BLOBS[path].prior} ${AFFECTED_WORLD_DIFF_BLOBS[path].final} M\0${path}\0`).join(''));
+test('affected world diff admission: each exact path and the combined two-M delta select the sole owner and exactly the one physically present, discovered direct suite', () => {
+  assert.deepEqual(WORLD_VERSION_DIFF_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_WORLD_DIFF_PATHS);assert.equal(new Set(AFFECTED_WORLD_DIFF_PATHS).size,2);
+  assert.deepEqual([...WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES],AFFECTED_WORLD_DIFF_SUITES);
+  for (const path of AFFECTED_WORLD_DIFF_PATHS) assert.ok(existsSync(fileURLToPath(new URL('../'+path.slice('nextjs/'.length),import.meta.url))),'owned path exists: '+path);
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_WORLD_DIFF_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_WORLD_DIFF_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedWorldDiffRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_WORLD_DIFF_PATHS.map(path=>['M','100644','100644',[path]]));
+  for (const path of AFFECTED_WORLD_DIFF_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_WORLD_DIFF_GROUP],path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],[AFFECTED_WORLD_DIFF_GROUP],[...AFFECTED_WORLD_DIFF_PATHS].sort(),AFFECTED_WORLD_DIFF_SUITES,[]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_WORLD_DIFF_PATHS.map(()=>['M',[AFFECTED_WORLD_DIFF_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[...AFFECTED_WORLD_DIFF_PATHS].sort(),false]);
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_WORLD_DIFF_MODEL,AFFECTED_WORLD_DIFF_TEST])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,[{status:'R100',paths:[AFFECTED_WORLD_DIFF_MODEL,AFFECTED_WORLD_DIFF_TEST],groups:[AFFECTED_WORLD_DIFF_GROUP]}]]);
+});
+test('affected world diff admission: the actual regular affectedPlan defers only the normal fresh native run and the owner adds no browser, build, database, worker or selector lane', () => {
+  for (const records of [[affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL])],[affectedRecord('M',[AFFECTED_WORLD_DIFF_TEST])],affectedWorldDiffRaw()]) {
+    const plan=affectedAskPlan(affectedMap(records)),label=records.map(r=>r.paths.join(' -> ')).join(', ');
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[[AFFECTED_WORLD_DIFF_GROUP,'native-world-race-fresh-run'].sort(),AFFECTED_WORLD_DIFF_SUITES,[]],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+      'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+      assert.ok(!plan[flag],`${flag} ${label}`);
+    assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT],label);
+    assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'),label);
+    assert.deepEqual([plan.affectedIntegration.changedPaths,plan.affectedIntegration.nativeEvidence.disposition,plan.affectedIntegration.nativeEvidence.freshRunClaimed],
+      [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
+  }
+});
+test('affected world diff admission: lookalikes, UI, CSS, route, server and spec siblings stay unknown, prior known paths keep only their prior owners; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/lib/world-version-diff.tsx','nextjs/lib/world-version-diff.js','nextjs/lib/world-version-diff.ts.bak','nextjs/lib/world-version-diffXts',
+    'nextjs/lib/world-version-diffs.ts','nextjs/lib/world-versions-diff.ts','nextjs/lib/world-version.ts','nextjs/lib/world-version-diff-v2.ts','nextjs/lib/world-version-diff/index.ts',
+    'nextjs/lib/World-Version-Diff.ts','nextjs/lib/world-version-diff-server.ts','nextjs/lib/world-version-diff.d.ts',
+    'nextjs/lib/world-version-diff.spec.ts','nextjs/lib/world-version-diff.test.tsx','nextjs/lib/world-version-diffXtest.ts','nextjs/lib/world-version-diff-copy.test.ts',
+    'nextjs/lib/world-version.test.ts','nextjs/lib/__snapshots__/world-version-diff.test.ts.snap',
+    'nextjs/components/world-version-diff.tsx','nextjs/components/world-version-diff.module.css','nextjs/components/world-version-diff.test.tsx',
+    'nextjs/app/api/v1/worlds/[id]/versions/diff/route.ts','nextjs/app/api/world-version-diff/route.ts','nextjs/e2e/world-version-diff.spec.ts',
+    'nextjs/nextjs/lib/world-version-diff.ts','lib/world-version-diff.ts','lib/world-version-diff.test.ts','world-version-diff.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Known paths of earlier owners keep exactly their prior selection; the new owner and its suite never join them.
+  const prior=[...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES]),
+    ...[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST].map(path=>[path,['review-queue'],AFFECTED_REVIEW_SUITES]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS],
+    ...['nextjs/lib/world-graph-layout.ts','nextjs/lib/visual-world-model.test.ts','nextjs/lib/world-directory-and-ontology.ts'].map(path=>[path,['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS]),
+    ['nextjs/lib/grounded-ask.ts',['grounded-ask'],AFFECTED_ASK_SUITES],[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES],
+    ['nextjs/app/docs/page.tsx',['docs'],AFFECTED_DOCS_SUITES]];
+  for (const [path,groups,units] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],groups,[...units].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_WORLD_DIFF_GROUP)&&!map.unitFiles.includes('lib/world-version-diff.test.ts'),path);
+  }
+  for (const path of ['nextjs/lib/./world-version-diff.ts','nextjs//lib/world-version-diff.ts','nextjs/lib/../lib/world-version-diff.ts','nextjs\\lib\\world-version-diff.ts',
+    'nextjs/lib/world-version-diff.test.ts ','nextjs/lib/world version-diff.ts','nextjs/lib/world-version-diff.ts\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of AFFECTED_WORLD_DIFF_PATHS)
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_WORLD_DIFF_MODEL,'nextjs/lib/world-version-diff-copy.ts']],['T',[AFFECTED_WORLD_DIFF_MODEL]],['U',[AFFECTED_WORLD_DIFF_TEST]],['X',[AFFECTED_WORLD_DIFF_TEST]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected world diff admission: known plus unknown or an unowned rename endpoint refuses the whole execution plan while the diagnostic selection remains, and deleting an owned path still checks the suite at head', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedWorldDiffRaw(),affectedRecord('A',['nextjs/lib/world-version-diff-v2.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/world-version-diff-v2.ts'],['nextjs/lib/world-version-diff-v2.ts']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_WORLD_DIFF_MODEL,'nextjs/lib/world-version-diff-v2.ts'],['nextjs/components/world-version-diff.tsx',AFFECTED_WORLD_DIFF_MODEL],
+    [AFFECTED_WORLD_DIFF_TEST,'nextjs/lib/world-version-diff.spec.ts'],['nextjs/lib/world-version.test.ts',AFFECTED_WORLD_DIFF_TEST]]) {
+    const unknown=paths.find(path=>!AFFECTED_WORLD_DIFF_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[[AFFECTED_WORLD_DIFF_GROUP]],AFFECTED_WORLD_DIFF_SUITES],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // An unknown sibling beside the consumer, UX08 and new owners closes the union too.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
+    affectedRecord('A',['nextjs/components/world-version-diff.module.css'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/world-version-diff.module.css'],['nextjs/components/world-version-diff.module.css']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting either owned path keeps the owner and still checks the actual suite at head.
+  for (const path of AFFECTED_WORLD_DIFF_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const expected=path===AFFECTED_WORLD_DIFF_TEST?['selected owner check is absent at head: lib/world-version-diff.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+  }
+  const modelGone=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[AFFECTED_WORLD_DIFF_MODEL],'100644','000000')],
+    headHasFile:file=>file!==AFFECTED_WORLD_DIFF_MODEL&&file!==AFFECTED_WORLD_DIFF_TEST});
+  assert.deepEqual([modelGone.groups,modelGone.failures],[[AFFECTED_WORLD_DIFF_GROUP],['selected owner check is absent at head: lib/world-version-diff.test.ts']]);
+  assert.throws(()=>affectedAskPlan(modelGone),/clean fail-closed map/);
+});
+test('affected world diff admission: the suite missing at head and readAffectedExecution without its report or coverage fail closed while the satisfied shared unit union succeeds', () => {
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedWorldDiffRaw(),headHasFile:path=>path!==AFFECTED_WORLD_DIFF_TEST});
+  assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,['selected owner check is absent at head: lib/world-version-diff.test.ts']]);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+  // Beside present consumer, UX08 and review suites the new suite alone still closes the map.
+  const sharedMissing=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedWorldDiffRaw(),affectedRecord('M',[AFFECTED_CONSUMER_MODEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_REVIEW_MODEL])],
+    headHasFile:path=>path!==AFFECTED_WORLD_DIFF_TEST});
+  assert.deepEqual(sharedMissing.failures,['selected owner check is absent at head: lib/world-version-diff.test.ts']);
+  assert.throws(()=>affectedAskPlan(sharedMissing),/clean fail-closed map/);
+  const sole=affectedMap(affectedWorldDiffRaw());assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union with the consumer, UX08, review and connector owners, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT]),
+    affectedRecord('M',[AFFECTED_REVIEW_MODEL]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],
+    [[],[],affectedUnion(AFFECTED_WORLD_DIFF_SUITES,AFFECTED_CONSUMER_SUITES,AFFECTED_ANALYTICS_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_CONNECTOR_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-world-diff-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // The omission keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      if (map===union) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!=='lib/world-version-diff.test.ts'))));
+        assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/world-version-diff\.test\.ts/);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected world diff admission: the combined consumer, UX08, workspace page, lifecycle/Ask, source-agent, connector, docs and Home delta is the current prior map plus only the new owner and its one suite', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier.
+  const prior=[...affectedConsumerRaw(),...affectedAnalyticsRaw(),...affectedReviewRaw(),affectedRecord('M',['nextjs/lib/world-graph-layout.ts']),
+    affectedRecord('M',['nextjs/lib/grounded-ask.ts']),...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/app/docs/page.tsx']),
+    affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedWorldDiffRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of [AFFECTED_CONSUMER_GROUP,'connector-progress','docs','grounded-ask','home-landing','repository-docs','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_WORLD_DIFF_GROUP)&&!base.unitFiles.includes('lib/world-version-diff.test.ts'));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_WORLD_DIFF_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_WORLD_DIFF_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_WORLD_DIFF_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>entry.groups),AFFECTED_WORLD_DIFF_PATHS.map(()=>[AFFECTED_WORLD_DIFF_GROUP]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_WORLD_DIFF_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_WORLD_DIFF_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_WORLD_DIFF_SUITES));
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  // No prior path picks up the new owner or its suite on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_WORLD_DIFF_GROUP)&&!alone.unitFiles.includes('lib/world-version-diff.test.ts'),record.paths.join(' -> '));
+  }
+});
+// ---- Affected customer lifecycle admission: two exact paths, one direct suite; no browser, database, worker, build or selector lane ----
+import { CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_PATHS, CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR product tree 812d6c423f8d0830f9f901bd26bf29f6a6721f8d on selector base
+// c0919ff8196e3766250f76838a87a14d600b6178): the two modified 100644 files.
+const AFFECTED_LIFECYCLE_MODEL='nextjs/lib/customer-source-lifecycle.ts',AFFECTED_LIFECYCLE_TEST='nextjs/lib/customer-source-lifecycle.test.ts';
+const AFFECTED_LIFECYCLE_PATHS=Object.freeze([AFFECTED_LIFECYCLE_MODEL,AFFECTED_LIFECYCLE_TEST]);
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_LIFECYCLE_BLOBS=Object.freeze({
+  [AFFECTED_LIFECYCLE_MODEL]:{prior:'c3e2fa3ded8714169de3f4bc4c7381440cbcb1bc',final:'2948763d207db83384ff41dcbc0c7fa15dfb8dbb'},
+  [AFFECTED_LIFECYCLE_TEST]:{prior:'789e3719a07549478e01de5cb24fe40723a65da7',final:'4bd99127cde551735a1e488a850e837fef4567ff'}});
+const AFFECTED_LIFECYCLE_SUITES=Object.freeze(['lib/customer-source-lifecycle.test.ts']);
+const AFFECTED_LIFECYCLE_GROUP='customer-source-lifecycle';
+// The final raw delta: two M (100644 -> 100644) records.
+const affectedLifecycleRaw=()=>parseAffectedRawDiff(AFFECTED_LIFECYCLE_PATHS.map(path=>
+  `:100644 100644 ${AFFECTED_LIFECYCLE_BLOBS[path].prior} ${AFFECTED_LIFECYCLE_BLOBS[path].final} M\0${path}\0`).join(''));
+test('affected customer lifecycle admission: each exact path and the combined two-M delta select the sole owner and exactly the one physically present, discovered direct suite', () => {
+  assert.deepEqual(CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_LIFECYCLE_PATHS);assert.equal(new Set(AFFECTED_LIFECYCLE_PATHS).size,2);
+  assert.deepEqual([...CUSTOMER_SOURCE_LIFECYCLE_AFFECTED_UNIT_FILES],AFFECTED_LIFECYCLE_SUITES);
+  for (const path of AFFECTED_LIFECYCLE_PATHS) assert.ok(existsSync(fileURLToPath(new URL('../'+path.slice('nextjs/'.length),import.meta.url))),'owned path exists: '+path);
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_LIFECYCLE_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_LIFECYCLE_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedLifecycleRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_LIFECYCLE_PATHS.map(path=>['M','100644','100644',[path]]));
+  for (const path of AFFECTED_LIFECYCLE_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_LIFECYCLE_GROUP],path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],[AFFECTED_LIFECYCLE_GROUP],[...AFFECTED_LIFECYCLE_PATHS].sort(),AFFECTED_LIFECYCLE_SUITES,[]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_LIFECYCLE_PATHS.map(()=>['M',[AFFECTED_LIFECYCLE_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[...AFFECTED_LIFECYCLE_PATHS].sort(),false]);
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_LIFECYCLE_MODEL,AFFECTED_LIFECYCLE_TEST])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES,[{status:'R100',paths:[AFFECTED_LIFECYCLE_MODEL,AFFECTED_LIFECYCLE_TEST],groups:[AFFECTED_LIFECYCLE_GROUP]}]]);
+});
+test('affected customer lifecycle admission: the actual regular affectedPlan defers only the normal fresh native run and the owner adds no browser, build, database, worker or selector lane', () => {
+  for (const records of [[affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL])],[affectedRecord('M',[AFFECTED_LIFECYCLE_TEST])],affectedLifecycleRaw()]) {
+    const plan=affectedAskPlan(affectedMap(records)),label=records.map(r=>r.paths.join(' -> ')).join(', ');
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[[AFFECTED_LIFECYCLE_GROUP,'native-world-race-fresh-run'].sort(),AFFECTED_LIFECYCLE_SUITES,[]],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+      'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+      assert.ok(!plan[flag],`${flag} ${label}`);
+    assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT],label);
+    assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'),label);
+    assert.deepEqual([plan.affectedIntegration.changedPaths,plan.affectedIntegration.nativeEvidence.disposition,plan.affectedIntegration.nativeEvidence.freshRunClaimed],
+      [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
+  }
+});
+test('affected customer lifecycle admission: lookalikes, route, deletion, retention, backup, UI and spec siblings stay unknown, prior known paths keep only their prior owners; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/lib/customer-source-lifecycle.tsx','nextjs/lib/customer-source-lifecycle.js','nextjs/lib/customer-source-lifecycle.ts.bak','nextjs/lib/customer-source-lifecycleXts',
+    'nextjs/lib/customer-source-lifecycles.ts','nextjs/lib/customer-sources-lifecycle.ts','nextjs/lib/customer-source.ts','nextjs/lib/customer-source-lifecycle-v2.ts','nextjs/lib/customer-source-lifecycle/index.ts',
+    'nextjs/lib/Customer-Source-Lifecycle.ts','nextjs/lib/customer-source-lifecycle-server.ts','nextjs/lib/customer-source-lifecycle.d.ts',
+    'nextjs/lib/customer-source-lifecycle.spec.ts','nextjs/lib/customer-source-lifecycle.test.tsx','nextjs/lib/customer-source-lifecycleXtest.ts','nextjs/lib/customer-source-lifecycle-copy.test.ts',
+    'nextjs/lib/customer-source-lifecycle-route.test.ts','nextjs/lib/customer-source-lifecycle-route.ts','nextjs/lib/__snapshots__/customer-source-lifecycle.test.ts.snap',
+    'nextjs/lib/source-deletion.ts','nextjs/lib/source-deletion.test.ts','nextjs/lib/source-deletion-worker.ts','nextjs/lib/customer-source-deletion.ts',
+    'nextjs/lib/customer-source-retention.ts','nextjs/lib/customer-source-backup.ts','nextjs/lib/r2-source-deletion.ts',
+    'nextjs/app/api/documents/[id]/lifecycle/route.ts','nextjs/app/api/v1/sources/[id]/lifecycle/route.ts','nextjs/components/customer-source-lifecycle.tsx','nextjs/e2e/customer-source-lifecycle.spec.ts',
+    'nextjs/nextjs/lib/customer-source-lifecycle.ts','lib/customer-source-lifecycle.ts','lib/customer-source-lifecycle.test.ts','customer-source-lifecycle.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Known paths of earlier owners, and the SQL and worker neighbours, keep exactly their prior selection; the new owner and its suite never join them.
+  const prior=[...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES]),
+    ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES]),
+    ...[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST].map(path=>[path,['review-queue'],AFFECTED_REVIEW_SUITES]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS],
+    ...['nextjs/lib/world-graph-layout.ts','nextjs/lib/visual-world-model.test.ts','nextjs/lib/world-directory-and-ontology.ts'].map(path=>[path,['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS]),
+    ['nextjs/lib/grounded-ask.ts',['grounded-ask'],AFFECTED_ASK_SUITES],[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES],
+    ['nextjs/app/docs/page.tsx',['docs'],AFFECTED_DOCS_SUITES],
+    ['supabase/drafts/customer_source_lifecycle.sql',['database-contract'],['lib/pgtap-fixtures.test.ts']],
+    ['quarantine-sidecar/foundation-cdr-worker/src/source-deletion.ts',['ocr-worker'],[]]];
+  for (const [path,groups,units] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],groups,[...units].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_LIFECYCLE_GROUP)&&!map.unitFiles.includes('lib/customer-source-lifecycle.test.ts'),path);
+  }
+  for (const path of ['nextjs/lib/./customer-source-lifecycle.ts','nextjs//lib/customer-source-lifecycle.ts','nextjs/lib/../lib/customer-source-lifecycle.ts','nextjs\\lib\\customer-source-lifecycle.ts',
+    'nextjs/lib/customer-source-lifecycle.test.ts ','nextjs/lib/customer source-lifecycle.ts','nextjs/lib/customer-source-lifecycle.ts\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of AFFECTED_LIFECYCLE_PATHS)
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_LIFECYCLE_MODEL,'nextjs/lib/customer-source-lifecycle-copy.ts']],['T',[AFFECTED_LIFECYCLE_MODEL]],['U',[AFFECTED_LIFECYCLE_TEST]],['X',[AFFECTED_LIFECYCLE_TEST]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected customer lifecycle admission: known plus unknown or an unowned rename endpoint refuses the whole execution plan while the diagnostic selection remains, and deleting an owned path still checks the suite at head', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedLifecycleRaw(),affectedRecord('A',['nextjs/lib/customer-source-lifecycle-v2.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/customer-source-lifecycle-v2.ts'],['nextjs/lib/customer-source-lifecycle-v2.ts']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_LIFECYCLE_MODEL,'nextjs/lib/customer-source-lifecycle-v2.ts'],['nextjs/lib/customer-source-lifecycle-route.test.ts',AFFECTED_LIFECYCLE_MODEL],
+    [AFFECTED_LIFECYCLE_TEST,'nextjs/lib/customer-source-lifecycle.spec.ts'],['nextjs/lib/source-deletion.ts',AFFECTED_LIFECYCLE_TEST]]) {
+    const unknown=paths.find(path=>!AFFECTED_LIFECYCLE_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[[AFFECTED_LIFECYCLE_GROUP]],AFFECTED_LIFECYCLE_SUITES],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // An unknown sibling beside the consumer, UX08, world diff and new owners closes the union too.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
+    affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),affectedRecord('A',['nextjs/components/customer-source-lifecycle.tsx'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/customer-source-lifecycle.tsx'],['nextjs/components/customer-source-lifecycle.tsx']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting either owned path keeps the owner and still checks the actual suite at head.
+  for (const path of AFFECTED_LIFECYCLE_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const expected=path===AFFECTED_LIFECYCLE_TEST?['selected owner check is absent at head: lib/customer-source-lifecycle.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+  }
+  const modelGone=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[AFFECTED_LIFECYCLE_MODEL],'100644','000000')],
+    headHasFile:file=>file!==AFFECTED_LIFECYCLE_MODEL&&file!==AFFECTED_LIFECYCLE_TEST});
+  assert.deepEqual([modelGone.groups,modelGone.failures],[[AFFECTED_LIFECYCLE_GROUP],['selected owner check is absent at head: lib/customer-source-lifecycle.test.ts']]);
+  assert.throws(()=>affectedAskPlan(modelGone),/clean fail-closed map/);
+});
+test('affected customer lifecycle admission: the suite missing at head and readAffectedExecution without its report or coverage fail closed while the satisfied shared unit union succeeds', () => {
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedLifecycleRaw(),headHasFile:path=>path!==AFFECTED_LIFECYCLE_TEST});
+  assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES,['selected owner check is absent at head: lib/customer-source-lifecycle.test.ts']]);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+  // Beside present world diff, consumer, UX08 and review suites the new suite alone still closes the map.
+  const sharedMissing=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedLifecycleRaw(),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_MODEL]),
+    affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_REVIEW_MODEL])],headHasFile:path=>path!==AFFECTED_LIFECYCLE_TEST});
+  assert.deepEqual(sharedMissing.failures,['selected owner check is absent at head: lib/customer-source-lifecycle.test.ts']);
+  assert.throws(()=>affectedAskPlan(sharedMissing),/clean fail-closed map/);
+  const sole=affectedMap(affectedLifecycleRaw());assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union with the world diff, consumer, UX08, review and connector owners, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),
+    affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT]),affectedRecord('M',[AFFECTED_REVIEW_MODEL]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],
+    [[],[],affectedUnion(AFFECTED_LIFECYCLE_SUITES,AFFECTED_WORLD_DIFF_SUITES,AFFECTED_CONSUMER_SUITES,AFFECTED_ANALYTICS_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_CONNECTOR_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-customer-lifecycle-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // The omission keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      if (map===union) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!=='lib/customer-source-lifecycle.test.ts'))));
+        assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/customer-source-lifecycle\.test\.ts/);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected customer lifecycle admission: the combined consumer, world diff, UX08, workspace page, lifecycle/Ask, source-agent/cloud, connector, docs and Home delta is the current prior map plus only the new owner and its one suite', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier.
+  const prior=[...affectedConsumerRaw(),...affectedWorldDiffRaw(),...affectedAnalyticsRaw(),...affectedReviewRaw(),affectedRecord('M',['nextjs/lib/world-graph-layout.ts']),
+    affectedRecord('M',['nextjs/lib/grounded-ask.ts']),...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/app/docs/page.tsx']),
+    affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedLifecycleRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of [AFFECTED_CONSUMER_GROUP,AFFECTED_WORLD_DIFF_GROUP,'connector-progress','docs','grounded-ask','home-landing','repository-docs','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_LIFECYCLE_GROUP)&&!base.unitFiles.includes('lib/customer-source-lifecycle.test.ts'));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_LIFECYCLE_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_LIFECYCLE_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_LIFECYCLE_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>entry.groups),AFFECTED_LIFECYCLE_PATHS.map(()=>[AFFECTED_LIFECYCLE_GROUP]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual([base.runCdrWorkerChecks,base.runSelectorContracts,base.databaseChanged,base.databaseTests],[false,false,false,[]]);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_LIFECYCLE_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_LIFECYCLE_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_LIFECYCLE_SUITES));
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  // No prior path picks up the new owner or its suite on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_LIFECYCLE_GROUP)&&!alone.unitFiles.includes('lib/customer-source-lifecycle.test.ts'),record.paths.join(' -> '));
+  }
+});
+// ---- Affected preflight report admission: two exact paths, one direct suite; no browser, database, worker, build or selector lane ----
+import { PREFLIGHT_REPORT_AFFECTED_PATHS, PREFLIGHT_REPORT_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR product tree a7b2966f6eb4aeab4bfd8616e5e0ce17381dbfa6 on selector base
+// d7a4641d973c1dd64e610e215f86deec3f2c0210): the two modified 100644 files.
+const AFFECTED_PREFLIGHT_MODEL='nextjs/lib/preflight-report.ts',AFFECTED_PREFLIGHT_TEST='nextjs/lib/preflight-report.test.ts';
+const AFFECTED_PREFLIGHT_PATHS=Object.freeze([AFFECTED_PREFLIGHT_MODEL,AFFECTED_PREFLIGHT_TEST]);
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_PREFLIGHT_BLOBS=Object.freeze({
+  [AFFECTED_PREFLIGHT_MODEL]:{prior:'bcbc6b3b1ed4005541de9425941055ef78d29572',final:'e0b37d43dfd6ad12f9f03abd32817c452e8929e8'},
+  [AFFECTED_PREFLIGHT_TEST]:{prior:'52e8e1633b80fc43a986925836d25121b28779d2',final:'90063be96680f122a034c7f27bb05287e146d439'}});
+const AFFECTED_PREFLIGHT_SUITES=Object.freeze(['lib/preflight-report.test.ts']);
+const AFFECTED_PREFLIGHT_GROUP='preflight-report';
+// The intake-triage owner keeps its own selection for the triage client, copy, admission and upload API neighbours.
+const AFFECTED_PREFLIGHT_INTAKE_SUITES=Object.freeze([...INTAKE_TRIAGE_UNIT_TESTS].sort());
+// The final raw delta: two M (100644 -> 100644) records.
+const affectedPreflightRaw=()=>parseAffectedRawDiff(AFFECTED_PREFLIGHT_PATHS.map(path=>
+  `:100644 100644 ${AFFECTED_PREFLIGHT_BLOBS[path].prior} ${AFFECTED_PREFLIGHT_BLOBS[path].final} M\0${path}\0`).join(''));
+test('affected preflight report admission: each exact path and the combined two-M delta select the sole owner and exactly the one physically present, discovered direct suite', () => {
+  assert.deepEqual(PREFLIGHT_REPORT_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_PREFLIGHT_PATHS);assert.equal(new Set(AFFECTED_PREFLIGHT_PATHS).size,2);
+  assert.deepEqual([...PREFLIGHT_REPORT_AFFECTED_UNIT_FILES],AFFECTED_PREFLIGHT_SUITES);
+  for (const path of AFFECTED_PREFLIGHT_PATHS) assert.ok(existsSync(fileURLToPath(new URL('../'+path.slice('nextjs/'.length),import.meta.url))),'owned path exists: '+path);
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_PREFLIGHT_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_PREFLIGHT_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedPreflightRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_PREFLIGHT_PATHS.map(path=>['M','100644','100644',[path]]));
+  for (const path of AFFECTED_PREFLIGHT_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_PREFLIGHT_GROUP],path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],[AFFECTED_PREFLIGHT_GROUP],[...AFFECTED_PREFLIGHT_PATHS].sort(),AFFECTED_PREFLIGHT_SUITES,[]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_PREFLIGHT_PATHS.map(()=>['M',[AFFECTED_PREFLIGHT_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[...AFFECTED_PREFLIGHT_PATHS].sort(),false]);
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_PREFLIGHT_MODEL,AFFECTED_PREFLIGHT_TEST])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES,[{status:'R100',paths:[AFFECTED_PREFLIGHT_MODEL,AFFECTED_PREFLIGHT_TEST],groups:[AFFECTED_PREFLIGHT_GROUP]}]]);
+});
+test('affected preflight report admission: the actual regular affectedPlan defers only the normal fresh native run and the owner adds no browser, build, database, worker or selector lane', () => {
+  for (const records of [[affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL])],[affectedRecord('M',[AFFECTED_PREFLIGHT_TEST])],affectedPreflightRaw()]) {
+    const plan=affectedAskPlan(affectedMap(records)),label=records.map(r=>r.paths.join(' -> ')).join(', ');
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[[AFFECTED_PREFLIGHT_GROUP,'native-world-race-fresh-run'].sort(),AFFECTED_PREFLIGHT_SUITES,[]],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+      'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+      assert.ok(!plan[flag],`${flag} ${label}`);
+    assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT],label);
+    assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'),label);
+    assert.deepEqual([plan.affectedIntegration.changedPaths,plan.affectedIntegration.nativeEvidence.disposition,plan.affectedIntegration.nativeEvidence.freshRunClaimed],
+      [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
+  }
+});
+test('affected preflight report admission: lookalikes, operations, pipeline, API, shared backend, UI and spec siblings stay unknown, prior known paths keep only their prior owners; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/lib/preflight-report.tsx','nextjs/lib/preflight-report.js','nextjs/lib/preflight-report.ts.bak','nextjs/lib/preflight-reportXts',
+    'nextjs/lib/preflight-reports.ts','nextjs/lib/preflight-reporter.ts','nextjs/lib/preflight.ts','nextjs/lib/preflight-report-v2.ts','nextjs/lib/preflight-report/index.ts',
+    'nextjs/lib/Preflight-Report.ts','nextjs/lib/preflight-report-server.ts','nextjs/lib/preflight-report.d.ts',
+    'nextjs/lib/preflight-report.spec.ts','nextjs/lib/preflight-report.test.tsx','nextjs/lib/preflight-reportXtest.ts','nextjs/lib/preflight-report-copy.test.ts',
+    'nextjs/lib/__snapshots__/preflight-report.test.ts.snap','nextjs/lib/pipeline.ts','nextjs/lib/pipeline.test.ts',
+    'nextjs/components/operations-ultimate.tsx','nextjs/components/preflight-report.tsx','nextjs/e2e/preflight-report.spec.ts',
+    'nextjs/app/api/v1/preflight-report/route.ts','nextjs/app/api/preflight-report/route.ts',
+    'shared/capabilityManifest.ts','shared/intakeCeiling.ts','shared/qualifiedDocumentInputs.ts',
+    'nextjs/nextjs/lib/preflight-report.ts','lib/preflight-report.ts','lib/preflight-report.test.ts','preflight-report.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Known paths of earlier owners, the intake-triage neighbours, and the SQL and worker neighbours keep exactly their prior selection;
+  // the new owner and its suite never join them.
+  const prior=[...AFFECTED_LIFECYCLE_PATHS.map(path=>[path,[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES]),
+    ...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES]),
+    ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES]),
+    ...[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST].map(path=>[path,['review-queue'],AFFECTED_REVIEW_SUITES]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS],
+    ...['nextjs/lib/world-graph-layout.ts','nextjs/lib/visual-world-model.test.ts','nextjs/lib/world-directory-and-ontology.ts'].map(path=>[path,['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS]),
+    ['nextjs/lib/grounded-ask.ts',['grounded-ask'],AFFECTED_ASK_SUITES],[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES],
+    ['nextjs/app/docs/page.tsx',['docs'],AFFECTED_DOCS_SUITES],
+    ...['nextjs/lib/intake-triage-client.ts','nextjs/lib/intake-triage-copy.ts','nextjs/lib/intake-admission.ts','nextjs/app/api/v1/uploads/triage/preflight/route.ts']
+      .map(path=>[path,['intake-triage'],AFFECTED_PREFLIGHT_INTAKE_SUITES]),
+    ['supabase/drafts/preflight_report.sql',['database-contract'],['lib/pgtap-fixtures.test.ts']],
+    ['quarantine-sidecar/foundation-cdr-worker/src/preflight.ts',['ocr-worker'],[]]];
+  for (const [path,groups,units] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],groups,[...units].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_PREFLIGHT_GROUP)&&!map.unitFiles.includes('lib/preflight-report.test.ts'),path);
+  }
+  for (const path of ['nextjs/lib/./preflight-report.ts','nextjs//lib/preflight-report.ts','nextjs/lib/../lib/preflight-report.ts','nextjs\\lib\\preflight-report.ts',
+    'nextjs/lib/preflight-report.test.ts ','nextjs/lib/preflight report.ts','nextjs/lib/preflight-report.ts\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of AFFECTED_PREFLIGHT_PATHS)
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_PREFLIGHT_MODEL,'nextjs/lib/preflight-report-copy.ts']],['T',[AFFECTED_PREFLIGHT_MODEL]],['U',[AFFECTED_PREFLIGHT_TEST]],['X',[AFFECTED_PREFLIGHT_TEST]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected preflight report admission: known plus unknown or an unowned rename endpoint refuses the whole execution plan while the diagnostic selection remains, and deleting an owned path still checks the suite at head', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedPreflightRaw(),affectedRecord('A',['nextjs/lib/preflight-report-v2.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/preflight-report-v2.ts'],['nextjs/lib/preflight-report-v2.ts']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_PREFLIGHT_MODEL,'nextjs/lib/preflight-report-v2.ts'],['nextjs/components/operations-ultimate.tsx',AFFECTED_PREFLIGHT_MODEL],
+    [AFFECTED_PREFLIGHT_TEST,'nextjs/lib/preflight-report.spec.ts'],['nextjs/lib/pipeline.ts',AFFECTED_PREFLIGHT_TEST]]) {
+    const unknown=paths.find(path=>!AFFECTED_PREFLIGHT_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[[AFFECTED_PREFLIGHT_GROUP]],AFFECTED_PREFLIGHT_SUITES],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // An unknown sibling beside the customer lifecycle, consumer, UX08, world diff and new owners closes the union too.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),
+    affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL]),affectedRecord('A',['nextjs/components/preflight-report.tsx'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/preflight-report.tsx'],['nextjs/components/preflight-report.tsx']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting either owned path keeps the owner and still checks the actual suite at head.
+  for (const path of AFFECTED_PREFLIGHT_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const expected=path===AFFECTED_PREFLIGHT_TEST?['selected owner check is absent at head: lib/preflight-report.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+  }
+  const modelGone=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[AFFECTED_PREFLIGHT_MODEL],'100644','000000')],
+    headHasFile:file=>file!==AFFECTED_PREFLIGHT_MODEL&&file!==AFFECTED_PREFLIGHT_TEST});
+  assert.deepEqual([modelGone.groups,modelGone.failures],[[AFFECTED_PREFLIGHT_GROUP],['selected owner check is absent at head: lib/preflight-report.test.ts']]);
+  assert.throws(()=>affectedAskPlan(modelGone),/clean fail-closed map/);
+});
+test('affected preflight report admission: the suite missing at head and readAffectedExecution without its report or coverage fail closed while the satisfied shared unit union succeeds', () => {
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedPreflightRaw(),headHasFile:path=>path!==AFFECTED_PREFLIGHT_TEST});
+  assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES,['selected owner check is absent at head: lib/preflight-report.test.ts']]);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+  // Beside present customer lifecycle, world diff, consumer, UX08 and review suites the new suite alone still closes the map.
+  const sharedMissing=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedPreflightRaw(),...affectedLifecycleRaw(),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
+    affectedRecord('M',[AFFECTED_CONSUMER_MODEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_REVIEW_MODEL])],headHasFile:path=>path!==AFFECTED_PREFLIGHT_TEST});
+  assert.deepEqual(sharedMissing.failures,['selected owner check is absent at head: lib/preflight-report.test.ts']);
+  assert.throws(()=>affectedAskPlan(sharedMissing),/clean fail-closed map/);
+  const sole=affectedMap(affectedPreflightRaw());assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union with the customer lifecycle, world diff, consumer, UX08, review and connector owners, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL]),affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
+    affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT]),affectedRecord('M',[AFFECTED_REVIEW_MODEL]),affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],
+    [[],[],affectedUnion(AFFECTED_PREFLIGHT_SUITES,AFFECTED_LIFECYCLE_SUITES,AFFECTED_WORLD_DIFF_SUITES,AFFECTED_CONSUMER_SUITES,AFFECTED_ANALYTICS_SUITES,AFFECTED_REVIEW_SUITES,AFFECTED_CONNECTOR_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-preflight-report-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // The omission keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      if (map===union) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!=='lib/preflight-report.test.ts'))));
+        assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/preflight-report\.test\.ts/);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected preflight report admission: the combined customer lifecycle, consumer, world diff, UX08, workspace page, lifecycle/Ask, source-agent/cloud, connector, docs and Home delta is the current prior map plus only the new owner and its one suite', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier.
+  const prior=[...affectedLifecycleRaw(),...affectedConsumerRaw(),...affectedWorldDiffRaw(),...affectedAnalyticsRaw(),...affectedReviewRaw(),affectedRecord('M',['nextjs/lib/world-graph-layout.ts']),
+    affectedRecord('M',['nextjs/lib/grounded-ask.ts']),...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/app/docs/page.tsx']),
+    affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedPreflightRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of [AFFECTED_LIFECYCLE_GROUP,AFFECTED_CONSUMER_GROUP,AFFECTED_WORLD_DIFF_GROUP,'connector-progress','docs','grounded-ask','home-landing','repository-docs','review-queue',
+    AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_PREFLIGHT_GROUP)&&!base.unitFiles.includes('lib/preflight-report.test.ts'));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_PREFLIGHT_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_PREFLIGHT_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_PREFLIGHT_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>entry.groups),AFFECTED_PREFLIGHT_PATHS.map(()=>[AFFECTED_PREFLIGHT_GROUP]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual([base.runCdrWorkerChecks,base.runSelectorContracts,base.databaseChanged,base.databaseTests],[false,false,false,[]]);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_PREFLIGHT_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_PREFLIGHT_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_PREFLIGHT_SUITES));
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  // No prior path picks up the new owner or its suite on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_PREFLIGHT_GROUP)&&!alone.unitFiles.includes('lib/preflight-report.test.ts'),record.paths.join(' -> '));
+  }
+});
+// ---- Affected workspace membership admission: two exact paths, one direct suite; no browser, database, worker, build or selector lane ----
+import { WORKSPACE_MEMBERSHIP_AFFECTED_PATHS, WORKSPACE_MEMBERSHIP_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR UX19 product tree 19d7e79131b7b149d71dd4710841a86af3765a1a, composed after preflight
+// selector 3107f4f63069f12de8a39d929dd254cfa92192f7): the two modified 100644 files.
+const AFFECTED_MEMBERSHIP_MODEL='nextjs/lib/workspace-membership.ts',AFFECTED_MEMBERSHIP_TEST='nextjs/lib/workspace-membership.test.ts';
+const AFFECTED_MEMBERSHIP_PATHS=Object.freeze([AFFECTED_MEMBERSHIP_MODEL,AFFECTED_MEMBERSHIP_TEST]);
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_MEMBERSHIP_BLOBS=Object.freeze({
+  [AFFECTED_MEMBERSHIP_MODEL]:{prior:'cc90db54dd2c2bc09fbafd850aff3e04a88a0d50',final:'966da34771d2dfb8506240c1245be3997dfb1521'},
+  [AFFECTED_MEMBERSHIP_TEST]:{prior:'249151f9c9cae5c2bb16ea6ee22b3d28ba74efff',final:'3840ba1a20f952571fe8d0e8ab66ed1ba603e61e'}});
+const AFFECTED_MEMBERSHIP_SUITES=Object.freeze(['lib/workspace-membership.test.ts']);
+const AFFECTED_MEMBERSHIP_GROUP='workspace-membership';
+// The billing plan-gate owner keeps its own five suites for every billing and plan-entitlement neighbour.
+const AFFECTED_MEMBERSHIP_BILLING_SUITES=Object.freeze(['lib/billing-gate-enforce-route.test.ts','lib/billing-gate-enforcement.test.ts','lib/billing-product-access.test.ts',
+  'lib/plan-entitlement.test.ts','lib/world-activation-plan-gate.test.ts']);
+// The final raw delta: two M (100644 -> 100644) records.
+const affectedMembershipRaw=()=>parseAffectedRawDiff(AFFECTED_MEMBERSHIP_PATHS.map(path=>
+  `:100644 100644 ${AFFECTED_MEMBERSHIP_BLOBS[path].prior} ${AFFECTED_MEMBERSHIP_BLOBS[path].final} M\0${path}\0`).join(''));
+test('affected workspace membership admission: each exact path and the combined two-M delta select the sole owner and exactly the one physically present, discovered direct suite', () => {
+  assert.deepEqual(WORKSPACE_MEMBERSHIP_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_MEMBERSHIP_PATHS);assert.equal(new Set(AFFECTED_MEMBERSHIP_PATHS).size,2);
+  assert.deepEqual([...WORKSPACE_MEMBERSHIP_AFFECTED_UNIT_FILES],AFFECTED_MEMBERSHIP_SUITES);
+  for (const path of AFFECTED_MEMBERSHIP_PATHS) assert.ok(existsSync(fileURLToPath(new URL('../'+path.slice('nextjs/'.length),import.meta.url))),'owned path exists: '+path);
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_MEMBERSHIP_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_MEMBERSHIP_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedMembershipRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_MEMBERSHIP_PATHS.map(path=>['M','100644','100644',[path]]));
+  for (const path of AFFECTED_MEMBERSHIP_PATHS) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_MEMBERSHIP_GROUP],path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],[AFFECTED_MEMBERSHIP_GROUP],[...AFFECTED_MEMBERSHIP_PATHS].sort(),AFFECTED_MEMBERSHIP_SUITES,[]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_MEMBERSHIP_PATHS.map(()=>['M',[AFFECTED_MEMBERSHIP_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[...AFFECTED_MEMBERSHIP_PATHS].sort(),false]);
+  // A rename inside the owner keeps one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_MEMBERSHIP_MODEL,AFFECTED_MEMBERSHIP_TEST])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.entries],
+    [[],[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES,[{status:'R100',paths:[AFFECTED_MEMBERSHIP_MODEL,AFFECTED_MEMBERSHIP_TEST],groups:[AFFECTED_MEMBERSHIP_GROUP]}]]);
+});
+test('affected workspace membership admission: the actual regular affectedPlan defers only the normal fresh native run and the owner adds no browser, build, database, worker or selector lane', () => {
+  for (const records of [[affectedRecord('M',[AFFECTED_MEMBERSHIP_MODEL])],[affectedRecord('M',[AFFECTED_MEMBERSHIP_TEST])],affectedMembershipRaw()]) {
+    const plan=affectedAskPlan(affectedMap(records)),label=records.map(r=>r.paths.join(' -> ')).join(', ');
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],[[AFFECTED_MEMBERSHIP_GROUP,'native-world-race-fresh-run'].sort(),AFFECTED_MEMBERSHIP_SUITES,[]],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+      'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+      assert.ok(!plan[flag],`${flag} ${label}`);
+    assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT],label);
+    assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'),label);
+    assert.deepEqual([plan.affectedIntegration.changedPaths,plan.affectedIntegration.nativeEvidence.disposition,plan.affectedIntegration.nativeEvidence.freshRunClaimed],
+      [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
+  }
+});
+test('affected workspace membership admission: lookalikes, auth helpers, routes, API, UI, SQL and neighbour siblings stay unknown, prior known paths keep only their prior owners; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/lib/workspace-membership.tsx','nextjs/lib/workspace-membership.js','nextjs/lib/workspace-membership.ts.bak','nextjs/lib/workspace-membershipXts',
+    'nextjs/lib/workspace-memberships.ts','nextjs/lib/workspace-member.ts','nextjs/lib/workspace_membership.ts','nextjs/lib/workspace-membership-v2.ts','nextjs/lib/workspace-membership/index.ts',
+    'nextjs/lib/Workspace-Membership.ts','nextjs/lib/workspace-membership-server.ts','nextjs/lib/workspace-membership.d.ts',
+    'nextjs/lib/workspace-membership.spec.ts','nextjs/lib/workspace-membership.test.tsx','nextjs/lib/workspace-membershipXtest.ts','nextjs/lib/workspace-membership-copy.test.ts',
+    'nextjs/lib/__snapshots__/workspace-membership.test.ts.snap',
+    'nextjs/lib/foundation-pilot.ts','nextjs/lib/foundation-pilot.test.ts','nextjs/lib/supabase-admin.ts','nextjs/lib/supabase-admin.test.ts','nextjs/lib/auth.ts','nextjs/lib/request-user.ts','nextjs/middleware.ts',
+    'nextjs/lib/workspace-roles.ts','nextjs/lib/workspace-invite.ts','nextjs/lib/workspace-invite.test.ts','nextjs/lib/workspace-access.ts',
+    'nextjs/app/api/v1/workspaces/[id]/members/route.ts','nextjs/app/api/v1/workspace-membership/route.ts','nextjs/app/api/v1/workspace-membership/invite/route.ts',
+    'nextjs/app/api/v1/workspace-membership/revoke/route.ts','nextjs/app/api/workspace-membership/route.ts',
+    'nextjs/components/workspace-membership.tsx','nextjs/components/workspace-members-panel.tsx','nextjs/e2e/workspace-membership.spec.ts',
+    'nextjs/lib/workspace-membership.sql','supabase/functions/workspace-membership/index.ts',
+    'nextjs/nextjs/lib/workspace-membership.ts','lib/workspace-membership.ts','lib/workspace-membership.test.ts','workspace-membership.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Known paths of earlier owners, the workspace UI, sign-in, ACL, billing and intake neighbours, and the SQL and worker neighbours keep
+  // exactly their prior selection; the new owner and its suite never join them.
+  const prior=[...AFFECTED_PREFLIGHT_PATHS.map(path=>[path,[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES]),
+    ...AFFECTED_LIFECYCLE_PATHS.map(path=>[path,[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES]),
+    ...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES]),
+    ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES]),
+    ...[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST].map(path=>[path,['review-queue'],AFFECTED_REVIEW_SUITES]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS],
+    ...['nextjs/lib/world-graph-layout.ts','nextjs/lib/visual-world-model.test.ts','nextjs/lib/world-directory-and-ontology.ts','nextjs/app/workspace/members/page.tsx']
+      .map(path=>[path,['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS]),
+    ['nextjs/lib/grounded-ask.ts',['grounded-ask'],AFFECTED_ASK_SUITES],[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES],
+    ['nextjs/app/docs/page.tsx',['docs'],AFFECTED_DOCS_SUITES],
+    ...['nextjs/app/auth/callback/page.tsx','nextjs/app/login/page.tsx'].map(path=>[path,['recipe-continuation'],AFFECTED_RECIPE_SUITES]),
+    ...['nextjs/lib/connector-source-access.ts','nextjs/lib/google-drive-acl-capture.ts'].map(path=>[path,['acl'],AFFECTED_ACL_UNITS]),
+    ['nextjs/lib/plan-entitlement.ts',['billing-access-plan-gates'],AFFECTED_MEMBERSHIP_BILLING_SUITES],
+    ['nextjs/app/api/v1/uploads/triage/preflight/route.ts',['intake-triage'],AFFECTED_PREFLIGHT_INTAKE_SUITES],
+    ...['supabase/migrations/20260920110000_workspace_membership_control_plane.sql','supabase/tests/workspace_membership.sql']
+      .map(path=>[path,['database-contract'],['lib/pgtap-fixtures.test.ts']]),
+    ['quarantine-sidecar/foundation-cdr-worker/src/workspace-membership.ts',['ocr-worker'],[]]];
+  for (const [path,groups,units] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],groups,[...units].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_MEMBERSHIP_GROUP)&&!map.unitFiles.includes('lib/workspace-membership.test.ts'),path);
+  }
+  for (const path of ['nextjs/lib/./workspace-membership.ts','nextjs//lib/workspace-membership.ts','nextjs/lib/../lib/workspace-membership.ts','nextjs\\lib\\workspace-membership.ts',
+    'nextjs/lib/workspace-membership.test.ts ','nextjs/lib/workspace membership.ts','nextjs/lib/workspace-membership.ts\n'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of AFFECTED_MEMBERSHIP_PATHS)
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_MEMBERSHIP_MODEL,'nextjs/lib/workspace-membership-copy.ts']],['T',[AFFECTED_MEMBERSHIP_MODEL]],['U',[AFFECTED_MEMBERSHIP_TEST]],['X',[AFFECTED_MEMBERSHIP_TEST]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected workspace membership admission: known plus unknown or an unowned rename endpoint refuses the whole execution plan while the diagnostic selection remains, and deleting an owned path still checks the suite at head', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedMembershipRaw(),affectedRecord('A',['nextjs/lib/workspace-membership-v2.ts'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/workspace-membership-v2.ts'],['nextjs/lib/workspace-membership-v2.ts']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  for (const paths of [[AFFECTED_MEMBERSHIP_MODEL,'nextjs/lib/workspace-membership-v2.ts'],['nextjs/lib/foundation-pilot.ts',AFFECTED_MEMBERSHIP_MODEL],
+    [AFFECTED_MEMBERSHIP_TEST,'nextjs/lib/workspace-membership.spec.ts'],['nextjs/lib/supabase-admin.ts',AFFECTED_MEMBERSHIP_TEST]]) {
+    const unknown=paths.find(path=>!AFFECTED_MEMBERSHIP_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
+    assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[[AFFECTED_MEMBERSHIP_GROUP]],AFFECTED_MEMBERSHIP_SUITES],paths.join(' -> '));
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
+  }
+  // An unknown sibling beside the preflight, customer lifecycle, consumer, UX08, world diff and new owners closes the union too.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL]),affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),
+    affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),affectedRecord('M',[AFFECTED_MEMBERSHIP_MODEL]),
+    affectedRecord('A',['nextjs/components/workspace-membership.tsx'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/workspace-membership.tsx'],['nextjs/components/workspace-membership.tsx']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting either owned path keeps the owner and still checks the actual suite at head.
+  for (const path of AFFECTED_MEMBERSHIP_PATHS) {
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
+    const expected=path===AFFECTED_MEMBERSHIP_TEST?['selected owner check is absent at head: lib/workspace-membership.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+  }
+  const modelGone=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[AFFECTED_MEMBERSHIP_MODEL],'100644','000000')],
+    headHasFile:file=>file!==AFFECTED_MEMBERSHIP_MODEL&&file!==AFFECTED_MEMBERSHIP_TEST});
+  assert.deepEqual([modelGone.groups,modelGone.failures],[[AFFECTED_MEMBERSHIP_GROUP],['selected owner check is absent at head: lib/workspace-membership.test.ts']]);
+  assert.throws(()=>affectedAskPlan(modelGone),/clean fail-closed map/);
+});
+test('affected workspace membership admission: the suite missing at head and readAffectedExecution without its report or coverage fail closed while the satisfied shared unit union succeeds', () => {
+  const missing=buildAffectedMap({headSha:affectedHeadSha,records:affectedMembershipRaw(),headHasFile:path=>path!==AFFECTED_MEMBERSHIP_TEST});
+  assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES,['selected owner check is absent at head: lib/workspace-membership.test.ts']]);
+  assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/);
+  // Beside present preflight, customer lifecycle, world diff, consumer, UX08 and review suites the new suite alone still closes the map.
+  const sharedMissing=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedMembershipRaw(),...affectedPreflightRaw(),...affectedLifecycleRaw(),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
+    affectedRecord('M',[AFFECTED_CONSUMER_MODEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_REVIEW_MODEL])],headHasFile:path=>path!==AFFECTED_MEMBERSHIP_TEST});
+  assert.deepEqual(sharedMissing.failures,['selected owner check is absent at head: lib/workspace-membership.test.ts']);
+  assert.throws(()=>affectedAskPlan(sharedMissing),/clean fail-closed map/);
+  const sole=affectedMap(affectedMembershipRaw());assert.deepEqual(sole.failures,[]);
+  // A normal shared unit-only union with the preflight, customer lifecycle, world diff, consumer, UX08, review and connector owners, so no Playwright report is involved.
+  const union=affectedMap([affectedRecord('M',[AFFECTED_MEMBERSHIP_MODEL]),affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL]),affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),
+    affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_CONSENT]),affectedRecord('M',[AFFECTED_REVIEW_MODEL]),
+    affectedRecord('M',[AFFECTED_CONNECTOR_STATUS])]);
+  assert.deepEqual([union.failures,union.browserFiles,union.unitFiles],
+    [[],[],affectedUnion(AFFECTED_MEMBERSHIP_SUITES,AFFECTED_PREFLIGHT_SUITES,AFFECTED_LIFECYCLE_SUITES,AFFECTED_WORLD_DIFF_SUITES,AFFECTED_CONSUMER_SUITES,AFFECTED_ANALYTICS_SUITES,
+      AFFECTED_REVIEW_SUITES,AFFECTED_CONNECTOR_SUITES)]);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-workspace-membership-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    for (const map of [sole,union]) {
+      const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
+      rmSync(vitestPath,{force:true});
+      assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+      // The omission keeps every other selected suite passing, exactly as the prior owners' coverage checks do.
+      if (map===union) {
+        writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles.filter(file=>file!=='lib/workspace-membership.test.ts'))));
+        assert.throws(()=>readAffectedExecution(root,plan),/Vitest report omitted selected file\(s\): lib\/workspace-membership\.test\.ts/);
+      }
+      writeFileSync(vitestPath,JSON.stringify(vitest(map.unitFiles)));
+      const result=readAffectedExecution(root,plan),count=map.unitFiles.length;
+      assert.deepEqual([result.units,result.browsers],[{files:count,passed:count,skipped:0,failed:0},[]]);
+    }
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected workspace membership admission: the combined preflight, customer lifecycle, consumer, world diff, UX08, workspace page, lifecycle/Ask, source-agent/cloud, connector, docs, Home and representative ACL/billing delta is the current prior map plus only the new owner and its one suite', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier.
+  const prior=[...affectedPreflightRaw(),...affectedLifecycleRaw(),...affectedConsumerRaw(),...affectedWorldDiffRaw(),...affectedAnalyticsRaw(),...affectedReviewRaw(),
+    affectedRecord('M',['nextjs/lib/world-graph-layout.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/app/docs/page.tsx']),
+    affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',['nextjs/lib/connector-source-access.ts']),affectedRecord('M',['nextjs/lib/plan-entitlement.ts'])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedMembershipRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of [AFFECTED_PREFLIGHT_GROUP,AFFECTED_LIFECYCLE_GROUP,AFFECTED_CONSUMER_GROUP,AFFECTED_WORLD_DIFF_GROUP,'acl','billing-access-plan-gates','connector-progress','docs',
+    'grounded-ask','home-landing','repository-docs','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_MEMBERSHIP_GROUP)&&!base.unitFiles.includes('lib/workspace-membership.test.ts'));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_MEMBERSHIP_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_MEMBERSHIP_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_MEMBERSHIP_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>entry.groups),AFFECTED_MEMBERSHIP_PATHS.map(()=>[AFFECTED_MEMBERSHIP_GROUP]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
+  assert.deepEqual([base.runCdrWorkerChecks,base.runSelectorContracts,base.databaseChanged,base.databaseTests],[false,false,false,[]]);
+  // The representative ACL owner keeps its one recorded fixture contract; the new owner adds none.
+  assert.deepEqual(base.fixtureContracts.map(contract=>[contract.group,contract.suite]),[['acl','lib/pgtap-fixtures.test.ts']]);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_MEMBERSHIP_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_MEMBERSHIP_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_MEMBERSHIP_SUITES));
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  // No prior path picks up the new owner or its suite on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_MEMBERSHIP_GROUP)&&!alone.unitFiles.includes('lib/workspace-membership.test.ts'),record.paths.join(' -> '));
+  }
+});
+// ---- Affected ontology name preview admission (UX20): five exact paths, one direct suite; the viewer pair keeps workspace-lifecycle ----
+import { ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_PATHS, ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR UX20 product tree 7c30264e29ea4b6c8c91fe2ed5e9b08c5e259548, composed after selector
+// 4b2ae4fe3aab93aeca092858713dbd1960e1fca5): two modified (M) and three added (A) 100644 files.
+const AFFECTED_ONTOLOGY_VIEWER='nextjs/components/world-ontology-viewer.tsx',AFFECTED_ONTOLOGY_VIEWER_CSS='nextjs/components/world-ontology-viewer.module.css';
+const AFFECTED_ONTOLOGY_PREVIEW='nextjs/components/world-ontology-rename-preview.tsx';
+const AFFECTED_ONTOLOGY_MODEL='nextjs/lib/ontology-class-rename-preview.ts',AFFECTED_ONTOLOGY_TEST='nextjs/lib/ontology-class-rename-preview.test.ts';
+const AFFECTED_ONTOLOGY_PATHS=Object.freeze([AFFECTED_ONTOLOGY_VIEWER,AFFECTED_ONTOLOGY_VIEWER_CSS,AFFECTED_ONTOLOGY_PREVIEW,AFFECTED_ONTOLOGY_MODEL,AFFECTED_ONTOLOGY_TEST]);
+// The two existing workspace-lifecycle paths gain a bounded overlap; the three new paths have this owner alone.
+const AFFECTED_ONTOLOGY_OLD=Object.freeze([AFFECTED_ONTOLOGY_VIEWER,AFFECTED_ONTOLOGY_VIEWER_CSS]);
+const AFFECTED_ONTOLOGY_NEW=Object.freeze([AFFECTED_ONTOLOGY_PREVIEW,AFFECTED_ONTOLOGY_MODEL,AFFECTED_ONTOLOGY_TEST]);
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_ONTOLOGY_BLOBS=Object.freeze({
+  [AFFECTED_ONTOLOGY_VIEWER]:{prior:'ca58ae36e232c79a080b9fa3acd6c7cff83d8d9e',final:'eaf625c50be41ca01079846019080c4ec905b9b1'},
+  [AFFECTED_ONTOLOGY_VIEWER_CSS]:{prior:'dbc8f8cef336a608d33f334fab9c9ce5c458eb71',final:'82b16ad1f909e471ea9946b826d670f8401dea7f'},
+  [AFFECTED_ONTOLOGY_PREVIEW]:{prior:null,final:'3a60b56d1417fd1719f5e35ae49b92f5654177ef'},
+  [AFFECTED_ONTOLOGY_MODEL]:{prior:null,final:'272620cb089cb1d5a717bfbaffae3b49c6f3c367'},
+  [AFFECTED_ONTOLOGY_TEST]:{prior:null,final:'faed6b720d3c3b1ebb2f506405d397a67ea7e6c2'}});
+const AFFECTED_ONTOLOGY_SUITES=Object.freeze(['lib/ontology-class-rename-preview.test.ts']);
+const AFFECTED_ONTOLOGY_GROUP='ontology-class-rename-preview',AFFECTED_ONTOLOGY_SPEC='e2e/world-lifecycle.spec.ts';
+// The viewer pair selects the new suite beside the four retained lifecycle suites and the retained lifecycle browser suite.
+const AFFECTED_ONTOLOGY_OLD_GROUPS=Object.freeze([AFFECTED_ONTOLOGY_GROUP,'workspace-lifecycle']);
+const AFFECTED_ONTOLOGY_OLD_UNITS=Object.freeze(affectedUnion(AFFECTED_LIFECYCLE_UNITS,AFFECTED_ONTOLOGY_SUITES));
+const AFFECTED_ONTOLOGY_RUNS=Object.freeze([{kind:'project',project:'1440',files:[AFFECTED_ONTOLOGY_SPEC]},{kind:'project',project:'390',files:[AFFECTED_ONTOLOGY_SPEC]},
+  {kind:'project',project:'reduced-motion',files:[AFFECTED_ONTOLOGY_SPEC]}]);
+const affectedOntologyOld=path=>AFFECTED_ONTOLOGY_OLD.includes(path);
+const affectedOntologyPhysical=path=>existsSync(fileURLToPath(new URL(`../../${path}`,import.meta.url)));
+// The final raw delta: two M (100644 -> 100644) and three A (000000 -> 100644) records.
+const affectedOntologyRaw=()=>parseAffectedRawDiff(AFFECTED_ONTOLOGY_PATHS.map(path=>{
+  const {prior,final}=AFFECTED_ONTOLOGY_BLOBS[path];
+  return prior?`:100644 100644 ${prior} ${final} M\0${path}\0`:`:000000 100644 ${'0'.repeat(40)} ${final} A\0${path}\0`;
+}).join(''));
+test('affected ontology name preview admission: each exact path and the combined 2M3A current product delta admit individually and together; the three new paths are sole-owned, the viewer pair overlaps workspace-lifecycle, and the one direct suite is physically present and discovered', () => {
+  assert.deepEqual(ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_ONTOLOGY_PATHS);assert.equal(new Set(AFFECTED_ONTOLOGY_PATHS).size,5);
+  assert.deepEqual([...ONTOLOGY_CLASS_RENAME_PREVIEW_AFFECTED_UNIT_FILES],AFFECTED_ONTOLOGY_SUITES);
+  for (const path of AFFECTED_ONTOLOGY_PATHS) assert.ok(affectedOntologyPhysical(path),'owned path exists: '+path);
+  // The direct suite is a physically present .ts file under lib/: the unchanged global include discovers it and the default config runs it.
+  assert.ok(affectedOntologyPhysical('nextjs/'+AFFECTED_ONTOLOGY_SUITES[0]),'the direct suite exists');
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
+  assert.deepEqual(buildUnitArgs(AFFECTED_ONTOLOGY_SUITES,'report.json'),['exec','vitest','run','--reporter=default','--reporter=json','--outputFile=report.json',...AFFECTED_ONTOLOGY_SUITES]);
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_ONTOLOGY_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_ONTOLOGY_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  // The existing lifecycle descriptor is untouched: its four suites, its one browser suite and its historical native reuse.
+  const lifecycle=AFFECTED_GROUPS.filter(o=>o.group==='workspace-lifecycle');
+  assert.equal(lifecycle.length,1);
+  assert.deepEqual([[...lifecycle[0].unitFiles].sort(),[...lifecycle[0].browserFiles],lifecycle[0].nativeReuse,Boolean(lifecycle[0].worker),Boolean(lifecycle[0].selector),Boolean(lifecycle[0].database)],
+    [AFFECTED_LIFECYCLE_UNITS,[AFFECTED_ONTOLOGY_SPEC],true,false,false,false]);
+  const records=affectedOntologyRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),
+    AFFECTED_ONTOLOGY_PATHS.map(path=>affectedOntologyOld(path)?['M','100644','100644',[path]]:['A','000000','100644',[path]]));
+  for (const path of AFFECTED_ONTOLOGY_PATHS) {
+    const old=affectedOntologyOld(path),groups=old?AFFECTED_ONTOLOGY_OLD_GROUPS:[AFFECTED_ONTOLOGY_GROUP];
+    const units=old?AFFECTED_ONTOLOGY_OLD_UNITS:AFFECTED_ONTOLOGY_SUITES,browsers=old?[AFFECTED_ONTOLOGY_SPEC]:[];
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group).sort(),groups,path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],groups,units,browsers],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  const delta=affectedMap(records);
+  assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+    [[],[],AFFECTED_ONTOLOGY_OLD_GROUPS,[...AFFECTED_ONTOLOGY_PATHS].sort(),AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC]]);
+  assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_ONTOLOGY_PATHS.map(path=>affectedOntologyOld(path)?['M',AFFECTED_ONTOLOGY_OLD_GROUPS]:['A',[AFFECTED_ONTOLOGY_GROUP]]));
+  assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[...AFFECTED_ONTOLOGY_PATHS].sort(),false]);
+  // The three new paths together are sole-owned with no browser lane; the old pair together keeps the lifecycle selection beside the new suite.
+  const added=affectedMap(records.filter(r=>!affectedOntologyOld(r.paths[0]))),kept=affectedMap(records.filter(r=>affectedOntologyOld(r.paths[0])));
+  assert.deepEqual([added.failures,added.groups,added.changedPaths,added.unitFiles,added.browserFiles],[[],[AFFECTED_ONTOLOGY_GROUP],[...AFFECTED_ONTOLOGY_NEW].sort(),AFFECTED_ONTOLOGY_SUITES,[]]);
+  assert.deepEqual([kept.failures,kept.groups,kept.changedPaths,kept.unitFiles,kept.browserFiles],[[],AFFECTED_ONTOLOGY_OLD_GROUPS,[...AFFECTED_ONTOLOGY_OLD].sort(),AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC]]);
+  // A rename inside the owner keeps one selection and maps both endpoints; a rename touching the viewer keeps its lifecycle overlap.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_ONTOLOGY_MODEL,AFFECTED_ONTOLOGY_PREVIEW])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.browserFiles,within.entries],
+    [[],[AFFECTED_ONTOLOGY_GROUP],AFFECTED_ONTOLOGY_SUITES,[],[{status:'R100',paths:[AFFECTED_ONTOLOGY_MODEL,AFFECTED_ONTOLOGY_PREVIEW],groups:[AFFECTED_ONTOLOGY_GROUP]}]]);
+  const viewerRename=affectedMap([affectedRecord('R095',[AFFECTED_ONTOLOGY_VIEWER,AFFECTED_ONTOLOGY_PREVIEW])]);
+  assert.deepEqual([viewerRename.failures,viewerRename.groups,viewerRename.unitFiles,viewerRename.browserFiles],[[],AFFECTED_ONTOLOGY_OLD_GROUPS,AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC]]);
+});
+test('affected ontology name preview admission: the actual regular affectedPlan keeps every lane flag off, defers only the normal fresh native run as unexecuted debt and inherits the lifecycle browser suite only for the viewer pair; map classification is not plan qualification', () => {
+  const raw=affectedOntologyRaw();
+  for (const records of [...raw.map(record=>[record]),raw.filter(r=>!affectedOntologyOld(r.paths[0])),raw.filter(r=>affectedOntologyOld(r.paths[0])),raw]) {
+    const old=records.some(r=>affectedOntologyOld(r.paths[0])),plan=affectedAskPlan(affectedMap(records)),label=records.map(r=>r.paths.join(' -> ')).join(', ');
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles],
+      [[...(old?AFFECTED_ONTOLOGY_OLD_GROUPS:[AFFECTED_ONTOLOGY_GROUP]),'native-world-race-fresh-run'].sort(),old?AFFECTED_ONTOLOGY_OLD_UNITS:AFFECTED_ONTOLOGY_SUITES,old?[AFFECTED_ONTOLOGY_SPEC]:[]],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+      'requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+      assert.ok(!plan[flag],`${flag} ${label}`);
+    assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT],label);
+    assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run'),label);
+    assert.deepEqual([plan.affectedIntegration.changedPaths,plan.affectedIntegration.nativeEvidence.disposition,plan.affectedIntegration.nativeEvidence.freshRunClaimed],
+      [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
+    // The fresh seven-case run stays deferred debt: neither executed nor claimed by this plan.
+    assert.match(plan.affectedIntegration.nativeEvidence.status,/neither executed nor claimed here/,label);
+    // Only the viewer pair inherits the lifecycle browser suite, in exactly its three reviewed projects; the new three add no browser lane.
+    assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),old?AFFECTED_ONTOLOGY_RUNS:[],label);
+  }
+  // Map classification is not plan qualification. The unchanged classifier still reuses historical inputs for a lifecycle-only sibling,
+  // whose plan defers no native run; the new product owner is what invalidates them for the viewer pair, never a waiver or override.
+  const sibling=affectedMap([affectedRecord('M',['nextjs/components/world-graph-canvas.tsx'])]);
+  assert.deepEqual([sibling.failures,sibling.groups,sibling.unitFiles,sibling.browserFiles,sibling.nativeEvidence.disposition,sibling.nativeEvidence.invalidatingPaths],
+    [[],['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS,[AFFECTED_ONTOLOGY_SPEC],'historical-input-reuse',[]]);
+  const siblingPlan=affectedAskPlan(sibling);
+  assert.deepEqual([siblingPlan.deferredGroups,siblingPlan.fullQualification,siblingPlan.affectedIntegration.nativeEvidence.freshRunClaimed],[[],'pending',false]);
+  // An unmapped endpoint never enters invalidatingPaths, so its per-path disposition still reads historical-input-reuse while the map fails
+  // closed and no plan exists: a historical-input-reuse row of a refused map is a classification, never current-head qualification.
+  for (const path of ['nextjs/components/world-ontology-rename-preview-v2.tsx','nextjs/lib/ontology-class-rename-preview-v2.ts','nextjs/lib/ontology-class-rename-preview-v2.test.ts']) {
+    const unmapped=affectedMap([affectedRecord('A',[path],'000000')]);
+    assert.deepEqual([unmapped.failures,unmapped.groups,unmapped.nativeEvidence.disposition,unmapped.nativeEvidence.invalidatingPaths],[[`unmapped changed endpoint: ${path}`],[],'historical-input-reuse',[]],path);
+    assert.throws(()=>affectedAskPlan(unmapped),/clean fail-closed map/,path);
+  }
+  // The historical inputs stay bound to the 5dd baseline only.
+  const plan=affectedAskPlan(affectedMap(raw)),historical=plan.affectedIntegration.nativeEvidence.historical;
+  assert.deepEqual([plan.affectedIntegration.baseline,historical.headSha,historical.treeSha,historical.nativeLinuxDbCases],
+    [{commit:'5dd95ed815719656fe09f1af10213a9ecf1119a8',tree:'c0773387cfffdd334076c66a1f2013a6662c6578'},'5dd95ed815719656fe09f1af10213a9ecf1119a8','c0773387cfffdd334076c66a1f2013a6662c6578',7]);
+  assert.match(historical.status,/not full release and not current-head evidence/);
+});
+test('affected ontology name preview admission: lookalikes, spellings, modes, statuses, routes, API and backend neighbours stay unknown or refuse, while prior known paths and lifecycle siblings keep only their prior owners', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
+  for (const path of ['nextjs/components/world-ontology-viewer.ts','nextjs/components/world-ontology-viewer.jsx','nextjs/components/world-ontology-viewer.tsx.bak',
+    'nextjs/components/world-ontology-viewerXtsx','nextjs/components/world-ontology-viewer.test.tsx','nextjs/components/world-ontology-viewer-v2.tsx',
+    'nextjs/components/world-ontology-viewer/index.tsx','nextjs/components/World-Ontology-Viewer.tsx','nextjs/components/world-ontology-viewer.css',
+    'nextjs/components/world-ontology-viewer.module.scss','nextjs/components/world-ontology-viewer.moduleXcss','nextjs/components/world-ontology-viewer.module.css.map',
+    'nextjs/components/world-ontology-rename-preview.ts','nextjs/components/world-ontology-rename-preview.jsx','nextjs/components/world-ontology-rename-previewXtsx',
+    'nextjs/components/world-ontology-rename-preview.module.css','nextjs/components/world-ontology-rename-preview.test.tsx','nextjs/components/world-ontology-rename-previews.tsx',
+    'nextjs/components/world_ontology_rename_preview.tsx','nextjs/components/world-ontology-rename-preview-v2.tsx','nextjs/components/world-ontology-rename-preview/index.tsx',
+    'nextjs/components/ontology-class-rename-preview.tsx','nextjs/components/world-ontology-editor.tsx','nextjs/components/world-ontology-panel.tsx',
+    'nextjs/lib/ontology-class-rename-preview.tsx','nextjs/lib/ontology-class-rename-preview.js','nextjs/lib/ontology-class-rename-preview.d.ts','nextjs/lib/ontology-class-rename-previewXts',
+    'nextjs/lib/ontology-class-rename-preview.ts.bak','nextjs/lib/ontology-class-rename-previews.ts','nextjs/lib/ontology-class-rename.ts','nextjs/lib/ontology_class_rename_preview.ts',
+    'nextjs/lib/Ontology-Class-Rename-Preview.ts','nextjs/lib/ontology-class-rename-preview-server.ts','nextjs/lib/ontology-class-rename-preview/index.ts',
+    'nextjs/lib/world-ontology-rename-preview.tsx','nextjs/lib/ontology-class-rename-preview.md','nextjs/lib/ontology-class-rename-preview.spec.ts',
+    'nextjs/lib/ontology-class-rename-preview.test.tsx','nextjs/lib/ontology-class-rename-previewXtest.ts','nextjs/lib/ontology-class-rename-preview-copy.test.ts',
+    'nextjs/lib/__snapshots__/ontology-class-rename-preview.test.ts.snap',
+    'nextjs/lib/world-read-model.ts','nextjs/lib/world-read-model.test.ts','nextjs/lib/world-ontology.ts','nextjs/lib/ontology-mutation.ts','nextjs/lib/world-ontology-store.ts',
+    'nextjs/app/api/v1/worlds/[id]/ontology/route.ts','nextjs/app/api/v1/worlds/[id]/ontology/classes/[classId]/rename/route.ts','nextjs/app/api/v1/ontology-class-rename-preview/route.ts',
+    'nextjs/app/api/ontology/rename/route.ts','nextjs/app/worlds/[id]/ontology/page.tsx','nextjs/e2e/world-ontology-rename-preview.spec.ts','nextjs/e2e/ontology-class-rename-preview.spec.ts',
+    'supabase/functions/ontology-class-rename/index.ts',
+    'nextjs/nextjs/lib/ontology-class-rename-preview.ts','lib/ontology-class-rename-preview.ts','components/world-ontology-rename-preview.tsx','components/world-ontology-viewer.tsx',
+    'ontology-class-rename-preview.ts']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // Known paths of earlier owners, the viewer's lifecycle siblings (including an ontology-named world-visual file and an ontology workspace
+  // route), sign-in, ACL, billing, intake, SQL and worker neighbours keep exactly their prior selection; the new owner and suite never join them.
+  const prior=[...AFFECTED_MEMBERSHIP_PATHS.map(path=>[path,[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES]),
+    ...AFFECTED_PREFLIGHT_PATHS.map(path=>[path,[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES]),
+    ...AFFECTED_LIFECYCLE_PATHS.map(path=>[path,[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES]),
+    ...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES]),
+    ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES]),
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES]),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES]),
+    ...[AFFECTED_REVIEW_MODEL,AFFECTED_REVIEW_COMPONENT,AFFECTED_REVIEW_TEST].map(path=>[path,['review-queue'],AFFECTED_REVIEW_SUITES]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS],
+    ...['nextjs/components/world-graph-canvas.tsx','nextjs/components/world-directory-tree.tsx','nextjs/components/world-directory-tree.module.css',
+      'nextjs/components/world-studio-ultimate.module.css','nextjs/components/workspace-ultimate-shell.tsx','nextjs/components/world-visual/world-ontology-rename-preview.tsx',
+      'nextjs/lib/world-directory-and-ontology.ts','nextjs/lib/world-directory-and-ontology.test.ts','nextjs/app/workspace/worlds/[id]/ontology/page.tsx',
+      'nextjs/e2e/world-lifecycle.spec.ts'].map(path=>[path,['workspace-lifecycle'],AFFECTED_LIFECYCLE_UNITS]),
+    ['nextjs/lib/grounded-ask.ts',['grounded-ask'],AFFECTED_ASK_SUITES],[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES],
+    ['nextjs/app/docs/page.tsx',['docs'],AFFECTED_DOCS_SUITES],['docs/ontology-class-rename-preview.md',['repository-docs'],[]],
+    ...['nextjs/app/auth/callback/page.tsx','nextjs/app/login/page.tsx'].map(path=>[path,['recipe-continuation'],AFFECTED_RECIPE_SUITES]),
+    ...['nextjs/lib/connector-source-access.ts','nextjs/lib/google-drive-acl-capture.ts'].map(path=>[path,['acl'],AFFECTED_ACL_UNITS]),
+    ['nextjs/lib/plan-entitlement.ts',['billing-access-plan-gates'],AFFECTED_MEMBERSHIP_BILLING_SUITES],
+    ['nextjs/app/api/v1/uploads/triage/preflight/route.ts',['intake-triage'],AFFECTED_PREFLIGHT_INTAKE_SUITES],
+    ...['supabase/migrations/20261010100000_ontology_class_rename.sql','supabase/tests/ontology_class_rename_preview.sql']
+      .map(path=>[path,['database-contract'],['lib/pgtap-fixtures.test.ts']]),
+    ['quarantine-sidecar/foundation-cdr-worker/src/ontology-class-rename-preview.ts',['ocr-worker'],[]]];
+  for (const [path,groups,units] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles],[[],groups,[...units].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_ONTOLOGY_GROUP)&&!map.unitFiles.includes('lib/ontology-class-rename-preview.test.ts'),path);
+  }
+  for (const path of ['nextjs/lib/./ontology-class-rename-preview.ts','nextjs//lib/ontology-class-rename-preview.ts','nextjs/lib/../lib/ontology-class-rename-preview.ts',
+    'nextjs\\lib\\ontology-class-rename-preview.ts','nextjs/lib/ontology-class-rename-preview.test.ts ','nextjs/components/world ontology-rename-preview.tsx',
+    'nextjs/components/world-ontology-viewer.tsx\n','nextjs/components/./world-ontology-viewer.module.css'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of AFFECTED_ONTOLOGY_PATHS)
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_ONTOLOGY_MODEL,'nextjs/lib/ontology-class-rename-preview-copy.ts']],['T',[AFFECTED_ONTOLOGY_VIEWER]],['U',[AFFECTED_ONTOLOGY_PREVIEW]],
+    ['X',[AFFECTED_ONTOLOGY_TEST]],['M001',[AFFECTED_ONTOLOGY_VIEWER_CSS]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected ontology name preview admission: mixed unknown, an unknown rename endpoint or a deleted owned path refuse the whole plan unless the new direct suite is physically present at head, while the diagnostic selection remains', () => {
+  // buildAffectedMap keeps the known owners' selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  const mixed=affectedMap([...affectedOntologyRaw(),affectedRecord('A',['nextjs/components/world-ontology-rename-preview-v2.tsx'],'000000')]);
+  assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/components/world-ontology-rename-preview-v2.tsx'],['nextjs/components/world-ontology-rename-preview-v2.tsx']]);
+  assert.deepEqual([mixed.groups,mixed.unitFiles,mixed.browserFiles],[AFFECTED_ONTOLOGY_OLD_GROUPS,AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC]],'diagnostic selection is retained beside the failure');
+  assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
+  // A rename with one unowned endpoint refuses in either direction, for the sole-owned paths and for the viewer pair.
+  for (const paths of [[AFFECTED_ONTOLOGY_PREVIEW,'nextjs/components/world-ontology-rename-preview-v2.tsx'],['nextjs/lib/world-read-model.ts',AFFECTED_ONTOLOGY_MODEL],
+    [AFFECTED_ONTOLOGY_TEST,'nextjs/lib/ontology-class-rename-preview.spec.ts'],[AFFECTED_ONTOLOGY_VIEWER,'nextjs/components/world-ontology-editor.tsx'],
+    ['nextjs/components/world-ontology-viewer.module.scss',AFFECTED_ONTOLOGY_VIEWER_CSS]]) {
+    const known=paths.find(path=>AFFECTED_ONTOLOGY_PATHS.includes(path)),unknown=paths.find(path=>path!==known),old=affectedOntologyOld(known);
+    const map=affectedMap([affectedRecord('R090',paths)]),label=paths.join(' -> ');
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],label);
+    assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles],[[old?AFFECTED_ONTOLOGY_OLD_GROUPS:[AFFECTED_ONTOLOGY_GROUP]],old?AFFECTED_ONTOLOGY_OLD_UNITS:AFFECTED_ONTOLOGY_SUITES],label);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,label);
+  }
+  // An unknown sibling beside the new, membership, preflight, customer lifecycle, consumer, UX08 and world diff owners closes the union too.
+  const shared=affectedMap([...affectedOntologyRaw(),affectedRecord('M',[AFFECTED_MEMBERSHIP_MODEL]),affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL]),affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),
+    affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
+    affectedRecord('A',['nextjs/lib/world-ontology-store.ts'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/world-ontology-store.ts'],['nextjs/lib/world-ontology-store.ts']]);
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting any owned path keeps the owner and still checks the new suite at head: with the suite present the plan qualifies with the normal
+  // deferred native debt, with the suite absent the whole plan refuses. The viewer pair keeps its lifecycle overlap after deletion.
+  for (const path of AFFECTED_ONTOLOGY_PATHS) {
+    const old=affectedOntologyOld(path),record=affectedRecord('D',[path],'100644','000000');
+    const groups=old?AFFECTED_ONTOLOGY_OLD_GROUPS:[AFFECTED_ONTOLOGY_GROUP],units=old?AFFECTED_ONTOLOGY_OLD_UNITS:AFFECTED_ONTOLOGY_SUITES;
+    const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[record],headHasFile:file=>file!==path});
+    const expected=path===AFFECTED_ONTOLOGY_TEST?['selected owner check is absent at head: lib/ontology-class-rename-preview.test.ts']:[];
+    assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[groups,units,expected,[path]],path);
+    if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
+    else assert.deepEqual(affectedAskPlan(deleted).deferredGroups,['native-world-race-fresh-run'],path);
+    const suiteGone=buildAffectedMap({headSha:affectedHeadSha,records:[record],headHasFile:file=>file!==path&&file!==AFFECTED_ONTOLOGY_TEST});
+    assert.deepEqual([suiteGone.groups,suiteGone.failures],[groups,['selected owner check is absent at head: lib/ontology-class-rename-preview.test.ts']],path);
+    assert.throws(()=>affectedAskPlan(suiteGone),/clean fail-closed map/,path);
+  }
+  // Against the actual physical files, deleting a sole-owned non-suite path qualifies only because the real direct suite is present.
+  for (const path of [AFFECTED_ONTOLOGY_PREVIEW,AFFECTED_ONTOLOGY_MODEL]) {
+    const physical=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path&&affectedOntologyPhysical(file)});
+    assert.deepEqual([physical.groups,physical.unitFiles,physical.failures],[[AFFECTED_ONTOLOGY_GROUP],AFFECTED_ONTOLOGY_SUITES,[]],path);
+    assert.deepEqual(affectedAskPlan(physical).unitFiles,AFFECTED_ONTOLOGY_SUITES,path);
+  }
+});
+test('affected ontology name preview admission: absent reports, a missing new suite and missing shared lifecycle unit or browser coverage refuse at head and in readAffectedExecution; only the genuine whole-plan proof shape qualifies', () => {
+  const raw=affectedOntologyRaw(),addedRecords=raw.filter(r=>!affectedOntologyOld(r.paths[0]));
+  // At head: the new suite, each retained lifecycle suite and the lifecycle browser suite are each required once the viewer pair is selected.
+  for (const file of [...AFFECTED_ONTOLOGY_OLD_UNITS,AFFECTED_ONTOLOGY_SPEC]) {
+    const missing=buildAffectedMap({headSha:affectedHeadSha,records:raw,headHasFile:path=>path!=='nextjs/'+file});
+    assert.deepEqual([missing.groups,missing.unitFiles,missing.browserFiles,missing.failures],
+      [AFFECTED_ONTOLOGY_OLD_GROUPS,AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC],[`selected owner check is absent at head: ${file}`]],file);
+    assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/,file);
+    // The three new paths alone select only the new suite, so only its absence concerns them.
+    const added=buildAffectedMap({headSha:affectedHeadSha,records:addedRecords,headHasFile:path=>path!=='nextjs/'+file});
+    assert.deepEqual(added.failures,file===AFFECTED_ONTOLOGY_SUITES[0]?[`selected owner check is absent at head: ${file}`]:[],file);
+  }
+  const root=mkdtempSync(resolve(tmpdir(),'affected-ontology-preview-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json'),pw=index=>resolve(reports,`playwright-${index}.json`);
+    mkdirSync(reports,{recursive:true});
+    const vitest=files=>({numTotalTests:files.length,numPassedTests:files.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,
+      testResults:files.map(file=>({name:resolve(root,file),status:'passed',assertionResults:[{status:'passed'}]}))});
+    const pass=projectName=>({projectName,status:'expected',results:[{status:'passed'}]}),skip=projectName=>({projectName,status:'skipped',results:[{status:'skipped'}]});
+    const playwright=(projectName,file=AFFECTED_ONTOLOGY_SPEC,tests=[pass(projectName)])=>({config:{rootDir:root},
+      stats:{expected:tests.filter(t=>t.status==='expected').length,skipped:tests.filter(t=>t.status==='skipped').length,unexpected:tests.filter(t=>t.status==='unexpected').length,flaky:0},
+      suites:[{specs:[{file,title:'world lifecycle fixture',tests}]}]});
+    const write=(path,value)=>writeFileSync(path,typeof value==='string'?value:JSON.stringify(value));
+    const literal=text=>text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    // The three new paths: the actual unit-only plan, so no Playwright report is involved.
+    const added=affectedAskPlan(affectedMap(addedRecords));
+    assert.deepEqual([added.unitFiles,added.browserFiles,added.runDetailIntegrity],[AFFECTED_ONTOLOGY_SUITES,[],false]);
+    assert.throws(()=>readAffectedExecution(root,added),/Vitest report is missing/);
+    write(vitestPath,vitest(AFFECTED_LIFECYCLE_UNITS));
+    assert.throws(()=>readAffectedExecution(root,added),/Vitest report omitted selected file\(s\): lib\/ontology-class-rename-preview\.test\.ts/);
+    write(vitestPath,vitest(AFFECTED_ONTOLOGY_SUITES));
+    assert.deepEqual(readAffectedExecution(root,added),{units:{files:1,passed:1,skipped:0,failed:0},browsers:[]});
+    // The whole five-path plan: five Vitest suites and the lifecycle browser suite in its three reviewed projects.
+    const plan=affectedAskPlan(affectedMap(raw));
+    assert.deepEqual([plan.unitFiles,plan.browserFiles,plan.runDetailIntegrity],[AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC],false]);
+    const restore=()=>{write(vitestPath,vitest(AFFECTED_ONTOLOGY_OLD_UNITS));AFFECTED_ONTOLOGY_RUNS.forEach((run,index)=>write(pw(index+1),playwright(run.project)));};
+    rmSync(vitestPath,{force:true});
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    write(vitestPath,vitest(AFFECTED_ONTOLOGY_OLD_UNITS));
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-1\.json/);
+    write(pw(1),playwright('1440'));write(pw(2),playwright('390'));
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-3\.json/);
+    write(pw(3),playwright('reduced-motion'));
+    const result=readAffectedExecution(root,plan);
+    assert.deepEqual(result.units,{files:5,passed:5,skipped:0,failed:0});
+    assert.deepEqual(result.browsers.map(b=>[b.project,b.files,b.passed,b.skipped,b.flaky,b.failed]),AFFECTED_ONTOLOGY_RUNS.map(run=>[run.project,1,1,0,0,0]));
+    const rejected=[
+      ...AFFECTED_ONTOLOGY_OLD_UNITS.map(file=>[vitestPath,vitest(AFFECTED_ONTOLOGY_OLD_UNITS.filter(other=>other!==file)),new RegExp(`Vitest report omitted selected file\\(s\\): ${literal(file)}$`)]),
+      [vitestPath,'{',/Vitest report is malformed JSON/],
+      [pw(1),'{',/Playwright report is malformed JSON/],
+      [pw(1),playwright('1440',AFFECTED_EXPLORE_SPEC),/Playwright report omitted selected file\(s\): e2e\/world-lifecycle\.spec\.ts/],
+      [pw(2),playwright('1440'),/ran in an unconfigured project: e2e\/world-lifecycle\.spec\.ts/],
+      [pw(3),playwright('360'),/ran in an unconfigured project: e2e\/world-lifecycle\.spec\.ts/],
+      [pw(3),playwright('reduced-motion',AFFECTED_ONTOLOGY_SPEC,[skip('reduced-motion')]),/Selected Playwright file had no executed passing test: e2e\/world-lifecycle\.spec\.ts/],
+      [pw(2),playwright('390',AFFECTED_ONTOLOGY_SPEC,[pass('390'),{projectName:'390',status:'unexpected',results:[{status:'failed'}]}]),/Playwright report contains 1 failed test/],
+    ];
+    for (const [path,value,pattern] of rejected) {
+      write(path,value);assert.throws(()=>readAffectedExecution(root,plan),pattern,String(pattern));
+      restore();
+    }
+    rmSync(pw(2),{force:true});
+    assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-2\.json/);
+    restore();assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected ontology name preview admission: the combined prior preflight, membership, customer lifecycle (UX16), consumer, world diff, UX08 ledger, workspace page/Ask, source-agent/cloud, connector, docs, Home and representative ACL/billing delta keeps every prior owner and shared flag and adds only the new owner and its one suite', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier.
+  const prior=[...affectedMembershipRaw(),...affectedPreflightRaw(),...affectedLifecycleRaw(),...affectedConsumerRaw(),...affectedWorldDiffRaw(),...affectedAnalyticsRaw(),...affectedReviewRaw(),
+    affectedRecord('M',['nextjs/lib/world-graph-layout.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),affectedRecord('M',['nextjs/app/docs/page.tsx']),
+    affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',['nextjs/lib/connector-source-access.ts']),affectedRecord('M',['nextjs/lib/plan-entitlement.ts'])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedOntologyRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of [AFFECTED_MEMBERSHIP_GROUP,AFFECTED_PREFLIGHT_GROUP,AFFECTED_LIFECYCLE_GROUP,AFFECTED_CONSUMER_GROUP,AFFECTED_WORLD_DIFF_GROUP,'acl','billing-access-plan-gates',
+    'connector-progress','docs','grounded-ask','home-landing','repository-docs','review-queue',AFFECTED_ANALYTICS_GROUP,'source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_ONTOLOGY_GROUP)&&!base.unitFiles.includes('lib/ontology-class-rename-preview.test.ts'));
+  // The viewer pair's lifecycle overlap is already in the prior union, so only the new owner and its one suite are added.
+  for (const file of AFFECTED_LIFECYCLE_UNITS) assert.ok(base.unitFiles.includes(file),file);
+  assert.ok(base.browserFiles.includes(AFFECTED_ONTOLOGY_SPEC));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_ONTOLOGY_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_ONTOLOGY_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_ONTOLOGY_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>[entry.status,entry.groups]),
+    AFFECTED_ONTOLOGY_PATHS.map(path=>affectedOntologyOld(path)?['M',AFFECTED_ONTOLOGY_OLD_GROUPS]:['A',[AFFECTED_ONTOLOGY_GROUP]]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,AFFECTED_ONTOLOGY_SPEC]);
+  assert.deepEqual([base.runCdrWorkerChecks,base.runSelectorContracts,base.databaseChanged,base.databaseTests],[false,false,false,[]]);
+  // The representative ACL owner keeps its one recorded fixture contract; the new owner adds none.
+  assert.deepEqual(base.fixtureContracts.map(contract=>[contract.group,contract.suite]),[['acl','lib/pgtap-fixtures.test.ts']]);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_ONTOLOGY_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_ONTOLOGY_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_ONTOLOGY_SUITES));
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),planBrowserRuns(basePlan.browserFiles,basePlan.runDetailIntegrity));
+  // No prior path picks up the new owner or its suite on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_ONTOLOGY_GROUP)&&!alone.unitFiles.includes('lib/ontology-class-rename-preview.test.ts'),record.paths.join(' -> '));
+  }
+});
+// ---- Affected pilot worksheet admission: four exact paths, two direct suites; the existing EvaluationPage suite is selected, never owned ----
+import { PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS, PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+// Restated from the root handoff (SOURCE-CLEAR worksheet product tree 5325dd1bd0445cf6180a08ff3fde0916279e22cf, composed after selector
+// 5db58f0788d0b47e56b17c200f996dc72bbdf9c8): four modified (M) 100644 files. The 5db map owned none of the four nor the old suite path.
+const AFFECTED_PILOT_PAGE='nextjs/components/evaluation-page.tsx',AFFECTED_PILOT_EN='nextjs/public/evaluation/pilot-worksheet.en.md';
+const AFFECTED_PILOT_KO='nextjs/public/evaluation/pilot-worksheet.ko.md',AFFECTED_PILOT_TEST='nextjs/lib/pilot-evaluation-worksheet.test.ts';
+const AFFECTED_PILOT_PATHS=Object.freeze([AFFECTED_PILOT_PAGE,AFFECTED_PILOT_EN,AFFECTED_PILOT_KO,AFFECTED_PILOT_TEST]);
+// The existing two-case EvaluationPage suite: selected as a direct suite, while its own path stays an unregistered endpoint.
+const AFFECTED_PILOT_OLD_SUITE='nextjs/components/evaluation-page.test.tsx';
+// Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
+const AFFECTED_PILOT_BLOBS=Object.freeze({
+  [AFFECTED_PILOT_PAGE]:{prior:'0ca899bc0c1e28aad51cdb0e0972119686895bf4',final:'50f34ae236ffded5f1ea2e48f9527a243ce9bc8a'},
+  [AFFECTED_PILOT_EN]:{prior:'5f8a118ef702a7c76cfe9333e6143399be94982f',final:'7f32f92f52f0e45de2e3d4dfb48e5a2d489665ef'},
+  [AFFECTED_PILOT_KO]:{prior:'131ecf5da05302744b875a49e54af0de74863648',final:'4d4b7a585a7a4e5df8b8ed8da4756a787f51d806'},
+  [AFFECTED_PILOT_TEST]:{prior:'0152aa837910fee9bbd3982aa2b92378ac3e6ce0',final:'e3bdcaf96de9fbdde49a1beca783df4e96e721a6'}});
+const AFFECTED_PILOT_SUITES=Object.freeze(['components/evaluation-page.test.tsx','lib/pilot-evaluation-worksheet.test.ts']);
+const AFFECTED_PILOT_GROUP='pilot-evaluation-worksheet';
+const affectedPilotPhysical=path=>existsSync(fileURLToPath(new URL(`../../${path}`,import.meta.url)));
+// The exact raw delta from 5db: four M (100644 -> 100644) records.
+const affectedPilotRaw=()=>parseAffectedRawDiff(AFFECTED_PILOT_PATHS.map(path=>`:100644 100644 ${AFFECTED_PILOT_BLOBS[path].prior} ${AFFECTED_PILOT_BLOBS[path].final} M\0${path}\0`).join(''));
+// The cumulative delta from the verified affected baseline: the page modified (its baseline blob is a stand-in), the rest added.
+const affectedPilotCumulativeRaw=()=>parseAffectedRawDiff(AFFECTED_PILOT_PATHS.map(path=>path===AFFECTED_PILOT_PAGE
+  ?`:100644 100644 ${'1'.repeat(40)} ${AFFECTED_PILOT_BLOBS[path].final} M\0${path}\0`:`:000000 100644 ${'0'.repeat(40)} ${AFFECTED_PILOT_BLOBS[path].final} A\0${path}\0`).join(''));
+// Arbitrary regular future content on the same four paths: other blobs, the same single owner.
+const affectedPilotFutureRaw=()=>parseAffectedRawDiff(AFFECTED_PILOT_PATHS.map((path,index)=>`:100644 100644 ${String(index+2).repeat(40)} ${'abcd'[index].repeat(40)} M\0${path}\0`).join(''));
+test('affected pilot worksheet admission: each exact path, the combined 4M delta, the cumulative page M plus three A delta and arbitrary future content admit individually and together under one sole owner with exactly two direct suites and no other lane', () => {
+  assert.deepEqual(PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_PILOT_PATHS);assert.equal(new Set(AFFECTED_PILOT_PATHS).size,4);
+  assert.deepEqual([...PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES],AFFECTED_PILOT_SUITES);
+  for (const path of [...AFFECTED_PILOT_PATHS,AFFECTED_PILOT_OLD_SUITE]) assert.ok(affectedPilotPhysical(path),'path exists: '+path);
+  // Both direct suites are discovered by the unchanged global includes, so the default config runs them.
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('components/evaluation-page.test.tsx'),'the EvaluationPage suite keeps its explicit include');
+  assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the worksheet suite is discovered by the unchanged lib include');
+  assert.deepEqual(buildUnitArgs(AFFECTED_PILOT_SUITES,'report.json'),['exec','vitest','run','--reporter=default','--reporter=json','--outputFile=report.json',...AFFECTED_PILOT_SUITES]);
+  const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_PILOT_GROUP);
+  assert.equal(owners.length,1);const [owner]=owners;
+  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+    [AFFECTED_PILOT_SUITES,[],[],false,false,false,false,undefined,undefined]);
+  const records=affectedPilotRaw();
+  assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_PILOT_PATHS.map(path=>['M','100644','100644',[path]]));
+  for (const path of AFFECTED_PILOT_PATHS) {
+    // Sole owner: no prior descriptor matches any of the four paths.
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_PILOT_GROUP],path);
+    // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
+    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path],'100644','100755'),
+      affectedRecord('M',[path],'100755','100644'),affectedRecord('D',[path],'100644','000000')]) {
+      const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
+      assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[]],label);
+      assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
+      assert.deepEqual([map.nativeEvidence.disposition,map.nativeEvidence.invalidatingPaths,map.nativeEvidence.freshRunClaimed],['fresh-seven-case-native-run-required',[path],false],label);
+    }
+  }
+  for (const [label,raw,statuses] of [['exact 4M',records,['M','M','M','M']],['cumulative page M plus three A',affectedPilotCumulativeRaw(),['M','A','A','A']],
+    ['arbitrary future content',affectedPilotFutureRaw(),['M','M','M','M']]]) {
+    assert.deepEqual(raw.map(r=>[r.status,r.paths]),AFFECTED_PILOT_PATHS.map((path,index)=>[statuses[index],[path]]),label);
+    const delta=affectedMap(raw);
+    assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
+      [[],[],[AFFECTED_PILOT_GROUP],[...AFFECTED_PILOT_PATHS].sort(),AFFECTED_PILOT_SUITES,[]],label);
+    assert.deepEqual(delta.entries,AFFECTED_PILOT_PATHS.map((path,index)=>({status:statuses[index],paths:[path],groups:[AFFECTED_PILOT_GROUP]})),label);
+    assert.deepEqual([delta.runCdrWorkerChecks,delta.runSelectorContracts,delta.databaseChanged,delta.databaseTests,delta.databaseDependencyReasons,delta.fixtureContracts],[false,false,false,[],{},[]],label);
+    assert.deepEqual([delta.nativeEvidence.disposition,delta.nativeEvidence.invalidatingPaths,delta.nativeEvidence.freshRunClaimed],
+      ['fresh-seven-case-native-run-required',[...AFFECTED_PILOT_PATHS].sort(),false],label);
+  }
+  // A rename inside the owner keeps the one selection and maps both endpoints.
+  const within=affectedMap([affectedRecord('R100',[AFFECTED_PILOT_EN,AFFECTED_PILOT_KO])]);
+  assert.deepEqual([within.failures,within.groups,within.unitFiles,within.browserFiles,within.entries],
+    [[],[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[],[{status:'R100',paths:[AFFECTED_PILOT_EN,AFFECTED_PILOT_KO],groups:[AFFECTED_PILOT_GROUP]}]]);
+});
+test('affected pilot worksheet admission: the actual regular affectedPlan defers only the normal fresh native run as unexecuted debt with no build, browser, database, worker or selector lane; the missing native run is never claimed', () => {
+  const raw=affectedPilotRaw();
+  for (const records of [...raw.map(record=>[record]),raw,affectedPilotCumulativeRaw(),affectedPilotFutureRaw()]) {
+    const plan=affectedAskPlan(affectedMap(records)),label=records.map(r=>`${r.status} ${r.paths.join(' -> ')}`).join(', ');
+    assert.deepEqual([plan.groups,plan.unitFiles,plan.browserFiles,plan.catalogueFiles,plan.unknownPaths],[['native-world-race-fresh-run',AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[],[],[]],label);
+    for (const flag of ['runWorkflowStaticGate','runCdrWorkerChecks','runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity',
+      'requireWorkspaceIntakeCapture','requirePublicUiScreenshots','requireHomePricingCaptures','requirePublicProductCaptures','requireSolutionsCaptures','exploreRepairPresentation','solutionsPagesPresentation'])
+      assert.ok(!plan[flag],`${flag} ${label}`);
+    assert.ok(!plan.groups.some(group=>['selector-config','workflow-static','database-contract','ocr-gpu-worker'].includes(group)),label);
+    assert.deepEqual([plan.deferredGroups,plan.fullQualification,plan.inheritedChecks,plan.pendingFullDebt],[['native-world-race-fresh-run'],'pending',{},AFFECTED_HOME_FULL_DEBT],label);
+    assert.ok(plan.pendingDebt.includes('native-world-race-fresh-run')&&plan.pendingQualificationDebt.includes('native-world-race-fresh-run'),label);
+    assert.match(plan.databaseRehearsalStatus,/^no SQL change since the verified baseline/,label);
+    assert.deepEqual([plan.affectedIntegration.changedPaths,plan.affectedIntegration.nativeEvidence.disposition,plan.affectedIntegration.nativeEvidence.freshRunClaimed],
+      [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
+    // The fresh seven-case run stays deferred debt: neither executed nor claimed by this plan.
+    assert.match(plan.affectedIntegration.nativeEvidence.status,/neither executed nor claimed here/,label);
+    assert.ok(plan.qualificationReasons.includes(plan.affectedIntegration.nativeEvidence.status),label);
+    assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),[],label);
+  }
+  // The normal policy is unchanged: a docs-only head still reuses historical inputs and defers nothing; the worksheet adds exactly the
+  // native debt. Beside such a reuse path the worksheet's own four paths invalidate the inputs, never a waiver or an override.
+  const docsOnly=affectedAskPlan(affectedMap([affectedRecord('M',['README.md'])]));
+  assert.deepEqual([docsOnly.deferredGroups,docsOnly.affectedIntegration.nativeEvidence.disposition],[[],'historical-input-reuse']);
+  const plan=affectedAskPlan(affectedMap(raw));
+  assert.deepEqual(plan.pendingDebt,affectedUnion(docsOnly.pendingDebt,['native-world-race-fresh-run']));
+  const withDocs=affectedMap([affectedRecord('M',['README.md']),...raw]);
+  assert.deepEqual([withDocs.failures,withDocs.nativeEvidence.disposition,withDocs.nativeEvidence.invalidatingPaths,withDocs.nativeEvidence.freshRunClaimed],
+    [[],'fresh-seven-case-native-run-required',[...AFFECTED_PILOT_PATHS].sort(),false]);
+  assert.deepEqual(affectedAskPlan(withDocs).deferredGroups,['native-world-race-fresh-run']);
+  // An unmapped endpoint never enters invalidatingPaths, so its disposition still reads historical-input-reuse while the map fails closed
+  // and no plan exists: that row is a classification, never current-head qualification.
+  for (const path of [AFFECTED_PILOT_OLD_SUITE,'nextjs/public/evaluation/pilot-worksheet.ja.md','nextjs/components/contact-form.tsx']) {
+    const unmapped=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([unmapped.failures,unmapped.groups,unmapped.nativeEvidence.disposition,unmapped.nativeEvidence.invalidatingPaths],[[`unmapped changed endpoint: ${path}`],[],'historical-input-reuse',[]],path);
+    assert.throws(()=>affectedAskPlan(unmapped),/clean fail-closed map/,path);
+  }
+  // The historical inputs stay bound to the 5dd baseline only.
+  const historical=plan.affectedIntegration.nativeEvidence.historical;
+  assert.deepEqual([plan.affectedIntegration.baseline,historical.headSha,historical.treeSha,historical.nativeLinuxDbCases],
+    [{commit:'5dd95ed815719656fe09f1af10213a9ecf1119a8',tree:'c0773387cfffdd334076c66a1f2013a6662c6578'},'5dd95ed815719656fe09f1af10213a9ecf1119a8','c0773387cfffdd334076c66a1f2013a6662c6578',7]);
+  assert.match(historical.status,/not full release and not current-head evidence/);
+});
+test('affected pilot worksheet admission: adjacent and lookalike paths, other locales and extensions, routes, backends, the contact form and the old suite endpoint stay unknown; docs, Home and UX20 viewer overlaps are unchanged; spellings, statuses and modes refuse', () => {
+  // Every metacharacter is escaped and each path is anchored, so neighbours, other locales, other extensions and other directories never match.
+  for (const path of [AFFECTED_PILOT_OLD_SUITE,
+    'nextjs/components/evaluation-page.ts','nextjs/components/evaluation-page.jsx','nextjs/components/evaluation-page.tsx.bak','nextjs/components/evaluation-pageXtsx',
+    'nextjs/components/evaluation-page-v2.tsx','nextjs/components/evaluation-pages.tsx','nextjs/components/evaluation_page.tsx','nextjs/components/Evaluation-Page.tsx',
+    'nextjs/components/evaluation-page/index.tsx','nextjs/components/evaluation-page.module.css','nextjs/components/evaluation-page.test.ts','nextjs/components/evaluation-page.spec.tsx',
+    'nextjs/components/contact-form.tsx','nextjs/components/contact-form.test.tsx','nextjs/components/contact-form.module.css','nextjs/components/public-site-chrome.tsx',
+    'nextjs/app/evaluation/page.tsx','nextjs/app/ko/evaluation/page.tsx','nextjs/app/evaluation/pilot-worksheet/route.ts','nextjs/app/api/contact/route.ts',
+    'nextjs/app/api/v1/evaluation/requests/route.ts','nextjs/app/api/evaluation/worksheet/route.ts',
+    'nextjs/public/evaluation/pilot-worksheet.md','nextjs/public/evaluation/pilot-worksheet.ja.md','nextjs/public/evaluation/pilot-worksheet.en-US.md',
+    'nextjs/public/evaluation/pilot-worksheet.EN.md','nextjs/public/evaluation/pilot-worksheet.ko.MD','nextjs/public/evaluation/pilot-worksheet.en.markdown',
+    'nextjs/public/evaluation/pilot-worksheet.en.txt','nextjs/public/evaluation/pilot-worksheet.ko.pdf','nextjs/public/evaluation/pilot-worksheet.en.html',
+    'nextjs/public/evaluation/pilot-worksheet.en.md.bak','nextjs/public/evaluation/pilot-worksheet.en.md.gz','nextjs/public/evaluation/pilot-worksheet.enXmd',
+    'nextjs/public/evaluation/pilot-worksheets.en.md','nextjs/public/evaluation/pilot_worksheet.en.md','nextjs/public/evaluation/Pilot-Worksheet.en.md',
+    'nextjs/public/evaluation/ko/pilot-worksheet.md','nextjs/public/evaluation/en/pilot-worksheet.en.md','nextjs/public/evaluation/index.md',
+    'nextjs/public/pilot-worksheet.en.md','nextjs/public/evaluations/pilot-worksheet.en.md',
+    'nextjs/lib/pilot-evaluation-worksheet.ts','nextjs/lib/pilot-evaluation-worksheet.test.tsx','nextjs/lib/pilot-evaluation-worksheet.spec.ts',
+    'nextjs/lib/pilot-evaluation-worksheet-v2.test.ts','nextjs/lib/pilot-evaluation-worksheetXtest.ts','nextjs/lib/pilot-evaluation-worksheet.test.ts.bak',
+    'nextjs/lib/pilot_evaluation_worksheet.test.ts','nextjs/lib/__snapshots__/pilot-evaluation-worksheet.test.ts.snap','nextjs/lib/evaluation-page.test.ts',
+    'nextjs/lib/activation-policy.ts','nextjs/lib/contact-form.ts','nextjs/e2e/evaluation.spec.ts','nextjs/e2e/pilot-worksheet.spec.ts',
+    'supabase/functions/contact/index.ts','supabase/functions/evaluation-request/index.ts',
+    'components/evaluation-page.tsx','public/evaluation/pilot-worksheet.en.md','lib/pilot-evaluation-worksheet.test.ts','components/evaluation-page.test.tsx',
+    'evaluation/pilot-worksheet.ko.md','nextjs/nextjs/components/evaluation-page.tsx']) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+  }
+  // The shared discovery config keeps only its selector owner; the EvaluationPage include it already carries is not a worksheet owner.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test('nextjs/vitest.config.ts')).map(o=>o.group),['shared-test-discovery']);
+  // Known paths of earlier owners, including the docs, Home and UX20 viewer overlaps, a served public developer doc, a repository doc named
+  // like a worksheet and the other component render suite, keep exactly their prior selection; the new owner and suites never join them.
+  const prior=[[AFFECTED_HOME_PAGE_PATH,['home-landing'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]],
+    ['nextjs/app/docs/page.tsx',['docs'],AFFECTED_DOCS_SUITES,['e2e/docs-reading-layout.spec.ts']],['docs/pilot-worksheet.en.md',['repository-docs'],[],[]],
+    ...AFFECTED_ONTOLOGY_OLD.map(path=>[path,AFFECTED_ONTOLOGY_OLD_GROUPS,AFFECTED_ONTOLOGY_OLD_UNITS,[AFFECTED_ONTOLOGY_SPEC]]),
+    ...AFFECTED_ONTOLOGY_NEW.map(path=>[path,[AFFECTED_ONTOLOGY_GROUP],AFFECTED_ONTOLOGY_SUITES,[]]),
+    ...AFFECTED_RECIPE_PATHS.map(path=>[path,['recipe-continuation'],AFFECTED_RECIPE_SUITES,AFFECTED_RECIPE_BROWSERS]),
+    [AFFECTED_REVIEW_PAGE,['grounded-ask','review-queue','workspace-lifecycle'],AFFECTED_REVIEW_PAGE_UNITS,[AFFECTED_ONTOLOGY_SPEC]],
+    ['nextjs/lib/grounded-ask.ts',['grounded-ask'],AFFECTED_ASK_SUITES,[]],
+    ...AFFECTED_ANALYTICS_PATHS.map(path=>[path,[AFFECTED_ANALYTICS_GROUP],AFFECTED_ANALYTICS_SUITES,[]]),
+    ...AFFECTED_CONSUMER_PATHS.map(path=>[path,[AFFECTED_CONSUMER_GROUP],AFFECTED_CONSUMER_SUITES,[]]),
+    ...AFFECTED_LIFECYCLE_PATHS.map(path=>[path,[AFFECTED_LIFECYCLE_GROUP],AFFECTED_LIFECYCLE_SUITES,[]]),
+    ...AFFECTED_PREFLIGHT_PATHS.map(path=>[path,[AFFECTED_PREFLIGHT_GROUP],AFFECTED_PREFLIGHT_SUITES,[]]),
+    ...AFFECTED_MEMBERSHIP_PATHS.map(path=>[path,[AFFECTED_MEMBERSHIP_GROUP],AFFECTED_MEMBERSHIP_SUITES,[]]),
+    ...AFFECTED_WORLD_DIFF_PATHS.map(path=>[path,[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,[]]),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>[path,['source-agent'],AFFECTED_SOURCE_AGENT_SUITES,[]]),
+    ...AFFECTED_CONNECTOR_PATHS.map(path=>[path,['connector-progress'],AFFECTED_CONNECTOR_SUITES,[]]),
+    ['nextjs/components/explore/evidence-workbench.test.tsx',['explore-answer'],AFFECTED_EXPLORE_SUITES,[AFFECTED_EXPLORE_SPEC]]];
+  for (const [path,groups,units,browsers] of prior) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unitFiles,map.browserFiles],[[],groups,[...units].sort(),[...browsers].sort()],path);
+    assert.ok(!map.groups.includes(AFFECTED_PILOT_GROUP)&&!AFFECTED_PILOT_SUITES.some(file=>map.unitFiles.includes(file)),path);
+  }
+  for (const path of ['nextjs/components/./evaluation-page.tsx','nextjs//components/evaluation-page.tsx','nextjs/components/../components/evaluation-page.tsx',
+    'nextjs\\public\\evaluation\\pilot-worksheet.en.md','nextjs/public/evaluation/pilot-worksheet.ko.md ','nextjs/public/evaluation/pilot worksheet.en.md',
+    'nextjs/lib/pilot-evaluation-worksheet.test.ts\n','nextjs/public/evaluation/./pilot-worksheet.ko.md','nextjs/public/evaluation/pilot-worksheet.한국어.md',
+    '/nextjs/components/evaluation-page.tsx'])
+    assert.deepEqual(affectedMap([affectedRecord('M',[path])]).failures,[`unsupported path spelling: ${JSON.stringify(path)}`],path);
+  for (const path of AFFECTED_PILOT_PATHS)
+    for (const [status,oldMode,newMode] of [['A','000000','120000'],['A','100644','100644'],['M','100644','120000'],['M','160000','160000'],['D','100644','100644'],['D','120000','000000']])
+      assert.deepEqual(affectedMap([affectedRecord(status,[path],oldMode,newMode)]).failures,[`unsupported file mode ${oldMode} -> ${newMode}: ${path}`],`${status} ${oldMode}->${newMode} ${path}`);
+  for (const [status,paths] of [['C075',[AFFECTED_PILOT_PAGE,'nextjs/components/evaluation-page-copy.tsx']],['C100',[AFFECTED_PILOT_EN,AFFECTED_PILOT_KO]],['T',[AFFECTED_PILOT_EN]],
+    ['U',[AFFECTED_PILOT_KO]],['X',[AFFECTED_PILOT_TEST]],['M001',[AFFECTED_PILOT_PAGE]],['R',[AFFECTED_PILOT_EN,AFFECTED_PILOT_KO]]])
+    assert.match(affectedMap([affectedRecord(status,paths)]).failures[0],new RegExp(`^unsupported change status ${status}:`),status);
+});
+test('affected pilot worksheet admission: mixed unknown, an unknown rename endpoint or the old suite endpoint refuse the whole plan while the diagnostic selection remains; a deleted owned path still requires both direct suites at head', () => {
+  // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
+  for (const unknown of ['nextjs/components/evaluation-page-v2.tsx','nextjs/public/evaluation/pilot-worksheet.ja.md',AFFECTED_PILOT_OLD_SUITE,'nextjs/components/contact-form.tsx']) {
+    const mixed=affectedMap([...affectedPilotRaw(),affectedRecord(unknown===AFFECTED_PILOT_OLD_SUITE?'M':'A',[unknown],unknown===AFFECTED_PILOT_OLD_SUITE?'100644':'000000')]);
+    assert.deepEqual([mixed.failures,mixed.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],unknown);
+    assert.deepEqual([mixed.groups,mixed.unitFiles,mixed.browserFiles],[[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[]],'diagnostic selection is retained beside the failure: '+unknown);
+    assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/,unknown);
+  }
+  // A rename with one unowned endpoint refuses in either direction, including a rename to or from the old suite path.
+  for (const paths of [[AFFECTED_PILOT_PAGE,'nextjs/components/evaluation-page-v2.tsx'],['nextjs/components/contact-form.tsx',AFFECTED_PILOT_PAGE],
+    [AFFECTED_PILOT_EN,'nextjs/public/evaluation/pilot-worksheet.ja.md'],['nextjs/public/evaluation/pilot-worksheet.md',AFFECTED_PILOT_KO],
+    [AFFECTED_PILOT_TEST,'nextjs/lib/pilot-evaluation-worksheet.spec.ts'],[AFFECTED_PILOT_OLD_SUITE,AFFECTED_PILOT_TEST],[AFFECTED_PILOT_PAGE,AFFECTED_PILOT_OLD_SUITE]]) {
+    const known=paths.find(path=>AFFECTED_PILOT_PATHS.includes(path)),unknown=paths.find(path=>path!==known);
+    const map=affectedMap([affectedRecord('R090',paths)]),label=paths.join(' -> ');
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],label);
+    assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles,map.browserFiles],[[[AFFECTED_PILOT_GROUP]],AFFECTED_PILOT_SUITES,[]],label);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,label);
+  }
+  // A recognized rename into a prior owner unions both selections and stays clean.
+  const intoHome=affectedMap([affectedRecord('R085',[AFFECTED_PILOT_PAGE,AFFECTED_HOME_PAGE_PATH])]);
+  assert.deepEqual([intoHome.failures,intoHome.groups,intoHome.unitFiles,intoHome.browserFiles],
+    [[],['home-landing',AFFECTED_PILOT_GROUP],affectedUnion(AFFECTED_HOME_SUITES,AFFECTED_PILOT_SUITES),[AFFECTED_HOME_SPEC]]);
+  // An unknown sibling beside the worksheet and the membership, preflight, customer lifecycle, consumer, UX08 and UX20 owners closes the union too.
+  const shared=affectedMap([...affectedPilotRaw(),...affectedOntologyRaw(),affectedRecord('M',[AFFECTED_MEMBERSHIP_MODEL]),affectedRecord('M',[AFFECTED_PREFLIGHT_MODEL]),
+    affectedRecord('M',[AFFECTED_LIFECYCLE_MODEL]),affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),
+    affectedRecord('A',['nextjs/app/evaluation/pilot-worksheet/route.ts'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/app/evaluation/pilot-worksheet/route.ts'],['nextjs/app/evaluation/pilot-worksheet/route.ts']]);
+  assert.ok(shared.groups.includes(AFFECTED_PILOT_GROUP)&&AFFECTED_PILOT_SUITES.every(file=>shared.unitFiles.includes(file)));
+  assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
+  // Deleting the old suite path is itself an unknown endpoint, and the owner still requires that suite at head.
+  const oldSuiteGone=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedPilotRaw(),affectedRecord('D',[AFFECTED_PILOT_OLD_SUITE],'100644','000000')],
+    headHasFile:file=>file!==AFFECTED_PILOT_OLD_SUITE&&affectedPilotPhysical(file)});
+  assert.deepEqual([oldSuiteGone.groups,oldSuiteGone.failures],[[AFFECTED_PILOT_GROUP],
+    [`unmapped changed endpoint: ${AFFECTED_PILOT_OLD_SUITE}`,'selected owner check is absent at head: components/evaluation-page.test.tsx']]);
+  assert.throws(()=>affectedAskPlan(oldSuiteGone),/clean fail-closed map/);
+  // Deleting any owned path keeps the owner and still checks both direct suites at the physical head: with both present the plan qualifies
+  // with the normal deferred native debt; with either absent (or the deleted path being the worksheet suite itself) the whole plan refuses.
+  for (const path of AFFECTED_PILOT_PATHS) {
+    const record=affectedRecord('D',[path],'100644','000000');
+    for (const absentSuite of [null,...AFFECTED_PILOT_SUITES]) {
+      const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[record],headHasFile:file=>file!==path&&file!==(absentSuite&&'nextjs/'+absentSuite)&&affectedPilotPhysical(file)});
+      const expected=AFFECTED_PILOT_SUITES.filter(suite=>suite===absentSuite||'nextjs/'+suite===path).map(suite=>`selected owner check is absent at head: ${suite}`);
+      const label=`${path} without ${absentSuite??'no suite'}`;
+      assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,expected,[path]],label);
+      if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,label);
+      else {
+        const plan=affectedAskPlan(deleted);
+        assert.deepEqual([plan.unitFiles,plan.browserFiles,plan.deferredGroups],[AFFECTED_PILOT_SUITES,[],['native-world-race-fresh-run']],label);
+      }
+    }
+  }
+});
+test('affected pilot worksheet admission: each direct suite independently missing at the physical head fails closed, and readAffectedExecution requires both suites executed and passing; a satisfied union qualifies and a missing suite execution refuses', () => {
+  const raw=affectedPilotRaw();
+  for (const suite of AFFECTED_PILOT_SUITES) {
+    for (const records of [raw,...raw.map(record=>[record]),affectedPilotCumulativeRaw()]) {
+      const missing=buildAffectedMap({headSha:affectedHeadSha,records,headHasFile:path=>path!=='nextjs/'+suite&&affectedPilotPhysical(path)});
+      const label=`${suite} ${records.map(r=>r.paths[0]).join(', ')}`;
+      assert.deepEqual([missing.groups,missing.unitFiles,missing.failures],[[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[`selected owner check is absent at head: ${suite}`]],label);
+      assert.throws(()=>affectedAskPlan(missing),/clean fail-closed map/,label);
+    }
+  }
+  const present=buildAffectedMap({headSha:affectedHeadSha,records:raw,headHasFile:affectedPilotPhysical});
+  assert.deepEqual([present.failures,present.unitFiles],[[],AFFECTED_PILOT_SUITES]);
+  assert.deepEqual(affectedAskPlan(present).unitFiles,AFFECTED_PILOT_SUITES);
+  const root=mkdtempSync(resolve(tmpdir(),'affected-pilot-worksheet-reports-'));
+  try {
+    const reports=resolve(root,'node_modules/.cache/repair-scope-reports'),vitestPath=resolve(reports,'vitest.json');
+    mkdirSync(reports,{recursive:true});
+    const result=(file,status='passed',assertions=['passed'])=>({name:resolve(root,file),status,assertionResults:assertions.map(status=>({status}))});
+    const vitest=(results,extra={})=>({numTotalTests:results.length,numPassedTests:results.length,numFailedTests:0,numPendingTests:0,numTodoTests:0,success:true,testResults:results,...extra});
+    const write=value=>writeFileSync(vitestPath,typeof value==='string'?value:JSON.stringify(value));
+    const literal=text=>text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const [oldSuite,worksheet]=AFFECTED_PILOT_SUITES;
+    // The actual unit-only plan: both direct suites, no Playwright report involved.
+    const plan=affectedAskPlan(affectedMap(raw));
+    assert.deepEqual([plan.unitFiles,plan.browserFiles,plan.runDetailIntegrity],[AFFECTED_PILOT_SUITES,[],false]);
+    assert.throws(()=>readAffectedExecution(root,plan),/Vitest report is missing/);
+    const rejected=[
+      [vitest([result(oldSuite)]),/Vitest report omitted selected file\(s\): lib\/pilot-evaluation-worksheet\.test\.ts$/],
+      [vitest([result(worksheet)]),/Vitest report omitted selected file\(s\): components\/evaluation-page\.test\.tsx$/],
+      [vitest([]),/Vitest report omitted selected file\(s\): components\/evaluation-page\.test\.tsx, lib\/pilot-evaluation-worksheet\.test\.ts$/],
+      // Lookalike report names never stand in for a selected suite.
+      [vitest([result(oldSuite),result('lib/pilot-evaluation-worksheet.test.tsx')]),/Vitest report omitted selected file\(s\): lib\/pilot-evaluation-worksheet\.test\.ts$/],
+      [vitest([result('components/evaluation-page.test.tsx.bak'),result(worksheet)]),/Vitest report omitted selected file\(s\): components\/evaluation-page\.test\.tsx$/],
+      [vitest([result(oldSuite,'passed',['skipped']),result(worksheet)]),/Selected Vitest file had no executed passing test: components\/evaluation-page\.test\.tsx/],
+      [vitest([result(oldSuite),result(worksheet,'passed',['todo'])]),/Selected Vitest file had no executed passing test: lib\/pilot-evaluation-worksheet\.test\.ts/],
+      [vitest([result(oldSuite),result(worksheet,'failed',['passed','failed'])]),/Selected Vitest file contains a failed suite: lib\/pilot-evaluation-worksheet\.test\.ts/],
+      [vitest([result(oldSuite),result(worksheet)],{success:false,numFailedTests:1}),/Vitest report contains 1 failed test\(s\)/],
+      ['{',/Vitest report is malformed JSON/],
+    ];
+    for (const [value,pattern] of rejected) { write(value);assert.throws(()=>readAffectedExecution(root,plan),pattern,String(pattern)); }
+    write(vitest([result(oldSuite),result(worksheet)]));
+    const executed=readAffectedExecution(root,plan);
+    assert.deepEqual(executed,{units:{files:2,passed:2,skipped:0,failed:0},browsers:[]});
+    // The reader returns unit and browser results only: no native result exists, so the deferred native run is never reported as passed.
+    assert.deepEqual(Object.keys(executed).sort(),['browsers','units']);assert.ok(plan.deferredGroups.includes('native-world-race-fresh-run'));
+    // A satisfied union with a prior unit-only owner: every selected suite must be reported; extra reported suites are ignored.
+    const union=affectedAskPlan(affectedMap([...raw,...affectedMembershipRaw()]));
+    assert.deepEqual([union.unitFiles,union.browserFiles],[affectedUnion(AFFECTED_PILOT_SUITES,AFFECTED_MEMBERSHIP_SUITES),[]]);
+    write(vitest([result(oldSuite),result(worksheet),result(AFFECTED_MEMBERSHIP_SUITES[0]),result('lib/visual-world-model.test.ts')]));
+    assert.deepEqual(readAffectedExecution(root,union),{units:{files:3,passed:3,skipped:0,failed:0},browsers:[]});
+    for (const omitted of AFFECTED_PILOT_SUITES) {
+      write(vitest([...AFFECTED_PILOT_SUITES.filter(file=>file!==omitted),...AFFECTED_MEMBERSHIP_SUITES].map(file=>result(file))));
+      assert.throws(()=>readAffectedExecution(root,union),new RegExp(`Vitest report omitted selected file\\(s\\): ${literal(omitted)}$`),omitted);
+    }
+    rmSync(vitestPath,{force:true});
+    assert.throws(()=>readAffectedExecution(root,union),/Vitest report is missing/);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('affected pilot worksheet admission: the combined prior workspace, UX08 ledger, grounded Ask, docs, Home, UX20, recipe, source-agent/cloud, consumer, customer lifecycle, connector, preflight, membership and representative ACL/billing delta keeps every prior owner and shared flag and adds only the new owner and its two deduplicated suites', () => {
+  // The prior map is computed by the current selector from the existing restated deltas, never by a cloned classifier or a handcrafted map.
+  const prior=[...affectedMembershipRaw(),...affectedPreflightRaw(),...affectedLifecycleRaw(),...affectedConsumerRaw(),...affectedWorldDiffRaw(),...affectedAnalyticsRaw(),...affectedReviewRaw(),
+    ...affectedOntologyRaw(),...AFFECTED_RECIPE_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['nextjs/lib/world-graph-layout.ts']),affectedRecord('M',['nextjs/lib/grounded-ask.ts']),
+    ...AFFECTED_SOURCE_AGENT_PATHS.map(path=>affectedRecord('M',[path])),...AFFECTED_CONNECTOR_PATHS.map(path=>affectedRecord('M',[path])),affectedRecord('M',['README.md']),
+    affectedRecord('M',['nextjs/app/docs/page.tsx']),affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',['nextjs/lib/connector-source-access.ts']),affectedRecord('M',['nextjs/lib/plan-entitlement.ts'])];
+  const base=affectedMap(prior),combined=affectedMap([...prior,...affectedPilotRaw()]);
+  assert.deepEqual([base.failures,combined.failures,base.unmappedPaths,combined.unmappedPaths],[[],[],[],[]]);
+  for (const group of [AFFECTED_MEMBERSHIP_GROUP,AFFECTED_PREFLIGHT_GROUP,AFFECTED_LIFECYCLE_GROUP,AFFECTED_CONSUMER_GROUP,AFFECTED_WORLD_DIFF_GROUP,AFFECTED_ONTOLOGY_GROUP,AFFECTED_ANALYTICS_GROUP,
+    'acl','billing-access-plan-gates','connector-progress','docs','grounded-ask','home-landing','recipe-continuation','repository-docs','review-queue','source-agent','workspace-lifecycle'])
+    assert.ok(base.groups.includes(group),group);
+  assert.ok(!base.groups.includes(AFFECTED_PILOT_GROUP)&&!AFFECTED_PILOT_SUITES.some(file=>base.unitFiles.includes(file)));
+  assert.deepEqual(combined.groups,[...base.groups,AFFECTED_PILOT_GROUP].sort());
+  assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_PILOT_SUITES));
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+2);assert.equal(new Set(combined.unitFiles).size,combined.unitFiles.length);
+  assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_PILOT_PATHS));
+  assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
+  assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>[entry.status,entry.groups]),AFFECTED_PILOT_PATHS.map(()=>['M',[AFFECTED_PILOT_GROUP]]));
+  for (const key of ['browserFiles','runCdrWorkerChecks','runSelectorContracts','databaseChanged','databaseTests','databaseDependencyReasons','fixtureContracts'])
+    assert.deepEqual(combined[key],base[key],key);
+  assert.deepEqual(base.browserFiles,affectedUnion(['e2e/docs-reading-layout.spec.ts',AFFECTED_HOME_SPEC,AFFECTED_ONTOLOGY_SPEC],AFFECTED_RECIPE_BROWSERS));
+  assert.deepEqual([base.runCdrWorkerChecks,base.runSelectorContracts,base.databaseChanged,base.databaseTests],[false,false,false,[]]);
+  // The representative ACL owner keeps its one recorded fixture contract; the new owner adds none.
+  assert.deepEqual(base.fixtureContracts.map(contract=>[contract.group,contract.suite]),[['acl','lib/pgtap-fixtures.test.ts']]);
+  assert.deepEqual([base.nativeEvidence.disposition,combined.nativeEvidence.disposition,combined.nativeEvidence.freshRunClaimed],
+    ['fresh-seven-case-native-run-required','fresh-seven-case-native-run-required',false]);
+  assert.deepEqual(combined.nativeEvidence.invalidatingPaths,affectedUnion(base.nativeEvidence.invalidatingPaths,AFFECTED_PILOT_PATHS));
+  const basePlan=affectedAskPlan(base),plan=affectedAskPlan(combined);
+  assert.deepEqual([...plan.groups].sort(),[...basePlan.groups,AFFECTED_PILOT_GROUP].sort());
+  assert.deepEqual([...plan.unitFiles].sort(),affectedUnion(basePlan.unitFiles,AFFECTED_PILOT_SUITES));assert.equal(new Set(plan.unitFiles).size,plan.unitFiles.length);
+  for (const key of ['browserFiles','deferredGroups','fullQualification','inheritedChecks','pendingFullDebt','pendingDebt','runWorkflowStaticGate','runCdrWorkerChecks',
+    'runDatabaseRehearsal','runFullHermeticVitest','runApiCatalogueChecks','runScriptContracts','runDetailIntegrity'])
+    assert.deepEqual(plan[key],basePlan[key],key);
+  assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),planBrowserRuns(basePlan.browserFiles,basePlan.runDetailIntegrity));
+  // Repeating the worksheet delta (exact 4M and cumulative M plus 3A) adds entries but never a duplicate group, suite or path.
+  const repeated=affectedMap([...prior,...affectedPilotRaw(),...affectedPilotCumulativeRaw()]);
+  assert.deepEqual([repeated.failures,repeated.groups,repeated.unitFiles,repeated.changedPaths,repeated.browserFiles,repeated.entries.length],
+    [[],combined.groups,combined.unitFiles,combined.changedPaths,combined.browserFiles,combined.entries.length+4]);
+  // Evaluation and contact-form neighbours stay diagnostics only: beside the combined delta they close the whole plan, while the
+  // diagnostic selection equals the clean combined selection.
+  for (const adjacent of ['nextjs/components/contact-form.tsx','nextjs/app/evaluation/page.tsx',AFFECTED_PILOT_OLD_SUITE]) {
+    const map=affectedMap([...prior,...affectedPilotRaw(),affectedRecord('M',[adjacent])]);
+    assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${adjacent}`],[adjacent]],adjacent);
+    assert.deepEqual([map.groups,map.unitFiles,map.browserFiles],[combined.groups,combined.unitFiles,combined.browserFiles],adjacent);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,adjacent);
+  }
+  // No prior path picks up the new owner or its suites on its own.
+  for (const record of prior) {
+    const alone=affectedMap([record]);
+    assert.ok(!alone.groups.includes(AFFECTED_PILOT_GROUP)&&!AFFECTED_PILOT_SUITES.some(file=>alone.unitFiles.includes(file)),record.paths.join(' -> '));
+  }
+});
+
+// BEGIN CUSTOMER PAGINATION DEPENDENCY CONTRACT
+test('affected directory pagination shared helper retains its original owner and selects the actual directory lens checks only on the exact dependency path', () => {
+  const record = path => ({ status: 'M', oldMode: '100644', newMode: '100644', paths: [path] });
+  const headSha = 'f'.repeat(40); // Explicit synthetic owner-map input, not a published execution head.
+  const select = (path, headHasFile = () => true) => buildAffectedMap({ headSha, records: [record(path)], headHasFile });
+  const helper = 'nextjs/lib/world-explorer-navigation.ts';
+  const dependentUnits = ['lib/visual-world-model.test.ts', 'lib/workspace-failure-copy.test.ts',
+    'lib/world-directory-and-ontology.test.ts', 'lib/world-graph-layout.test.ts', 'lib/world-explorer-navigation.test.ts'].sort();
+  const dependency = select(helper);
+  assert.deepEqual(dependency.failures, []);
+  assert.deepEqual(dependency.groups, ['workspace-lifecycle', 'world-explorer-navigation']);
+  assert.deepEqual(dependency.unitFiles, dependentUnits);
+  assert.deepEqual(dependency.browserFiles, ['e2e/world-lifecycle.spec.ts']);
+  assert.equal(dependency.runCdrWorkerChecks, false);
+  assert.equal(dependency.databaseChanged, false);
+  assert.equal(dependency.runSelectorContracts, false);
+  assert.deepEqual(dependency.nativeEvidence.invalidatingPaths, [helper]);
+  assert.equal(dependency.nativeEvidence.freshRunClaimed, false);
+  assert.match(readFileSync(new URL('../components/world-directory-tree.tsx', import.meta.url), 'utf8'),
+    /import\s*\{\s*directoryPage\s*\}\s*from\s*["']\.\.\/lib\/world-explorer-navigation["']/);
+  assert.match(readFileSync(new URL('../lib/world-directory-and-ontology.test.ts', import.meta.url), 'utf8'),
+    /describe\("World Studio directory pagination"/);
+  for (const path of ['nextjs/lib/world-explorer-navigation.test.ts', 'nextjs/components/world-explorer.tsx', 'nextjs/components/world-explorer.module.css']) {
+    const untouched = select(path);
+    assert.deepEqual(untouched.groups, ['world-explorer-navigation'], path);
+    assert.deepEqual(untouched.unitFiles, ['lib/world-explorer-navigation.test.ts'], path);
+    assert.deepEqual(untouched.browserFiles, [], path);
+  }
+  for (const path of ['nextjs/components/world-directory-tree.tsx', 'nextjs/components/world-directory-tree.module.css', 'nextjs/lib/world-directory-and-ontology.test.ts']) {
+    const lens = select(path);
+    assert.deepEqual(lens.failures, [], path);
+    assert.deepEqual(lens.groups, ['workspace-lifecycle'], path);
+    assert.ok(lens.unitFiles.includes('lib/world-directory-and-ontology.test.ts'), path);
+    assert.deepEqual(lens.browserFiles, ['e2e/world-lifecycle.spec.ts'], path);
+  }
+  for (const path of ['nextjs/lib/world-version-diff-view.ts', 'nextjs/lib/world-version-diff-view.test.ts',
+    'nextjs/components/world-version-diff.tsx', 'nextjs/components/world-version-diff.module.css']) {
+    const diff = select(path);
+    assert.deepEqual(diff.failures, [], path);
+    assert.deepEqual(diff.groups, ['world-version-diff'], path);
+    assert.deepEqual(diff.unitFiles, ['lib/world-version-comparison-binding.test.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-diff.test.ts'], path);
+    assert.deepEqual(diff.browserFiles, [], path);
+  }
+  for (const path of ['nextjs/lib/world-explorer-navigation.tsx', 'nextjs/lib/world-explorer-navigation.js',
+    'nextjs/lib/world-explorer-navigation.ts.bak', 'nextjs/lib/World-explorer-navigation.ts', 'nextjs/lib/world-explorer-navigation-v2.ts']) {
+    const unknown = select(path);
+    assert.deepEqual(unknown.groups, [], path);
+    assert.deepEqual(unknown.failures, [`unmapped changed endpoint: ${path}`], path);
+  }
+  const missing = select(helper, path => path !== 'nextjs/lib/world-directory-and-ontology.test.ts');
+  assert.deepEqual(missing.failures, ['selected owner check is absent at head: lib/world-directory-and-ontology.test.ts']);
+});
+// END CUSTOMER PAGINATION DEPENDENCY CONTRACT

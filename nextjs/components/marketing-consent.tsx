@@ -7,10 +7,10 @@ import {
   CONSENT_EDIT_EVENT,
   CONSENT_KEY,
   GA_ID,
-  MARKETING_EVENTS,
   NAV_OPEN_EVENT,
   consentCopy,
   consentSurface,
+  marketingEventPayload,
   publicPageLocation,
   readConsent,
   referralOrigin,
@@ -142,11 +142,11 @@ export default function MarketingConsent() {
       script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
       document.head.appendChild(script);
     }
+    // UX08: what reaches the vendor is decided by `marketingEventPayload` -- an allowlisted name and
+    // the current page's canonical location, never a field of the incoming detail.
     const record = (event: Event) => {
-      const name: unknown = (event as CustomEvent)?.detail?.event;
-      if (typeof name === "string" && MARKETING_EVENTS.has(name) && publicPageLocation(window.location.pathname)) {
-        win.gtag?.("event", name, { page_location: location, page_title: "TAVONEL" });
-      }
+      const payload = marketingEventPayload(consent, window.location.pathname, (event as CustomEvent)?.detail);
+      if (payload) win.gtag?.("event", payload.name, payload.params);
     };
     window.addEventListener("tavonel:funnel", record);
     return () => { disableAnalytics(); window.removeEventListener("tavonel:funnel", record); };

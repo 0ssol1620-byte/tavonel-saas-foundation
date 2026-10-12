@@ -14,6 +14,10 @@ export default function EvaluationPage({ korean = false }: { korean?: boolean })
         <p>{korean ? "사용 허가된 작은 문서 묶음과 실제 질문으로 시작합니다. 처리 전에 범위와 비용을 합의하고, 결과와 누락된 근거 및 남은 한계를 함께 확인합니다." : "Start with a small, permitted document set and real questions. Agree on the scope and cost before any processing, then inspect the results, missing evidence, and remaining limitations."}</p>
         <p className="evaluation-gate">{korean ? KO_CHROME.customerDataGate : activationPolicy.customerData.reason}</p>
         <Link href="/explore">{korean ? "먼저 공개 샘플 살펴보기 (영문) ↗" : "Inspect the public sample first ↗"}</Link>
+        {/* A plain same-origin file download with no client state. Following the link is an ordinary GET that retrieves the blank static file; it submits no worksheet or form contents. */}
+        <p className="fine">{korean
+          ? <>파일럿을 준비하신다면 빈 기록지로 업무, 문서 사용 허가, 질문과 기대 답변, 결과 집계 방식을 미리 정리할 수 있습니다. 내용이 비어 있는 양식이며, 내려받기는 빈 파일을 받아 오는 것일 뿐 자료 처리, 외부 연결, 결제를 시작하지 않습니다. 내려받은 파일을 작성하는 것만으로는 그 내용이 저희에게 전송되지 않습니다. <a href="/evaluation/pilot-worksheet.ko.md" download="tavonel-pilot-worksheet.ko.md" type="text/markdown">빈 파일럿 근거 기록지 내려받기 (Markdown, 한국어)</a></>
+          : <>Preparing a pilot? The blank worksheet lists what to record: the task, document permissions, questions with expected answers, and how results will be counted. It is an empty template. Downloading it only retrieves the blank file: it does not start processing, enable a connection, or create a payment. Filling in your copy does not by itself send what you write to us. <a href="/evaluation/pilot-worksheet.en.md" download="tavonel-pilot-worksheet.en.md" type="text/markdown">Download the blank pilot evidence worksheet (Markdown, English)</a></>}</p>
       </section>
       <div className="evaluation-grid">
         <aside>

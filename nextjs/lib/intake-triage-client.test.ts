@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { intakeDisplayToken, triageUploadNotice } from "./intake-triage-copy";
 import { approveAndSealTriage, finalizeTriageReceipt, quoteTriageProcessing, stageTriage, type StageTriageResult, type TriageReceiptReply, type TriageUploadFile } from "./intake-triage-client";
+import { quoteCompilePages, quoteIntakeManifest } from "./usage-pricing";
 
 
 const batch: Extract<StageTriageResult, { kind: "ready" }> = {
@@ -179,6 +180,175 @@ describe("separate full-processing quote", () => {
     }), { status: 200 }));
     const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", fetcher);
     expect(result).toMatchObject({ error: { code: "INTAKE_QUOTE_INVALID", status: 503 } });
+  });
+});
+
+describe("processing quote internal consistency", () => {
+  const quoteReply = (quote: Record<string, number>) => vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    code: "INTAKE_QUOTE", triageReceiptId: validReady.receipt.receiptId,
+    triageInventoryDigest: validReady.receipt.inventoryDigest,
+    clientManifestDigest: `sha256:${"c".repeat(64)}`,
+    pricingFingerprint: validReady.estimate.customerChargeCoverage.pricingFingerprint,
+    quote,
+    files: [{ fileKey: "file-1" }],
+  }), { status: 200 }));
+
+  it.each([
+    { name: "reserved and estimate equal to the maximum", quote: { maximumPages: 1, reservedCredits: 4, maximumCredits: 4, estimatedUsd: 0.04, maximumUsd: 0.04 } },
+    { name: "zero reserved credits and zero estimate", quote: { maximumPages: 80, reservedCredits: 0, maximumCredits: 4, estimatedUsd: 0, maximumUsd: 0.04 } },
+  ])("passes an unchanged consistent quote through: $name", async ({ quote }) => {
+    const fetcher = quoteReply(quote);
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", fetcher);
+    expect(result).toEqual({
+      triageReceiptId: validReady.receipt.receiptId,
+      clientManifestDigest: `sha256:${"c".repeat(64)}`,
+      pricingFingerprint: validReady.estimate.customerChargeCoverage.pricingFingerprint,
+      quote,
+      files: [{ fileKey: "file-1" }],
+    });
+  });
+
+  it.each([
+    { name: "reserved credits above the maximum credits", quote: { maximumPages: 80, reservedCredits: 6, maximumCredits: 4, estimatedUsd: 0.02, maximumUsd: 0.04 } },
+    { name: "estimated dollars above the maximum dollars", quote: { maximumPages: 80, reservedCredits: 2, maximumCredits: 4, estimatedUsd: 0.05, maximumUsd: 0.04 } },
+    { name: "fractional maximum pages", quote: { maximumPages: 80.5, reservedCredits: 2, maximumCredits: 4, estimatedUsd: 0.02, maximumUsd: 0.04 } },
+    { name: "fractional reserved credits", quote: { maximumPages: 80, reservedCredits: 2.5, maximumCredits: 4, estimatedUsd: 0.02, maximumUsd: 0.04 } },
+    { name: "unsafe-integer maximum pages", quote: { maximumPages: Number.MAX_SAFE_INTEGER + 1, reservedCredits: 2, maximumCredits: 4, estimatedUsd: 0.02, maximumUsd: 0.04 } },
+  ])("refuses an internally inconsistent quote instead of offering it for approval: $name", async ({ quote }) => {
+    const fetcher = quoteReply(quote);
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", fetcher);
+    expect(result).toEqual({ error: { code: "INTAKE_QUOTE_INVALID", status: 503 } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  const compiled = (pages: number) => {
+    const priced = quoteCompilePages(pages)!;
+    return { maximumPages: priced.pages, reservedCredits: priced.standardUnits, maximumCredits: priced.maximumUnits,
+      estimatedUsd: priced.estimatedUsd, maximumUsd: priced.maximumUsd };
+  };
+
+  it.each([1, 19, 57, 200, 10_000])("accepts the real server pricing for %i pages unchanged", async (pages) => {
+    const quote = compiled(pages);
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply(quote));
+    expect(result).toMatchObject({ quote });
+  });
+
+  it("accepts a real single-file 19-page manifest quote whose maximum dollars carry binary rounding", async () => {
+    const quoted = quoteIntakeManifest([{ bytes: 80_000, mimeType: "application/pdf", claimedPages: 19, claimedBasis: "pdf_page_tree" }]);
+    if (!quoted.ok) throw new Error("pricing refused the 19-page control");
+    const { maximumPages, reservedCredits, maximumCredits, estimatedUsd, maximumUsd } = quoted.quote;
+    // The reply the old `maximumCredits / 100` equality refused before approval was offered.
+    expect(maximumUsd).not.toBe(maximumCredits / 100);
+    const quote = { maximumPages, reservedCredits, maximumCredits, estimatedUsd, maximumUsd };
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply(quote));
+    expect(result).toMatchObject({ quote });
+  });
+
+  it.each([1.15, 1.13])("refuses a cent-scale wrong maximum (%s) against real 19-page credits", async (maximumUsd) => {
+    const fetcher = quoteReply({ ...compiled(19), maximumUsd });
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", fetcher);
+    expect(result).toEqual({ error: { code: "INTAKE_QUOTE_INVALID", status: 503 } });
+  });
+});
+
+describe("processing quote estimate matches the reserved credits", () => {
+  const quoteReply = (quote: Record<string, unknown>, fileKeys = ["file-1"]) => vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    code: "INTAKE_QUOTE", triageReceiptId: validReady.receipt.receiptId,
+    triageInventoryDigest: validReady.receipt.inventoryDigest,
+    clientManifestDigest: `sha256:${"c".repeat(64)}`,
+    pricingFingerprint: validReady.estimate.customerChargeCoverage.pricingFingerprint,
+    quote,
+    files: fileKeys.map((fileKey) => ({ fileKey })),
+  }), { status: 200 }));
+  const compiled = (pages: number) => {
+    const priced = quoteCompilePages(pages)!;
+    return { maximumPages: priced.pages, reservedCredits: priced.standardUnits, maximumCredits: priced.maximumUnits,
+      estimatedUsd: priced.estimatedUsd, maximumUsd: priced.maximumUsd };
+  };
+  const invalid = { error: { code: "INTAKE_QUOTE_INVALID", status: 503 } };
+  // Each wrong estimate must still be a non-negative number at or below the real maximum and must
+  // differ from the real estimate, so only the estimate/reserved check can be what refuses it.
+  const expectBelowCeilingMismatch = (quote: ReturnType<typeof compiled>, estimatedUsd: number) => {
+    expect(estimatedUsd).not.toBe(quote.estimatedUsd);
+    expect(estimatedUsd).toBeGreaterThanOrEqual(0);
+    expect(estimatedUsd).toBeLessThanOrEqual(quote.maximumUsd);
+  };
+
+  it("accepts the real 19-page server quote with its own estimate unchanged", async () => {
+    const quote = compiled(19);
+    expect(quote).toMatchObject({ reservedCredits: 76, maximumCredits: 114, maximumUsd: 114 * 0.01 });
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply(quote));
+    expect(result).toMatchObject({ quote });
+  });
+
+  it.each([0.01, 1.10])("refuses the real 19-page quote with its estimate changed to %s below the maximum", async (estimatedUsd) => {
+    const quote = compiled(19);
+    expectBelowCeilingMismatch(quote, estimatedUsd);
+    const fetcher = quoteReply({ ...quote, estimatedUsd });
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", fetcher);
+    expect(result).toEqual(invalid);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([1, 19, 57, 200, 10_000])("refuses a cent under, a cent over and one ulp over the real estimate for %i pages", async (pages) => {
+    const quote = compiled(pages);
+    for (const estimatedUsd of [quote.estimatedUsd - 0.01, quote.estimatedUsd + 0.01, quote.estimatedUsd * (1 + Number.EPSILON)]) {
+      expectBelowCeilingMismatch(quote, estimatedUsd);
+      const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply({ ...quote, estimatedUsd }));
+      expect(result).toEqual(invalid);
+    }
+  });
+
+  it("refuses an estimate rounded by decimal division where the real server product differs", async () => {
+    const quote = compiled(57);
+    const divided = quote.reservedCredits / 100;
+    expectBelowCeilingMismatch(quote, divided);
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply({ ...quote, estimatedUsd: divided }));
+    expect(result).toEqual(invalid);
+  });
+
+  it("refuses an estimate overstated to the maximum when fewer credits are reserved", async () => {
+    const quote = compiled(19);
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply({ ...quote, estimatedUsd: quote.maximumUsd }));
+    expect(result).toEqual(invalid);
+  });
+
+  it.each([null, "0.76", -0.76])("still refuses a malformed estimate: %j", async (estimatedUsd) => {
+    const result = await quoteTriageProcessing(validReady as unknown as TriageReceiptReply, "token", quoteReply({ ...compiled(19), estimatedUsd }));
+    expect(result).toEqual(invalid);
+  });
+
+  describe("aggregate multi-file manifest", () => {
+    const fileKeys = ["file-1", "file-2", "file-3"];
+    const multiReady = {
+      ...validReady,
+      receipt: { ...validReady.receipt, inventory: { ...validReady.receipt.inventory, selectedFileKeys: fileKeys } },
+    } as unknown as TriageReceiptReply;
+    const manifest = () => {
+      const quoted = quoteIntakeManifest([
+        { bytes: 80_000, mimeType: "application/pdf", claimedPages: 19, claimedBasis: "pdf_page_tree" },
+        { bytes: 5_000, mimeType: "image/png", claimedPages: null, claimedBasis: null },
+        { bytes: 160_000, mimeType: "application/pdf", claimedPages: 37, claimedBasis: "pdf_page_tree" },
+      ]);
+      if (!quoted.ok) throw new Error("pricing refused the multi-file control");
+      const { maximumPages, reservedCredits, maximumCredits, estimatedUsd, maximumUsd } = quoted.quote;
+      return { files: quoted.quote.files, quote: { maximumPages, reservedCredits, maximumCredits, estimatedUsd, maximumUsd } };
+    };
+
+    it("accepts the real server totals unchanged", async () => {
+      const { files, quote } = manifest();
+      expect(quote.reservedCredits).toBe(files.reduce((sum, file) => sum + file.reservedCredits, 0));
+      const result = await quoteTriageProcessing(multiReady, "token", quoteReply(quote, fileKeys));
+      expect(result).toMatchObject({ quote, files: fileKeys.map((fileKey) => ({ fileKey })) });
+    });
+
+    it("refuses the totals when the estimate covers only one member's reserved credits", async () => {
+      const { files, quote } = manifest();
+      const estimatedUsd = files[0]!.estimatedUsd;
+      expectBelowCeilingMismatch(quote, estimatedUsd);
+      const result = await quoteTriageProcessing(multiReady, "token", quoteReply({ ...quote, estimatedUsd }, fileKeys));
+      expect(result).toEqual(invalid);
+    });
   });
 });
 

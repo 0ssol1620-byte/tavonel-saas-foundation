@@ -13,7 +13,9 @@ import {
   buildPreflightSummary,
   describePreflightFile,
   describePreflightSummary,
+  words,
 } from "./preflight-report";
+import { validateIntakeAdmission, type IntakeAdmission } from "./intake-admission";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -294,5 +296,225 @@ describe("the staged-selection block in the workspace", () => {
     expect(outer).not.toMatch(/grid-template-columns|\bwidth:\s|min-width:\s(?!0)/);
     expect(list).toContain("min-width: 0");
     expect(list).toContain("overflow-wrap: anywhere");
+  });
+});
+
+/*
+  A known size, held to the predicate intake actually admits on.
+
+  The browser reports a size for a file it is still sending. When it does, the report must not
+  call accepted what `validateIntakeAdmission` refuses -- an empty file used to read as a
+  supported one. When it does not (absent or null) nothing is known, and the report stays the
+  format lookup it always was: unknown is not zero.
+*/
+const INVALID_SIZE = "empty_or_invalid_file_size";
+const OVER_CEILING = "over_the_5_mib_processing_ceiling";
+const sized = (bytes: unknown, fileName = "manual.pdf", mime: string | null = "application/pdf") =>
+  buildPreflightFileReport({ fileName, mime, bytes: bytes as number | null });
+
+describe("preflight known size admission: an empty or negative size is refused", () => {
+  const cases: Array<[string, number]> = [
+    ["zero", 0],
+    ["negative zero", -0],
+    ["minus one", -1],
+    ["minus the ceiling", -PROCESSING_CEILING.maxSourceBytes],
+    ["the most negative safe integer", Number.MIN_SAFE_INTEGER],
+  ];
+
+  it.each(cases)("refuses %s bytes", (_label, bytes) => {
+    const report = buildPreflightFileReport({
+      fileName: "manual.pdf",
+      mime: "application/pdf",
+      bytes,
+      reviewRequired: true,
+    });
+    expect(report.status).toBe("refused");
+    expect(report.reasons).toEqual([INVALID_SIZE]);
+    expect(report.preserved).toEqual([]);
+    expect(report.omitted).toEqual([]);
+    expect(report.converted).toBe(false);
+    // Refused means nothing will read it, so it is not "awaiting review" either.
+    expect(report.reviewRequired).toBe(false);
+  });
+
+  it("refuses an empty file whose MIME was inferred from the filename as well", () => {
+    const report = buildPreflightFileReport({ fileName: "forecast.xlsx", bytes: 0 });
+    expect(report.status).toBe("refused");
+    expect(report.mime).toBe(XLSX);
+    expect(report.reasons).toEqual([INVALID_SIZE]);
+  });
+});
+
+describe("preflight known size admission: a fractional, non-finite, unsafe or non-number size is refused", () => {
+  const cases: Array<[string, unknown]> = [
+    ["fractional", 1.5],
+    ["fractional just under the ceiling", PROCESSING_CEILING.maxSourceBytes - 0.5],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+    ["-Infinity", Number.NEGATIVE_INFINITY],
+    ["beyond the safe integers", Number.MAX_SAFE_INTEGER + 1],
+    ["a numeric string from an untyped caller", "1024"],
+    ["a boolean from an untyped caller", true],
+    ["an object from an untyped caller", {}],
+  ];
+
+  it.each(cases)("refuses %s", (_label, bytes) => {
+    const report = sized(bytes);
+    expect(report.status).toBe("refused");
+    // Infinity is not a larger file; it is not a size. Only a real count reaches the ceiling.
+    expect(report.reasons).toEqual([INVALID_SIZE]);
+    expect(report.reasons).not.toContain(OVER_CEILING);
+  });
+});
+
+describe("preflight known size admission: unknown size stays a format lookup and the ceiling is unchanged", () => {
+  const unknownSize = buildPreflightFileReport({ fileName: "manual.pdf", mime: "application/pdf" });
+
+  it("treats absent, undefined and null as unknown, never as zero", () => {
+    expect(unknownSize.status).toBe("accepted");
+    expect(unknownSize.reasons).not.toContain(INVALID_SIZE);
+    expect(buildPreflightFileReport({ fileName: "manual.pdf", mime: "application/pdf", bytes: undefined }))
+      .toEqual(unknownSize);
+    expect(buildPreflightFileReport({ fileName: "manual.pdf", mime: "application/pdf", bytes: null }))
+      .toEqual(unknownSize);
+    const inferred = buildPreflightFileReport({ fileName: "forecast.xlsx", bytes: null });
+    expect(inferred.status).toBe("accepted");
+    expect(inferred.reasons[0]).toBe("mime_inferred_from_the_filename_extension");
+  });
+
+  it("accepts one byte and exactly the ceiling with the same report as an unknown size", () => {
+    expect(sized(1)).toEqual(unknownSize);
+    expect(sized(PROCESSING_CEILING.maxSourceBytes)).toEqual(unknownSize);
+  });
+
+  it("refuses one byte over the ceiling with the reason it already gave", () => {
+    expect(PROCESSING_CEILING.maxSourceBytes).toBe(5 * 1024 * 1024);
+    const report = sized(PROCESSING_CEILING.maxSourceBytes + 1);
+    expect(report.status).toBe("refused");
+    expect(report.reasons).toEqual([OVER_CEILING]);
+  });
+});
+
+describe("preflight known size admission: agrees with the actual pure intake admission predicate", () => {
+  // Metadata only. The real validator is called directly: no reservation, RPC, signing or
+  // credentials, and nothing here says the upload would be authorised, paid for or processed.
+  const admission: IntakeAdmission = {
+    workspaceKey: "ws_size_fixture",
+    documentId: "3f2a9c1e-8b4d-4e6f-9a1b-2c3d4e5f6a7b",
+    userId: "7c1d2e3f-4a5b-4c6d-8e7f-a1b2c3d4e5f6",
+    objectKey: "quarantine/ws_size_fixture/3f2a9c1e-8b4d-4e6f-9a1b-2c3d4e5f6a7b/source",
+    requestedBytes: 1,
+    declaredMimeType: "application/pdf",
+  };
+  const admits = (bytes: unknown) => validateIntakeAdmission({ ...admission, requestedBytes: bytes as number });
+
+  it("starts from a fixture the validator accepts, so only the size can decide", () => {
+    expect(admits(1)).toBe(true);
+  });
+
+  const cases: Array<[string, unknown, boolean]> = [
+    ["zero", 0, false],
+    ["minus one", -1, false],
+    ["fractional", 1.5, false],
+    ["NaN", Number.NaN, false],
+    ["Infinity", Number.POSITIVE_INFINITY, false],
+    ["beyond the safe integers", Number.MAX_SAFE_INTEGER + 1, false],
+    ["a numeric string", "1024", false],
+    ["one byte", 1, true],
+    ["one KiB", 1024, true],
+    ["exactly the ceiling", PROCESSING_CEILING.maxSourceBytes, true],
+    ["one byte over the ceiling", PROCESSING_CEILING.maxSourceBytes + 1, false],
+  ];
+
+  it.each(cases)("%s: the report accepts exactly when admission does", (_label, bytes, admitted) => {
+    expect(admits(bytes)).toBe(admitted);
+    expect(sized(bytes).status).toBe(admitted ? "accepted" : "refused");
+  });
+
+  it("makes no size claim at all when the size is unknown", () => {
+    // Admission needs a byte count; a report without one stays a format lookup and is not
+    // presented as an admission verdict in either direction.
+    const report = sized(null);
+    expect(report.status).toBe("accepted");
+    expect(report.reasons).not.toContain(INVALID_SIZE);
+    expect(report.reasons).not.toContain(OVER_CEILING);
+  });
+});
+
+describe("preflight known size admission: mixed sizes are counted honestly and claim no safety", () => {
+  const summary = buildPreflightSummary([
+    { fileName: "empty.pdf", mime: "application/pdf", bytes: 0 },
+    { fileName: "one.pdf", mime: "application/pdf", bytes: 1 },
+    { fileName: "edge.pdf", mime: "application/pdf", bytes: PROCESSING_CEILING.maxSourceBytes },
+    { fileName: "large.pdf", mime: "application/pdf", bytes: PROCESSING_CEILING.maxSourceBytes + 1 },
+    { fileName: "garbled.pdf", mime: "application/pdf", bytes: Number.NaN },
+    { fileName: "unknown.pdf", mime: "application/pdf", bytes: null },
+  ]);
+
+  it("counts the empty, garbled and oversized files as refused against the same denominator", () => {
+    expect(summary.files.map((file) => file.status))
+      .toEqual(["refused", "accepted", "accepted", "refused", "refused", "accepted"]);
+    expect(summary.stagedCount).toBe(6);
+    expect(summary.acceptedCount).toBe(3);
+    expect(summary.refusedCount).toBe(3);
+    expect(summary.acceptedCount + summary.refusedCount).toBe(summary.stagedCount);
+    expect(describePreflightSummary(summary)).toContain("3 of 6 selected files supported by format checks");
+  });
+
+  it("gives each refusal one plain reason a customer can read", () => {
+    expect(summary.files[0].reasons.map(words)).toEqual(["empty or invalid file size"]);
+    expect(summary.files[4].reasons.map(words)).toEqual(["empty or invalid file size"]);
+    expect(summary.files[3].reasons.map(words)).toEqual(["over the 5 mib processing ceiling"]);
+    for (const file of summary.files.filter((each) => each.status === "refused")) {
+      for (const reason of file.reasons.map(words)) {
+        expect(reason).not.toMatch(/_|intake|admission|requested|integer|rpc/i);
+      }
+    }
+  });
+
+  it("keeps the safety and qualification caveats beside the counts", () => {
+    const line = describePreflightSummary(summary);
+    expect(line).toContain("Source safety checks are separate");
+    expect(line).toContain(`0 of ${summary.acceptedFormatCount} supported formats carry a qualification receipt`);
+    expect(line).toContain("Format lookup only; this report does not inspect file bytes or assess safety");
+    for (const file of summary.files) {
+      const fileLine = describePreflightFile(file);
+      expect(fileLine).toContain("Source safety not assessed by this format lookup");
+      expect(fileLine).not.toMatch(/\bsafe to\b|guarantee|qualified/i);
+    }
+    expect(describePreflightFile(summary.files[0]))
+      .toBe("refused by format checks · Source safety not assessed by this format lookup");
+  });
+});
+
+describe("preflight known size admission: format refusals still come first and inputs are not mutated", () => {
+  it("keeps the filename, MIME and unsupported-format reasons ahead of any size", () => {
+    expect(sized(0, "../escape.pdf").reasons).toEqual(["invalid_filename"]);
+    expect(sized(-1, "notes.docx").reasons).toEqual(["filename_mime_mismatch"]);
+    expect(sized(Number.NaN, "payload.pdf", "__proto__").reasons).toEqual(["unqualified_mime"]);
+    expect(sized(1.5, "drawing.dwg", "image/vnd.dwg").reasons).toEqual(["unqualified_mime"]);
+    expect(sized(PROCESSING_CEILING.maxSourceBytes + 1, "drawing.dwg", "image/vnd.dwg").reasons)
+      .toEqual(["unqualified_mime"]);
+    expect(sized(0, "scan", null).reasons).toEqual(["unqualified_mime"]);
+    const archive = sized(0, "sources.zip", null);
+    expect(archive.tier).toBe("UNSUPPORTED");
+    expect(archive.reasons).toContain("the_archive_itself_is_never_compiled");
+    expect(archive.reasons).not.toContain(INVALID_SIZE);
+  });
+
+  it("reads its inputs without changing them", () => {
+    const inputs = [
+      { fileName: " manual.pdf ", mime: "application/pdf", bytes: 0, reviewRequired: true },
+      { fileName: "manual.pdf", mime: "application/pdf", bytes: Number.NaN },
+      { fileName: "manual.pdf", mime: "application/pdf", bytes: PROCESSING_CEILING.maxSourceBytes + 1 },
+      { fileName: "manual.pdf", mime: "application/pdf", bytes: null },
+      { fileName: "../escape.pdf", mime: "application/pdf", bytes: -1 },
+    ];
+    const before = structuredClone(inputs);
+    for (const input of inputs) Object.freeze(input);
+    Object.freeze(inputs);
+    buildPreflightSummary(inputs);
+    for (const input of inputs) buildPreflightFileReport(input);
+    expect(inputs).toEqual(before);
   });
 });

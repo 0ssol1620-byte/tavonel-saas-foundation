@@ -206,7 +206,9 @@ export function buildIntakeTriage(input: {
   if (!validateInput(input)) return null;
   const sorted = [...input.observations].sort((a, b) => (a.fileKey < b.fileKey ? -1 : a.fileKey > b.fileKey ? 1 : 0));
   const representatives = new Map<string, string>();
+  const observationsByKey = new Map<string, TriageObservation>();
   for (const file of sorted) {
+    observationsByKey.set(file.fileKey, file);
     const hex = digestHex(file.contentSha256);
     if (file.digestEvidence !== "server_verified" || !hex) continue;
     const previous = representatives.get(hex);
@@ -287,7 +289,7 @@ export function buildIntakeTriage(input: {
     && customerKeys.length === requestedKeys.length
     && customerKeys.every((key, index) => key === requestedKeys[index])
     && customerSources.every((source) => {
-      const observed = sorted.find((file) => file.fileKey === source.fileKey);
+      const observed = observationsByKey.get(source.fileKey);
       return !!observed && observed.revision === source.revision && observed.contentSha256 === source.contentSha256
         && observed.digestEvidence === "server_verified"
         && source.mode === "new_read";

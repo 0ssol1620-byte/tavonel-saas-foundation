@@ -1398,11 +1398,17 @@ const AFFECTED_SQL_FIXTURE_PATHS=Object.freeze(['supabase/tests/connector_checkp
 const AFFECTED_ASK_ANSWER_PATHS=Object.freeze(['nextjs/lib/grounded-ask-packet.test.ts','nextjs/lib/grounded-ask.test.ts','nextjs/lib/grounded-ask.ts',
   'nextjs/lib/workspace-ask-copy.test.ts','nextjs/lib/workspace-ask-copy.ts']);
 const AFFECTED_ASK_SUITES=Object.freeze(['lib/ask-route-limits.test.ts','lib/context-packet.test.ts','lib/grounded-ask-packet.test.ts','lib/grounded-ask.test.ts','lib/workspace-ask-copy.test.ts']);
+// Preserve the original 43/48 inventories. Current CI-bearing synthetic heads additionally need their actual selected contracts.
+const AFFECTED_NODE_SUPPORT_PATHS=Object.freeze(['nextjs/lib/repair-node-evidence.test.mjs','nextjs/lib/repair-node-gate-receipt.test.ts']);
+const AFFECTED_CI_SUPPORT_PATHS=Object.freeze(['nextjs/lib/home-reader-heading-css-contract.test.ts','nextjs/lib/home-reader-heading-css-registration.test.ts',
+  ...AFFECTED_NODE_SUPPORT_PATHS,'nextjs/scripts/fixtures/home-reader-heading-css-baseline.json']);
+const affectedSupportPaths=paths=>!paths.some(p=>AFFECTED_CI_OWNER_PATHS.includes(p)&&p!=='AFFECTED-INTEGRATION-MANIFEST.md')?[]:
+  paths.includes('nextjs/scripts/repair-scope.mjs')?AFFECTED_CI_SUPPORT_PATHS:AFFECTED_NODE_SUPPORT_PATHS;
 // CI owners carry their actual candidate bytes. Product (including the Ask answer leaves) and SQL fixture leaves are path-exact stand-ins (baseline
 // bytes plus one line, or a marker when absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel
 // product task.
 const affectedLeafBytes=p=>{
-  if(AFFECTED_CI_OWNER_PATHS.includes(p))return readFileSync(resolve(nativeRoot,p));
+  if(AFFECTED_CI_OWNER_PATHS.includes(p)||AFFECTED_CI_SUPPORT_PATHS.includes(p))return readFileSync(resolve(nativeRoot,p));
   let base;try{base=baselineBytes(p);}catch{return Buffer.from(`affected fixture stand-in for ${p}\n`);}
   return Buffer.concat([base,Buffer.from('\n')]);
 };
@@ -1427,8 +1433,8 @@ function affectedRealGitFixture(){
     assert.equal(git(['ls-files','--others','--exclude-standard','-z']),'','fixture checkout has no untracked path');
     return head;
   };
-  const put=(p,bytes,mode='100644')=>()=>{
-    const blob=git(['hash-object','-w',mode==='100644'?`--path=${p}`:'--no-filters','--stdin'],{input:bytes}).trim();
+  const put=(p,bytes,mode='100644',raw=false)=>()=>{
+    const blob=git(['hash-object','-w',raw||mode!=='100644'?'--no-filters':`--path=${p}`,'--stdin'],{input:bytes}).trim();
     staging(['update-index','--add','--cacheinfo',`${mode},${blob},${p}`]);written[p]=blob;
   };
   const move=(from,to)=>()=>{const blob=git(['rev-parse',`${B}:${from}`]).trim();staging(['update-index','--force-remove','--',from]);staging(['update-index','--add','--cacheinfo',`100644,${blob},${to}`]);};
@@ -1443,24 +1449,33 @@ function affectedRealGitFixture(){
   try{checkout(B);}catch(error){rmSync(root,{recursive:true,force:true});throw error;}
   return {root,B,git,put,move,remove,commit,checkout,written,cleanup:()=>rmSync(root,{recursive:true,force:true})};
 }
-test('affected real Git map covers the combined 48-path head (43-path checkpoint plus the five Ask answer leaves) and its rename, deletion, index-only and owner-output edges from clean checkouts',()=>{
+test('affected real Git map retains the original 43/48 inventories with exact current CI support and rename, deletion, index-only and owner-output edges',()=>{
   const previous=process.cwd();let fixture;
   try{
     fixture=affectedRealGitFixture();const {root,B,git,put,move,remove,commit,checkout,written}=fixture;
     process.chdir(root);
     const map=head=>{const intent=world.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return world.verifyAffectedSource({headSha:head,intent});};
-    const all=[...AFFECTED_PRODUCT_PATHS,...AFFECTED_CI_OWNER_PATHS,...AFFECTED_SQL_FIXTURE_PATHS].sort(),leaves=paths=>paths.map(p=>put(p,affectedLeafBytes(p)));
+    const all=[...AFFECTED_PRODUCT_PATHS,...AFFECTED_CI_OWNER_PATHS,...AFFECTED_SQL_FIXTURE_PATHS].sort();
+    const leaves=paths=>[...new Set([...paths,...affectedSupportPaths(paths)])].map(p=>put(p,affectedLeafBytes(p),'100644',AFFECTED_CI_SUPPORT_PATHS.includes(p)));
     assert.equal(all.length,43);
     const combined=[...all,...AFFECTED_ASK_ANSWER_PATHS].sort();
     assert.equal(combined.length,48);assert.equal(new Set(combined).size,48);
+    const supported=[...combined,...AFFECTED_CI_SUPPORT_PATHS].sort();assert.equal(supported.length,53);assert.equal(new Set(supported).size,53);
     const integrated=commit(...leaves(combined));
-    // Exact target tree: the baseline child differs from the baseline in exactly the 48 written leaves.
-    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),combined);
-    for(const p of combined)assert.equal(git(['rev-parse',`${integrated}:${p}`]).trim(),written[p],p);
+    // Keep all original 48 leaves and add only the five actual current CI dependencies.
+    const rawPaths=git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort();
+    assert.deepEqual(rawPaths,supported);
+    console.log('collector-current53-diff '+JSON.stringify({head:integrated,baseline:B,paths:rawPaths}));
+    for(const p of supported)assert.equal(git(['rev-parse',`${integrated}:${p}`]).trim(),written[p],p);
+    for(const p of AFFECTED_CI_SUPPORT_PATHS){
+      const actual=readFileSync(resolve(nativeRoot,p)),staged=git(['show',`${integrated}:${p}`],{encoding:'buffer'});
+      assert.ok(staged.equals(actual),p+' actual current CI bytes');assert.equal(gitBlob(staged),written[p],p+' raw blob identity');
+      console.log('collector-current-ci-support '+JSON.stringify({path:p,bytes:staged.length,sha256:createHash('sha256').update(staged).digest('hex'),gitBlob:written[p]}));
+    }
     const full=map(integrated);
-    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,combined);
+    assert.equal(full.eligible,true,full.reason);assert.deepEqual(full.map.changedPaths,supported);
     // The workspace page and ask-route-limits.test.ts overlaps (and the Ask answer leaves) also select grounded-ask and its five suites.
-    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','intake-triage','ocr-worker','repository-docs','workspace-lifecycle']);
+    assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
     for(const suite of AFFECTED_ASK_SUITES)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
     assert.deepEqual(full.map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
@@ -1493,37 +1508,48 @@ test('affected real Git map covers the combined 48-path head (43-path checkpoint
     assert.equal(docs.eligible,true,docs.reason);assert.deepEqual(docs.map.groups,['docs']);
     assert.ok(docs.map.entries.some(e=>/^R\d{3}$/.test(e.status)&&e.paths.join(' ')==='nextjs/app/docs/page.tsx nextjs/app/docs/moved/page.tsx'),'both rename endpoints are mapped');
     assert.equal(docs.map.nativeEvidence.disposition,'historical-input-reuse');
-    const sql=map(commit(put('supabase/tests/affected_fixture.sql','select 1;\n'),put('.github/workflows/repair-scope.yml','name: x\n')));
+    const sqlHead=commit(put('supabase/tests/affected_fixture.sql','select 1;\n'),put('.github/workflows/repair-scope.yml','name: x\n'),
+      ...AFFECTED_NODE_SUPPORT_PATHS.map(p=>put(p,affectedLeafBytes(p),'100644',true)));
+    const sql=map(sqlHead);
     assert.equal(sql.eligible,true,sql.reason);assert.deepEqual(sql.map.groups,['ci-selector','database-contract']);
+    assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,sqlHead]).split('\0').filter(Boolean).sort(),['.github/workflows/repair-scope.yml',...AFFECTED_NODE_SUPPORT_PATHS,'supabase/tests/affected_fixture.sql'].sort());
+    for(const p of AFFECTED_NODE_SUPPORT_PATHS)assert.ok(git(['show',`${sqlHead}:${p}`],{encoding:'buffer'}).equals(readFileSync(resolve(nativeRoot,p))),p+' workflow-only actual Node contract');
     assert.deepEqual([sql.map.databaseChanged,sql.map.runSelectorContracts,sql.map.nativeEvidence.disposition,sql.map.databaseTests],[true,true,'fresh-seven-case-native-run-required',[]]);
     assert.match(map(commit(put('nextjs/lib/docs-content.ts','docs-content.test.ts','120000'))).reason,/unsupported (?:change status T|file mode)/);
     assert.match(map(commit(put('nextjs/next.config.ts','export default {};\n'))).reason,/unmapped changed endpoint: nextjs\/next\.config\.ts/);
   }finally{process.chdir(previous);fixture?.cleanup();}
 });
-test('affected real Git plan and final gate qualify only the regular owner plan and refuse planted receipts, plan links and mismatches',t=>{
+test('affected real Git regular owner plan binds current CI selection but missing execution evidence fails with no credit and planted outputs refuse',t=>{
   const previous=process.cwd();let fixture,support;
   try{
     fixture=affectedRealGitFixture();const {root,B,git,put,commit}=fixture;
     // The unchanged cumulative selector needs the exact 6401 anchor history; a shallow archive without it cannot run this path.
-    try{git(['cat-file','-e',`${world.FULL_ANCHOR}^{commit}`]);}catch{t.skip('unavailable: the 6401 full-anchor history required by the normal selector is absent from this checkout');return;}
+    try{git(['cat-file','-e',`${world.FULL_ANCHOR}^{commit}`]);}catch(error){
+      assert.match(String(error.stderr),/Not a valid object name|invalid object name|bad object/,'skip only a genuinely absent full-anchor object');
+      t.skip('unavailable: the 6401 full-anchor history required by the normal selector is absent from this checkout');return;
+    }
     process.chdir(root);support=mkdtempSync(resolve(tmpdir(),'affected-final-support-'));
-    // The CI-owner half of the integrated delta selects no unit or browser suite, so the final gate needs no fabricated report.
-    const head=commit(...AFFECTED_CI_OWNER_PATHS.map(p=>put(p,affectedLeafBytes(p))));
+    // The CI-owner half now selects four real Node/Vitest contracts. No execution reports are created for them here.
+    const supported=[...AFFECTED_CI_OWNER_PATHS,...AFFECTED_CI_SUPPORT_PATHS].sort();
+    const head=commit(...supported.map(p=>put(p,affectedLeafBytes(p),'100644',AFFECTED_CI_SUPPORT_PATHS.includes(p))));
     const eventPath=resolve(support,'event.json');writeFileSync(eventPath,JSON.stringify({number:141,pull_request:{number:141,base:{sha:B},head:{sha:head}}}));
     const env={...process.env,GITHUB_EVENT_PATH:eventPath,PR_BASE_SHA:B,PR_NUMBER:'141',REPAIR_ANCHOR_SHA:world.FULL_ANCHOR,REPAIR_HEAD_SHA:head,HEAD_SHA:head,GITHUB_OUTPUT:resolve(support,'outputs.txt')};
     for(const k of ['PLAN_RESULT','SECRET_RESULT','CHECK_RESULT','VITEST_RESULT','AUX_RESULT','WORKFLOW_RESULT','SELECTOR_TEST_RESULT'])env[k]='success';
     const cli=(name,args=[])=>spawnSync(process.execPath,[resolve(root,'nextjs/scripts/'+name),...args],{cwd:resolve(root,'nextjs'),env:{...env,RUN_REPAIR_SCOPE:name==='repair-collector-only.mjs'?'1':'0'},encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
     const planned=cli('repair-collector-only.mjs',['plan']);assert.equal(planned.status,0,planned.stderr);
     const planPath=resolve(root,'nextjs/repair-plan.json'),receiptPath=resolve(root,'nextjs/repair-receipt.json'),plannedBytes=readFileSync(planPath),plan=JSON.parse(plannedBytes);
-    assert.equal(plan.selector,'affected-integration-v1');assert.equal(plan.headSha,head);assert.deepEqual(plan.affectedIntegration.changedPaths,[...AFFECTED_CI_OWNER_PATHS].sort());
-    assert.deepEqual(plan.affectedIntegration.groups,['ci-selector','repository-docs']);
-    assert.deepEqual([plan.unitFiles,plan.browserFiles,plan.runFullHermeticVitest,plan.runDatabaseRehearsal,plan.affectedIntegration.databaseTests],[[],[],false,false,[]]);
+    assert.equal(plan.selector,'affected-integration-v1');assert.equal(plan.headSha,head);assert.deepEqual(plan.affectedIntegration.changedPaths,supported);
+    assert.deepEqual(plan.affectedIntegration.groups,['ci-selector','home-reader-heading-css','repository-docs']);
+    const selected=['lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts','lib/repair-node-evidence.test.mjs','lib/repair-node-gate-receipt.test.ts'];
+    assert.deepEqual([plan.unitFiles,plan.browserFiles,plan.runFullHermeticVitest,plan.runDatabaseRehearsal,plan.affectedIntegration.databaseTests],[selected,[],false,false,[]]);
     assert.match(readFileSync(env.GITHUB_OUTPUT,'utf8'),/affected=true/);
     assert.match(world.classifyAffectedIntent({headSha:head}).reason,/untracked paths: nextjs\/repair-plan\.json/,'only the final-gate owner may see its plan');
-    const gated=cli('repair-scope-gate.mjs');assert.equal(gated.status,0,gated.stderr+gated.stdout);
+    // Nominal successful step labels cannot replace selected per-file Node/Vitest execution evidence.
+    const gated=cli('repair-scope-gate.mjs');assert.equal(gated.status,1,gated.stderr+gated.stdout);
     const receipt=JSON.parse(readFileSync(receiptPath,'utf8'));
-    assert.deepEqual([receipt.gate,receipt.fullQualification,receipt.executedChecks.affectedUnits,receipt.executedChecks.affectedBrowserReports,receipt.runResults['native-world-race-fresh-run']],
-      ['passed-scoped-only','pending','none selected','none selected','pending-deferred']);
+    assert.deepEqual([receipt.gate,receipt.fullQualification,receipt.runResults['native-world-race-fresh-run']],['failed','pending','pending-deferred']);
+    assert.ok(receipt.gateFailures.some(reason=>reason.startsWith('affected selected reports: ')));
+    for(const key of ['affectedUnits','affectedBrowserReports','affectedNodeUnits'])assert.ok(!Object.hasOwn(receipt.executedChecks,key),key+' is not executed credit');
     rmSync(receiptPath);
     const refusal=pattern=>{const r=cli('repair-scope-gate.mjs');assert.equal(r.status,1,r.stdout);assert.match(r.stderr,pattern);};
     const link=(target,path,name)=>{if(process.platform==='win32'){const junction=resolve(support,name);mkdirSync(junction);symlinkSync(junction,path,'junction');}else symlinkSync(target,path,'file');};
@@ -1536,6 +1562,9 @@ test('affected real Git plan and final gate qualify only the regular owner plan 
     refusal(/regular non-symlink owner output/);rmSync(planPath);
     writeFileSync(planPath,Buffer.concat([plannedBytes,Buffer.from(' ')]));refusal(/differs from the independently recomputed current-head plan/);
     writeFileSync(planPath,JSON.stringify({...plan,affectedIntegration:undefined,groups:[]},null,2)+'\n');refusal(/differs from the independently recomputed current-head plan/);
-    writeFileSync(planPath,plannedBytes);const again=cli('repair-scope-gate.mjs');assert.equal(again.status,0,again.stderr);
+    writeFileSync(planPath,plannedBytes);const again=cli('repair-scope-gate.mjs');assert.equal(again.status,1,again.stderr);
+    const againReceipt=JSON.parse(readFileSync(receiptPath,'utf8'));assert.equal(againReceipt.gate,'failed');
+    assert.ok(againReceipt.gateFailures.some(reason=>reason.startsWith('affected selected reports: ')));
+    assert.ok(!Object.hasOwn(againReceipt.executedChecks,'affectedNodeUnits'));
   }finally{process.chdir(previous);fixture?.cleanup();if(support)rmSync(support,{recursive:true,force:true});}
 });

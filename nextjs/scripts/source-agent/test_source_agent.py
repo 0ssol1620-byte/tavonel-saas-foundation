@@ -16,6 +16,27 @@ A later Claude Opus 5.5 revision moved sync uploads onto the quote/approval cont
 run the real FoundationClient and sync against a synthetic Foundation and object store served by
 a ThreadingHTTPServer bound to 127.0.0.1 for the length of one test, with a synthetic key; no
 request leaves the host and every socket has a bounded timeout.
+
+A later Claude Opus 5.5 revision added SourceScopeTests for the mounted sync scan: real junctions
+(Windows) or directory symlinks (elsewhere) with targets inside the temporary tree, plus mocked
+lstat metadata for reparse kinds a host cannot create without privilege (dedup, cloud, server-side
+junction identity). They observe listings and content reads only beneath the temporary directory.
+A correction added the late-swap regressions: a test-owned directory is renamed and replaced by a
+link only after the metadata walk is exhausted (or after the quote), and no content behind it may
+be opened.
+
+A later correction bound mounted content reads to held handles. The read-boundary tests swap a
+test-owned directory for a junction (Windows) or symlink (elsewhere) to a test-owned outside
+directory at the moment the parent handle is already held and the file is about to be opened,
+which is where the path-revalidation draft read the outside sentinel. They assert the bytes
+actually hashed or uploaded came from the held directory, and read the swapped path themselves
+only to show it now leads outside. Refusal and handle-cleanup cases use a synthetic backend.
+
+A later Claude Opus 5.5 correction holds the selected root once per sync. SelectedRootTests swap the
+root itself, not a child: a linked --root is retargeted, or the root path is renamed away and replaced
+by a link to a test-owned outside tree, after the fingerprint, after approval, or before a pending set
+resumes. They compare the file identity behind every descriptor the agent opens with the held original
+and the outside sentinel, and compare file identities rather than reading the swapped path.
 """
 import hashlib
 import importlib.util
@@ -329,11 +350,13 @@ class SyncTests(SyncFixture, unittest.TestCase):
         expected=agent.scan_mount(self.root,100)['a.pdf']
         self.add(data=b"new")
         with self.assertRaisesRegex(agent.AgentError,'changed after inventory'):
-            agent.snapshot_mount(self.root/'a.pdf',expected,100)
+            with agent._anchored_root(self.root) as open_source:
+                agent.snapshot_mount(open_source('a.pdf'),'a.pdf',expected,100)
     def test_snapshot_upload_bytes_are_immutable(self):
         self.add(data=b"old")
         expected=agent.scan_mount(self.root,100)['a.pdf']
-        snapshot,directory=agent.snapshot_mount(self.root/'a.pdf',expected,100)
+        with agent._anchored_root(self.root) as open_source:
+            snapshot,directory=agent.snapshot_mount(open_source('a.pdf'),'a.pdf',expected,100)
         try:
             self.add(data=b"new")
             self.assertEqual(snapshot.read_bytes(),b"old")
@@ -382,6 +405,393 @@ class SyncTests(SyncFixture, unittest.TestCase):
         pending=self.args.state.with_name('state.json.pending');v=json.loads(pending.read_text());v['body']['events']=[];pending.write_text(json.dumps(v))
         with self.assertRaisesRegex(agent.AgentError,'manifest'):agent.sync(self.args)
         self.assertEqual(len(Client.bodies),1)
+
+@contextmanager
+def recorded_scan():
+    """Record every directory listing, and the native id of every file opened for content beneath the held root."""
+    listed=[];read=[]
+    real_scandir=agent.os.scandir;real_open=agent._open_inventoried
+    def scandir(path='.'):listed.append(Path(os.fspath(path)));return real_scandir(path)
+    def opened(backend,root_handle,native_id):
+        descriptor=real_open(backend,root_handle,native_id);read.append(native_id);return descriptor
+    with patch.object(agent.os,'scandir',scandir),patch.object(agent,'_open_inventoried',opened):
+        yield listed,read
+
+@contextmanager
+def lstat_reporting(**overrides):
+    """Report Windows reparse metadata this host cannot create without privilege; keyed by entry name."""
+    real=os.lstat
+    def lstat(path,*args,**kwargs):
+        found=real(path,*args,**kwargs);extra=overrides.get(Path(os.fspath(path)).name)
+        if extra is None:return found
+        fields=dict(st_mode=found.st_mode,st_dev=found.st_dev,st_ino=found.st_ino,
+                    st_file_attributes=getattr(found,'st_file_attributes',0),st_reparse_tag=getattr(found,'st_reparse_tag',0))
+        fields.update(extra);return SimpleNamespace(**fields)
+    with patch.object(agent.os,'lstat',lstat):yield
+
+@contextmanager
+def after_walk(swap):
+    """Run swap once the metadata walk is exhausted, i.e. after enumeration and before any content read."""
+    real=os.walk
+    def walk(*a,**k):
+        yield from real(*a,**k);swap()
+    with patch.object(agent.os,'walk',walk):yield
+
+@contextmanager
+def mounted_reads():
+    """Record (native id, device, file id) of every file the agent opens for content beneath a held root."""
+    reads=[];real=agent._open_inventoried
+    def opened(backend,root_handle,native_id):
+        descriptor=real(backend,root_handle,native_id);metadata=os.fstat(descriptor)
+        reads.append((native_id,metadata.st_dev,metadata.st_ino));return descriptor
+    with patch.object(agent,'_open_inventoried',opened):yield reads
+
+@contextmanager
+def held_roots(backend):
+    """Track the root handles the real backend opens; every one must be closed again, refusals included."""
+    opened=[];real_open=backend.open_root;real_close=backend.close
+    def open_root(self,path):
+        handle=real_open(self,path);opened.append(handle);return handle
+    def close(self,handle):
+        if handle in opened:opened.remove(handle)
+        return real_close(self,handle)
+    with patch.object(backend,'open_root',open_root),patch.object(backend,'close',close):yield opened
+
+@contextmanager
+def nothing_requested_or_read():
+    """Any quote, approval, upload, commit, listing or content read fails the test."""
+    with patch.object(Client,'quote',side_effect=AssertionError('quoted')), \
+         patch.object(Client,'create_approval',side_effect=AssertionError('approved')), \
+         patch.object(Client,'read_approval',side_effect=AssertionError('approval read')), \
+         patch.object(Client,'upload',side_effect=AssertionError('uploaded')), \
+         patch.object(Client,'post',side_effect=AssertionError('committed')), \
+         patch.object(agent,'_open_inventoried',side_effect=AssertionError('content read')), \
+         patch.object(agent.os,'walk',side_effect=AssertionError('listed')):
+        yield
+
+def file_id(path):
+    metadata=os.stat(path);return (metadata.st_dev,metadata.st_ino)
+
+REPARSE=0x0400;DIRECTORY=0x0010
+
+class SourceScopeTests(SyncFixture, unittest.TestCase):
+    """Mounted sync stays inside its root: links and reparse points are neither descended nor read.
+
+    Native cases create real junctions (Windows) or directory symlinks (elsewhere) whose targets
+    stay inside the test-owned temporary tree, and skip by name when the host cannot create them.
+    """
+    def kinds(self,body=-1):return [(e['kind'],e['nativeId']) for e in Client.bodies[body]['events']]
+    def swap_for_link(self,name):
+        # The real directory moves outside the root; a link to it takes its name, as a racing writer could.
+        moved=self.base/(name+'-moved');rename_with_retry(self.root/name,moved)
+        make_directory_link(self,self.root/name,moved)
+
+    def test_nested_add_change_delete_recreate_keep_native_ids(self):
+        (self.root/'docs'/'deep').mkdir(parents=True);(self.root/'docs'/'deep'/'a.pdf').write_bytes(b'one');self.add('b.pdf')
+        agent.sync(self.args);self.assertEqual(self.kinds(),[('added','b.pdf'),('added','docs/deep/a.pdf')])
+        (self.root/'docs'/'deep'/'a.pdf').write_bytes(b'two');(self.root/'b.pdf').unlink()
+        agent.sync(self.args);self.assertEqual(self.kinds(),[('deleted','b.pdf'),('changed','docs/deep/a.pdf')])
+        self.add('b.pdf');agent.sync(self.args);self.assertEqual(self.kinds(),[('added','b.pdf')])
+        self.assertEqual(agent.sync(self.args)['status'],'unchanged')
+
+    def test_child_link_to_outside_is_never_listed_or_read(self):
+        outside=self.base/'outside';outside.mkdir();(outside/'secret.pdf').write_bytes(b'secret')
+        self.add('inside.pdf');make_directory_link(self,self.root/'escape',outside)
+        with recorded_scan() as (listed,read):agent.sync(self.args)
+        self.assertEqual(self.kinds(),[('added','inside.pdf')])
+        escape=self.root/'escape'
+        self.assertFalse([p for p in listed if p==escape or escape in p.parents or p==outside or outside in p.parents])
+        # Two legitimate in-root reads of the same authorized file: the scan hashes it, then the
+        # upload seals a snapshot of it, both through the held root. Nothing else is ever opened.
+        self.assertEqual(read,['inside.pdf','inside.pdf'])
+
+    def test_in_root_cycle_and_alias_terminate_without_duplicates(self):
+        docs=self.root/'docs';docs.mkdir();(docs/'a.pdf').write_bytes(b'one')
+        make_directory_link(self,docs/'loop',self.root);make_directory_link(self,self.root/'alias',docs)
+        with recorded_scan() as (listed,read):files=agent.scan_mount(self.root,100)
+        self.assertEqual(list(files),['docs/a.pdf']);self.assertEqual(read,['docs/a.pdf'])
+        self.assertEqual(sorted(listed),sorted([self.root,docs]))
+
+    def test_synced_directory_turned_link_refuses_before_reading_or_quoting(self):
+        (self.root/'docs').mkdir();(self.root/'docs'/'a.pdf').write_bytes(b'one');self.add('b.pdf')
+        agent.sync(self.args);original=self.args.state.read_bytes();uploads=len(Client.uploads)
+        self.swap_for_link('docs');self.add('b.pdf',b'changed')
+        with patch.object(agent,'_open_inventoried',side_effect=AssertionError('content read')), \
+             patch.object(Client,'quote',side_effect=AssertionError('quoted')):
+            with self.assertRaisesRegex(agent.AgentError,'previously synced'):agent.sync(self.args)
+        self.assertEqual(original,self.args.state.read_bytes())
+        self.assertFalse(self.args.state.with_name('state.json.pending').exists())
+        self.assertEqual(len(Client.bodies),1);self.assertEqual(len(Client.uploads),uploads)
+
+    def test_pending_replay_runs_before_scan_and_the_next_cycle_refuses(self):
+        (self.root/'docs').mkdir();(self.root/'docs'/'a.pdf').write_bytes(b'one');Client.lose_response=True
+        with self.assertRaises(agent.RetryableAgentError):agent.sync(self.args)
+        pending=self.args.state.with_name('state.json.pending');self.assertTrue(pending.exists())
+        self.swap_for_link('docs')
+        with patch.object(agent,'scan_mount',side_effect=AssertionError('scanned before replay')):
+            self.assertEqual(agent.sync(self.args)['status'],'replayed')
+        self.assertFalse(pending.exists());committed=self.args.state.read_bytes()
+        with self.assertRaisesRegex(agent.AgentError,'previously synced'):agent.sync(self.args)
+        self.assertEqual(committed,self.args.state.read_bytes());self.assertEqual(len(Client.bodies),2)
+
+    def test_reparse_metadata_contract(self):
+        # Mocked: dedup/cloud tags are not name surrogates; 0xA000000C is. Only directories are pruned outright.
+        # The walk still collects a non-surrogate reparse file; a real one is refused at the held-handle
+        # read (reparse_file in the refusal test), and these fixtures are plain files on disk.
+        self.add('dedup.pdf');self.add('surrogate.pdf');(self.root/'cloud').mkdir();(self.root/'cloud'/'c.pdf').write_bytes(b'c')
+        with lstat_reporting(**{'dedup.pdf':dict(st_file_attributes=REPARSE,st_reparse_tag=0x80000013),
+                                'surrogate.pdf':dict(st_file_attributes=REPARSE,st_reparse_tag=0xA000000C),
+                                'cloud':dict(st_file_attributes=REPARSE|DIRECTORY,st_reparse_tag=0x9000001A)}):
+            with recorded_scan() as (listed,read):files=agent.scan_mount(self.root,100)
+        self.assertEqual(list(files),['dedup.pdf']);self.assertEqual(listed,[self.root])
+
+    def test_directory_reached_twice_refuses_before_any_read(self):
+        # Mocked: an SMB server-side junction is a plain directory to the client; only its identity repeats.
+        for name in ('one','two'):(self.root/name).mkdir();(self.root/name/'a.pdf').write_bytes(b'a')
+        same=dict(st_dev=7,st_ino=42)
+        with lstat_reporting(one=same,two=same),patch.object(agent,'_open_inventoried',side_effect=AssertionError('content read')):
+            with self.assertRaisesRegex(agent.AgentError,'reached twice'):agent.scan_mount(self.root,100)
+
+    def test_unreadable_entry_metadata_is_incomplete_not_a_deletion(self):
+        self.add();agent.sync(self.args);original=self.args.state.read_bytes()
+        real=os.lstat
+        def lstat(path,*a,**k):
+            if Path(os.fspath(path)).name=='a.pdf':raise PermissionError('denied')
+            return real(path,*a,**k)
+        with patch.object(agent.os,'lstat',lstat):
+            with self.assertRaisesRegex(agent.AgentError,'incomplete'):agent.sync(self.args)
+        self.assertEqual(original,self.args.state.read_bytes());self.assertEqual(len(Client.bodies),1)
+
+    def test_ancestor_swapped_for_outside_link_after_walk_refuses_before_reading(self):
+        # The coordinator's reproduction: once the walk is exhausted, actual/ is renamed and a link named actual points outside.
+        actual=self.root/'actual';actual.mkdir();(actual/'report.pdf').write_bytes(b'inside');self.add('b.pdf')
+        agent.sync(self.args);original=self.args.state.read_bytes();bodies=len(Client.bodies);uploads=len(Client.uploads)
+        outside=self.base/'outside-test-owned-root';outside.mkdir();(outside/'report.pdf').write_bytes(b'outside')
+        def swap():rename_with_retry(actual,self.root/'saved-actual');make_directory_link(self,actual,outside)
+        with after_walk(swap),recorded_scan() as (listed,read),patch.object(Client,'quote',side_effect=AssertionError('quoted')):
+            with self.assertRaisesRegex(agent.AgentError,'link or reparse point after inventory'):agent.sync(self.args)
+        self.assertEqual(read,['b.pdf'])
+        self.assertEqual(original,self.args.state.read_bytes())
+        self.assertFalse(self.args.state.with_name('state.json.pending').exists())
+        self.assertEqual((len(Client.bodies),len(Client.uploads)),(bodies,uploads))
+
+    def test_ancestor_swapped_for_in_root_alias_after_walk_refuses_before_reading(self):
+        actual=self.root/'actual';other=self.root/'other'
+        for folder in (actual,other):folder.mkdir();(folder/'report.pdf').write_bytes(folder.name.encode())
+        def swap():rename_with_retry(actual,self.base/'actual-moved');make_directory_link(self,actual,other)
+        with after_walk(swap),recorded_scan() as (listed,read):
+            with self.assertRaisesRegex(agent.AgentError,'link or reparse point after inventory'):agent.scan_mount(self.root,100)
+        self.assertEqual(read,[])
+
+    def test_read_through_held_parent_when_path_is_swapped_at_the_file_open(self):
+        # The acceptance counterexample moved to the read boundary itself: actual/ is held, then renamed
+        # and replaced by a link to an outside sentinel just before report.pdf is opened beneath it.
+        backend=traversal_backend(self)
+        actual=self.root/'actual';actual.mkdir();(actual/'report.pdf').write_bytes(b'inside')
+        outside=self.base/'outside-test-owned-root';outside.mkdir();(outside/'report.pdf').write_bytes(b'outside')
+        real=backend.open_file_beneath;swapped=[]
+        def open_file_beneath(held,parent,name):
+            if not swapped:
+                rename_with_retry(actual,self.root/'saved-actual');make_directory_link(self,actual,outside);swapped.append(name)
+            return real(held,parent,name)
+        with patch.object(backend,'open_file_beneath',open_file_beneath):files=agent.scan_mount(self.root,100)
+        self.assertEqual(swapped,['report.pdf'])
+        self.assertEqual((actual/'report.pdf').read_bytes(),b'outside')  # a path-based open would now read outside
+        self.assertEqual(files['actual/report.pdf']['contentSha256'],sha(b'inside'))
+        self.assertNotIn(sha(b'outside'),[item['contentSha256'] for item in files.values()])
+
+    def test_upload_snapshot_reads_the_held_parent_when_path_is_swapped_at_the_file_open(self):
+        # Same bytes outside, so only file identity shows which file the upload snapshot was copied from.
+        backend=traversal_backend(self)
+        docs=self.root/'docs';docs.mkdir();(docs/'a.pdf').write_bytes(b'inside')
+        outside=self.base/'outside-test-owned-root';outside.mkdir();(outside/'a.pdf').write_bytes(b'inside')
+        real=backend.open_file_beneath;real_snapshot=agent.snapshot_mount;swapped=[];copied=[]
+        def open_file_beneath(held,parent,name):
+            if Client.approvals and not swapped:
+                rename_with_retry(docs,self.root/'saved-docs');make_directory_link(self,docs,outside);swapped.append(name)
+            return real(held,parent,name)
+        def snapshot(descriptor,name,expected,limit):
+            metadata=os.fstat(descriptor);copied.append((metadata.st_dev,metadata.st_ino))
+            return real_snapshot(descriptor,name,expected,limit)
+        with patch.object(backend,'open_file_beneath',open_file_beneath),patch.object(agent,'snapshot_mount',snapshot):
+            self.assertEqual(agent.sync(self.args)['status'],'applied')
+        held=os.stat(self.root/'saved-docs'/'a.pdf');sentinel=os.stat(outside/'a.pdf')
+        self.assertEqual(swapped,['a.pdf']);self.assertEqual(len(Client.uploads),1)
+        self.assertEqual(copied,[(held.st_dev,held.st_ino)]);self.assertNotEqual(copied[0],(sentinel.st_dev,sentinel.st_ino))
+
+    def test_file_swapped_for_outside_symlink_after_walk_is_refused_at_the_open(self):
+        self.add('a.pdf',b'inside');outside=self.base/'outside.pdf';outside.write_bytes(b'outside')
+        def swap():
+            (self.root/'a.pdf').unlink()
+            try:os.symlink(outside,self.root/'a.pdf')
+            except (OSError,NotImplementedError) as error:self.skipTest(f'file symlinks are unavailable: {error}')
+        with after_walk(swap),recorded_scan() as (listed,read):
+            with self.assertRaisesRegex(agent.AgentError,'link or reparse point after inventory'):agent.scan_mount(self.root,100)
+        self.assertEqual(read,[])
+
+    def test_every_read_refusal_closes_held_handles_and_opens_no_file(self):
+        class Backend:
+            def __init__(self,refuse_at,refusal):self.refuse_at=refuse_at;self.refusal=refusal;self.held=set();self.next=100
+            def hold(self):self.next+=1;self.held.add(self.next);return self.next
+            def open_beneath(self,parent,name,*,listing):
+                assert (parent==10 or parent in self.held) and not listing
+                return (None,self.refusal) if name==self.refuse_at else (self.hold(),None)
+            def open_file_beneath(self,parent,name):
+                assert parent in self.held
+                return (None,self.refusal) if name==self.refuse_at else (self.hold(),None)
+            def close(self,handle):self.held.remove(handle)
+        messages={'symlink':'link or reparse point after inventory','reparse_point':'link or reparse point after inventory',
+                  'mount_point':'another file system','reparse_file':'cloud placeholder','missing':'inventory incomplete',
+                  'not_a_directory':'changed type','not_a_regular_file':'changed type','invalid_name':'changed type'}
+        for refusal,message in messages.items():
+            for at in ('a','b','report.pdf'):
+                backend=Backend(at,refusal)
+                with self.assertRaisesRegex(agent.AgentError,message):agent._open_inventoried(backend,10,'a/b/report.pdf')
+                self.assertEqual(backend.held,set())
+        backend=Backend(None,None);descriptor=agent._open_inventoried(backend,10,'a/b/report.pdf')
+        self.assertEqual(backend.held,{descriptor})  # only the file stays open, for the caller to read and close
+        class Root:
+            closed=[]
+            def open_root(self,path):return 10
+            def close(self,handle):Root.closed.append(handle)
+        with patch.object(agent,'_traversal_backend',return_value=Root()):
+            with self.assertRaisesRegex(RuntimeError,'refused'):
+                with agent._anchored_root(self.root):raise RuntimeError('refused')
+        self.assertEqual(Root.closed,[10])
+
+    def test_link_swapped_in_after_quote_refuses_before_the_upload_snapshot(self):
+        # Same bytes behind the link, so only the held-handle open stops the outside read at upload time.
+        (self.root/'docs').mkdir();(self.root/'docs'/'a.pdf').write_bytes(b'one')
+        real=Client.create_approval
+        def approve(client,body):self.swap_for_link('docs');return real(client,body)
+        with patch.object(Client,'create_approval',approve),patch.object(agent,'snapshot_mount',side_effect=AssertionError('opened')):
+            with self.assertRaisesRegex(agent.AgentError,'link or reparse point after inventory'):agent.sync(self.args)
+        self.assertEqual(Client.uploads,[]);self.assertFalse(self.args.state.exists())
+
+class SelectedRootTests(SyncFixture, unittest.TestCase):
+    """The selected root itself is swapped, not a child: the cycle must stay on the object it held.
+
+    Native junctions (Windows) or directory symlinks (elsewhere), all inside the temporary tree.
+    A linked --root is allowed and followed once; what the selection or the root path names later
+    must never be listed into a read, quoted or uploaded. Only the network client is faked.
+    """
+    def setUp(self):
+        super().setUp()
+        self.backend=traversal_backend(self)
+        self.outside=self.base/'outside-test-owned-root';self.outside.mkdir()
+        self.pending=self.args.state.with_name('state.json.pending')
+
+    def link_selection(self):
+        link=self.base/'selected-link';make_directory_link(self,link,self.root);self.args.root=link;return link
+
+    def retarget(self,link,target):
+        remove_link(link);make_directory_link(self,link,target)
+
+    def replace_root(self):
+        """Rename the held root away and put a link to the outside tree at its path; returns the original's new path."""
+        saved=self.base/'saved-source-root'
+        try:rename_with_retry(self.root,saved)
+        except PermissionError as error:
+            # A precise platform lock, not a swap: the root is untouched, so there is nothing to observe.
+            self.assertEqual((os.name,getattr(error,'winerror',None) in (5,32)),('nt',True))
+            self.assertFalse(agent._not_followed(os.lstat(self.root)));self.assertFalse(saved.exists())
+            self.skipTest(f'Windows refused to rename the held root (WinError {error.winerror}); it was left in place')
+        make_directory_link(self,self.root,self.outside)
+        self.assertTrue(agent._not_followed(os.lstat(self.root)))
+        return saved
+
+    @contextmanager
+    def after_fingerprint(self,swap):
+        real=agent.source_fingerprint;taken=[]
+        def fingerprint(*a,**k):
+            value=real(*a,**k);taken.append(value);swap();return value
+        with patch.object(agent,'source_fingerprint',fingerprint):yield taken
+
+    def lose_approval_reply(self):
+        # The approval is stored by the server but its reply is lost, so the set stays pending for a resume.
+        real=Client.create_approval
+        def lost(client,body):real(client,body);raise agent.RetryableAgentError('lost approval reply')
+        with patch.object(Client,'create_approval',lost):
+            with self.assertRaises(agent.RetryableAgentError):agent.sync(self.args)
+        self.assertTrue(self.pending.exists());self.assertFalse(self.args.state.exists())
+        journal=self.pending.read_bytes();saved=json.loads(journal)
+        self.assertTrue(saved['intake']['approvalPosted']);self.assertIsInstance(saved['rootIdentity'],str)
+        return journal
+
+    def test_linked_selection_retargeted_after_fingerprint_reads_only_the_held_root(self):
+        self.add('a.pdf',b'inside');(self.outside/'a.pdf').write_bytes(b'outside');link=self.link_selection()
+        inside=file_id(self.root/'a.pdf')
+        with self.after_fingerprint(lambda:self.retarget(link,self.outside)) as taken,mounted_reads() as reads:
+            self.assertEqual(agent.sync(self.args)['status'],'applied')
+        self.assertEqual(file_id(link/'a.pdf'),file_id(self.outside/'a.pdf'))  # the selection now names the sentinel
+        self.assertEqual(reads,[('a.pdf',*inside)]*2)  # scan, then upload snapshot, both from the held original
+        self.assertEqual(Client.bodies[-1]['events'][0]['contentSha256'],sha(b'inside'));self.assertEqual(len(Client.uploads),1)
+        state=json.loads(self.args.state.read_text())
+        self.assertEqual(state['scopeFingerprint'],taken[0]);self.assertEqual(taken[0],agent.source_fingerprint(self.args,self.root))
+
+    def test_root_path_turned_outside_link_after_fingerprint_refuses_before_any_read(self):
+        self.add('a.pdf',b'inside');agent.sync(self.args)
+        original=self.args.state.read_bytes();bodies=len(Client.bodies);uploads=len(Client.uploads)
+        self.add('a.pdf',b'inside changed');(self.outside/'a.pdf').write_bytes(b'outside')
+        with self.after_fingerprint(self.replace_root),mounted_reads() as reads,held_roots(self.backend) as opened, \
+             patch.object(Client,'quote',side_effect=AssertionError('quoted')):
+            with self.assertRaisesRegex(agent.AgentError,'became a link or reparse point'):agent.sync(self.args)
+        self.assertEqual(reads,[]);self.assertEqual(opened,[])
+        self.assertEqual(original,self.args.state.read_bytes());self.assertFalse(self.pending.exists())
+        self.assertEqual((len(Client.bodies),len(Client.uploads)),(bodies,uploads))
+
+    def test_linked_selection_retargeted_after_approval_uploads_the_held_original(self):
+        # Same bytes outside, so only file identity shows which file the upload snapshot came from.
+        self.add('a.pdf',b'inside');(self.outside/'a.pdf').write_bytes(b'inside');link=self.link_selection()
+        inside=file_id(self.root/'a.pdf');real=Client.create_approval
+        def approve(client,body):self.retarget(link,self.outside);return real(client,body)
+        with patch.object(Client,'create_approval',approve),mounted_reads() as reads:
+            self.assertEqual(agent.sync(self.args)['status'],'applied')
+        self.assertEqual(file_id(link/'a.pdf'),file_id(self.outside/'a.pdf'))
+        self.assertEqual(reads,[('a.pdf',*inside)]*2);self.assertEqual(len(Client.uploads),1)
+
+    def test_root_path_turned_outside_link_after_approval_uploads_the_held_original_then_refuses(self):
+        self.add('a.pdf',b'inside');(self.outside/'a.pdf').write_bytes(b'inside');real=Client.create_approval;saved=[]
+        def approve(client,body):saved.append(self.replace_root());return real(client,body)
+        with patch.object(Client,'create_approval',approve),mounted_reads() as reads,held_roots(self.backend) as opened:
+            self.assertEqual(agent.sync(self.args)['status'],'applied')
+        held=file_id(saved[0]/'a.pdf');self.assertEqual(file_id(self.root/'a.pdf'),file_id(self.outside/'a.pdf'))
+        self.assertEqual(reads,[('a.pdf',*held)]*2);self.assertNotIn(file_id(self.outside/'a.pdf'),[r[1:] for r in reads])
+        self.assertEqual(Client.bodies[-1]['events'][0]['contentSha256'],sha(b'inside'))
+        self.assertEqual(opened,[]);committed=self.args.state.read_bytes();bodies=len(Client.bodies)
+        # The next cycle holds what the path names now; its scope differs, so nothing is listed, read or quoted.
+        with nothing_requested_or_read(),held_roots(self.backend) as opened:
+            with self.assertRaisesRegex(agent.AgentError,'scope changed'):agent.sync(self.args)
+        self.assertEqual(opened,[]);self.assertEqual(committed,self.args.state.read_bytes());self.assertEqual(len(Client.bodies),bodies)
+
+    def test_resumed_set_refuses_a_replaced_root_before_any_request_or_read(self):
+        self.add('a.pdf',b'inside');journal=self.lose_approval_reply()
+        # Same path, same bytes, different object: only the bound identity tells them apart.
+        saved=self.base/'saved-source-root';rename_with_retry(self.root,saved);self.root.mkdir();self.add('a.pdf',b'inside')
+        self.assertNotEqual(file_id(self.root),file_id(saved))
+        with nothing_requested_or_read(),held_roots(self.backend) as opened:
+            with self.assertRaisesRegex(agent.AgentError,'not the object this pending upload set was quoted from'):agent.sync(self.args)
+        self.assertEqual(opened,[]);self.assertEqual(self.pending.read_bytes(),journal);self.assertFalse(self.args.state.exists())
+        (self.root/'a.pdf').unlink();self.root.rmdir();rename_with_retry(saved,self.root);original=file_id(self.root/'a.pdf')
+        # A journal written before the binding existed can't show which root it came from, so it fails closed too.
+        legacy=json.loads(journal);legacy.pop('rootIdentity');self.pending.write_text(json.dumps(legacy))
+        with nothing_requested_or_read():
+            with self.assertRaisesRegex(agent.AgentError,'not the object this pending upload set was quoted from'):agent.sync(self.args)
+        self.assertEqual(json.loads(self.pending.read_text()),legacy);self.pending.write_bytes(journal)
+        with mounted_reads() as reads:self.assertEqual(agent.sync(self.args)['status'],'applied')
+        self.assertEqual(reads,[('a.pdf',*original)]);self.assertEqual(len(Client.uploads),1);self.assertFalse(self.pending.exists())
+        self.assertEqual(Client.bodies[-1]['events'][0]['contentSha256'],sha(b'inside'))
+
+    def test_resumed_set_refuses_a_retargeted_selection_before_any_request_or_read(self):
+        self.add('a.pdf',b'inside');(self.outside/'a.pdf').write_bytes(b'inside');link=self.link_selection()
+        journal=self.lose_approval_reply();self.retarget(link,self.outside)
+        self.assertEqual(file_id(link/'a.pdf'),file_id(self.outside/'a.pdf'))
+        with nothing_requested_or_read(),held_roots(self.backend) as opened:
+            with self.assertRaisesRegex(agent.AgentError,'pending journal scope binding is invalid'):agent.sync(self.args)
+        self.assertEqual(opened,[]);self.assertEqual(self.pending.read_bytes(),journal);self.assertFalse(self.args.state.exists())
+        self.retarget(link,self.root);original=file_id(self.root/'a.pdf')
+        with mounted_reads() as reads:self.assertEqual(agent.sync(self.args)['status'],'applied')
+        self.assertEqual(reads,[('a.pdf',*original)]);self.assertEqual(len(Client.uploads),1)
 
 class PlanTests(SyncFixture, unittest.TestCase):
     """Intake-plan behavior on a host with a handle-anchored backend (Windows or Linux)."""
@@ -826,6 +1236,18 @@ class UnsupportedTraversalTests(SyncFixture, unittest.TestCase):
         assert_fails_closed_unsupported(self,plan,'platform_not_supported')
         self.assertEqual(code,2);self.assertEqual(json.loads(out[0])['failClosedReason'],'unsupported_safe_traversal')
 
+    def test_unsupported_traversal_refuses_mounted_sync_before_listing_reading_or_quoting(self):
+        self.add();agent.sync(self.args);original=self.args.state.read_bytes();self.add('b.pdf')
+        forbidden=AssertionError('listed or read without an anchored handle')
+        with patch.object(agent,'_traversal_backend',side_effect=agent.UnsupportedSafeTraversal('platform_not_supported')), \
+             patch.object(agent.os,'walk',side_effect=forbidden), \
+             patch.object(agent,'_digest_descriptor',side_effect=forbidden), \
+             patch.object(agent,'file_digest',side_effect=forbidden), \
+             patch.object(Client,'quote',side_effect=AssertionError('quoted')):
+            with self.assertRaisesRegex(agent.AgentError,'platform_not_supported'):agent.sync(self.args)
+        self.assertEqual(original,self.args.state.read_bytes());self.assertEqual(len(Client.bodies),1)
+        self.assertFalse(self.args.state.with_name('state.json.pending').exists())
+
     def test_platforms_without_a_backend_fail_closed(self):
         if os.name=='nt' or ON_LINUX:self.skipTest('this platform has a handle-anchored backend')
         self.add('a.pdf',b'a')
@@ -881,6 +1303,26 @@ class WindowsCaseLookupTests(unittest.TestCase):
             self.assertFalse(attributes&agent._OBJ_CASE_INSENSITIVE)
             self.assertEqual((disposition,options),(agent._FILE_OPEN,agent._NT_DIRECTORY_OPEN_OPTIONS))
             self.assertTrue(options&agent._FILE_OPEN_REPARSE_POINT)
+
+    def test_file_open_is_one_name_beneath_the_held_parent_and_refuses_every_reparse_point(self):
+        backend=agent._WindowsTraversal();captured=[];closed=[];handles=iter(range(201,210))
+        def nt_create_file(handle,access,attributes,status_block,allocation,file_attributes,share,disposition,options,ea,ea_length):
+            value=attributes._obj;name=value.ObjectName.contents
+            captured.append((value.RootDirectory,agent.ctypes.wstring_at(name.Buffer,name.Length//2),access,disposition,options))
+            handle._obj.value=next(handles);return 0
+        backend._nt_create_file=nt_create_file;backend.close=closed.append
+        reparse=agent._FILE_ATTRIBUTE_REPARSE_POINT
+        for (attributes,tag),refusal in [((reparse,agent._IO_REPARSE_TAG_SYMLINK),'symlink'),((reparse,IO_REPARSE_TAG_MOUNT_POINT),'reparse_point'),
+                                          ((reparse,0x80000013),'reparse_file'),((agent._FILE_ATTRIBUTE_DIRECTORY,0),'not_a_regular_file')]:
+            with patch.object(backend,'_attributes',return_value=(attributes,tag)):
+                self.assertEqual(backend.open_file_beneath(7,'a.pdf'),(None,refusal))
+        self.assertEqual(closed,[201,202,203,204])
+        self.assertEqual(backend.open_file_beneath(7,'a.pdf:stream'),(None,'invalid_name'))
+        for root,name,access,disposition,options in captured:
+            self.assertEqual((root,name,disposition),(7,'a.pdf',agent._FILE_OPEN))
+            self.assertEqual(options,agent._NT_FILE_OPEN_OPTIONS);self.assertTrue(options&agent._FILE_OPEN_REPARSE_POINT)
+            self.assertTrue(access&agent._FILE_READ_DATA)
+        self.assertEqual(len(captured),4)
 
     def test_case_policy_is_read_from_the_held_handle(self):
         tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup)

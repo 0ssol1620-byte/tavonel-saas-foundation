@@ -137,6 +137,156 @@ describe("comparing two versions of a World", () => {
   });
 });
 
+/*
+  Reference lists compared as sets.
+
+  The variants below are derived from the compiled `after` model with one controlled edit each.
+  They are synthetic: the replaced ids are not real stored evidence or source bindings, and
+  nothing here qualifies a World. They test that the comparison sees membership, not length.
+*/
+describe("comparing what an object or relation refers to", () => {
+  type WorldObject = WorldReadModel["objects"][number];
+  type WorldRelation = WorldReadModel["relations"][number];
+
+  const canonical = (ids: readonly string[]) => JSON.stringify([...new Set(ids)].sort());
+  const replaceLast = (ids: readonly string[], tag: string) =>
+    [...ids.slice(0, -1), `${ids[ids.length - 1]}#controlled-${tag}`];
+  const withObject = (model: WorldReadModel, id: string, patch: Partial<WorldObject>): WorldReadModel => ({
+    ...model,
+    objects: model.objects.map((object) => (object.id === id ? { ...object, ...patch } : object)),
+  });
+  const withRelation = (model: WorldReadModel, id: string, patch: Partial<WorldRelation>): WorldReadModel => ({
+    ...model,
+    relations: model.relations.map((relation) => (relation.id === id ? { ...relation, ...patch } : relation)),
+  });
+
+  it("world diff reference membership: a same-sized evidence reference replacement changes exactly that object", () => {
+    const target = after.objects.find((object) => object.evidenceRefs.length > 0);
+    expect(target).toBeDefined();
+    const replaced = replaceLast(target!.evidenceRefs, "evidence");
+    const diff = diffWorldVersions(after, withObject(after, target!.id, { evidenceRefs: replaced }));
+    expect(diff.objects.added).toEqual([]);
+    expect(diff.objects.removed).toEqual([]);
+    expect(diff.objects.changed.map((item) => item.id)).toEqual([target!.id]);
+    // The count is the same on both sides, so only the membership line appears.
+    expect(diff.objects.changed[0].changes).toEqual([
+      { field: "evidenceRefs", before: canonical(target!.evidenceRefs), after: canonical(replaced) },
+    ]);
+  });
+
+  it("world diff reference membership: a same-sized relation replacement changes exactly that object", () => {
+    const target = after.objects.find((object) => object.relations.length > 0);
+    expect(target).toBeDefined();
+    const replaced = replaceLast(target!.relations, "relation");
+    const diff = diffWorldVersions(after, withObject(after, target!.id, { relations: replaced }));
+    expect(diff.objects.changed.map((item) => item.id)).toEqual([target!.id]);
+    expect(diff.objects.changed[0].changes).toEqual([
+      { field: "relationRefs", before: canonical(target!.relations), after: canonical(replaced) },
+    ]);
+  });
+
+  it("world diff reference membership: a same-sized claim replacement changes exactly that object", () => {
+    const target = after.objects.find((object) => object.claims.length > 0);
+    expect(target).toBeDefined();
+    const replaced = replaceLast(target!.claims, "claim");
+    const diff = diffWorldVersions(after, withObject(after, target!.id, { claims: replaced }));
+    expect(diff.objects.changed.map((item) => item.id)).toEqual([target!.id]);
+    expect(diff.objects.changed[0].changes).toEqual([
+      { field: "claims", before: canonical(target!.claims), after: canonical(replaced) },
+    ]);
+  });
+
+  it("world diff reference membership: source versions exchanged between two objects are reported per object", () => {
+    // Two objects of the compiled model trade controlled source versions. The set of revisions
+    // across the World is the same on both sides, which is exactly what used to hide this.
+    const [first, second] = after.objects;
+    expect(second).toBeDefined();
+    const assign = (a: string, b: string) =>
+      withObject(withObject(after, first.id, { sourceVersions: [a] }), second.id, { sourceVersions: [b] });
+    const left = assign("controlled-source-version-x", "controlled-source-version-y");
+    const right = assign("controlled-source-version-y", "controlled-source-version-x");
+    const diff = diffWorldVersions(left, right);
+    expect(diff.sourceRevisions.added).toEqual([]);
+    expect(diff.sourceRevisions.removed).toEqual([]);
+    expect(diff.sourceRevisions.unchanged).toBe(new Set(left.objects.flatMap((object) => object.sourceVersions)).size);
+    expect(diff.objects.changed).toEqual([
+      {
+        id: first.id,
+        label: first.label,
+        type: first.type,
+        changes: [{ field: "sourceVersions", before: '["controlled-source-version-x"]', after: '["controlled-source-version-y"]' }],
+      },
+      {
+        id: second.id,
+        label: second.label,
+        type: second.type,
+        changes: [{ field: "sourceVersions", before: '["controlled-source-version-y"]', after: '["controlled-source-version-x"]' }],
+      },
+    ]);
+    expect(diff.identical).toBe(false);
+  });
+
+  it("world diff reference membership: a same-sized relation evidence replacement changes exactly that relation", () => {
+    const target = after.relations.find((relation) => relation.evidenceRefs.length > 0);
+    expect(target).toBeDefined();
+    const replaced = replaceLast(target!.evidenceRefs, "relation-evidence");
+    const diff = diffWorldVersions(after, withRelation(after, target!.id, { evidenceRefs: replaced }));
+    expect(diff.relations.added).toEqual([]);
+    expect(diff.relations.removed).toEqual([]);
+    expect(diff.relations.changed).toEqual([{
+      id: target!.id,
+      predicate: target!.predicate,
+      subject: target!.subject,
+      object: target!.object,
+      changes: [{ field: "evidenceRefs", before: canonical(target!.evidenceRefs), after: canonical(replaced) }],
+    }]);
+    expect(diff.objects.changed).toEqual([]);
+  });
+
+  it("world diff reference membership: reordering and repeating references is not a change", () => {
+    // Every reference list reversed and then repeated: same members, different order, every
+    // count doubled before deduplication.
+    const noisy = (ids: readonly string[]) => [...ids].reverse().concat(ids);
+    const reordered: WorldReadModel = {
+      ...after,
+      objects: after.objects.map((object) => ({
+        ...object,
+        evidenceRefs: noisy(object.evidenceRefs),
+        relations: noisy(object.relations),
+        claims: noisy(object.claims),
+        sourceVersions: noisy(object.sourceVersions),
+      })),
+      relations: after.relations.map((relation) => ({ ...relation, evidenceRefs: noisy(relation.evidenceRefs) })),
+    };
+    const references = (model: WorldReadModel) => JSON.stringify({
+      objects: model.objects.map((object) => [object.evidenceRefs, object.relations, object.claims, object.sourceVersions]),
+      relations: model.relations.map((relation) => relation.evidenceRefs),
+    });
+    const afterBeforeCall = references(after);
+    const reorderedBeforeCall = references(reordered);
+
+    const diff = diffWorldVersions(after, reordered);
+    expect(diff.objects.changed).toEqual([]);
+    expect(diff.relations.changed).toEqual([]);
+    expect(diff.identical).toBe(true);
+    expect(countChanges(diff)).toBe(0);
+
+    // The comparison sorts copies; the models it was handed are left as they were.
+    expect(references(after)).toBe(afterBeforeCall);
+    expect(references(reordered)).toBe(reorderedBeforeCall);
+
+    // The existing controls still hold on top of the reordering.
+    const corrected = diffWorldVersions(before, reordered);
+    expect(corrected.objects.changed.map((item) => item.id)).toEqual([entity.id]);
+    expect(corrected.objects.changed[0].changes).toEqual([{ field: "label", before: entity.label, after: "ACME Corporation" }]);
+    const promoted: WorldReadModel = {
+      ...reordered,
+      objects: reordered.objects.map((object) => ({ ...object, status: "active" as const })),
+    };
+    expect(diffWorldVersions(after, promoted).objects.changed).toEqual([]);
+  });
+});
+
 describe("where the comparison is shown", () => {
   const studio = readFileSync(new URL("../components/world-studio-ultimate.tsx", import.meta.url), "utf8");
   const panel = readFileSync(new URL("../components/world-version-diff.tsx", import.meta.url), "utf8");

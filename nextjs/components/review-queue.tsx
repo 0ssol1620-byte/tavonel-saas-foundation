@@ -8,7 +8,9 @@ import {
   REVIEW_DECISION_READ_LIMIT,
   REVIEW_QUEUE_STATUS_COPY,
   reviewQueueReasons,
+  type ReviewLedgerStatus,
   type ReviewQueueInput,
+  type ReviewQueueRow,
   type ReviewQueueStatus,
 } from "@/lib/review-queue";
 import { formatTimestamp } from "@/lib/format";
@@ -29,6 +31,48 @@ import { countNoun } from "@/lib/plural";
 
 const ORDER: ReviewQueueStatus[] = ["excluded", "under_review", "unprocessed", "read"];
 
+/*
+  What to say when the decision ledger was not read. None of these is "no decision yet": a read
+  that is still running, had no session, or failed has no answer about any document.
+*/
+const UNREAD_LEDGER_COPY: Record<Exclude<ReviewLedgerStatus, "ready">, { notice: string; row: string }> = {
+  loading: {
+    notice: "Review decisions for this compile are still being read. Until they are, no document is shown as decided or undecided, and no time to a first review is given.",
+    row: "Review decisions not read yet",
+  },
+  unavailable: {
+    notice: "Review decisions were not read for this compile, because there was no signed-in session or compiled collection to read them for. Whether any document has been decided is not known here.",
+    row: "Review decisions not available",
+  },
+  error: {
+    notice: "The review-decision read failed or came back unreadable, so whether any document has been decided is not known here, and no time to a first review is given.",
+    row: "Review decisions could not be read",
+  },
+};
+
+/*
+  One line per document about its review decisions, saying only what the inputs support. A
+  truncated read can show a decision it holds but not call it the first; a first decision with
+  no elapsed time says which end is missing or that it predates the compile settling.
+*/
+function reviewTimingCopy(row: ReviewQueueRow, decisionsRead: ReviewLedgerStatus, historyTruncated: boolean, settledKnown: boolean): string {
+  if (decisionsRead !== "ready") return UNREAD_LEDGER_COPY[decisionsRead].row;
+  if (historyTruncated) {
+    const observed = row.observedReviewAt ?? row.firstReviewAt;
+    return observed === null
+      ? "No review decision among the decisions read"
+      : `Review decision recorded ${formatTimestamp(observed) ?? observed} · earliest among the decisions read, not necessarily the first`;
+  }
+  if (row.firstReviewAt === null) return "No review decision recorded yet";
+  const elapsed = formatElapsed(row.timeToFirstReviewMs);
+  if (elapsed !== null) return `First review decision after ${elapsed}`;
+  const at = formatTimestamp(row.firstReviewAt) ?? row.firstReviewAt;
+  // With both ends recorded, the only unmeasured gap is a decision older than the settled time.
+  return settledKnown
+    ? `First review decision ${at} · recorded before this compile settled, so elapsed is not measured`
+    : `First review decision ${at} · elapsed not measured`;
+}
+
 export default function ReviewQueue({
   input,
   compact = false,
@@ -48,6 +92,9 @@ export default function ReviewQueue({
     () => filterReviewQueue(queue.rows, reasons.includes(reason) ? reason : ""),
     [queue.rows, reason, reasons],
   );
+
+  const historyTruncated = queue.missing.includes("review_decisions");
+  const settledKnown = !queue.missing.includes("compile_settled_at");
 
   if (queue.total === 0) {
     return (
@@ -79,13 +126,21 @@ export default function ReviewQueue({
           This compile has no settled time recorded, so time-to-first-review is not measured.
         </p>
       ) : null}
-      {queue.missing.includes("review_decisions") ? (
+      {/*
+        A full window says older decisions may exist, not that they do, or how many. So no row
+        names a first decision or a time to it; each shows only what the read held.
+      */}
+      {historyTruncated ? (
         <p className="fine" role="status">
-          More than {REVIEW_DECISION_READ_LIMIT} review decisions are recorded for this World and
-          only the newest {REVIEW_DECISION_READ_LIMIT} were read. A document whose first decision
-          falls outside that window shows no decision, or a later one, and is ordered as if it
-          were still undecided.
+          The review-decision read returned its full window of the newest{" "}
+          {REVIEW_DECISION_READ_LIMIT}, so older decisions may exist that were not read. Times
+          below are from the decisions that were read; which decision came first on a document,
+          and how long it took, is not measured here. A document with no decision among those read
+          is ordered as undecided.
         </p>
+      ) : null}
+      {queue.decisionsRead !== "ready" ? (
+        <p className="fine" role="status">{UNREAD_LEDGER_COPY[queue.decisionsRead].notice}</p>
       ) : null}
 
       {compact ? null : (
@@ -121,7 +176,6 @@ export default function ReviewQueue({
 
       <ul className="document-meta" aria-label="Documents in this compile, most at risk first">
         {rows.map((row) => {
-          const elapsed = formatElapsed(row.timeToFirstReviewMs);
           return (
             <li key={row.documentId} data-review-status={row.status} data-security={row.securityBlocked || undefined}>
               <strong>{row.name}</strong>
@@ -131,13 +185,7 @@ export default function ReviewQueue({
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
               {row.reasons.map((value) => <small key={value}>Reason: {value}</small>)}
-              <small>
-                {row.firstReviewAt === null
-                  ? "No review decision recorded yet"
-                  : elapsed === null
-                    ? `First review decision ${formatTimestamp(row.firstReviewAt) ?? row.firstReviewAt} · elapsed not measured`
-                    : `First review decision after ${elapsed}`}
-              </small>
+              <small>{reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown)}</small>
               {onSelectDocument && row.evidenceCount > 0 ? (
                 <button
                   type="button"

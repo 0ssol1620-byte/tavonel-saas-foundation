@@ -63,27 +63,51 @@ function changesBetween(
 }
 
 /*
+  Reference lists are sets, and are compared as sets.
+
+  Comparing only their length let a same-sized replacement through: an object whose one
+  evidence reference was swapped for another reported no change, and two objects that traded
+  source versions hid behind a global revision set that had not moved. The membership itself is
+  compared now, as JSON of the sorted unique ids, so before and after read unambiguously. Order
+  and repetition carry no meaning here and so cannot produce a change. The ids are copied before
+  sorting and are never trimmed or normalised: two ids that differ by a byte are two ids.
+*/
+function membership(ids: readonly string[]): string[] {
+  return [...new Set(ids)].sort();
+}
+
+/*
   Which fields of an object are compared.
 
   Deliberately not "everything on the type". `status` flips from candidate to active when a
   version is promoted, which is a fact about the version and not a change to the object, and
-  reporting it would fill every diff with noise that hides the one line that matters.
+  reporting it would fill every diff with noise that hides the one line that matters. Aliases
+  and first-seen/last-changed history are read values the compiled artifact does not yet carry,
+  and stay out of the comparison for the same reason they are absent from the model.
 */
 function objectFields(object: WorldReadModel["objects"][number]): Record<string, string> {
+  const evidenceRefs = membership(object.evidenceRefs);
+  const relationRefs = membership(object.relations);
   return {
     label: object.label,
     type: object.type,
-    evidence: String(object.evidenceRefs.length),
-    relations: String(object.relations.length),
+    evidence: String(evidenceRefs.length),
+    relations: String(relationRefs.length),
+    evidenceRefs: JSON.stringify(evidenceRefs),
+    relationRefs: JSON.stringify(relationRefs),
+    claims: JSON.stringify(membership(object.claims)),
+    sourceVersions: JSON.stringify(membership(object.sourceVersions)),
   };
 }
 
 function relationFields(relation: WorldReadModel["relations"][number]): Record<string, string> {
+  const evidenceRefs = membership(relation.evidenceRefs);
   return {
     predicate: relation.predicate,
     subject: relation.subject,
     object: relation.object,
-    evidence: String(relation.evidenceRefs.length),
+    evidence: String(evidenceRefs.length),
+    evidenceRefs: JSON.stringify(evidenceRefs),
   };
 }
 

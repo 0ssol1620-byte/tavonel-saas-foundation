@@ -20,7 +20,7 @@
     },
     "sourceAgent": {
       "url": "https://tavonel.com/developer/tavonel-source-agent.py",
-      "sha256": "sha256:ac6811c8ad7188265357dc1d480cc3266285f2d6a84dff65211e1b0030c0b698"
+      "sha256": "sha256:1762598893b8a1f713f4036146b9406275720b002fcb6639c6266738b3a419c1"
     },
     "verifyExport": {
       "url": "https://tavonel.com/developer/tavonel-verify-export.mjs",

@@ -17,6 +17,17 @@ python3 tavonel-source-agent.py --root /approved/documents \
 
 Only an already-authorized environment variable supplies the key. Do not paste keys into documents, shell history or support logs.
 
+## Cloud bucket/prefix intake plan
+
+Before processing an S3/R2/MinIO source, `--dry-run-plan` with `--s3-bucket` lists the selected bucket and prefix as a bounded, metadata-only diagnostic:
+
+```sh
+python3 tavonel-source-agent.py --s3-bucket example-bucket --s3-prefix contracts/2026/ \
+  --s3-endpoint-url https://ACCOUNT_ID.r2.cloudflarestorage.com --s3-region auto --dry-run-plan
+```
+
+It is not offline or free: it sends up to two authenticated `ListObjectsV2` requests with the host's boto3 credentials, and the provider may bill them; no cost is estimated. It never reads objects, calls TAVONEL or touches state. The plan client disables SDK retries and sets 1.25 s connect/read timeouts. It also counts every HTTP attempt at botocore's `before-send` event: at most two `ListObjectsV2` attempts per plan, including region-redirect re-sends, and any other operation (such as a redirect's `HeadBucket`) is refused before it is sent. If that guard can't be installed, the plan fails before sending. Elapsed time is checked between requests, so a request already sent can overrun the 5 s budget. Credential lookups and DNS aren't counted or time-bounded. Exit 0 means a complete finite listing. Anything truncated, malformed, failed or refused at the send guard exits 2 with only earlier valid rows. A client-construction error, including a failing `credential_process`, exits 1 with the sanitized `SOURCE_SYNC_FAILED` and no message or traceback. The plan is not consent to process, is never submitted, and a key missing from a partial plan is never a deletion. See the developer guide's "Cloud bucket/prefix plan" for the exact bounds and checks.
+
 ## One-shot and continuous modes
 
 Default execution performs one reconciliation and exits. `--watch` repeats with a minimum one-second interval; default `--poll-seconds` is 30. `--max-cycles N` bounds a test or scheduled session; zero means repeat until stopped when watch is enabled.

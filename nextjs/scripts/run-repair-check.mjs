@@ -18,7 +18,7 @@ const registeredUnitTestPaths = new Set([
   'components/compile-stage-player.mobile-view.test.tsx',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
-const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs']);
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -475,13 +475,16 @@ export function planBrowserRuns(files, runDetailIntegrity) {
 // The final gate re-reads the reports this runner wrote for an affected plan; a step outcome alone is not accepted.
 export function readAffectedExecution(workspaceRoot, plan) {
   const reportDir = resolve(workspaceRoot, 'node_modules/.cache/repair-scope-reports');
+  if (plan.unitFiles.some(file => file.endsWith('.mjs') && !nodeUnitTestPaths.has(file))) throw new Error('Affected execution contains an unregistered Node test file.');
+  const nodeFiles = plan.unitFiles.filter(file => nodeUnitTestPaths.has(file));
+  const nodeUnits = nodeFiles.length ? readNodeUnitExecution(workspaceRoot, plan) : null;
   const vitestFiles = plan.unitFiles.filter(file => !nodeUnitTestPaths.has(file));
   const units = vitestFiles.length ? readAndValidateVitestReport(resolve(reportDir, 'vitest.json'), vitestFiles) : null;
   const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map((planned, index) => ({
     project: planned.project ?? planned.kind, files: planned.files,
     ...readAndValidatePlaywrightReport(resolve(reportDir, `playwright-${index + 1}.json`), planned.files, workspaceRoot, planned.projects ?? [planned.project]),
   }));
-  return { units, browsers };
+  return nodeFiles.length ? { units, nodeUnits, browsers } : { units, browsers };
 }
 
 export function requireUnitFiles(files) {
@@ -544,22 +547,99 @@ async function waitForServer(child, url) {
   throw new Error('Next server did not become ready within 120 seconds.');
 }
 
-async function runNodeUnit(files, reportPath) {
-  const args = buildNodeTestArgs(files);
-  const child = spawn(process.execPath, args, { cwd: repoRoot, env: process.env, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
-  let output = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', chunk => { output += chunk; });
-  child.stderr.on('data', chunk => { output += chunk; });
-  const exitCode = await new Promise((resolveExit, rejectExit) => {
-    child.once('error', rejectExit);
-    child.once('close', resolveExit);
-  });
-  writeFileSync(reportPath, output);
-  const summary = validateNodeTapReport(output, files);
-  console.log('Node TAP report: ' + summary.passed + ' passed, ' + summary.failed + ' failed across ' + summary.files + ' selected files.');
-  if (exitCode !== 0) throw new Error('Node test runner exited with ' + exitCode + '.');
+const nodeEvidenceVersion = 1;
+const nodeRunnerSource = fileURLToPath(import.meta.url);
+const nodeDigest = value => createHash('sha256').update(value).digest('hex');
+const nodeReportName = file => 'node-unit-' + nodeDigest(file);
+
+export function validateNodeFileReport(output, file, workspaceRoot) {
+  const summary = validateNodeTapReport(output, [file]);
+  if (!/^# cancelled 0$/m.test(output)) throw new Error('Node file report contains cancelled or missing cancellation evidence: ' + file);
+  const normalizeFileName = value => value.replaceAll('\\', '/').replace(/\/+/g, '/');
+  const fileNames = new Set([file, resolve(workspaceRoot, file)].map(normalizeFileName));
+  const namedTests = [...output.matchAll(/^\s*# Subtest: (.+)$/gm)]
+    .filter(match => !fileNames.has(normalizeFileName(match[1])));
+  if (!namedTests.length) throw new Error('Node file had no named executed test: ' + file);
+  return summary;
+}
+
+function nodeExecutionIdentity(workspaceRoot, plan) {
+  if (!plan || !/^[0-9a-f]{40}$/.test(plan.headSha)) throw new Error('Node execution requires an exact head SHA.');
+  const files = plan.unitFiles.filter(file => file.endsWith('.mjs'));
+  buildNodeTestArgs(files);
+  if (new Set(files).size !== files.length) throw new Error('Node execution selection contains duplicate files.');
+  files.forEach(file => validateSelectedPath(file, 'unit', workspaceRoot));
+  return { version: nodeEvidenceVersion, headSha: plan.headSha, planSha256: nodeDigest(JSON.stringify(plan)),
+    runnerSha256: nodeDigest(readFileSync(nodeRunnerSource)), files };
+}
+
+// Single-file processes bind each TAP outcome to one selected source, rather than crediting an aggregate count to every file.
+export async function runNodeUnit(workspaceRoot, plan) {
+  const root = realpathSync(workspaceRoot), identity = nodeExecutionIdentity(root, plan);
+  const reportDir = resolve(root, 'node_modules/.cache/repair-scope-reports');
+  mkdirSync(reportDir, { recursive: true });
+  const receiptPath = resolve(reportDir, 'node-unit-receipts.json');
+  rmSync(receiptPath, { force: true });
+  const receipt = { ...identity, executions: [] };
+  for (const file of identity.files) {
+    const args = buildNodeTestArgs([file]), sourcePath = resolve(root, file);
+    const sourceSha256 = nodeDigest(readFileSync(sourcePath));
+    const name = nodeReportName(file), stdoutPath = resolve(reportDir, name + '.tap'), stderrPath = resolve(reportDir, name + '.stderr');
+    rmSync(stdoutPath, { force: true }); rmSync(stderrPath, { force: true });
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT; // Each selected file must run independently, including contracts spawned from node:test.
+    const child = spawn(process.execPath, args, { cwd: root, env, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+    child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
+    const exitCode = await new Promise((resolveExit, rejectExit) => { child.once('error', rejectExit); child.once('close', resolveExit); });
+    writeFileSync(stdoutPath, stdout); writeFileSync(stderrPath, stderr);
+    receipt.executions.push({ file, command: process.execPath, args, exitCode, sourceSha256,
+      sourceAfterSha256: nodeDigest(readFileSync(sourcePath)), stdoutSha256: nodeDigest(stdout), stderrSha256: nodeDigest(stderr) });
+    writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n');
+    if (exitCode !== 0) throw new Error('Node test runner exited with ' + exitCode + ' for ' + file + '.');
+    if (receipt.executions.at(-1).sourceAfterSha256 !== sourceSha256) throw new Error('Node source changed during execution: ' + file);
+    const summary = validateNodeFileReport(stdout, file, root);
+    console.log('Node file ' + file + ': ' + summary.passed + ' passed; source SHA256 ' + sourceSha256 + '; receipt ' + receiptPath);
+  }
+  return readNodeUnitExecution(root, plan);
+}
+
+export function readNodeUnitExecution(workspaceRoot, plan) {
+  return readNodeUnitEvidence(workspaceRoot, plan).summary;
+}
+
+export function readNodeUnitEvidence(workspaceRoot, plan) {
+  const identity = nodeExecutionIdentity(workspaceRoot, plan);
+  const reportDir = resolve(workspaceRoot, 'node_modules/.cache/repair-scope-reports');
+  const receiptPath = resolve(reportDir, 'node-unit-receipts.json');
+  if (!existsSync(receiptPath)) throw new Error('Node execution receipt is missing.');
+  let receipt;
+  try { receipt = JSON.parse(readFileSync(receiptPath, 'utf8')); } catch { throw new Error('Node execution receipt is malformed JSON.'); }
+  if (Object.hasOwn(receipt, 'status')) throw new Error('Node execution receipt contains unsupported execution status.');
+  for (const key of ['version', 'headSha', 'planSha256', 'runnerSha256', 'files']) {
+    if (JSON.stringify(receipt?.[key]) !== JSON.stringify(identity[key])) throw new Error('Node execution receipt identity mismatch: ' + key);
+  }
+  if (!Array.isArray(receipt.executions) || receipt.executions.length !== identity.files.length) throw new Error('Node execution receipt omitted selected files.');
+  const summary = { files: 0, tests: 0, passed: 0, failed: 0, skipped: 0, todo: 0 };
+  const executions = [];
+  for (const [index, file] of identity.files.entries()) {
+    const execution = receipt.executions[index], args = buildNodeTestArgs([file]);
+    if (execution && Object.hasOwn(execution, 'status')) throw new Error('Node execution row contains unsupported execution status: ' + file);
+    if (!execution || execution.file !== file || execution.command !== process.execPath
+      || JSON.stringify(execution.args) !== JSON.stringify(args) || execution.exitCode !== 0) throw new Error('Node execution command or outcome mismatch: ' + file);
+    const sourceSha256 = nodeDigest(readFileSync(resolve(workspaceRoot, file)));
+    if (execution.sourceSha256 !== sourceSha256 || execution.sourceAfterSha256 !== sourceSha256) throw new Error('Node execution source mismatch: ' + file);
+    const name = nodeReportName(file), stdoutPath = resolve(reportDir, name + '.tap'), stderrPath = resolve(reportDir, name + '.stderr');
+    if (!existsSync(stdoutPath) || !existsSync(stderrPath)) throw new Error('Node execution report is missing: ' + file);
+    const stdout = readFileSync(stdoutPath, 'utf8'), stderr = readFileSync(stderrPath, 'utf8');
+    if (execution.stdoutSha256 !== nodeDigest(stdout) || execution.stderrSha256 !== nodeDigest(stderr)) throw new Error('Node execution report digest mismatch: ' + file);
+    const result = validateNodeFileReport(stdout, file, workspaceRoot);
+    for (const key of Object.keys(summary)) summary[key] += result[key];
+    executions.push({ file, status: 'success', command: 'node', validatorNodeVersion: process.version, args, exitCode: 0, sourceSha256,
+      sourceAfterSha256: sourceSha256, stdoutSha256: nodeDigest(stdout), stderrSha256: nodeDigest(stderr), ...result });
+  }
+  return { ...identity, summary, executions };
 }
 
 async function runUnit() {
@@ -572,9 +652,8 @@ async function runUnit() {
   const reportDir = resolve(repoRoot, 'node_modules/.cache/repair-scope-reports');
   mkdirSync(reportDir, { recursive: true });
   if (nodeFiles.length) {
-    const nodeReportPath = resolve(reportDir, 'node-tap.txt');
-    rmSync(nodeReportPath, { force: true });
-    await runNodeUnit(nodeFiles, nodeReportPath);
+    const summary = await runNodeUnit(repoRoot, plan);
+    console.log('Node TAP reports: ' + summary.passed + ' passed across ' + summary.files + ' independently executed selected files.');
   }
   if (!vitestFiles.length) return;
   const reportPath = resolve(reportDir, 'vitest.json');

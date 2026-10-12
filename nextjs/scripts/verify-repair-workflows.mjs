@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
-import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
+import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -185,7 +185,7 @@ assert(dbRehearsal.includes("if: always() && steps.completed-read-draft.outputs.
 assert(planner.includes("COMPLETED_READ_PRODUCER_PREDECESSOR_SHA = '3a5be63e0901f9f1972f6793cac7891bf064af9e'") && planner.includes('COMPLETED_READ_PRODUCER_BLOBS = Object.freeze(') && planner.includes('verifyCompletedReadProducerScopeEvidence'), 'producer must bind all fifteen exact draft source files');
 assert(planner.includes('completedReadProducerVerification?.eligible && Object.hasOwn(COMPLETED_READ_PRODUCER_BLOBS, path)'), 'OCR safety overrides may require only complete producer evidence');
 for (const path of ['lib/api-error-codes.test.ts', 'lib/settle-route.test.ts', 'lib/completed-read-proof.test.ts']) assert(planner.includes(`'${path}'`), 'producer must select genuine Vitest tests: ' + path);
-assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
+assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
 assert((repair.match(/npm ci --ignore-scripts --no-audit --no-fund/g) ?? []).length === 1 && repair.includes('CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}'), 'producer must reuse one normal worker install/test/types step and its strict actual-outcome gate');
 assert(intakeStage > asyncStage, 'intake triage draft must stage only after ACL and async authority');
 assert(dbRehearsal.includes('supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql') && dbRehearsal.includes('supabase/drafts/tests/foundation_intake_triage_binding.sql'), 'intake rehearsal must source only the two reviewed drafts');
@@ -414,24 +414,106 @@ for(const suite of ['nextjs/scripts/repair-scope.test.mjs','nextjs/scripts/repai
 assert((readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8').match(/^test\('affected /gm)??[]).length>=1 && /test\('native world race static: affected /.test(readFileSync(resolve(repo,'nextjs/scripts/db/native-world-race-ci.test.mjs'),'utf8')), 'affected native selector and report patterns must select actual tests');
 assert(repair.includes('run: pnpm install --frozen-lockfile')&&repair.includes('run: pnpm scan:secrets')&&repair.includes('run: pnpm check')&&repair.includes('run: pnpm exec next build')&&!/run: pnpm (?:run )?build\b/.test(repair), 'frozen install, secrets, global type/lint and the direct browser build (no full Vitest prehook) stay unchanged');
 assert(raceHelper.includes('export function admitAffectedSource(')&&raceHelper.indexOf('const baselineIntent=classifyAffected({headSha:head,exec});')<raceHelper.indexOf('const intent=classify({headSha:head,exec});')&&raceHelper.includes('classifyAffected=classifyAffectedIntent, affected=verifyAffectedSource'), 'PR 141 race admission routes verified-baseline descendants to the collector affected proof before any exact race increment');
-// Ordinary Home admission, restated independently: one finite sixteen-path owner with seven direct suites (the mobile-view TSX is
-// registered above) and one browser suite, a single shared-map row for exactly 1440, 390, 360 and reduced-motion. No legacy Home profile.
+// Ordinary Home admission, restated independently: one finite seventeen-path owner with seven direct suites (the mobile-view TSX is
+// registered above) and one browser suite, a single shared-map row for exactly 1440, 390, 360 and reduced-motion. The exact CSS owner adds one reviewed stylesheet overlap. No legacy Home profile.
 const homePaths=['components/compile-stage-player.mobile-view.test.tsx','components/compile-stage-player.tsx','components/landing-v2/hero-actions.tsx','components/landing-v2/hero-film-disclosure.tsx',
   'components/landing-v2/hero-film.tsx','components/landing-v2/hero-source-card.test.tsx','components/landing-v2/hero-source-card.tsx','components/landing-v2/landing-analytics.tsx',
-  'components/landing-v2/landing-hero.module.css','components/landing-v2/landing-page.tsx','e2e/landing-v2.spec.ts','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts','lib/home-evidence-view.ts',
+  'components/landing-v2/home-reader-guide.tsx','components/landing-v2/landing-hero.module.css','components/landing-v2/landing-page.tsx','e2e/landing-v2.spec.ts','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts','lib/home-evidence-view.ts',
   'lib/landing-v2-page.test.ts','lib/one-path-contract.test.ts'];
 const homeSuites=['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/home-evidence-view.test.ts','lib/landing-v2-page.test.ts',
   'lib/one-path-contract.test.ts','lib/film-motion-control.test.ts','lib/marketing-analytics.test.ts'];
 const homeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-landing'),[homeOwner]=homeOwners;
+const homeCssPaths=['components/landing-v2/landing-hero.module.css','app/tavonel.css','lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts',
+  'scripts/fixtures/home-reader-heading-css-baseline.json','scripts/repair-scope.mjs'];
+const homeCssSuites=['lib/home-reader-heading-css-contract.test.ts','lib/home-reader-heading-css-registration.test.ts'];
+const homeCssOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='home-reader-heading-css'),[homeCssOwner]=homeCssOwners;
 assert(JSON.stringify(HOME_AFFECTED_PATHS)===JSON.stringify(homePaths)&&JSON.stringify(HOME_AFFECTED_UNIT_FILES)===JSON.stringify(homeSuites)&&HOME_AFFECTED_BROWSER_FILE==='e2e/landing-v2.spec.ts'
   &&homeOwners.length===1&&JSON.stringify(homeOwner.unitFiles)===JSON.stringify(homeSuites)&&JSON.stringify(homeOwner.browserFiles)===JSON.stringify(['e2e/landing-v2.spec.ts'])
   &&!homeOwner.nativeReuse&&!homeOwner.selector&&!homeOwner.worker&&!homeOwner.database&&!homeOwner.databaseTests.length
-  &&homePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()==='home-landing')
-  &&homePaths.length===16&&new Set(homePaths).size===16&&!homePaths.includes('lib/marketing-analytics.test.ts')
+  &&homePaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).join()===(p==='components/landing-v2/landing-hero.module.css'?'home-landing,home-reader-heading-css':'home-landing'))
+  &&homePaths.length===17&&new Set(homePaths).size===17&&!homePaths.includes('lib/marketing-analytics.test.ts')
   &&['components/landing-v2/other.tsx','components/landing-v2/hero-actions.test.tsx','components/compile-stage-player.test.tsx','e2e/landing-v2-extra.spec.ts','lib/home-evidence-view.tsx','components/landing-v2/landing-hero.css',
     'lib/film-motion-control.ts','lib/marketing-analytics.test.ts'].every(p=>!homeOwner.match.test('nextjs/'+p))
   &&(sharedMap.match(/landing-v2/g)??[]).length===1&&sharedMap.includes("\n  ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],")
-  &&!AFFECTED_GROUPS.some(owner=>/^home-(?!landing$)|legacy/.test(owner.group)), 'Home enters the affected map only as the exact sixteen-path owner with its seven suites and one four-project shared-map row');
+  &&!AFFECTED_GROUPS.some(owner=>(/^home-/.test(owner.group)&&!['home-landing','home-reader-heading-css'].includes(owner.group))||/legacy/.test(owner.group)), 'Home retains its exact seventeen-path owner, seven suites and four-project browser row with only the exact reader stylesheet overlap');
+assert(homeCssOwners.length===1&&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_PATHS)===JSON.stringify(homeCssPaths)
+  &&JSON.stringify(HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES)===JSON.stringify(homeCssSuites)&&JSON.stringify(homeCssOwner.unitFiles)===JSON.stringify(homeCssSuites)
+  &&!homeCssOwner.browserFiles.length&&!homeCssOwner.databaseTests.length&&!homeCssOwner.nativeReuse&&!homeCssOwner.selector&&!homeCssOwner.worker&&!homeCssOwner.database
+  &&homeCssPaths.every(p=>homeCssOwner.match.test('nextjs/'+p))&&homePaths.filter(p=>homeCssOwner.match.test('nextjs/'+p)).join()==='components/landing-v2/landing-hero.module.css'
+  &&homeCssPaths.every(p=>AFFECTED_GROUPS.filter(owner=>owner.match.test('nextjs/'+p)).map(owner=>owner.group).sort().join()===(p==='components/landing-v2/landing-hero.module.css'?'home-landing,home-reader-heading-css':p==='scripts/repair-scope.mjs'?'ci-selector,home-reader-heading-css':p==='scripts/fixtures/home-reader-heading-css-baseline.json'?'ci-selector,home-reader-heading-css':'home-reader-heading-css'))
+  &&['app/globals.css','app/tavonel.scss','app/tavonel.css.bak','components/landing-v2/other.module.css','lib/home-reader-heading-css-contract.ts','scripts/fixtures/other.json','scripts/repair-scope.test.mjs'].every(p=>!homeCssOwner.match.test('nextjs/'+p)),
+  'Reader heading CSS owner must retain its exact six paths, two portable suites, no new execution lane and only the finite Home/CI overlaps');
+const ciNodeSuites=['lib/repair-node-evidence.test.mjs','lib/repair-node-gate-receipt.test.ts'];
+const ciNodeOwners=AFFECTED_GROUPS.filter(owner=>owner.group==='ci-selector');
+assert(REPAIR_NODE_EVIDENCE_CONTRACT_FILE===ciNodeSuites[0]&&REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE===ciNodeSuites[1]
+  &&ciNodeOwners.length===3&&ciNodeOwners.every(owner=>JSON.stringify(owner.unitFiles)===JSON.stringify(ciNodeSuites)&&owner.selector&&!owner.browserFiles.length&&!owner.databaseTests.length&&!owner.worker&&!owner.database&&!owner.nativeReuse)
+  &&ciNodeSuites.every(p=>ciNodeOwners.filter(owner=>owner.match.test('nextjs/'+p)).length===1)
+  &&['lib/repair-node-evidence.test.ts','lib/repair-node-gate-receipt.test.mjs','lib/repair-node-gate-receipt.ts'].every(p=>!ciNodeOwners.some(owner=>owner.match.test('nextjs/'+p))),
+  'CI selector keeps exactly the registered Node evidence and Vitest gate receipt contracts, with finite endpoints and no product neighbor admission');
+// Current compile, navigation and version comparison ownership is finite and restated independently.
+const currentOwnerBindings = [
+  { group: 'compile-source-observations', paths: ['app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts', 'lib/compile-job-worker.ts', 'lib/collection-compile-source-observations.test.mjs'],
+    exportedPaths: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, suites: ['lib/collection-compile-run.test.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs'], exportedSuites: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES,
+    neighbors: ['app/api/collections/compile-other/route.ts', 'lib/collection-compile-source-observations.ts', 'lib/compile-job-worker-other.ts'] },
+  { group: 'world-explorer-navigation', paths: ['components/world-explorer.tsx', 'components/world-explorer.module.css', 'lib/world-explorer-navigation.ts', 'lib/world-explorer-navigation.test.ts'],
+    exportedPaths: WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, suites: ['lib/world-explorer-navigation.test.ts'], exportedSuites: WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES,
+    neighbors: ['components/world-explorer-other.tsx', 'lib/world-explorer-navigation.test.mjs', 'lib/world-read-model.ts'] },
+  { group: 'world-version-diff', paths: ['lib/world-version-diff.ts', 'lib/world-version-diff.test.ts', 'components/world-version-diff.tsx', 'components/world-version-diff.module.css', 'lib/world-version-diff-view.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-comparison-binding.test.ts'],
+    exportedPaths: WORLD_VERSION_DIFF_AFFECTED_PATHS, suites: ['lib/world-version-diff.test.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-comparison-binding.test.ts'], exportedSuites: WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES,
+    neighbors: ['components/world-version-diff-other.tsx', 'lib/world-version-diff-view.test.mjs', 'lib/world-read-model.ts'] },
+];
+for (const binding of currentOwnerBindings) {
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
+  assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)
+    && JSON.stringify(binding.exportedSuites) === JSON.stringify(binding.suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(binding.suites)
+    && !owner.browserFiles.length && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && binding.paths.every(p => owner.match.test('nextjs/' + p)) && binding.neighbors.every(p => !owner.match.test('nextjs/' + p)),
+    'Current affected owner must retain exact paths, direct suites and no broad neighbor admission: ' + binding.group);
+}
+assert(runner.includes("const nodeFiles = plan.unitFiles.filter(file => nodeUnitTestPaths.has(file));")
+  && runner.includes('const nodeUnits = nodeFiles.length ? readNodeUnitExecution(workspaceRoot, plan) : null;')
+  && runner.includes('return nodeFiles.length ? { units, nodeUnits, browsers } : { units, browsers };'),
+  'Affected final reader must preserve the original no-Node shape and add Node results only for a selected Node plan');
+for (const binding of [
+  'export async function runNodeUnit(workspaceRoot, plan)', 'export function readNodeUnitExecution(workspaceRoot, plan)',
+  "resolve(reportDir, 'node-unit-receipts.json')", 'const args = buildNodeTestArgs([file])',
+  "spawn(process.execPath, args, { cwd: root, env, shell: false, stdio: ['ignore', 'pipe', 'pipe'] })", 'delete env.NODE_TEST_CONTEXT;',
+  'planSha256: nodeDigest(JSON.stringify(plan))', 'runnerSha256: nodeDigest(readFileSync(nodeRunnerSource))',
+  'receipt.executions.length !== identity.files.length', 'execution.exitCode !== 0',
+  'execution.sourceSha256 !== sourceSha256 || execution.sourceAfterSha256 !== sourceSha256',
+  'execution.stdoutSha256 !== nodeDigest(stdout) || execution.stderrSha256 !== nodeDigest(stderr)',
+  'validateNodeFileReport(stdout, file, workspaceRoot)', 'Node file had no named executed test:',
+]) assert(runner.includes(binding), 'Selected Node files require separate exact command/source/report identity and executed named tests: ' + binding);
+// The final affected receipt may expose Node identities only after re-reading validated per-file evidence at the exact current head.
+const nodeEvidenceReader=runner.slice(runner.indexOf('export function readNodeUnitEvidence(workspaceRoot, plan)'),runner.indexOf('async function runUnit()'));
+assert(runner.includes('export function readNodeUnitExecution(workspaceRoot, plan) {\n  return readNodeUnitEvidence(workspaceRoot, plan).summary;\n}')
+  &&nodeEvidenceReader.includes("if (Object.hasOwn(receipt, 'status'))")&&nodeEvidenceReader.includes("if (execution && Object.hasOwn(execution, 'status'))")
+  &&nodeEvidenceReader.includes('const executions = [];')&&nodeEvidenceReader.includes("executions.push({ file, status: 'success', command: 'node', validatorNodeVersion: process.version, args, exitCode: 0, sourceSha256,")
+  &&nodeEvidenceReader.includes('sourceAfterSha256: sourceSha256, stdoutSha256: nodeDigest(stdout), stderrSha256: nodeDigest(stderr), ...result')
+  &&nodeEvidenceReader.includes('const result = validateNodeFileReport(stdout, file, workspaceRoot);')&&nodeEvidenceReader.includes('return { ...identity, summary, executions };'),
+  'Validated Node evidence must retain the summary API while exposing only re-read per-file identities and executed counts, never asserted status labels');
+const affectedChecksReader=nativeGateSource.slice(nativeGateSource.indexOf('export function readAffectedExecutedChecks('),nativeGateSource.indexOf('export function appendAffectedExecutedChecks('));
+const affectedChecksAppender=nativeGateSource.slice(nativeGateSource.indexOf('export function appendAffectedExecutedChecks('),nativeGateSource.indexOf('function runGate('));
+assert(nativeGateSource.includes('readAffectedExecution, readNodeUnitEvidence')&&nativeGateSource.includes('const validatedAffectedChecks = new WeakMap();')
+  &&affectedChecksReader.includes('if (headSha !== plan.headSha)')&&affectedChecksReader.includes("const nodeFiles = plan.unitFiles.filter(file => file.endsWith('.mjs'));")
+  &&affectedChecksReader.includes('const evidence = nodeFiles.length ? readNodeUnitEvidence(workspaceRoot, plan) : null;')
+  &&affectedChecksReader.includes('JSON.stringify(execution?.nodeUnits) !== JSON.stringify(evidence.summary)')
+  &&affectedChecksReader.includes("affectedUnits: execution.units ? { status: 'success', ...execution.units } : 'none selected'")
+  &&affectedChecksReader.includes("affectedBrowserReports: execution.browsers.length ? { status: 'success', reports: execution.browsers } : 'none selected'")
+  &&affectedChecksReader.includes("...(evidence ? { affectedNodeUnits: { status: 'success', headSha: evidence.headSha, planSha256: evidence.planSha256,")
+  &&affectedChecksReader.includes('runnerSha256: evidence.runnerSha256, selectedFiles: evidence.files, ...evidence.summary, executions: evidence.executions')
+  &&affectedChecksReader.includes('validatedAffectedChecks.set(checks, { serialized: JSON.stringify(checks), headSha,')
+  &&affectedChecksReader.includes("planSha256: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),")
+  &&affectedChecksReader.includes('scope: affectedReceiptScopeKeys.map(key => [key, JSON.stringify(plan[key])])')
+  &&nativeGateSource.includes("const affectedReceiptScopeKeys = ['headSha', 'unitFiles', 'groups', 'browserFiles', 'changedPaths', 'affectedIntegration',\n  'repairAnchorSha', 'pullRequestBaseSha', 'repository', 'pullRequest', 'deferredGroups', 'runDetailIntegrity',\n  'runFullHermeticVitest', 'runWorkflowStaticGate', 'runCdrWorkerChecks', 'databaseTests'];")
+  &&affectedChecksAppender.includes("if (receipt.gate !== 'passed-scoped-only') return receipt;")
+  &&affectedChecksAppender.includes('validatedAffectedChecks.get(executedChecks)')&&affectedChecksAppender.includes('validated.serialized !== JSON.stringify(executedChecks)')
+  &&affectedChecksAppender.includes('validated.headSha !== receipt.completedHeadSha')
+  &&affectedChecksAppender.includes('validated.scope.some(([key, value]) => JSON.stringify(receipt[key]) !== value)')
+  &&nativeGateSource.includes('affectedExecutedChecks = readAffectedExecutedChecks(process.cwd(), plan, affectedExecution, env.HEAD_SHA);')
+  &&nativeGateSource.includes('if (plan.affectedIntegration) receipt = appendAffectedExecutedChecks(receipt, affectedExecutedChecks);')
+  &&nativeGateSource.indexOf('receipt = appendAffectedExecutedChecks(receipt, affectedExecutedChecks);')<nativeGateSource.indexOf("writeFileSync('repair-receipt.json'"),
+  'Affected gate must bind explicit head and plan, re-read Node identities, reject missing or mismatched summaries, retain the no-Node shape and append only an unchanged validated projection after passed-scoped-only');
 // Recipe continuation admission (X08), restated independently: one finite seven-path owner (the cookbook route's [slug] matched
 // literally), seven direct suites, and exactly one shared-map row per browser suite -- the continuation spec in 1440, 390, 360 and
 // reduced-motion, the existing login-capability spec in 1440 only. No owner may select a browser suite the shared map cannot route.

@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -65,6 +66,53 @@ import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "
 const LOCALES: LandingV2Locale[] = ["en", "ko"];
 const HOME_SCENES = ["s1", "s2", "s3", "s4", "s5", "s6"] as const;
 const REMOVED_HOME_SCENES = ["sources", "evidence", "why", "use"] as const;
+
+describe("Home reading guide integration", () => {
+  it.each(LOCALES)("%s explains source checks and sample limits before the real close", locale => {
+    const main = mainOf(render(locale));
+    const start = main.indexOf("data-home-reader-guide");
+    const close = main.indexOf('<section id="s6"');
+    expect(start).toBeGreaterThan(main.indexOf('<section id="s5"'));
+    expect(close).toBeGreaterThan(start);
+    const guide = main.slice(start, close);
+    const text = readable(guide);
+    expect(elements(guide, "li")).toHaveLength(4);
+    const disclosures = [...guide.matchAll(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/g)];
+    expect(disclosures).toHaveLength(3);
+    for (const disclosure of disclosures) {
+      expect(disclosure[0]).not.toMatch(/<details[^>]*\sopen(?:=|\s|>)/);
+      expect(disclosure[1]).toMatch(/^<summary>[\s\S]+<\/summary><p>[\s\S]+<\/p>$/);
+    }
+    expect(elements(guide, "a").map(open => attr(open, "href"))).toEqual(["#s1"]);
+    expect(guide).not.toMatch(/<form|<input|<textarea|data-consent|<video|<img/);
+    expect(text).not.toContain("Shared workspace policy");
+    expect(text).not.toContain("Example studio");
+    expect(text).toContain(locale === "ko" ? "실제 처리는 실행하지 않았으며" : "Processing has not been run");
+    expect(text).toContain(locale === "ko" ? "원본 HTML 공시" : "original HTML filing");
+    expect(text).toContain(locale === "ko" ? "별도 협의" : "by arrangement");
+    expect(text).toContain(locale === "ko" ? "사용자의 파일을 업로드하거나 처리하지 않습니다" : "does not upload or process your files");
+    if (locale === "ko") expect(text).not.toContain("Before relying on");
+  });
+
+  it("keeps the Home film mark distinguishable across scene backgrounds", () => {
+    const css = readFileSync(new URL("../components/landing-v2/landing-hero.module.css", import.meta.url), "utf8");
+    const control = css.match(/\.film :global\(\.compile-film-viewport\) > :global\(\.compile-film-motion-control\) \{([^}]+)\}/)?.[1];
+    expect(control, "a Home-scoped motion control treatment").toBeDefined();
+    expect(control).toMatch(/color:\s*#fff;/);
+    const plateVar = control!.match(/background:\s*var\((--[a-z-]+)\)/)![1];
+    const plate = css.match(new RegExp(`${plateVar}:\\s*#([0-9a-f]{6})`, "i"))![1]!;
+    const alpha = Number(control!.match(/opacity:\s*([\d.]+)/)![1]);
+    const linear = (value: number) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    const luminance = (channels: number[]) => channels.map(linear).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i]!, 0);
+    const plateChannels = plate.match(/../g)!.map(channel => parseInt(channel, 16) / 255);
+    for (const background of [0, 1]) {
+      const mark = luminance([0, 1, 2].map(() => alpha + background * (1 - alpha)));
+      const ground = luminance(plateChannels.map(channel => channel * alpha + background * (1 - alpha)));
+      expect((mark + 0.05) / (ground + 0.05)).toBeGreaterThanOrEqual(3);
+    }
+    expect(css).toMatch(/compile-film-motion-control\):focus-visible \{[^}]*outline:\s*2px[^}]*box-shadow:/);
+  });
+});
 
 const render = (locale: LandingV2Locale) =>
   renderToStaticMarkup(createElement(LandingPage, { korean: locale === "ko" }));
@@ -214,7 +262,8 @@ describe("landing v2 -- the composition", () => {
       const levels = [...main.matchAll(/<h([1-6])(\s[^>]*)?>/g)].map(match =>
         Number(match[1])
       );
-      expect(levels.filter(level => level === 2)).toHaveLength(6);
+      // The six existing scene headings plus the reader guide and its FAQ.
+      expect(levels.filter(level => level === 2)).toHaveLength(8);
       expect(levels[0]).toBe(1);
       // An h3 may only appear under a heading one level above it: no h1 -> h3 jump anywhere.
       levels.reduce((previous, level) => {

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { DEVELOPER_SCOPES, type DeveloperScope } from "@/lib/developer-contracts";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import ConsumerVerificationPanel from "@/components/consumer-verification-panel";
 
 type ApiKey = {
   keyId: string;
@@ -165,6 +166,7 @@ export default function DeveloperPanel() {
           </div>
         </div>
       </div>
+      <ConsumerVerificationPanel />
     </section>
   );
 }

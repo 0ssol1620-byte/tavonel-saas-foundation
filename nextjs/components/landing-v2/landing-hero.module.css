@@ -1108,6 +1108,126 @@ section.receive {
   }
 }
 
+.film :global(.compile-film-viewport) > :global(.compile-film-motion-control) {
+  border-color: rgb(255 255 255 / 0.6);
+  background: var(--home-ink);
+  color: #fff;
+  opacity: 0.88;
+}
+
+.film :global(.compile-film-viewport) > :global(.compile-film-motion-control[data-control="play"]),
+.film :global(.compile-film-viewport) > :global(.compile-film-motion-control):focus-visible {
+  opacity: 1;
+}
+
+.film :global(.compile-film-viewport) > :global(.compile-film-motion-control):focus-visible {
+  outline: 2px solid var(--home-cobalt);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .film :global(.compile-film-viewport:hover) > :global(.compile-film-motion-control) {
+    opacity: 1;
+  }
+}
+
+/* The accepted concept's reading guide, with the current sample's status and real access path. */
+.readerGuide {
+  padding-block: clamp(2.5rem, 6vw, 4.5rem);
+  background: var(--home-paper);
+  color: var(--home-ink);
+}
+
+.readerLayout {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.readerHead,
+.readerChecks,
+.readerFaq {
+  min-width: 0;
+}
+
+.readerHead h2,
+.readerFaq h2 {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.readerGuide p {
+  max-width: 60ch;
+  margin: 0.625rem 0 0;
+  color: var(--home-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.readerChecks {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.readerChecks li {
+  padding-block-start: 1rem;
+  border-top: 1px solid var(--home-rule-strong);
+}
+
+.readerChecks h3 {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.readerFaq {
+  padding-block-start: 1.5rem;
+  border-top: 2px solid var(--home-ink);
+}
+
+.readerFaq details {
+  border-bottom: 1px solid var(--home-rule);
+}
+
+.readerFaq summary {
+  min-height: 44px;
+  padding-block: 0.875rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.readerFaq summary:focus-visible {
+  outline: 2px solid var(--home-cobalt);
+  outline-offset: 3px;
+}
+
+.readerFaq details p {
+  margin-block: 0 1.25rem;
+}
+
+@media (min-width: 960px) {
+  .readerLayout {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+  .readerFaq {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 3rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   section.hero .actionsBlock :global(.btn.lv2-cta),
   .regionButton,

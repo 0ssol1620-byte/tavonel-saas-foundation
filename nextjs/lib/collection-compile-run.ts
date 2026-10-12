@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { globalCollectionCompileEnabled, GLOBAL_COLLECTION_KEY_PREFIX, GLOBAL_COLLECTION_MAX_BYTES, GLOBAL_COLLECTION_MAX_REGIONS, judgeGlobalCollectionInput } from "./global-collection-compile";
 import { CORE_MAX_LATENCY_MS } from "./execution-budget";
@@ -77,6 +78,12 @@ export type CollectionCompileRun =
   | { ok: true; status: 200; payload: CollectionCompileSuccess }
   | { ok: false; status: number; code: string; payload: Record<string, unknown>; retryAfterSeconds?: number };
 
+/** Server-owned identity metadata only; it never grants source access. Not accepted from JSON. */
+export type CompileObservationPrincipal = Readonly<{
+  userId: string | null;
+  provenance: "authenticated_request" | "durable_job";
+}>;
+
 /** The compiler has not been given anything to read yet; the caller should wait, not fail. */
 export function isCompileWaitingOnReading(code: string) {
   return code === "OCR_NOT_READY" || code === "SOURCE_VERSION_CHANGED";
@@ -96,8 +103,20 @@ export async function runCollectionCompile(
   documentIds: readonly string[],
   logicalCollectionKey?: string,
   compileJobId?: string,
+  observationPrincipal?: CompileObservationPrincipal,
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
+  // An invocation identity, distinct from a durable job (which can have several attempts).
+  // Copy and hash the server caller's principal now; no customer text or raw identity is logged.
+  const observationRunId = randomUUID();
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const observationJobId = /^cjob-[a-f0-9]{32}$/.test(compileJobId ?? "") ? compileJobId! : null;
+  const principalProvenance = observationPrincipal?.provenance;
+  const principalBound = uuid.test(observationPrincipal?.userId ?? "")
+    && (principalProvenance === "authenticated_request"
+      || (principalProvenance === "durable_job" && observationJobId !== null));
+  const principalRefSha256 = principalBound
+    ? `sha256:${createHash("sha256").update(observationPrincipal!.userId!).digest("hex")}` : null;
   const globalCollection = logicalCollectionKey?.startsWith(GLOBAL_COLLECTION_KEY_PREFIX) === true;
   if (globalCollection && documentIds.length > CORPUS_MAX_DOCUMENTS) {
     return { ok: false, status: 413, code: "GLOBAL_COLLECTION_RESOURCE_LIMIT", payload: {} };
@@ -435,7 +454,37 @@ export async function runCollectionCompile(
     // The signed payload binds the admitting grant's digest, whose schema already names its stage;
     // the audit row states it plainly so a qualification compile is never read as a release compile.
     details: { ...compileReceiptAuditDetails(signed.receipt, signed.payload),
-      customerDataGateStage: authorizationStage(customerDataGate) },
+      customerDataGateStage: authorizationStage(customerDataGate),
+      // This existing audit write occurs only after OCR bindings and the Core response were
+      // validated. It is a partial observation of this invocation, not a whole-run monitor.
+      // A Core response covers the collection: it does not prove per-file model processing.
+      sourceProcessingObservations: {
+        schemaVersion: "tavonel.compile_source_observations.v1",
+        runId: observationRunId,
+        compileJobId: observationJobId,
+        principalRefSha256,
+        principalBinding: principalBound ? principalProvenance : "unknown",
+        principalIsSourceAccessGrant: false,
+        coverage: {
+          status: "incomplete",
+          observedBoundaries: ["ocr_input_read_and_validated", "core_collection_response_validated"],
+          unobservedBoundaries: ["cdr", "raw_source_read", "external_transport", "per_file_core_processing", "settlement", "negative_effects"],
+        },
+        sources: verifiedInputs.map((input) => ({
+          documentId: input.documentId,
+          fileKey: null,
+          fileKeyBinding: "unknown",
+          sourceIdentityKind: input.logicalSourceId ? "connector_logical_identity_sha256" : "direct_upload_document",
+          sourceIdentity: input.logicalSourceId
+            ? `sha256:${createHash("sha256").update(input.logicalSourceId).digest("hex")}` : input.documentId,
+          versionKey: input.versionKey,
+          sanitizedInputSha256: input.inputSha256,
+          ocrInputRead: "observed_and_validated",
+          coreResult: "collection_response_observed",
+          perFileProcessing: "unknown",
+          charge: "unknown",
+        })),
+      } },
   });
   if (!audited.ok) return { ok: false, status: 503, code: audited.code, payload: {} };
 

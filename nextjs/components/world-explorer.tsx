@@ -14,7 +14,13 @@
  * something the tenant does not have.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import {
+  collectionScope, directoryEntryIdentity, directoryGroups, directoryPage,
+  initialDirectoryNavigation, matchesDirectoryFilter, navigateDirectory,
+  reconcileDirectoryNavigation, selectedDirectoryEntry,
+} from "../lib/world-explorer-navigation";
+import styles from "./world-explorer.module.css";
 
 export interface CollectionShape {
   collectionId: string;
@@ -34,8 +40,6 @@ export interface CollectionShape {
   };
 }
 
-/** Directory roots, in the order the compiler creates them. */
-const ROOT_ORDER = ["Sources", "Topics", "Entities", "Claims", "Evidence", "Assets", "MOCs", "Packages"];
 
 /**
  * What each compile pass produced, counted from the plan it actually returned.
@@ -82,55 +86,106 @@ function CompilePasses({ collection }: { collection: CollectionShape }) {
   );
 }
 
-export default function WorldExplorer({ collection, onUpload }: { collection: CollectionShape | null; onUpload?: () => void }) {
-  const [openRoot, setOpenRoot] = useState<string | null>("Topics");
-  /**
-   * How many roots are on screen.
-   *
-   * The compiler builds these in a fixed order and the plan records it, so revealing them one at
-   * a time is showing the order the structure was actually created in -- not a decorative delay
-   * bolted onto a finished result. It runs once per collection, it never gates anything (every
-   * root is present in the DOM within a second), and a visitor who does not want it gets the
-   * whole tree immediately: the reveal is skipped entirely under reduced motion.
-   */
+function DirectoryBrowser({ collection }: { collection: CollectionShape }) {
+  const controlsId = useId();
+  const grouped = useMemo(() => directoryGroups(collection), [collection]);
+  const [navigation, setNavigation] = useState(() => initialDirectoryNavigation(collection));
+  const current = reconcileDirectoryNavigation(collection, navigation);
+  // Adjust before rendering the new model, so a removed path cannot retarget or return later.
+  if (current !== navigation) setNavigation(current);
+  const selected = selectedDirectoryEntry(collection, current);
+  const openEntries = grouped.find(({ root }) => root === current.openRoot)?.entries ?? [];
+  const visible = directoryPage(openEntries, current.query, current.page);
+  const selectedVisible = selected && visible.entries.some((entry) =>
+    directoryEntryIdentity(entry) === current.selectedIdentity);
+  const totalMatches = grouped.reduce((total, group) => total
+    + group.entries.filter((entry) => matchesDirectoryFilter(entry, current.query)).length, 0);
   const [revealed, setRevealed] = useState(0);
-  const revealedFor = useRef<string | null>(null);
+  const scope = collectionScope(collection);
 
-  const grouped = useMemo(() => {
-    if (!collection) return [];
-    const byRoot = new Map<string, { path: string; kind: string; sourceIds: string[] }[]>();
-    for (const entry of collection.directoryPlan) {
-      if (entry.kind === "root") continue;
-      const root = entry.path.split("/")[0];
-      const list = byRoot.get(root) ?? [];
-      list.push(entry);
-      byRoot.set(root, list);
-    }
-    return ROOT_ORDER.filter((root) => byRoot.has(root)).map((root) => ({
-      root,
-      entries: byRoot.get(root) ?? [],
-    }));
-  }, [collection]);
-
+  // Preserve the existing once-per-collection root reveal and its reduced-motion behavior.
   useEffect(() => {
-    const id = collection?.collectionId ?? null;
-    if (!id || grouped.length === 0) return;
-    if (revealedFor.current === id) return;
-    revealedFor.current = id;
-
-    const reduce = typeof window !== "undefined"
-      && window.matchMedia
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (grouped.length === 0) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduce) {
       setRevealed(grouped.length);
       return;
     }
     setRevealed(1);
-    const timers = grouped.map((_, index) =>
-      window.setTimeout(() => setRevealed((current) => Math.max(current, index + 1)), index * 110));
+    const timers = Array.from({ length: grouped.length }, (_, index) =>
+      window.setTimeout(() => setRevealed((count) => Math.max(count, index + 1)), index * 110));
     return () => timers.forEach(window.clearTimeout);
-  }, [collection?.collectionId, grouped]);
+  }, [scope, grouped.length]);
 
+  const navigate = (action: Parameters<typeof navigateDirectory>[2]) =>
+    setNavigation((previous) => navigateDirectory(collection, previous, action));
+
+  return (
+    <div className={styles.browser}>
+      <div className={styles.filter}>
+        <label htmlFor={`${controlsId}-filter`}>Filter directory entries</label>
+        <input id={`${controlsId}-filter`} type="search" value={current.query}
+          placeholder="Path or kind" onChange={(event) => navigate({ type: "filter", query: event.target.value })}
+          aria-describedby={`${controlsId}-filter-help`} />
+        <p id={`${controlsId}-filter-help`} className="fine">Matches paths or kinds across all roots.</p>
+      </div>
+      {grouped.length === 0 ? <p role="status">No directory entries in this collection.</p> : null}
+      {grouped.length > 0 && totalMatches === 0 ? <p role="status">No directory entries match this filter.</p> : null}
+      <div className="tree">
+        {grouped.map(({ root, entries }, index) => {
+          const open = current.openRoot === root;
+          const page = directoryPage(entries, current.query, open ? current.page : 1);
+          const panelId = `${controlsId}-root-${index}`;
+          return (
+            <div className="tree-root" key={root} data-open={open ? 1 : 0} data-in={index < revealed ? 1 : 0}>
+              <button type="button" onClick={() => navigate({ type: "root", root: open ? null : root })}
+                aria-expanded={open} aria-controls={panelId}>
+                <span className="tw" aria-hidden="true">{open ? "−" : "+"}</span>
+                <span className="tn">{root}</span>
+                <span className="tc">{current.query.trim() ? `${page.total} of ${entries.length}` : entries.length}</span>
+              </button>
+              <div id={panelId} hidden={!open}>
+                {open ? <>
+                  {page.total === 0 ? <p className={styles.empty}>No entries in {root} match this filter.</p> : (
+                    <ul>
+                      {page.entries.map((entry) => (
+                        <li key={directoryEntryIdentity(entry)} className={styles.entryRow}>
+                          <button type="button" className={styles.entry} aria-pressed={current.selectedIdentity === directoryEntryIdentity(entry)}
+                            onClick={() => navigate({ type: "select", entry })}>
+                            <span className={styles.path}>{entry.path.startsWith(`${root}/`) ? entry.path.slice(root.length + 1) : entry.path}</span>
+                            <span className={styles.kind}>{entry.kind}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <nav className={styles.pagination} aria-label={`${root} directory pages`}>
+                    <button type="button" disabled={page.page === 1}
+                      onClick={() => navigate({ type: "page", page: page.page - 1 })}>Previous</button>
+                    <span role="status">{page.first}–{page.last} of {page.total} · Page {page.page} of {page.pageCount}</span>
+                    <button type="button" disabled={page.page === page.pageCount}
+                      onClick={() => navigate({ type: "page", page: page.page + 1 })}>Next</button>
+                  </nav>
+                </> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className={styles.selection} role="status">
+        {selected ? <>
+          <p className="eyebrow">Selected directory entry</p>
+          <p className={styles.selectedPath}>{selected.path}</p>
+          <p className="fine">{selected.kind} · {selected.sourceIds.length} source reference{selected.sourceIds.length === 1 ? "" : "s"}</p>
+          {!selectedVisible ? <p className="fine">This selection is outside the current page or filter.</p> : null}
+          <button type="button" onClick={() => navigate({ type: "clear" })}>Clear selection</button>
+        </> : <p className="fine">Select a directory entry to keep its path in view while browsing.</p>}
+      </div>
+    </div>
+  );
+}
+
+export default function WorldExplorer({ collection, onUpload }: { collection: CollectionShape | null; onUpload?: () => void }) {
   if (!collection) {
     return (
       <section className="card">
@@ -189,40 +244,7 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
         ))}
       </div>
 
-      <div className="tree">
-        {grouped.map(({ root, entries }, index) => {
-          const open = openRoot === root;
-          return (
-            <div
-              className="tree-root"
-              key={root}
-              data-open={open ? 1 : 0}
-              data-in={index < revealed ? 1 : 0}
-            >
-              <button type="button" onClick={() => setOpenRoot(open ? null : root)} aria-expanded={open}>
-                <span className="tw">{open ? "−" : "+"}</span>
-                <span className="tn">{root}</span>
-                <span className="tc">{entries.length}</span>
-              </button>
-              {open ? (
-                <ul>
-                  {entries.slice(0, 40).map((entry) => (
-                    <li key={entry.path}>
-                      <span className="tp">{entry.path.slice(root.length + 1)}</span>
-                      <span className="tk">{entry.kind}</span>
-                    </li>
-                  ))}
-                  {entries.length > 40 ? (
-                    // Never truncate silently: a list that stops without saying so reads as a
-                    // complete list that happens to be short.
-                    <li className="more">{(entries.length - 40).toLocaleString("en-US")} more not listed</li>
-                  ) : null}
-                </ul>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      <DirectoryBrowser key={collectionScope(collection)} collection={collection} />
 
       {collection.manifestDigest ? (
         <p className="fine id">Manifest {collection.manifestDigest}</p>

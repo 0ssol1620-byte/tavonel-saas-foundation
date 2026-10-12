@@ -315,3 +315,118 @@ describe("versioned reviewed intake triage", () => {
     })).toBeNull();
   });
 });
+
+describe("indexed customer charge coverage", () => {
+  function coverageInput() {
+    return {
+      scope,
+      configurationRevision: "triage-config-1",
+      pricingFingerprint: priceFingerprint,
+      supportedMimeTypes: ["application/pdf"],
+      observations: [
+        observation("file-b", { revision: "rev-b", aclObservationSha256: "e".repeat(64) }),
+        observation("file-a", { revision: "rev-a", aclObservationSha256: "c".repeat(64) }),
+        observation("file-c", { contentSha256: `sha256:${"d".repeat(64)}` }),
+      ],
+      choices: { "file-a": "include", "file-b": "include", "file-c": "exclude" } as Record<string, TriageChoice>,
+      estimate: {
+        ...estimate,
+        customerChargeCoverage: {
+          ...estimate.customerChargeCoverage,
+          sourceVersions: [
+            { fileKey: "file-b", revision: "rev-b", contentSha256: hash, mode: "new_read" as const },
+            { fileKey: "file-a", revision: "rev-a", contentSha256: hash, mode: "new_read" as const },
+          ] as TriageEstimateRange["customerChargeCoverage"]["sourceVersions"],
+        },
+      },
+    };
+  }
+
+  it("matches complete reordered coverage by key while keeping ACL-distinct duplicates selected", () => {
+    const input = coverageInput();
+    const inventory = buildIntakeTriage(input);
+    expect(inventory?.approvalReady).toBe(true);
+    expect(inventory?.approvalBlockers).toEqual([]);
+    expect(inventory?.selectedFileKeys).toEqual(["file-a", "file-b"]);
+    expect(inventory?.files.slice(0, 2).map((file) => [file.fileKey, file.revision, file.aclObservationSha256])).toEqual([
+      ["file-a", "rev-a", "c".repeat(64)],
+      ["file-b", "rev-b", "e".repeat(64)],
+    ]);
+    expect(inventory?.files[1].exactDuplicateOf).toBe("file-a");
+    expect(inventory?.estimate).toBe(input.estimate);
+    expect(inventory?.duplicatePolicy).toBe("review_only_no_artifact_reuse");
+  });
+
+  it.each([
+    "missing_quote", "stale_revision", "stale_digest", "duplicate_quote",
+    "unverified_digest", "unknown_scope", "unknown_reprocessing", "unchanged_recompile",
+  ] as const)("retains strict coverage blocker for %s", (failure) => {
+    const input = coverageInput();
+    const coverage = input.estimate.customerChargeCoverage;
+    if (failure === "missing_quote") coverage.sourceVersions.pop();
+    if (failure === "stale_revision") coverage.sourceVersions[0].revision = "rev-b-old";
+    if (failure === "stale_digest") coverage.sourceVersions[0].contentSha256 = `sha256:${"9".repeat(64)}`;
+    if (failure === "duplicate_quote") coverage.sourceVersions[0] = { ...coverage.sourceVersions[1] };
+    if (failure === "unverified_digest") input.observations[0].digestEvidence = "connector_observed";
+    if (failure === "unknown_scope") coverage.scope = "unknown";
+    if (failure === "unknown_reprocessing") coverage.sourceVersions[0].mode = "unknown_reprocessing";
+    if (failure === "unchanged_recompile") coverage.sourceVersions[0].mode = "unchanged_already_read_recompile";
+    const inventory = buildIntakeTriage(input);
+    expect(inventory).not.toBeNull();
+    expect(inventory?.selectedFileKeys).toEqual(["file-a", "file-b"]);
+    expect(inventory?.approvalReady).toBe(false);
+    expect(inventory?.approvalBlockers).toContain("customer_charge_scope_or_new_read_coverage_incomplete");
+    expect(inventory?.approvalBlockers.includes("READ_PROOF_REQUIRED")).toBe(failure === "unchanged_recompile");
+  });
+
+  it.each(["duplicate_observation", "unknown_choice", "pricing_fingerprint", "price_policy"] as const)(
+    "keeps validation fail-closed for %s before indexing", (failure) => {
+      const input = coverageInput();
+      if (failure === "duplicate_observation") input.observations[1].fileKey = input.observations[0].fileKey;
+      if (failure === "unknown_choice") input.choices["not-observed"] = "include";
+      if (failure === "pricing_fingerprint") input.estimate.customerChargeCoverage.pricingFingerprint = `sha256:${"8".repeat(64)}`;
+      if (failure === "price_policy") {
+        input.estimate.customerChargeCoverage.policy = "unrecognized" as "published_page_admission_once";
+      }
+      expect(buildIntakeTriage(input)).toBeNull();
+    },
+  );
+
+  it("bounds coverage key accesses for 1000 connector observations without a timing assertion", () => {
+    const count = 1000;
+    let observedKeyReads = 0;
+    let quotedKeyReads = 0;
+    const keys = Array.from({ length: count }, (_, index) => `file-${String(index).padStart(4, "0")}`);
+    const observations = keys.map((key, index) => {
+      const row = observation(key, {
+        revision: `rev-${index}`,
+        contentSha256: `sha256:${index.toString(16).padStart(64, "0")}`,
+      });
+      Object.defineProperty(row, "fileKey", {
+        enumerable: true,
+        get() { observedKeyReads += 1; return key; },
+      });
+      return row;
+    });
+    const sourceVersions = keys.map((key, index) => ({
+      get fileKey() { quotedKeyReads += 1; return key; },
+      revision: `rev-${index}`,
+      contentSha256: `sha256:${index.toString(16).padStart(64, "0")}`,
+      mode: "new_read" as const,
+    })).reverse();
+    const inventory = buildIntakeTriage({
+      scope: { ...scope, sourceKind: "connector", inventoryRevision: "1" },
+      configurationRevision: "triage-config-1",
+      pricingFingerprint: priceFingerprint,
+      supportedMimeTypes: ["application/pdf"],
+      observations,
+      choices: Object.fromEntries(keys.map((key) => [key, "include" as const])),
+      estimate: { ...estimate, customerChargeCoverage: { ...estimate.customerChargeCoverage, sourceVersions } },
+    });
+    expect(inventory?.approvalReady).toBe(true);
+    expect(inventory?.selectedFileKeys).toHaveLength(count);
+    console.info(JSON.stringify({ coverageAccessCount: { count, observedKeyReads, quotedKeyReads } }));
+    expect(quotedKeyReads).toBeLessThanOrEqual(count * 4);
+    expect(observedKeyReads).toBeLessThanOrEqual(count * 40);
+  });
+});

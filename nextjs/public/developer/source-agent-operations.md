@@ -4,7 +4,7 @@ Status: `IMPLEMENTED_NOT_PROVEN`. Local deterministic tests do not qualify a rea
 
 ## Scope and setup
 
-The agent reads only the explicitly selected local/mounted root or S3-compatible bucket/prefix. It does not obtain filesystem or cloud access by connecting MCP. Mounted SMB/NFS/SFTP must already be available to the host. S3/R2/MinIO uses the host's authorized boto3 credential chain.
+The agent reads only the explicitly selected local/mounted root or S3-compatible bucket/prefix. It does not obtain filesystem or cloud access by connecting MCP. Mounted sync reads file content only through held directory handles, so its root must be on a local NTFS or ReFS volume (Windows) or an allowlisted local Linux file system; SMB, NFS and SFTP mounts, other file systems and macOS are refused before anything is listed (see "Deletions and incomplete listings"). S3/R2/MinIO uses the host's authorized boto3 credential chain.
 
 Requirements for sync: Python 3.12+, outbound HTTPS to the configured Foundation and its signed upload destination, and boto3 only for S3 mode. Verify the script against `sourceAgent.sha256` in `channel.json` before distributing it. Updating the developer channel and integrity hash is an integrator-owned follow-up; a local source change is not a new deployed version.
 
@@ -20,7 +20,7 @@ Only an already-authorized environment variable supplies the key. Do not paste k
 
 ## Metadata-only intake plan
 
-Use `--dry-run-plan` to produce a local triage manifest for an explicitly mounted root. This path does not require `TAVONEL_API_KEY`, a connection ID or a state file. It makes no HTTP, S3, LLM or provider calls; it does not upload, hash, open or otherwise read file contents; and it does not modify sync state or a server cursor. It is separate from normal sync and from the Foundation CDR/OCR intake paths. Core intake caching does not apply to this source-agent plan.
+Use `--dry-run-plan` with `--root` to produce a local triage manifest for an explicitly mounted root. (With `--s3-bucket` it is a different, provider-authenticated command; see "Cloud bucket/prefix plan" below.) This path does not require `TAVONEL_API_KEY`, a connection ID or a state file. It makes no HTTP, S3, LLM or provider calls; it does not upload, hash, open or otherwise read file contents; and it does not modify sync state or a server cursor. It is separate from normal sync and from the Foundation CDR/OCR intake paths. Core intake caching does not apply to this source-agent plan.
 
 ```sh
 python3 tavonel-source-agent.py --root /approved/documents --dry-run-plan
@@ -83,7 +83,7 @@ Everything else fails closed before any directory is listed. The plan has one en
 - `platform_not_supported`: macOS, BSD, and every platform other than Windows and Linux.
 - `native_api_unavailable`, `descriptor_relative_api_unavailable`, `filesystem_type_unavailable`, `volume_information_unavailable`, `volume_device_unavailable`, and `volume_root_not_a_plain_directory`: the host can't provide the required APIs or volume facts.
 
-The plan never falls back to path-based scanning. Mounted SMB/NFS/SFTP shares, the agent's main sync use case, are therefore unsupported for `--dry-run-plan`.
+The plan never falls back to path-based scanning. Mounted SMB/NFS/SFTP shares are therefore unsupported for `--dry-run-plan`, and, since the read-binding correction, for mounted sync as well.
 
 #### How it's implemented
 
@@ -112,13 +112,33 @@ NTFS can mark a directory case-sensitive, and that directory can then hold `A` a
 - **Trust anchors:** the drive letter (Windows) and `/` (Linux) are resolved once, when the walk starts. A `subst` mapping or a changed DOS-device mapping is used as found at that moment. The root path is normalized lexically first (`..` is collapsed before the walk).
 - **Linux mount points:** Linux btrfs subvolumes have their own device numbers, so they're reported as `mount_point_not_followed`.
 - **Hard links:** a hard-linked file inside the root is reported like any other file.
-- **Normal sync:** sync doesn't use this traversal; see "Deletions and incomplete listings".
+- **Normal sync:** sync lists with its own path-based metadata walk, but opens file content only through this traversal's held handles; see "Deletions and incomplete listings".
 
 ### Ordering and determinism
 
 Children are traversed, and the manifest is sorted, by case-folded name, with the exact name as a tie-break. `A.pdf` and `a.pdf` therefore sort the same way whatever order the file system lists them in, and a complete plan over unchanged metadata has the same `manifestSha256`. When a count or time budget stops a listing part-way, which entries were reached depends on the file system's listing order, so don't compare truncated plans by hash across hosts.
 
 Statuses distinguish `eligible`, `excluded_by_policy`, `unsupported`, `oversized`, `inaccessible`, and `needs_review`. `unchanged_metadata_candidate` is reserved for a future explicit metadata-baseline comparison; this command reads no baseline and never claims unchanged content, exact duplicates, or reusable content. The plan is a triage aid only and does not authorize upload, deletion, publication, or downstream document processing.
+
+### Cloud bucket/prefix plan (S3, R2, MinIO)
+
+`--dry-run-plan` with `--s3-bucket` inventories one explicitly selected bucket and prefix before any processing. Unlike the mounted plan it is **not offline and not free**: it sends up to two authenticated `ListObjectsV2` requests using the host's existing boto3 credential chain (nothing is copied or added), and the provider may bill them. No request cost is estimated. It needs no `TAVONEL_API_KEY`, connection ID or state file, never calls TAVONEL, and never gets, heads or downloads an object.
+
+```sh
+python3 tavonel-source-agent.py --s3-bucket example-bucket --s3-prefix contracts/2026/ \
+  --s3-endpoint-url https://ACCOUNT_ID.r2.cloudflarestorage.com --s3-region auto --dry-run-plan
+```
+
+End the prefix with `/`: S3 prefixes match by string, so `contracts` also selects `contracts-old/`.
+
+- **Bounds.** At most 2 requests, each with the exact `Bucket` and `Prefix` and `MaxKeys` = the smallest of 1,000, the remaining manifest entries and the remaining entry count (the same `scanBudgets` as the mounted plan), so at most 2,000 keys. The candidate-byte and 1 MiB output budgets apply as for the mounted plan. A listing that still has more pages after the second request is reported incomplete (`truncatedBy: ["request_count"]`).
+- **HTTP attempts.** Disabling SDK retries doesn't stop botocore from adding attempts inside one call: an S3 region redirect re-sends the `ListObjectsV2`, and without a region header it first sends `HeadBucket`. The plan's client therefore counts every attempt on botocore's `before-send` event, which fires once per HTTP attempt just before it is sent. At most 2 `ListObjectsV2` attempts are sent per plan, counting redirect re-sends, and any other operation is refused before it is sent. A refused attempt stops the plan with exit code 2 and `failClosedReason` `listing_http_attempt_cap_reached` or `listing_non_list_operation_refused`. A redirected first request can therefore leave the plan incomplete after one page. If the guard can't be installed and shown active on the client, the plan fails with `SOURCE_SYNC_FAILED` before sending anything. `listing.requestsMade` counts `ListObjectsV2` calls and `listing.httpAttemptsSent` counts the attempts the guard let through. Credential lookups (`credential_process`, SSO, metadata service) and DNS are outside this count.
+- **Time.** The plan's own client sets botocore `retries` to `total_max_attempts: 1` (no SDK retries) and connect and read timeouts of 1.25 s each, the 5 s elapsed budget split across the two allowed HTTP attempts. Sync's S3 client is unchanged and gets no send guard. Elapsed time is checked before each request and after each response; a response that arrives late keeps its rows but ends the plan as incomplete. This is not a hard 5-second limit: a request already sent can't be cancelled, each timeout bounds one socket wait rather than a whole response, and credential lookup and DNS are outside it.
+- **Fail closed.** Each page is validated whole before any of its rows is kept: a boolean `IsTruncated`, a `Contents` list no longer than the requested `MaxKeys`, a consistent `KeyCount`, `Name` and `Prefix` where returned, a non-empty UTF-8 key of at most 1,024 bytes inside the selected prefix, a non-negative integer `Size`, no key seen twice, and a continuation token that is present and never repeated. Any failure, or a provider error, stops the plan with `failClosedReason` and exit code 2, keeping only rows from earlier valid pages. `providerError` reports only the exception class and the provider's error code; messages, endpoints, credentials and continuation tokens are never printed.
+- **Classification.** The same default policy and service byte ceiling as the mounted plan: only the default policy applies, and no ignore file is fetched. Directory and name exclusions are matched against the key's own `/`-separated segments, starting at the last `/` of the prefix. A key ending in `/` is a folder marker (`needs_review` / `directory_marker_not_file_content`), not evidence of file content. A key with an empty, `.` or `..` segment, a backslash or a control character is `needs_review` / `key_not_a_safe_relative_name`. Keys are provider keys only; nothing is opened, read or written locally. `eligible` still means only a supported suffix with listed size at or under 5,242,880 bytes; `pageCount` is null, and ETags are not read or used as content hashes.
+- **Output.** Schema `tavonel.source-intake-cloud-plan.v1`, with the same `policy` and `policyFingerprint` as the mounted plan. `source` names only the bucket and prefix, not the endpoint, region or credentials. Entries keep listing order and carry `key` and `path` (the key without the prefix). Exit code 0 means a complete finite listing within every bound; 2 means incomplete or fail-closed. A configuration problem (no boto3, a non-HTTPS endpoint, an invalid bucket name or a prefix over 1,024 bytes) prints the usual sanitized `SOURCE_SYNC_FAILED` and exits 1. Any error while building the plan's client prints the same output and exits 1. That includes SDK configuration errors, credential errors such as a failing `credential_process`, and event-registration errors. Their messages, any captured process stderr, the traceback and the chained cause are never printed.
+
+The cloud plan is a diagnostic only. It is not consent to process, quote or upload, and it is never sent to the service. `partialScanFinalized` is false and `absenceSemantics` is `none`, so a key missing from a partial plan is never a deletion. It makes no duplicate-content, true page-count, price or billing claim, and it is not a qualification of any real S3, R2 or MinIO account. Its tests use an offline fake provider. Where boto3 and botocore are installed, they also run the real SDK with its HTTP send replaced in memory and static synthetic credentials. Those SDK cases are skipped when the SDK is absent.
 
 ## One-shot and continuous modes
 
@@ -157,9 +177,46 @@ The process prints one JSON result per completed cycle and sanitized retry/failu
 
 ## Deletions and incomplete listings
 
-A permission error in a mounted-directory walk aborts reconciliation rather than turning unlisted files into deletions. Symbolic links are skipped, paths outside the selected root are refused, and file metadata is checked during hashing. Repeated/missing S3 continuation tokens abort the inventory.
+A permission error in a mounted-directory walk, or an entry whose metadata can't be read, aborts reconciliation rather than turning unlisted files into deletions. Paths outside the selected root are refused, and file metadata is checked during hashing. Repeated/missing S3 continuation tokens abort the inventory.
 
-The revision that hardened the intake plan didn't change normal sync. Sync skips symbolic links, but like `os.walk` it still descends into Windows junctions. If it reaches any file through a junction that leads outside the root, the cycle aborts and the cursor is left unchanged (fail closed). A junction that leads back inside the root can duplicate inventory entries, or loop until a path error aborts the cycle. Keep junctions out of synced roots until sync gets the same reparse-point handling as the plan.
+Mounted sync scans in two phases. Before either phase, the agent holds the root the way the intake plan does (see "Links, junctions and confinement"): a no-follow walk of single names from the drive or `/`, on a supported local volume. If that can't be done, the cycle stops before anything is listed or read. The first phase reads metadata only (`lstat` of each entry) and reads no file content; the second hashes the collected files, opening each one beneath the held root. During the first phase:
+
+- **Links are not descended or collected.** A symbolic link, a Windows directory junction or volume mount point, and any other reparse-point directory (for example a OneDrive Files On-Demand folder) is skipped. A file that is a name-surrogate reparse point (a file symlink) is skipped. A file with a non-link reparse tag, such as a deduplicated or cloud-backed file, is still collected, but on Windows its content can't be read through a held handle, so the cycle then stops (see below). A skipped link's target is synced only if it is also reachable as a real directory inside the root, under its real path.
+- **Each directory is reached once.** If a directory's file identity (device and file ID) repeats, the cycle aborts with `source directory reached twice`. It was added for junctions on an SMB server, which the server resolves on its own side so the client sees a plain directory; remote volumes are now refused before the walk, and the check remains for a bind mount that loops on Linux. A file system that reports a zero file ID gets no identity check.
+- **A synced path that became a link is not a deletion.** If a path from the previous committed state is now a skipped link, or sits beneath one, the cycle aborts with `a previously synced source path is now a link or reparse point` before any content is read, any quote is requested or anything is uploaded. Committed state and any pending journal are left unchanged. Replace the link with the real directory, or register a separate source.
+- **A directory that turned into a link while being walked** aborts the cycle.
+
+File content is never opened by path. For hashing in the second phase, and for the sealed upload snapshot after approval (through the root held for the whole cycle), each file is opened one name at a time beneath held handles: each directory on its inventoried path is opened beneath its held parent, starting from the held root, and the file beneath the last of them. On Windows each open is `NtCreateFile` relative to the held handle with `FILE_OPEN_REPARSE_POINT`, the file with `FILE_NON_DIRECTORY_FILE` and read access; on Linux it is `openat` with `O_NOFOLLOW` (and `O_DIRECTORY` for directories), a device check against the root and a regular-file check. The bytes hashed or copied are those of the handle that was opened, so renaming a held directory and putting a link at its name redirects nothing. Every intermediate handle is closed, whether the open succeeds or is refused.
+
+A refused open aborts the cycle:
+
+- a link, junction or other name-surrogate reparse point on the way: `a source path became a link or reparse point after inventory`;
+- a Linux mount point on the way: `a source path crossed onto another file system after inventory`;
+- an entry that disappeared: `source inventory incomplete`;
+- an entry whose type changed: `a source path changed type after inventory`;
+- on Windows, a non-link reparse file such as a deduplicated file or cloud placeholder: `... whose content can't be read through held handles`. Opened as itself it wouldn't read as its content, and following it wouldn't be a held-handle read.
+
+During the scan a refusal happens before any quote, approval, upload, journal or state write. At upload time it ends the cycle at the same point as the existing `source changed after inventory` refusal.
+
+The root is resolved once per sync, before the state lock and before any pending set is replayed (`--root` may be a link; its target at that moment is the source). It is then held by a no-follow walk of that resolved path, so a link appearing among its ancestors in between is refused. The rest of the cycle uses only the held root and never resolves `--root` again: the state fingerprint is computed from the held path, the scan lists from it and reads through the handle, and the upload snapshot opens files beneath the same handle. Re-pointing a linked `--root`, or renaming the root away and putting a link at its path, after the root is held can't redirect a read:
+
+- If the root path itself becomes a link during the scan, the cycle stops with `a source directory became a link or reparse point during scan` before any content is read or quoted. The path may already have been listed (see "Listing is still path-based" below).
+- After the scan, the upload snapshot reads the held original even though the path now names something else. The next cycle holds what the path names then; a different directory has a different fingerprint and is refused as a changed scope before anything is listed or read.
+- A process can't keep a handle across a restart, so a set saved in the pending journal for quote, approval or upload also records the held root's file identity: volume serial and 128-bit file ID on Windows, device and inode on Linux. A resumed set holds the root again and compares that identity before any request is sent or any file is read. A different object, even at the same path with the same bytes, is refused with `the mounted root is not the object this pending upload set was quoted from`. A journal written before this binding has no identity and is refused the same way. Restore the original root, or delete the journal as the message says. A linked `--root` that now leads elsewhere is refused earlier, as `pending journal scope binding is invalid`.
+
+Earlier revisions of this guide said the root was resolved once. In fact the fingerprint, the scan and the upload each resolved `--root` again, so a selection re-pointed after the fingerprint or after approval could be read from its new target. The size and hash checks run only after such a read, so they couldn't prevent the disclosure.
+
+What this does and doesn't establish:
+
+- **Confinement is about the objects opened.** Each read handle was reached from the held root through directories that were plain at the moment each was opened. Native tests show this for a held directory swapped for an outside link at the file open (see "Offline verification"). It isn't a proof for every file system or filter driver.
+- **Listing is still path-based.** The first phase lists with `os.walk` and `lstat`. An entry replaced between its `lstat` and its listing can still have its names listed once. Only names and metadata come from that listing, and each name is still opened beneath the held root.
+- **Held directories can move.** A directory already opened beneath the root can be renamed to outside the root while held. A file read through that handle then comes from its new location; whoever moved it could equally have put the file inside the root.
+- **Ordinary replacement.** A real directory or file (not a link) swapped in at the same name is read as the new content. The size and hash checks catch it only where its content differs from what was quoted.
+- **Root replaced between cycles.** Committed state binds the root's resolved path, not its file identity. A real directory put at that path between two cycles, or in the moment between resolving `--root` and holding it, is held and synced as the source. Only a pending set checks the root's identity.
+- **Hard links.** A file hard-linked into the root from elsewhere is read like any other file.
+- **Access control.** Opens use the agent's own credentials. ACLs are neither verified nor changed; a denied open aborts the cycle as incomplete.
+- **Linux bind mounts.** A bind mount of the same device inside the root isn't caught by the device check.
+- **Platforms.** Only Windows on local NTFS or ReFS and Linux on the allowlisted file systems are supported. Mapped drives, UNC paths, SMB, NFS, SFTP and FUSE mounts, FAT and exFAT, and macOS are refused with the backend's reason code before any listing. This is a compatibility tightening: such roots previously synced through path-based reads. Likewise, the walk still descends a Linux mount point inside the root (including a btrfs subvolume), but the first file beneath it now stops the cycle instead of being read.
 
 An empty inventory following a nonempty one is refused by default, protecting against an unavailable mount or unexpected listing. `--allow-empty-snapshot` permits this deletion/suspension batch only after the source is verified. It remains an operator decision, not automatic confirmation that every original file was deleted. The agent never deletes the customer's original files.
 
@@ -171,7 +228,7 @@ The server decides how deleted sources are suspended. This change alone does not
 python3 -m unittest discover -s scripts/source-agent -p 'test_*.py' -v
 ```
 
-The suite covers unchanged sync, lost response and exact replay, scope changes, empty inventories, permission failure, symlink skipping, state outside source, budget preflight, explicit legacy adoption, local lock exclusion, bounded watch and retry, repeated S3 cursor and journal tampering. Most sync tests use a mocked client. A dedicated wire regression runs the real `FoundationClient.upload` against a local fake HTTP Foundation and storage server; it checks the capability body, stable idempotency key, unauthenticated byte PUT, and confirmation request. All fixtures are synthetic and local; no live credentials or remote upload is used. The Vitest suite invokes these tests through `lib/source-agent-runtime.test.ts`.
+The suite covers unchanged sync, lost response and exact replay, scope changes, empty inventories, permission failure, symlink skipping, sync source scope (nested add/change/delete/recreate; a junction to an outside tree that is never listed or read; an in-root junction loop and alias that end without duplicates; a synced directory replaced by a junction, refused before any read, quote or upload; a pending replay that commits before the next cycle refuses; a directory swapped after the walk for a junction to an outside tree or to another in-root directory, refused before its content is read, quoted or uploaded; a link swapped in after approval, refused before the upload snapshot opens it; the read boundary itself, where a directory already held for the file open is renamed and replaced by a link to an outside sentinel, and the hash, or the upload snapshot's file identity, still comes from the held directory; a file swapped for an outside file symlink after the walk, refused at its open (skipped on Windows without symlink privilege); the selected root itself swapped, where a linked `--root` is retargeted to an outside tree, or the root path is renamed away and replaced by a link to it, after the fingerprint or after approval, and the scan and upload read only the held original, or the cycle refuses before any read; a pending set resumed after the root was replaced by another directory with the same bytes, after its selection was retargeted, or from a journal without the root identity, refused before any request or read and resumed once the original is back; every read refusal closing all held handles (synthetic backend); on Windows, the mocked `NtCreateFile` file open and its reparse refusals; unsupported traversal refusing mounted sync before any listing, read or quote; mocked dedup, cloud and file-symlink reparse metadata; a repeated directory identity; unreadable entry metadata), state outside source, budget preflight, explicit legacy adoption, local lock exclusion, bounded watch and retry, repeated S3 cursor and journal tampering. Most sync tests use a mocked client. A dedicated wire regression runs the real `FoundationClient.upload` against a local fake HTTP Foundation and storage server; it checks the capability body, stable idempotency key, unauthenticated byte PUT, and confirmation request. All fixtures are synthetic and local; no live credentials or remote upload is used. The Vitest suite invokes these tests through `lib/source-agent-runtime.test.ts`.
 
 The intake-plan tests cover:
 
@@ -183,6 +240,7 @@ The intake-plan tests cover:
 - missing, non-directory, and unreadable roots
 - no content reads or tree changes, and no network, credential, or state use
 - normal sync behaving the same after a plan
+- the cloud plan (`test_cloud_intake_plan.py`, offline fake provider only): a complete single page, prefix and segment policy, a full-page continuation, the two-request ceiling, `MaxKeys` following the remaining allowance, huge UTF-8 keys against the output budget, candidate-byte and elapsed budgets (fake clock), malformed, out-of-prefix, duplicate and cycling pages, an empty listing, sanitized provider errors, no state, approval, upload, content or HTTP use, CLI routing with the mounted branch unchanged, and the plan client's retry and timeout arguments (fake SDK modules)
 
 - traversal anchored to directory handles:
   - Windows opens are single names beneath a held handle, with `FILE_OPEN_REPARSE_POINT`.
@@ -269,3 +327,31 @@ r3 was also prepared without running the test suite. Run it on Windows and on Li
 The 2026-10-03 compatibility repair changes normal sync's upload path. The agent now quotes each complete changed manifest before work, requires the operator's `--approve-up-to-credits` bound, and requires `--allow-unknown-page-count` when non-image sources have no trusted estimate. It persists attempt, quote, approval and file identities before transfer, then confirms each upload before advancing the cursor batch. A changed quote, a larger set than the 128-file approval bound, or an approval refusal stops the cycle for operator review. Existing complete-set and legacy compile behavior is retained.
 
 The repair is a task-owned candidate against PR141 head `db8a8771e10211b7850cdf4ff5788537c2a0aca6`. The prior source-agent implementation was mixed-authored: Claude Opus 5.5 supplied the bounded-intake changes, and Codex added this revision's full-sync fake-HTTP recovery coverage, whole-set cancel call and API contract updates. Local synthetic tests do not prove a deployed API, a production upload, or downstream compile quality.
+
+## Sync source-scope revision
+
+A later revision by Claude Opus 5.5 (`claude-opus-5-5`) changed only the mounted sync scan (`scan_mount`), the path the mounted upload snapshot opens (`sealed_source`), its tests and this guide. It replaces the earlier statement that sync "still descends into Windows junctions": that is what the previous code did, and a junction back into the root could duplicate entries or loop until a path error. The intake plan, S3, quote, approval, upload protocol, journal, replay, retry, locking, fingerprint and budget code are unchanged, as is the command-line interface.
+
+Behavior changes an operator may notice:
+
+- A junction, mount point or other reparse-point directory inside the root is now skipped instead of descended. Content reached only through one is no longer synced.
+- A previously synced path that became a link now stops the cycle instead of producing deletions.
+- A repeated directory identity now stops the cycle.
+
+The first draft of this revision checked containment only during the walk. An independent native Windows test showed that a directory replaced by an outside junction after the walk was still read and returned under its old native ID. A correction then revalidated each path immediately before its content was opened, and added regressions for that swap. That left the race between the check and the open: a native test that swapped the directory for an outside junction just after the check read the outside sentinel and returned it under the old native ID.
+
+A second correction removes the path check and binds the read itself (see "Deletions and incomplete listings"). Mounted content is opened only beneath held handles, reusing the intake plan's Windows and Linux backends with one added file-open operation each, and mounted sync fails closed wherever those backends can't hold the root. Behavior changes an operator may notice:
+
+- SMB, NFS and SFTP mounts, mapped drives and UNC paths, non-NTFS/ReFS Windows volumes, non-allowlisted Linux file systems and macOS are now refused for mounted sync, before anything is listed.
+- On Windows a deduplicated or cloud-placeholder file now stops the cycle instead of being read.
+- A file beneath a Linux mount point inside the root now stops the cycle.
+
+Hard links, held directories moved out of the root, ordinary replacement and ACLs remain as described under "Deletions and incomplete listings".
+
+A third correction stops the selected root itself from being resolved again within a cycle (see "Deletions and incomplete listings"). Behavior changes an operator may notice:
+
+- The root is held before the state lock and before a pending journal is replayed, so a host or volume that can't hold it now refuses even a pending commit that would read no content.
+- A pending set that is quoted, approved or partly uploaded resumes only under the same root object. A journal from an earlier agent version can't show that and must be deleted, so the current set is quoted again.
+- A root path that becomes a link during the scan stops the cycle.
+
+The author had no shell and could not run tests. Run the suite on Windows, where the junction cases run natively, and on Linux before accepting this revision. Mounted SMB and NFS sources are now refused, not qualified. Because the agent file changed, the developer channel's `sourceAgent` integrity hash must be updated by the integrator.

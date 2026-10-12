@@ -1,0 +1,24 @@
+.browser { min-width: 0; }
+.filter { display: grid; gap: 8px; margin-bottom: 16px; min-width: 0; }
+.filter label { color: var(--text-mid); font-size: 14px; }
+.filter input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst); background: var(--g1); color: var(--text-hi); font: inherit; }
+.filter p { margin: 0; }
+.browser .entryRow { display: block; min-width: 0; }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; width: 100%; min-height: 44px; padding: 8px; border: 1px solid transparent; border-radius: var(--r-inst); text-align: left; color: var(--text-mid); font: inherit; }
+.entry[aria-pressed="true"] { border-color: var(--source); color: var(--text-hi); background: var(--g1); }
+.path, .selectedPath { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.kind { color: var(--text-lo); overflow-wrap: anywhere; }
+.empty { padding: 0 13px 12px 41px; color: var(--text-lo); font-size: 14px; }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 13px 14px 41px; color: var(--text-mid); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pagination button, .selection button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--hairline-hi); border-radius: var(--r-inst); color: var(--text-hi); background: var(--g1); }
+.pagination button:disabled { cursor: default; color: var(--text-lo); border-color: var(--hairline); }
+.browser button:focus-visible, .filter input:focus-visible { outline: 2px solid var(--source); outline-offset: 2px; }
+.selection { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); min-width: 0; }
+.selectedPath { font-family: var(--f-mono); color: var(--text-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .entry:hover, .pagination button:not(:disabled):hover, .selection button:hover { background: var(--g2); }
+}
+@media (max-width: 480px) {
+  .entry { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .pagination { padding-left: 13px; }
+}

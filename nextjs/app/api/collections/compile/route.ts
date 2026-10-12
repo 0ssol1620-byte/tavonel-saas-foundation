@@ -65,7 +65,9 @@ export async function POST(request: Request) {
     plan: auth.principal.accessSource ?? "unknown",
     sources: String(documentIds.length),
   });
-  const run = await runCollectionCompile(auth.principal.workspaceKey, documentIds);
+  const run = await runCollectionCompile(auth.principal.workspaceKey, documentIds, undefined, undefined, {
+    userId: auth.principal.userId, provenance: "authenticated_request",
+  });
   if (!run.ok) {
     const headers: Record<string, string> = { "Cache-Control": "no-store" };
     if (run.retryAfterSeconds) headers["Retry-After"] = String(run.retryAfterSeconds);

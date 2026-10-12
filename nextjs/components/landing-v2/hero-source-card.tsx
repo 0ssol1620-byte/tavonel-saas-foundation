@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
+import { getImageProps } from "next/image";
 import type { Route } from "next";
 import { caseStatus, displayableRegions, publishableClaims, type EvidenceCase, type EvidenceRegion } from "@/lib/home-evidence-view";
 import styles from "./landing-hero.module.css";
@@ -163,6 +164,16 @@ const QUALIFIER = {
 
 const letter = (index: number) => String.fromCharCode(65 + index);
 
+// Presentation copies use Next's same-origin optimizer. The committed raster remains the
+// fallback, widest candidate and open-page destination; evidence digests describe that source.
+// Slots follow this Home module's 1320px layout and 7fr/5fr desktop grid.
+const PAGE_SIZES = "(min-width: 1404px) 726px, (min-width: 960px) 52vw, (min-width: 667px) 94vw, calc(100vw - 42px)";
+function pageSrcSet(image: { src: string; width: number; height: number }) {
+  const { srcSet = "" } = getImageProps({ src: image.src, width: image.width, height: image.height, alt: "", sizes: PAGE_SIZES }).props;
+  const copies = srcSet.split(", ").filter(candidate => Number.parseInt(candidate.slice(candidate.lastIndexOf(" ") + 1), 10) < image.width);
+  return [...copies, `${image.src} ${image.width}w`].join(", ");
+}
+
 export default function HeroSourceCard({ view, korean = false }: { view: EvidenceCase; korean?: boolean }) {
   const locale = korean ? "ko" : "en";
   const t = COPY[locale];
@@ -214,8 +225,10 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
               style={{ aspectRatio: `${page.image.width} / ${(page.image.height * (windowEnd - windowStart)) / 1000}` }}
             >
               <div className={styles.pageSheet} style={{ transform: `translateY(-${windowStart / 10}%)` }}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- the committed raster, unre-encoded */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- preserve the committed raster fallback and widest candidate */}
                 <img
+                  srcSet={pageSrcSet(page.image)}
+                  sizes={PAGE_SIZES}
                   src={page.image.src}
                   width={page.image.width}
                   height={page.image.height}

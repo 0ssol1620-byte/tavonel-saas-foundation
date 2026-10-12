@@ -1,4 +1,6 @@
-export type TriageUploadFile = { file: File; relativePath: string; mimeType: string };
+import { PROCESSING_UNIT_USD } from "./usage-pricing";
+
+export type TriageUploadFile ={ file: File; relativePath: string; mimeType: string };
 
 export type TriageStage = {
   index: number;
@@ -349,7 +351,15 @@ export async function quoteTriageProcessing(
       || typeof json.pricingFingerprint !== "string" || !/^sha256:[a-f0-9]{64}$/.test(json.pricingFingerprint)
       || (receipt.receipt.estimate.customerChargeCoverage.pricingFingerprint !== json.pricingFingerprint)
       || !q || values.some((value) => typeof value !== "number" || !Number.isFinite(value) || value < 0)
-      || !Number.isSafeInteger(q.maximumCredits) || q.maximumUsd !== (q.maximumCredits as number) / 100
+      || ![q.maximumPages, q.reservedCredits, q.maximumCredits].every(Number.isSafeInteger)
+      || (q.reservedCredits as number) > (q.maximumCredits as number)
+      || (q.estimatedUsd as number) > (q.maximumUsd as number)
+      // Same formula the server prices with (usage-pricing: credits * PROCESSING_UNIT_USD), so a
+      // genuine reply is bit-identical; `/ 100` refused e.g. 114 credits -> 1.1400000000000001.
+      || q.maximumUsd !== (q.maximumCredits as number) * PROCESSING_UNIT_USD
+      // The estimate is priced the same way from the reserved total, so the dollars shown can
+      // never contradict the credits held, even below the ceiling.
+      || q.estimatedUsd !== (q.reservedCredits as number) * PROCESSING_UNIT_USD
       || !Array.isArray(selected) || selected.length === 0 || files.length !== selected.length
       || !files.every((file) => record(file) && typeof file.fileKey === "string" && selected.includes(file.fileKey))
       || new Set(files.map((file) => record(file) ? file.fileKey : null)).size !== files.length) {

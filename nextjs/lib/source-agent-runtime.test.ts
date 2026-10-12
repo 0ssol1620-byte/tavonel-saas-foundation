@@ -10,5 +10,5 @@ describe("source-agent offline durability and bounded watch", () => {
     const python = process.platform === "win32" ? (existsSync(bundled) ? bundled : "python") : "python3";
     const output = execFileSync(python, ["-m", "unittest", "discover", "-s", fileURLToPath(new URL("../scripts/source-agent", import.meta.url)), "-p", "test_*.py", "-v"], { encoding: "utf8", timeout: 30_000, stdio: ["ignore", "pipe", "pipe"] });
     expect(output).not.toContain("FAILED");
-  });
+  }, 35_000); // just above the child's own 30 s deadline; Vitest's 5 s default cut a ~6.5 s suite run
 });

@@ -40,6 +40,22 @@
 .summary code { color: var(--diff-ink); font: 12px var(--f-mono, monospace); }
 .note { margin: 0; color: var(--diff-faint); font-size: 12px; line-height: 1.6; }
 
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 0; padding: 12px; min-width: 0; border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); }
+.filters legend { padding: 0 4px; color: var(--diff-muted); font: 500 12px var(--f-sans, sans-serif); }
+.filters label { display: grid; gap: 6px; min-width: 0; color: var(--diff-muted); font: 12px var(--f-sans, sans-serif); }
+.filters select, .filters input { box-sizing: border-box; width: 100%; min-height: 44px; max-width: 100%; padding: 8px 10px; color: var(--diff-ink); background: var(--ground, #11120f); border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); font: 13px var(--f-sans, sans-serif); }
+.filters .search { flex: 1 1 240px; }
+.filters button { min-height: 44px; padding: 8px 12px; color: var(--diff-ink); border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); font: 500 13px var(--f-sans, sans-serif); }
+.filters button:disabled { color: var(--diff-faint); cursor: default; }
+.filters input::placeholder { color: var(--diff-faint); }
+.filters :is(input, select, button):focus-visible { outline: 2px solid var(--diff-added); outline-offset: 3px; }
+.filters .note { flex-basis: 100%; }
+.sectionCount { color: var(--diff-muted); font: 12px var(--f-mono, monospace); letter-spacing: normal; text-transform: none; }
+
+@media (max-width: 480px) {
+  .filters label, .filters .search { flex: 1 1 100%; }
+}
+
 .plain { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font: 12px/1.6 var(--f-mono, monospace); }
 .plain > li { color: var(--diff-muted); overflow-wrap: anywhere; }
 /* The sign carries the meaning as much as the colour does, so this reads without hue. */
@@ -69,3 +85,8 @@
 .empty span { color: var(--text-lo, #74736d); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
 .empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
 .empty p { margin: 0; color: var(--text-lo, #a5a49d); font-size: 12px; }
+
+.pagination { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; color: var(--diff-muted); font: 12px var(--f-sans, sans-serif); }
+.pagination button { min-height: 44px; padding: 8px 12px; color: var(--diff-ink); border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); font: 500 13px var(--f-sans, sans-serif); }
+.pagination button:disabled { color: var(--diff-faint); cursor: default; }
+.pagination button:focus-visible { outline: 2px solid var(--diff-added); outline-offset: 3px; }

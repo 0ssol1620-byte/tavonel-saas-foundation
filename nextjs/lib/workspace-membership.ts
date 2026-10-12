@@ -112,11 +112,19 @@ export async function getWorkspaceMembership(workspaceKey: string, userId: strin
     return failure("WORKSPACE_MEMBERSHIP_READ_FAILED");
   }
   if (!response.ok) return failure("WORKSPACE_MEMBERSHIP_READ_FAILED");
-  const rows = await response.json().catch(() => null) as Array<Record<string, unknown>> | null;
-  if (!Array.isArray(rows)) return failure("WORKSPACE_MEMBERSHIP_STORE_INVALID");
-  const row = rows[0];
-  if (!row) return { ok: true as const, membership: null };
-  if (!(["owner", "admin", "member"] as unknown[]).includes(row.role)
+  const rows: unknown = await response.json().catch(() => null);
+  // limit=1 was requested, so anything but zero or one row is an ambiguous store response.
+  if (!Array.isArray(rows) || rows.length > 1) return failure("WORKSPACE_MEMBERSHIP_STORE_INVALID");
+  if (rows.length === 0) return { ok: true as const, membership: null };
+  const value: unknown = rows[0];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return failure("WORKSPACE_MEMBERSHIP_STORE_INVALID");
+  const row = value as Record<string, unknown>;
+  // The selected row must itself carry the requested identity: never rebind another
+  // workspace's or user's membership to the request.
+  const rowUserId = typeof row.user_id === "string" ? row.user_id : "";
+  if (row.workspace_key !== workspaceKey || !UUID.test(rowUserId)
+    || rowUserId.toLowerCase() !== userId.toLowerCase()
+    || !(["owner", "admin", "member"] as unknown[]).includes(row.role)
     || !(["active", "revoked"] as unknown[]).includes(row.state)
     || typeof row.accepted_at !== "string"
     || !Number.isSafeInteger(row.authorization_revision)

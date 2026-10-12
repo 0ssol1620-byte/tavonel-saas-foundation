@@ -326,8 +326,10 @@ export async function runCompileJobTurn(job: CompileJob): Promise<CompileJobTurn
   }
 
   const run = job.compilationMode === "global_collection"
-    ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`, job.jobId)
-    : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId);
+    ? await runCollectionCompile(job.workspaceKey, classified.ready, `${GLOBAL_COLLECTION_KEY_PREFIX}${job.corpusId}`, job.jobId,
+      { userId: job.createdByUserId, provenance: "durable_job" })
+    : await runCollectionCompile(job.workspaceKey, classified.ready, undefined, job.jobId,
+      { userId: job.createdByUserId, provenance: "durable_job" });
   if (!run.ok) {
     if (isCompileWaitingOnReading(run.code)) {
       /*

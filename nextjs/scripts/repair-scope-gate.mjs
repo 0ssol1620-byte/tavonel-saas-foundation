@@ -1,7 +1,8 @@
-import { readPublicProductExecution, readSolutionsWorkflowExecution, readExploreRepairExecution, readAffectedExecution } from './run-repair-check.mjs';
+import { readPublicProductExecution, readSolutionsWorkflowExecution, readExploreRepairExecution, readAffectedExecution, readNodeUnitEvidence } from './run-repair-check.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { verifyPublicPagesEligibility, publicPagesLineageFailures, collectorLineageFailures, verifyCollectorEligibility, verifyNativeDbEligibility, nativeDbLineageFailures, verifySolutionsEligibility, solutionsPagesLineageFailures, verifyExploreRepairEligibility, exploreRepairLineageFailures, verifyNativeRaceEligibility, nativeRaceLineageFailures, classifyAffectedIntent, verifyAffectedEligibility, affectedLineageFailures } from './repair-collector-only.mjs';
 import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt, verifyIntakePresentationEligibility, intakePresentationLineageFailures, readIntakePresentationExecution } from './repair-known-regression.mjs';
 
@@ -51,6 +52,41 @@ export function buildRepairReceipt(plan, { headSha, failures = [], databaseResul
   };
 }
 
+const validatedAffectedChecks = new WeakMap();
+const affectedReceiptScopeKeys = ['headSha', 'unitFiles', 'groups', 'browserFiles', 'changedPaths', 'affectedIntegration',
+  'repairAnchorSha', 'pullRequestBaseSha', 'repository', 'pullRequest', 'deferredGroups', 'runDetailIntegrity',
+  'runFullHermeticVitest', 'runWorkflowStaticGate', 'runCdrWorkerChecks', 'databaseTests'];
+
+export function readAffectedExecutedChecks(workspaceRoot, plan, execution, headSha) {
+  if (headSha !== plan.headSha) throw new Error('Affected executed checks require the exact current head.');
+  const nodeFiles = plan.unitFiles.filter(file => file.endsWith('.mjs'));
+  const evidence = nodeFiles.length ? readNodeUnitEvidence(workspaceRoot, plan) : null;
+  if (evidence && JSON.stringify(execution?.nodeUnits) !== JSON.stringify(evidence.summary)) {
+    throw new Error('Affected Node summary is absent or differs from the validated per-file evidence.');
+  }
+  const checks = {
+    affectedUnits: execution.units ? { status: 'success', ...execution.units } : 'none selected',
+    affectedBrowserReports: execution.browsers.length ? { status: 'success', reports: execution.browsers } : 'none selected',
+    nativeWorldRaceHostedCases: `${plan.affectedIntegration.nativeEvidence.disposition}: not executed or claimed by Repair; only the dedicated native-world-race workflow runs the seven cases`,
+    ...(evidence ? { affectedNodeUnits: { status: 'success', headSha: evidence.headSha, planSha256: evidence.planSha256,
+      runnerSha256: evidence.runnerSha256, selectedFiles: evidence.files, ...evidence.summary, executions: evidence.executions } } : {}),
+  };
+  validatedAffectedChecks.set(checks, { serialized: JSON.stringify(checks), headSha,
+    planSha256: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
+    scope: affectedReceiptScopeKeys.map(key => [key, JSON.stringify(plan[key])]) });
+  return checks;
+}
+
+export function appendAffectedExecutedChecks(receipt, executedChecks) {
+  if (receipt.gate !== 'passed-scoped-only') return receipt;
+  const validated = executedChecks && validatedAffectedChecks.get(executedChecks);
+  if (!validated || validated.serialized !== JSON.stringify(executedChecks) || validated.headSha !== receipt.completedHeadSha
+    || validated.scope.some(([key, value]) => JSON.stringify(receipt[key]) !== value)) {
+    throw new Error('Affected executed checks must be the unchanged validated current-head evidence.');
+  }
+  return { ...receipt, executedChecks: { ...receipt.executedChecks, ...executedChecks } };
+}
+
 export function requireCompletedReadRehearsal({ stageResult, state, firstPgTapResult, secondPgTapResult }) {
   const failures = [
     ['completed-read draft staging', stageResult, 'success'],
@@ -81,13 +117,16 @@ function runGate() {
     ['selected browser checks', browserRequired ? env.BROWSER_RESULT : 'success'],
   ];
   if (plan.collectorOnlyFailure) requirements.push([`collector-only eligibility: ${plan.collectorOnlyFailure.reason ?? 'unqualified'}`, 'failure']);
-  let repairProof, repairExecution, intakeExecution, publicProductExecution, solutionsExecution, exploreExecution, affectedExecution;
+  let repairProof, repairExecution, intakeExecution, publicProductExecution, solutionsExecution, exploreExecution, affectedExecution, affectedExecutedChecks;
   // Re-derived from the current head, never from plan flags: deleting the affected record cannot skip byte recomputation or report checks.
   const affectedIntent = classifyAffectedIntent({ headSha: env.HEAD_SHA });
   if (plan.affectedIntegration || affectedIntent.classification !== 'normal') {
     const proof = verifyAffectedEligibility({ headSha: env.HEAD_SHA, intent: affectedIntent });
     for (const reason of affectedLineageFailures(plan, proof)) requirements.push([reason, 'failure']);
-    try { affectedExecution = readAffectedExecution(process.cwd(), plan); }
+    try {
+      affectedExecution = readAffectedExecution(process.cwd(), plan);
+      affectedExecutedChecks = readAffectedExecutedChecks(process.cwd(), plan, affectedExecution, env.HEAD_SHA);
+    }
     catch (error) { requirements.push(['affected selected reports: ' + error.message, 'failure']); }
   }
   if(plan.publicPagesPresentation||plan.groups.includes('public-product-pages')){
@@ -162,10 +201,7 @@ function runGate() {
   if(plan.publicPagesPresentation&&receipt.gate==='passed-scoped-only')receipt.executedChecks={...receipt.executedChecks,units:{status:'success',...publicProductExecution.units},selectedBrowserReports:{status:'success',reports:publicProductExecution.browsers},publicProductCaptures:{status:'success',files:publicProductExecution.captures}};
   if(plan.solutionsPagesPresentation&&receipt.gate==='passed-scoped-only')receipt.executedChecks={...receipt.executedChecks,units:{status:'success',...solutionsExecution.units},selectedBrowserReports:{status:'success',reports:[{project:'1440',...solutionsExecution.browser}]},solutionsWorkflowCases:solutionsExecution.browser,captures:{status:'success',files:solutionsExecution.captures}};
   if(plan.exploreRepairPresentation&&receipt.gate==='passed-scoped-only')receipt.executedChecks={...receipt.executedChecks,units:{status:'success',...exploreExecution.units},selectedBrowserReports:{status:'success',reports:[{project:'1440',file:'e2e/solutions-workflows.spec.ts',...exploreExecution.solutionsBrowser},{project:'1440',file:'e2e/explore.spec.ts',...exploreExecution.exploreBrowser}]},solutionsWorkflowCases:exploreExecution.solutionsBrowser,exploreCases:exploreExecution.exploreCases,captures:{status:'success',files:exploreExecution.captures}};
-  if (plan.affectedIntegration && receipt.gate === 'passed-scoped-only') receipt.executedChecks = { ...receipt.executedChecks,
-    affectedUnits: affectedExecution.units ? { status: 'success', ...affectedExecution.units } : 'none selected',
-    affectedBrowserReports: affectedExecution.browsers.length ? { status: 'success', reports: affectedExecution.browsers } : 'none selected',
-    nativeWorldRaceHostedCases: `${plan.affectedIntegration.nativeEvidence.disposition}: not executed or claimed by Repair; only the dedicated native-world-race workflow runs the seven cases` };
+  if (plan.affectedIntegration) receipt = appendAffectedExecutedChecks(receipt, affectedExecutedChecks);
   if(plan.nativeWorldRacePresentation&&receipt.gate==='passed-scoped-only')receipt.executedChecks={...receipt.executedChecks,nativeWorldRaceContracts:{status:env.SELECTOR_TEST_RESULT,suites:[...plan.nativeWorldRaceContractSuites],step:'Run selector regression tests'},nativeWorldRaceHostedCases:'not executed by Repair; owned by the dedicated native-world-race workflow'};
   if (plan.intakePresentation && receipt.gate === 'passed-scoped-only') receipt.executedChecks = { ...receipt.executedChecks,
     units: { status: 'success', ...intakeExecution.units }, intakeBrowsers: { status: 'success', reports: intakeExecution.browsers },
