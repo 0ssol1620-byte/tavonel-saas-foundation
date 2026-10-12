@@ -29,7 +29,8 @@
   /* Align the Home workbench, other scenes and shared chrome to one measure. */
   .home { --chrome-measure: 1320px; }
   /* Give the dark text its actual paper backdrop even before hydration. */
-  .home > header:not([data-scrolled="1"]) { background: var(--home-paper); }
+  /* The legacy chrome rule is unlayered; this scoped priority preserves an opaque light header. */
+  .home > header:not([data-scrolled="1"]) { background: var(--home-paper) !important; }
 }
 
 /*
