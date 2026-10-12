@@ -5393,36 +5393,46 @@ test('affected consumer verification admission: the combined workspace page, con
     assert.ok(!alone.groups.includes(AFFECTED_CONSUMER_GROUP)&&!alone.unitFiles.includes('lib/consumer-verification.test.ts'),record.paths.join(' -> '));
   }
 });
-// ---- Affected world diff admission: two exact paths, one direct suite; no browser, database, worker, build or selector lane ----
+// ---- Affected world diff admission: seven exact paths, three direct suites; no additional execution lane ----
 import { WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 // Restated from the root handoff (SOURCE-CLEAR product tree f395bbf4b7646df4ca775672aa812a19b7899aa4 on selector base
 // 91bf15c0508b611c0d280148ae2940b03a47db01): the two modified 100644 files.
 const AFFECTED_WORLD_DIFF_MODEL='nextjs/lib/world-version-diff.ts',AFFECTED_WORLD_DIFF_TEST='nextjs/lib/world-version-diff.test.ts';
 const AFFECTED_WORLD_DIFF_PATHS=Object.freeze([AFFECTED_WORLD_DIFF_MODEL,AFFECTED_WORLD_DIFF_TEST]);
+// Current ownership includes the reviewed pagination panel/view and comparison binding. Keep the
+// original two-file raw fixture and diagnostic blob identities below as historical input.
+const AFFECTED_WORLD_DIFF_OWNED_PATHS=Object.freeze([
+  AFFECTED_WORLD_DIFF_MODEL,AFFECTED_WORLD_DIFF_TEST,
+  'nextjs/components/world-version-diff.tsx','nextjs/components/world-version-diff.module.css',
+  'nextjs/lib/world-version-diff-view.ts','nextjs/lib/world-version-diff-view.test.ts','nextjs/lib/world-version-comparison-binding.test.ts',
+]);
 // Diagnostic identities only: the map never reads oids and the selector pins none, so future product edits keep the same owner.
 const AFFECTED_WORLD_DIFF_BLOBS=Object.freeze({
   [AFFECTED_WORLD_DIFF_MODEL]:{prior:'efb62079a6ae5e1dd0d7a2ad23d4960e9e4a0afe',final:'9c00ce849c5068c3151012b8a8a79722f7df58cb'},
   [AFFECTED_WORLD_DIFF_TEST]:{prior:'608744ddd8238e71eeecbd60ae0a8c05e574e7f1',final:'3b0646c801f6b1f7b0818b3b83d18ef4c45760ea'}});
-const AFFECTED_WORLD_DIFF_SUITES=Object.freeze(['lib/world-version-diff.test.ts']);
+const AFFECTED_WORLD_DIFF_SUITES=Object.freeze([
+  'lib/world-version-comparison-binding.test.ts','lib/world-version-diff-view.test.ts','lib/world-version-diff.test.ts',
+]);
 const AFFECTED_WORLD_DIFF_GROUP='world-version-diff';
 // The final raw delta: two M (100644 -> 100644) records.
 const affectedWorldDiffRaw=()=>parseAffectedRawDiff(AFFECTED_WORLD_DIFF_PATHS.map(path=>
   `:100644 100644 ${AFFECTED_WORLD_DIFF_BLOBS[path].prior} ${AFFECTED_WORLD_DIFF_BLOBS[path].final} M\0${path}\0`).join(''));
-test('affected world diff admission: each exact path and the combined two-M delta select the sole owner and exactly the one physically present, discovered direct suite', () => {
-  assert.deepEqual(WORLD_VERSION_DIFF_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_WORLD_DIFF_PATHS);assert.equal(new Set(AFFECTED_WORLD_DIFF_PATHS).size,2);
-  assert.deepEqual([...WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES],AFFECTED_WORLD_DIFF_SUITES);
-  for (const path of AFFECTED_WORLD_DIFF_PATHS) assert.ok(existsSync(fileURLToPath(new URL('../'+path.slice('nextjs/'.length),import.meta.url))),'owned path exists: '+path);
+test('affected world diff admission: each current exact path and the historical two-M delta select the sole owner and all three physically present, discovered direct suites', () => {
+  assert.deepEqual(WORLD_VERSION_DIFF_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_WORLD_DIFF_OWNED_PATHS);assert.equal(new Set(AFFECTED_WORLD_DIFF_OWNED_PATHS).size,7);
+  assert.deepEqual([...WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES].sort(),AFFECTED_WORLD_DIFF_SUITES);
+  for (const path of AFFECTED_WORLD_DIFF_OWNED_PATHS) assert.ok(existsSync(fileURLToPath(new URL('../'+path.slice('nextjs/'.length),import.meta.url))),'owned path exists: '+path);
+  for (const suite of AFFECTED_WORLD_DIFF_SUITES) assert.ok(existsSync(fileURLToPath(new URL('../'+suite,import.meta.url))),'selected suite exists: '+suite);
   assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the suite is discovered by the unchanged global include');
   const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_WORLD_DIFF_GROUP);
   assert.equal(owners.length,1);const [owner]=owners;
-  assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
+  assert.deepEqual([[...owner.unitFiles].sort(),owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
     [AFFECTED_WORLD_DIFF_SUITES,[],[],false,false,false,false,undefined,undefined]);
   const records=affectedWorldDiffRaw();
   assert.deepEqual(records.map(({status,oldMode,newMode,paths})=>[status,oldMode,newMode,paths]),AFFECTED_WORLD_DIFF_PATHS.map(path=>['M','100644','100644',[path]]));
-  for (const path of AFFECTED_WORLD_DIFF_PATHS) {
+  for (const path of AFFECTED_WORLD_DIFF_OWNED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[AFFECTED_WORLD_DIFF_GROUP],path);
     // The actual record, plus every regular status/mode the inherited policy supports, all map the same way.
-    for (const record of [records.find(r=>r.paths[0]===path),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
+    for (const record of [records.find(r=>r.paths[0]===path)??affectedRecord('M',[path]),affectedRecord('A',[path],'000000'),affectedRecord('A',[path],'000000','100755'),affectedRecord('M',[path]),affectedRecord('M',[path],'100644','100755')]) {
       const map=affectedMap([record]),label=`${record.status} ${record.oldMode}->${record.newMode} ${path}`;
       assert.deepEqual([map.failures,map.unmappedPaths,map.groups,map.unitFiles,map.browserFiles],[[],[],[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,[]],label);
       assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests,map.databaseDependencyReasons,map.fixtureContracts],[false,false,false,[],{},[]],label);
@@ -5452,14 +5462,14 @@ test('affected world diff admission: the actual regular affectedPlan defers only
       [[...new Set(records.flatMap(r=>r.paths))].sort(),'fresh-seven-case-native-run-required',false],label);
   }
 });
-test('affected world diff admission: lookalikes, UI, CSS, route, server and spec siblings stay unknown, prior known paths keep only their prior owners; spellings, statuses and modes refuse', () => {
+test('affected world diff admission: lookalikes and unowned UI, CSS, route, server and spec siblings stay unknown, prior known paths keep only their prior owners; spellings, statuses and modes refuse', () => {
   // Every metacharacter is escaped and each path is anchored, so neighbours, other extensions and other directories never match.
   for (const path of ['nextjs/lib/world-version-diff.tsx','nextjs/lib/world-version-diff.js','nextjs/lib/world-version-diff.ts.bak','nextjs/lib/world-version-diffXts',
     'nextjs/lib/world-version-diffs.ts','nextjs/lib/world-versions-diff.ts','nextjs/lib/world-version.ts','nextjs/lib/world-version-diff-v2.ts','nextjs/lib/world-version-diff/index.ts',
     'nextjs/lib/World-Version-Diff.ts','nextjs/lib/world-version-diff-server.ts','nextjs/lib/world-version-diff.d.ts',
     'nextjs/lib/world-version-diff.spec.ts','nextjs/lib/world-version-diff.test.tsx','nextjs/lib/world-version-diffXtest.ts','nextjs/lib/world-version-diff-copy.test.ts',
     'nextjs/lib/world-version.test.ts','nextjs/lib/__snapshots__/world-version-diff.test.ts.snap',
-    'nextjs/components/world-version-diff.tsx','nextjs/components/world-version-diff.module.css','nextjs/components/world-version-diff.test.tsx',
+    'nextjs/components/world-version-diff-v2.tsx','nextjs/components/world-version-diff-v2.module.css','nextjs/components/world-version-diff.test.tsx',
     'nextjs/app/api/v1/worlds/[id]/versions/diff/route.ts','nextjs/app/api/world-version-diff/route.ts','nextjs/e2e/world-version-diff.spec.ts',
     'nextjs/nextjs/lib/world-version-diff.ts','lib/world-version-diff.ts','lib/world-version-diff.test.ts','world-version-diff.ts']) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
@@ -5497,7 +5507,7 @@ test('affected world diff admission: known plus unknown or an unowned rename end
   assert.deepEqual([mixed.failures,mixed.unmappedPaths],[['unmapped changed endpoint: nextjs/lib/world-version-diff-v2.ts'],['nextjs/lib/world-version-diff-v2.ts']]);
   assert.deepEqual([mixed.groups,mixed.unitFiles],[[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES],'diagnostic selection is retained beside the failure');
   assert.throws(()=>affectedAskPlan(mixed),/clean fail-closed map/);
-  for (const paths of [[AFFECTED_WORLD_DIFF_MODEL,'nextjs/lib/world-version-diff-v2.ts'],['nextjs/components/world-version-diff.tsx',AFFECTED_WORLD_DIFF_MODEL],
+  for (const paths of [[AFFECTED_WORLD_DIFF_MODEL,'nextjs/lib/world-version-diff-v2.ts'],['nextjs/components/world-version-diff-v2.tsx',AFFECTED_WORLD_DIFF_MODEL],
     [AFFECTED_WORLD_DIFF_TEST,'nextjs/lib/world-version-diff.spec.ts'],['nextjs/lib/world-version.test.ts',AFFECTED_WORLD_DIFF_TEST]]) {
     const unknown=paths.find(path=>!AFFECTED_WORLD_DIFF_PATHS.includes(path)),map=affectedMap([affectedRecord('R090',paths)]);
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],paths.join(' -> '));
@@ -5506,13 +5516,14 @@ test('affected world diff admission: known plus unknown or an unowned rename end
   }
   // An unknown sibling beside the consumer, UX08 and new owners closes the union too.
   const shared=affectedMap([affectedRecord('M',[AFFECTED_CONSUMER_PANEL]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',[AFFECTED_WORLD_DIFF_MODEL]),
-    affectedRecord('A',['nextjs/components/world-version-diff.module.css'],'000000')]);
-  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/world-version-diff.module.css'],['nextjs/components/world-version-diff.module.css']]);
+    affectedRecord('A',['nextjs/components/world-version-diff-v2.module.css'],'000000')]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/world-version-diff-v2.module.css'],['nextjs/components/world-version-diff-v2.module.css']]);
   assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
-  // Deleting either owned path keeps the owner and still checks the actual suite at head.
-  for (const path of AFFECTED_WORLD_DIFF_PATHS) {
+  // Deleting any owned path keeps the owner; every selected direct suite must remain at head.
+  for (const path of AFFECTED_WORLD_DIFF_OWNED_PATHS) {
     const deleted=buildAffectedMap({headSha:affectedHeadSha,records:[affectedRecord('D',[path],'100644','000000')],headHasFile:file=>file!==path});
-    const expected=path===AFFECTED_WORLD_DIFF_TEST?['selected owner check is absent at head: lib/world-version-diff.test.ts']:[];
+    const suite=path.slice('nextjs/'.length);
+    const expected=AFFECTED_WORLD_DIFF_SUITES.includes(suite)?[`selected owner check is absent at head: ${suite}`]:[];
     assert.deepEqual([deleted.groups,deleted.unitFiles,deleted.failures,deleted.nativeEvidence.invalidatingPaths],[[AFFECTED_WORLD_DIFF_GROUP],AFFECTED_WORLD_DIFF_SUITES,expected,[path]],path);
     if (expected.length) assert.throws(()=>affectedAskPlan(deleted),/clean fail-closed map/,path);
   }
@@ -5570,7 +5581,7 @@ test('affected world diff admission: the combined consumer, UX08, workspace page
   assert.ok(!base.groups.includes(AFFECTED_WORLD_DIFF_GROUP)&&!base.unitFiles.includes('lib/world-version-diff.test.ts'));
   assert.deepEqual(combined.groups,[...base.groups,AFFECTED_WORLD_DIFF_GROUP].sort());
   assert.deepEqual(combined.unitFiles,affectedUnion(base.unitFiles,AFFECTED_WORLD_DIFF_SUITES));
-  assert.equal(combined.unitFiles.length,base.unitFiles.length+1);
+  assert.equal(combined.unitFiles.length,base.unitFiles.length+AFFECTED_WORLD_DIFF_SUITES.length);
   assert.deepEqual(combined.changedPaths,affectedUnion(base.changedPaths,AFFECTED_WORLD_DIFF_PATHS));
   assert.deepEqual(combined.entries.slice(0,base.entries.length),base.entries);
   assert.deepEqual(combined.entries.slice(base.entries.length).map(entry=>entry.groups),AFFECTED_WORLD_DIFF_PATHS.map(()=>[AFFECTED_WORLD_DIFF_GROUP]));
