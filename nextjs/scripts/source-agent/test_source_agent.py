@@ -411,7 +411,12 @@ def recorded_scan():
     """Record every directory listing, and the native id of every file opened for content beneath the held root."""
     listed=[];read=[]
     real_scandir=agent.os.scandir;real_open=agent._open_inventoried
-    def scandir(path='.'):listed.append(Path(os.fspath(path)));return real_scandir(path)
+    def scandir(path='.'):
+        # Linux scandir also accepts held descriptors (including tempfile cleanup).
+        # Resolve their actual directory so confinement observations are not omitted.
+        observed=Path(os.readlink(f'/proc/self/fd/{path}')) if isinstance(path,int) else Path(os.fspath(path))
+        listed.append(observed)
+        return real_scandir(path)
     def opened(backend,root_handle,native_id):
         descriptor=real_open(backend,root_handle,native_id);read.append(native_id);return descriptor
     with patch.object(agent.os,'scandir',scandir),patch.object(agent,'_open_inventoried',opened):

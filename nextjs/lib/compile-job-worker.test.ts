@@ -276,7 +276,8 @@ describe("the durable compile worker", () => {
     }));
     expect(turn.note).toBe("compiled");
     expect(turn.state).toBe("ready");
-    expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001");
+    expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001",
+      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
   });
 
   it("records the digest of the artifact it produced, on whichever advance lands", async () => {
@@ -572,6 +573,7 @@ it("compiles every document of a qualified global job into one logical collectio
   const turn = await runCompileJobTurn(job({ compilationMode: "global_collection", corpusId,
     batchIndex: 0, batchCount: 1, documentIds: ids, documentsTotal: 13 }));
   expect(turn.note).toBe("compiled");
-  expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`, "cjob-00000000000000000000000000000001");
+  expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`, "cjob-00000000000000000000000000000001",
+    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" });
   vi.unstubAllEnvs();
 });

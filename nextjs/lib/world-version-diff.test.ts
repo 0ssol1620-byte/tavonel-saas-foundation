@@ -303,7 +303,9 @@ describe("where the comparison is shown", () => {
   });
 
   it("puts the rollback button under the diff it is confirming", () => {
-    expect(panel).toContain("reverses every change listed above");
+    expect(panel).toContain("reverses the entire version comparison");
+    expect(panel).toContain("all {countChanges(diff)} artifact changes, including rows hidden by filters");
+    expect(panel).toContain("onRollback(diff.left.manifestDigest)");
     expect(workspace).toContain("onRollback={rollbackReason.trim().length >= 8");
   });
 });
