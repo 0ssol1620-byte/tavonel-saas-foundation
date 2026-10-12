@@ -31,7 +31,7 @@
   /* Give the dark text its actual paper backdrop even before hydration. */
   /* The legacy chrome rule is unlayered; this scoped priority preserves an opaque light header. */
   .home > header:not([data-scrolled="1"]) { background: var(--home-paper) !important; }
-  .home > header:not([data-scrolled="1"]) > details > summary { background: var(--home-ink) !important; }
+  .home > header:not([data-scrolled="1"]) > details > summary { background: var(--home-sheet) !important; color: var(--home-ink) !important; }
 }
 
 /*
@@ -196,7 +196,6 @@ section.hero .intake {
 
 /* The workbench: one top rule, numbered steps, no nested panels. */
 .bench {
-  counter-reset: home-step;
   min-width: 0;
   border-top: 2px solid var(--home-ink);
   color: var(--home-ink);
@@ -251,17 +250,6 @@ section.hero .intake {
   padding-top: 1.25rem;
 }
 
-/* Step numbers are counters, so the page's figure guard never sees a typed digit. */
-.step::before {
-  counter-increment: home-step;
-  content: counter(home-step, decimal-leading-zero) "\2002" attr(data-step);
-  display: block;
-  margin-bottom: 0.5rem;
-  color: var(--home-muted);
-  font: 600 0.75rem/1.4 var(--home-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 
 @media (min-width: 960px) {
   .benchGrid {
@@ -741,7 +729,6 @@ section.difficulty {
 }
 
 .diffList {
-  counter-reset: home-diff;
   display: grid;
   margin: 0;
   padding: 0;
@@ -749,7 +736,6 @@ section.difficulty {
 }
 
 .diffList > li {
-  counter-increment: home-diff;
   display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr);
   column-gap: 1rem;
@@ -757,15 +743,6 @@ section.difficulty {
   border-top: 1px solid var(--home-rule-strong);
 }
 
-.diffList > li::before {
-  content: counter(home-diff, decimal-leading-zero);
-  grid-row: 1 / span 3;
-  color: var(--home-amber-ink);
-  font-size: 1.75rem;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
 
 .diffList > li > * {
   grid-column: 2;
@@ -1064,21 +1041,6 @@ section.receive {
     padding-top: 0.25rem;
   }
 
-  .step::before {
-    margin-bottom: 0.125rem;
-  }
-
-  /*
-    The file name is the source step here, so its generated "01 Source" label is dropped; the
-    element keeps the count so the passage and record steps stay 02 and 03.
-  */
-  .locator::before {
-    display: none;
-  }
-
-  .locator {
-    counter-increment: home-step;
-  }
 
   .filename {
     font-size: 1rem;
@@ -1304,4 +1266,164 @@ section.receive {
   .filmSummary::before {
     transition: none;
   }
+}
+
+@layer overrides {
+.home {
+  --home-paper: #fbfaf7 !important;
+  --home-stone: #f2f0eb !important;
+  --home-sheet: #ffffff !important;
+  --home-ink: #15191d !important;
+  --home-muted: #555b62 !important;
+  --home-cobalt: #2347b8 !important;
+  --home-rule: rgb(21 25 29 / 0.12) !important;
+  --home-rule-strong: rgb(21 25 29 / 0.24) !important;
+  --home-ko: "Wanted Sans Variable", var(--f-sans), system-ui, sans-serif !important;
+  font-family: "Wanted Sans Variable", var(--f-sans), sans-serif !important;
+}
+
+
+.home section.hero {
+  padding-block: calc(4rem + clamp(2rem, 6vw, 5rem)) clamp(3rem, 7vw, 5.5rem) !important;
+}
+.home section.hero .layout { gap: clamp(2.5rem, 6vw, 4.5rem) !important; }
+.home section.hero .intro { gap: 1.25rem 3rem !important; align-items: start !important; }
+
+@media (min-width: 960px) {
+  .home section.hero .intro {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr) !important;
+    grid-template-areas: "title title" "support actions" !important;
+    align-items: end !important;
+  }
+}
+
+.home section.hero .intro :global(.lv2-eyebrow) { display: none !important; }
+
+.home section.hero .intro :global(.lv2-hero-h1) {
+  max-width: none !important;
+  font-family: "Wanted Sans Variable", var(--f-sans), sans-serif !important;
+  font-size: clamp(2.5rem, 1.4rem + 4vw, 4.75rem) !important;
+  font-weight: 510 !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.02em !important;
+  text-wrap: balance !important;
+}
+
+.home section.hero .intro :global(.lv2-hero-h1):lang(ko) {
+  max-width: 20em !important;
+  font-family: var(--home-ko) !important;
+  font-size: clamp(1.875rem, 1.2rem + 3vw, 3.5rem) !important;
+  font-weight: 560 !important;
+  line-height: 1.24 !important;
+  letter-spacing: -0.025em !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+.home section.hero .intro :global(.lv2-hero-support) {
+  max-width: 38rem !important;
+  font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem) !important;
+  line-height: 1.6 !important;
+}
+.home section.hero .intro :global(.lv2-hero-support):lang(ko) { line-height: 1.75 !important; word-break: keep-all !important; }
+
+.home section.hero .actionsBlock :global(.btn.lv2-cta) {
+  min-height: 48px !important;
+  padding-inline: 1.5rem !important;
+  border-radius: 6px !important;
+  font-weight: 560 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+
+.home section.hero .bench { border-top: 1px solid var(--home-rule-strong) !important; }
+.home section.hero .benchHead { padding-block: 1rem !important; }
+.home section.hero .benchGrid { gap: 1.75rem !important; padding-top: 1.75rem !important; }
+@media (min-width: 960px) { .home section.hero .benchGrid { row-gap: 1.5rem !important; } }
+
+.home section.hero .step::before { content: none !important; display: none !important; }
+
+.home section.hero .pageWindow { border-color: var(--home-rule) !important; background: #fff !important; }
+.home section.hero .passagePane .quote { background: var(--home-paper) !important; font-size: 1.1875rem !important; line-height: 1.65 !important; }
+.home section.hero .passagePane .quote { border-inline-start: 0 !important; padding-inline-start: 0 !important; }
+.home section.hero .passagePane .quote:lang(ko) { line-height: 1.8 !important; word-break: keep-all !important; }
+
+.home section.hero .extracted,
+.home section.hero .metaField,
+.home section.hero .regionsLabel {
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  font-weight: 560 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.home section.hero .extracted { border-color: var(--home-rule-strong) !important; }
+
+.home section.hero .regionPane .regionButton { min-height: 48px !important; border-color: var(--home-rule-strong) !important; }
+
+.home section.hero .record { padding-top: 1.5rem !important; border-top-color: var(--home-rule-strong) !important; }
+.home section.hero .record .recordList { gap: 1.5rem 2.5rem !important; }
+
+
+.home section.difficulty { background: var(--home-stone) !important; }
+.home section.difficulty .diffList > li { grid-template-columns: minmax(0, 1fr) !important; padding-block: 1.5rem !important; border-top-color: var(--home-rule) !important; }
+.home section.difficulty .diffList > li::before { content: none !important; display: none !important; }
+.home section.difficulty .diffList > li > * { grid-column: 1 !important; }
+
+
+.home .splitHead :global(.lv2-h2),
+.home .receiveHead :global(.lv2-h2),
+.home .readerGuide .readerHead h2,
+.home .readerGuide .readerFaq h2 {
+  font-family: "Wanted Sans Variable", var(--f-sans), sans-serif !important;
+  font-weight: 510 !important;
+  line-height: 1.04 !important;
+  letter-spacing: -0.015em !important;
+}
+.home .splitHead :global(.lv2-h2):lang(ko),
+.home .receiveHead :global(.lv2-h2):lang(ko),
+.home .readerGuide .readerHead h2:lang(ko),
+.home .readerGuide .readerFaq h2:lang(ko) {
+  font-family: var(--home-ko) !important;
+  font-weight: 560 !important;
+  line-height: 1.3 !important;
+  letter-spacing: -0.02em !important;
+  word-break: keep-all !important;
+}
+
+
+.home section.receive .recordSheet {
+  border-top: 1px solid var(--home-rule-strong) !important;
+  box-shadow: none !important;
+}
+.home section.receive .recordSheet .recordKind,
+.home section.receive .recordSheet .recordFields dt {
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.home section.receive .noteList li { padding-top: 1.125rem !important; border-top-color: var(--home-rule) !important; }
+.home section.receive .method { padding: clamp(1.25rem, 3vw, 2rem) !important; background: var(--home-stone) !important; }
+
+.home .readerGuide { padding-block: clamp(3.5rem, 8vw, 6rem) !important; }
+.home .readerGuide .readerChecks li { border-top-color: var(--home-rule) !important; }
+.home .readerGuide p:lang(ko),
+.home .noteList p:lang(ko),
+.home .method ol:lang(ko) { line-height: 1.75 !important; word-break: keep-all !important; }
+
+@media (max-width: 639.98px) {
+  .home section.hero { padding-block: calc(4rem + 1rem) 2.5rem !important; }
+  .home section.hero .layout { gap: 1.5rem !important; }
+  .home section.hero .intro { gap: 0.75rem !important; }
+  .home section.hero .intro :global(.lv2-hero-h1) { max-width: none !important; font-size: clamp(2.25rem, 10vw, 2.75rem) !important; line-height: 1.02 !important; }
+  .home section.hero .intro :global(.lv2-hero-h1):lang(ko) { font-size: clamp(1.75rem, 7.6vw, 2rem) !important; line-height: 1.28 !important; }
+  .home section.hero .benchGrid { gap: 1.25rem !important; padding-top: 0.75rem !important; }
+  .home section.hero .actionsBlock :global(.btn.lv2-cta) { min-height: 44px !important; }
+}
+
+.home section.hero .runStatus { font-family: inherit !important; }
+.home section.hero .runStatus::before { content: none !important; }
+.home .receive .recordQuote { border-inline-start: 0 !important; padding-inline-start: 0 !important; }
 }

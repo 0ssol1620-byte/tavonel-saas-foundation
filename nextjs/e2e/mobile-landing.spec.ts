@@ -78,7 +78,9 @@ test("the mobile menu exposes the five customer choices plus Sign in, and the ac
   await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs"]);
   // BQ-059: the header keeps the action at every width; the sheet is the sections.
   await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
-  await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
+  const pricing = page.locator('header .nav-actions a[href="/pricing"]');
+  await expect(pricing).toHaveCount(1);
+  await expect(pricing).toHaveText("Pricing");
   /*
     Landing V2: Sign in moved the other way, and the two halves of that are one assertion each.
 

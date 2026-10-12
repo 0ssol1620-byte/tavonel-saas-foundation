@@ -16,7 +16,6 @@ export default function HeroStatement({
   const lines = arm ? arm.split(SENTENCES).filter(Boolean) : copy.headline.split(SENTENCES).filter(Boolean);
   return (
     <div className="lv2-hero-text">
-      <p className="lv2-eyebrow lv2-meta">{copy.eyebrow}</p>
       <h1 className="lv2-hero-h1" id={titleId}>
         {lines.map((line, index) => {
           const at = accent ? line.indexOf(accent) : -1;

@@ -35,6 +35,15 @@
 .disclosure[open] .list { margin-top: 12px; }
 .frame[data-progressive="1"] { grid-template-areas: "page" "detail" "list"; }
 
+@layer overrides {
+  @media (min-width: 1200px) {
+    .frame:not([data-progressive="1"]) {
+      grid-template-columns: minmax(0, 320px) minmax(0, 1fr) !important;
+      grid-template-areas: "page list" "detail detail" !important;
+    }
+  }
+}
+
 /*
   Stacked at phone width, page beside excerpt from 880px. The page column is capped so a tall
   filing page does not push the excerpt off a laptop screen; the region list sits under the page

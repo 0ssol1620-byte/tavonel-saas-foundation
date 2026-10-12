@@ -262,6 +262,13 @@ export default function LandingPage({
 
   return (
     <div className={`page lv2 ${heroStyles.home}`} lang={korean ? "ko" : undefined}>
+      <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.90.woff2" crossOrigin="anonymous" />
+      {korean ? <>
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.73.woff2" crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.86.woff2" crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.87.woff2" crossOrigin="anonymous" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.88.woff2" crossOrigin="anonymous" />
+      </> : null}
       <PublicSiteHeader korean={korean} />
       <main id="main" tabIndex={-1} data-home-ia="outcome-v1.1">
         {children}
@@ -325,7 +332,6 @@ export default function LandingPage({
         >
           <div className={`lv2-wrap ${heroStyles.split}`}>
             <div className={heroStyles.splitHead}>
-              <p className="lv2-eyebrow lv2-meta">{page.difficulty.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-difficulty-title">{page.difficulty.title}</h2>
               <p className="lv2-scene-support">{page.difficulty.support}</p>
             </div>
@@ -381,7 +387,6 @@ export default function LandingPage({
         >
           <div className="lv2-wrap">
             <div className={heroStyles.receiveHead}>
-              <p className="lv2-eyebrow lv2-meta">{page.receive.eyebrow}</p>
               <h2 className="lv2-h2" id="lv2-receive-title">{page.receive.title}</h2>
               <p className="lv2-scene-support">{page.receive.support}</p>
             </div>
@@ -394,6 +399,8 @@ export default function LandingPage({
                 <blockquote className={heroStyles.recordQuote} lang="en" data-derived="1">
                   {record.claim.excerpt}{record.claim.excerptTruncated ? "…" : ""}
                 </blockquote>
+                <details className={heroStyles.details}>
+                  <summary className={heroStyles.detailsSummary}>{korean ? "원문 상세" : "Source details"}</summary>
                 <dl className={heroStyles.recordFields}>
                   <div>
                     <dt>{copy.evidence.fields.source}</dt>
@@ -418,10 +425,10 @@ export default function LandingPage({
                     <dd><code data-derived="1">{record.version.digest}</code></dd>
                   </div>
                 </dl>
+                </details>
                 <p className={heroStyles.recordLinks}>
                   <Link className={heroStyles.diffLink} href={record.hrefs.evidence as Route} prefetch={false} data-analytics="source-open">
                     {page.receive.openRegion}
-                    <span aria-hidden="true">↗</span>
                   </Link>
                   <a className={heroStyles.diffLink} href={record.hrefs.original}>
                     {copy.evidence.openOriginal}

@@ -185,10 +185,11 @@ describe("the Home workbench -- source and passage", () => {
     // The filing's form, date and provenance prose live here, off the line above the page.
     expect(inside).toContain(`${value.sources[0]!.form} · ${value.sources[0]!.filingDate}`);
     expect(inside).toContain("The original HTML filing, as submitted.");
-    // Outside the disclosure the version is the short form only.
+    // Version identifiers stay in the disclosure; the summary states the claim boundary.
     const outside = readable(html.replace(details![0], ""));
     expect(outside).not.toContain(value.sources[0]!.digest);
-    expect(outside).toContain(value.sources[0]!.digest.slice(0, 15));
+    expect(outside).not.toContain(value.sources[0]!.digest.slice(0, 15));
+    expect(outside).toContain("Published claims: None.");
     expect(outside).not.toContain("original HTML");
   });
 });
@@ -223,7 +224,10 @@ describe("the Home workbench -- region selection", () => {
       expect(attr(link, "href")).toBe(escaped(region.href!));
       const pressed = buttonsOf(html).filter(([, open]) => attr(open!, "aria-pressed") === "true");
       expect(pressed).toHaveLength(1);
-      expect(readable(pressed[0]![2]!)).toContain(region.bbox1000.join(","));
+      expect(attr(pressed[0]![1]!, "aria-label")).toContain(region.bbox1000.join(","));
+      expect(readable(pressed[0]![2]!)).toContain(`Page ${region.page}`);
+      const details = html.match(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/)?.[1] ?? "";
+      expect(readable(details)).toContain(region.bbox1000.join(","));
       const box = html.match(/<span\s[^>]*data-selected="1"[^>]*>/)?.[0] ?? "";
       expect(attr(box, "data-region-id")).toBe(escaped(region.id));
       const note = region.role === "selected" ? "Context required." : "Shown as printed, for context.";
