@@ -22,6 +22,8 @@ export default defineConfig({
     include: [
       "lib/**/*.test.ts", "lib/**/*.spec.ts", "eval/**/metrics.test.ts",
       "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs",
+      "components/landing-v2/hero-source-card.test.tsx",
+      "components/compile-stage-player.mobile-view.test.tsx",
     ],
   },
 });

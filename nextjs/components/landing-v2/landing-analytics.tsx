@@ -63,7 +63,7 @@ const QUARTILES: ReadonlyArray<[number, FunnelEvent]> = [
  */
 function sourceFrom(element: Element): string {
   const scene = element.closest("section[data-scene]")?.id;
-  if (scene === "hero") return "hero";
+  if (scene === "hero" || scene === "s1") return "hero";
   return scene === "evidence" ? "inspector" : "proof";
 }
 
@@ -143,7 +143,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s1 .compile-film-sequence button, #s2 [data-compiler-specimen] button")) {
+      if (target.closest("#s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s1 [data-source-digest] button[aria-pressed][aria-controls]")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

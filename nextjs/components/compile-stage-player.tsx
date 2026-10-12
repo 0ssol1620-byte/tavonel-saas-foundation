@@ -168,6 +168,10 @@ export const FILM_TEXT = {
   ko: { stages: "컴파일 단계", error: FILM_ERROR_KO, errorLong: `${FILM_ERROR_KO} 다른 단계를 선택하거나 공개 샘플을 확인해 보세요.` },
 } as const;
 
+/** Phone callers open on the accepted whole frame; Focus remains an explicit opt-in. */
+export type MobileFilmView = "fit" | "focus";
+export function toggleMobileFilmFit(fit: boolean): boolean { return !fit; }
+
 export default function CompileStagePlayer({
   stages = COMPILE_STAGES,
   onStageChange,
@@ -177,6 +181,7 @@ export default function CompileStagePlayer({
   stageDisclosureLabel,
   priorityPoster = false,
   korean = false,
+  initialMobileFilmView = "fit",
 }: {
   stages?: readonly CompileStage[];
   onStageChange?: (stage: CompileStage, index: number) => void;
@@ -192,6 +197,8 @@ export default function CompileStagePlayer({
   priorityPoster?: boolean;
   /** BQ-013. Name the controls and the fallback in the page's language. The stage list carries its own. */
   korean?: boolean;
+  /** Initial phone view only; the existing visitor toggle remains available. */
+  initialMobileFilmView?: MobileFilmView;
 }) {
   const text = korean ? FILM_TEXT.ko : FILM_TEXT.en;
   const instanceId = useId().replaceAll(":", "");
@@ -206,7 +213,7 @@ export default function CompileStagePlayer({
   const [ended, setEnded] = useState(false);
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
-  const [mobileFilmFit, setMobileFilmFit] = useState(false);
+  const [mobileFilmFit, setMobileFilmFit] = useState(initialMobileFilmView === "fit");
   const [videoError, setVideoError] = useState(false);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
@@ -505,7 +512,7 @@ export default function CompileStagePlayer({
           className="compile-film-focus-control"
           aria-controls={panelId}
           aria-pressed={!mobileFilmFit}
-          onClick={() => setMobileFilmFit(value => !value)}
+          onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
         >
           {mobileFilmFit
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
