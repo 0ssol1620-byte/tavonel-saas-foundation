@@ -452,7 +452,7 @@ assert(REPAIR_NODE_EVIDENCE_CONTRACT_FILE===ciNodeSuites[0]&&REPAIR_NODE_GATE_RE
   'CI selector keeps exactly the registered Node evidence and Vitest gate receipt contracts, with finite endpoints and no product neighbor admission');
 // Current compile, navigation and version comparison ownership is finite and restated independently.
 const currentOwnerBindings = [
-  { group: 'compile-source-observations', paths: ['app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts', 'lib/compile-job-worker.ts', 'lib/collection-compile-source-observations.test.mjs'],
+  { group: 'compile-source-observations', paths: ['app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts', 'lib/compile-job-worker.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs'],
     exportedPaths: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, suites: ['lib/collection-compile-run.test.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs'], exportedSuites: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES,
     neighbors: ['app/api/collections/compile-other/route.ts', 'lib/collection-compile-source-observations.ts', 'lib/compile-job-worker-other.ts'] },
   { group: 'world-explorer-navigation', paths: ['components/world-explorer.tsx', 'components/world-explorer.module.css', 'lib/world-explorer-navigation.ts', 'lib/world-explorer-navigation.test.ts'],
