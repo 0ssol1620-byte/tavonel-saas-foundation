@@ -443,7 +443,7 @@ class CloudPlanFailClosedTests(CloudPlanTestCase):
     def test_provider_failure_is_sanitized(self):
         class FakeClientError(Exception):
             def __init__(self, code):
-                super().__init__(f'denied for AKIASYNTHETICACCESSKEY at {ENDPOINT} with opaque-token-1 and secret provider detail')
+                super().__init__(f'denied for fixture-access-key-never-serialize at {ENDPOINT} with opaque-token-1 and secret provider detail')
                 self.response = {'Error': {'Code': code, 'Message': 'secret provider detail'}}
 
         fake = FakeS3(FakeClientError('AccessDenied'))
@@ -453,7 +453,7 @@ class CloudPlanFailClosedTests(CloudPlanTestCase):
         self.assertEqual(plan['failClosedReason'], 'listing_request_failed')
         self.assertEqual(plan['providerError'], {'errorType': 'FakeClientError', 'providerErrorCode': 'AccessDenied'})
         self.assertEqual(plan['entries'], [])
-        for secret in ('AKIASYNTHETIC', 'secret provider detail'):
+        for secret in ('fixture-access-key-never-serialize', 'AKIASYNTHETIC', 'secret provider detail'):
             self.assertNotIn(secret, out[0])
 
         fake = FakeS3(FakeClientError('Bad Code <script>'))

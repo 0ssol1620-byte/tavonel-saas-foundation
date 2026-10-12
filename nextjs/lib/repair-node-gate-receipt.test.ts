@@ -5,27 +5,39 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { appendAffectedExecutedChecks, buildRepairReceipt, readAffectedExecutedChecks } from '../scripts/repair-scope-gate.mjs';
-import { readAffectedExecution, readNodeUnitEvidence, readNodeUnitExecution, runNodeUnit } from '../scripts/run-repair-check.mjs';
+import { readAffectedExecution, readNodeUnitExecution, runNodeUnit } from '../scripts/run-repair-check.mjs';
 import { buildAffectedMap, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE } from '../scripts/repair-scope.mjs';
 
 // Actual per-file runner processes execute only these harmless synthetic fixture sources.
 // Symbolic head and plan inputs do not establish checkout/CI qualification; the real gate keeps its existing proof path.
 const files = ['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs'];
+type SyntheticExecution = { file: string; status: string; exitCode: number; sourceSha256: string; sourceAfterSha256: string;
+  stdoutSha256: string; stderrSha256: string; trace?: string; stdout?: string; absolutePath?: string };
+type SyntheticManifest = { status: string; headSha: string; planSha256: string; runnerSha256: string; executions: SyntheticExecution[];
+  env?: { SECRET: string }; customerData?: string };
+type Mutation = (record: SyntheticManifest) => void;
 const plan = { headSha: 'b'.repeat(40), repairAnchorSha: 'a'.repeat(40), pullRequestBaseSha: 'c'.repeat(40), groups: ['ci-selector'],
   deferredGroups: [], pendingQualificationDebt: [], unitFiles: files, browserFiles: [], runDetailIntegrity: false,
   affectedIntegration: { nativeEvidence: { disposition: 'fresh-seven-case-native-run-required' } } };
-const hash = value => createHash('sha256').update(value).digest('hex');
-const reportDir = root => resolve(root, 'node_modules/.cache/repair-scope-reports');
-const manifestPath = root => resolve(reportDir(root), 'node-unit-receipts.json');
-const reportPath = (root, file, extension = '.tap') => resolve(reportDir(root), 'node-unit-' + hash(file) + extension);
+const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
+const reportDir = (root: string) => resolve(root, 'node_modules/.cache/repair-scope-reports');
+const manifestPath = (root: string) => resolve(reportDir(root), 'node-unit-receipts.json');
+const reportPath = (root: string, file: string, extension = '.tap') => resolve(reportDir(root), 'node-unit-' + hash(file) + extension);
 const roots: string[] = [];
 let successfulRoot: string;
 const newRoot = () => { const root = mkdtempSync(resolve(tmpdir(), 'repair-node-gate-')); roots.push(root); mkdirSync(resolve(root, 'lib')); return root; };
 const clone = () => { const root = newRoot(); cpSync(successfulRoot, root, { recursive: true }); return root; };
-const manifest = root => JSON.parse(readFileSync(manifestPath(root), 'utf8'));
-const mutate = (root, fn) => { const record = manifest(root); fn(record); writeFileSync(manifestPath(root), JSON.stringify(record)); };
-const execution = root => readAffectedExecution(root, plan);
-const checks = (root, observed = execution(root), currentHead = plan.headSha) => readAffectedExecutedChecks(root, plan, observed, currentHead);
+const manifest = (root: string): SyntheticManifest => JSON.parse(readFileSync(manifestPath(root), 'utf8'));
+const mutate = (root: string, fn: Mutation) => { const record = manifest(root); fn(record); writeFileSync(manifestPath(root), JSON.stringify(record)); };
+const execution = (root: string) => readAffectedExecution(root, plan);
+const checks = (root: string, observed: unknown = execution(root), currentHead = plan.headSha) => {
+  // Deliberately malformed JSON inputs below still reach the runtime validator. This test-only
+  // boundary accepts unknown; it never broadens the production reader's TypeScript contract.
+  const validated = readAffectedExecutedChecks(root, plan, observed as Parameters<typeof readAffectedExecutedChecks>[2], currentHead);
+  if (!validated.affectedNodeUnits) throw new Error('Selected Node evidence is absent');
+  // Preserve the exact validated object identity used by appendAffectedExecutedChecks.
+  return validated as typeof validated & { affectedNodeUnits: NonNullable<typeof validated.affectedNodeUnits> };
+};
 const receipt = (failures: string[] = []) => buildRepairReceipt(plan, { headSha: plan.headSha, failures, executedChecks: { plan: 'success', units: 'success' } });
 beforeAll(async () => {
   successfulRoot = newRoot();
@@ -50,7 +62,7 @@ test('Node gate receipt serializes every validated selected file and exact curre
   expect(node).toMatchObject({ status: 'success', headSha: plan.headSha, planSha256: hash(JSON.stringify(plan)), selectedFiles: files, ...oldSummary });
   expect(node.runnerSha256).toBe(manifest(successfulRoot).runnerSha256);
   expect(node.executions).toHaveLength(2);
-  node.executions.forEach((row, index) => {
+  node.executions.forEach((row: SyntheticExecution, index: number) => {
     expect(row).toMatchObject({ file: files[index], status: 'success', command: 'node', validatorNodeVersion: process.version,
       args: ['--test', '--test-reporter=tap', files[index]], exitCode: 0, files: 1, tests: 1, passed: 1, failed: 0, skipped: 0, todo: 0 });
     expect(row.sourceSha256).toBe(hash(readFileSync(resolve(successfulRoot, files[index]))));
@@ -81,7 +93,8 @@ test('Node gate receipt preserves mixed Vitest and Node results without creditin
     numPendingTests: 0, numTodoTests: 0, success: true, testResults: [{ name: resolve(root, 'lib/harmless-gate.test.ts'), status: 'passed', assertionResults: [{ status: 'passed' }] }] }));
   const observed = readAffectedExecution(root, mixed), added = readAffectedExecutedChecks(root, mixed, observed, mixed.headSha);
   expect(added.affectedUnits).toEqual({ status: 'success', files: 1, passed: 1, skipped: 0, failed: 0 });
-  expect(added.affectedNodeUnits.files).toBe(2); expect(added.affectedNodeUnits.executions.map(row => row.file)).toEqual(files);
+  expect(added.affectedNodeUnits).toBeDefined();
+  expect(added.affectedNodeUnits!.files).toBe(2); expect(added.affectedNodeUnits!.executions.map((row: SyntheticExecution) => row.file)).toEqual(files);
 });
 for (const [name, summary] of [
   ['omitted', undefined], ['not run', { status: 'not run' }], ['inherited', { status: 'inherited' }], ['incomplete', { files: 1, tests: 2, passed: 2, failed: 0, skipped: 0, todo: 0 }],
@@ -102,7 +115,7 @@ for (const [name, change, pattern] of [
   ['wrong head', record => { record.headSha = 'c'.repeat(40); }, /identity mismatch: headSha/],
   ['wrong plan', record => { record.planSha256 = '0'.repeat(64); }, /identity mismatch: planSha256/],
   ['wrong selected file', record => { record.executions[1].file = files[0]; }, /command or outcome mismatch/],
-]) test('Node gate receipt independently refuses ' + name + ' evidence despite an apparently passing input summary', () => {
+] satisfies [string, Mutation, RegExp][]) test('Node gate receipt independently refuses ' + name + ' evidence despite an apparently passing input summary', () => {
   const root = clone(); mutate(root, change);
   expect(() => checks(root, execution(successfulRoot))).toThrow(pattern);
 });

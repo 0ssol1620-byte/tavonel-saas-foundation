@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { verifyPublicPagesEligibility, publicPagesLineageFailures, collectorLineageFailures, verifyCollectorEligibility, verifyNativeDbEligibility, nativeDbLineageFailures, verifySolutionsEligibility, solutionsPagesLineageFailures, verifyExploreRepairEligibility, exploreRepairLineageFailures, verifyNativeRaceEligibility, nativeRaceLineageFailures, classifyAffectedIntent, verifyAffectedEligibility, affectedLineageFailures } from './repair-collector-only.mjs';
 import { knownRepairLineageFailures, verifyKnownRepairEligibility, readKnownRepairExecution, resolveKnownRepairDebt, verifyIntakePresentationEligibility, intakePresentationLineageFailures, readIntakePresentationExecution } from './repair-known-regression.mjs';
 
-export function buildRepairReceipt(plan, { headSha, failures = [], databaseResult = 'unrun', executedChecks = {} }) {
+export function buildRepairReceipt(plan, { headSha, failures = /** @type {string[]} */ ([]), databaseResult = 'unrun', executedChecks = {} }) {
   const deferred = new Set(plan.deferredGroups ?? []);
   const failed = failures.length > 0 || headSha !== plan.headSha || Boolean(plan.collectorOnlyFailure);
   const gateFailures = [...failures];

@@ -14,6 +14,7 @@ const registeredUnitTestPaths = new Set([
   'components/intake-triage-review.interaction.test.ts',
   'components/intake-triage-review.test.tsx',
   'components/landing-v2/hero-source-card.test.tsx',
+  'components/evaluation-page.test.tsx',
   'components/explore/evidence-workbench.test.tsx',
   'components/compile-stage-player.mobile-view.test.tsx',
 ]);

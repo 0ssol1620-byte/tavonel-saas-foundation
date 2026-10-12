@@ -6971,3 +6971,12 @@ test('affected directory pagination shared helper retains its original owner and
   assert.deepEqual(missing.failures, ['selected owner check is absent at head: lib/world-directory-and-ontology.test.ts']);
 });
 // END CUSTOMER PAGINATION DEPENDENCY CONTRACT
+test('affected pilot worksheet runner admits the exact registered component suite and refuses unregistered siblings', async () => {
+  const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
+  const file = 'components/evaluation-page.test.tsx';
+  assert.equal(validateSelectedPath(file, 'unit', process.cwd()), file);
+  assert.ok(buildUnitArgs([file], '/tmp/reviewed-evaluation-unit.json').includes(file));
+  for (const sibling of ['components/evaluation-page.test.ts', 'components/evaluation-page.spec.tsx', 'components/evaluation-page-v2.test.tsx']) {
+    assert.throws(() => validateSelectedPath(sibling, 'unit', process.cwd()), /Unsupported unit path/);
+  }
+});
