@@ -91,6 +91,14 @@ test("the actual sample package remains readable and keyboard usable at narrow w
       await proofPage.keyboard.press("ArrowDown");
       await expect.poll(() => preview.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
       if (previewBox.scrollWidth > previewBox.clientWidth) {
+        // The first positive offset can precede completion of native scrolling.
+        // Settle that motion before testing the independent horizontal key.
+        await expect.poll(() => preview.evaluate(async element => {
+          const before = element.scrollTop;
+          await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          return Math.abs(element.scrollTop - before) < 0.1;
+        })).toBe(true);
+        await expect(preview).toBeFocused();
         await proofPage.keyboard.press("ArrowRight");
         await expect.poll(() => preview.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
       }
