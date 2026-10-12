@@ -67,20 +67,21 @@ describe("approved one-path experience", () => {
     CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
     this contract keeps the buyer's first-visit sequence explicit.
   */
-  it("orders the landing as film, explanation, proof scene, change, trust and action", () => {
+  it("orders the landing as source, context, optional film, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
     expect(page).toContain("<HeroFilm");
-    expect(page).toContain("<CompilerSpecimen");
+    expect(page).toContain("<HeroSourceCard");
+    expect(page).not.toContain("<CompilerSpecimen");
+    expect(page).not.toContain("<HeroProof");
     const order = [
       'id="s1"',
       "<HeroStatement",
       "<HeroActions",
-      "<HeroFilm",
+      "<HeroSourceCard",
       'id="s2"',
-      "<CompilerSpecimen",
-      "<HeroProof",
-      "<ProofScene",
+      "<HeroFilm",
+      'id="s3"',
       "<RecompileScene",
       "<TrustScene",
       "<StartScene",
@@ -96,9 +97,14 @@ describe("approved one-path experience", () => {
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
-    /* The film is the first visual again, so its poster owns the eager image slot. */
-    expect(film).toContain("preferVideo");
-    expect(film).toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
+    const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
+    expect(film).toContain("<HeroFilmDisclosure");
+    expect(disclosure).toContain("useState(false)");
+    expect(disclosure).toContain("{open ? (");
+    expect(disclosure).toContain("<CompileStagePlayer");
+    expect(disclosure).toContain("preferVideo");
+    expect(disclosure).not.toContain("priorityPoster");
+    expect(disclosure).toContain("Illustrative product walkthrough");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");
@@ -187,8 +193,10 @@ describe("approved one-path experience", () => {
       rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
     const composition = text("components/landing-v2/landing-page.tsx");
-    expect(composition, "the pricing link remains in the Korean journey")
-      .toContain('pricingHref={korean ? "/ko/pricing" : "/pricing"}');
+    expect(composition, "the evaluation action names the actual bilingual destination")
+      .toContain('korean ? "/ko/evaluation" : "/evaluation"');
+    expect(composition).toContain("startHref={heroStart.href}");
+    expect(composition).toContain("const startActions");
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');

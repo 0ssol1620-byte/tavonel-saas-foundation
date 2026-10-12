@@ -231,7 +231,10 @@ test.describe("on a touch screen", () => {
         if (style.webkitLineClamp !== "none" || style.getPropertyValue("line-clamp")) continue;
         const selector = `${element.tagName}.${String(element.className).slice(0, 36)}`;
         const hides = (axis: string) => axis === "hidden" || axis === "clip";
-        if (hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
+        // Only the source workbench's intended image crop is exempt vertically; width is still checked.
+        const pageWindowCrop = element.hasAttribute("data-page-window") &&
+          element.closest("article[data-case-status]") !== null && element.querySelector("img") !== null;
+        if (!pageWindowCrop && hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
           result.push({ selector, axis: "y", hidden: element.scrollHeight - element.clientHeight });
         }
         if (hides(style.overflowX) && element.scrollWidth - element.clientWidth > 2) {

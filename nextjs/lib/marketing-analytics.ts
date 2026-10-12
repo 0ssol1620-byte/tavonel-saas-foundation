@@ -29,6 +29,7 @@ export const PUBLIC_MARKETING_PATHS = new Set([
   // path being listed is what makes a consented page view possible, never what makes it exempt.
   "/ko",
   "/ko/contact", "/ko/pricing",
+  "/evaluation", "/ko/evaluation",
   /*
     The two pages the 2026-09-11 campaign published, found at integration by the guard in
     `lib/seo-surface.test.ts` rather than by a reader: `/solutions` is the new hub (all five

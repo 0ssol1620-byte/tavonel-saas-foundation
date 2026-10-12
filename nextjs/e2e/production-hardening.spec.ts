@@ -68,9 +68,9 @@ test("odd grids compose the final item instead of painting an empty cell", async
 test("landing scenes flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
   await page.goto("/");
-  const geometry = await page.locator('main > section[data-scene]').evaluateAll(sections => sections.map(section => {
+  const geometry = await page.locator('main > section[data-scene], main > [data-home-reader-guide]').evaluateAll(sections => sections.map(section => {
     const rect = section.getBoundingClientRect();
-    return { id: section.id, top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
+    return { id: section.id || "reader-guide", top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
   }));
   /*
     Landing V2, 2026-09-20: six scenes. Two of the three rules are unchanged -- the
@@ -83,7 +83,7 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     thing the old rule was actually protecting: no scene may floor at more than one viewport, and
     no scene may be taller than two. An ocean is still a failure; a composed frame is not one.
   */
-  expect(geometry.map(item => item.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "s6"]);
+  expect(geometry.map(item => item.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "reader-guide", "s6"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }

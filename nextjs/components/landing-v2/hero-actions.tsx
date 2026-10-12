@@ -5,26 +5,27 @@ import type { Route } from "next";
 import { ArrowUpRight } from "lucide-react";
 import { trackFunnel } from "@/lib/funnel-events";
 
-export default function HeroActions({
-  exploreLabel,
-  exploreHref,
-  pricingLabel,
-  pricingHref = "/pricing",
-  scene,
-  ctaOrderVariant = "a",
-}: {
+type HeroActionsProps = {
   exploreLabel: string;
   exploreHref: string;
-  pricingLabel: string;
-  pricingHref?: string;
   scene: string;
   ctaOrderVariant?: "a" | "b" | "c";
-}) {
+} & (
+  | { startLabel: string; startHref: string }
+  | { pricingLabel: string; pricingHref?: string }
+);
+
+/** Accept the resolved Home access action while preserving existing pricing callers. */
+export default function HeroActions(props: HeroActionsProps) {
+  const { exploreLabel, exploreHref, scene, ctaOrderVariant = "a" } = props;
   const explore = { label: exploreLabel, href: exploreHref, cta: "explore" } as const;
-  const pricing = { label: pricingLabel, href: pricingHref, cta: "pricing" } as const;
-  const [primary, secondary] = ctaOrderVariant === "b" ? [pricing, explore] : [explore, pricing];
-  const onSelect = (action: typeof explore | typeof pricing) => () => {
+  const access = "startLabel" in props
+    ? { label: props.startLabel, href: props.startHref, cta: "start" as const }
+    : { label: props.pricingLabel, href: props.pricingHref ?? "/pricing", cta: "pricing" as const };
+  const [primary, secondary] = ctaOrderVariant === "b" ? [access, explore] : [explore, access];
+  const onSelect = (action: typeof explore | typeof access) => () => {
     if (scene === "1" && action.cta === "explore") trackFunnel("hero_explore_clicked");
+    if (scene === "1" && action.cta === "start") trackFunnel("hero_start_clicked");
     trackFunnel("cta_clicked", { cta: action.cta, scene });
   };
   return (

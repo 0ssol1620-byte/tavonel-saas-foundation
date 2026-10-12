@@ -8,28 +8,25 @@ async function capture(page: Page, name: string) {
   mkdirSync(evidenceDir, { recursive: true });
   await page.screenshot({ path: resolve(evidenceDir, `${name}-${page.viewportSize()?.width}.png`), fullPage: true });
 }
-async function connectionErrors(page: Page, scope: string) {
-  return page.locator(scope).evaluate(pair => {
-    const a = pair.querySelector('[data-evidence-origin]')!.getBoundingClientRect();
-    const b = pair.querySelector('.lv2-region')!.getBoundingClientRect();
-    const path = pair.querySelector<SVGPathElement>('.lv2-evidence-connector path')!;
-    const matrix = path.getScreenCTM()!;
-    const p = path.getPointAtLength(0).matrixTransform(matrix);
-    const q = path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix);
-    return { start: Math.hypot(p.x - a.right, p.y - a.top - a.height / 2), end: Math.hypot(q.x - b.left, q.y - b.top - b.height / 2) };
-  });
+async function sourceBinding(page: Page) {
+  const bench = page.locator('#s1 article[data-case-status]');
+  const region = bench.locator('[data-region-id][data-selected="1"]');
+  await expect(region).toHaveCount(1);
+  const id = await region.getAttribute('data-region-id');
+  const href = await bench.locator('[data-hero-evidence]').getAttribute('href');
+  expect(new URL(href!, 'https://tavonel.com').searchParams.get('evidence')).toBe(id);
+  const a = (await bench.locator('[data-page-window]').boundingBox())!, b = (await region.boundingBox())!;
+  expect(b.x).toBeGreaterThanOrEqual(a.x - 1); expect(b.x + b.width).toBeLessThanOrEqual(a.x + a.width + 1);
+  expect(b.y).toBeGreaterThanOrEqual(a.y - 1); expect(b.y + b.height).toBeLessThanOrEqual(a.y + a.height + 1);
 }
 for (const route of ["/", "/ko"]) test(`source connections have two real endpoints on ${route}`, async ({ page }) => {
   await page.goto(route);
-  await page.locator('#s3').scrollIntoViewIfNeeded();
-  for (const tab of await page.locator('#s3 [role="tab"]').all()) {
-    await tab.click();
-    const pair = '#s3 [role="tabpanel"]:not([hidden]) [data-evidence-pair]';
-    if ((page.viewportSize()?.width ?? 0) >= 900) {
-      await expect(page.locator(`${pair} [data-connected="true"]`)).toBeVisible();
-      await expect.poll(async () => (await connectionErrors(page, pair)).start).toBeLessThan(2);
-      await expect.poll(async () => (await connectionErrors(page, pair)).end).toBeLessThan(2);
-    } else await expect(page.locator(`${pair} .lv2-evidence-connector`)).toBeHidden();
+  const buttons = page.locator('#s1 article[data-case-status] button');
+  await expect(buttons).toHaveCount(3);
+  for (const button of await buttons.all()) {
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await sourceBinding(page);
   }
   await capture(page, route === '/' ? 'evidence-en' : 'evidence-ko');
 });
@@ -137,12 +134,8 @@ test('source endpoints stay attached after a width change, without a page reload
   await page.goto('/');
   for (const width of [1440, 1024, 768, 1920]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.locator('#s3').scrollIntoViewIfNeeded();
-    const pair = '#s3 [role="tabpanel"]:not([hidden]) [data-evidence-pair]';
-    if (width >= 900) {
-      await expect(page.locator(`${pair} [data-connected="true"]`)).toBeVisible();
-      await expect.poll(async () => (await connectionErrors(page, pair)).end).toBeLessThan(2);
-    } else await expect(page.locator(`${pair} .lv2-evidence-connector`)).toBeHidden();
+    await page.locator('#s1 article[data-case-status]').scrollIntoViewIfNeeded();
+    await sourceBinding(page);
   }
 });
 

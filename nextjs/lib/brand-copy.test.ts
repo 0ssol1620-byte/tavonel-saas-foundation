@@ -421,7 +421,11 @@ describe("public copy", () => {
     const rendered = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map(
       match => match[1]!
     );
-    expect(rendered).toEqual(["hero", "proof", "recompile", "trust", "start"]);
+    expect(rendered).toEqual(["recompile", "trust", "start"]);
+    expect(page).toContain("...copy.hero");
+    expect(page).toContain("<HeroSourceCard");
+    const beats = ['id="s1"', 'id="s2"', 'id="s3"', 'sectionId="s4"', 'sectionId="s5"', 'sectionId="s6"'].map(id => page.indexOf(id));
+    expect(beats.every((at, index) => at >= 0 && (index === 0 || at > beats[index - 1]!))).toBe(true);
     for (const removed of ["sources", "evidence", "why", "use"]) {
       expect(page).not.toContain(`copy={copy.${removed}}`);
     }
@@ -493,17 +497,19 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("opens on the four-cut film, then the specimen and live inspector", () => {
+  it("opens on the source and passage, with the illustrative film behind a disclosure", () => {
     const page = landingSource();
     /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
        film opens the landmark that explains how the World was compiled. The entry pages preload
        the hero's own raster because that is the image above the fold now. */
-    expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<HeroFilm"));
-    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<CompilerSpecimen"));
-    expect(page.indexOf("<CompilerSpecimen")).toBeLessThan(page.indexOf("<HeroProof"));
+    expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<HeroSourceCard"));
+    expect(page.indexOf("<HeroSourceCard")).toBeLessThan(page.indexOf("<HeroFilm"));
+    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf('id="s3"'));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
-    expect(page).toContain("CompilerSpecimen");
+    expect(page).not.toContain("<CompilerSpecimen");
+    expect(page).not.toContain("<HeroProof");
+    expect(read("components/landing-v2/hero-film-disclosure.tsx")).toContain("useState(false)");
     expect(read("components/landing-v2/compiler-specimen.tsx")).not.toContain(
       "<video"
     );
@@ -1203,9 +1209,9 @@ describe("public copy", () => {
     expect(page).not.toContain('className="hero-proof"');
     // §9's order, read as positions: the hero, then the instant proof, then the rest.
     expect(page.indexOf('data-scene="1"')).toBeLessThan(
-      page.indexOf("copy.proof")
+      page.indexOf("<HeroSourceCard")
     );
-    expect(page.indexOf("copy.proof")).toBeLessThan(page.indexOf("copy.trust"));
+    expect(page.indexOf("<HeroSourceCard")).toBeLessThan(page.indexOf("copy.trust"));
     /*
       The strip under a hero is where invented figures arrive: "10M pages compiled", "99.9%
       uptime", a customer count. §35 bars every one of them, none is measured here, and the copy
@@ -1319,11 +1325,10 @@ describe("public copy", () => {
     const order = [
       'id="s1"',
       "<HeroActions",
-      "<HeroFilm",
+      "<HeroSourceCard",
       'id="s2"',
-      "<CompilerSpecimen",
-      "<HeroProof",
-      "<ProofScene",
+      "<HeroFilm",
+      'id="s3"',
       "copy.recompile",
       "copy.trust",
       "copy.start",
