@@ -31,6 +31,7 @@
   /* Give the dark text its actual paper backdrop even before hydration. */
   /* The legacy chrome rule is unlayered; this scoped priority preserves an opaque light header. */
   .home > header:not([data-scrolled="1"]) { background: var(--home-paper) !important; }
+  .home > header:not([data-scrolled="1"]) > details > summary { background: var(--home-ink) !important; }
 }
 
 /*
