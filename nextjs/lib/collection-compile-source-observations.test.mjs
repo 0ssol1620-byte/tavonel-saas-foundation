@@ -27,14 +27,14 @@ function load(relative, mocks) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
   });
   assert.equal((result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error).length, 0);
-  const module = { exports: {} };
-  vm.runInNewContext(result.outputText, { module, exports: module.exports, Buffer, Date,
+  const loadedModule = { exports: {} };
+  vm.runInNewContext(result.outputText, { module: loadedModule, exports: loadedModule.exports, Buffer, Date,
     process: { env: {} }, console, require: name => {
       if (name === "node:crypto") return require(name);
       assert.ok(Object.hasOwn(mocks, name), `Unexpected dependency: ${name}`);
       return mocks[name];
     } }, { filename: path });
-  return module.exports;
+  return loadedModule.exports;
 }
 
 function compileFixture(options = {}) {

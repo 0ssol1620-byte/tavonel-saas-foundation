@@ -6,13 +6,18 @@ import type { ReviewImpactContract, WorldObject, WorldReadModel } from "./world-
 import { countChanges, diffWorldVersions, type WorldVersionDiff } from "./world-version-diff";
 import { DEFAULT_DIFF_FILTERS, DIFF_PAGE_SIZE, deriveWorldVersionDiffView, paginateWorldVersionDiffView, type DiffFilters } from "./world-version-diff-view";
 
-const pageRuntime = vi.hoisted(() => ({ active: null as any }));
+type Effect = () => void | (() => void);
+type HookSlot = { value?: unknown; deps?: readonly unknown[]; cleanup?: () => void };
+type ElementProps = Record<string, unknown> & { children?: unknown; onClick: () => unknown;
+  onChange: (event: { target: { value: string } }) => unknown };
+type TestElement = { type: string | symbol | ((props: ElementProps) => unknown); props: ElementProps };
+const pageRuntime = vi.hoisted(() => ({ active: null as PageHooks | null }));
 vi.mock("react", async (original) => {
-  const react = await original<any>();
+  const react = await original<typeof import("react")>();
   return { ...react,
-    useState: (initial: any) => pageRuntime.active ? pageRuntime.active.state(initial) : react.useState(initial),
-    useMemo: (factory: any, deps: any[]) => pageRuntime.active ? pageRuntime.active.memo(factory, deps) : react.useMemo(factory, deps),
-    useEffect: (effect: any, deps: any[]) => pageRuntime.active ? pageRuntime.active.effect(effect, deps) : react.useEffect(effect, deps),
+    useState: <T,>(initial: T | (() => T)) => pageRuntime.active ? pageRuntime.active.state(initial) : react.useState(initial),
+    useMemo: <T,>(factory: () => T, deps: readonly unknown[]) => pageRuntime.active ? pageRuntime.active.memo(factory, deps) : react.useMemo(factory, deps),
+    useEffect: (effect: Effect, deps: readonly unknown[]) => pageRuntime.active ? pageRuntime.active.effect(effect, deps) : react.useEffect(effect, deps),
     useId: () => pageRuntime.active ? pageRuntime.active.id() : react.useId(),
   };
 });
@@ -278,21 +283,21 @@ describe("UX24 bounded diff paging", () => {
 
 // Same deterministic actual-component hook technique as the admitted comparison-binding tests.
 // This invokes real controls with local synthetic auth/fetch only; no browser/runtime qualification.
-const pageSame = (a?: any[], b?: any[]) => !!a && !!b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+const pageSame = (a?: readonly unknown[], b?: readonly unknown[]) => !!a && !!b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 class PageHooks {
-  slots: any[] = []; pending = new Map<number, () => any>(); cursor = 0; tree: any;
+  slots: HookSlot[] = []; pending = new Map<number, Effect>(); cursor = 0; tree: unknown;
   constructor(public props: Parameters<typeof WorldVersionDiffPanel>[0]) {}
-  state(initial: any) {
+  state<T>(initial: T | (() => T)): [T, (next: T | ((previous: T) => T)) => void] {
     const index = this.cursor++;
-    if (!this.slots[index]) this.slots[index] = { value: typeof initial === "function" ? initial() : initial };
-    return [this.slots[index].value, (next: any) => { this.slots[index].value = typeof next === "function" ? next(this.slots[index].value) : next; }];
+    if (!this.slots[index]) this.slots[index] = { value: typeof initial === "function" ? (initial as () => T)() : initial };
+    return [this.slots[index].value as T, next => { this.slots[index].value = typeof next === "function" ? (next as (previous: T) => T)(this.slots[index].value as T) : next; }];
   }
-  memo(factory: () => any, deps: any[]) {
+  memo<T>(factory: () => T, deps: readonly unknown[]): T {
     const index = this.cursor++;
     if (!pageSame(this.slots[index]?.deps, deps)) this.slots[index] = { deps, value: factory() };
-    return this.slots[index].value;
+    return this.slots[index].value as T;
   }
-  effect(effect: () => any, deps: any[]) {
+  effect(effect: Effect, deps: readonly unknown[]) {
     const index = this.cursor++; const old = this.slots[index];
     if (!pageSame(old?.deps, deps)) { this.slots[index] = { deps, cleanup: old?.cleanup }; this.pending.set(index, effect); }
   }
@@ -305,26 +310,28 @@ class PageHooks {
   effects() {
     const pending = [...this.pending]; this.pending.clear();
     for (const [index] of pending) this.slots[index].cleanup?.();
-    for (const [index, effect] of pending) this.slots[index].cleanup = effect();
+    for (const [index, effect] of pending) this.slots[index].cleanup = effect() as (() => void) | undefined;
     return this;
   }
   dispose() { for (const slot of this.slots) slot?.cleanup?.(); }
 }
-function pageNodes(value: any): any[] {
+function pageNodes(value: unknown): TestElement[] {
   if (Array.isArray(value)) return value.flatMap(pageNodes);
   if (!value || typeof value !== "object") return [];
-  if (typeof value.type === "function") return pageNodes(value.type(value.props));
-  return [value, ...pageNodes(value.props?.children)];
+  const element = value as TestElement;
+  if (typeof element.type === "function") return pageNodes(element.type(element.props));
+  return [element, ...pageNodes(element.props?.children)];
 }
-function pageText(value: any): string {
+function pageText(value: unknown): string {
   if (Array.isArray(value)) return value.map(pageText).join("");
   if (value == null || typeof value === "boolean") return "";
   if (typeof value !== "object") return String(value);
-  return typeof value.type === "function" ? pageText(value.type(value.props)) : pageText(value.props?.children);
+  const element = value as TestElement;
+  return typeof element.type === "function" ? pageText(element.type(element.props)) : pageText(element.props?.children);
 }
 function pageButton(hooks: PageHooks, label: string) {
   const found = pageNodes(hooks.tree).find(node => node.type === "button" && pageText(node) === label);
-  expect(found).toBeDefined(); return found;
+  expect(found).toBeDefined(); return found!;
 }
 const pageTicks = async () => { for (let index = 0; index < 16; index++) await Promise.resolve(); };
 function pagingModel(letter: string, withRows = false) {
@@ -372,7 +379,7 @@ describe("UX24 bounded diff paging actual handlers", () => {
     await withPagingPanel((hooks, calls) => {
       pageButton(hooks, "Next changes").props.onClick(); hooks.render();
       const nodes = pageNodes(hooks.tree);
-      if (kind === "text") nodes.find(node => node.type === "input" && node.props.type === "search").props.onChange({ target: { value: "Entity 122" } });
+      if (kind === "text") nodes.find(node => node.type === "input" && node.props.type === "search")!.props.onChange({ target: { value: "Entity 122" } });
       else nodes.filter(node => node.type === "select")[kind === "category" ? 0 : 1].props.onChange({ target: { value: kind === "category" ? "objects" : "added" } });
       hooks.render(); // No effect flush: reset must already be visible.
       expect(pageText(hooks.tree)).toContain(kind === "text" ? "Rows 1–1 of 1 matching changes" : "Rows 1–50 of 123 matching changes");
@@ -392,7 +399,7 @@ describe("UX24 bounded diff paging actual handlers", () => {
         pageButton(hooks, "Next changes").props.onClick(); hooks.render();
         expect(pageText(hooks.tree)).toContain("Rows 51–100 of 123 matching changes");
         const row = pageNodes(hooks.tree).find(node => node.type === "li" && pageText(node).includes(letter.repeat(12)));
-        pageNodes(row).find(node => node.type === "button" && pageText(node) === "Compare").props.onClick();
+        pageNodes(row).find(node => node.type === "button" && pageText(node) === "Compare")!.props.onClick();
         hooks.render();
         expect(pageText(hooks.tree)).not.toContain("Rows ");
         expect(pageNodes(hooks.tree).filter(node => node.type === "button" && pageText(node) === "Roll back to this version")).toHaveLength(0);
@@ -412,7 +419,7 @@ describe("UX24 bounded diff paging actual handlers", () => {
       if (kind !== "digest") hooks.props = { ...hooks.props, model: pagingModel(kind === "current" ? "d" : "c", true) };
       else {
         const row = pageNodes(hooks.tree).find(node => node.type === "li" && pageText(node).includes("b".repeat(12)));
-        pageNodes(row).find(node => node.type === "button" && pageText(node) === "Compare").props.onClick();
+        pageNodes(row).find(node => node.type === "button" && pageText(node) === "Compare")!.props.onClick();
       }
       hooks.render();
       expect(pageText(hooks.tree)).not.toContain("Rows ");

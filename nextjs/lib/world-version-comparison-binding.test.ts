@@ -1,43 +1,49 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorldReadModel } from "./world-read-model";
 
+type AuthResult = { data: { session: { access_token: string } | null } };
+type Effect = () => void | (() => void);
+type HookSlot = { value?: unknown; deps?: readonly unknown[]; cleanup?: () => void };
+type ElementProps = Record<string, unknown> & { children?: unknown; onClick: () => unknown;
+  onChange: (event: { target: { value: string } }) => unknown };
+
 // Actual candidate component execution with deterministic hook scheduling.
 // This is neither SSR nor mounted React/browser proof. No external service is contacted.
-const runtime = vi.hoisted(() => ({ active: null as any, token: "synthetic-token" as string | null, session: null as Promise<any> | null }));
+const runtime = vi.hoisted(() => ({ active: null as Hooks | null, token: "synthetic-token" as string | null, session: null as Promise<AuthResult> | null }));
 vi.mock("react", async (original) => ({
-  ...await original<any>(),
-  useState: (initial: any) => runtime.active.state(initial),
-  useMemo: (factory: any, deps: any[]) => runtime.active.memo(factory, deps),
-  useEffect: (effect: any, deps: any[]) => runtime.active.effect(effect, deps),
-  useId: () => runtime.active.id(),
+  ...await original<typeof import("react")>(),
+  useState: <T,>(initial: T | (() => T)) => runtime.active!.state(initial),
+  useMemo: <T,>(factory: () => T, deps: readonly unknown[]) => runtime.active!.memo(factory, deps),
+  useEffect: (effect: Effect, deps: readonly unknown[]) => runtime.active!.effect(effect, deps),
+  useId: () => runtime.active!.id(),
 }));
 vi.mock("./supabase-browser", () => ({
   getSupabaseBrowserClient: () => ({ auth: { getSession: () => runtime.session ?? Promise.resolve({ data: { session: runtime.token ? { access_token: runtime.token } : null } }) } }),
 }));
 import Panel from "../components/world-version-diff";
 
-type Element = { type: any; props: Record<string, any> };
-const same = (a?: any[], b?: any[]) => !!a && !!b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
+type Element = { type: string | symbol | ((props: ElementProps) => unknown); props: ElementProps };
+const same = (a?: readonly unknown[], b?: readonly unknown[]) => !!a && !!b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
 class Hooks {
-  slots: any[] = [];
-  pending = new Map<number, () => any>();
+  slots: HookSlot[] = [];
+  pending = new Map<number, Effect>();
   cursor = 0;
-  tree: any;
+  tree: unknown;
   props: Parameters<typeof Panel>[0];
   constructor(props: Parameters<typeof Panel>[0], private component = Panel) { this.props = props; }
-  state(initial: any) {
+  state<T>(initial: T | (() => T)): [T, (next: T | ((previous: T) => T)) => void] {
     const index = this.cursor++;
-    if (!this.slots[index]) this.slots[index] = { value: typeof initial === "function" ? initial() : initial };
-    return [this.slots[index].value, (next: any) => {
-      this.slots[index].value = typeof next === "function" ? next(this.slots[index].value) : next;
+    if (!this.slots[index]) this.slots[index] = { value: typeof initial === "function" ? (initial as () => T)() : initial };
+    return [this.slots[index].value as T, next => {
+      this.slots[index].value = typeof next === "function" ? (next as (previous: T) => T)(this.slots[index].value as T) : next;
     }];
   }
-  memo(factory: () => any, deps: any[]) {
+  memo<T>(factory: () => T, deps: readonly unknown[]): T {
     const index = this.cursor++;
     if (!same(this.slots[index]?.deps, deps)) this.slots[index] = { deps, value: factory() };
-    return this.slots[index].value;
+    return this.slots[index].value as T;
   }
-  effect(effect: () => any, deps: any[]) {
+  effect(effect: Effect, deps: readonly unknown[]) {
     const index = this.cursor++;
     const prior = this.slots[index];
     if (!same(prior?.deps, deps)) {
@@ -57,22 +63,24 @@ class Hooks {
     const pending = [...this.pending];
     this.pending.clear();
     for (const [index] of pending) this.slots[index].cleanup?.();
-    for (const [index, effect] of pending) this.slots[index].cleanup = effect();
+    for (const [index, effect] of pending) this.slots[index].cleanup = effect() as (() => void) | undefined;
     return this;
   }
   dispose() { for (const slot of this.slots) slot?.cleanup?.(); }
 }
-function nodes(value: any): Element[] {
+function nodes(value: unknown): Element[] {
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value || typeof value !== "object") return [];
-  if (typeof value.type === "function") return nodes(value.type(value.props));
-  return [value, ...nodes(value.props?.children)];
+  const element = value as Element;
+  if (typeof element.type === "function") return nodes(element.type(element.props));
+  return [element, ...nodes(element.props?.children)];
 }
-function text(value: any): string {
+function text(value: unknown): string {
   if (Array.isArray(value)) return value.map(text).join("");
   if (value === null || value === undefined || typeof value === "boolean") return "";
   if (typeof value !== "object") return String(value);
-  return typeof value.type === "function" ? text(value.type(value.props)) : text(value.props?.children);
+  const element = value as Element;
+  return typeof element.type === "function" ? text(element.type(element.props)) : text(element.props?.children);
 }
 const digest = (letter: string) => `sha256:${letter.repeat(64)}`;
 const notYet = { state: "not_yet", reason: "Synthetic contract fixture." };
@@ -91,7 +99,8 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-type Request = ReturnType<typeof deferred<any>> & { url: string; init: any };
+type SyntheticResponse = { ok: boolean; json: () => Promise<unknown> };
+type Request = ReturnType<typeof deferred<SyntheticResponse>> & { url: string; init?: RequestInit };
 let requests: Request[];
 let harnesses: Hooks[];
 const ticks = async () => { for (let index = 0; index < 16; index++) await Promise.resolve(); };
@@ -139,9 +148,9 @@ function safePending(hooks: Hooks) {
 }
 beforeEach(() => {
   requests = []; harnesses = []; runtime.token = "synthetic-token"; runtime.session = null;
-  vi.stubGlobal("fetch", vi.fn((url: string, init: any) => {
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
     if (url.startsWith("/api/v1/reviews?")) return Promise.resolve({ ok: true, json: async () => ({ decisions: [] }) });
-    const item = { ...deferred<any>(), url, init }; requests.push(item); return item.promise;
+    const item = { ...deferred<SyntheticResponse>(), url, init }; requests.push(item); return item.promise;
   }));
 });
 afterEach(() => { harnesses.forEach(hooks => hooks.dispose()); vi.unstubAllGlobals(); });
@@ -243,7 +252,7 @@ describe("new comparison binding transitions — deterministic actual-component 
     await resolve(request("b"), model("b")); hooks.render(); expect(rollback(hooks)).toHaveLength(1);
   });
   it("late authentication and fetch from superseded A cannot replace ready B", async () => {
-    const session = deferred<any>(); runtime.session = session.promise;
+    const session = deferred<AuthResult>(); runtime.session = session.promise;
     const { hooks, calls } = await start(); expect(requests).toHaveLength(0);
     select(hooks, "b"); safePending(hooks); runtime.session = null;
     hooks.flushEffects(); await ticks(); await resolve(request("b"), model("b")); hooks.render();
