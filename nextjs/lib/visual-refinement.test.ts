@@ -42,7 +42,10 @@ describe("2026-09-20 visual refinement", () => {
   it("leaves source data and the four-cut player as the source of the hero", () => {
     const component = read("components/landing-v2/hero-film.tsx");
     expect(component).toContain("COMPILE_STAGES.map");
-    expect(component).toContain("CompileStagePlayer");
+    expect(component).toContain("HeroFilmDisclosure");
+    const disclosure = read("components/landing-v2/hero-film-disclosure.tsx");
+    expect(disclosure).toContain("useState(false)");
+    expect(disclosure).toContain("<CompileStagePlayer");
     expect(read("components/landing-v2/hero-statement.tsx")).toContain("copy.headline.split");
   });
 });
