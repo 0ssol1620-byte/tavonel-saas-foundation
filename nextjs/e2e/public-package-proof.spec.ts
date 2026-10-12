@@ -76,6 +76,13 @@ test("the actual sample package remains readable and keyboard usable at narrow w
       await expect(preview).toBeFocused();
       await preview.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
       expect(await preview.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe("none");
+      // Focus can still be moving the outer viewport when scrollIntoView returns.
+      // Keep the same header and viewport bounds, observing them after native scrolling.
+      await expect.poll(() => preview.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        const header = document.querySelector("header.nav")?.getBoundingClientRect();
+        return box.top >= (header?.bottom ?? 0) - 1 && box.bottom <= innerHeight;
+      })).toBe(true);
       const previewBox = await preview.evaluate(element => {
         const box = element.getBoundingClientRect();
         const header = document.querySelector("header.nav")?.getBoundingClientRect();
