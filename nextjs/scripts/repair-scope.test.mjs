@@ -6610,10 +6610,11 @@ test('affected pilot worksheet admission: each exact path, the combined 4M delta
   assert.deepEqual(PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_PILOT_PATHS);assert.equal(new Set(AFFECTED_PILOT_PATHS).size,4);
   assert.deepEqual([...PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES],AFFECTED_PILOT_SUITES);
   for (const path of [...AFFECTED_PILOT_PATHS,AFFECTED_PILOT_OLD_SUITE]) assert.ok(affectedPilotPhysical(path),'path exists: '+path);
-  // Both direct suites are discovered by the unchanged global includes, so the default config runs them.
+  // Both direct suites remain globally discoverable. The finite TSX registry selects
+  // the repair config, which inherits these includes while explicit file args keep the scope exact.
   assert.ok(VITEST_DISCOVERY_INCLUDES.includes('components/evaluation-page.test.tsx'),'the EvaluationPage suite keeps its explicit include');
   assert.ok(VITEST_DISCOVERY_INCLUDES.includes('lib/**/*.test.ts'),'the worksheet suite is discovered by the unchanged lib include');
-  assert.deepEqual(buildUnitArgs(AFFECTED_PILOT_SUITES,'report.json'),['exec','vitest','run','--reporter=default','--reporter=json','--outputFile=report.json',...AFFECTED_PILOT_SUITES]);
+  assert.deepEqual(buildUnitArgs(AFFECTED_PILOT_SUITES,'report.json'),['exec','vitest','run','--config','vitest.repair-scope.config.ts','--reporter=default','--reporter=json','--outputFile=report.json',...AFFECTED_PILOT_SUITES]);
   const owners=AFFECTED_GROUPS.filter(owner=>owner.group===AFFECTED_PILOT_GROUP);
   assert.equal(owners.length,1);const [owner]=owners;
   assert.deepEqual([[...owner.unitFiles],owner.browserFiles,owner.databaseTests,Boolean(owner.worker),Boolean(owner.selector),Boolean(owner.database),owner.nativeReuse,owner.fixtureContract,owner.databaseDependencies],
