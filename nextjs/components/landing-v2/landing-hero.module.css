@@ -25,6 +25,13 @@
   --home-ease: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+@layer overrides {
+  /* Align the Home workbench, other scenes and shared chrome to one measure. */
+  .home { --chrome-measure: 1320px; }
+  /* Give the dark text its actual paper backdrop even before hydration. */
+  .home > header:not([data-scrolled="1"]) { background: var(--home-paper); }
+}
+
 /*
   Home only: the shared 64px header is transparent with light text and sits over this paper
   until it scrolls. While it is unscrolled -- menu open or not -- re-ink only the header row:
