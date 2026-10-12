@@ -223,7 +223,7 @@ const PHONE: Scenario[] = [
       // Landing V2: Sign in is the sheet's last row at this width, and the access action is not
       // in the sheet at all -- it is in the header, visible without opening anything.
       await expect(page.locator(`${SHEET} > nav a.mobile-nav-signin`)).toHaveCount(1);
-      await expect(page.locator("header.nav .nav-actions .btn")).toBeVisible();
+      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
     },
   },
   {
