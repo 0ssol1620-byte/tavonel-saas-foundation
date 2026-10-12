@@ -1741,7 +1741,7 @@ export const WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES = Object.freeze([
 // Product compile code, so never nativeReuse; the existing compile and worker suites remain direct owning checks.
 export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS = Object.freeze([
   'app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts',
-  'lib/compile-job-worker.ts', 'lib/collection-compile-source-observations.test.mjs',
+  'lib/compile-job-worker.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs',
 ]);
 export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/collection-compile-run.test.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs',

@@ -6981,3 +6981,13 @@ test('affected pilot worksheet runner admits the exact registered component suit
     assert.throws(() => validateSelectedPath(sibling, 'unit', process.cwd()), /Unsupported unit path/);
   }
 });
+
+test('affected durable worker contract has one existing compile owner and keeps its three direct checks', () => {
+  const path = 'nextjs/lib/compile-job-worker.test.ts';
+  const map = affectedMap([affectedRecord('M', [path])]);
+  assert.deepEqual(map.failures, []);
+  assert.deepEqual(map.groups, ['compile-source-observations']);
+  assert.deepEqual(map.unitFiles, ['lib/collection-compile-run.test.ts', 'lib/collection-compile-source-observations.test.mjs', 'lib/compile-job-worker.test.ts']);
+  assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['compile-source-observations']);
+  assert.ok(affectedMap([affectedRecord('M', ['nextjs/lib/compile-job-worker-v2.test.ts'])]).failures.length > 0);
+});
