@@ -1,3 +1,5 @@
+@layer reset, tokens, base, components, utilities, overrides;
+
 /*
   Home only (`landing-page.tsx`): the lead, the workbench (`hero-source-card.tsx`), the two
   editorial beats under it, and the closed walkthrough disclosure (`hero-film-disclosure.tsx`).

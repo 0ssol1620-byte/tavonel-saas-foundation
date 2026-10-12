@@ -133,5 +133,5 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   const nav = page.locator("header.nav .nav-actions");
   const box = await nav.boundingBox();
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  expect(await nav.locator(".btn").evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
+  expect(await nav.getByRole("link", { name: "Pricing", exact: true }).evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
