@@ -1,5 +1,7 @@
 "use client";
 
+import { preload } from "react-dom";
+
 import CompileStagePlayer, { type MobileFilmView } from "@/components/compile-stage-player";
 import type { CompileStage } from "@/lib/compile-stages";
 import styles from "./landing-hero.module.css";
@@ -15,6 +17,9 @@ export default function HeroFilmDisclosure({
   korean: boolean;
   stages: CompileStage[];
 }) {
+  // Next supports resource hints in an SSR client component, before hydration.
+  const openingPoster = stages[0]?.poster;
+  if (openingPoster) preload(openingPoster, { as: "image", fetchPriority: "high" });
   return (
     <figure
       className={`lv2-film-story ${styles.film}`}

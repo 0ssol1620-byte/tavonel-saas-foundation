@@ -123,9 +123,10 @@ test("visible film offers all four approved cuts with the locked video source", 
 test("server-renders the visible film poster as its priority image", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
-  const posterHint = [...html.matchAll(/<link[^>]*>/g)].map(match => match[0]).find(tag => /rel="preload"/i.test(tag) && /as="image"/i.test(tag) && tag.includes("/film/poster-1-hero-2x.webp"));
-  expect(posterHint).toBeTruthy();
-  expect(posterHint).toMatch(/fetchpriority="high"/i);
+  // Next transmits this early hint in the HTTP Link header before streaming the body.
+  const posterHint = response.headers()["link"] ?? "";
+  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
+  expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
   expect(high).toHaveLength(1); expect(high[0]).toContain('class="compile-film-still"'); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
