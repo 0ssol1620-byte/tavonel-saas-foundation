@@ -80,7 +80,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       "column-headings": "Column headings",
     },
     selectedNote:
-      "Context required. This passage prints values without their column headings or unit. Both are separate regions of the same page, and joining them is interpretation this preview has not run.",
+      "Context required: headings and units are separate regions. Interpretation has not run.",
     contextNote: "Shown as printed, for context. It has not been joined to the selected passage.",
     regions: "Regions on this page",
     openRegion: "Open this region in Explore",
@@ -123,7 +123,7 @@ const COPY: Record<"en" | "ko", Copy> = {
       "column-headings": "열 제목",
     },
     selectedNote:
-      "맥락 확인 필요. 이 구절에는 값만 있고 열 제목과 단위가 없습니다. 둘 다 같은 페이지의 다른 영역에 있으며, 이를 묶는 해석은 이 미리보기에서 실행하지 않았습니다.",
+      "맥락 확인 필요: 열 제목과 단위는 별도 영역입니다. 해석은 아직 실행하지 않았습니다.",
     contextNote: "맥락 확인용으로 인쇄된 그대로 보여 줍니다. 선택한 구절과 묶지 않았습니다.",
     regions: "이 페이지의 영역",
     openRegion: "Explore에서 이 영역 열기",
@@ -315,9 +315,6 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
       </div>
 
       <footer className={`${styles.record} ${styles.step}`} data-step={t.steps.record}>
-        {publishableClaims(view).length === 0 ? (
-          <p className={styles.claimNote}>{t.record.claims[0]}: {t.record.claims[1]}</p>
-        ) : null}
         <details className={styles.details}>
           <summary className={styles.detailsSummary}>{t.details}</summary>
         <dl className={styles.recordList}>

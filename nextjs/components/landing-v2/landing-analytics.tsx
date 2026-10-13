@@ -143,7 +143,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls]")) {
+      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls]")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

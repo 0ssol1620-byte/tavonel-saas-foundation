@@ -4,18 +4,17 @@ import {
   PublicSiteFooter,
   PublicSiteHeader,
 } from "@/components/public-site-chrome";
-import HeroFilm from "./hero-film";
+import SourceInspectionFilm from "./source-inspection-film";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
 import HomeReaderGuide from "./home-reader-guide";
-import HomeMeasurement from "./home-measurement";
 import heroStyles from "./landing-hero.module.css";
+import sourceStyles from "./source-first-home.module.css";
 import LandingAnalytics from "./landing-analytics";
 import RecompileScene from "./scenes/recompile";
 import StartScene from "./scenes/start";
 import TrustScene from "./scenes/trust";
-import { KO_EXPLORE_LABEL } from "./scene-actions";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
 import {
@@ -92,7 +91,7 @@ function homeData(): HomeData {
 */
 const HOME_COPY = {
   en: {
-    support: "Explore versioned knowledge and inspect the passages behind it.",
+    support: "Explore your sources together. Open the passage behind each record.",
     intake: "Own-source intake by arrangement",
     difficulty: {
       eyebrow: "Why this passage is hard",
@@ -120,9 +119,9 @@ const HOME_COPY = {
     },
     receive: {
       eyebrow: "What you receive",
-      title: "Versioned knowledge, with every passage still attached.",
+      title: "Connected knowledge. With its sources attached.",
       support:
-        "Each object in a Compiled World is a record: the source's own words, the version they were read from, and the region you can open.",
+        "Inspect the records and the original passages behind them.",
       kind: (kind: string) => kind,
       notes: [
         { title: "Versioned", body: "Bound to the digest of the exact source version it was read from." },
@@ -144,7 +143,7 @@ const HOME_COPY = {
     },
   },
   ko: {
-    support: "버전이 관리되는 지식을 살펴보고, 그 뒤의 원문 구절을 직접 확인하세요.",
+    support: "자료를 함께 살펴보고, 각 기록의 근거가 된 원문을 여세요.",
     intake: "자체 원문 접수는 별도 협의",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
@@ -172,9 +171,9 @@ const HOME_COPY = {
     },
     receive: {
       eyebrow: "받게 되는 것",
-      title: "모든 구절이 계속 붙어 있는, 버전이 관리되는 지식.",
+      title: "연결된 지식. 함께 남는 원문.",
       support:
-        "Compiled World의 각 객체는 기록입니다. 원문의 문장 그대로, 그것을 읽어 온 버전, 그리고 열어 볼 수 있는 영역을 함께 가집니다.",
+        "기록과 그 근거가 된 원문 구절을 함께 확인하세요.",
       kind: (kind: string) => (kind === "Claim" ? "진술" : kind),
       notes: [
         { title: "버전 관리", body: "읽어 온 원문 버전의 다이제스트에 묶여 있습니다." },
@@ -247,7 +246,7 @@ export default function LandingPage({
     own separately authored CTA copy and the resolved access link in `./scenes/start`.
   */
   const heroActions = {
-    exploreLabel: korean ? KO_EXPLORE_LABEL : EXPLORE_CTA.label,
+    exploreLabel: korean ? "공개 샘플 살펴보기" : "Explore the public sample",
     exploreHref: EXPLORE_CTA.href,
   };
   const access = primaryCallToAction();
@@ -262,7 +261,7 @@ export default function LandingPage({
   };
 
   return (
-    <div className={`page lv2 ${heroStyles.home}`} lang={korean ? "ko" : undefined}>
+    <div className={`page lv2 ${sourceStyles.home}`} lang={korean ? "ko" : "en"}>
       <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.90.woff2" crossOrigin="anonymous" />
       {korean ? <>
         <link rel="preload" as="font" type="font/woff2" href="/fonts/WantedSansVariable.split.73.woff2" crossOrigin="anonymous" />
@@ -291,33 +290,31 @@ export default function LandingPage({
           data-scene="1"
           tabIndex={-1}
           aria-labelledby="lv2-hero-title"
-          className={`lv2-scene lv2-hero ${heroStyles.hero}`}
+          className="lv2-scene lv2-hero"
         >
-          <div className={`lv2-wrap ${heroStyles.layout}`}>
-            <div className={heroStyles.intro}>
-              {/* The founder headline in the page's own sans; no serif accent. */}
+          <div className="lv2-wrap">
+            <div className={sourceStyles.intro}>
               <HeroStatement
-                copy={{ ...copy.hero, support: page.support }}
+                copy={{ ...copy.hero, headline: korean ? "내 문서. 연결된 지식." : "Your documents. Connected knowledge.", headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
+                showSupport={false}
               >
-                <HeroFilm korean={korean} />
+                <div className={sourceStyles.heroMedia}>
+                  <SourceInspectionFilm korean={korean} />
+                  <div className={sourceStyles.heroAside}>
+                    <p className="lv2-hero-support lv2-body-l">{page.support}</p>
+                    <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
+                      scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
+                    <p className={sourceStyles.intake}>{page.intake}</p>
+                  </div>
+                </div>
               </HeroStatement>
-              <div className={heroStyles.actionsBlock}>
-                <HeroActions
-                  exploreLabel={heroActions.exploreLabel}
-                  exploreHref={heroActions.exploreHref}
-                  startLabel={heroStart.label}
-                  startHref={heroStart.href}
-                  scene="1"
-                  ctaOrderVariant={experiment.ctaOrderVariant}
-                />
-                <p className={heroStyles.intakeNote}>{page.intake}</p>
-              </div>
             </div>
-            <p className={`lv2-hero-intake lv2-meta ${heroStyles.intake}`}>
-              {SOURCES_COPY[locale].formatsLabel} · {formats}
-            </p>
+            <details className={sourceStyles.formats}>
+              <summary>{korean ? "지원하는 원문 형식" : "Supported source formats"}</summary>
+              <p className={`lv2-hero-intake lv2-meta ${heroStyles.intake}`}>{SOURCES_COPY[locale].formatsLabel} · {formats}</p>
+            </details>
           </div>
         </section>
 
@@ -474,9 +471,9 @@ export default function LandingPage({
           data={data.recompile}
           sectionId="s4"
           sceneIndex={4}
+          compact
         />
-        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
-        <HomeMeasurement korean={korean} />
+        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} compact />
         <HomeReaderGuide korean={korean} faqOnly />
         <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
       </main>

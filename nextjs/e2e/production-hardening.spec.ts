@@ -83,7 +83,7 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     thing the old rule was actually protecting: no scene may floor at more than one viewport, and
     no scene may be taller than two. An ocean is still a failure; a composed frame is not one.
   */
-  expect(geometry.map(item => item.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "measurement", "reader-guide", "s6"]);
+  expect(geometry.map(item => item.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "reader-guide", "s6"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }
