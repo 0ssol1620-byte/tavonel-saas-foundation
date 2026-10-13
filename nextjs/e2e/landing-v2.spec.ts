@@ -1,13 +1,12 @@
 /** Active source-led Home contract. Retired specimen timers are outside this route. */
 import { test, expect, type Page } from "@playwright/test";
-const BENCH = "#s1 article[data-case-status]";
-const FILM = "#s2 .compile-film-sequence";
+const BENCH = "#s2 article[data-case-status]";
+const FILM = '#s1 figure[data-testid="landing-hero-film"] .compile-film-sequence';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
-async function openFilm(page: Page) {
+async function visibleFilm(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /./);
-  const disclosure = page.getByTestId("landing-film-disclosure");
-  await disclosure.locator("summary").click();
-  await expect(disclosure).toHaveAttribute("open", "");
+  const disclosure = page.getByTestId("landing-hero-film");
+  await expect(disclosure).toBeVisible();
   await expect(page.locator(FILM)).toBeVisible();
   return page.locator(FILM);
 }
@@ -18,9 +17,9 @@ for (const route of ["/", "/ko"]) {
     const source = await page.locator(BENCH).boundingBox();
     const context = await page.locator("#s2 h2").first().boundingBox();
     expect(actions).not.toBeNull(); expect(source).not.toBeNull(); expect(context).not.toBeNull();
-    expect(actions!.y + actions!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    expect((await page.getByTestId("landing-hero-film").boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
     expect(actions!.y + actions!.height).toBeLessThan(source!.y);
-    expect(source!.y + source!.height).toBeLessThan(context!.y);
+    expect(context!.y).toBeLessThan(source!.y);
     await expect(page.locator("[data-compiler-specimen]")).toHaveCount(0);
   });
   test(`${route} renders six ordered, named scene landmarks`, async ({ page }) => {
@@ -99,32 +98,46 @@ test("Korean close follows its commercial destination and keeps Korean pricing",
     await expect(page.getByRole("contentinfo").getByRole("link", { name: "English" })).toHaveAttribute("href", "/contact");
   } else await expect(page.locator('input[type="email"]')).toBeVisible();
 });
-test("optional film starts closed with no mounted video or canvas", async ({ page }) => {
+test("film is visible directly after the headline without an opening action", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("landing-film-disclosure")).not.toHaveAttribute("open");
-  await expect(page.locator(".compile-film-sequence")).toHaveCount(0);
-  await expect(page.locator("main video, main canvas")).toHaveCount(0);
+  const film = page.getByTestId("landing-hero-film");
+  await expect(film).toBeVisible();
+  await expect(film.locator('.compile-film-sequence')).toHaveCount(1);
+  const headline = (await page.locator('h1').boundingBox())!;
+  const media = (await film.boundingBox())!;
+  expect(media.y).toBeGreaterThanOrEqual(headline.y + headline.height);
+  expect(media.y).toBeLessThan(page.viewportSize()!.height);
+  const actions = (await page.locator('#s1 .lv2-actions').boundingBox())!;
+  expect(media.y + media.height).toBeLessThanOrEqual(actions.y);
+  await expect(page.locator('#s1 details, #s1 summary')).toHaveCount(0);
 });
-test("optional film opens all four approved cuts with the locked video source", async ({ page }) => {
-  await page.goto("/"); const film = await openFilm(page);
+test("visible film offers all four approved cuts with the locked video source", async ({ page }) => {
+  await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.getByRole("tab")).toHaveCount(4);
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   await expect(film).toHaveAttribute("data-video-primary-src", "/film/compile-cut.mp4");
-  await expect(page.getByTestId("landing-film-disclosure")).toContainText("Illustrative product walkthrough");
+  await expect(page.getByTestId("landing-hero-film")).toContainText("Illustrative product walkthrough");
   await film.getByRole("tab").nth(2).click();
   await expect(film.getByRole("tab").nth(2)).toHaveAttribute("aria-selected", "true");
 });
-test("server-renders only the actual source page as the high-priority image", async ({ request }) => {
+test("server-renders the visible film poster as its priority image", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
+  // Next transmits this early hint in the HTTP Link header before streaming the body.
+  const posterHint = response.headers()["link"] ?? "";
+  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
+  expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain("apple-2026-q1-10-q-reference-p004");
+  expect(high).toHaveLength(1); expect(high[0]).toContain('class="compile-film-still"'); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
-  expect(html).not.toContain('class="compile-film-still"');
+  const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
+  expect(sourceImages).toHaveLength(1);
+  expect(sourceImages[0]).toContain('loading="lazy"');
+  expect(sourceImages[0]).not.toMatch(/fetchpriority="high"/i);
 });
 test("reduced motion opens a static poster and keeps all cuts selectable", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
-  const film = await openFilm(page);
+  const film = await visibleFilm(page);
   await expect(film.locator(".compile-film-still")).toBeVisible();
   await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
   await film.getByRole("tab").last().click();

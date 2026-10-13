@@ -7,17 +7,16 @@ const PHONE_PROJECTS = new Set(["360", "390"]);
   four cuts, a keyboard-scrollable focused viewport, and a poster under reduced motion until the
   visitor plays -- belongs to the film, not to the landmark it sits in.
 
-  Source-led Home (2026-10-08): the film is an optional, illustrative walkthrough, closed at the
-  foot of Scene 02 and mounted only once opened. Home opens a phone on the whole frame
+  Home (2026-10-13): the illustrative film is visible below the headline in Scene 01. Home opens a phone on the whole frame
   (`LANDING_MOBILE_FILM_VIEW = "fit"`); "Focus details" is one tap away and magnifies the cut.
 */
-const DISCLOSURE = '#s2 [data-testid="landing-film-disclosure"]';
+const DISCLOSURE = '#s1 [data-testid="landing-hero-film"]';
 const FILM_SCENE = `${DISCLOSURE} .compile-film-sequence`;
 
-/* The player mounts from React state, so the disclosure is opened only once the page is live. */
+/* Wait for hydration before exercising player state. */
 async function openWalkthrough(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
-  await page.locator(`${DISCLOSURE} > summary`).click();
+  await expect(page.locator(DISCLOSURE)).toBeVisible();
   await expect(page.locator(FILM_SCENE)).toHaveCount(1);
 }
 

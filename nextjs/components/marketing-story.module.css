@@ -1,0 +1,33 @@
+@layer reset, tokens, base, components, utilities, overrides;
+
+@layer overrides {
+  .process, .product { padding-top: clamp(40px, 5vw, 72px); }
+  .lead { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: end; margin-bottom: 48px; }
+  .lead h1 { max-width: 20ch; margin: 0; font-size: clamp(36px, 4.4vw, 64px); font-weight: 560; line-height: 1.08; letter-spacing: -0.03em; }
+  .lead p { max-width: 48ch; margin: 0; font: 18px/1.6 var(--f-sans); }
+  .pipeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 40px; margin: 0; padding: 0; list-style: none; }
+  .pipeline li { padding: 28px 0 34px; border-top: 1px solid var(--hairline-hi); min-width: 0; }
+  .stepFlow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 72px; font: 13px/1.5 var(--f-sans); color: var(--text-mid); }
+  .stepFlow strong { color: var(--source); font-weight: 560; }
+  .pipeline h2 { margin: 20px 0 12px; font: 560 24px/1.25 var(--f-sans); letter-spacing: -0.02em; }
+  .pipeline p { margin: 0 0 12px; max-width: 44ch; color: var(--text-mid); font: 15px/1.7 var(--f-sans); }
+  .pipeline a, .processClose a, .outcome a, .boundary summary { display: inline-flex; align-items: center; min-height: 44px; font: 15px/1.5 var(--f-sans); }
+  .processClose { display: flex; flex-wrap: wrap; gap: 12px 28px; border-top: 1px solid var(--hairline); padding-top: 28px; margin-top: 12px; }
+  .processClose p { flex-basis: 100%; max-width: 82ch; margin: 0; color: var(--text-mid); font: 14px/1.7 var(--f-sans); }
+  .world { margin: 32px 0 56px; }
+  .outcomes { display: grid; gap: 0; }
+  .outcome { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 56px; border-top: 1px solid var(--hairline-hi); padding: 32px 0; }
+  .outcome h2 { margin: 0; font: 560 clamp(24px, 2.5vw, 36px)/1.2 var(--f-sans); letter-spacing: -0.025em; }
+  .outcome p { max-width: 60ch; margin: 0 0 12px; font: 17px/1.6 var(--f-sans); color: var(--text-mid); }
+  .boundary { margin: 32px 0; border-block: 1px solid var(--hairline); padding: 8px 0; }
+  .boundary summary { cursor: pointer; }
+  .close { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 24px; }
+  @media (max-width: 1023px) { .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; } }
+  @media (max-width: 767px) {
+    .lead, .outcome { grid-template-columns: 1fr; gap: 20px; }
+    .lead { margin-bottom: 28px; }
+    .pipeline { grid-template-columns: 1fr; }
+    .stepFlow { min-height: 44px; }
+    .outcome { padding-block: 28px; }
+  }
+}

@@ -19,7 +19,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 const CUSTOMER_LINKS = [
   { label: "Product", href: "/product" },
-  { label: "How it works", href: "/knowledge-compiler" },
+  { label: "How it works", href: "/how-it-works" },
   { label: "Resources", href: "/resources" },
   { label: "Docs", href: "/docs" },
 ] as const;

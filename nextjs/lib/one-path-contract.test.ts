@@ -20,7 +20,7 @@ describe("approved one-path experience", () => {
   it("has exactly five shared customer destinations", () => {
     expect(CUSTOMER_NAV).toEqual([
       { href: "/product", label: "Product" },
-      { href: "/knowledge-compiler", label: "How it works" },
+      { href: "/how-it-works", label: "How it works" },
       { href: "/resources", label: "Resources" },
       { href: "/docs", label: "Docs" },
       { href: "/pricing", label: "Pricing" },
@@ -67,7 +67,7 @@ describe("approved one-path experience", () => {
     CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
     this contract keeps the buyer's first-visit sequence explicit.
   */
-  it("orders the landing as source, context, optional film, record, change, trust and action", () => {
+  it("orders the landing as visible film, source, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
     expect(page).toContain("<HeroFilm");
@@ -77,10 +77,10 @@ describe("approved one-path experience", () => {
     const order = [
       'id="s1"',
       "<HeroStatement",
-      "<HeroActions",
-      "<HeroSourceCard",
-      'id="s2"',
       "<HeroFilm",
+      "<HeroActions",
+      'id="s2"',
+      "<HeroSourceCard",
       'id="s3"',
       "<RecompileScene",
       "<TrustScene",
@@ -99,11 +99,11 @@ describe("approved one-path experience", () => {
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
     const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
     expect(film).toContain("<HeroFilmDisclosure");
-    expect(disclosure).toContain("useState(false)");
-    expect(disclosure).toContain("{open ? (");
+    expect(disclosure).toContain('data-testid="landing-hero-film"');
+    expect(disclosure).not.toContain("{open ? (");
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(disclosure).toContain("preferVideo");
-    expect(disclosure).not.toContain("priorityPoster");
+    expect(disclosure).toContain("priorityPoster");
     expect(disclosure).toContain("Illustrative product walkthrough");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");

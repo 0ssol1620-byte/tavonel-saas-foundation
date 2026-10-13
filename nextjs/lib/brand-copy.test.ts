@@ -418,10 +418,10 @@ describe("public copy", () => {
       Each surviving beat is handed its own copy, and the order here is the order a reader gets.
       `lib/landing-v2-page.test.ts` pins the same order against both rendered locales.
     */
-    const rendered = [...page.matchAll(/copy=\{copy\.([a-z]+)\}/g)].map(
+    const rendered = [...page.matchAll(/copy=\{(?:\{ \.\.\.copy\.|copy\.)([a-z]+)/g)].map(
       match => match[1]!
     );
-    expect(rendered).toEqual(["recompile", "trust", "start"]);
+    expect(rendered).toEqual(["hero", "recompile", "trust", "start"]);
     expect(page).toContain("...copy.hero");
     expect(page).toContain("<HeroSourceCard");
     const beats = ['id="s1"', 'id="s2"', 'id="s3"', 'sectionId="s4"', 'sectionId="s5"', 'sectionId="s6"'].map(id => page.indexOf(id));
@@ -497,19 +497,19 @@ describe("public copy", () => {
     The bytes are untouched either way: `lib/one-path-contract.test.ts` still holds every cut and
     every poster to its length and its sha256, and nothing in this campaign re-encodes one.
   */
-  it("opens on the source and passage, with the illustrative film behind a disclosure", () => {
+  it("opens on the visible illustrative film, followed by the source workbench", () => {
     const page = landingSource();
     /* 2026-09-22, gap #1: the hero is the Evidence Inspector on the public sample World, and the
        film opens the landmark that explains how the World was compiled. The entry pages preload
        the hero's own raster because that is the image above the fold now. */
     expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<HeroSourceCard"));
-    expect(page.indexOf("<HeroSourceCard")).toBeLessThan(page.indexOf("<HeroFilm"));
+    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<HeroSourceCard"));
     expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf('id="s3"'));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
     expect(page).not.toContain("<CompilerSpecimen");
     expect(page).not.toContain("<HeroProof");
-    expect(read("components/landing-v2/hero-film-disclosure.tsx")).toContain("useState(false)");
+    expect(read("components/landing-v2/hero-film-disclosure.tsx")).toContain('data-testid="landing-hero-film"');
     expect(read("components/landing-v2/compiler-specimen.tsx")).not.toContain(
       "<video"
     );
@@ -1324,10 +1324,10 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<HeroActions",
-      "<HeroSourceCard",
-      'id="s2"',
       "<HeroFilm",
+      "<HeroActions",
+      'id="s2"',
+      "<HeroSourceCard",
       'id="s3"',
       "copy.recompile",
       "copy.trust",

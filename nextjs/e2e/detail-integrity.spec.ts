@@ -9,7 +9,7 @@ async function capture(page: Page, name: string) {
   await page.screenshot({ path: resolve(evidenceDir, `${name}-${page.viewportSize()?.width}.png`), fullPage: true });
 }
 async function sourceBinding(page: Page) {
-  const bench = page.locator('#s1 article[data-case-status]');
+  const bench = page.locator('#s2 article[data-case-status]');
   const region = bench.locator('[data-region-id][data-selected="1"]');
   await expect(region).toHaveCount(1);
   const id = await region.getAttribute('data-region-id');
@@ -21,7 +21,7 @@ async function sourceBinding(page: Page) {
 }
 for (const route of ["/", "/ko"]) test(`source connections have two real endpoints on ${route}`, async ({ page }) => {
   await page.goto(route);
-  const buttons = page.locator('#s1 article[data-case-status] button');
+  const buttons = page.locator('#s2 article[data-case-status] button');
   await expect(buttons).toHaveCount(3);
   for (const button of await buttons.all()) {
     await button.click();
@@ -134,7 +134,7 @@ test('source endpoints stay attached after a width change, without a page reload
   await page.goto('/');
   for (const width of [1440, 1024, 768, 1920]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.locator('#s1 article[data-case-status]').scrollIntoViewIfNeeded();
+    await page.locator('#s2 article[data-case-status]').scrollIntoViewIfNeeded();
     await sourceBinding(page);
   }
 });

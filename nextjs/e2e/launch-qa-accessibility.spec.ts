@@ -17,6 +17,7 @@ const routes = [
   "/login",
   "/pricing",
   "/product",
+  "/how-it-works",
   "/solutions/ai-ready-knowledge",
   // The hub and one section page: both are templates rather than single pages, and the section
   // template now renders the documentation index twice (a column and a disclosure) so that a

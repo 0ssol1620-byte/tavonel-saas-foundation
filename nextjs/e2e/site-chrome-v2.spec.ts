@@ -22,7 +22,7 @@ import { test, expect, type Page } from "@playwright/test";
 /** The four section links; Pricing is the separate emphasized header control. */
 const CUSTOMER_NAV = [
   { href: "/product", label: "Product" },
-  { href: "/knowledge-compiler", label: "How it works" },
+  { href: "/how-it-works", label: "How it works" },
   { href: "/resources", label: "Resources" },
   { href: "/docs", label: "Docs" },
 ] as const;

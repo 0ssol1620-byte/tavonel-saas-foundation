@@ -42,15 +42,15 @@ for (const path of ["/", "/ko"]) {
     const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
     const filmWrap = await page.locator("#s2 .lv2-wrap").boundingBox();
     const mark = await page.locator("header .wordmark").boundingBox();
-    const bench = await page.locator("#s1 article[data-case-status]").boundingBox();
+    const bench = await page.locator("#s2 article[data-case-status]").boundingBox();
     expect(wrap && filmWrap && mark && bench).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(filmWrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     expect(bench!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
     expect(bench!.x + bench!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
-    const disclosure = page.getByTestId("landing-film-disclosure");
-    await disclosure.locator("summary").click();
+    const disclosure = page.getByTestId("landing-hero-film");
+    await expect(disclosure).toBeVisible();
     await expect(disclosure.locator(".compile-film-viewport")).toBeVisible();
     const film = (await disclosure.locator(".compile-film-viewport").boundingBox())!;
     expect(film.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);

@@ -1,5 +1,6 @@
 @layer reset, tokens, base, components, utilities, overrides;
 
+
 /*
   Home only (`landing-page.tsx`): the lead, the workbench (`hero-source-card.tsx`), the two
   editorial beats under it, and the closed walkthrough disclosure (`hero-film-disclosure.tsx`).
@@ -1428,4 +1429,57 @@ section.receive {
 .home section.hero .runStatus { font-family: inherit !important; }
 .home section.hero .runStatus::before { content: none !important; }
 .home .receive .recordQuote { border-inline-start: 0 !important; padding-inline-start: 0 !important; }
+}
+
+@layer overrides {
+  .home section.hero .intro { display: block !important; text-align: center !important; }
+  .home section.hero .intro :global(.lv2-hero-text) { display: block !important; max-width: none !important; }
+  .home section.hero .intro :global(.lv2-hero-h1) { max-width: none !important; margin-inline: auto; font-size: clamp(36px, 4.2vw, 64px) !important; line-height: 1.1 !important; }
+  .home section.hero .intro :global(.lv2-h1-line) { display: inline !important; white-space: normal !important; }
+  .home section.hero .intro :global(.lv2-hero-support) { max-width: 56ch !important; margin: 24px auto 0 !important; }
+  .home section.hero .actionsBlock { margin: 20px auto 0; text-align: center !important; }
+  .home section.hero .actionsBlock :global(.lv2-hero-actions) { justify-content: center; }
+  .home .film { width: min(100%, 1040px); margin: 28px auto 0 !important; border: 0 !important; }
+  .home .filmBody { margin: 0 !important; padding: 0 !important; }
+  .home .film figcaption { margin-top: 12px; font-size: 13px; line-height: 1.5; color: var(--home-muted); }
+  .home .proofLayout { display: grid; gap: 28px; }
+  .home .contextDisclosure { width: min(100%, 840px); margin-inline: auto; border-top: 1px solid var(--home-rule); }
+  .home .contextDisclosure > summary, .home .receiveNotes > summary { min-height: 44px; padding-block: 12px; cursor: pointer; color: var(--home-ink); font-size: 16px; }
+  .home .contextDisclosure .diffList { margin-top: 20px; }
+  .home .receiveNotes { border-top: 1px solid var(--home-rule); padding-top: 0; }
+  .home .readerLayout { display: block !important; max-width: 900px; }
+  .home .readerFaq { width: 100%; }
+  .measurement { padding-block: clamp(44px, 6vw, 80px); background: #fbfaf7; color: #15191d; border-top: 1px solid #d8d5ce; }
+  .measurementLead { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: end; }
+  .measurementLead p { margin: 0; max-width: 48ch; font: 17px/1.6 var(--f-sans); }
+  .measurementResults { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin: 32px 0; padding-block: 28px; border-block: 1px solid #d8d5ce; }
+  .measurementResults dt { font: 15px/1.5 var(--f-sans); color: #424951; }
+  .measurementResults dd { margin: 14px 0 0; font: 560 clamp(36px, 4vw, 56px)/1.05 var(--f-sans); letter-spacing: -0.03em; }
+  .measurementResults dd span { font-size: 0.42em; color: #555b62; letter-spacing: 0; }
+  .measurementBoundary { max-width: 78ch; margin-bottom: 18px; font: 14px/1.7 var(--f-sans); color: #424951; }
+  @media (max-width: 767px) {
+    .measurementLead { grid-template-columns: 1fr; gap: 20px; }
+    .measurementResults { grid-template-columns: 1fr; gap: 24px; }
+    .measurementResults > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+    .measurementResults dd { margin: 0; }
+    .home section.hero .intro :global(.lv2-hero-h1) { max-width: 15ch !important; }
+    .home .film { margin-top: 24px !important; }
+  }
+  .home section.hero .film :global(.compile-film-stages button) { color: #4b5057 !important; border-color: #d8d5ce !important; }
+  .home section.hero .film :global(.compile-film-stages button[aria-selected="true"]) { color: #2347b8 !important; border-color: #2347b8 !important; }
+  .home section.hero .film :global(.compile-film-caption),
+  .home section.hero .film :global(.compile-film-mobile-tools) { color: #4b5057 !important; }
+  .home section.hero .film :global(.compile-film-focus-control) { color: #2347b8 !important; }
+}
+
+@layer overrides {
+  .home section.hero .intro :global(.lv2-hero-h1),
+  .home section.hero .intro :global(.lv2-hero-support) { text-align: center !important; }
+  .home section.hero .film :global(.compile-film-caption p),
+  .home section.hero .film :global(.compile-film-progress),
+  .home section.hero .film :global(.compile-film-mobile-tools p) { color: #4b5057 !important; }
+}
+
+@layer overrides {
+  .measurement :global(.lv2-h2) { color: #15191d !important; font-family: "Wanted Sans Variable", var(--f-sans), sans-serif; font-weight: 560; }
 }

@@ -9,6 +9,7 @@ import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
 import HomeReaderGuide from "./home-reader-guide";
+import HomeMeasurement from "./home-measurement";
 import heroStyles from "./landing-hero.module.css";
 import LandingAnalytics from "./landing-analytics";
 import RecompileScene from "./scenes/recompile";
@@ -47,7 +48,7 @@ import {
 /*
   Home, structural candidate 2026-10-08. One composition, two languages.
 
-  Six beats: a short lead over one full-width workbench (source -> highlighted passage -> record),
+  Six beats: a short lead and visible film, then one source workbench (source -> highlighted passage -> record),
   why that passage is difficult, what a reader receives, what changed in the sources, method and
   trust, and the close. Scene ids `s1`-`s6` and their focusable landmarks are unchanged.
 
@@ -60,7 +61,7 @@ import {
 
   WHY THIS IS A SERVER COMPONENT
   The public World is a committed snapshot. This file reads it once and hands each beat a flat,
-  serializable projection; the workbench's region selection, the action row and the optional
+  serializable projection; the workbench's region selection, the action row and the visible
   film are the only client islands.
 */
 
@@ -299,7 +300,9 @@ export default function LandingPage({
                 copy={{ ...copy.hero, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
-              />
+              >
+                <HeroFilm korean={korean} />
+              </HeroStatement>
               <div className={heroStyles.actionsBlock}>
                 <HeroActions
                   exploreLabel={heroActions.exploreLabel}
@@ -312,7 +315,6 @@ export default function LandingPage({
                 <p className={heroStyles.intakeNote}>{page.intake}</p>
               </div>
             </div>
-            {home ? <HeroSourceCard view={home} korean={korean} /> : null}
             <p className={`lv2-hero-intake lv2-meta ${heroStyles.intake}`}>
               {SOURCES_COPY[locale].formatsLabel} · {formats}
             </p>
@@ -330,11 +332,15 @@ export default function LandingPage({
           aria-labelledby="lv2-difficulty-title"
           className={`lv2-scene lv2-paper ${heroStyles.difficulty}`}
         >
-          <div className={`lv2-wrap ${heroStyles.split}`}>
+          <div className={`lv2-wrap ${heroStyles.proofLayout}`}>
             <div className={heroStyles.splitHead}>
-              <h2 className="lv2-h2" id="lv2-difficulty-title">{page.difficulty.title}</h2>
-              <p className="lv2-scene-support">{page.difficulty.support}</p>
+              <h2 className="lv2-h2" id="lv2-difficulty-title">{korean ? "구절에서 원문까지, 직접 확인하세요." : "Follow a passage to its source."}</h2>
+              <p className="lv2-scene-support">{korean ? "인용에는 문서 버전, 페이지와 좌표가 함께 남습니다." : "The document version, page and coordinates stay with the citation."}</p>
             </div>
+            {home ? <HeroSourceCard view={home} korean={korean} /> : null}
+            <details className={heroStyles.contextDisclosure}>
+              <summary>{korean ? "이 구절에 필요한 맥락" : "The context this passage needs"}</summary>
+              <p>{page.difficulty.support}</p>
             {home && selected ? (
               <ol className={heroStyles.diffList}>
                 <li>
@@ -363,13 +369,8 @@ export default function LandingPage({
             {caseStatus(HOME_RESERVED_CASE) === "prepared" ? (
               <p className={heroStyles.reserved}>{page.difficulty.reserved}</p>
             ) : null}
-            {/*
-              The optional, illustrative walkthrough: closed on load, its player mounted only once
-              opened. It stays in `#s2` because `LandingAnalytics` counts `hero_demo_interact` there.
-            */}
-            <div className={heroStyles.filmSlot}>
-              <HeroFilm korean={korean} />
-            </div>
+            </details>
+
           </div>
         </section>
 
@@ -437,7 +438,8 @@ export default function LandingPage({
                 </p>
               </article>
 
-              <div className={heroStyles.receiveNotes}>
+              <details className={heroStyles.receiveNotes}>
+                <summary>{korean ? "기록 읽기" : "Read the record"}</summary>
                 <ul className={heroStyles.noteList}>
                   {page.receive.notes.map(note => (
                     <li key={note.title}>
@@ -457,7 +459,7 @@ export default function LandingPage({
                   </ol>
                 </div>
                 <p className={heroStyles.rights}>{page.receive.rights}</p>
-              </div>
+              </details>
             </div>
             <p className="lv2-scene-note lv2-small">{landingV2HeroExtra(korean).entityDisclaimer}</p>
           </div>
@@ -465,13 +467,17 @@ export default function LandingPage({
 
         <RecompileScene
           locale={locale}
-          copy={copy.recompile}
+          copy={{ ...copy.recompile,
+            support: korean ? "새 공시로 만든 World를 이전 버전과 비교합니다." : "Compare the World compiled from new filings with its previous version.",
+            contractNote: korean ? "공개 샘플은 전체 자료를 다시 컴파일한 결과입니다. 선택적 재컴파일의 범위는 컴파일러 계약에서 확인하세요." : "The public sample compares full-corpus compiles. Selective rebuild is specified in the compiler contract."
+          }}
           data={data.recompile}
           sectionId="s4"
           sceneIndex={4}
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
-        <HomeReaderGuide korean={korean} />
+        <HomeMeasurement korean={korean} />
+        <HomeReaderGuide korean={korean} faqOnly />
         <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />

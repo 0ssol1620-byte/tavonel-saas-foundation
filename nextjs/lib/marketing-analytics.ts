@@ -12,7 +12,7 @@ export const CONSENT_KEY = "tavonel.analytics-consent.v1";
 */
 export const PUBLIC_MARKETING_PATHS = new Set([
   "/", "/api", "/arena", "/benchmarks", "/benchmarks/gdp-pdf", "/changelog", "/contact", "/demo", "/developers", "/docs", "/enterprise",
-  "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/pricing", "/privacy",
+  "/evidence", "/explore", "/integrations", "/knowledge-compiler", "/how-it-works", "/pricing", "/privacy",
   "/product", "/product/compiled-world", "/product/continuous-knowledge", "/product/document-understanding",
   "/refunds", "/research", "/research/notes", "/resources", "/security", "/sources", "/status",
   "/subprocessors", "/terms", "/solutions/ai-ready-knowledge", "/solutions/document-intelligence",
