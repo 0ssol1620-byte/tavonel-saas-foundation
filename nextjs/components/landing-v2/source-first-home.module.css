@@ -22,11 +22,13 @@
     --ink: #19201f;
     --text-hi: #19201f;
     --text-mid: #58615e;
+    --text-lo: #58615e;
     background: var(--paper);
     color: var(--ink);
     font-family: var(--f-sans);
   }
   .home.home :global(.lv2-main) { background: var(--paper); color: var(--ink); }
+  .home.home > footer { --ink: #edf2f5; --text-hi: #edf2f5; --text-mid: #b7c3d2; --text-lo: #b7c3d2; }
   .intro { display: block; }
   .home.home > header { background: var(--paper); color: var(--ink); }
   .home.home > header :global(.wordmark), .home.home > header :global(.wordmark) :is(b, svg),

@@ -70,7 +70,7 @@ export default function ProductPage() {
         </details>
         <div className={styles.close}>
           <Link className="btn" href={"/how-it-works" as Route}>Follow the compilation process</Link>
-          <Link className="btn ghost" href="/benchmarks/gdp-pdf">Read the measured evaluation</Link>
+          <Link className="btn ghost" href="/evaluation">Evaluate your documents</Link>
           <Link className="btn ghost" href="/sources">See supported sources</Link>
         </div>
       </div>

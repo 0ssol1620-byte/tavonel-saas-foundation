@@ -36,7 +36,7 @@ test("Home leads with the product while the historical result keeps its conditio
 // New light-surface text must not inherit the old dark-surface palette.
 test("source-inspection controls and captions retain readable contrast", async ({ page }) => {
   await page.goto("/");
-  for (const selector of ['[data-source-inspection-film] button', '[data-source-inspection-film] figcaption']) {
+  for (const selector of ['[data-source-inspection-film] button', '[data-source-inspection-film] figcaption', '#s4 .lv2-scene-note', 'footer .wordmark b', 'footer .site-footer-legal-pair', 'footer [data-consent-anchor]']) {
     const contrasts = await page.locator(selector).evaluateAll(elements => elements.map(element => {
       const luminance = (value: string) => {
         const channels = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map(channel => {
