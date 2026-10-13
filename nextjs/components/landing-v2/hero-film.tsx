@@ -1,3 +1,4 @@
+import { preload } from "react-dom";
 import { COMPILE_STAGES, type CompileStage } from "@/lib/compile-stages";
 import { LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-hero-copy";
 import HeroFilmDisclosure from "./hero-film-disclosure";
@@ -39,5 +40,8 @@ function heroStages(korean: boolean): CompileStage[] {
 }
 
 export default function HeroFilm({ korean = false }: { korean?: boolean }) {
+  // Discover the above-the-fold poster in the streamed head, before the player markup.
+  // This preserves the locked master while avoiding a body-discovery network delay.
+  preload(HERO_FILM_POSTER, { as: "image", fetchPriority: "high" });
   return <HeroFilmDisclosure korean={korean} stages={heroStages(korean)} />;
 }

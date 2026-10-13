@@ -50,7 +50,7 @@ test("the entry page keeps its public product routes actionable, with no console
   }
 
   // Source metadata can be inspected without dominating the record's initial view.
-  const sourceDetails = proof.locator("details");
+  const sourceDetails = proof.locator("article details");
   await expect(sourceDetails).toHaveCount(1);
   await sourceDetails.locator("summary").click();
   await expect(sourceDetails.locator("dl")).toBeVisible();

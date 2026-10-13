@@ -101,7 +101,7 @@ test("desktop editorial pages reserve enough width for their primary claim", asy
   for (const route of EDITORIAL_ROUTES) {
     await page.goto(route);
     const result = await page.evaluate(() => {
-      const body = document.querySelector<HTMLElement>("main .body");
+      const body = document.querySelector<HTMLElement>("main .body, main .product-overview .shell > div:first-child");
       const title = document.querySelector<HTMLElement>("main .document-title");
       if (!body || !title) return null;
       const first = body.firstElementChild?.getBoundingClientRect();

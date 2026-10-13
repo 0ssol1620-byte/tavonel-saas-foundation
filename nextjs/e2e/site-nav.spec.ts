@@ -86,7 +86,7 @@ const TASKS = [
 ] as const;
 
 /** The four section links; Pricing has its own emphasized header control. */
-const CUSTOMER_HREFS = ["/product", "/knowledge-compiler", "/resources", "/docs"] as const;
+const CUSTOMER_HREFS = ["/product", "/how-it-works", "/resources", "/docs"] as const;
 
 const BAR = 'header.nav nav[aria-label="Sections"]';
 const SHEET = "header.nav details.mobile-primary-nav";

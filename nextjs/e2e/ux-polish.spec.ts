@@ -101,20 +101,12 @@ test("product page shows the product path before secondary product surfaces", as
   const expectedCta = status.availableActions.compileCustomerDocuments.enabled &&
     status.availableActions.purchasePlan.enabled ? SELF_SERVE_CTA : ACCESS_CTA;
   await page.goto("/product");
-  /*
-    BQ-109 deleted `.product-flow`. /product printed the same four beats twice -- once as a
-    numbered SOURCE-to-WORLD strip, once as four cards -- and the cards are the half that links
-    anywhere, so the strip went rather than being restyled (`app/product-polish.css` keeps the
-    note). The strip's assertions become the inverse guard, and what the page shows before its
-    secondary material is the four linked surfaces the strip was duplicating.
-
-    The scoping the old comment argued for still matters: unscoped, "SOURCE" first matched the
-    header's own nav link rather than anything on the page.
-  */
-  await expect(page.locator(".product-flow")).toHaveCount(0);
-  const surfaces = page.locator(".product-surface-grid > .product-surface");
-  await expect(surfaces).toHaveCount(4);
-  await expect(surfaces.first()).toBeVisible();
+  // Output uses follow the actual World; the old duplicate process/card wall stays retired.
+  await expect(page.locator(".product-flow, .product-surface-grid")).toHaveCount(0);
+  const outcomes = page.getByRole("heading", { name: "Open the evidence", exact: true }).locator("..").locator("..");
+  await expect(outcomes.locator(":scope > section")).toHaveCount(3);
+  await expect(outcomes.getByRole("heading")).toHaveText(["Open the evidence", "Keep versions readable", "Use the World in your stack"]);
+  await expect(outcomes.getByRole("link")).toHaveCount(3);
   /*
     The page's own CTA, not "a Start free somewhere on the document". `PublicSiteHeader` renders
     the same runtime-derived `PublicPrimaryCta` on every public route (both arrived in `e5eb77c`),
