@@ -281,12 +281,10 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
           <blockquote className={styles.quote} lang="en" data-derived="1">
             {active.passage}{active.passageTruncated ? "…" : ""}
           </blockquote>
-          <p className={styles.citation} data-derived="1">{`${source.filename} · ${where(active)}`}</p>
           <p className={styles.contextNote}>{active.role === "selected" ? t.selectedNote : t.contextNote}</p>
           {active.href ? (
             <Link className={styles.evidenceLink} href={active.href as Route} prefetch={false} data-hero-evidence data-analytics="source-open">
               {t.openRegion}
-              <span aria-hidden="true">↗</span>
             </Link>
           ) : null}
         </div>
@@ -301,12 +299,13 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
                   className={styles.regionButton}
                   aria-pressed={region.id === active.id}
                   aria-controls={passageId}
+                  aria-label={`${t.roles[region.role]} ${where(region)}`}
                   onClick={() => setSelectedId(region.id)}
                 >
                   <span className={styles.regionLetter} aria-hidden="true">{letter(index)}</span>
                   <span className={styles.regionText}>
                     <span className={styles.regionRole}>{t.roles[region.role]}</span>
-                    <span className={styles.regionWhere} data-derived="1">{where(region)}</span>
+                    <span className={styles.regionWhere} data-derived="1">{korean ? `${region.page}쪽` : `Page ${region.page}`}</span>
                   </span>
                 </button>
               </li>
@@ -316,6 +315,11 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
       </div>
 
       <footer className={`${styles.record} ${styles.step}`} data-step={t.steps.record}>
+        {publishableClaims(view).length === 0 ? (
+          <p className={styles.claimNote}>{t.record.claims[0]}: {t.record.claims[1]}</p>
+        ) : null}
+        <details className={styles.details}>
+          <summary className={styles.detailsSummary}>{t.details}</summary>
         <dl className={styles.recordList}>
           <div>
             <dt>{t.record.passage[0]}</dt>
@@ -338,9 +342,8 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
           ) : null}
         </dl>
 
-        <details className={styles.details}>
-          <summary className={styles.detailsSummary}>{t.details}</summary>
           <dl className={styles.detailList}>
+            <div><dt>{t.roles[active.role]}</dt><dd className={styles.citation} data-derived="1">{`${source.filename} · ${where(active)}`}</dd></div>
             <div><dt>{t.detailFields.file}</dt><dd data-derived="1">{source.filename}</dd></div>
             <div>
               <dt>{t.fields.version}</dt>

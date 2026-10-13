@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("filled navigation and hero actions keep readable labels", async ({ page }) => {
+test("navigation and hero actions keep readable labels", async ({ page }) => {
   await page.goto("/");
-  for (const selector of ['header.nav a.btn', '[data-analytics="hero-primary"]']) {
+  for (const selector of ['header.nav .nav-actions a[href="/pricing"]', '[data-analytics="hero-primary"]']) {
     const contrast = await page.locator(selector).first().evaluate(element => {
       const style = getComputedStyle(element);
       const channels = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
@@ -14,7 +14,18 @@ test("filled navigation and hero actions keep readable labels", async ({ page })
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       };
       const foreground = luminance(style.color);
-      const background = luminance(style.backgroundColor);
+      let ancestor: Element | null = element;
+      let ground = "rgb(255, 255, 255)";
+      while (ancestor) {
+        const value = getComputedStyle(ancestor).backgroundColor;
+        const rgba = value.match(/[\d.]+/g)?.map(Number) ?? [];
+        if (rgba.length === 3 || (rgba.length === 4 && rgba[3]! >= 0.99)) {
+          ground = value;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      const background = luminance(ground);
       return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
     });
     expect(contrast, `${selector} label contrast`).toBeGreaterThanOrEqual(4.5);

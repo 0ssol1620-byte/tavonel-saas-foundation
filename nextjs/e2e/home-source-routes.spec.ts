@@ -49,8 +49,11 @@ test("the entry page keeps its public product routes actionable, with no console
     expect(box?.height ?? 0, "44px touch floor").toBeGreaterThanOrEqual(44);
   }
 
-  // The fold this section used to carry is gone; the pages it opened are still one click away.
-  await expect(proof.locator("details")).toHaveCount(0);
+  // Source metadata can be inspected without dominating the record's initial view.
+  const sourceDetails = proof.locator("details");
+  await expect(sourceDetails).toHaveCount(1);
+  await sourceDetails.locator("summary").click();
+  await expect(sourceDetails.locator("dl")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });

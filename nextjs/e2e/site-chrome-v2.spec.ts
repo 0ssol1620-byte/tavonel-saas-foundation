@@ -4,7 +4,7 @@
  * Everything here is a geometric or compositional fact that no unit test can see:
  * `lib/one-path-contract.test.ts` knows the bar declares five destinations, and
  * `lib/site-nav-model.test.ts` knows each one is a published route with a Korean label, but
- * neither can tell whether the bar is 64px tall, whether it is transparent before the reader
+ * neither can tell whether the bar is 64px tall, whether its surface stays readable before the reader
  * scrolls, whether the access action is the only filled control in it, or whether five labels
  * plus an action plus a sign-in link still fit inside 1440.
  *
@@ -59,7 +59,7 @@ test.describe("at 1440", () => {
   });
 
   /*
-    §8: Request access only is a filled CTA, Sign in is text.
+    Pricing and Sign in are ordinary navigation; the page owns its primary action.
 
     "Filled" is measured as a painted background rather than as a class name, because the class is
     the implementation and the rule is about what a reader sees: two filled controls in one row is
@@ -67,12 +67,12 @@ test.describe("at 1440", () => {
     button fails the class assertion and passes this one, which is the right split -- the class is
     the contract other lanes read, the paint is the design rule.
   */
-  test("gives the bar exactly one filled control, and it is the access action", async ({ page }) => {
+  test("keeps Pricing and Sign in readable without competing with the hero action", async ({ page }) => {
     await page.goto("/product");
-    const action = page.locator(`${HEADER} .nav-actions .btn`);
+    const action = page.locator(`${HEADER} .nav-actions a[href="/pricing"]`);
     await expect(action).toHaveCount(1);
-    await expect(action).toHaveClass(/\bbtn\b/);
-    await expect(action).not.toHaveClass(/\bghost\b/);
+    await expect(action).toHaveText("Pricing");
+    await expect(action).toBeVisible();
     await expect(action).toHaveAttribute("href", "/pricing");
 
     const filled = await page.locator(`${HEADER} a, ${HEADER} button`).evaluateAll((elements) =>
@@ -96,7 +96,7 @@ test.describe("at 1440", () => {
         })
         .map((element) => (element.textContent ?? "").trim().slice(0, 24)),
     );
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toHaveLength(1);
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toHaveLength(0);
 
     const signIn = page.locator(`${HEADER} .nav-signin`);
     await expect(signIn).toHaveAttribute("href", "/login");
@@ -120,15 +120,15 @@ test.describe("at 1440", () => {
   });
 
   /*
-    Transparent over the page, opaque after 40px. The threshold is asserted from both sides:
+    The paper surface stays opaque. The scroll threshold is asserted from both sides:
     a listener that fires but reads the wrong number is the failure mode worth catching, and an
     attribute that is simply always "1" passes a one-sided check.
   */
-  test("is transparent at the top of the page and gains its ground after 40px of scroll", async ({ page }) => {
+  test("keeps its readable surface while tracking both sides of the scroll threshold", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     const background = () => header.evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(await background(), "the bar paints a ground before the reader has moved").toMatch(/,\s*0\)$|^transparent$/);
+    expect(await background(), "the initial bar has its readable paper surface").toBe("rgb(251, 250, 247)");
 
     await page.evaluate(() => window.scrollTo(0, 20));
     await expect(header).toHaveAttribute("data-scrolled", "0");
@@ -138,12 +138,12 @@ test.describe("at 1440", () => {
     /*
       `toHaveCSS` retries; a bare read does not.
 
-      The ground arrives through a `background-color` transition, so a single sample taken the
+      The paper surface remains stable while the scroll state changes; a single sample taken the
       instant the attribute flips reads whatever alpha the interpolation is at -- 0.75, then 0.76
       on the retry, then 0.77. The threshold and the toggle were never the flake; the stopwatch
       was. This waits for the transition to land on the declared value instead.
     */
-    await expect(header).toHaveCSS("background-color", "rgba(9, 13, 20, 0.94)");
+    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(header).toHaveAttribute("data-scrolled", "0");
@@ -195,7 +195,7 @@ test.describe("at 390", () => {
     await page.goto("/product");
     // The action is reachable without opening anything: §29's commercial CTA may not be behind a
     // disclosure, which is the whole reason the sheet does not carry a second copy of it.
-    await expect(page.locator(`${HEADER} .nav-actions .btn`)).toBeVisible();
+    await expect(page.locator(`${HEADER} .nav-actions a[href="/pricing"]`)).toBeVisible();
 
     await page.locator(`${SHEET} > summary`).click();
     const panel = page.locator(`${SHEET} > nav`);
@@ -239,13 +239,13 @@ test.describe("at 390", () => {
     expect(short, `chrome controls under 44px or outside the viewport: ${JSON.stringify(short)}`).toEqual([]);
   });
 
-  test("gains its ground after 40px of scroll on a phone too", async ({ page }) => {
+  test("keeps its readable surface after 40px of scroll on a phone too", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
-    // Retried, for the transition reason in the desktop test above.
-    await expect(header).toHaveCSS("background-color", "rgba(9, 13, 20, 0.94)");
+    // The phone shares the same stable paper surface as the desktop.
+    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
   });
 
   test("does not scroll sideways with the sheet open", async ({ page }) => {

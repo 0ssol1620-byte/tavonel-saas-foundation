@@ -104,7 +104,6 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
     >
       <div className="lv2-wrap">
         <div className="lv2-scene-head">
-          <p className="lv2-eyebrow lv2-meta">{copy.eyebrow}</p>
           <h2 className="lv2-h2" id={TITLE_ID}>
             <span className="lv2-h2-line">{copy.headline}</span>
           </h2>

@@ -33,7 +33,7 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
   await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
   // BQ-059: the header keeps the action at every width; the sheet is the sections and Sign in.
   await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
-  await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
+  await expect(page.locator('header .nav-actions a[href="/pricing"]')).toHaveCount(1);
   await expect(menu.locator("details.mobile-nav-group")).toHaveCount(0);
 });
 
