@@ -103,9 +103,9 @@ test("product page shows the product path before secondary product surfaces", as
   await page.goto("/product");
   // Output uses follow the actual World; the old duplicate process/card wall stays retired.
   await expect(page.locator(".product-flow, .product-surface-grid")).toHaveCount(0);
-  const outcomes = page.getByRole("heading", { name: "Open the evidence", exact: true }).locator("..").locator("..");
+  const outcomes = page.getByRole("heading", { name: "Inspect the evidence", exact: true }).locator("..").locator("..");
   await expect(outcomes.locator(":scope > section")).toHaveCount(3);
-  await expect(outcomes.getByRole("heading")).toHaveText(["Open the evidence", "Keep versions readable", "Use the World in your stack"]);
+  await expect(outcomes.getByRole("heading")).toHaveText(["Inspect the evidence", "Keep versions readable", "Give your AI the output"]);
   await expect(outcomes.getByRole("link")).toHaveCount(3);
   /*
     The page's own CTA, not "a Start free somewhere on the document". `PublicSiteHeader` renders

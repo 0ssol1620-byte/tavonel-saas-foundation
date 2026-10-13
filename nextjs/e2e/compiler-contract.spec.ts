@@ -142,7 +142,7 @@ test("leaves no empty row in the three product outcomes", async ({ page }: { pag
   await page.goto("/product");
 
   const layout = await page.evaluate(() => {
-    const grid = [...document.querySelectorAll("h2")].find(heading => heading.textContent === "Open the evidence")?.parentElement?.parentElement;
+    const grid = [...document.querySelectorAll("h2")].find(heading => heading.textContent === "Inspect the evidence")?.parentElement?.parentElement;
     if (!grid) return { columns: 0, cards: 0, rows: [] as number[] };
     const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
     const rows = [...new Set([...grid.children].map((card) => Math.round(card.getBoundingClientRect().top)))];

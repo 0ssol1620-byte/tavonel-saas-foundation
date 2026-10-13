@@ -45,6 +45,8 @@
   .home.home :global(.lv2-h1-line) { display: block; }
   .home.home :global(.lv2-h2) { font: 560 clamp(32px, 3.6vw, 52px)/1.12 var(--f-sans); letter-spacing: -0.03em; color: var(--ink); }
   .home.home :global(.lv2-scene-support) { color: #58615e; font: 17px/1.65 var(--f-sans); }
+  .home.home :global(main a) { display: inline-flex; align-items: center; min-height: 44px; }
+  .home.home :global(main summary) { min-height: 44px; }
   .heroMedia { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 48px; align-items: center; }
   .heroAside { min-width: 0; }
   .heroAside :global(.lv2-hero-support) { margin: 0; max-width: 34ch; font: 20px/1.6 var(--f-sans); color: var(--ink); text-align: left; }
@@ -72,6 +74,7 @@
   .transcript p { margin-top: 8px; max-width: 64ch; }
   .home.home :global(#s2), .home.home :global(#s3) { background: var(--paper); color: var(--ink); }
   .home.home :global(#s4), .home.home :global(#s5) { background: #eef0eb; color: var(--ink); }
+  .home.home :global(#s4) { --ink-900: #ffffff; --hairline: #c7cdc7; --source: #244ac8; --impact: #865600; }
   .home.home :global(#s4 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
   .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: #58615e; }
   .home.home :global(#s4 .lv2-split) { grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 64px; }
