@@ -1,5 +1,33 @@
 # TAVONEL Final Web Product Workspace visual QA report
 
+## 2026-10-13 source-first release candidate
+
+Scope: Home EN/KO, Product and How it works. The Home recording is an actual first-party
+inspection of the prepared public source sample, placed immediately below the headline; mobile
+is a disclosed crop of the same actions. No new processing or customer result is depicted.
+Decoding is deferred until explicit play. Original illustrative film hashes are preserved.
+Long source/method/version notes use native disclosures. Product shows the real World and
+source-bound outputs; How uses a continuous six-step process and code illustrations. Historical
+GDP.pdf figures have been removed from the Home pitch while their full conditions remain on
+Benchmarks. The immutable report is unchanged.
+
+Actual implementation included Claude Opus 5.5 parallel work through a newly started Claude
+Code CLI session, with scoped normal permissions. The already-running MCP session did not
+reload its permission state and still denied subagent writes; no bypass mode was used.
+
+Parent browser inspection of desktop Home, phone KO, Product and How found and repaired legacy
+CSS precedence and a sticky-header/title overlap. Repository checks passed brand assets, the
+12px floor, TypeScript and changed-file ESLint. The first full unit run completed with 5,898
+passes and nine integration failures across five files. Their affected contracts were repaired:
+source-copy/state checks, source-first order, layered CSS parsing, Korean language declaration
+and component traceability. Subsequent scoped checks passed 111, 247 and 404 tests respectively;
+these counts overlap and are not a replacement total for the full suite.
+
+Final seven-width/reduced-motion captures, playback, accessibility, production build, unchanged
+Lighthouse budgets and exact-head hosted checks remain to be recorded before acceptance. This
+section is a candidate checkpoint, not a claim that these pending checks passed. Automated
+acceptance does not establish founder aesthetic approval or industry-leading accuracy.
+
 Authority: `D:\TAVONEL_FINAL_WEB_PRODUCT_WORKSPACE_MASTERPLAN_2026-09-02.md`
 Repository worktree: `D:\CodexProjects\tavonel-saas-foundation-p0p2-integration`
 Run date: 2026-09-02 KST

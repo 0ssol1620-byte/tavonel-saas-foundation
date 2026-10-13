@@ -1,7 +1,7 @@
 /** Active source-led Home contract. Retired specimen timers are outside this route. */
 import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
-const FILM = '#s1 figure[data-testid="landing-hero-film"] .compile-film-sequence';
+const FILM = '#s1 figure[data-testid="landing-hero-film"]';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
 async function visibleFilm(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /./);
@@ -82,7 +82,7 @@ for (const route of ["/", "/ko"]) {
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Your documents. Knowledge you can verify.");
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Your documents. Connected knowledge.");
 });
 test("Korean close follows its commercial destination and keeps Korean pricing", async ({ page }) => {
   await page.goto("/ko");
@@ -102,47 +102,49 @@ test("film is visible directly after the headline without an opening action", as
   await page.goto("/");
   const film = page.getByTestId("landing-hero-film");
   await expect(film).toBeVisible();
-  await expect(film.locator('.compile-film-sequence')).toHaveCount(1);
+  await expect(film.locator('picture')).toHaveCount(1);
   const headline = (await page.locator('h1').boundingBox())!;
   const media = (await film.boundingBox())!;
   expect(media.y).toBeGreaterThanOrEqual(headline.y + headline.height);
   expect(media.y).toBeLessThan(page.viewportSize()!.height);
   const actions = (await page.locator('#s1 .lv2-actions').boundingBox())!;
-  expect(media.y + media.height).toBeLessThanOrEqual(actions.y);
-  await expect(page.locator('#s1 details, #s1 summary')).toHaveCount(0);
+  expect(actions.y).toBeGreaterThanOrEqual(headline.y + headline.height);
+  await expect(film.locator("video")).toHaveCount(0);
 });
-test("visible film offers all four approved cuts with the locked video source", async ({ page }) => {
+test("inspection video loads only after a reader plays and advances", async ({ page }) => {
   await page.goto("/"); const film = await visibleFilm(page);
-  await expect(film.getByRole("tab")).toHaveCount(4);
-  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
-  await expect(film).toHaveAttribute("data-video-primary-src", "/film/compile-cut.mp4");
-  await expect(page.getByTestId("landing-hero-film")).toContainText("Illustrative product walkthrough");
-  await film.getByRole("tab").nth(2).click();
-  await expect(film.getByRole("tab").nth(2)).toHaveAttribute("aria-selected", "true");
+  await expect(film.locator("video")).toHaveCount(0);
+  await expect(film).toContainText("Prepared public sample");
+  await film.getByRole("button", { name: "Play the source inspection", exact: true }).click();
+  const video = film.locator("video");
+  await expect(video).toBeVisible();
+  await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
+  expect(await video.evaluate((node: HTMLVideoElement) => node.error)).toBeNull();
 });
+
 test("server-renders the visible film poster as its priority image", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
   // Next transmits this early hint in the HTTP Link header before streaming the body.
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
+  expect(posterHint).toContain("</film/source-inspection/desktop.webp>");
   expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain('class="compile-film-still"'); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
+  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/source-inspection/desktop.webp");
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   expect(sourceImages).toHaveLength(1);
   expect(sourceImages[0]).toContain('loading="lazy"');
   expect(sourceImages[0]).not.toMatch(/fetchpriority="high"/i);
 });
-test("reduced motion opens a static poster and keeps all cuts selectable", async ({ page }) => {
+test("reduced motion keeps the prepared poster static until explicit play", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
   const film = await visibleFilm(page);
-  await expect(film.locator(".compile-film-still")).toBeVisible();
-  await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
-  await film.getByRole("tab").last().click();
-  await expect(film.getByRole("tab").last()).toHaveAttribute("aria-selected", "true");
+  await expect(film.locator("picture img")).toBeVisible();
+  await expect(film.locator("video")).toHaveCount(0);
+  await expect(film.getByRole("button", { name: "Play the source inspection", exact: true })).toBeVisible();
 });
+
 test("source controls clear the touch floor and keep selected regions inside the page window", async ({ page }) => {
   await page.goto("/"); const bench = page.locator(BENCH), buttons = bench.getByRole("button");
   await expect(buttons).toHaveCount(3);

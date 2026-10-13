@@ -54,7 +54,7 @@ export default function HomeReaderGuide({ korean = false, faqOnly = false }: { k
         </ul></> : null}
         <div className={styles.readerFaq}>
           <h2 id="home-faq-title">{copy.faqTitle}</h2>
-          <div aria-labelledby="home-faq-title">
+          <div>
             {copy.faq.map(([question, answer]) => (
               <details key={question}>
                 <summary>{question}</summary>

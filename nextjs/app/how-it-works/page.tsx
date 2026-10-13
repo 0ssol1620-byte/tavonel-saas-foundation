@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { PublicSitePage } from "@/components/public-site-chrome";
 import { pageMetadata } from "@/lib/page-seo";
-import RecompileScene from "@/components/landing-v2/scenes/recompile";
-import { landingV2Copy } from "@/lib/landing-v2-copy";
-import { buildRecompileView } from "@/lib/landing-v2-runtime";
 import styles from "@/components/marketing-story.module.css";
 
 export const metadata = pageMetadata({
@@ -26,11 +23,21 @@ export default function HowItWorksPage() {
     <section className={`scene doc ${styles.process}`}>
       <div className="shell">
         <div className={styles.lead}>
-          <h1 className="document-title">From a source<br />to a versioned World.</h1>
+          <h1 className="document-title">From source files<br />to a versioned World.</h1>
           <p className="lede">Follow what happens to a document, and what your AI receives at the other end.</p>
         </div>
         <ol className={styles.pipeline} aria-label="The compilation process">
-          {STEPS.map(step => <li key={step.title}>
+          {STEPS.map((step, index) => <li key={step.title}>
+            <svg className={styles.stepArt} viewBox="0 0 48 48" aria-hidden="true">
+              <path d={[
+                "M12 6h18l8 8v28H12z M30 6v8h8 M17 22h16 M17 28h16 M17 34h10",
+                "M12 6h18l8 8v28H12z M30 6v8h8 M17 20h16v8H17z",
+                "M6 10h22v28H6z M11 18h12v8H11z M23 22h10 M33 16h10v12H33z",
+                "M10 8h28v32H10z M16 24l6 6 12-12",
+                "M6 12h20v24H6z M26 24h16 M36 18l6 6-6 6",
+                "M8 6h20v26H8z M18 16h20v26H18z M23 24h10 M23 30h10 M23 36h6",
+              ][index]} />
+            </svg>
             <div className={styles.stepFlow}><span>{step.input}</span><span aria-hidden="true">→</span><strong>{step.output}</strong></div>
             <h2>{step.title}</h2>
             <p>{step.body}</p>
@@ -40,10 +47,10 @@ export default function HowItWorksPage() {
         <div className={styles.processClose}>
           <p>Own-source processing follows the current access, rights and release conditions. This process diagram describes the product path; it is not a customer run receipt.</p>
           <Link href="/product">See the product and its outputs</Link>
+          <Link href="/product/continuous-knowledge">Read the version contract</Link>
           <Link href="/knowledge-compiler">Read the Knowledge Compiler category guide</Link>
         </div>
       </div>
     </section>
-    <RecompileScene locale="en" copy={landingV2Copy(false).recompile} data={buildRecompileView()} sectionId="version-changes" />
   </PublicSitePage>;
 }

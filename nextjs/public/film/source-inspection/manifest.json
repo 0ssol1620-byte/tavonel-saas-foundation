@@ -1,0 +1,51 @@
+{
+  "schema": "tavonel.source-inspection-media.v1",
+  "truthClass": "T0",
+  "generatedWithAI": false,
+  "source": "https://tavonel.com/#s2",
+  "sourceRelease": "4bf698a3feb292142f1fd6dc9d60b9bd08cbc64d",
+  "creator": "TAVONEL first-party browser recording",
+  "rights": "First-party recording of the existing published source-bound public sample. Its public-sample rights boundary is retained; this does not grant rights to arbitrary source uploads.",
+  "allowedUse": "TAVONEL product marketing: inspection of a prepared public example, with its unresolved context stated. No claim of a new OCR/compile run, customer result, verified interpretation or benchmark improvement.",
+  "masters": "Internal research replan 2026-10-13 recording and PNG posters; web exports are derivatives.",
+  "derivatives": {
+    "desktop.webm": "12-second source-inspection recording, unchanged from the internal master export",
+    "mobile.webm": "390x270 crop of the same inspection; not a new mobile application run",
+    "desktop.webp": "WebP export of the recorded desktop poster",
+    "mobile.webp": "WebP export of the independently cropped mobile poster",
+    "en.vtt": "English description of visible inspection actions",
+    "ko.vtt": "Korean description of the same actions"
+  },
+  "files": [
+    {
+      "file": "desktop.webm",
+      "bytes": 749768,
+      "sha256": "e8685c869590d2273e42af4fb5a08bde15567e3d479965bcc206cf34842cfff3"
+    },
+    {
+      "file": "desktop.webp",
+      "bytes": 65972,
+      "sha256": "404d76a593a25f48e35b71476bc7fbb73ea2017cec62a29d34d4154916cff570"
+    },
+    {
+      "file": "en.vtt",
+      "bytes": 158,
+      "sha256": "4ac764f6368af9ff64acff98d3c2f7a7a7607a6f1a0efdbda6daeac430b6ff6b"
+    },
+    {
+      "file": "ko.vtt",
+      "bytes": 167,
+      "sha256": "90c4bec7adf235d9ac9db57499adc2dc28896139fb2a583a4efda9261d570009"
+    },
+    {
+      "file": "mobile.webm",
+      "bytes": 260708,
+      "sha256": "8d13fa06b57d471ac3d54f130bf4f9d1be1d367c4aae82760d482fc18e154451"
+    },
+    {
+      "file": "mobile.webp",
+      "bytes": 18556,
+      "sha256": "e33852790d7d631a9333c961f8156b7abf451201d06ba6c76a949f5b22331f95"
+    }
+  ]
+}

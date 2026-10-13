@@ -67,7 +67,7 @@ function blocks(css: string, context: string[] = [], out: Rule[] = []): Rule[] {
       }
       const body = css.slice(i + 1, j - 1);
       const head = prelude.trim();
-      if (head.startsWith("@media") || head.startsWith("@supports")) blocks(body, [...context, head], out);
+      if (head.startsWith("@media") || head.startsWith("@supports") || head.startsWith("@layer")) blocks(body, [...context, head], out);
       else out.push({ prelude: head, body, context });
       prelude = "";
       i = j;

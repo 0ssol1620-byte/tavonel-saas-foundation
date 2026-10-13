@@ -33,7 +33,6 @@ vi.mock("./commercial-state", async importOriginal => {
 import LandingPage from "../components/landing-v2/landing-page";
 import EvaluationPage from "../components/evaluation-page";
 import HeroActions from "../components/landing-v2/hero-actions";
-import { HERO_FILM_POSTER } from "../components/landing-v2/hero-film";
 import { primaryCallToAction } from "./commercial-state";
 import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
@@ -46,7 +45,7 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
-import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 
 /*
   THE COMPOSITION GUARD (contract D9, D13).
@@ -233,7 +232,7 @@ describe("landing v2 -- the composition", () => {
   );
 
   it.each(LOCALES)(
-    "%s has one h1, and it is the founder-owned headline",
+    "%s has one h1 with the source-first story",
     locale => {
       const html = render(locale);
       const main = mainOf(html);
@@ -251,8 +250,8 @@ describe("landing v2 -- the composition", () => {
       const bare = (value: string) => value.replace(/\s+/g, "");
       const expected =
         locale === "ko"
-          ? LANDING_V2_COPY.ko.hero.headline
-          : BRAND_LINE.headline;
+          ? "내 문서. 연결된 지식."
+          : "Your documents. Connected knowledge.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
     }
   );
@@ -264,8 +263,8 @@ describe("landing v2 -- the composition", () => {
       const levels = [...main.matchAll(/<h([1-6])(\s[^>]*)?>/g)].map(match =>
         Number(match[1])
       );
-      // The six existing scene headings plus the reader guide and its FAQ.
-      expect(levels.filter(level => level === 2)).toHaveLength(8);
+      // Six scenes and the FAQ; historical evaluation metrics live on Benchmarks.
+      expect(levels.filter(level => level === 2)).toHaveLength(7);
       expect(levels[0]).toBe(1);
       // An h3 may only appear under a heading one level above it: no h1 -> h3 jump anywhere.
       levels.reduce((previous, level) => {
@@ -369,14 +368,15 @@ describe("landing v2 -- the composition", () => {
     the page, and no media competes with the source page.
   */
   it.each(LOCALES)(
-    "%s renders no specimen, no question framing and no hero media",
+    "%s renders a static source-inspection poster without fabricated question answers or autoplay",
     locale => {
       const main = mainOf(render(locale));
       expect(main).not.toContain("<video");
       expect(main).not.toContain("<iframe");
       expect(main).not.toContain("<canvas");
       expect(main).not.toContain("data-compiler-specimen");
-      expect(elements(sceneOf(main, "s1"), "div").filter(open => attr(open, "role") === "tablist")).toHaveLength(1);
+      expect(elements(sceneOf(main, "s1"), "div").filter(open => attr(open, "role") === "tablist")).toHaveLength(0);
+      expect(sceneOf(main, "s1")).toContain("data-source-inspection-film");
       const text = readable(main);
       for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
       expect(text).not.toMatch(/verified answer/i);
@@ -547,15 +547,15 @@ describe("landing v2 -- the lead and the workbench", () => {
       .toBeLessThan(readable(mainOf(render(locale))).indexOf(buildHeroView().source.filename));
   });
 
-  it.each(LOCALES)("%s shows the illustrative film immediately after the headline", locale => {
+  it.each(LOCALES)("%s shows the prepared source-inspection film immediately after the headline", locale => {
     const main = mainOf(render(locale));
     const hero = sceneOf(main, "s1");
     const filmAt = hero.indexOf('data-testid="landing-hero-film"');
     expect(filmAt).toBeGreaterThan(hero.indexOf('</h1>'));
     expect(filmAt).toBeLessThan(hero.indexOf('lv2-hero-support'));
-    expect(hero).toContain(HERO_FILM_POSTER);
-    expect(hero).toContain('compile-film-sequence');
-    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "not customer results");
+    expect(hero).toContain("/film/source-inspection/desktop.webp");
+    expect(hero).toContain('data-source-inspection-film');
+    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "Not a new OCR or compilation run, or customer results");
     expect(sceneOf(main, "s2")).not.toContain('data-testid="landing-hero-film"');
   });
 });

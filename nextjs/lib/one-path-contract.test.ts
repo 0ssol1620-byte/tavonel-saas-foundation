@@ -70,14 +70,14 @@ describe("approved one-path experience", () => {
   it("orders the landing as visible film, source, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    expect(page).toContain("<HeroFilm");
+    expect(page).toContain("<SourceInspectionFilm");
     expect(page).toContain("<HeroSourceCard");
     expect(page).not.toContain("<CompilerSpecimen");
     expect(page).not.toContain("<HeroProof");
     const order = [
       'id="s1"',
       "<HeroStatement",
-      "<HeroFilm",
+      "<SourceInspectionFilm",
       "<HeroActions",
       'id="s2"',
       "<HeroSourceCard",

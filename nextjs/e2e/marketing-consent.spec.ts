@@ -46,7 +46,7 @@ test("the consent notice never covers homepage or pricing actions at 1440 and 39
     expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(headerBox!.y + 1);
 
     const target = route === "/"
-      ? page.getByRole("link", { name: "Explore a Compiled World", exact: true }).first()
+      ? page.locator('#s1 a[href="/explore"]')
       : page.locator(".plan-action a").first();
     await expect(target).toBeVisible();
     const targetBox = await target.boundingBox();

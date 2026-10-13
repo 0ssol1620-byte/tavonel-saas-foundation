@@ -51,8 +51,8 @@ for (const path of ["/", "/ko"]) {
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();
-    await expect(disclosure.locator(".compile-film-viewport")).toBeVisible();
-    const film = (await disclosure.locator(".compile-film-viewport").boundingBox())!;
+    await expect(disclosure.locator("picture")).toBeVisible();
+    const film = (await disclosure.locator("picture").boundingBox())!;
     expect(film.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);
     expect(film.x + film.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + 1);
   });

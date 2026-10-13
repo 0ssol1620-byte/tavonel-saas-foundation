@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { LANDING_V2_SCENE_ORDER, type LandingV2Locale, type LandingV2TrustCopy } from "@/lib/landing-v2-copy";
 import styles from "./trust.module.css";
+import homeStyles from "../source-first-home.module.css";
 
 /*
   Scene 08 -- Trust (§18, D9, contract rule 7 "Trust").
@@ -83,11 +84,12 @@ const FOOTNOTE: Record<LandingV2Locale, string> = {
 const SCENE_INDEX = LANDING_V2_SCENE_ORDER.indexOf("trust") + 1;
 const TITLE_ID = "lv2-trust-title";
 
-export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }: {
+export default function Scene({ locale, copy, sectionId = "trust", sceneIndex, compact = false }: {
   locale: LandingV2Locale;
   copy: LandingV2TrustCopy;
   sectionId?: string;
   sceneIndex?: number;
+  compact?: boolean;
 }) {
   const byHref = (href: string) => copy.links.find((link) => link.href === href);
   const next = byHref(NEXT_HREF);
@@ -135,7 +137,10 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
                   {proof.label}
                 </Link>
               </p>
-              <p className="lv2-proof-note lv2-small">{proof.note}</p>
+              {compact ? <details className={homeStyles.compactDetails}>
+                <summary>{locale === "ko" ? "적용 범위" : "Scope"}</summary>
+                <p className="lv2-proof-note lv2-small">{proof.note}</p>
+              </details> : <p className="lv2-proof-note lv2-small">{proof.note}</p>}
             </li>
           ))}
         </ul>

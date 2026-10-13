@@ -6,15 +6,15 @@ test("How it works explains a pipeline rather than repeating the Product World",
   const process = page.getByRole("list", { name: "The compilation process" });
   await expect(process.locator("li")).toHaveCount(6);
   await expect(process).toContainText("full-corpus compiles");
-  await expect(page.getByRole("heading", { name: "From a source to a versioned World." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "From source files to a versioned World." })).toBeVisible();
   await expect(page.locator('.explore-frame')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
 test("Product offers output uses and a distinct process destination", async ({ page }) => {
   await page.goto("/product");
-  await expect(page.getByRole("heading", { name: "A World. Ready for your AI." })).toBeVisible();
-  for (const name of ["Open the evidence", "Keep versions readable", "Use the World in your stack"]) {
+  await expect(page.getByRole("heading", { name: "Your sources. A World you can inspect." })).toBeVisible();
+  for (const name of ["Inspect the evidence", "Keep versions readable", "Give your AI the output"]) {
     await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(1);
   }
   await expect(page.getByRole("link", { name: "Follow the compilation process" })).toHaveAttribute("href", "/how-it-works");
@@ -22,19 +22,21 @@ test("Product offers output uses and a distinct process destination", async ({ p
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
-test("Home publishes the negative GDP result with its comparison boundary", async ({ page }) => {
+test("Home leads with the product while the historical result keeps its conditions", async ({ page }) => {
   await page.goto("/");
-  const measured = page.locator('[data-home-measurement]');
-  await expect(measured.locator('dd')).toHaveText(["31 / 100", "27 / 100", "−4.0 pp"]);
-  await expect(measured).toContainText("Compiled context did not improve this run");
-  await expect(measured).toContainText("cannot be compared with published GDP.pdf scores or competitors");
-  await expect(measured.getByRole("link")).toHaveAttribute("href", "/benchmarks/gdp-pdf");
+  await expect(page.locator('[data-home-measurement]')).toHaveCount(0);
+  await page.goto("/benchmarks/gdp-pdf");
+  const measured = page.locator('main');
+  await expect(measured).toContainText("31 of 100");
+  await expect(measured).toContainText("27 of 100");
+  await expect(measured).toContainText("−4.0 pp");
+  await expect(measured).toContainText("Not comparable with published GDP.pdf scores");
 });
 
 // New light-surface text must not inherit the old dark-surface palette.
-test("hero film controls and measured-result heading retain readable contrast", async ({ page }) => {
+test("source-inspection controls and captions retain readable contrast", async ({ page }) => {
   await page.goto("/");
-  for (const selector of ['.compile-film-stages button', '.compile-film-caption p', '.compile-film-progress', '[data-home-measurement] h2']) {
+  for (const selector of ['[data-source-inspection-film] button', '[data-source-inspection-film] figcaption', '#s4 .lv2-scene-note', 'footer .wordmark b', 'footer .site-footer-legal-pair', 'footer [data-consent-anchor]']) {
     const contrasts = await page.locator(selector).evaluateAll(elements => elements.map(element => {
       const luminance = (value: string) => {
         const channels = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map(channel => {

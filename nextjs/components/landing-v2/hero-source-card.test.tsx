@@ -61,7 +61,7 @@ describe("the Home workbench -- status truthfulness", () => {
     const text = readable(render(homeCase()));
     expect(text).toContain("Published claims");
     expect(text).toContain("None. A verified claim needs every region it rests on, its period and unit cited, and a qualified run.");
-    expect(text).toContain("Context required.");
+    expect(text).toContain("Context required:");
   });
 });
 
@@ -189,7 +189,8 @@ describe("the Home workbench -- source and passage", () => {
     const outside = readable(html.replace(details![0], ""));
     expect(outside).not.toContain(value.sources[0]!.digest);
     expect(outside).not.toContain(value.sources[0]!.digest.slice(0, 15));
-    expect(outside).toContain("Published claims: None.");
+    expect(inside).toContain("Published claims");
+    expect(outside).toContain("Interpretation has not run.");
     expect(outside).not.toContain("original HTML");
   });
 });
@@ -230,7 +231,7 @@ describe("the Home workbench -- region selection", () => {
       expect(readable(details)).toContain(region.bbox1000.join(","));
       const box = html.match(/<span\s[^>]*data-selected="1"[^>]*>/)?.[0] ?? "";
       expect(attr(box, "data-region-id")).toBe(escaped(region.id));
-      const note = region.role === "selected" ? "Context required." : "Shown as printed, for context.";
+      const note = region.role === "selected" ? "Context required:" : "Shown as printed, for context.";
       expect(readable(html)).toContain(note);
     }
   });
