@@ -90,7 +90,7 @@ describe("the Home workbench -- source and passage", () => {
     expect(quotes[0]![2]).toBe(escaped(selected.passage!));
   });
 
-  it("makes the source page the hero's prioritized paint, with every region boxed at its bbox", () => {
+  it("loads the below-film source page lazily, with every region boxed at its bbox", () => {
     const value = homeCase();
     const image = value.pages[0]!.image!;
     const html = render(value);
@@ -99,8 +99,8 @@ describe("the Home workbench -- source and passage", () => {
     expect(images[0]).toContain(`src="${escaped(image.src)}"`);
     expect(images[0]).toContain(`width="${image.width}"`);
     expect(images[0]).toContain(`height="${image.height}"`);
-    expect(images[0]).toMatch(/\sfetchpriority="high"/i);
-    expect(images[0]).toMatch(/\sloading="eager"/);
+    expect(images[0]).toMatch(/\sfetchpriority="auto"/i);
+    expect(images[0]).toMatch(/\sloading="lazy"/);
     expect(images[0]).toMatch(/\sdecoding="async"/);
     expect(attr(images[0]!, "alt")).toBeTruthy();
     expect(attr(images[0]!, "alt")).not.toMatch(/\d/);

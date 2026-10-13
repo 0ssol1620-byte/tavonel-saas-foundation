@@ -233,9 +233,9 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
                   width={page.image.width}
                   height={page.image.height}
                   alt={t.pageAlt}
-                  fetchPriority="high"
+                  fetchPriority="auto"
                   decoding="async"
-                  loading="eager"
+                  loading="lazy"
                 />
                 {regions.map((region, index) => {
                   const [x, y, x2, y2] = region.bbox1000;

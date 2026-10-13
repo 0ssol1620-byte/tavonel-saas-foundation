@@ -6,11 +6,13 @@ export default function HeroStatement({
   titleId,
   accent,
   headlineVariant = "a",
+  children,
 }: {
   copy: LandingV2HeroCopy;
   titleId: string;
   accent?: string;
   headlineVariant?: LandingVariant;
+  children?: React.ReactNode;
 }) {
   const arm = headlineVariant === "a" ? undefined : copy.headlineExperiment?.[headlineVariant];
   const lines = arm ? arm.split(SENTENCES).filter(Boolean) : copy.headline.split(SENTENCES).filter(Boolean);
@@ -35,6 +37,7 @@ export default function HeroStatement({
           );
         })}
       </h1>
+      {children}
       <p className="lv2-hero-support lv2-body-l">{copy.support}</p>
     </div>
   );

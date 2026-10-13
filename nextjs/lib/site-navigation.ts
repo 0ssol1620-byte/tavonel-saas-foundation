@@ -24,11 +24,8 @@ export type SiteLink = { href: string; label: string };
   Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five, and the bar is the
   reader's map of the site rather than the three destinations a pilot visitor was steered to.
 
-  "How it works" moves off /product and onto /knowledge-compiler. /product is a hub of four
-  surface cards -- it says what the parts are called, not how the thing works -- while the compile
-  contract, the four stages and the comparison with RAG, graphs and search are all written on
-  /knowledge-compiler. /product takes its own name back, which is also the label its <title> and
-  its H1 already use.
+  "How it works" owns /how-it-works: the source-to-World process. /product presents the
+  resulting World and its uses. The deeper category guide remains at /knowledge-compiler.
 
   Integrations leaves the bar. It is one Product-group destination among several and it was
   holding a top-level slot while Docs and Resources -- the two things an evaluating engineer looks
@@ -37,7 +34,7 @@ export type SiteLink = { href: string; label: string };
 */
 export const CUSTOMER_NAV: readonly SiteLink[] = [
   { href: "/product", label: "Product" },
-  { href: "/knowledge-compiler", label: "How it works" },
+  { href: "/how-it-works", label: "How it works" },
   { href: "/resources", label: "Resources" },
   { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
@@ -152,7 +149,7 @@ export const KO_CHROME = {
   */
   nav: {
     "/product": "제품",
-    "/knowledge-compiler": "작동 방식",
+    "/how-it-works": "작동 방식",
     "/resources": "자료",
     "/docs": "문서",
     "/pricing": "요금",

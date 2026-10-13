@@ -44,7 +44,7 @@ describe("2026-09-20 visual refinement", () => {
     expect(component).toContain("COMPILE_STAGES.map");
     expect(component).toContain("HeroFilmDisclosure");
     const disclosure = read("components/landing-v2/hero-film-disclosure.tsx");
-    expect(disclosure).toContain("useState(false)");
+    expect(disclosure).toContain('data-testid="landing-hero-film"');
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(read("components/landing-v2/hero-statement.tsx")).toContain("copy.headline.split");
   });
