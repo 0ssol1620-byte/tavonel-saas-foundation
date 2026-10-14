@@ -93,6 +93,7 @@ export type ReviewableCollectionArtifact = {
     reviewReasons?: string[];
   };
   reviewReasons?: string[];
+  sourceDocuments?: Array<Record<string, unknown>>;
   coreExecution: {
     status: "completed" | "review_required";
     runtime: string;
@@ -187,6 +188,105 @@ export function validateReviewableCollectionArtifact(
   ) {
     return null;
   }
+  // Review evidence is carried inside the signed candidate-world download.
+  // Check every v3 source: one valid source must not hide a second damaged one.
+  const conflictReasons = reviewReasons.filter((reason) => reason.startsWith("OCR_RECOGNITION_CONFLICT:"));
+  const expectedConflictReasonIds = new Set(conflictReasons);
+  const sources = artifact.sourceDocuments;
+  if (conflictReasons.length && (!Array.isArray(sources) || sources.length === 0)) return null;
+  const sourceManifest = artifact.package.files.find((file) => file.path === "source/collection-files.json");
+  if (!sourceManifest) return null;
+  let coreSourceRows: Array<Record<string, unknown>>;
+  try {
+    const parsed = JSON.parse(sourceManifest.content) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0 ||
+        parsed.some((row) => !row || typeof row !== "object" || Array.isArray(row))) return null;
+    coreSourceRows = parsed as Array<Record<string, unknown>>;
+  } catch { return null; }
+  const v3CoreRows = coreSourceRows.filter((row) =>
+    row.ocrSchemaVersion !== undefined || row.readerRevision !== undefined ||
+    row.readerBindingSha256 !== undefined || row.recognitionConflictCount !== undefined);
+  // The required-v3 route rejects a complete metadata downgrade even when the
+  // OCR disagreement count is zero. The mandatory Core source manifest detects
+  // a missing projection-side sourceDocuments array in either rollout state.
+  if (process.env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" &&
+      v3CoreRows.length !== coreSourceRows.length) return null;
+  if (v3CoreRows.length && (!Array.isArray(sources) || sources.length !== coreSourceRows.length)) return null;
+  for (const row of v3CoreRows) {
+    if (Object.keys(row).sort().join(",") !==
+        "documentId,documentVersionId,immutableObjectKey,ocrObjectKey,ocrSchemaVersion,readerBindingSha256,readerRevision,recognitionConflictCount,sourceSha256" ||
+        row.ocrSchemaVersion !== "tavonel.ocr_result.v3" ||
+        !SHA256.test(String(row.readerRevision ?? "")) ||
+        !SHA256.test(String(row.readerBindingSha256 ?? "")) ||
+        !SHA256.test(String(row.sourceSha256 ?? "")) ||
+        typeof row.recognitionConflictCount !== "number" ||
+        !Number.isInteger(row.recognitionConflictCount) ||
+        row.recognitionConflictCount < 0 || row.recognitionConflictCount > 128 ||
+        typeof row.immutableObjectKey !== "string" || !row.immutableObjectKey ||
+        typeof row.ocrObjectKey !== "string" || !row.ocrObjectKey ||
+        sources?.filter((source) => source.coreSourceId === row.documentId &&
+          source.inputSha256 === row.sourceSha256 &&
+          source.sanitizedKey === row.immutableObjectKey &&
+          source.ocrJsonKey === row.ocrObjectKey &&
+          source.readerRevision === row.readerRevision &&
+          source.readerBindingSha256 === row.readerBindingSha256 &&
+          source.recognitionConflictCount === row.recognitionConflictCount).length !== 1) return null;
+  }
+  const carriedConflictReasonIds = new Set<string>();
+  for (const source of sources ?? []) {
+    const v3 = source.recognitionConflictCount !== undefined || source.recognitionConflicts !== undefined ||
+      source.readerRevision !== undefined || source.readerBindingSha256 !== undefined;
+    if (!v3) continue;
+    const conflicts = source.recognitionConflicts;
+    if (!/^src_[a-f0-9]{64}$/.test(String(source.coreSourceId ?? "")) ||
+        !coreSourceRows.some((row) => row.documentId === source.coreSourceId &&
+          row.sourceSha256 === source.inputSha256 && row.ocrSchemaVersion === "tavonel.ocr_result.v3") ||
+        !SHA256.test(String(source.inputSha256 ?? "")) ||
+        !SHA256.test(String(source.readerRevision ?? "")) ||
+        !SHA256.test(String(source.readerBindingSha256 ?? "")) ||
+        typeof source.recognitionConflictCount !== "number" ||
+        !Number.isInteger(source.recognitionConflictCount) ||
+        source.recognitionConflictCount < 0 || source.recognitionConflictCount > 128 ||
+        !Array.isArray(conflicts) || conflicts.length !== source.recognitionConflictCount) return null;
+    for (const raw of conflicts) {
+      if (!raw || typeof raw !== "object") return null;
+      const conflict = raw as Record<string, unknown>;
+      const candidates = conflict.candidates;
+      const reasonId = `OCR_RECOGNITION_CONFLICT:${source.coreSourceId}:${conflict.regionId}`;
+      if (Object.keys(conflict).sort().join(",") !== "bbox1000,candidates,pageIndex0,regionId,sourceSha256" ||
+          conflict.sourceSha256 !== source.inputSha256 ||
+          typeof conflict.regionId !== "string" ||
+          typeof conflict.pageIndex0 !== "number" ||
+          !Number.isInteger(conflict.pageIndex0) || conflict.pageIndex0 < 0 ||
+          !Array.isArray(conflict.bbox1000) || conflict.bbox1000.length !== 4 ||
+          !Array.isArray(candidates) || candidates.length !== 2 ||
+          !expectedConflictReasonIds.has(reasonId) || carriedConflictReasonIds.has(reasonId)) return null;
+      carriedConflictReasonIds.add(reasonId);
+      const engines = new Set<string>();
+      const texts = new Set<string>();
+      for (const rawCandidate of candidates) {
+        if (!rawCandidate || typeof rawCandidate !== "object") return null;
+        const candidate = rawCandidate as Record<string, unknown>;
+        if (Object.keys(candidate).sort().join(",") !== "confidence,engineId,modelSha256,polygon,text" ||
+            (candidate.engineId !== "general-ppocrv6" && candidate.engineId !== "korean-ppocrv5") ||
+            engines.has(candidate.engineId) ||
+            candidate.modelSha256 !== (candidate.engineId === "general-ppocrv6"
+              ? "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+              : "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b") ||
+            typeof candidate.text !== "string" || !candidate.text.trim() || candidate.text.length > 2_000 ||
+            typeof candidate.confidence !== "number" || !Number.isFinite(candidate.confidence) ||
+            candidate.confidence < 0 || candidate.confidence > 1 ||
+            !Array.isArray(candidate.polygon) || candidate.polygon.length < 3 || candidate.polygon.length > 8 ||
+            candidate.polygon.some((point) => !Array.isArray(point) || point.length !== 2 ||
+              point.some((coordinate) => typeof coordinate !== "number" || !Number.isFinite(coordinate) || coordinate < 0))) return null;
+        engines.add(candidate.engineId);
+        texts.add(candidate.text);
+      }
+      if (engines.size !== 2 || texts.size !== 2) return null;
+    }
+  }
+  if (carriedConflictReasonIds.size !== expectedConflictReasonIds.size ||
+      [...expectedConflictReasonIds].some((reason) => !carriedConflictReasonIds.has(reason))) return null;
 
   const paths = new Set<string>();
   let totalBytes = 0;
@@ -217,8 +317,10 @@ export function validateReviewableCollectionArtifact(
       status?: unknown;
       reviewReasons?: unknown;
       documents?: unknown;
+      documentCount?: unknown;
     };
     if (report.status !== artifact.validation.status) return null;
+    if (report.documentCount !== undefined && report.documentCount !== coreSourceRows.length) return null;
     if (
       artifact.lifecycle === "review_required" &&
       (!Array.isArray(report.reviewReasons) || !sameStrings(reviewReasons, report.reviewReasons))

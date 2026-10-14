@@ -92,6 +92,8 @@ export type OcrDispatchEnv = {
   FOUNDATION_R2_BUCKET: string;
   FOUNDATION_COMPLETED_READ_ENABLED?: string;
   FOUNDATION_COMPLETED_READ_BINDING?: string;
+  /** Opt-in only for a pinned v3 reader; a v2 create-once winner cannot satisfy it. */
+  FOUNDATION_OCR_CONFLICT_V3_REQUIRED?: string;
 };
 
 /** Must stay retryable even after the queue's cold-start retry budget. */
@@ -118,13 +120,16 @@ async function inspectPersistedOcr(
     if (bytes.byteLength < 1 || bytes.byteLength > MAX_PERSISTED_OCR_BYTES
       || (object.size !== undefined && bytes.byteLength !== object.size)) throw new Error("size");
     const payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    const result = qualifyOcrResult(payload, inputSha256);
+    const result = qualifyOcrResult(payload, inputSha256, "persisted");
     if (!result || payload.sourceImmutableKey !== immutablePdfKey) throw new Error("contract");
+    if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && result.schemaVersion !== OCR_RESULT_SCHEMA_V3) {
+      throw new OcrEvidenceRetryableError("persisted v2 OCR lacks required v3 conflict evidence");
+    }
     const outputSha256 = await sha256DigestHeader(bytes);
     const facts: OcrDispatchResult = { status, key, inputSha256, outputSha256,
       observedPageCount: result.pageCount, computeCredits: 2 };
     // Legacy objects have no provenance. Never stamp them with today's configured revision.
-    if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true") {
+    if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true" || result.schemaVersion === OCR_RESULT_SCHEMA_V3) {
       const binding = parseReaderBinding(env.FOUNDATION_COMPLETED_READ_BINDING, (env.FOUNDATION_OCR_URL ?? "").trim());
       if (!binding || payload.readerRevision !== binding.readerRevision
         || payload.readerBindingSha256 !== await readerBindingSha256(binding)) {
@@ -144,7 +149,12 @@ async function inspectPersistedOcr(
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const PROD_MARKERS = ["tavonel-pdf-cdr", "tavonel-prod", "tavonel-quarantine-sidecar"];
-const OCR_RESULT_SCHEMA = "tavonel.ocr_result.v2";
+const OCR_RESULT_SCHEMA_V2 = "tavonel.ocr_result.v2";
+const OCR_RESULT_SCHEMA_V3 = "tavonel.ocr_result.v3";
+const RECOGNIZER_IDENTITIES: Record<string, string> = {
+  "general-ppocrv6": "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+  "korean-ppocrv5": "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b",
+};
 const AUTHORITY_CLASSES = new Set(["unknown", "informal", "official", "contractual"]);
 // RunPod cold starts have been observed at roughly 30 seconds. Keep the request below the
 // approved 90-second execution ceiling while leaving enough room for startup and one-page OCR.
@@ -315,22 +325,62 @@ type OcrRegion = {
   bbox1000: [number, number, number, number];
   confidence: number;
   authority: string;
+  recognitionConflict?: {
+    sourceSha256: string;
+    regionId: string;
+    pageIndex0: number;
+    bbox1000: [number, number, number, number];
+    candidates: Array<{
+      engineId: "general-ppocrv6" | "korean-ppocrv5";
+      modelSha256: string;
+      text: string;
+      confidence: number;
+      polygon: number[][];
+    }>;
+  };
 };
 
 type QualifiedOcrResult = {
-  schemaVersion: typeof OCR_RESULT_SCHEMA;
+  schemaVersion: typeof OCR_RESULT_SCHEMA_V2 | typeof OCR_RESULT_SCHEMA_V3;
   status: "ok";
   text: string;
   pageCount: number;
   inputSha256: string;
   regions: OcrRegion[];
+  recognitionConflictCount?: number;
 };
 
-export function qualifyOcrResult(payload: unknown, expectedInputSha256: string): QualifiedOcrResult | null {
-  if (!payload || typeof payload !== "object") return null;
+const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
+  Object.keys(value).sort().join(",") === [...keys].sort().join(",");
+
+function polygonBounds(points: number[][]): [number, number, number, number] {
+  return [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1])),
+    Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))];
+}
+
+function polygonBoxIoU(left: number[][], right: number[][]): number {
+  const a = polygonBounds(left), b = polygonBounds(right);
+  const areaA = (a[2] - a[0]) * (a[3] - a[1]);
+  const areaB = (b[2] - b[0]) * (b[3] - b[1]);
+  if (areaA <= 0 || areaB <= 0) return 0;
+  const intersection = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) *
+    Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  return intersection / (areaA + areaB - intersection);
+}
+
+export function qualifyOcrResult(
+  payload: unknown, expectedInputSha256: string, location: "response" | "persisted" = "response",
+): QualifiedOcrResult | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   const result = payload as Partial<QualifiedOcrResult>;
+  const v3 = result.schemaVersion === OCR_RESULT_SCHEMA_V3;
+  if (!v3 && (Object.hasOwn(payload, "recognitionConflict") || Object.hasOwn(payload, "recognitionConflicts"))) return null;
+  if (v3 && !exactKeys(payload as Record<string, unknown>, [
+    "schemaVersion", "status", "text", "pageCount", "inputSha256", "regions", "recognitionConflictCount",
+    ...(location === "persisted" ? ["sourceImmutableKey", "readerRevision", "readerBindingSha256"] : []),
+  ])) return null;
   if (
-    result.schemaVersion !== OCR_RESULT_SCHEMA ||
+    (result.schemaVersion !== OCR_RESULT_SCHEMA_V2 && !v3) ||
     result.status !== "ok" ||
     typeof result.text !== "string" ||
     result.text.length < 1 ||
@@ -344,11 +394,19 @@ export function qualifyOcrResult(payload: unknown, expectedInputSha256: string):
     result.regions.length < 1 ||
     result.regions.length > 50_000
   ) return null;
+  if (v3 && (!Number.isInteger(result.recognitionConflictCount) ||
+    Number(result.recognitionConflictCount) < 0 || Number(result.recognitionConflictCount) > 128)) return null;
 
   const regionIds = new Set<string>();
   const orders = new Set<number>();
+  let conflictCount = 0;
   for (const region of result.regions) {
-    if (!region || typeof region !== "object") return null;
+    if (!region || typeof region !== "object" || Array.isArray(region)) return null;
+    if (v3 && !exactKeys(region as unknown as Record<string, unknown>, [
+      "regionId", "pageIndex0", "pageNumber1", "order", "blockType", "text",
+      "bbox1000", "confidence", "authority", ...(region.recognitionConflict ? ["recognitionConflict"] : []),
+    ])) return null;
+    if (!v3 && Object.hasOwn(region, "recognitionConflict")) return null;
     const bbox = region.bbox1000;
     if (
       typeof region.regionId !== "string" ||
@@ -376,10 +434,52 @@ export function qualifyOcrResult(payload: unknown, expectedInputSha256: string):
       region.confidence > 1 ||
       !AUTHORITY_CLASSES.has(region.authority)
     ) return null;
+    if (v3 && region.recognitionConflict !== undefined) {
+      conflictCount += 1;
+      if (conflictCount > 128) return null;
+      const conflict = region.recognitionConflict as Record<string, unknown>;
+      if (!conflict || typeof conflict !== "object" || Array.isArray(conflict) ||
+        !exactKeys(conflict, ["sourceSha256", "regionId", "pageIndex0", "bbox1000", "candidates"]) ||
+        conflict.sourceSha256 !== expectedInputSha256 || conflict.regionId !== region.regionId ||
+        conflict.pageIndex0 !== region.pageIndex0 ||
+        !Array.isArray(conflict.bbox1000) ||
+        conflict.bbox1000.length !== 4 || conflict.bbox1000.some((x, i) => x !== bbox[i]) ||
+        !Array.isArray(conflict.candidates) || conflict.candidates.length !== 2) return null;
+      const engines = new Set<string>();
+      let selectedMatches = 0;
+      const texts = new Set<string>();
+      const polygons: number[][][] = [];
+      for (const item of conflict.candidates) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+        const candidate = item as Record<string, unknown>;
+        if (!exactKeys(candidate, ["engineId", "modelSha256", "text", "confidence", "polygon"]) ||
+          typeof candidate.engineId !== "string" ||
+          candidate.modelSha256 !== RECOGNIZER_IDENTITIES[candidate.engineId] ||
+          engines.has(candidate.engineId) ||
+          typeof candidate.text !== "string" || !candidate.text.trim() || candidate.text.length > 2000 ||
+          typeof candidate.confidence !== "number" || !Number.isFinite(candidate.confidence) ||
+          candidate.confidence < 0 || candidate.confidence > 1 ||
+          !Array.isArray(candidate.polygon) || candidate.polygon.length < 3 || candidate.polygon.length > 8 ||
+          candidate.polygon.some((point) => !Array.isArray(point) || point.length !== 2 ||
+            point.some((n) => typeof n !== "number" || !Number.isFinite(n) || n < 0))) return null;
+        engines.add(candidate.engineId);
+        texts.add(candidate.text);
+        polygons.push(candidate.polygon as number[][]);
+        if (candidate.text === region.text && candidate.confidence === region.confidence) selectedMatches += 1;
+      }
+      if (engines.size !== 2 || texts.size !== 2 || selectedMatches !== 1 ||
+        polygonBoxIoU(polygons[0], polygons[1]) < 0.45) return null;
+    }
     regionIds.add(region.regionId);
     orders.add(region.order);
   }
   if (result.regions.some((_region, index) => !orders.has(index))) return null;
+  if (v3 && conflictCount !== result.recognitionConflictCount) return null;
+  if (v3 && (location === "persisted" && (
+      typeof (payload as Record<string, unknown>).sourceImmutableKey !== "string" ||
+      !SHA256_PATTERN.test((payload as Record<string, unknown>).readerRevision as string) ||
+      !SHA256_PATTERN.test((payload as Record<string, unknown>).readerBindingSha256 as string)
+    ))) return null;
   if (result.text !== result.regions.map((region) => region.text).join("\n").trim()) return null;
   return result as QualifiedOcrResult;
 }
@@ -468,6 +568,9 @@ export async function dispatchOcrAfterSanitize(
   if (existingOcr) return inspectPersistedOcr(env, immutablePdfKey, inputSha256, "exists");
   const binding = env.FOUNDATION_COMPLETED_READ_ENABLED === "true"
     ? parseReaderBinding(env.FOUNDATION_COMPLETED_READ_BINDING, url) : null;
+  if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && !binding) {
+    throw new OcrEvidenceRetryableError("v3 OCR requires a qualified completed-read binding");
+  }
   if (env.FOUNDATION_COMPLETED_READ_ENABLED === "true" && !binding) {
     throw new OcrEvidenceRetryableError("qualified immutable OCR reader binding is missing");
   }
@@ -587,6 +690,12 @@ export async function dispatchOcrAfterSanitize(
   if (!qualified) {
     return { status: "failed", key: ocrKey, reasonCode: "OCR_RESPONSE_INVALID", reason: "OCR response contract is invalid", requestId, inputSha256, computeCredits: 2 };
   }
+  if (qualified.schemaVersion === OCR_RESULT_SCHEMA_V3 && !binding) {
+    throw new OcrEvidenceRetryableError("v3 OCR result has no qualified completed-read binding");
+  }
+  if (env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" && qualified.schemaVersion !== OCR_RESULT_SCHEMA_V3) {
+    throw new OcrEvidenceRetryableError("v2 OCR response lacks required v3 conflict evidence");
+  }
 
   if (binding) {
     const provenance = payload as Record<string, unknown>;
@@ -603,6 +712,8 @@ export async function dispatchOcrAfterSanitize(
     text: qualified.text,
     pageCount: qualified.pageCount,
     regions: qualified.regions,
+    ...(qualified.schemaVersion === OCR_RESULT_SCHEMA_V3 ?
+      { recognitionConflictCount: qualified.recognitionConflictCount } : {}),
     sourceImmutableKey: immutablePdfKey,
     inputSha256: qualified.inputSha256,
     ...(binding ? { readerRevision: binding.readerRevision, readerBindingSha256: await readerBindingSha256(binding) } : {}),

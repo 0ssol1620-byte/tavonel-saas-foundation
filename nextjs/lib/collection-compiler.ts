@@ -86,6 +86,11 @@ export type CollectionOcrInput = {
   text: string;
   inputSha256: string;
   sourceImmutableKey: string;
+  ocrSchemaVersion?: "tavonel.ocr_result.v2" | "tavonel.ocr_result.v3";
+  /** Qualified completed-read provenance. Both fields are mandatory for v3 only. */
+  readerRevision?: string;
+  readerBindingSha256?: string;
+  recognitionConflictCount?: number;
   /*
     Optional on the wire, and `regionsOrNone` is the only reading of "absent" either path takes.
 
@@ -108,6 +113,18 @@ export type CollectionOcrRegion = {
   bbox1000: [number, number, number, number];
   confidence: number;
   authority: "unknown" | "informal" | "official" | "contractual";
+  recognitionConflict?: CollectionOcrRecognitionConflict;
+};
+
+export type CollectionOcrRecognitionConflict = {
+  sourceSha256: string;
+  regionId: string;
+  pageIndex0: number;
+  bbox1000: [number, number, number, number];
+  candidates: [
+    { engineId: "general-ppocrv6" | "korean-ppocrv5"; modelSha256: string; text: string; confidence: number; polygon: Array<[number, number]> },
+    { engineId: "general-ppocrv6" | "korean-ppocrv5"; modelSha256: string; text: string; confidence: number; polygon: Array<[number, number]> },
+  ];
 };
 
 type KnowledgeNode = {
@@ -205,6 +222,12 @@ export type CollectionCandidateArtifact = {
     pageCount: number;
     textCharacters: number;
     inputSha256: string;
+    /** Only v3 documents carry the qualified reader binding and review evidence. */
+    readerRevision?: string;
+    readerBindingSha256?: string;
+    recognitionConflictCount?: number;
+    coreSourceId?: string;
+    recognitionConflicts?: CollectionOcrRecognitionConflict[];
   }>;
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   ontology: {
@@ -461,6 +484,22 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
   ) {
     return null;
   }
+  if (input.ocrSchemaVersion !== undefined &&
+      input.ocrSchemaVersion !== "tavonel.ocr_result.v2" &&
+      input.ocrSchemaVersion !== "tavonel.ocr_result.v3") return null;
+  const sha256Wire = /^sha256:[a-f0-9]{64}$/;
+  if (input.ocrSchemaVersion === "tavonel.ocr_result.v3") {
+    if (typeof input.readerRevision !== "string" || !sha256Wire.test(input.readerRevision) ||
+        typeof input.readerBindingSha256 !== "string" || !sha256Wire.test(input.readerBindingSha256) ||
+        !Number.isInteger(input.recognitionConflictCount) || Number(input.recognitionConflictCount) < 0 ||
+        Number(input.recognitionConflictCount) > 128) return null;
+  } else {
+    // Existing v2 CDR completed-read objects may already carry this pair.
+    if (input.recognitionConflictCount !== undefined ||
+        ((input.readerRevision !== undefined || input.readerBindingSha256 !== undefined) &&
+         (typeof input.readerRevision !== "string" || !sha256Wire.test(input.readerRevision) ||
+          typeof input.readerBindingSha256 !== "string" || !sha256Wire.test(input.readerBindingSha256)))) return null;
+  }
   /*
     A `regions` key that is present must be a real region list; absent means the reader recorded
     none, which `runCollectionCompile` refuses with OCR_REGIONS_REQUIRED before a compile starts.
@@ -475,6 +514,9 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
     for (const rawRegion of input.regions) {
       if (!rawRegion || typeof rawRegion !== "object") return null;
       const region = rawRegion as Record<string, unknown>;
+       if (input.ocrSchemaVersion === "tavonel.ocr_result.v3" && Object.keys(region).some((key) =>
+           !new Set(["regionId", "pageIndex0", "pageNumber1", "order", "blockType", "text", "bbox1000",
+                     "confidence", "authority", "recognitionConflict"]).has(key))) return null;
       const bbox = region.bbox1000;
       if (
         typeof region.regionId !== "string" ||
@@ -502,10 +544,47 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
         typeof region.authority !== "string" ||
         !authorities.has(region.authority)
       ) return null;
+       const conflict = region.recognitionConflict;
+       if (conflict !== undefined) {
+         if (input.ocrSchemaVersion !== "tavonel.ocr_result.v3" ||
+             !conflict || typeof conflict !== "object") return null;
+         const row = conflict as Record<string, unknown>;
+         const candidates = row.candidates;
+         if (Object.keys(row).sort().join(",") !== "bbox1000,candidates,pageIndex0,regionId,sourceSha256" ||
+             row.sourceSha256 !== input.inputSha256 || row.regionId !== region.regionId ||
+             row.pageIndex0 !== region.pageIndex0 ||
+             JSON.stringify(row.bbox1000) !== JSON.stringify(bbox) ||
+             !Array.isArray(candidates) || candidates.length !== 2) return null;
+         const engines = new Set<string>();
+         for (const rawCandidate of candidates) {
+           if (!rawCandidate || typeof rawCandidate !== "object") return null;
+           const candidate = rawCandidate as Record<string, unknown>;
+            if (Object.keys(candidate).sort().join(",") !== "confidence,engineId,modelSha256,polygon,text" ||
+               (candidate.engineId !== "general-ppocrv6" && candidate.engineId !== "korean-ppocrv5") ||
+               engines.has(candidate.engineId) ||
+                candidate.modelSha256 !== (candidate.engineId === "general-ppocrv6"
+                  ? "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+                  : "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b") ||
+               typeof candidate.text !== "string" || candidate.text.trim().length < 1 ||
+               candidate.text.length > 2_000 ||
+               typeof candidate.confidence !== "number" || !Number.isFinite(candidate.confidence) ||
+                candidate.confidence < 0 || candidate.confidence > 1 ||
+                !Array.isArray(candidate.polygon) || candidate.polygon.length < 3 || candidate.polygon.length > 8 ||
+                candidate.polygon.some((point) => !Array.isArray(point) || point.length !== 2 ||
+                  point.some((coordinate) => typeof coordinate !== "number" || !Number.isFinite(coordinate) ||
+                    coordinate < 0))) return null;
+           engines.add(candidate.engineId);
+         }
+          if (candidates[0].text === candidates[1].text ||
+              !candidates.some((candidate) => candidate.text === region.text && candidate.confidence === region.confidence)) return null;
+       }
       ids.add(region.regionId);
       orders.add(Number(region.order));
     }
     if (input.regions.some((_region, index) => !orders.has(index))) return null;
+    const conflicts = input.regions.filter((region) => (region as Record<string, unknown>).recognitionConflict !== undefined).length;
+    if (conflicts > 128 || (input.ocrSchemaVersion === "tavonel.ocr_result.v3" &&
+        conflicts !== input.recognitionConflictCount)) return null;
     if (input.text !== input.regions.map((region) => (region as Record<string, unknown>).text).join("\n").trim()) return null;
   }
   return input as CollectionOcrInput;

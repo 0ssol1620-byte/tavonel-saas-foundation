@@ -85,6 +85,60 @@ describe("OCR sibling key shape", () => {
   });
 });
 
+describe("fictional OCR v3 recognition conflicts", () => {
+  it("qualifies the paired originals and refuses malformed or downgraded evidence", async () => {
+    const digest = await sha256DigestHeader(new TextEncoder().encode("%PDF-1.4\nfictional source only"));
+    const polygonA = [[10, 20], [110, 20], [110, 40], [10, 40]];
+    const polygonB = [[11, 20], [111, 20], [111, 40], [11, 40]];
+    const conflict = {
+      sourceSha256: digest, regionId: "fictional-label-1", pageIndex0: 0,
+      bbox1000: [50, 200, 550, 400], candidates: [
+        { engineId: "general-ppocrv6", modelSha256: "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884", text: "FICTIONAL-A", confidence: 0.71, polygon: polygonA },
+        { engineId: "korean-ppocrv5", modelSha256: "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b", text: "FICTIONAL-B", confidence: 0.69, polygon: polygonB },
+      ],
+    };
+    const region = {
+      regionId: "fictional-label-1", pageIndex0: 0, pageNumber1: 1, order: 0,
+      blockType: "paragraph", text: "FICTIONAL-A", bbox1000: [50, 200, 550, 400],
+      confidence: 0.71, authority: "informal", recognitionConflict: conflict,
+    };
+    const valid = {
+      schemaVersion: "tavonel.ocr_result.v3", status: "ok", text: region.text,
+      pageCount: 1, inputSha256: digest, regions: [region], recognitionConflictCount: 1,
+    };
+    assert.ok(qualifyOcrResult(valid, digest));
+    const negatives: Array<(value: typeof valid) => void> = [
+      (x) => { Reflect.deleteProperty(x.regions[0], "recognitionConflict"); },
+      (x) => { x.recognitionConflictCount = 0; },
+      (x) => { x.schemaVersion = "tavonel.ocr_result.v2"; },
+      (x) => { x.inputSha256 = `sha256:${"b".repeat(64)}`; },
+      (x) => { x.regions[0].recognitionConflict.sourceSha256 = `sha256:${"b".repeat(64)}`; },
+      (x) => { x.regions[0].recognitionConflict.bbox1000[0] = 51; },
+      (x) => { x.regions[0].recognitionConflict.candidates[0].engineId = "korean-ppocrv5"; },
+      (x) => { x.regions[0].recognitionConflict.candidates[1].modelSha256 = `sha256:${"c".repeat(64)}`; },
+      (x) => { Object.assign(x.regions[0].recognitionConflict.candidates[0].polygon[0], { 0: "bad" }); },
+      (x) => { x.regions[0].recognitionConflict.candidates[1].polygon = [[500, 500], [600, 500], [600, 520], [500, 520]]; },
+      (x) => { x.regions[0].confidence = 0.72; },
+      (x) => { x.regions[0].text = "FICTIONAL-C"; x.text = "FICTIONAL-C"; },
+      (x) => { Object.assign(x.regions[0], { unregistered: 1 }); },
+      (x) => { Object.assign(x, { unregistered: 1 }); },
+      (x) => { Object.assign(x.regions[0].recognitionConflict.candidates[0], { unregistered: 1 }); },
+    ];
+    for (const [index, mutate] of negatives.entries()) {
+      const bad = structuredClone(valid);
+      mutate(bad);
+      assert.equal(Boolean(qualifyOcrResult(bad, digest)), false, `invalid case ${index}`);
+    }
+    const cleanV2 = structuredClone(valid);
+    cleanV2.schemaVersion = "tavonel.ocr_result.v2";
+    Reflect.deleteProperty(cleanV2.regions[0], "recognitionConflict");
+    Reflect.deleteProperty(cleanV2, "recognitionConflictCount");
+    assert.ok(qualifyOcrResult(cleanV2, digest));
+    const cleanV3 = { ...cleanV2, schemaVersion: "tavonel.ocr_result.v3", recognitionConflictCount: 0 };
+    assert.ok(qualifyOcrResult(cleanV3, digest));
+  });
+});
+
 describe("Foundation OCR URL guards", () => {
   it("refuses production CDR and prod buckets in the URL", () => {
     assert.equal(isForbiddenOcrUrl("https://tavonel-pdf-cdr.example.run.app/v1/ocr"), true);

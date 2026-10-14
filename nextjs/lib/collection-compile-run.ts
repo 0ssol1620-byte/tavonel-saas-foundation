@@ -209,6 +209,16 @@ export async function runCollectionCompile(
   if (bodies.some((body) => body === null || typeof body !== "object")) {
     return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   }
+  // The v3 conflict contract is region-scoped. Never silently discard an
+  // unrecognized sidecar or let an unknown OCR version fall back to v2.
+  if (bodies.some((body) => {
+    const json = body as Record<string, unknown>;
+    return (json.schemaVersion !== "tavonel.ocr_result.v2" && json.schemaVersion !== "tavonel.ocr_result.v3") ||
+      json.recognitionConflicts !== undefined ||
+      (json.schemaVersion === "tavonel.ocr_result.v3" && Object.keys(json).some((key) =>
+        !new Set(["schemaVersion", "status", "text", "pageCount", "inputSha256", "sourceImmutableKey", "regions",
+                  "readerRevision", "readerBindingSha256", "recognitionConflictCount"]).has(key)));
+  })) return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   const candidates = bodies.map((body, index) => {
     const document = selected[index]!;
     const json = body as Record<string, unknown>;
@@ -221,7 +231,11 @@ export async function runCollectionCompile(
       text: json.text,
       inputSha256: json.inputSha256,
       sourceImmutableKey: json.sourceImmutableKey,
-      regions: json.schemaVersion === "tavonel.ocr_result.v2" ? json.regions : undefined,
+      ocrSchemaVersion: json.schemaVersion,
+      readerRevision: json.readerRevision,
+      readerBindingSha256: json.readerBindingSha256,
+      recognitionConflictCount: json.recognitionConflictCount,
+      regions: json.regions,
     };
   });
 
@@ -252,6 +266,22 @@ export async function runCollectionCompile(
   }
 
   const verifiedInputs = inputs.filter((item) => item !== null);
+  // A v3-qualified reader must never be silently replayed as a v2 OCR winner.
+  // The capability is operator-controlled and defaults off for existing v2 sources.
+  if (process.env.FOUNDATION_OCR_CONFLICT_V3_REQUIRED === "true" &&
+      verifiedInputs.some((input) => input.ocrSchemaVersion !== "tavonel.ocr_result.v3")) {
+    return { ok: false, status: 422, code: "OCR_V3_READER_REQUIRED", payload: {} };
+  }
+  // An unqualified v3 document cannot be dispatched to either Core release.
+  if (verifiedInputs.some((input) => input.ocrSchemaVersion === "tavonel.ocr_result.v3") &&
+      process.env.TAVONEL_OCR_CONFLICT_V3_CORE_READY !== "1") {
+    return { ok: false, status: 503, code: "OCR_CONFLICT_CORE_CONTRACT_UNAVAILABLE", payload: {} };
+  }
+  if (verifiedInputs.some((input) => input.regions?.some((region) => region.recognitionConflict)) &&
+      process.env.TAVONEL_OCR_CONFLICT_V3_CORE_READY !== "1") {
+    // Fail before paid dispatch until this exact strict Core contract is deployed.
+    return { ok: false, status: 503, code: "OCR_CONFLICT_CORE_CONTRACT_UNAVAILABLE", payload: {} };
+  }
   if (gate.scope === "connector") {
     const bindings = await readConnectorCompileIdentities(workspaceId, documentIds);
     if (!bindings.ok) return { ok: false, status: 409, code: bindings.code, payload: {} };
@@ -385,7 +415,7 @@ export async function runCollectionCompile(
         },
       };
     }
-    const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled());
+    const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled(), workspaceId);
     if (!projected) return { ok: false, status: 502, code: "CORE_V2_PROJECTION_INVALID", payload: {} };
     artifact = projected;
     coreExecution = {

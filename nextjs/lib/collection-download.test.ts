@@ -9,6 +9,7 @@ import {
   EXTRACTION_CANDIDATE_BUDGET,
   compileCollectionCandidate,
   type CollectionOcrInput,
+  type CollectionOcrRecognitionConflict,
 } from "./collection-compiler";
 import {
   MAX_UNCOMPRESSED_BYTES,
@@ -321,5 +322,81 @@ describe("Foundation collection package download", () => {
     ]);
     expect(validateDownloadableCollectionArtifact(withoutCore, withoutCore.collectionId)).toBeNull();
     expect(validateDownloadableCollectionArtifact(completedArtifact(), "collection-00000000000000000000000000000000")).toBeNull();
+  });
+});
+
+describe("fictional OCR v3 review evidence", () => {
+  it("requires one distinct carried conflict for each Core review reason", () => {
+    const artifact = structuredClone(completedArtifact());
+    const coreSourceId = `src_${"a".repeat(64)}`;
+    const readerRevision = `sha256:${"b".repeat(64)}`;
+    const readerBindingSha256 = `sha256:${"c".repeat(64)}`;
+    const source = artifact.sourceDocuments[0];
+    const sourceSha256 = source.inputSha256;
+    const polygon: Array<[number, number]> = [[20, 40], [100, 40], [100, 80], [20, 80]];
+    const conflict = (regionId: string, left: string, right: string): CollectionOcrRecognitionConflict => ({
+      sourceSha256, regionId, pageIndex0: 0, bbox1000: [10, 20, 120, 50],
+      candidates: [
+        { engineId: "general-ppocrv6", modelSha256: "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884", text: left, confidence: 0.71, polygon },
+        { engineId: "korean-ppocrv5", modelSha256: "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b", text: right, confidence: 0.69, polygon },
+      ],
+    });
+    const conflictA = conflict("fictional-a", "FICTIONAL-A", "FICTIONAL-B");
+    const conflictB = conflict("fictional-b", "FICTIONAL-C", "FICTIONAL-D");
+    const reasons = [conflictA, conflictB].map((item) =>
+      `OCR_RECOGNITION_CONFLICT:${coreSourceId}:${item.regionId}`);
+    const replaceFile = (candidate: typeof artifact, path: string, content: string) => {
+      const file = candidate.package.files.find((item) => item.path === path);
+      expect(file).toBeDefined();
+      file!.content = content;
+      file!.sizeBytes = Buffer.byteLength(content, "utf8");
+      file!.sha256 = `sha256:${createHash("sha256").update(content).digest("hex")}`;
+    };
+    const v3Source = {
+      ...source, coreSourceId, readerRevision, readerBindingSha256,
+      recognitionConflictCount: 2, recognitionConflicts: [conflictA, conflictB],
+    };
+    const sourceRows = JSON.parse(artifact.package.files.find((item) =>
+      item.path === "source/collection-files.json")!.content) as Array<Record<string, unknown>>;
+    const row = {
+      documentId: coreSourceId, documentVersionId: source.versionKey,
+      immutableObjectKey: source.sanitizedKey, ocrObjectKey: source.ocrJsonKey,
+      ocrSchemaVersion: "tavonel.ocr_result.v3", readerRevision,
+      readerBindingSha256, recognitionConflictCount: 2, sourceSha256,
+    };
+    sourceRows[0] = row;
+    artifact.sourceDocuments[0] = v3Source;
+    artifact.lifecycle = "review_required";
+    artifact.reviewReasons = reasons;
+    artifact.validation.status = "review_required";
+    artifact.validation.reviewReasons = reasons;
+    artifact.coreExecution.status = "review_required";
+    replaceFile(artifact, "source/collection-files.json", `${JSON.stringify(sourceRows)}\n`);
+    const report = JSON.parse(artifact.package.files.find((item) =>
+      item.path === "validation/report.json")!.content) as Record<string, unknown>;
+    report.status = "review_required";
+    report.reviewReasons = reasons;
+    if (Array.isArray(report.documents)) {
+      (report.documents[0] as Record<string, unknown>).documentId = coreSourceId;
+    }
+    replaceFile(artifact, "validation/report.json", `${JSON.stringify(report)}\n`);
+
+    expect(validateReviewableCollectionArtifact(artifact, artifact.collectionId)).not.toBeNull();
+    expect(validatePromotableCollectionArtifact(artifact, artifact.collectionId)).toBeNull();
+
+    const duplicate = structuredClone(artifact);
+    duplicate.sourceDocuments[0].recognitionConflicts![1] = structuredClone(conflictA);
+    expect(validateReviewableCollectionArtifact(duplicate, duplicate.collectionId)).toBeNull();
+
+    const substituted = structuredClone(artifact);
+    substituted.sourceDocuments[0].recognitionConflicts![1].regionId = "fictional-c";
+    expect(validateReviewableCollectionArtifact(substituted, substituted.collectionId)).toBeNull();
+
+    const omitted = structuredClone(artifact);
+    omitted.sourceDocuments[0].recognitionConflicts!.pop();
+    omitted.sourceDocuments[0].recognitionConflictCount = 1;
+    sourceRows[0] = { ...row, recognitionConflictCount: 1 };
+    replaceFile(omitted, "source/collection-files.json", `${JSON.stringify(sourceRows)}\n`);
+    expect(validateReviewableCollectionArtifact(omitted, omitted.collectionId)).toBeNull();
   });
 });

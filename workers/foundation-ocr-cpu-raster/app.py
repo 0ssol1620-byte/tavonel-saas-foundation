@@ -15,7 +15,7 @@ from importlib import metadata
 from pathlib import Path
 from threading import Lock, Thread
 from time import monotonic
-from typing import Final, TypedDict
+from typing import Final, NotRequired, TypedDict
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
@@ -44,6 +44,9 @@ MAX_RASTER_PAGE_PIXELS: Final = 16 * 1024 * 1024
 MAX_RASTER_TOTAL_PIXELS: Final = MAX_PAGES * 4 * 1024 * 1024
 PAGE_GEOMETRY_REFUSAL: Final = "OCR source page geometry is not qualified"
 OCR_ENGINE_RELEASE: Final = "rapidocr-3.9.2-ko-pass-nocls-v3-cpu-raster-selftest"
+# This CPU capability is separate from GPU qualification. The CDR must also require
+# a completed-read binding before it accepts v3 or a create-once persisted winner.
+OCR_CONFLICT_V3_ENABLED: Final = os.getenv("TAVONEL_OCR_CONFLICT_V3_ENABLED") == "true"
 # Same pinned weights as the GPU worker; materialize_models.py checks them at image build time.
 OCR_MODEL_FILES: Final = {
     "general-det": ("PP-OCRv6_det_small.onnx", "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"),
@@ -51,6 +54,10 @@ OCR_MODEL_FILES: Final = {
     "korean-rec": ("korean_PP-OCRv5_rec_mobile.onnx", "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b"),
 }
 OCR_MODEL_SHA256: Final = {label: digest for label, (_, digest) in OCR_MODEL_FILES.items()}
+RECOGNIZER_IDENTITIES: Final = {
+    "general-ppocrv6": "sha256:" + OCR_MODEL_SHA256["general-rec"],
+    "korean-ppocrv5": "sha256:" + OCR_MODEL_SHA256["korean-rec"],
+}
 PINNED_RUNTIME: Final = {"onnxruntime": "1.20.1", "rapidocr": "3.9.2"}
 FORBIDDEN_RUNTIME: Final = ("onnxruntime-gpu", "onnxruntime-directml", "onnxruntime-openvino")
 CPU_PROVIDER: Final = "CPUExecutionProvider"
@@ -88,12 +95,40 @@ class OcrRegion(TypedDict):
     bbox1000: list[int]
     confidence: float
     authority: str
+    recognitionConflict: NotRequired[dict]
 
 
 class RasterLine(TypedDict):
     polygon: list[list[float]]
     text: str
     confidence: float
+    rawText: NotRequired[str]
+    recognitionCandidates: NotRequired[list[dict]]
+
+
+def recognition_candidate(engine_id: str, line: RasterLine) -> dict:
+    text = line.get("rawText", line["text"])
+    polygon = line["polygon"]
+    confidence = line["confidence"]
+    if (
+        type(text) is not str or not text.strip() or len(text) > 2000
+        or not 3 <= len(polygon) <= 8
+        or any(
+            type(point) is not list or len(point) != 2
+            or any(type(value) not in (float, int) or not math.isfinite(value) or value < 0 for value in point)
+            for point in polygon
+        )
+        or type(confidence) not in (float, int) or not math.isfinite(confidence)
+        or not 0 <= confidence <= 1
+    ):
+        raise HTTPException(422, "OCR recognition candidate is not qualified")
+    return {
+        "engineId": engine_id,
+        "modelSha256": RECOGNIZER_IDENTITIES[engine_id],
+        "text": text,
+        "confidence": confidence,
+        "polygon": [point.copy() for point in polygon],
+    }
 
 
 def installed_version(distribution: str) -> str | None:
@@ -332,7 +367,10 @@ def rapidocr_lines(engine, image, **options) -> list[RasterLine]:
         points = [[float(point[0]), float(point[1])] for point in polygon if len(point) >= 2]
         if len(points) < 3:
             continue
-        rows.append({"polygon": points, "text": text.strip(), "confidence": max(0.0, min(1.0, float(score)))})
+        rows.append({
+            "polygon": points, "text": text.strip(), "rawText": text,
+            "confidence": max(0.0, min(1.0, float(score))),
+        })
     return rows
 
 
@@ -386,6 +424,16 @@ def _prefer_korean(general: RasterLine, korean: RasterLine) -> bool:
 
 def merge_korean_lines(general: list[RasterLine], korean: list[RasterLine]) -> list[RasterLine]:
     """Replace only geometry-matched lines with materially better Hangul recognition (as the GPU worker)."""
+    # Preserve the original v2 matching and selection for every clean input,
+    # including duplicate/ambiguous geometry. Any genuine matched engine
+    # disagreement must refuse rather than disappear into the legacy merge.
+    if not OCR_CONFLICT_V3_ENABLED and any(
+        _intersection_over_union(general_line, korean_line) >= 0.45
+        and general_line.get("rawText", general_line["text"])
+        != korean_line.get("rawText", korean_line["text"])
+        for general_line in general for korean_line in korean
+    ):
+        raise HTTPException(422, "OCR recognition conflict requires qualified v3 reader")
     matched_korean: set[int] = set()
     merged: list[RasterLine] = []
     for general_line in general:
@@ -393,17 +441,29 @@ def merge_korean_lines(general: list[RasterLine], korean: list[RasterLine]) -> l
             (
                 (_intersection_over_union(general_line, korean_line), index, korean_line)
                 for index, korean_line in enumerate(korean)
-                if index not in matched_korean
+                if OCR_CONFLICT_V3_ENABLED or index not in matched_korean
             ),
             reverse=True,
             key=lambda item: item[0],
         )
         if candidates and candidates[0][0] >= 0.45:
+            if OCR_CONFLICT_V3_ENABLED and len(candidates) > 1 and candidates[1][0] >= 0.45:
+                raise HTTPException(422, "OCR engine geometry match is ambiguous")
             _, index, korean_line = candidates[0]
+            if OCR_CONFLICT_V3_ENABLED and index in matched_korean:
+                raise HTTPException(422, "OCR engine geometry match is reused")
             matched_korean.add(index)
-            if _prefer_korean(general_line, korean_line):
-                merged.append(korean_line)
+            selected = korean_line if _prefer_korean(general_line, korean_line) else general_line
+            general_raw = general_line.get("rawText", general_line["text"])
+            korean_raw = korean_line.get("rawText", korean_line["text"])
+            if general_raw != korean_raw:
+                merged.append({**selected, "recognitionCandidates": [
+                    recognition_candidate("general-ppocrv6", general_line),
+                    recognition_candidate("korean-ppocrv5", korean_line),
+                ]})
                 continue
+            merged.append(selected)
+            continue
         merged.append(general_line)
 
     for index, korean_line in enumerate(korean):
@@ -443,13 +503,14 @@ def raster_page_regions(page, index: int, order: int, *, qualified_table=None,
         )
     width, height = image.size
     regions: list[OcrRegion] = []
+    conflicts_by_id: dict[str, tuple[str, dict]] = {}
     for line_index, line in enumerate(lines):
         xs = [point[0] for point in line["polygon"]]
         ys = [point[1] for point in line["polygon"]]
         bbox = normalized_bbox(min(xs), min(ys), max(xs), max(ys), width, height)
         if not line["text"] or bbox is None:
             continue
-        regions.append({
+        region: OcrRegion = {
             "regionId": f"ocr-p{index + 1:04d}-l{line_index + 1:05d}",
             "pageIndex0": index,
             "pageNumber1": index + 1,
@@ -459,12 +520,34 @@ def raster_page_regions(page, index: int, order: int, *, qualified_table=None,
             "bbox1000": bbox,
             "confidence": line["confidence"],
             "authority": "informal",
-        })
+        }
+        if "recognitionCandidates" in line:
+            if not OCR_CONFLICT_V3_ENABLED:
+                raise HTTPException(422, "OCR recognition conflict requires qualified v3 reader")
+            raw_text = line.get("rawText", line["text"])
+            if not any(
+                candidate["text"] == raw_text and candidate["confidence"] == line["confidence"]
+                for candidate in line["recognitionCandidates"]
+            ):
+                raise HTTPException(422, "OCR selected recognition is not a preserved candidate")
+            conflicts_by_id[region["regionId"]] = (raw_text, {
+                "regionId": region["regionId"],
+                "pageIndex0": index,
+                "bbox1000": bbox,
+                "candidates": line["recognitionCandidates"],
+            })
+        regions.append(region)
     if binding_requested:
         regions, _ = apply_bound_table(
             regions, profile=qualified_table, approved_profile_sha256=approved_profile_sha256,
             source_payload=source_payload, page_index0=index, page_size_pixels=image.size,
         )
+    # The approved table profile hashes the exact legacy source regions before
+    # reordering. Bind v3 evidence by immutable region ID only after that check.
+    for region in regions:
+        evidence = conflicts_by_id.get(region["regionId"])
+        if evidence is not None:
+            region["text"], region["recognitionConflict"] = evidence
     return regions
 
 
@@ -786,13 +869,26 @@ def ping() -> JSONResponse | Response:
 
 
 def ocr_result_body(text: str, page_count: int, regions: list[OcrRegion], input_sha256: str) -> dict:
+    conflicted = [region for region in regions if "recognitionConflict" in region]
+    if len(conflicted) > 128:
+        raise HTTPException(422, "OCR recognition conflict count exceeds bound")
+    if conflicted and not OCR_CONFLICT_V3_ENABLED:
+        raise HTTPException(422, "OCR recognition conflict requires qualified v3 reader")
+    if conflicted:
+        regions = [
+            {**region, "recognitionConflict": {
+                **region["recognitionConflict"], "sourceSha256": input_sha256,
+            }} if "recognitionConflict" in region else region
+            for region in regions
+        ]
     return {
-        "schemaVersion": "tavonel.ocr_result.v2",
+        "schemaVersion": "tavonel.ocr_result.v3" if OCR_CONFLICT_V3_ENABLED else "tavonel.ocr_result.v2",
         "status": "ok",
         "text": text,
         "pageCount": page_count,
         "inputSha256": input_sha256,
         "regions": regions,
+        **({"recognitionConflictCount": len(conflicted)} if OCR_CONFLICT_V3_ENABLED else {}),
     }
 
 

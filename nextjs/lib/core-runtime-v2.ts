@@ -73,6 +73,9 @@ export type ProductCoreV2CompileRequest = {
     title: string;
     sourceFilename: string;
     pageCount: number;
+    readerRevision?: string;
+    readerBindingSha256?: string;
+    recognitionConflictCount?: number;
     regions: Array<{
       regionId: string;
       pageIndex0: number;
@@ -83,6 +86,16 @@ export type ProductCoreV2CompileRequest = {
       bbox1000?: [number, number, number, number];
       confidence?: number;
       authority: "unclassified" | "unknown" | "informal" | "official" | "contractual";
+       recognitionConflict?: {
+         sourceSha256: string;
+         regionId: string;
+         pageIndex0: number;
+         bbox1000: [number, number, number, number];
+         candidates: [
+            { engineId: "general-ppocrv6" | "korean-ppocrv5"; modelSha256: string; text: string; confidence: number; polygon: Array<[number, number]> },
+            { engineId: "general-ppocrv6" | "korean-ppocrv5"; modelSha256: string; text: string; confidence: number; polygon: Array<[number, number]> },
+         ];
+       };
     }>;
   }>;
   /** `PreviousWorldSnapshot` in contracts.py. Required by a non-initial operation class. */
@@ -288,6 +301,9 @@ export function buildProductCoreV2Request(
         title: `Document ${document.documentId.slice(0, 8)}`,
         sourceFilename: `${document.documentId}.pdf`,
         pageCount: document.pageCount,
+        ...(document.ocrSchemaVersion === "tavonel.ocr_result.v3"
+          ? { readerRevision: document.readerRevision, readerBindingSha256: document.readerBindingSha256,
+              recognitionConflictCount: document.recognitionConflictCount } : {}),
         /*
           Regions are copied, never conjured.
 
@@ -309,6 +325,7 @@ export function buildProductCoreV2Request(
           bbox1000: region.bbox1000,
           confidence: region.confidence,
           authority: region.authority,
+           ...(region.recognitionConflict ? { recognitionConflict: region.recognitionConflict } : {}),
         })),
       })),
     ...(previousActiveWorld ? { previousActiveWorld } : {}),
@@ -377,7 +394,9 @@ export function projectProductCoreV2Candidate(
     what it is today.
   */
   keepRevisionSnapshot = false,
+  workspaceId?: string,
 ): CollectionCandidateArtifact | null {
+  if (documents.some((document) => document.ocrSchemaVersion === "tavonel.ocr_result.v3") && !workspaceId) return null;
   if (result.status === "rejected" || result.candidate.lifecycle === "rejected") return null;
   if (
     (result.status === "completed" && result.candidate.lifecycle !== "candidate") ||
@@ -566,6 +585,18 @@ export function projectProductCoreV2Candidate(
         pageCount: document.pageCount,
         textCharacters: document.text.length,
         inputSha256: document.inputSha256,
+        ...(document.ocrSchemaVersion === "tavonel.ocr_result.v3" ? {
+          // akc_cir.identity.source_id v1: length-delimited ASCII identifiers.
+          // This names the exact Core review reason/source-manifest row.
+          coreSourceId: `src_${sha256(`akc.identity.v1\x1esrc\x1e${[
+            workspaceId!.trim(), "foundation-r2", (document.logicalSourceId ?? document.documentId).trim(),
+          ].map((part) => `${part.length}:${part}`).join("\x1f")}`)}`,
+          readerRevision: document.readerRevision,
+          readerBindingSha256: document.readerBindingSha256,
+          recognitionConflictCount: document.recognitionConflictCount,
+          recognitionConflicts: regionsOrNone(document)
+            .flatMap((region) => region.recognitionConflict ? [region.recognitionConflict] : []),
+        } : {}),
       })),
     directoryPlan: result.candidate.directoryPlan,
     ontology: { nodes, edges },
