@@ -3190,7 +3190,7 @@ test('affected owner groups select the initial task checks for every product own
   assert.deepEqual([ci.groups,ci.runSelectorContracts,ci.unitFiles],[['ci-selector'],true,['lib/repair-node-evidence.test.mjs','lib/repair-node-gate-receipt.test.ts']]);
   // Product owner suites live in the independently staged product half of this task; this CI-only checkout verifies their exact mapping, not their presence on this intermediate tree.
   const browsers=[...new Set(AFFECTED_GROUPS.flatMap(group=>group.browserFiles))].sort();
-  assert.deepEqual(planBrowserRuns(browsers,false).filter(run=>run.files.includes('e2e/world-lifecycle.spec.ts')).map(run=>run.project),['1440','390','reduced-motion']);
+  assert.deepEqual(planBrowserRuns(browsers,browsers.includes('e2e/detail-integrity.spec.ts')).filter(run=>run.files.includes('e2e/world-lifecycle.spec.ts')).map(run=>run.project),['1440','390','reduced-motion']);
 });
 test('affected owner map covers all 26 requested product paths and their executing checks', () => {
   const select=path=>affectedMap([affectedRecord('M',[path])]);
@@ -4431,6 +4431,7 @@ test('affected recipe continuation admission: the bracketed cookbook route is li
     'nextjs/app/auth/callback/route.ts','nextjs/app/auth/page.tsx','nextjs/components/recipe-preflight.test.tsx','nextjs/components/recipe-preflight.module.css','nextjs/lib/recipe-intent.tsx',
     'nextjs/lib/recipe-intent.spec.ts','nextjs/lib/recipe-intents.ts','nextjs/lib/checkout-intent.ts','nextjs/lib/checkout-intent.test.ts','nextjs/lib/funnel-events.test.ts','nextjs/lib/seo-surface.test.ts',
     'nextjs/e2e/login-capability.spec.ts','nextjs/e2e/recipe-continuation.spec.tsx','nextjs/e2e/recipe-continuation-extra.spec.ts','app/login/page.tsx','nextjs/nextjs/app/login/page.tsx']) {
+    if (assertNewReviewedMarketingEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -5092,6 +5093,7 @@ test('affected sample analytics admission: adjacent lookalikes, new CSS, vendor,
     'nextjs/public/vendor/gtag.js','nextjs/lib/gtag.ts','nextjs/lib/google-analytics.ts','nextjs/lib/analytics-provider.ts','nextjs/app/api/analytics/route.ts',
     'nextjs/lib/oauth-google-analytics.ts','nextjs/lib/analytics-source-collector.ts','nextjs/package.json',
     'nextjs/nextjs/lib/marketing-analytics.ts','lib/marketing-analytics.ts','lib/sample-analytics-admission.test.ts','components/marketing-consent.tsx']) {
+    if (assertNewReviewedMarketingEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
@@ -5119,9 +5121,13 @@ test('affected sample analytics admission: a known batch with an unknown sibling
     assert.deepEqual(map.entries.map(entry=>entry.groups),[[AFFECTED_ANALYTICS_GROUP]],paths.join(' -> '));
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,paths.join(' -> '));
   }
-  // An unknown sibling beside a Home path and the relay closes the union too.
-  const shared=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',['nextjs/components/marketing-consent.module.css'])]);
-  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/marketing-consent.module.css'],['nextjs/components/marketing-consent.module.css']]);
+  // The exact reviewed stylesheet now has a distinct owner; preserve all prior selections in the union.
+  const reviewed=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',['nextjs/components/marketing-consent.module.css'])]);
+  assert.deepEqual([reviewed.failures,reviewed.groups],[[],['home-landing','public-marketing-surface',AFFECTED_ANALYTICS_GROUP].sort()]);
+  for(const file of [...AFFECTED_HOME_SUITES,...AFFECTED_ANALYTICS_SUITES,...PUBLIC_MARKETING_AFFECTED_UNIT_FILES])assert.ok(reviewed.unitFiles.includes(file),file);
+  // Its unreviewed sibling still closes the whole union, with no shrunken known-owner selection.
+  const shared=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY]),affectedRecord('M',['nextjs/components/marketing-consent-unreviewed.module.css'])]);
+  assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/components/marketing-consent-unreviewed.module.css'],['nextjs/components/marketing-consent-unreviewed.module.css']]);
   assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
 });
 test('affected sample analytics admission: either selected suite missing at head refuses, and deleting any owner path still selects both or fails closed', () => {
@@ -5276,6 +5282,7 @@ test('affected consumer verification admission: lookalikes, backend routes and d
     'nextjs/app/developer/page.tsx','nextjs/lib/consumer-verification-server.ts','nextjs/lib/consumer-verification-provider.ts','nextjs/lib/api-keys.ts','nextjs/package.json',
     'nextjs/lib/developer-distribution.test.ts','nextjs/public/developer/consumer-verification.md',
     'nextjs/nextjs/lib/consumer-verification.ts','lib/consumer-verification.ts','lib/consumer-verification.test.ts','components/developer-panel.tsx']) {
+    if (assertNewReviewedMarketingEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
@@ -6720,6 +6727,7 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
     'supabase/functions/contact/index.ts','supabase/functions/evaluation-request/index.ts',
     'components/evaluation-page.tsx','public/evaluation/pilot-worksheet.en.md','lib/pilot-evaluation-worksheet.test.ts','components/evaluation-page.test.tsx',
     'evaluation/pilot-worksheet.ko.md','nextjs/nextjs/components/evaluation-page.tsx']) {
+    if (assertNewReviewedMarketingEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -7045,3 +7053,22 @@ test('affected published024 marketing admission: discovery duplicate cleanup pre
   assert.ok(vitestDiscoveryConfigFailures(duplicate).includes('include is duplicated: components/landing-v2/hero-source-card.test.tsx'));
   assert.ok(vitestDiscoveryConfigFailures(source.replace('environment: "node"','environment: "jsdom"')).some(x=>x.includes('changed outside its include list')));
 });
+
+// Old-owner negative lists include paths deliberately registered by published024. Keep positive finite ownership
+// and the unreadable tooling rejection explicit; every other spelling/path still runs its original rejection.
+function assertNewReviewedMarketingEndpoint(path) {
+  if(PUBLIC_MARKETING_AFFECTED_PATHS.includes(path)) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],
+      [[],['public-marketing-surface'],[],[...PUBLIC_MARKETING_AFFECTED_UNIT_FILES], [...PUBLIC_MARKETING_AFFECTED_BROWSER_FILES]],path);
+    assert.equal(map.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
+    return true;
+  }
+  if(Object.hasOwn(MARKETING_TOOLING_POSTIMAGES,path)) {
+    const map=affectedMap([affectedRecord('M',[path])]);
+    assert.deepEqual([map.failures,map.groups,map.unmappedPaths],[['unreviewed marketing tooling postimage: '+path],['marketing-tooling-lock'],[]],path);
+    assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
+    return true;
+  }
+  return false;
+}
