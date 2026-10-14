@@ -3159,7 +3159,7 @@ test('affected map unions both rename endpoints and fails closed on unsupported 
     ['a deletion that kept its mode',[affectedRecord('D',['nextjs/lib/docs-content.ts'])],/unsupported file mode 100644 -> 100644/],
     ['a spaced path',[affectedRecord('M',['docs/a b.md'])],/unsupported path spelling/],
     ['a traversal path',[affectedRecord('M',['docs/../README.md'])],/unsupported path spelling/],
-    ['a toolchain path',[affectedRecord('M',['nextjs/package.json'])],/unmapped changed endpoint: nextjs\/package\.json/],
+    ['an unreadable or unreviewed toolchain postimage',[affectedRecord('M',['nextjs/package.json'])],/unreviewed marketing tooling postimage: nextjs\/package\.json/],
     ['a rename into an unowned path',[affectedRecord('R100',['nextjs/lib/docs-content.ts','nextjs/lib/unowned.ts'])],/unmapped changed endpoint: nextjs\/lib\/unowned\.ts/],
   ]) {
     const map=affectedMap(records);assert.ok(map.failures.some(f=>pattern.test(f)),label+': '+map.failures.join('; '));
@@ -4147,6 +4147,12 @@ test('affected Home admission: unknown siblings, bad spellings, modes, statuses 
     'nextjs/lib/one-path-contract.ts','nextjs/lib/film-motion-control.ts','nextjs/lib/film-motion-control.spec.ts','nextjs/e2e/landing-v2-extra.spec.ts',
     'nextjs/e2e/landing-v2.spec.tsx','nextjs/e2e/landing-hero-mobile.spec.ts','nextjs/app/page.tsx','components/landing-v2/hero-film.tsx','nextjs/nextjs/components/landing-v2/hero-film.tsx']) {
     const map=affectedMap([affectedRecord('M',[path])]);
+    if (path === 'nextjs/e2e/landing-hero-mobile.spec.ts') {
+      assert.ok(!AFFECTED_HOME_PATHS.includes(path), 'the original finite Home owner is unchanged');
+      assert.deepEqual([map.failures,map.groups,map.unmappedPaths],[[],['public-marketing-surface'],[]]);
+      assert.ok(map.browserFiles.includes('e2e/landing-hero-mobile.spec.ts'));
+      continue;
+    }
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,path);
   }
@@ -6990,4 +6996,52 @@ test('affected durable worker contract has one existing compile owner and keeps 
   assert.deepEqual(map.unitFiles, ['lib/collection-compile-run.test.ts', 'lib/collection-compile-source-observations.test.mjs', 'lib/compile-job-worker.test.ts']);
   assert.deepEqual(AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group), ['compile-source-observations']);
   assert.ok(affectedMap([affectedRecord('M', ['nextjs/lib/compile-job-worker-v2.test.ts'])]).failures.length > 0);
+});
+
+// Regression for exact024 source-admission failures. No product/browser execution in these selector tests.
+import { PUBLIC_MARKETING_AFFECTED_PATHS, PUBLIC_MARKETING_AFFECTED_UNIT_FILES, PUBLIC_MARKETING_AFFECTED_BROWSER_FILES, MARKETING_TOOLING_POSTIMAGES } from './repair-scope.mjs';
+const reviewedMarketingPaths = ["nextjs/app/evaluation/opengraph-image.tsx", "nextjs/app/how-it-works/opengraph-image.tsx", "nextjs/app/how-it-works/page.tsx", "nextjs/app/ko/evaluation/opengraph-image.tsx", "nextjs/app/ko/pricing/opengraph-image.tsx", "nextjs/app/landing-v2.css", "nextjs/app/product/page.tsx", "nextjs/app/sitemap.ts", "nextjs/components/evaluation-page.module.css", "nextjs/components/evidence/region-highlight.module.css", "nextjs/components/landing-v2/hero-statement.tsx", "nextjs/components/landing-v2/home-measurement.tsx", "nextjs/components/landing-v2/scenes/recompile.tsx", "nextjs/components/landing-v2/scenes/start.tsx", "nextjs/components/landing-v2/scenes/trust.tsx", "nextjs/components/landing-v2/source-first-home.module.css", "nextjs/components/landing-v2/source-inspection-film.tsx", "nextjs/components/marketing-consent.module.css", "nextjs/components/marketing-story.module.css", "nextjs/components/public-site-chrome.module.css", "nextjs/components/public-site-chrome.tsx", "nextjs/e2e/compiler-contract.spec.ts", "nextjs/e2e/detail-integrity.spec.ts", "nextjs/e2e/evidence-first.spec.ts", "nextjs/e2e/hero-four-stage-restoration.spec.ts", "nextjs/e2e/hero-home-responsive.spec.ts", "nextjs/e2e/home-source-routes.spec.ts", "nextjs/e2e/landing-hero-mobile.spec.ts", "nextjs/e2e/launch-qa-accessibility.spec.ts", "nextjs/e2e/launch-qa-mobile-nav.spec.ts", "nextjs/e2e/marketing-consent.spec.ts", "nextjs/e2e/marketing-story.spec.ts", "nextjs/e2e/mobile-landing.spec.ts", "nextjs/e2e/premium-craft.spec.ts", "nextjs/e2e/production-hardening.spec.ts", "nextjs/e2e/public-composition.spec.ts", "nextjs/e2e/public-package-proof.spec.ts", "nextjs/e2e/site-chrome-v2.spec.ts", "nextjs/e2e/site-nav.spec.ts", "nextjs/e2e/ux-polish.spec.ts", "nextjs/e2e/visual-continuity.spec.ts", "nextjs/e2e/visual-refinement.spec.ts", "nextjs/lib/brand-copy.test.ts", "nextjs/lib/landing-v2-motion.test.ts", "nextjs/lib/marketing-story.test.ts", "nextjs/lib/og-card-frame.test.ts", "nextjs/lib/product-left-column.test.ts", "nextjs/lib/seo-surface.test.ts", "nextjs/lib/site-nav-model.test.ts", "nextjs/lib/site-navigation.ts", "nextjs/lib/visual-refinement.test.ts", "nextjs/public/film/source-inspection/desktop.webm", "nextjs/public/film/source-inspection/desktop.webp", "nextjs/public/film/source-inspection/en.vtt", "nextjs/public/film/source-inspection/ko.vtt", "nextjs/public/film/source-inspection/manifest.json", "nextjs/public/film/source-inspection/mobile.webm", "nextjs/public/film/source-inspection/mobile.webp", "nextjs/public/llms.txt"];
+const marketingMap = (records, overrides = {}) => buildAffectedMap({headSha:affectedHeadSha, records,
+  headHasFile:path=>existsSync(resolve(process.cwd(),'..',path)),
+  readHeadFile:path=>readFileSync(resolve(process.cwd(),'..',path),'utf8'), ...overrides});
+test('affected published024 marketing admission: all 61 explicit endpoints retain executing checks and fresh native debt', () => {
+  assert.deepEqual(PUBLIC_MARKETING_AFFECTED_PATHS,reviewedMarketingPaths);
+  assert.equal(PUBLIC_MARKETING_AFFECTED_PATHS.length,59);
+  const endpoints=[...reviewedMarketingPaths,...Object.keys(MARKETING_TOOLING_POSTIMAGES)];
+  const map=marketingMap(endpoints.map(path=>affectedRecord('M',[path])));
+  assert.deepEqual(map.failures,[]); assert.deepEqual(map.unmappedPaths,[]);
+  assert.deepEqual(map.groups,['marketing-tooling-lock','public-marketing-surface']);
+  for(const file of PUBLIC_MARKETING_AFFECTED_UNIT_FILES)assert.ok(map.unitFiles.includes(file),file);
+  assert.deepEqual(map.browserFiles,PUBLIC_MARKETING_AFFECTED_BROWSER_FILES);
+  assert.equal(map.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
+  assert.equal(map.nativeEvidence.freshRunClaimed,false);
+  assert.equal(map.runSelectorContracts,true);
+  assert.equal(map.databaseChanged,false);assert.equal(map.runCdrWorkerChecks,false);
+  const plan=affectedAskPlan(map);assert.equal(plan.fullQualification,'pending');
+  assert.deepEqual(plan.inheritedChecks,{});assert.equal(plan.runFullHermeticVitest,false);
+  assert.equal(plan.runDetailIntegrity,true);
+  const runs=planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity);
+  assert.equal(runs.filter(run=>run.kind==='detail-integrity').length,1);
+  for(const file of map.browserFiles)assert.ok(runs.some(run=>run.files.includes(file)),file);
+  for(const project of ['1440','390'])assert.ok(runs.some(run=>run.project===project&&run.files.includes('e2e/hero-four-stage-restoration.spec.ts')));
+  for(const project of ['360','390'])assert.ok(runs.some(run=>run.project===project&&run.files.includes('e2e/landing-hero-mobile.spec.ts')));
+  assert.equal(runs.filter(run=>run.files.includes('e2e/hero-home-responsive.spec.ts')).length,1);
+});
+test('affected published024 marketing admission: unknown neighbors, unsafe rename, absent checks and changed tooling are refused', () => {
+  for(const path of ['nextjs/components/landing-v2/unreviewed.tsx','nextjs/app/other/page.tsx','nextjs/package-lock.json','nextjs/public/film/source-inspection/unreviewed.webm'])
+    assert.ok(marketingMap([affectedRecord('M',[path])]).failures.some(x=>x.includes('unmapped changed endpoint')),path);
+  assert.ok(marketingMap([affectedRecord('R100',[reviewedMarketingPaths[0],'nextjs/app/unreviewed.tsx'])]).failures.length);
+  const absent=marketingMap([affectedRecord('M',[reviewedMarketingPaths[0]])],{headHasFile:path=>path!=='nextjs/e2e/hero-four-stage-restoration.spec.ts'});
+  assert.ok(absent.failures.includes('selected owner check is absent at head: e2e/hero-four-stage-restoration.spec.ts'));
+  for(const path of Object.keys(MARKETING_TOOLING_POSTIMAGES)) {
+    const changed=marketingMap([affectedRecord('M',[path])],{readHeadFile:()=>'{"unreviewed":true}'});
+    assert.deepEqual(changed.failures,['unreviewed marketing tooling postimage: '+path]);
+  }
+});
+test('affected published024 marketing admission: discovery duplicate cleanup preserves every original include and runtime setting', () => {
+  const source=readFileSync('vitest.config.ts','utf8');
+  assert.deepEqual(vitestDiscoveryConfigFailures(source),[]);
+  const duplicate=source.replace('    include: [','    include: [\n      "components/landing-v2/hero-source-card.test.tsx",');
+  assert.ok(vitestDiscoveryConfigFailures(duplicate).includes('include is duplicated: components/landing-v2/hero-source-card.test.tsx'));
+  assert.ok(vitestDiscoveryConfigFailures(source.replace('environment: "node"','environment: "jsdom"')).some(x=>x.includes('changed outside its include list')));
 });

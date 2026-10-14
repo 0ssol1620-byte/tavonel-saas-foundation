@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -1791,6 +1792,114 @@ export const PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES = Object.freeze(['co
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+// Exact public marketing endpoints observed at published024. No wildcard or default owner.
+// Source, styles, SEO, media and their changed browser/unit contracts stay checked together.
+// This adds no inherited PASS and always invalidates historical native reuse.
+export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
+  "nextjs/app/evaluation/opengraph-image.tsx",
+  "nextjs/app/how-it-works/opengraph-image.tsx",
+  "nextjs/app/how-it-works/page.tsx",
+  "nextjs/app/ko/evaluation/opengraph-image.tsx",
+  "nextjs/app/ko/pricing/opengraph-image.tsx",
+  "nextjs/app/landing-v2.css",
+  "nextjs/app/product/page.tsx",
+  "nextjs/app/sitemap.ts",
+  "nextjs/components/evaluation-page.module.css",
+  "nextjs/components/evidence/region-highlight.module.css",
+  "nextjs/components/landing-v2/hero-statement.tsx",
+  "nextjs/components/landing-v2/home-measurement.tsx",
+  "nextjs/components/landing-v2/scenes/recompile.tsx",
+  "nextjs/components/landing-v2/scenes/start.tsx",
+  "nextjs/components/landing-v2/scenes/trust.tsx",
+  "nextjs/components/landing-v2/source-first-home.module.css",
+  "nextjs/components/landing-v2/source-inspection-film.tsx",
+  "nextjs/components/marketing-consent.module.css",
+  "nextjs/components/marketing-story.module.css",
+  "nextjs/components/public-site-chrome.module.css",
+  "nextjs/components/public-site-chrome.tsx",
+  "nextjs/e2e/compiler-contract.spec.ts",
+  "nextjs/e2e/detail-integrity.spec.ts",
+  "nextjs/e2e/evidence-first.spec.ts",
+  "nextjs/e2e/hero-four-stage-restoration.spec.ts",
+  "nextjs/e2e/hero-home-responsive.spec.ts",
+  "nextjs/e2e/home-source-routes.spec.ts",
+  "nextjs/e2e/landing-hero-mobile.spec.ts",
+  "nextjs/e2e/launch-qa-accessibility.spec.ts",
+  "nextjs/e2e/launch-qa-mobile-nav.spec.ts",
+  "nextjs/e2e/marketing-consent.spec.ts",
+  "nextjs/e2e/marketing-story.spec.ts",
+  "nextjs/e2e/mobile-landing.spec.ts",
+  "nextjs/e2e/premium-craft.spec.ts",
+  "nextjs/e2e/production-hardening.spec.ts",
+  "nextjs/e2e/public-composition.spec.ts",
+  "nextjs/e2e/public-package-proof.spec.ts",
+  "nextjs/e2e/site-chrome-v2.spec.ts",
+  "nextjs/e2e/site-nav.spec.ts",
+  "nextjs/e2e/ux-polish.spec.ts",
+  "nextjs/e2e/visual-continuity.spec.ts",
+  "nextjs/e2e/visual-refinement.spec.ts",
+  "nextjs/lib/brand-copy.test.ts",
+  "nextjs/lib/landing-v2-motion.test.ts",
+  "nextjs/lib/marketing-story.test.ts",
+  "nextjs/lib/og-card-frame.test.ts",
+  "nextjs/lib/product-left-column.test.ts",
+  "nextjs/lib/seo-surface.test.ts",
+  "nextjs/lib/site-nav-model.test.ts",
+  "nextjs/lib/site-navigation.ts",
+  "nextjs/lib/visual-refinement.test.ts",
+  "nextjs/public/film/source-inspection/desktop.webm",
+  "nextjs/public/film/source-inspection/desktop.webp",
+  "nextjs/public/film/source-inspection/en.vtt",
+  "nextjs/public/film/source-inspection/ko.vtt",
+  "nextjs/public/film/source-inspection/manifest.json",
+  "nextjs/public/film/source-inspection/mobile.webm",
+  "nextjs/public/film/source-inspection/mobile.webp",
+  "nextjs/public/llms.txt",
+]);
+export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
+  "lib/brand-copy.test.ts",
+  "lib/landing-v2-motion.test.ts",
+  "lib/landing-v2-page.test.ts",
+  "lib/marketing-analytics.test.ts",
+  "lib/marketing-story.test.ts",
+  "lib/og-card-frame.test.ts",
+  "lib/one-path-contract.test.ts",
+  "lib/pilot-evaluation-worksheet.test.ts",
+  "lib/product-left-column.test.ts",
+  "lib/public-package-proof.test.ts",
+  "lib/seo-surface.test.ts",
+  "lib/site-nav-model.test.ts",
+  "lib/visual-refinement.test.ts",
+]);
+export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
+  "e2e/compiler-contract.spec.ts",
+  "e2e/detail-integrity.spec.ts",
+  "e2e/evidence-first.spec.ts",
+  "e2e/hero-four-stage-restoration.spec.ts",
+  "e2e/hero-home-responsive.spec.ts",
+  "e2e/home-source-routes.spec.ts",
+  "e2e/landing-hero-mobile.spec.ts",
+  "e2e/launch-qa-accessibility.spec.ts",
+  "e2e/launch-qa-mobile-nav.spec.ts",
+  "e2e/marketing-consent.spec.ts",
+  "e2e/marketing-story.spec.ts",
+  "e2e/mobile-landing.spec.ts",
+  "e2e/premium-craft.spec.ts",
+  "e2e/production-hardening.spec.ts",
+  "e2e/public-composition.spec.ts",
+  "e2e/public-package-proof.spec.ts",
+  "e2e/site-chrome-v2.spec.ts",
+  "e2e/site-nav.spec.ts",
+  "e2e/ux-polish.spec.ts",
+  "e2e/visual-continuity.spec.ts",
+  "e2e/visual-refinement.spec.ts",
+]);
+// The only package delta reviewed here adds two already locked ESLint plugins as direct devDependencies.
+// Pin both Git postimages; any further dependency change requires a new reviewed owner, not admission by filename.
+export const MARKETING_TOOLING_POSTIMAGES = Object.freeze({
+  "nextjs/package.json": "d82ceef9173c0347669211698368d4af46c7a340e99eb17e78c4a8de1087bef1",
+  "nextjs/pnpm-lock.yaml": "a814e2ff45e2c563949ebd917df8036bcd7bde2c2a8a98480386fab0ea79be04"
+});
 // Shared test discovery: the exact global Vitest config, edited by the product author. A change is admitted only when every
 // existing include survives, the one addition is the registered mobile-view suite and nothing outside the include list moved.
 export const VITEST_DISCOVERY_CONFIG_PATH = 'nextjs/vitest.config.ts';
@@ -1843,6 +1952,10 @@ export function vitestDiscoveryConfigFailures(source) {
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 export const AFFECTED_GROUPS = Object.freeze([
+  affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
+    { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
+  affectedGroup('marketing-tooling-lock', new RegExp(`^(?:${exactPathAlternation(Object.keys(MARKETING_TOOLING_POSTIMAGES))})$`),
+    { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('intake-triage', /^nextjs\/(?:app\/api\/(?:v1\/)?uploads\/.+|components\/intake-triage-review[^/]*|lib\/(?:intake-[^/]+|compute-reservation[^/]*|r2-triage-seal[^/]*)|e2e\/workspace-intake-triage\.spec\.ts)$/,
     { unitFiles: INTAKE_TRIAGE_UNIT_TESTS, browserFiles: [INTAKE_TRIAGE_BROWSER_FILE] }),
   affectedGroup('acl', /^nextjs\/lib\/(?:(?:connector-source-access|google-drive-acl-capture|source-acl-admission-migration)(?:\.test)?\.ts|acl-refresh-core\.test\.mjs|ask-route-limits\.test\.ts)$/,
@@ -2009,6 +2122,12 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
     const source = headHasFile(VITEST_DISCOVERY_CONFIG_PATH) ? readHeadFile(VITEST_DISCOVERY_CONFIG_PATH) : null;
     if (typeof source !== 'string') failures.push(`shared test-discovery config is absent or unreadable at head: ${VITEST_DISCOVERY_CONFIG_PATH}`);
     else for (const failure of vitestDiscoveryConfigFailures(source)) failures.push(`unsupported shared test-discovery config change: ${failure}`);
+  }
+  for (const path of Object.keys(MARKETING_TOOLING_POSTIMAGES)) {
+    if (!entries.some(entry => entry.paths.includes(path))) continue;
+    const source = headHasFile(path) ? readHeadFile(path) : null;
+    if (typeof source !== 'string' || createHash('sha256').update(source.replace(/\r\n/g, '\n')).digest('hex') !== MARKETING_TOOLING_POSTIMAGES[path])
+      failures.push(`unreviewed marketing tooling postimage: ${path}`);
   }
   const fresh = invalidatingPaths.size > 0;
   return {

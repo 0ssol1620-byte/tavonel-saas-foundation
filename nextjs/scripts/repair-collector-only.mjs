@@ -1655,7 +1655,7 @@ export function affectedPlan(normal,proof){
    status:'cumulative 6401-anchor PR/full release selection; neither executed, inherited nor cleared by the incremental affected run'},
   changedPaths:[...map.changedPaths],groups:[...new Set([...map.groups,...(map.runSelectorContracts?['selector-config','workflow-static']:[]),...deferredGroups])].sort(),
   unitFiles:[...map.unitFiles],browserFiles:[...map.browserFiles],unknownPaths:[],catalogueFiles:[],
-  runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:map.runCdrWorkerChecks,runDetailIntegrity:false,runWorkflowStaticGate:map.runSelectorContracts,
+  runApiCatalogueChecks:false,runFullHermeticVitest:false,runScriptContracts:false,runCdrWorkerChecks:map.runCdrWorkerChecks,runDetailIntegrity:map.browserFiles.includes('e2e/detail-integrity.spec.ts'),runWorkflowStaticGate:map.runSelectorContracts,
   requireWorkspaceIntakeCapture:false,requirePublicUiScreenshots:false,requireHomePricingCaptures:false,requirePublicProductCaptures:false,requireSolutionsCaptures:false,
   runDatabaseRehearsal:false,databaseRehearsalStatus:map.databaseChanged?'SQL changed since the verified baseline: the fresh disposable rehearsal belongs to db-rehearsal and is neither executed nor inherited here':`no SQL change since the verified baseline: DB classifier run ${h.databaseClassifierRunId} is historical baseline input only, never current-head DB evidence`,
   deferredGroups,pendingQualificationDebt:debt,pendingDebt:debt,pendingFullDebt:[...normal.pendingFullDebt],fullQualification:'pending',inheritedChecks:{},
