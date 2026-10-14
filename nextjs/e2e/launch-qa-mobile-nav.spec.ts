@@ -235,11 +235,13 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
   await page.keyboard.press("Enter");
   const panel = page.locator("header.nav details.mobile-primary-nav > nav");
   await expect(panel).toBeVisible();
-  // The source-first paper surface uses the same 3px blue keyboard ring for every control.
-  await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "3px");
-  await expect(summary).toHaveCSS("outline-offset", "3px");
+  // The source-first paper surface uses the same 2px blue keyboard ring for every control.
+  await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "2px");
+  await expect(summary).toHaveCSS("outline-offset", "2px");
   await expect(summary).toHaveCSS("outline-color", "rgb(36, 71, 179)");
   await expect(summary).not.toHaveCSS("outline-style", "none");
+  const ring = await summary.evaluate(element => ({ color: getComputedStyle(element).outlineColor, background: getComputedStyle(element).backgroundColor }));
+  expect(contrastRatio(ring.color, ring.background), "visible keyboard ring contrast").toBeGreaterThanOrEqual(3);
 
   await panel.locator(":scope > a").last().focus();
   await page.keyboard.press("Tab");
@@ -254,8 +256,8 @@ for (const route of PUBLIC_HEADER_ROUTES) {
     await page.goto(route);
     const summary = page.locator("header.nav details.mobile-primary-nav > summary");
     await expect(summary).toBeVisible();
-    await expect(summary).toHaveCSS("background-color", "rgb(247, 245, 239)");
-    await expect(summary).toHaveCSS("color", "rgb(17, 21, 25)");
+    await expect(summary).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(summary).toHaveCSS("color", "rgb(21, 25, 29)");
     await expect(summary).toHaveCSS("border-radius", "6px");
     const style = await summary.evaluate((element) => ({
       background: getComputedStyle(element).backgroundColor,

@@ -194,7 +194,7 @@ const browserProjectsByFile = new Map([
   ['e2e/home-source-routes.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/launch-qa-accessibility.spec.ts', ['launch-chromium']],
   ['e2e/marketing-story.spec.ts', ['1440', '390', 'reduced-motion']],
-  ['e2e/production-hardening.spec.ts', ['1440', '390', 'reduced-motion']],
+  ['e2e/production-hardening.spec.ts', ['1440', '390', '360']],
   ['e2e/public-composition.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/ux-polish.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/visual-continuity.spec.ts', ['1440', '390', 'reduced-motion']],

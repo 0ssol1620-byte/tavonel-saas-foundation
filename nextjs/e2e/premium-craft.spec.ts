@@ -150,91 +150,48 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   expect(await nav.getByRole("link", { name: "Pricing", exact: true }).evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
 
-test("the home first screen shows source evidence without colliding with public chrome", async ({ page }) => {
+test("the Home first screen leads with the four-stage film and keeps source proof below it", async ({ page }) => {
   const width = page.viewportSize()?.width ?? 0;
-  test.skip(width !== 390 && width !== 1440, "This focused layout check runs at the phone and desktop reference widths.");
-
+  test.skip(width !== 390 && width !== 1440, "Phone and desktop reference widths.");
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(consent).toBeVisible();
-
-  const expectFirstScreen = async (consentVisible: boolean) => {
-    const layout = await page.evaluate(() => {
-      const rect = (selector: string) => {
-        const element = document.querySelector<HTMLElement>(selector);
-        if (!element) throw new Error(`Missing home proof element: ${selector}`);
-        const box = element.getBoundingClientRect();
-        return { top: box.top, bottom: box.bottom };
-      };
-      const banner = document.querySelector<HTMLElement>("[data-marketing-consent-panel]");
-      const bannerBox = banner?.getBoundingClientRect();
-      const sourceImage = document.querySelector<HTMLImageElement>(".paper-source-page img")!;
-      const imageBox = sourceImage.getBoundingClientRect();
-      const excerpt = document.querySelector<HTMLElement>(".paper-source-result blockquote")!;
-      return {
-        width: innerWidth,
-        height: innerHeight,
-        overflow: document.documentElement.scrollWidth - innerWidth,
-        header: rect("header.nav.chrome-v2-header"),
-        banner: bannerBox ? { top: bannerBox.top, bottom: bannerBox.bottom } : null,
-        availability: rect(".paper-availability"),
-        action: rect(".paper-hero-copy a.lv2-cta"),
-        source: rect(".paper-source"),
-        question: rect(".paper-source-question"),
-        sourcePage: rect(".paper-source-page img"),
-        excerpt: rect(".paper-source-result blockquote"),
-        excerptLineHeight: Number.parseFloat(getComputedStyle(excerpt).lineHeight),
-        image: { width: imageBox.width, height: imageBox.height, naturalWidth: sourceImage.naturalWidth, naturalHeight: sourceImage.naturalHeight },
-      };
-    });
-
-    const hasVisibleArea = (box: { top: number; bottom: number }) =>
-      Math.max(0, Math.min(layout.height, box.bottom) - Math.max(0, box.top)) > 0;
-    const doesNotOverlap = (a: { top: number; bottom: number }, b: { top: number; bottom: number }) =>
-      a.bottom <= b.top || b.bottom <= a.top;
-
+  const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+  await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
+  const measure = async () => page.evaluate(() => {
+    const rect = (selector: string) => { const element = document.querySelector(selector); if (!element) throw Error("Missing Home element: " + selector); return element.getBoundingClientRect().toJSON(); };
+    const banner = document.querySelector('[data-marketing-consent-panel]');
+    return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth,
+      header: rect("header.nav"), title: rect("#lv2-hero-title"), film: rect('#s1 figure[data-testid="landing-hero-film"]'),
+      action: rect("#s1 .lv2-actions a"), source: rect("#s2 article[data-case-status]"), banner: banner?.getBoundingClientRect().toJSON() ?? null };
+  });
+  for (const consentVisible of [true, false]) {
+    if (!consentVisible) await dismissConsent(page);
+    const layout = await measure();
     expect(layout.overflow).toBeLessThanOrEqual(1);
-    expect(hasVisibleArea(layout.availability)).toBe(true);
-    expect(hasVisibleArea(layout.action)).toBe(true);
-    expect(layout.action.bottom).toBeLessThanOrEqual(layout.height);
-    expect(hasVisibleArea(layout.source)).toBe(true);
-    expect(hasVisibleArea(layout.sourcePage)).toBe(true);
-    expect(layout.question.top).toBeGreaterThanOrEqual(0);
-    expect(layout.question.bottom, "the full prepared question is visible before the source quotation").toBeLessThanOrEqual(layout.height);
-    expect(layout.question.bottom).toBeLessThanOrEqual(layout.excerpt.top);
-    expect(hasVisibleArea(layout.excerpt)).toBe(true);
-    expect(layout.image.naturalWidth).toBeGreaterThan(0);
-    expect(layout.image.naturalHeight).toBeGreaterThan(0);
-    expect(layout.image.width / layout.image.height).toBeCloseTo(layout.image.naturalWidth / layout.image.naturalHeight, 2);
-    if (layout.width <= 600) {
-      const visibleExcerpt = Math.max(0, Math.min(layout.height, layout.excerpt.bottom) - Math.max(0, layout.excerpt.top));
-      expect(visibleExcerpt, "at least two readable excerpt lines begin beside the complete source page")
-        .toBeGreaterThanOrEqual(layout.excerptLineHeight * 2);
-    }
-    if (consentVisible && layout.banner) {
-      expect(doesNotOverlap(layout.banner, layout.header)).toBe(true);
-      expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
-    }
-    for (const content of [layout.availability, layout.action, layout.source, layout.question, layout.sourcePage, layout.excerpt]) {
-      expect(content.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
-      if (consentVisible && layout.banner) expect(content.top).toBeGreaterThanOrEqual(layout.banner.bottom - 1);
-    }
-    if (layout.width <= 600) expect(layout.source.top).toBeGreaterThanOrEqual(layout.action.bottom - 1);
-
-    if (["1440", "390"].includes(test.info().project.name)) {
-      const captureName = `home-first-screen-${test.info().project.name}-consent-${consentVisible ? "visible" : "dismissed"}`;
-      const capturePath = test.info().outputPath(captureName + ".png");
-      await page.screenshot({ path: capturePath, animations: "disabled" });
-      await test.info().attach(captureName, { path: capturePath, contentType: "image/png" });
-    }
-  };
-
-  await expectFirstScreen(true);
-  await dismissConsent(page);
-  await expectFirstScreen(false);
+    expect(layout.title.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
+    expect(layout.film.top).toBeGreaterThanOrEqual(layout.title.bottom);
+    expect(layout.film.top).toBeLessThan(layout.height);
+    expect(layout.film.left).toBeGreaterThanOrEqual(-1);
+    expect(layout.film.right).toBeLessThanOrEqual(layout.width + 1);
+    expect(layout.source.top).toBeGreaterThanOrEqual(layout.film.bottom);
+    expect(layout.action.top).toBeGreaterThanOrEqual(layout.film.top);
+    if (!consentVisible && width === 1440) expect(layout.action.bottom).toBeLessThanOrEqual(900);
+    if (consentVisible && layout.banner) expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
+    await test.info().attach("home-first-screen-" + width + "-consent-" + consentVisible, {body: await page.screenshot({animations: "disabled"}), contentType: "image/png"});
+  }
+  const source = page.locator("#s2 article[data-case-status]");
+  await source.scrollIntoViewIfNeeded();
+  await expect(source).toContainText("processing not yet run");
+  await expect(source.getByRole("button", {pressed: true})).toHaveCount(1);
+  await expect(source.locator("img")).toBeVisible();
+  await expect(source.locator("blockquote")).not.toHaveText("");
+  await expect(source.locator("[data-hero-evidence]")).toHaveAttribute("href", /act=evidence/);
 });
 
-test("the prepared home question and full quotation reflow at narrow widths and 200% zoom", async ({ browser, page }) => {
+test("the prepared source selection and full quotation reflow at narrow widths and 200% zoom", async ({ browser, page }) => {
   test.skip(page.viewportSize()?.width !== 1440, "Run this explicit viewport matrix once on the desktop project.");
   const profiles = [320, 360, 390, 768, 1440].map(width => ({ width, height: 844, deviceScaleFactor: 1, name: `${width}px` }));
   // Match the existing contrast/zoom audit: 1440 physical pixels at 200% = 720 CSS pixels at DPR 2.
@@ -246,8 +203,10 @@ test("the prepared home question and full quotation reflow at narrow widths and 
       for (const route of ["/", "/ko"]) {
         await proof.goto(route);
         if (route === "/") await dismissConsent(proof);
-        const source = proof.locator("#s1 .paper-source");
-        await expect(source.locator(".paper-source-question")).toHaveText("What were operating expenses for research and development?");
+        const source = proof.locator("#s2 article[data-case-status]");
+        await source.scrollIntoViewIfNeeded();
+        await expect(source.locator("button[aria-pressed]")).toHaveCount(3);
+        await expect(source.locator('button[aria-pressed="true"]')).toHaveCount(1);
         await expect(source.locator("blockquote")).toHaveText("Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443");
         await expect(source.locator("img")).toBeVisible();
         await expect.poll(() => source.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
@@ -270,13 +229,13 @@ test("the prepared home question and full quotation reflow at narrow widths and 
           const image = element.querySelector<HTMLImageElement>("img")!;
           return {
             overflow: document.documentElement.scrollWidth - innerWidth, width: innerWidth,
-            question: box(".paper-source-question"), quote: box("blockquote"),
-            page: box("img"), link: box(".paper-source-result a"),
+            question: box('button[aria-pressed="true"]'), quote: box("blockquote"),
+            page: box("img"), pageWindow: box("[data-page-window]"), link: box("[data-hero-evidence]"),
             naturalRatio: image.naturalWidth / image.naturalHeight,
           };
         });
         expect(geometry.overflow, `${route} ${profile.name}`).toBeLessThanOrEqual(1);
-        for (const text of [geometry.question, geometry.quote]) {
+        for (const text of [geometry.quote]) {
           expect(text.font).toBeGreaterThanOrEqual(15);
           expect(text.clamp).toBe("none");
           expect(text.clipped).toBe(false);
@@ -288,13 +247,16 @@ test("the prepared home question and full quotation reflow at narrow widths and 
           expect(box.left).toBeGreaterThanOrEqual(-1);
           expect(box.right).toBeLessThanOrEqual(geometry.width + 1);
         }
-        expect(geometry.question.bottom).toBeLessThanOrEqual(Math.min(geometry.quote.top, geometry.page.top));
-        expect(geometry.page.right).toBeLessThanOrEqual(geometry.quote.left);
+        expect(geometry.question.width).toBeGreaterThanOrEqual(44);
+        expect(geometry.question.height).toBeGreaterThanOrEqual(44);
+        // The stored full-page image extends behind the source viewport's intentional crop.
+        // Collision is measured against its visible window; pixel aspect ratio stays checked below.
+        expect(geometry.pageWindow.right <= geometry.quote.left + 1 || geometry.pageWindow.bottom <= geometry.quote.top + 1 || geometry.quote.bottom <= geometry.pageWindow.top + 1).toBe(true);
         expect(geometry.quote.bottom).toBeLessThanOrEqual(geometry.link.top);
         expect(geometry.page.width / geometry.page.height).toBeCloseTo(geometry.naturalRatio, 2);
         expect(geometry.link.height).toBeGreaterThanOrEqual(44);
         expect(geometry.link.width).toBeGreaterThanOrEqual(44);
-        const action = source.locator(".paper-source-result a");
+        const action = source.locator("[data-hero-evidence]");
         await action.scrollIntoViewIfNeeded();
         expect(await action.evaluate(link => {
           const box = link.getBoundingClientRect();

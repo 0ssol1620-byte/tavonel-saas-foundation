@@ -111,14 +111,14 @@ test("Product owns its public sections and using a mobile customer link closes t
   await page.goto("/research");
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
-  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+  await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
   await page.locator('header.nav .nav-actions a[href="/pricing"]').click({ noWaitAfter: true });
   await expect(menu.locator(":scope > nav")).toBeHidden();
 
   await page.goto("/sources");
   await menu.locator(":scope > summary").click();
-  await expect(menu.getByRole("link", { name: "Product", exact: true })).toHaveAttribute("aria-current", "location");
-  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
+  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
   await expect(menu.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
 
   await menu.getByRole("link", { name: "Product", exact: true }).click();

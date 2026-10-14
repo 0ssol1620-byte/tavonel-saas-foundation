@@ -40,6 +40,7 @@ test("navigation and hero actions keep readable labels", async ({ page }) => {
 */
 for (const path of ["/", "/ko"]) {
   test(`${path} shares a measured outer edge and keeps the opened walkthrough inside it`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
     const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
     const filmWrap = await page.locator("#s2 .lv2-wrap").boundingBox();
@@ -53,8 +54,8 @@ for (const path of ["/", "/ko"]) {
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();
-    await expect(disclosure.locator("picture")).toBeVisible();
-    const film = (await disclosure.locator("picture").boundingBox())!;
+    await expect(disclosure.locator("img")).toBeVisible();
+    const film = (await disclosure.locator("img").boundingBox())!;
     expect(film.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);
     expect(film.x + film.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + 1);
   });

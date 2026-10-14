@@ -7072,3 +7072,11 @@ function assertNewReviewedMarketingEndpoint(path) {
   }
   return false;
 }
+
+test('affected production-hardening admission uses only projects with actual guarded cases and retains every case family', () => {
+  assert.deepEqual(planBrowserRuns(['e2e/production-hardening.spec.ts'],false).map(run=>run.project),['1440','390','360']);
+  const source=readFileSync('e2e/production-hardening.spec.ts','utf8');
+  assert.match(source,/testInfo\.project\.name !== "390" && testInfo\.project\.name !== "360"/);
+  assert.match(source,/testInfo\.project\.name !== "1440"/);
+  assert.throws(()=>planBrowserRuns(['e2e/unreviewed.spec.ts'],false),/No reviewed Playwright project mapping/);
+});
