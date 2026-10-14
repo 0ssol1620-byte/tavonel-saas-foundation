@@ -49,7 +49,8 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await expect(page.locator(`${BENCH} details`)).not.toHaveAttribute("open");
   await expect(page.locator(BENCH)).toContainText("processing not yet run");
   await expect(page.locator("section#s1 canvas")).toHaveCount(0);
-  await expect(page.locator("section#s1 [data-source-inspection-film]")).toHaveCount(1);
+  await expect(page.locator('section#s1 h1 + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
+  await expect(page.locator("section#s1 .compile-film-sequence").getByRole("tab")).toHaveCount(4);
   await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
   await expect(page.locator("section#s2 .lv2-film-note")).toHaveCount(0);
   await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
@@ -108,7 +109,8 @@ test("Korean visitors get the same story and the same route behind it", async ({
   await expect(page.locator(`${BENCH} [data-hero-evidence]`))
     .toBeVisible();
   await expect(page.locator(`${BENCH} button[aria-pressed]`)).toHaveCount(3);
-  await expect(page.locator("section#s1 [data-source-inspection-film]")).toHaveCount(1);
+  await expect(page.locator('section#s1 h1 + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
+  await expect(page.locator("section#s1 .compile-film-sequence").getByRole("tab")).toHaveCount(4);
   await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
   await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
   await expect(page.getByTestId("landing-hero-film")).toBeVisible();

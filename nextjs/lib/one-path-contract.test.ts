@@ -70,14 +70,14 @@ describe("approved one-path experience", () => {
   it("orders the landing as visible film, source, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    expect(page).toContain("<SourceInspectionFilm");
+    expect(page).toContain("<HeroFilm");
     expect(page).toContain("<HeroSourceCard");
     expect(page).not.toContain("<CompilerSpecimen");
     expect(page).not.toContain("<HeroProof");
     const order = [
       'id="s1"',
       "<HeroStatement",
-      "<SourceInspectionFilm",
+      "<HeroFilm",
       "<HeroActions",
       'id="s2"',
       "<HeroSourceCard",
@@ -88,7 +88,9 @@ describe("approved one-path experience", () => {
     ].map(token => page.indexOf(token));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
     const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
-    expect(hero, "the legacy walkthrough film is not in the hero").not.toContain("<HeroFilm");
+    expect(hero, "the four-stage film follows the title inside the hero").toContain("<HeroFilm korean={korean} />");
+    expect(hero.indexOf("<HeroFilm")).toBeGreaterThan(hero.indexOf("<HeroStatement"));
+    expect(hero).not.toContain("<SourceInspectionFilm");
     /* The hero layout grid sets no columns of its own. */
     const css = text("components/landing-v2/landing-hero.module.css");
     const layout = css.slice(css.indexOf("section.hero .layout {"), css.indexOf("}", css.indexOf("section.hero .layout {")));
@@ -115,7 +117,9 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(disclosure).toContain("preferVideo");
     expect(disclosure).toContain("priorityPoster");
-    expect(disclosure).toContain("Illustrative product walkthrough");
+    expect(disclosure).toContain("Illustrative product demo · examples, not customer results.");
+    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
+    expect(film).toContain("COMPILE_STAGES.map");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");
@@ -125,17 +129,17 @@ describe("approved one-path experience", () => {
 
   /*
     `hero_demo_interact` is delegated by selector, so moving the film silently stops counting its
-    controls unless the selector moves with it. The source-inspection film in scene 01 is the
-    demo on Home, and its explicit play control must stay inside the counted selector.
+    controls unless the selector moves with it. The four-stage film in scene 01 is the
+    demo on Home, and its stage and motion controls must stay inside the counted selector.
   */
-  it("counts demo engagement on the scene-one source-inspection film controls", () => {
+  it("counts demo engagement on the scene-one four-stage film controls", () => {
     const analytics = text("components/landing-v2/landing-analytics.tsx");
     const onDemo = analytics.slice(analytics.indexOf("const onDemo"), analytics.indexOf('main.addEventListener("click"'));
     expect(onDemo, "the demo listener").not.toBe("");
     expect(onDemo).toContain('trackFunnelOnce("hero_demo_interact", arm)');
     const selector = onDemo.match(/target\.closest\("([^"]+)"\)/)?.[1] ?? "";
     const parts = selector.split(",").map(part => part.trim());
-    expect(parts, "the film's controls, where the film now is").toContain("#s1 [data-source-inspection-film] button");
+    expect(parts, "the film's controls, where the film now is").toContain("#s1 .compile-film-sequence button");
     expect(parts, "decision A preserves prepared source UI engagement")
       .toContain("#s2 [data-source-digest] button[aria-pressed][aria-controls]");
     expect(onDemo, "the engagement hook adds no action or document payload")
@@ -144,8 +148,8 @@ describe("approved one-path experience", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
     expect(page.indexOf('id="s2"')).toBeGreaterThan(page.indexOf('id="s1"'));
-    expect(hero).toContain("<SourceInspectionFilm");
-    expect(text("components/landing-v2/source-inspection-film.tsx")).toContain("data-source-inspection-film");
+    expect(hero).toContain("<HeroFilm");
+    expect(text("components/landing-v2/hero-film-disclosure.tsx")).toContain("<CompileStagePlayer");
     expect(text("components/compile-stage-player.tsx")).toContain('className="compile-film-sequence');
   });
 

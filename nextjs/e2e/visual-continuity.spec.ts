@@ -22,7 +22,7 @@ test.describe("visual continuity — locked film side", () => {
     await page.goto("/");
     /*
       Landing V2, 2026-09-19. The retired WORLD landing stage still cannot come back, and the two
-      absences that prove it are unchanged: no tab anywhere on the entry page, and no Works film.
+      absences that prove it are unchanged: no retired WORLD stage markup, and no Works film.
 
       What is dropped is the second half, which read the three output destinations out of the
       `Out` column of `#sources`'s in/out grid. That grid is Scene 07's P2 visual in V2 and has
@@ -46,13 +46,15 @@ test.describe("visual continuity — locked film side", () => {
       Scene 02; Scene 03 presents a source-bound record. The retired One-Path markup
       (.one-path-world-stage, one-path-works-film) still stays out.
     */
-    await expect(page.getByRole("tablist")).toHaveCount(0);
-    await expect(page.locator("[data-source-inspection-film]")).toHaveCount(1);
+    await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
+    await expect(page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();
-    await expect(page.getByRole("tablist")).toHaveCount(0);
-    await expect(disclosure.getByRole("button", { name: "Play the source inspection" })).toHaveCount(1);
+    await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
+    await expect(disclosure.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+    await expect(disclosure.locator(".compile-film-motion-control")).toHaveCount(1);
+    await expect(disclosure.locator(".compile-film-sequence")).toHaveAttribute("data-video-primary-src", "/film/compile-cut.mp4");
     await expect(disclosure.locator(".compile-film-stage-disclosure")).toHaveCount(0);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);

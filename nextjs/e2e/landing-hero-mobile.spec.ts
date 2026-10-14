@@ -1,38 +1,60 @@
 import { expect, test } from "@playwright/test";
-const FILM = '#s1 [data-source-inspection-film]';
-test.describe("phone source inspection", () => {
+const FILM = '#s1 h1 + figure[data-testid="landing-hero-film"]';
+test.describe("phone four-stage film", () => {
   test.beforeEach(async ({ page }, info) => {
     test.skip(!["360", "390"].includes(info.project.name), "phone composition");
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
   });
-  test("uses the independently framed phone poster and readable play control", async ({ page }) => {
+  test("opens on the locked full-frame poster with readable stage and play controls", async ({ page }) => {
     const film = page.locator(FILM);
     await expect(film).toBeVisible();
-    expect(await film.locator("img").evaluate((image: HTMLImageElement) => image.currentSrc)).toContain("/film/source-inspection/mobile.webp");
-    const play = film.getByRole("button", { name: "Play the source inspection" });
+    expect(await film.locator("img").evaluate((image: HTMLImageElement) => image.currentSrc)).toContain("/film/poster-1-hero-2x.webp");
+    await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+    const play = film.getByRole("button", { name: "Play the compilation film", exact: true });
     expect((await play.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await expect(film.locator("video")).toHaveCount(0);
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   });
-  test("plays the phone crop of the same inspection and discloses its scope", async ({ page }) => {
+  test("plays the approved recording and supports Fit, Focus and keyboard stage selection", async ({ page }) => {
     const film = page.locator(FILM);
-    await film.getByRole("button", { name: "Play the source inspection" }).click();
+    await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
     const video = film.locator("video");
     await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
-    expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/source-inspection/mobile.webm");
+    expect(await video.evaluate((node: HTMLVideoElement) => node.currentSrc)).toContain("/film/compile-cut.mp4");
     const box = (await video.boundingBox())!;
     expect(box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-    await film.locator("summary").click();
-    await expect(film.locator("details")).toContainText("phone recording focuses on the passage area of the same actions");
+    await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
+    const focus = film.getByRole("button", { name: "Focus details", exact: true });
+    expect((await focus.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await focus.click();
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
+    await film.getByRole("button", { name: "Fit full frame", exact: true }).click();
+    await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    const tabs = film.getByRole("tab");
+    await tabs.first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tabs.nth(1)).toBeFocused();
+    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("End");
+    await expect(tabs.last()).toBeFocused();
+    await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Home");
+    await expect(tabs.first()).toBeFocused();
+    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   });
-  test("reduced motion stays static and failed playback restores the source poster", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
+  test("reduced motion stays static and failed primary and fallback playback restore the locked poster", async ({ page }) => {
     const film = page.locator(FILM);
     await expect(film.locator("video")).toHaveCount(0);
-    await page.route("**/film/source-inspection/mobile.webm", route => route.abort());
-    await film.getByRole("button", { name: "Play the source inspection" }).click();
-    await expect(film.getByRole("status")).toContainText("recording could not load");
-    await expect(film.locator("picture img")).toBeVisible();
+    const failed: string[] = [];
+    await page.route("**/film/compile-cut*.mp4", route => { failed.push(route.request().url()); return route.abort(); });
+    await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
+    await expect(film.locator(".compile-film-caption")).toContainText("This browser could not play the film");
+    await expect(film.locator("img")).toBeVisible();
+    expect(failed.some(url => url.endsWith("/film/compile-cut.mp4"))).toBe(true);
+    expect(failed.some(url => url.endsWith("/film/compile-cut-hq-1440.mp4"))).toBe(true);
+    await expect(film.getByRole("tab")).toHaveCount(4);
   });
 });

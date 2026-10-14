@@ -171,10 +171,12 @@ test("the English close keeps its start action on an English destination", async
   expect(href, "the English close never sends a reader to the Korean pages").not.toMatch(/^\/ko(\/|$)/);
 });
 test("film is visible directly after the headline without an opening action", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const film = page.getByTestId("landing-hero-film");
+  const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
   await expect(film).toBeVisible();
-  await expect(film.locator('picture')).toHaveCount(1);
+  await expect(film.locator("img")).toHaveCount(1);
+  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   const headline = (await page.locator('h1').boundingBox())!;
   const media = (await film.boundingBox())!;
   expect(media.y).toBeGreaterThanOrEqual(headline.y + headline.height);
@@ -183,11 +185,12 @@ test("film is visible directly after the headline without an opening action", as
   expect(actions.y).toBeGreaterThanOrEqual(headline.y + headline.height);
   await expect(film.locator("video")).toHaveCount(0);
 });
-test("inspection video loads only after a reader plays and advances", async ({ page }) => {
+test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.locator("video")).toHaveCount(0);
-  await expect(film).toContainText("Prepared public sample");
-  await film.getByRole("button", { name: "Play the source inspection", exact: true }).click();
+  await expect(film).toContainText("Illustrative product demo · examples, not customer results.");
+  await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
   const video = film.locator("video");
   await expect(video).toBeVisible();
   await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
@@ -199,10 +202,10 @@ test("server-renders the visible film poster as its priority image", async ({ re
   const html = await response.text();
   // Next transmits this early hint in the HTTP Link header before streaming the body.
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint).toContain("</film/source-inspection/desktop.webp>");
+  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
   expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/source-inspection/desktop.webp");
+  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   expect(sourceImages).toHaveLength(1);
@@ -212,9 +215,9 @@ test("server-renders the visible film poster as its priority image", async ({ re
 test("reduced motion keeps the prepared poster static until explicit play", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
   const film = await visibleFilm(page);
-  await expect(film.locator("picture img")).toBeVisible();
+  await expect(film.locator("img")).toBeVisible();
   await expect(film.locator("video")).toHaveCount(0);
-  await expect(film.getByRole("button", { name: "Play the source inspection", exact: true })).toBeVisible();
+  await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
 });
 
 test("source controls clear the touch floor and keep selected regions inside the page window", async ({ page }) => {
