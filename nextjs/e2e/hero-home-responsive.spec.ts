@@ -40,6 +40,12 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
     await expect(film.locator("video")).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`home-en-${width}-reduced.png`) });
+    if (width === 1440 || width === 390) {
+      for (let index = 0; index < 4; index++) {
+        await film.getByRole("tab").nth(index).click();
+        await page.screenshot({ path: testInfo.outputPath(`home-en-${width}-stage-${index + 1}-still.png`) });
+      }
+    }
     await page.emulateMedia({ reducedMotion: "no-preference" });
   }
   for (const width of [1440, 390]) {

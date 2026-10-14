@@ -35,7 +35,7 @@
   .home.home > header :global(.site-nav-direct), .home.home > header :global(.nav-actions) > a { color: var(--ink); }
   .home.home :global(.lv2-wrap) { max-width: 1200px; width: calc(100% - 48px); padding-inline: 0; }
   .home.home :global(.lv2-scene) { min-height: 0; padding-block: 96px; border-bottom: 1px solid #d9ded9; }
-  .home.home :global(#s1) { padding-top: 88px; padding-bottom: 64px; }
+  .home.home :global(#s1) { padding-top: 72px; padding-bottom: 64px; }
   .home.home :global(#s1 > .lv2-wrap) { display: block; }
   .home.home :global(.lv2-hero-grid), .home.home :global(.lv2-hero-text) { display: block; }
   .home.home :global(.lv2-hero-h1) {
