@@ -4,7 +4,7 @@ import {
   PublicSiteFooter,
   PublicSiteHeader,
 } from "@/components/public-site-chrome";
-import SourceInspectionFilm from "./source-inspection-film";
+import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
@@ -300,14 +300,12 @@ export default function LandingPage({
                 headlineVariant={experiment.headlineVariant}
                 showSupport={false}
               >
-                <div className={sourceStyles.heroMedia}>
-                  <SourceInspectionFilm korean={korean} />
-                  <div className={sourceStyles.heroAside}>
+                <HeroFilm korean={korean} />
+                <div className={sourceStyles.heroAside}>
                     <p className="lv2-hero-support lv2-body-l">{page.support}</p>
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
                     <p className={sourceStyles.intake}>{page.intake}</p>
-                  </div>
                 </div>
               </HeroStatement>
             </div>
