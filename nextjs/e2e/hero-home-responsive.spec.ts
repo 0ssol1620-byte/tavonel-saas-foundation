@@ -1,5 +1,47 @@
 import { expect, test } from "@playwright/test";
 
+test("first-visit phone actions remain visible with the consent panel", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator("[data-marketing-consent-panel]")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  for (const action of await page.locator("#s1 .lv2-actions a").all()) {
+    const rect = await action.boundingBox();
+    expect(rect).not.toBeNull();
+    expect(rect!.y).toBeGreaterThanOrEqual(0);
+    expect(rect!.y + rect!.height).toBeLessThanOrEqual(844);
+    expect(rect!.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test("reduced-motion hero actions have no pointer press transform", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const consent = page.getByRole("button", { name: "No thanks", exact: true });
+  if (await consent.isVisible()) await consent.click();
+  const action = page.locator("#s1 .lv2-actions a").first();
+  await action.scrollIntoViewIfNeeded();
+  const rect = await action.boundingBox();
+  expect(rect).not.toBeNull();
+  await page.mouse.move(rect!.x + rect!.width / 2, rect!.y + rect!.height / 2);
+  await page.mouse.down();
+  try {
+    const style = await action.evaluate(element => ({
+      active: element.matches(":active"),
+      transform: getComputedStyle(element).transform,
+      transition: getComputedStyle(element).transitionDuration,
+    }));
+    expect(style.active).toBe(true);
+    expect(style.transform).toBe("none");
+    expect(style.transition).toBe("0s");
+  } finally {
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+  }
+});
+
 test("the restored hero keeps its title, stages and actions at seven widths", async ({ page }, testInfo) => {
   const layouts = [];
   for (const width of [1920, 1440, 1280, 1024, 768, 390, 360]) {

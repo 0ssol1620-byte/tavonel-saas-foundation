@@ -176,7 +176,7 @@ describe("reviewed Home reader heading CSS source contract", () => {
   it("keeps the legacy important token cascade distinct from the mounted Home root", () => {
     expect(declaration(moduleCss, ".home", "--home-ink")).toEqual({ value: "#15191d", important: true, layered: true });
     expect(declaration(moduleCss, ".home", "--home-paper")).toEqual({ value: "#fbfaf7", important: true, layered: true });
-    expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "#19201f", important: false, layered: true });
+    expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "#15191d", important: false, layered: true });
     expect(declaration(activeRootCss, ".home", "--home-paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
     const page = readFileSync(new URL("components/landing-v2/landing-page.tsx", packageRoot), "utf8");
     expect(page).toContain('className={`page lv2 ${sourceStyles.home}`}');

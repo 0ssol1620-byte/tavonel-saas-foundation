@@ -91,7 +91,7 @@ function homeData(): HomeData {
 */
 const HOME_COPY = {
   en: {
-    support: "Explore your sources together. Open the passage behind each record.",
+    support: "Your sources, connected for people and AI.",
     intake: "Own-source intake by arrangement",
     difficulty: {
       eyebrow: "Why this passage is hard",
@@ -143,7 +143,7 @@ const HOME_COPY = {
     },
   },
   ko: {
-    support: "자료를 함께 살펴보고, 각 기록의 근거가 된 원문을 여세요.",
+    support: "원문에서, 사람과 AI가 쓰는 지식으로.",
     intake: "자체 원문 접수는 별도 협의",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
@@ -302,9 +302,9 @@ export default function LandingPage({
               >
                 <HeroFilm korean={korean} />
                 <div className={sourceStyles.heroAside}>
-                    <p className="lv2-hero-support lv2-body-l">{page.support}</p>
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
+                    <p className="lv2-hero-support lv2-body-l">{page.support}</p>
                     <p className={sourceStyles.intake}>{page.intake}</p>
                 </div>
               </HeroStatement>

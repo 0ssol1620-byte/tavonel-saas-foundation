@@ -45,11 +45,12 @@
     "boundary": "Canonical Git LF bytes at the existing341 source; no new product CSS, browser pixels, release qualification or renaming of historical evidence.",
     "activeRoot": {
       "path": "components/landing-v2/source-first-home.module.css",
-      "sha256": "cc040832936d44b7af0a1123bce548b0f8fedf888f7091892c367651d475e7dd",
-      "bytes": 9634,
-      "ink": "#19201f",
+      "sha256": "6dda84520e83088a1fdde37717f46a65324f8e07dc1584c757902f5ebca33c95",
+      "bytes": 11315,
+      "ink": "#15191d",
       "paper": "#faf9f6",
-      "boundary": "Home mounts sourceStyles.home rather than heroStyles.home; reader headings inherit these root tokens."
+      "boundary": "CandidateA1 root CSS from exact90ce; source hash is the actual current Git-canonical LF postimage. Legacy/historical module pins remain separate and unchanged.",
+      "baseInputCommit": "90ce780a7dd0484186de5db7652e4265c4209e80"
     }
   }
 }

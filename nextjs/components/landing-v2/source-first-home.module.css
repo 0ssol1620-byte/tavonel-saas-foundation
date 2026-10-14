@@ -4,25 +4,25 @@
   .home {
     --chrome-measure: 1200px;
     --home-paper: #faf9f6;
-    --home-stone: #eef0eb;
+    --home-stone: #f0f1ee;
     --home-sheet: #ffffff;
-    --home-ink: #19201f;
-    --home-muted: #58615e;
+    --home-ink: #15191d;
+    --home-muted: #58606a;
     --home-cobalt: #244ac8;
     --home-cobalt-deep: #173692;
     --home-amber: #f2b73a;
     --home-amber-wash: #fff1c7;
     --home-amber-ink: #795400;
-    --home-rule: rgb(25 32 31 / 16%);
-    --home-rule-strong: rgb(25 32 31 / 32%);
+    --home-rule: rgb(21 25 29 / 16%);
+    --home-rule-strong: rgb(21 25 29 / 32%);
     --home-mono: ui-monospace, Consolas, monospace;
     --home-ease: cubic-bezier(0.23, 1, 0.32, 1);
     --f-sans: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif;
     --paper: #faf9f6;
-    --ink: #19201f;
-    --text-hi: #19201f;
-    --text-mid: #58615e;
-    --text-lo: #58615e;
+    --ink: #15191d;
+    --text-hi: #15191d;
+    --text-mid: #58606a;
+    --text-lo: #58606a;
     background: var(--paper);
     color: var(--ink);
     font-family: var(--f-sans);
@@ -33,24 +33,24 @@
   .home.home > header { background: var(--paper); color: var(--ink); }
   .home.home > header :global(.wordmark), .home.home > header :global(.wordmark) :is(b, svg),
   .home.home > header :global(.site-nav-direct), .home.home > header :global(.nav-actions) > a { color: var(--ink); }
-  .home.home :global(.lv2-wrap) { max-width: 1200px; width: calc(100% - 48px); padding-inline: 0; }
-  .home.home :global(.lv2-scene) { min-height: 0; padding-block: 96px; border-bottom: 1px solid #d9ded9; }
+  .home.home :global(.lv2-wrap) { max-width: 1200px; width: calc(100% - 2 * clamp(20px, 2.5vw, 32px)); padding-inline: 0; }
+  .home.home :global(.lv2-scene) { min-height: 0; padding-block: 88px; border-bottom: 1px solid var(--home-rule); }
   .home.home :global(#s1) { padding-top: 72px; padding-bottom: 64px; }
   .home.home :global(#s1 > .lv2-wrap) { display: block; }
   .home.home :global(.lv2-hero-grid), .home.home :global(.lv2-hero-text) { display: block; }
   .home.home :global(.lv2-hero-h1) {
-    max-width: 1040px; margin: 0 auto 20px; text-align: center;
-    font: 560 clamp(44px, 4.6vw, 56px)/1.08 var(--f-sans); font-variation-settings: "wght" 560; font-synthesis: none; letter-spacing: -0.035em;
+    max-width: 1040px; margin: 0 auto 16px; text-align: center;
+    font: 520 clamp(44px, 4.45vw, 64px)/1.06 var(--f-sans); font-variation-settings: "wght" 520; font-synthesis: none; letter-spacing: -0.04em;
   }
   .home.home :global(.lv2-h1-line) { display: block; }
-  .home.home :global(.lv2-h2) { font: 560 clamp(32px, 3.6vw, 52px)/1.12 var(--f-sans); letter-spacing: -0.03em; color: var(--ink); }
-  .home.home :global(.lv2-scene-support) { color: #58615e; font: 17px/1.65 var(--f-sans); }
+  .home.home :global(.lv2-h2) { font: 520 clamp(32px, 3.2vw, 44px)/1.14 var(--f-sans); letter-spacing: -0.025em; color: var(--ink); }
+  .home.home :global(.lv2-scene-support) { color: var(--home-muted); font: 17px/1.65 var(--f-sans); }
   .home.home :global(main a) { display: inline-flex; align-items: center; min-height: 44px; }
   .home.home :global(main summary) { min-height: 44px; }
   /* Legacy film figure/body margins are unlayered; reset only this opening figure. */
-  .home.home :global(#s1 .lv2-film-story) { margin: 0 auto !important; border: 0; max-width: 760px; }
-  .home.home :global(#s1 .lv2-film) { --lv2-film-w: 760px; margin-top: 0 !important; padding-bottom: 0; }
-  .home.home :global(#s1 .compile-film-sequence) { gap: 12px; }
+  .home.home :global(#s1 .lv2-film-story) { margin: 0 auto !important; border: 0; max-width: 720px; }
+  .home.home :global(#s1 .lv2-film) { --lv2-film-w: 720px; margin-top: 0 !important; padding-bottom: 0 !important; }
+  .home.home :global(#s1 .compile-film-sequence) { gap: 8px; }
   .home.home :global(#s1 .compile-film-stages) { border-top: 0; border-bottom: 1px solid var(--home-rule); }
   .home.home :global(#s1 .compile-film-stages button) {
     color: var(--home-muted); font: 560 15px/1.4 var(--f-sans); letter-spacing: -0.01em;
@@ -61,16 +61,16 @@
   .home.home :global(#s1 .compile-film-caption) { gap: 12px; align-items: start; }
   .home.home :global(#s1 .compile-film-caption p) { color: var(--home-ink); font: 15px/1.5 var(--f-sans); }
   .home.home :global(#s1 .compile-film-progress) { display: none; }
-  .home.home :global(#s1 .lv2-film-story > figcaption) { margin-top: 8px; color: var(--home-muted); font: 12px/1.5 var(--f-sans); text-align: center; }
-  .heroAside { min-width: 0; max-width: 760px; margin: 16px auto 0; display: grid; gap: 8px 24px; justify-items: center; }
+  .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 6px; color: var(--home-muted); font: 12px/1.5 var(--f-sans); text-align: center; }
+  .heroAside { min-width: 0; max-width: 720px; margin: 16px auto 0; display: grid; gap: 8px 24px; justify-items: center; }
   .heroAside :global(.lv2-hero-support) { margin: 0; max-width: 62ch; font: 18px/1.5 var(--f-sans); color: var(--ink); text-align: center; }
   .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: center; gap: 16px; margin-top: 0; }
   .home.home :global(.btn), .play { min-height: 48px; border-radius: 4px; }
   .home.home :global(.lv2-cta) { background: #244ac8; color: white; border-color: #244ac8; padding: 12px 24px; font: 560 15px/1.5 var(--f-sans); }
   .home.home :global(.lv2-cta:hover) { background: #173692; }
   .home.home :global(.lv2-text-link) { color: var(--ink); font-family: var(--f-sans); }
-  .intake { margin-top: 16px; color: #58615e; font: 13px/1.6 var(--f-sans); }
-  .formats { margin: 24px 0 0; font: 13px/1.6 var(--f-sans); color: #58615e; }
+  .intake { margin-top: 16px; color: var(--home-muted); font: 13px/1.6 var(--f-sans); }
+  .formats { margin: 24px 0 0; font: 13px/1.6 var(--f-sans); color: var(--home-muted); }
   .formats summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; }
   .formats p { max-width: 68ch; margin-top: 8px; }
   .film { margin: 0; min-width: 0; }
@@ -87,7 +87,7 @@
   .transcript summary { cursor: pointer; display: inline-flex; align-items: center; min-height: 44px; }
   .transcript p { margin-top: 8px; max-width: 64ch; }
   .home.home :global(#s2), .home.home :global(#s3) { background: var(--paper); color: var(--ink); }
-  .home.home :global(#s4), .home.home :global(#s5) { background: #eef0eb; color: var(--ink); }
+  .home.home :global(#s4), .home.home :global(#s5) { background: var(--home-stone); color: var(--ink); }
   .home.home :global(#s4) { --ink-900: #ffffff; --hairline: #c7cdc7; --source: #244ac8; --changed: #865600; }
   .home.home :global(#s4 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
   .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: #58615e; }
@@ -110,26 +110,54 @@
     .home.home :global(#s4 .lv2-split) { grid-template-columns: 1fr; gap: 32px; }
   }
   @media (min-width: 900px) {
-    .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: 475px; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
+    .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: 450px; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
     .heroAside { grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: start; }
-    .heroAside :global(.lv2-hero-support) { font-size: 16px; text-align: left; }
+    .heroAside :global(.lv2-hero-support) { grid-column: 1; grid-row: 1; font-size: 16px; text-align: left; }
+    .heroAside :global(.lv2-actions) { grid-column: 2; grid-row: 1; }
     .heroAside .intake { grid-column: 2; margin: 0; }
   }
   @media (max-width: 767px) {
-    .home.home :global(.lv2-wrap) { width: calc(100% - 40px); }
     .home.home :global(.lv2-scene) { padding-block: 64px; }
     .home.home :global(#s1) { padding-top: 96px; padding-bottom: 48px; }
-    .home.home :global(.lv2-hero-h1) { font-size: 38px; line-height: 1.1; margin-bottom: 24px; }
-    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 38px; line-height: 1.2; letter-spacing: -0.03em; }
-    .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-inline: 4px; min-height: 48px; }
+    /* Pending consent puts the header in normal flow: do not reserve its fixed-header space twice. */
+    :global(body:has([data-marketing-consent-panel])) .home.home :global(#s1) { padding-top: 16px; }
+    .home.home :global(.lv2-hero-h1) { font-size: 36px; line-height: 1.06; margin-bottom: 16px; }
+    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 36px; line-height: 1.16; letter-spacing: -0.03em; }
+    .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-inline: 4px; min-height: 48px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; }
     .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 12px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
-    .heroAside { margin-top: 20px; }
+    .heroAside { margin-top: 12px; }
     .heroAside :global(.lv2-hero-support) { font-size: 16px; line-height: 1.5; }
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; gap: 8px 20px; }
     .filmFrame { aspect-ratio: 390 / 270; }
     .play { right: 12px; bottom: 12px; }
     .film figcaption { font-size: 12px; }
   }
-  @media (prefers-reduced-motion: reduce) { .play:active { transform: none; } }
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .heroAside :global(a:not(:focus-visible)),
+    .home.home :global(#s1 .compile-film-stages button:not(:focus-visible)) {
+      transition: color 160ms var(--home-ease), background-color 160ms var(--home-ease), border-color 160ms var(--home-ease), transform 120ms var(--home-ease);
+    }
+    .heroAside :global(a:active:not(:focus-visible)) { transform: scale(0.98); }
+  }
+  .heroAside :global(a:focus-visible),
+  .home.home :global(#s1 .compile-film-stages button:focus-visible) { transition: none; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .play:active, .heroAside :global(a:active) { transform: none; }
+    .heroAside :global(a), .home.home :global(#s1 .compile-film-stages button) { transition: none; }
+    /* Shared unlayered controls otherwise retain their press transform and transition. */
+    .home.home :global(#s1 :is(button, a):active) { transform: none !important; }
+  }
+}
+
+/* Important layer order is reversed: match the shared reduced-motion sweep's
+   components layer so its 120ms opacity transition cannot override this Home exception. */
+@layer components {
+  @media (prefers-reduced-motion: reduce) {
+    .home.home :global(#s1 :is(button, a)) {
+      transition-property: none !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+    }
+  }
 }
