@@ -58,6 +58,8 @@
   }
   .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
   .home.home :global(#s1 .compile-film-viewport) { border-radius: 6px; border-color: var(--home-rule-strong); }
+  /* A legacy unlayered cover rule crops the still even when the player says fit. */
+  .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
   .home.home :global(#s1 .compile-film-caption) { gap: 12px; align-items: start; }
   .home.home :global(#s1 .compile-film-caption p) { color: var(--home-ink); font: 15px/1.5 var(--f-sans); }
   .home.home :global(#s1 .compile-film-progress) { display: none; }
