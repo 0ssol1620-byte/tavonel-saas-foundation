@@ -43,15 +43,17 @@ test.describe("visual continuity — locked film side", () => {
     await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
     /*
       The four locked cuts are direct tabs in Scene 01. The source-linked specimen follows in
-      Scene 02, and the public question tabs remain in Scene 03. The retired One-Path markup
+      Scene 02; Scene 03 presents a source-bound record. The retired One-Path markup
       (.one-path-world-stage, one-path-works-film) still stays out.
     */
-    await expect(page.getByRole("tablist")).toHaveCount(2);
-    await expect(page.locator("#s1 .compile-film-stages").getByRole("tab")).toHaveCount(0);
-    await expect(page.locator("#s1 .paper-source").locator("blockquote")).not.toBeEmpty();
-    await expect(page.locator("#s1 .compile-film-stage-disclosure")).toHaveCount(0);
-    await expect(page.locator("#s2 [data-compiler-specimen]").getByRole("tab")).toHaveCount(5);
-    await expect(page.locator("#s3").getByRole("tab")).toHaveCount(3);
+    await expect(page.getByRole("tablist")).toHaveCount(0);
+    await expect(page.locator("[data-source-inspection-film]")).toHaveCount(1);
+    await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
+    const disclosure = page.getByTestId("landing-hero-film");
+    await expect(disclosure).toBeVisible();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
+    await expect(disclosure.getByRole("button", { name: "Play the source inspection" })).toHaveCount(1);
+    await expect(disclosure.locator(".compile-film-stage-disclosure")).toHaveCount(0);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);
   });

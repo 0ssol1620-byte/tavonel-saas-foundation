@@ -1,5 +1,33 @@
 # TAVONEL Final Web Product Workspace visual QA report
 
+## 2026-10-13 source-first release candidate
+
+Scope: Home EN/KO, Product and How it works. The Home recording is an actual first-party
+inspection of the prepared public source sample, placed immediately below the headline; mobile
+is a disclosed crop of the same actions. No new processing or customer result is depicted.
+Decoding is deferred until explicit play. Original illustrative film hashes are preserved.
+Long source/method/version notes use native disclosures. Product shows the real World and
+source-bound outputs; How uses a continuous six-step process and code illustrations. Historical
+GDP.pdf figures have been removed from the Home pitch while their full conditions remain on
+Benchmarks. The immutable report is unchanged.
+
+Actual implementation included Claude Opus 5.5 parallel work through a newly started Claude
+Code CLI session, with scoped normal permissions. The already-running MCP session did not
+reload its permission state and still denied subagent writes; no bypass mode was used.
+
+Parent browser inspection of desktop Home, phone KO, Product and How found and repaired legacy
+CSS precedence and a sticky-header/title overlap. Repository checks passed brand assets, the
+12px floor, TypeScript and changed-file ESLint. The first full unit run completed with 5,898
+passes and nine integration failures across five files. Their affected contracts were repaired:
+source-copy/state checks, source-first order, layered CSS parsing, Korean language declaration
+and component traceability. Subsequent scoped checks passed 111, 247 and 404 tests respectively;
+these counts overlap and are not a replacement total for the full suite.
+
+Final seven-width/reduced-motion captures, playback, accessibility, production build, unchanged
+Lighthouse budgets and exact-head hosted checks remain to be recorded before acceptance. This
+section is a candidate checkpoint, not a claim that these pending checks passed. Automated
+acceptance does not establish founder aesthetic approval or industry-leading accuracy.
+
 Authority: `D:\TAVONEL_FINAL_WEB_PRODUCT_WORKSPACE_MASTERPLAN_2026-09-02.md`
 Repository worktree: `D:\CodexProjects\tavonel-saas-foundation-p0p2-integration`
 Run date: 2026-09-02 KST
@@ -598,3 +626,49 @@ At `6ecb651`, Linux CI still failed the mobile billing focus checks (947 passed,
 The two focus helpers now poll the unchanged strict `elementFromPoint` assertion for at most two seconds, allowing the native focus scroll to settle. Motion remains enabled. With smooth scrolling and retries disabled: the repeated mobile run passed 90/90, and the seven widths plus reduced-motion run passed 67 with 5 desktop-only skips. Removing the product scroll-margin fix still fails the assertion at both mobile widths. This negative control checks that polling does not conceal actual rail occlusion. Default Chromium also passed 67 with 5 skips; TypeScript passed.
 
 Linux CI on this new commit remains required before merge. The evidence and trace analysis are in the private launch audit `claude-billing-focus-linux-fix.json`. These are fixture tests, not authenticated customer or payment evidence.
+
+## 2026-10-13 — public UI craft and evidence disclosure
+
+The release candidate removes generic Home eyebrows and cosmetic counters, moves source digests and coordinate records into native Source details, and preserves exact region selection, source raster geometry, source links and the unverified-claim boundary. Existing Wanted Sans files carry the Home typography; the Korean headline's actual glyph subsets are preloaded. Shared public pages and chrome use a coherent bright surface. The analytics choice remains in document flow with equal controls. No competitor assets, customer logos, benchmarks or verified-run claims were introduced.
+
+Canonical source baseline: Foundation main `6119fa6587ef2c65b9371160eed0ad25d001a6a0`; branch `codex/home-design-craft-20261013`. The dirty Core checkout is outside this change.
+
+Evidence is in the local task artifact directory `outputs/tavonel-design-20261013`:
+
+- `BUILD.log`: complete repository check, 400 Vitest files / 5,893 tests passed and production compilation. `NODE-SCRIPT-TESTS.log`: 53 passed, zero skipped or failed.
+- `SOURCE-CARD-RECHECK.log`: all 31 source-card tests pass, including source rights, native links, exact selected coordinates and the visible claim boundary.
+- `final-captures/CAPTURE-RECEIPT.json`: Home EN/KO, Product, Pricing and Docs at 1920, 1440, 1280, 1024, 768, 390 and 360, plus 1440 reduced motion — 40 captures, zero overflow/capture errors. The parent inspected these actual renders; the first batched inspection led to one composition correction batch.
+- `DESIGN-E2E.json`: initial broad browser pass had 180 passes, 228 explicit condition skips and 10 failures, with retries disabled. Three failures were the obsolete header `.btn` assertion, two were short Changelog date targets, two were cramped Evidence caption geometry, and three lacked the repository's build-time browser fixture environment.
+- `E2E-AFFECTED-RECHECK.json`: the affected-only follow-up passed 16 cases with 11 condition skips, zero failed or flaky cases. Assertions retain the 44px floor and prose-width threshold. Native disclosures and region geometry are preserved.
+- `BUILD-CHECKED.log`: final CSS compiles with the repository's labelled, non-customer browser fixtures. Next's plugin-resolution warning was reproduced and repaired by declaring the existing pinned `eslint-plugin-react-hooks` and `@next/eslint-plugin-next` versions as direct development dependencies. `NEXT-LINT-RECHECK.log` then reports no lint warnings or errors. No lint rule or quality threshold was disabled.
+
+Skills applied: TAVONEL brand/asset instructions; Anthropic frontend-design; Impeccable 4.5.2 at upstream `919dbeba520df760a157fe635be62faae88d58da`; kill-ai-slop; Emil design engineering; Vercel React guidance. The Impeccable context launcher is not installed here, so its stated fallback was used; no claim is made that its automatic context/detect command ran. Scanner findings are manually classified and include inactive components and deliberate evidence notation. Two independent design assessments and the bounded composition patch resolved to Claude Opus 5.5; the parent owns integration and visual acceptance.
+
+Hosted CI, browser coverage and Lighthouse on the exact release head remain required before release. This section records scoped UI verification, not full Foundation/customer-data qualification or an industry ranking. Founder human visual approval has not been performed; the user explicitly delegated routine design and release judgment to the parent.
+
+Supporting reflow and touch repairs are captured in `support-captures/CAPTURE-RECEIPT.json`: Evidence, Changelog and document-understanding, all seven widths plus reduced motion, 24 captures with no overflow/capture error. Remaining old `.btn`/transparent-header browser assertions now check the actual Pricing link and the stable paper surface while retaining scroll-threshold, navigation, focus, geometry and 4.5:1 contrast checks. `CHROME-CONTRACT-RECHECK.json` passed 57 cases with 95 explicit project/condition skips, zero failed or flaky cases; WebKit's unavailable local runtime is not counted as a pass. Hosted browser coverage remains required. No further runtime UI change was made in this test-only follow-up.
+### 2026-10-13 hosted product regression repair
+
+The first hosted product pass failed 34 cases (906 passed, 219 conditional/project skips). The new root-loaded CSS modules registered `overrides` before the canonical layer order. CSSOM confirmed that `overrides` became the first layer and lost precedence to later `components`, affecting private workspace sizing, canvas hiding and mobile forms. Each of the four touched layered module sheets now declares the existing `reset, tokens, base, components, utilities, overrides` order before defining rules. The remaining navigation test now finds the named Pricing link instead of the retired `.btn` styling. No assertions for private workspace behavior were weakened. Exact revised-head hosted checks remain required.
+
+## 2026-10-13 Home film and page-role correction
+
+The earlier functional release did not satisfy the requested opening composition. Home now displays the four-cut illustrative film directly after H1, before the support and actions. The real source workbench follows in Scene 02; difficult context, record method and the three FAQs use native disclosures. Source rights, exact regions, original links and the prepared-run boundary remain. GDP aggregate counts are drawn from the immutable receipt: original 31/100, compiled 27/100, minus 4 percentage points, explicitly historical/unofficial and not a competitor comparison.
+
+Product presents the output World and three uses. A new canonical `/how-it-works` page presents six processing steps and the existing full-corpus version comparison; `/knowledge-compiler` remains the category guide. The new route is in navigation, sitemap, consented analytics, the language-model reading map and share-card coverage.
+
+Parent inspected actual Home, mobile film, Product, process, source-region and measurement pixels. Initial manual inspection found a legacy heading override and pale film controls; subsequent inspection found the measurement heading inherited a dark-surface color. These were fixed, and new changed-route E2E checks enforce 4.5:1 contrast, distinct process/output roles, overflow and the negative benchmark boundary. Film masters are byte-locked and unchanged (T1 illustration, examples caption); source/product screens remain T0 public-proof views, not customer qualifications.
+
+Local evidence: full unit baseline 5,901 passed with four integration failures; all four were repaired and their affected files passed 382 tests. Subsequent affected source/copy/analytics checks passed 387 tests. Repository check and production build passed. Updated film, phone controls, output/process distinction and source checks passed 84 browser tests; six existing viewport-specific cases were explicitly skipped. The 32-profile capture pass covered Home EN/KO, Product and How it works at 1920,1440,1280,1024,768,390,360 and 1440 reduced motion, without overflow/capture errors; this preceded the final measurement-heading contrast fix, so final capture/contrast receipts and exact-head hosted gates remain required before acceptance.
+
+De-slop scanner: 38 landing files, 43 candidates. Manual triage: source-page crop fade, accessible link underlines, evidence-region arrows/connector geometry and source/status labels are intentional; retired specimen/scene files and overridden eyebrow/dot rules are not active Home decoration. No new gradient atmosphere, invented metric, customer logo, badge wall or generated evidence was added. The scan is a map, not visual acceptance.
+
+No founder aesthetic approval or industry-leading performance is recorded by this report. Same-condition competitor evidence and real customer qualification remain open; this correction does not close the whole masterplan.
+
+### Full-suite integration follow-up
+
+The first hosted Product QA run on 5504484 reported 936 passed, 18 failed, 219 conditional skips and two retried passes. The failures exposed six old test contracts: the removed four-card Product grid, old How navigation URL, unscoped source disclosures, the former Product body and a continuity selector omitting the new measurement section. They now check three full-width output uses, the separate process destination, the article's own source details and every real section; touch, width, claim and scene-height limits remain unchanged. The affected local six-file scope passed 86 tests with 66 pre-existing viewport/browser condition skips.
+
+The same head failed the Home Lighthouse budget at median LCP 3088 ms (ceiling 3000), accessibility 100 and CLS zero. A native throttled trace identified the priority poster as LCP, with about 584 ms discovery delay and 2093 ms download. `HeroFilmDisclosure` now calls React's image preload from its SSR client component for the same locked poster; no asset bytes or budget changed. Its affected unit checks passed 342 tests. Final resource-hint, playback, performance and exact-head hosted receipts are required on PR146 before publication. This section records the actual failures and remediation, not an all-gates pass.
+
+The final local response carries the poster preload in its HTTP Link header, confirmed by native browser and request assertions (three width/motion checks passed). Three serial native Lighthouse 12.8.2/devtools-throttled Home runs measured LCP 2772.148, 2785.041 and 2780.453 ms: median 2780.453, performance 91, accessibility 100 and CLS zero. The budget stayed at 3000 ms. These are local production-build measurements; final hosted exact-head results and public deployment still must be verified. The HTTP header assertion replaces the mistaken assumption that Next must serialize this particular preload as a body link.

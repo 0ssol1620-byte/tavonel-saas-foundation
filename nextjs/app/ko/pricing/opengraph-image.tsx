@@ -1,5 +1,4 @@
-import { ogCard } from "@/lib/og-card";
-
-export { alt, contentType, size } from "@/lib/og-card";
-
-export default ogCard("요금과 도입", "공개 World를 확인하고, 내 자료의 도입 범위와 비용을 상담하세요.");
+// Match the existing Korean evaluation fallback: the OG renderer has no registered Korean
+// TTF/OTF. Reuse the existing English pricing card rather than rendering missing glyphs.
+// The Korean page's title, description and canonical/hreflang metadata remain localized.
+export { default, alt, contentType, size } from "../../pricing/opengraph-image";

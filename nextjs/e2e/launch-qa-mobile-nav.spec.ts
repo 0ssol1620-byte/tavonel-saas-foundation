@@ -1,8 +1,9 @@
 /**
  * The customer mobile menu, exercised in Chromium, Firefox and WebKit.
  *
- * The public header exposes Product, Explore and Developers; Pricing stays the emphasized header action.
- * Pricing is the one emphasized header action. Trust, legal and the remaining
+ * The public header exposes four section choices: Product, How it works, Resources and Docs.
+ * Pricing is the one emphasized header action. Explore and Developers stay reachable through the
+ * Home call to action, the footer and the hub. Trust, legal and the remaining
  * technical destinations stay in the footer/docs instead of becoming nested disclosures in the
  * phone menu. These tests keep the parts
  * only a browser can prove: viewport containment, 44px targets, keyboard escape/focus behaviour,
@@ -19,8 +20,9 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 const CUSTOMER_LINKS = [
   { label: "Product", href: "/product" },
-  { label: "Explore", href: "/explore" },
-  { label: "Developers", href: "/developers" },
+  { label: "How it works", href: "/how-it-works" },
+  { label: "Resources", href: "/resources" },
+  { label: "Docs", href: "/docs" },
 ] as const;
 
 async function openMenu(page: Page) {
@@ -77,8 +79,9 @@ test("the open menu keeps AA contrast and stays inside 760, 768, and 900px viewp
     expect(bounds.left, `panel left edge at ${width}px`).toBeGreaterThanOrEqual(0);
     expect(bounds.right, `panel right edge at ${width}px`).toBeLessThanOrEqual(width);
 
+    // Every customer choice plus the sheet's one Sign in link.
     const links = panel.locator("a.mobile-nav-direct, a.mobile-nav-signin");
-    await expect(links).toHaveCount(4);
+    await expect(links).toHaveCount(CUSTOMER_LINKS.length + 1);
     const measurements = await links.evaluateAll(elements => elements.map(element => {
       const style = getComputedStyle(element);
       return {
@@ -119,20 +122,19 @@ test("the mobile menu ships only the customer choices and one commercial action"
 });
 
 /*
-  The Developers entry owns the existing documentation and API routes. Explore is the public
-  sample itself; research pages remain reachable through the footer.
+  Docs owns the existing documentation and API routes as a location inside its section, not as
+  the exact page. Explore is the public sample itself and is reached from the Home action.
 */
-test("Developers owns its documentation routes", async ({ page }) => {
+test("Docs owns its documentation routes", async ({ page }) => {
   await page.goto("/docs/mcp");
   const { panel } = await openMenu(page);
   await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
-  await expect(panel.getByRole("link", { name: "Developers", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(panel.getByRole("link", { name: "Docs", exact: true })).toHaveAttribute("aria-current", "location");
   await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
   await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
 });
 
-// Explore owns an immersive stage, so current-page header markers apply to the other destinations.
-for (const item of CUSTOMER_LINKS.filter(item => item.href !== "/explore")) {
+for (const item of CUSTOMER_LINKS) {
   test(`the exact ${item.label} destination is the current page`, async ({ page }) => {
     await page.goto(item.href);
     const { panel } = await openMenu(page);
@@ -142,10 +144,9 @@ for (const item of CUSTOMER_LINKS.filter(item => item.href !== "/explore")) {
   });
 }
 
-test("Explore opens its current sample surface and exits back to the mobile menu", async ({ page }) => {
+test("Explore opens its current sample surface from Home and exits back to the mobile menu", async ({ page }) => {
   await page.goto("/");
-  const { panel } = await openMenu(page);
-  await panel.getByRole("link", { name: "Explore", exact: true }).click();
+  await page.locator('#s1 a[href="/explore"]').click();
   await expect(page).toHaveURL(/\/explore$/);
   const stage = page.locator('[data-visual-world="explore"]');
   await expect(stage).toBeVisible();
@@ -166,21 +167,32 @@ test("Explore opens its current sample surface and exits back to the mobile menu
   await expect(home.panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
 });
 
-test("Product owns its source page as a section", async ({ page }) => {
-  await page.goto("/sources");
+/*
+  Landing V2: /sources lost its owner when Integrations left the bar, and /research gained one.
+
+  The rule this was written for is unchanged -- a page the bar speaks for is marked, and the bar
+  does not grow another choice to say so. What changed is which page that is: Resources speaks for
+  the five hub pages with no item of their own, and nothing speaks for /sources, which is a footer
+  row. Marking some other item current there would tell a reader something false about where they
+  are, so the no-owner test asserts the mark is absent.
+*/
+test("Resources owns the hub pages without adding another top-level choice", async ({ page }) => {
+  await page.goto("/research");
   const { panel } = await openMenu(page);
-  await expect(panel.getByRole("link", { name: "Product", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
+  await expect(panel.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "location");
   await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-  await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
 });
 
-test("no customer choice claims a page the bar does not own", async ({ page }) => {
-  await page.goto("/contact");
-  const { panel } = await openMenu(page);
-  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
-});
+for (const path of ["/sources", "/contact"]) {
+  test(`no customer choice claims ${path}, a page the bar does not own`, async ({ page }) => {
+    await page.goto(path);
+    const { panel } = await openMenu(page);
+    await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+  });
+}
 
-test("Research stays footer-reachable without a false section owner", async ({ page }) => {
+test("Research stays footer-reachable under its Resources owner", async ({ page }) => {
   await page.goto("/");
   const researchLink = page.locator('footer.site a[href="/research"]').first();
   await researchLink.scrollIntoViewIfNeeded();
@@ -189,7 +201,8 @@ test("Research stays footer-reachable without a false section owner", async ({ p
   await expect(page).toHaveURL(new RegExp('/research$'));
 
   const { panel } = await openMenu(page);
-  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
+  await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
 });
 
 test("Escape closes the menu and returns focus to the control that opened it", async ({ page }) => {
@@ -203,15 +216,15 @@ test("Escape closes the menu and returns focus to the control that opened it", a
 test("following a customer link closes the menu", async ({ page }) => {
   await page.goto("/");
   const { panel } = await openMenu(page);
-  const developers = panel.getByRole("link", { name: "Developers", exact: true });
+  const docs = panel.getByRole("link", { name: "Docs", exact: true });
   // The destination is separately direct-entry tested by the launch route suite. Abort this one
   // navigation so the assertion measures the interaction contract itself: the disclosure closes
   // synchronously on activation, before the destination network request can complete or fail.
-  await page.route("**/developers", route => route.abort());
+  await page.route("**/docs", route => route.abort());
   // Windows WebKit's headless compositor can stall while Playwright performs a forced pointer
   // click on a native <details> descendant. dispatchEvent still sends the real DOM click that
   // React handles here, but removes the unrelated compositor/actionability bridge from this test.
-  await developers.dispatchEvent("click");
+  await docs.dispatchEvent("click");
   await expect(panel).toBeHidden();
 });
 
@@ -258,28 +271,29 @@ for (const route of PUBLIC_HEADER_ROUTES) {
   });
 }
 
-async function expectAvailabilityBelowHeader(page: Page) {
+/* The source-first Home leads with its headline; it is the first content band under the header. */
+async function expectHomeLeadBelowHeader(page: Page) {
   await expect.poll(async () => page.evaluate(() => {
-    const text = document.querySelector(".paper-availability");
+    const text = document.querySelector("h1#lv2-hero-title");
     const nav = document.querySelector("header.nav");
     if (!text || !nav) return false;
     return text.getBoundingClientRect().top >= nav.getBoundingClientRect().bottom;
   })).toBe(true);
 }
 
-test("the consent notice, header, and home availability occupy separate phone bands", async ({ page }) => {
+test("the consent notice, header, and home headline occupy separate phone bands", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
   await expect(page.locator("section[data-marketing-consent-panel]")).toBeVisible();
-  await expectAvailabilityBelowHeader(page);
+  await expectHomeLeadBelowHeader(page);
 });
 
-test("dismissing the consent notice leaves the fixed header above home availability", async ({ page }) => {
+test("dismissing the consent notice leaves the fixed header above the home headline", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
   const panel = page.locator("section[data-marketing-consent-panel]");
   await expect(panel).toBeVisible();
   await panel.locator("button").first().click();
   await expect(panel).toBeHidden();
-  await expectAvailabilityBelowHeader(page);
+  await expectHomeLeadBelowHeader(page);
 });

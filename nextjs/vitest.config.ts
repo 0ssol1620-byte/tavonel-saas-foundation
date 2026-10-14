@@ -24,6 +24,8 @@ export default defineConfig({
       "components/explore/evidence-workbench.test.tsx", "components/landing-v2/hero-source-card.test.tsx", "components/evaluation-page.test.tsx",
       "components/compile-stage-player.mobile-view.test.tsx",
       "scripts/router/*.test.mjs", "scripts/billing/*.test.mjs",
+      "components/landing-v2/hero-source-card.test.tsx",
+      "components/compile-stage-player.mobile-view.test.tsx",
     ],
   },
 });

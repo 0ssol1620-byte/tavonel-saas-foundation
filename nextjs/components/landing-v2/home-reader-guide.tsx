@@ -39,22 +39,22 @@ const COPY = {
   },
 };
 
-export default function HomeReaderGuide({ korean = false }: { korean?: boolean }) {
+export default function HomeReaderGuide({ korean = false, faqOnly = false }: { korean?: boolean; faqOnly?: boolean }) {
   const copy = COPY[korean ? "ko" : "en"];
   return (
-    <div className={styles.readerGuide} role="region" aria-labelledby="home-reader-title" data-home-reader-guide>
+    <div className={styles.readerGuide} role="region" aria-labelledby={faqOnly ? "home-faq-title" : "home-reader-title"} data-home-reader-guide>
       <div className={`lv2-wrap ${styles.readerLayout}`}>
-        <div className={styles.readerHead}>
+        {!faqOnly ? <><div className={styles.readerHead}>
           <h2 id="home-reader-title">{copy.title}</h2>
           <p>{copy.support}</p>
-          <a href="#s1" className={styles.diffLink}>{copy.back}<span aria-hidden="true">↑</span></a>
+          <a href="#s2" className={styles.diffLink}>{copy.back}<span aria-hidden="true">↑</span></a>
         </div>
         <ul className={styles.readerChecks}>
           {copy.checks.map(([title, body]) => <li key={title}><h3>{title}</h3><p>{body}</p></li>)}
-        </ul>
+        </ul></> : null}
         <div className={styles.readerFaq}>
           <h2 id="home-faq-title">{copy.faqTitle}</h2>
-          <div aria-labelledby="home-faq-title">
+          <div>
             {copy.faq.map(([question, answer]) => (
               <details key={question}>
                 <summary>{question}</summary>

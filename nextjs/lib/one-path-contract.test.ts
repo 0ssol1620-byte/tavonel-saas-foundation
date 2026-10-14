@@ -10,14 +10,19 @@ const text = (relative: string) => readFileSync(fileURLToPath(new URL(`../${rela
 
 describe("approved one-path experience", () => {
   /*
-    One shared row carries the product, inspectable public sample, developer entry and pricing.
-    Desktop and phone render the same route list, including the same sign-in destination.
+    Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five.
+
+    The order is the reader's path through the site rather than the repository's: what it is,
+    how it works, what to read, how to build, what it costs. Both chromes render the same array,
+    which is the half of this that used to be the defect -- the desktop bar and the phone sheet
+    read two different constants and made two different offers at two widths.
   */
-  it("has exactly four shared customer destinations", () => {
+  it("has exactly five shared customer destinations", () => {
     expect(CUSTOMER_NAV).toEqual([
       { href: "/product", label: "Product" },
-      { href: "/explore", label: "Explore" },
-      { href: "/developers", label: "Developers" },
+      { href: "/how-it-works", label: "How it works" },
+      { href: "/resources", label: "Resources" },
+      { href: "/docs", label: "Docs" },
       { href: "/pricing", label: "Pricing" },
     ]);
     expect(HEADER_NAV).toEqual(CUSTOMER_NAV.filter((item) => item.href !== "/pricing"));
@@ -28,28 +33,29 @@ describe("approved one-path experience", () => {
   it("does not confuse a prefix with an unrelated route", () => {
     expect(customerNavOwns("/product", "/product/document-intelligence/")).toBe(true);
     expect(customerNavOwns("/product", "/productivity")).toBe(false);
-    expect(customerNavOwns("/developers", "/docs/mcp")).toBe(true);
-    expect(customerNavOwns("/explore", "/explore")).toBe(true);
-    expect(customerNavOwns("/developers", "/docsearch")).toBe(false);
+    expect(customerNavOwns("/docs", "/docs/mcp")).toBe(true);
+    expect(customerNavOwns("/docs", "/docsearch")).toBe(false);
     expect(customerNavOwns("/pricing", "/privacy")).toBe(false);
   });
   /*
-    Product owns its related source and solution routes; Developers owns docs, API and changelog.
-    Explore owns its public sample. Research and trust remain reachable from the footer.
+    What Resources speaks for, and what nothing in the bar does.
+
+    The hub collects nine destinations; five of them have no bar item of their own, and a reader
+    on one of those five is in the Resources section whether or not the URL says so. The failure
+    path is the second half: /sources lost its owner when Integrations left the bar, and marking
+    some other item current there would tell the reader something false about where they are.
   */
-  it("marks Product and developer pages from the shared bar and leaves unrelated pages unowned", () => {
-    for (const path of ["/developers", "/docs", "/docs/mcp", "/api", "/changelog"]) {
-      expect(customerNavOwns("/developers", path), path).toBe(true);
+  it("lets Resources own the five hub pages that have no bar item, and leaves /sources unowned", () => {
+    for (const path of ["/research", "/research/notes", "/evidence", "/reproducibility", "/benchmarks", "/changelog"]) {
+      expect(customerNavOwns("/resources", path), path).toBe(true);
     }
-    for (const path of ["/sources", "/integrations", "/solutions", "/knowledge-compiler"]) {
-      expect(CUSTOMER_NAV.filter(({ href }) => customerNavOwns(href, path)).map(({ href }) => href), path)
-        .toEqual(["/product"]);
+    for (const href of CUSTOMER_NAV.map((item) => item.href)) {
+      expect(customerNavOwns(href, "/sources"), `${href} claims /sources`).toBe(false);
+      expect(customerNavOwns(href, "/integrations"), `${href} claims /integrations`).toBe(false);
     }
-    for (const path of ["/research", "/trust", "/contact", "/privacy", "/sources-extra", "/integrations-old", "/solutions-extra", "/knowledge-compiler-extra"]) {
-      expect(CUSTOMER_NAV.filter(({ href }) => customerNavOwns(href, path)), path).toEqual([]);
-    }
-    expect(customerNavOwns("/explore", "/research")).toBe(false);
-    expect(customerNavOwns("/explore", "/api")).toBe(false);
+    // /explore and /api are hub entries too, and deliberately not Resources' to claim.
+    expect(customerNavOwns("/resources", "/explore")).toBe(false);
+    expect(customerNavOwns("/resources", "/api")).toBe(false);
   });
   it.each(films.files)("preserves the approved $file bytes", ({ file, bytes, sha256 }) => {
     const data = readFileSync(fileURLToPath(new URL(`../public/film/${file}`, import.meta.url)));
@@ -57,26 +63,24 @@ describe("approved one-path experience", () => {
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
   /*
-    The hero opens source first: a short statement and its actions over one full-width workbench
-    (source -> highlighted passage -> record). Scene 02 says why that passage is hard and keeps
-    the optional film behind a closed disclosure; the record, change, trust and action beats
-    follow. The CompilerSpecimen, HeroProof and ProofScene of the retired layout are not composed.
-    The order below is read as positions so this contract keeps the first-visit sequence explicit.
+    The film opens under the centered hero message. Scene 02 follows with the source-linked
+    CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
+    this contract keeps the buyer's first-visit sequence explicit.
   */
-  it("orders the landing as source workbench, difficulty and optional film, record, change, trust and action", () => {
+  it("orders the landing as visible film, source, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    for (const gone of ["<CompilerSpecimen", "<HeroProof", "<ProofScene"]) {
-      expect(page, `${gone} belongs to the retired layout`).not.toContain(gone);
-    }
+    expect(page).toContain("<SourceInspectionFilm");
+    expect(page).toContain("<HeroSourceCard");
+    expect(page).not.toContain("<CompilerSpecimen");
+    expect(page).not.toContain("<HeroProof");
     const order = [
       'id="s1"',
       "<HeroStatement",
+      "<SourceInspectionFilm",
       "<HeroActions",
-      "<HeroSourceCard",
       'id="s2"',
-      'id="lv2-difficulty-title"',
-      "<HeroFilm",
+      "<HeroSourceCard",
       'id="s3"',
       "<RecompileScene",
       "<TrustScene",
@@ -84,15 +88,8 @@ describe("approved one-path experience", () => {
     ].map(token => page.indexOf(token));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
     const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
-    expect(hero, "the film is not in the hero any more").not.toContain("<HeroFilm");
-    /*
-      Full width: the workbench is the hero layout's own item after the closed intro block, not a
-      column beside the statement, and the layout grid sets no columns of its own.
-    */
-    const intro = hero.slice(hero.indexOf("<div className={heroStyles.intro}>"), hero.indexOf("<HeroSourceCard"));
-    expect(hero.indexOf("<div className={heroStyles.intro}>"), "the hero's intro block").toBeGreaterThan(-1);
-    expect(intro, "the statement and its actions lead the hero").toContain("<HeroActions");
-    expect(intro.match(/<div\b/g)?.length, "the intro block closes before the workbench").toBe(intro.match(/<\/div>/g)?.length);
+    expect(hero, "the legacy walkthrough film is not in the hero").not.toContain("<HeroFilm");
+    /* The hero layout grid sets no columns of its own. */
     const css = text("components/landing-v2/landing-hero.module.css");
     const layout = css.slice(css.indexOf("section.hero .layout {"), css.indexOf("}", css.indexOf("section.hero .layout {")));
     expect(layout).toContain("display: grid");
@@ -111,27 +108,14 @@ describe("approved one-path experience", () => {
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
     expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
-    expect(film).toContain("<HeroFilmDisclosure");
-    /*
-      The source raster is the hero's paint now. The film sits closed in scene 02: its player is
-      not mounted until the disclosure opens, and its poster may not take the eager image slot.
-    */
     const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
-    expect(disclosure).toContain('"use client"');
-    const details = disclosure.slice(disclosure.indexOf("<details"), disclosure.indexOf("<summary"));
-    expect(details, "the disclosure has a native <details>").not.toBe("");
-    expect(details, "the disclosure is closed on load").not.toMatch(/\sopen[\s={]/);
-    expect(disclosure).toContain("useState(false)");
-    expect(disclosure, "the player mounts only once the disclosure is open")
-      .toMatch(/\{open \? \([\s\S]*<CompileStagePlayer[\s\S]*\) : null\}/);
-    expect(disclosure).toMatch(/<CompileStagePlayer[^>]*preferVideo/);
-    for (const source of [film, disclosure]) {
-      expect(source, "the closed film does not prioritize its poster").not.toMatch(/<CompileStagePlayer[^>]*priorityPoster/);
-    }
-    /* The landing asks for the whole frame explicitly; a caller that omits the view also gets "fit". */
-    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
-    expect(disclosure).toMatch(/<CompileStagePlayer[^>]*initialMobileFilmView=\{LANDING_MOBILE_FILM_VIEW\}/);
-    expect(text("components/compile-stage-player.tsx")).toContain('initialMobileFilmView = "fit"');
+    expect(film).toContain("<HeroFilmDisclosure");
+    expect(disclosure).toContain('data-testid="landing-hero-film"');
+    expect(disclosure).not.toContain("{open ? (");
+    expect(disclosure).toContain("<CompileStagePlayer");
+    expect(disclosure).toContain("preferVideo");
+    expect(disclosure).toContain("priorityPoster");
+    expect(disclosure).toContain("Illustrative product walkthrough");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");
@@ -140,23 +124,28 @@ describe("approved one-path experience", () => {
   });
 
   /*
-    `hero_demo_interact` is delegated by selector, so moving the film out of the hero silently
-    stops counting its controls unless the selector moves with it. The film is the one demo left
-    on Home, in scene 02; the workbench's region buttons are reading, not a demo, and stay uncounted.
+    `hero_demo_interact` is delegated by selector, so moving the film silently stops counting its
+    controls unless the selector moves with it. The source-inspection film in scene 01 is the
+    demo on Home, and its explicit play control must stay inside the counted selector.
   */
-  it("counts demo engagement on the scene-two film controls", () => {
+  it("counts demo engagement on the scene-one source-inspection film controls", () => {
     const analytics = text("components/landing-v2/landing-analytics.tsx");
     const onDemo = analytics.slice(analytics.indexOf("const onDemo"), analytics.indexOf('main.addEventListener("click"'));
     expect(onDemo, "the demo listener").not.toBe("");
     expect(onDemo).toContain('trackFunnelOnce("hero_demo_interact", arm)');
     const selector = onDemo.match(/target\.closest\("([^"]+)"\)/)?.[1] ?? "";
     const parts = selector.split(",").map(part => part.trim());
-    expect(parts, "the film's controls, where the film now is").toContain("#s2 .compile-film-sequence button");
-    expect(selector, "the film is not in the hero any more").not.toMatch(/#s1\b/);
+    expect(parts, "the film's controls, where the film now is").toContain("#s1 [data-source-inspection-film] button");
+    expect(parts, "decision A preserves prepared source UI engagement")
+      .toContain("#s2 [data-source-digest] button[aria-pressed][aria-controls]");
+    expect(onDemo, "the engagement hook adds no action or document payload")
+      .toMatch(/trackFunnelOnce\("hero_demo_interact", arm\);/);
+    expect(onDemo).not.toMatch(/source_open|digest:|regionId:|documentId:/);
     const page = text("components/landing-v2/landing-page.tsx");
-    const sceneTwo = page.slice(page.indexOf('id="s2"'), page.indexOf('id="s3"'));
-    expect(page.indexOf('id="s3"')).toBeGreaterThan(page.indexOf('id="s2"'));
-    expect(sceneTwo).toContain("<HeroFilm");
+    const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
+    expect(page.indexOf('id="s2"')).toBeGreaterThan(page.indexOf('id="s1"'));
+    expect(hero).toContain("<SourceInspectionFilm");
+    expect(text("components/landing-v2/source-inspection-film.tsx")).toContain("data-source-inspection-film");
     expect(text("components/compile-stage-player.tsx")).toContain('className="compile-film-sequence');
   });
 
@@ -267,11 +256,13 @@ describe("approved one-path experience", () => {
       rather than writing a third, and /ko renders the same composition with the Korean copy.
     */
     const composition = text("components/landing-v2/landing-page.tsx");
+    expect(composition, "the evaluation action names the actual bilingual destination")
+      .toContain('korean ? "/ko/evaluation" : "/evaluation"');
+    expect(composition).toContain("startHref={heroStart.href}");
+    expect(composition).toContain("const startActions");
     expect(text("components/landing-v2/scenes/start.tsx"), "the pricing link remains in the Korean journey")
       .toContain('"/ko/pricing"');
     expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref');
-    expect(composition, "the hero's access action is the one resolved above, not a fixed /pricing")
-      .toContain("startHref={heroStart.href}");
     expect(composition).not.toContain("pricingHref");
     expect(composition, "the close keeps the resolved access actions").toContain("actions={startActions}");
     const korean = text("app/ko/page.tsx");

@@ -61,7 +61,7 @@ describe("the Home workbench -- status truthfulness", () => {
     const text = readable(render(homeCase()));
     expect(text).toContain("Published claims");
     expect(text).toContain("None. A verified claim needs every region it rests on, its period and unit cited, and a qualified run.");
-    expect(text).toContain("Context required.");
+    expect(text).toContain("Context required:");
   });
 });
 
@@ -90,7 +90,7 @@ describe("the Home workbench -- source and passage", () => {
     expect(quotes[0]![2]).toBe(escaped(selected.passage!));
   });
 
-  it("makes the source page the hero's prioritized paint, with every region boxed at its bbox", () => {
+  it("loads the below-film source page lazily, with every region boxed at its bbox", () => {
     const value = homeCase();
     const image = value.pages[0]!.image!;
     const html = render(value);
@@ -99,8 +99,8 @@ describe("the Home workbench -- source and passage", () => {
     expect(images[0]).toContain(`src="${escaped(image.src)}"`);
     expect(images[0]).toContain(`width="${image.width}"`);
     expect(images[0]).toContain(`height="${image.height}"`);
-    expect(images[0]).toMatch(/\sfetchpriority="high"/i);
-    expect(images[0]).toMatch(/\sloading="eager"/);
+    expect(images[0]).toMatch(/\sfetchpriority="auto"/i);
+    expect(images[0]).toMatch(/\sloading="lazy"/);
     expect(images[0]).toMatch(/\sdecoding="async"/);
     expect(attr(images[0]!, "alt")).toBeTruthy();
     expect(attr(images[0]!, "alt")).not.toMatch(/\d/);
@@ -185,10 +185,12 @@ describe("the Home workbench -- source and passage", () => {
     // The filing's form, date and provenance prose live here, off the line above the page.
     expect(inside).toContain(`${value.sources[0]!.form} · ${value.sources[0]!.filingDate}`);
     expect(inside).toContain("The original HTML filing, as submitted.");
-    // Outside the disclosure the version is the short form only.
+    // Version identifiers stay in the disclosure; the summary states the claim boundary.
     const outside = readable(html.replace(details![0], ""));
     expect(outside).not.toContain(value.sources[0]!.digest);
-    expect(outside).toContain(value.sources[0]!.digest.slice(0, 15));
+    expect(outside).not.toContain(value.sources[0]!.digest.slice(0, 15));
+    expect(inside).toContain("Published claims");
+    expect(outside).toContain("Interpretation has not run.");
     expect(outside).not.toContain("original HTML");
   });
 });
@@ -223,10 +225,13 @@ describe("the Home workbench -- region selection", () => {
       expect(attr(link, "href")).toBe(escaped(region.href!));
       const pressed = buttonsOf(html).filter(([, open]) => attr(open!, "aria-pressed") === "true");
       expect(pressed).toHaveLength(1);
-      expect(readable(pressed[0]![2]!)).toContain(region.bbox1000.join(","));
+      expect(attr(pressed[0]![1]!, "aria-label")).toContain(region.bbox1000.join(","));
+      expect(readable(pressed[0]![2]!)).toContain(`Page ${region.page}`);
+      const details = html.match(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/)?.[1] ?? "";
+      expect(readable(details)).toContain(region.bbox1000.join(","));
       const box = html.match(/<span\s[^>]*data-selected="1"[^>]*>/)?.[0] ?? "";
       expect(attr(box, "data-region-id")).toBe(escaped(region.id));
-      const note = region.role === "selected" ? "Context required." : "Shown as printed, for context.";
+      const note = region.role === "selected" ? "Context required:" : "Shown as printed, for context.";
       expect(readable(html)).toContain(note);
     }
   });

@@ -1,3 +1,5 @@
+@layer reset, tokens, base, components, utilities, overrides;
+
 /*
   The rules the shared chrome needs that `app/tavonel.css` cannot give it.
 
@@ -46,6 +48,66 @@
 */
 .header.header {
   flex-wrap: nowrap;
+}
+
+@layer overrides {
+  .header .pricingLink {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-height: 44px !important;
+    padding-inline: 8px !important;
+    background: transparent !important;
+    border: 0 !important;
+    font-weight: 560 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+  }
+  :global(.page:not(.lv2)):has(> .header) {
+    --ground: #fbfaf7;
+    --g1: #f2f0eb;
+    --g2: #ffffff;
+    --g3: #ece9e2;
+    --seam: #d8d5ce;
+    --hairline: rgb(21 25 29 / 0.12);
+    --hairline-hi: #c6c3bc;
+    --text-hi: #15191d;
+    --text-max: #292f35;
+    --text-mid: #424951;
+    --text-lo: #555b62;
+    --verified: #1a6d51;
+    --verified-dim: #278366;
+    --verified-deep: #dcece4;
+    --source: #2347b8;
+    --relation: #5f42a1;
+    --changed: #8c5217;
+    --changed-deep: #f5e9d4;
+    --unresolved: #a72d23;
+    --f-sans: "Wanted Sans Variable", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    color-scheme: light !important;
+    color: var(--text-hi) !important;
+    background: var(--ground) !important;
+    min-height: 100vh;
+    font-family: var(--f-sans) !important;
+  }
+  .header.header {
+    --text-hi: #15191d;
+    --text-mid: #424951;
+    --text-lo: #555b62;
+    --g1: #ffffff;
+    --g2: #f2f0eb;
+    --ground: #fbfaf7;
+    --verified: #2347b8;
+    background: #fbfaf7 !important;
+    color: #15191d !important;
+    border-bottom-color: rgb(21 25 29 / 0.12) !important;
+    font-family: "Wanted Sans Variable", "Malgun Gothic", sans-serif !important;
+  }
+  .header.header :global(.wordmark), .header.header :global(.wordmark) :is(b, svg) { color: #15191d !important; }
+  .header.header :global(details > summary) {
+    background: #ffffff !important;
+    color: #15191d !important;
+    border-color: #c6c3bc !important;
+  }
 }
 .wordmark.wordmark {
   flex: 0 0 auto;

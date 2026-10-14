@@ -4,6 +4,33 @@ const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/te
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
+test("decision A counts prepared source UI engagement once without source or action identifiers", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & { __preparedEngagement: Record<string, unknown>[] };
+    target.__preparedEngagement = [];
+    window.addEventListener("tavonel:funnel", (event) => {
+      target.__preparedEngagement.push((event as CustomEvent).detail);
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "No thanks", exact: true }).click();
+  const regions = page.locator("#s2 button[aria-pressed][aria-controls]");
+  await expect(regions).toHaveCount(3);
+  await regions.nth(1).click();
+  await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await regions.nth(2).click();
+  await expect(regions.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#s1 [data-source-inspection-film] button").click();
+  await expect(page.locator("#s1 [data-source-inspection-film] video")).toHaveCount(1);
+  const events = await page.evaluate(() =>
+    (window as Window & { __preparedEngagement: Record<string, unknown>[] }).__preparedEngagement,
+  );
+  const engagement = events.filter((event) => event.event === "hero_demo_interact");
+  expect(engagement).toHaveLength(1);
+  expect(Object.keys(engagement[0]).filter((key) => !["event", "variant"].includes(key))).toEqual([]);
+  expect(events.filter((event) => event.event === "source_open")).toEqual([]);
+});
+
 test("analytics remains optional, persists refusal, and fits the viewport", async ({ page }, testInfo) => {
   const googleRequests: string[] = [];
   page.on("request", request => {
@@ -48,7 +75,7 @@ test("the consent notice never covers homepage or pricing actions at 1440 and 39
     expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(headerBox!.y + 1);
 
     const target = route === "/"
-      ? page.getByRole("link", { name: "Open the public sample", exact: true }).first()
+      ? page.locator('#s1 a[href="/explore"]')
       : page.locator(".plan-action a").first();
     await expect(target).toBeVisible();
     const targetBox = await target.boundingBox();

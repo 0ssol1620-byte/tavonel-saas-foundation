@@ -63,7 +63,7 @@ const QUARTILES: ReadonlyArray<[number, FunnelEvent]> = [
  */
 function sourceFrom(element: Element): string {
   const scene = element.closest("section[data-scene]")?.id;
-  if (scene === "hero") return "hero";
+  if (scene === "hero" || scene === "s1") return "hero";
   return scene === "evidence" ? "inspector" : "proof";
 }
 
@@ -128,12 +128,18 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     /*
       `hero_demo_interact` -- once per page session, whichever way the reader touched the demo.
 
+      Integration decision A (2026-10-14) preserves production main304: prepared source-region
+      controls and the source-inspection recording both count as UI engagement. PR141983 counted
+      the narrower compile-demo controls, so the populations are not directly comparable. This
+      event does not establish selection success, document processing, activation or customer
+      value. Keep source_open and CTA actions separate; add no source identifiers or new payload.
+
       RETARGETED 2026-09-20 with the founder's centered hero, and again with the source-first
-      hero. The hero now opens on the committed source workbench, and the demonstration sits in
-      scene 02: the optional four-cut walkthrough film's stage tabs and motion control. The film's
-      controls exist only once its closed disclosure is opened, so a reader who never opens it
-      cannot fire the event through it. The `[data-compiler-specimen]` arm still counts the
-      specimen's controls if it is mounted in scene 02; Home does not mount it. The event keeps its
+      Home. The source-inspection recording sits directly under the headline in scene 01 and its
+      play control counts; the source workbench in scene 02 counts through its region buttons. The
+      film-sequence arms remain for any compile film mounted in scene 01 or 02. The
+      `[data-compiler-specimen]` arm still counts the specimen's controls if it is mounted in
+      scene 02; Home does not mount it. The event keeps its
       name and its meaning -- "this reader did something with the compile demo instead of
       scrolling past it" -- because renaming it would have broken the one funnel column that
       measures that engagement, for a change that did not change what is being counted.
@@ -145,7 +151,7 @@ export default function LandingAnalytics({ variant }: { variant?: LandingVariant
     const onDemo = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest("#s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button")) {
+      if (target.closest("#s1 [data-source-inspection-film] button, #s1 .compile-film-sequence button, #s2 .compile-film-sequence button, #s2 [data-compiler-specimen] button, #s2 [data-source-digest] button[aria-pressed][aria-controls]")) {
         trackFunnelOnce("hero_demo_interact", arm);
       }
     };

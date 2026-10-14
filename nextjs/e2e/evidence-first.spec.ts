@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+const BENCH = "section#s2 article[data-case-status]";
 
 /*
   What the landing offers as evidence, after the founder's 2026-09-20 hero decision.
@@ -25,7 +26,7 @@ import { expect, test } from "@playwright/test";
 
 test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("Evidence you can inspect.");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("Connected knowledge.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   await expect(page.locator("[data-source-sheet]")).toHaveCount(0);
 
@@ -33,25 +34,26 @@ test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
     The evidence the page does offer: a real page render with the region the compiler stored drawn
     on it, and the passage read from that region, in the scene under the hero.
   */
-  const raster = page.locator("section#s3 img.lv2-page-img");
+  const raster = page.locator(`${BENCH} img`);
   expect(await raster.count(), "the proof scene renders no source page").toBeGreaterThan(0);
   await expect(raster.first()).toHaveAttribute("alt", /\S/);
-  expect(await page.locator("section#s3 .lv2-region").count(), "no region is drawn on it")
+  expect(await page.locator(`${BENCH} [data-region-id]`).count(), "no region is drawn on it")
     .toBeGreaterThan(0);
-  await expect(page.locator('section#s3 a[href^="/explore?act=evidence&evidence="]').first())
+  await expect(page.locator(`${BENCH} [data-hero-evidence]`))
     .toBeVisible();
   /*
     The film opens in Scene 01; the source-linked specimen and Evidence Inspector follow in
     Scene 02. Nothing is a fabricated result, and each Explore link resolves to its source.
   */
-  await expect(page.locator("section#s2 .lv2-hero-inspector")).toHaveCount(1);
-  await expect(page.locator("section#s2 .lv2-hero-stats a")).toHaveCount(4);
+  await expect(page.locator(`${BENCH} button[aria-pressed]`)).toHaveCount(3);
+  await expect(page.locator(`${BENCH} details`)).not.toHaveAttribute("open");
+  await expect(page.locator(BENCH)).toContainText("processing not yet run");
   await expect(page.locator("section#s1 canvas")).toHaveCount(0);
-  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(0);
-  await expect(page.locator("section#s1 .paper-source").locator("blockquote")).not.toBeEmpty();
-  await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(0);
+  await expect(page.locator("section#s1 [data-source-inspection-film]")).toHaveCount(1);
+  await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
   await expect(page.locator("section#s2 .lv2-film-note")).toHaveCount(0);
-  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(1);
+  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
+  await expect(page.getByTestId("landing-hero-film")).toBeVisible();
 });
 
 test("every /explore link on the landing opens a route that resolves", async ({ page, request }) => {
@@ -75,7 +77,7 @@ test("the hero and every scene below it fit the viewport at the active product-Q
 
   const hero = page.locator("section#s1");
   const title = page.locator("h1#lv2-hero-title");
-  const demo = page.locator("section#s2 [data-compiler-specimen]");
+  const demo = page.locator(BENCH);
   await expect(hero).toBeVisible();
   await expect(title).toBeVisible();
   await expect(demo).toBeVisible();
@@ -98,18 +100,18 @@ test("the hero and every scene below it fit the viewport at the active product-Q
 
 test("Korean visitors get the same story and the same route behind it", async ({ page }) => {
   await page.goto("/ko");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("원문에서 확인하세요");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("연결된 지식.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   // The same six scenes, and the same real source page behind the same claim.
   await expect(page.locator("main > section[data-scene]")).toHaveCount(6);
-  expect(await page.locator("section#s3 img.lv2-page-img").count()).toBeGreaterThan(0);
-  await expect(page.locator('section#s3 a[href^="/explore?act=evidence&evidence="]').first())
+  expect(await page.locator(`${BENCH} img`).count()).toBeGreaterThan(0);
+  await expect(page.locator(`${BENCH} [data-hero-evidence]`))
     .toBeVisible();
-  await expect(page.locator("section#s2 .lv2-hero-inspector")).toHaveCount(1);
-  await expect(page.locator("section#s1 .compile-film-sequence")).toHaveCount(0);
-  await expect(page.locator("section#s1 .paper-source").locator("blockquote")).not.toBeEmpty();
-  await expect(page.locator("section#s2 .compile-film-sequence")).toHaveCount(0);
-  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "공개 샘플 열기" }).first()).toHaveAttribute("href", "/explore");
+  await expect(page.locator(`${BENCH} button[aria-pressed]`)).toHaveCount(3);
+  await expect(page.locator("section#s1 [data-source-inspection-film]")).toHaveCount(1);
+  await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
+  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
+  await expect(page.getByTestId("landing-hero-film")).toBeVisible();
+  await expect(page.locator('#s1').getByRole("link", { name: "공개 샘플 살펴보기" })).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

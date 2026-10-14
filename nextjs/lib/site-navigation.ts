@@ -19,14 +19,24 @@
 export type SiteLink = { href: string; label: string };
 
 /*
-  Customer entry points. Keep the four first questions visible: what it is, what the public sample
-  shows, where developers can start, and what access costs. All destinations already exist; the
-  navigation names routes without creating a new page hierarchy.
+  Customer entry points. Technical and trust destinations remain in the footer and docs.
+
+  Landing V2, 2026-09-19 (blueprint §8, contract D2). Three became five, and the bar is the
+  reader's map of the site rather than the three destinations a pilot visitor was steered to.
+
+  "How it works" owns /how-it-works: the source-to-World process. /product presents the
+  resulting World and its uses. The deeper category guide remains at /knowledge-compiler.
+
+  Integrations leaves the bar. It is one Product-group destination among several and it was
+  holding a top-level slot while Docs and Resources -- the two things an evaluating engineer looks
+  for first -- had none. It is still a footer row, still linked from /sources, and its URL has not
+  moved.
 */
 export const CUSTOMER_NAV: readonly SiteLink[] = [
   { href: "/product", label: "Product" },
-  { href: "/explore", label: "Explore" },
-  { href: "/developers", label: "Developers" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/resources", label: "Resources" },
+  { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
 ] as const;
 
@@ -34,13 +44,23 @@ export const CUSTOMER_NAV: readonly SiteLink[] = [
 export const HEADER_NAV: readonly SiteLink[] = CUSTOMER_NAV.filter((link) => link.href !== "/pricing");
 
 /*
-  A bar item also owns the pages nested under its section. Product carries its use cases and
-  source routes; Developers carries its documentation, API reference, changelog and cookbooks.
-  Research and trust routes stay in the footer directory.
+  The routes a bar item speaks for that do not sit underneath it.
+
+  /sources used to be here, under Integrations, and it is deliberately not reassigned: no item in
+  the five-link bar is the section /sources belongs to, so marking one of them current while a
+  reader is on that page would tell them something false about where they are. It stays reachable
+  from the footer's Product group and from /integrations itself.
+
+  Resources owns the five pages its hub collects that have no bar item of their own. /explore,
+  /docs, /api and /knowledge-compiler are excluded on purpose: two of them are bar items in their
+  own right (Docs owns /docs and everything under it), /explore is the product, and /api is a
+  Developers page the bar does not carry.
+
+  `customerNavCurrent` (PR141) separates the exact page from a location inside a section, so the
+  header marks `aria-current="page"` only on the item's own URL.
 */
 const NAV_ALSO_OWNS: Readonly<Record<string, readonly string[]>> = {
-  "/product": ["/solutions", "/sources", "/integrations", "/knowledge-compiler"],
-  "/developers": ["/docs", "/api", "/changelog", "/cookbooks"],
+  "/resources": ["/research", "/evidence", "/reproducibility", "/benchmarks", "/changelog"],
 };
 
 export function customerNavCurrent(href: string, pathname: string): "page" | "location" | undefined {
@@ -129,8 +149,9 @@ export const KO_CHROME = {
   /* Labels follow the same hrefs as the English primary navigation. */
   nav: {
     "/product": "제품",
-    "/explore": "둘러보기",
-    "/developers": "개발자",
+    "/how-it-works": "작동 방식",
+    "/resources": "자료",
+    "/docs": "문서",
     "/pricing": "요금",
   } as Record<string, string>,
   menu: "메뉴",

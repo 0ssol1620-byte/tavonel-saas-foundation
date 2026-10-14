@@ -4,8 +4,8 @@
  * Everything here is a geometric or compositional fact that no unit test can see:
  * `lib/one-path-contract.test.ts` knows the bar declares four destinations, and
  * `lib/site-nav-model.test.ts` knows each one is a published route with a Korean label, but
- * neither can tell whether the bar is 64px tall, whether its paper ground stays legible as the reader
- * scrolls, whether the access action is the only filled control in it, or whether three section labels
+ * neither can tell whether the bar is 64px tall, whether its surface stays readable before the reader
+ * scrolls, whether the access action is the only filled control in it, or whether five labels
  * plus an action plus a sign-in link still fit inside 1440.
  *
  * The header is site-wide, so these run against `/product` as well as `/` -- the landing is the
@@ -19,11 +19,12 @@
 
 import { test, expect, type Page } from "@playwright/test";
 
-/** Three section links; Pricing is the separate emphasized header control. */
+/** The four section links; Pricing is the separate emphasized header control. */
 const CUSTOMER_NAV = [
   { href: "/product", label: "Product" },
-  { href: "/explore", label: "Explore" },
-  { href: "/developers", label: "Developers" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/resources", label: "Resources" },
+  { href: "/docs", label: "Docs" },
 ] as const;
 
 const HEADER = "header.nav";
@@ -44,7 +45,7 @@ test.describe("at 1440", () => {
     test.skip(testInfo.project.name !== "1440", "the desktop bar is measured at the width it is drawn for");
   });
 
-  test("is a 64px bar carrying the three section destinations in order", async ({ page }) => {
+  test("is a 64px bar carrying the four section destinations in order", async ({ page }) => {
     await page.goto("/product");
     const box = await page.locator(HEADER).boundingBox();
     expect(box, "the header has no box").not.toBeNull();
@@ -58,7 +59,7 @@ test.describe("at 1440", () => {
   });
 
   /*
-    §8: Request access only is a filled CTA, Sign in is text.
+    Pricing and Sign in are ordinary navigation; the page owns its primary action.
 
     "Filled" is measured as a painted background rather than as a class name, because the class is
     the implementation and the rule is about what a reader sees: two filled controls in one row is
@@ -66,12 +67,12 @@ test.describe("at 1440", () => {
     button fails the class assertion and passes this one, which is the right split -- the class is
     the contract other lanes read, the paint is the design rule.
   */
-  test("gives the bar exactly one filled control, and it is the access action", async ({ page }) => {
+  test("keeps Pricing and Sign in readable without competing with the hero action", async ({ page }) => {
     await page.goto("/product");
-    const action = page.locator(`${HEADER} .nav-actions .btn`);
+    const action = page.locator(`${HEADER} .nav-actions a[href="/pricing"]`);
     await expect(action).toHaveCount(1);
-    await expect(action).toHaveClass(/\bbtn\b/);
-    await expect(action).not.toHaveClass(/\bghost\b/);
+    await expect(action).toHaveText("Pricing");
+    await expect(action).toBeVisible();
     await expect(action).toHaveAttribute("href", "/pricing");
 
     const filled = await page.locator(`${HEADER} a, ${HEADER} button`).evaluateAll((elements) =>
@@ -95,7 +96,7 @@ test.describe("at 1440", () => {
         })
         .map((element) => (element.textContent ?? "").trim().slice(0, 24)),
     );
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toHaveLength(1);
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toHaveLength(0);
 
     const signIn = page.locator(`${HEADER} .nav-signin`);
     await expect(signIn).toHaveAttribute("href", "/login");
@@ -119,26 +120,34 @@ test.describe("at 1440", () => {
   });
 
   /*
-    Paper at the top and after 40px. The scroll threshold is asserted from both sides:
+    The paper surface stays opaque. The scroll threshold is asserted from both sides:
     a listener that fires but reads the wrong number is the failure mode worth catching, and an
     attribute that is simply always "1" passes a one-sided check.
   */
-  test("keeps its paper ground while scroll state changes after 40px", async ({ page }) => {
+  test("keeps its readable surface while tracking both sides of the scroll threshold", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
-    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    const background = () => header.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(await background(), "the initial bar has its readable paper surface").toBe("rgb(251, 250, 247)");
 
     await page.evaluate(() => window.scrollTo(0, 20));
     await expect(header).toHaveAttribute("data-scrolled", "0");
 
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
-    // Scroll state changes the context, while the published paper ground remains constant.
-    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    /*
+      `toHaveCSS` retries; a bare read does not.
+
+      The paper surface remains stable while the scroll state changes; a single sample taken the
+      instant the attribute flips reads whatever alpha the interpolation is at -- 0.75, then 0.76
+      on the retry, then 0.77. The threshold and the toggle were never the flake; the stopwatch
+      was. This waits for the transition to land on the declared value instead.
+    */
+    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(header).toHaveAttribute("data-scrolled", "0");
-    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
   });
 
   /*
@@ -183,11 +192,11 @@ test.describe("at 390", () => {
     test.skip(testInfo.project.name !== "390", "the phone sheet is measured at a phone width");
   });
 
-  test("opens a sheet of three section destinations plus Sign in, with the action still in the row", async ({ page }) => {
+  test("opens a sheet of four section destinations plus Sign in, with the action still in the row", async ({ page }) => {
     await page.goto("/product");
     // The action is reachable without opening anything: §29's commercial CTA may not be behind a
     // disclosure, which is the whole reason the sheet does not carry a second copy of it.
-    await expect(page.locator(`${HEADER} .nav-actions .btn`)).toBeVisible();
+    await expect(page.locator(`${HEADER} .nav-actions a[href="/pricing"]`)).toBeVisible();
 
     await page.locator(`${SHEET} > summary`).click();
     const panel = page.locator(`${SHEET} > nav`);
@@ -231,13 +240,13 @@ test.describe("at 390", () => {
     expect(short, `chrome controls under 44px or outside the viewport: ${JSON.stringify(short)}`).toEqual([]);
   });
 
-  test("keeps its paper ground after 40px of scroll on a phone too", async ({ page }) => {
+  test("keeps its readable surface after 40px of scroll on a phone too", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     await page.evaluate(() => window.scrollTo(0, 80));
     await expect(header).toHaveAttribute("data-scrolled", "1");
-    // The same paper ground remains legible on the phone after scrolling.
-    await expect(header).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    // The phone shares the same stable paper surface as the desktop.
+    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
   });
 
   test("does not scroll sideways with the sheet open", async ({ page }) => {

@@ -1,3 +1,5 @@
+@layer reset, tokens, base, components, utilities, overrides;
+
 /*
   The first surface every visitor sees, and it was the least considered one (BA-231, BA-234).
 
@@ -29,6 +31,19 @@
 .panel, .settings {
   color: var(--text-hi);
   font: inherit;
+}
+
+@layer overrides {
+  .panel {
+    --text-hi: #15191d !important;
+    --text-lo: #555b62 !important;
+    --g1: #f2f0eb !important;
+    --g2: #ffffff !important;
+    --hairline-hi: rgb(21 25 29 / 0.22) !important;
+    color: #15191d !important;
+  }
+  .panel p a { color: #2347b8 !important; }
+  .panel .actions button { font-weight: 510 !important; }
 }
 
 .panel {

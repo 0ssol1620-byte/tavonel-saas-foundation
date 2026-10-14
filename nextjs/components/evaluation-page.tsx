@@ -3,9 +3,10 @@ import ContactForm from "@/components/contact-form";
 import { PublicSiteHeader, PublicSiteFooter } from "@/components/public-site-chrome";
 import { activationPolicy } from "@/lib/activation-policy";
 import { KO_CHROME } from "@/lib/site-navigation";
+import styles from "./evaluation-page.module.css";
 
 export default function EvaluationPage({ korean = false }: { korean?: boolean }) {
-  return <div className="page paper-product evaluation-page" lang={korean ? "ko" : "en"}>
+  return <div className={`page evaluation-page ${styles.page}`} lang={korean ? "ko" : "en"}>
     <PublicSiteHeader korean={korean} />
     <main id="main" className="evaluation-shell">
       <section className="evaluation-intro">
@@ -37,6 +38,6 @@ export default function EvaluationPage({ korean = false }: { korean?: boolean })
         </section>
       </div>
     </main>
-    <PublicSiteFooter korean={korean} />
+    <PublicSiteFooter korean={korean} languageHref={korean ? "/evaluation" : "/ko/evaluation"} />
   </div>;
 }

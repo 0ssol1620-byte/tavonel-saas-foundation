@@ -2,9 +2,9 @@ import { test, expect } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
 import { EXPLORE_CTA } from "../lib/site-navigation";
 
-test("filled navigation and hero actions keep readable labels", async ({ page }) => {
+test("navigation and hero actions keep readable labels", async ({ page }) => {
   await page.goto("/");
-  for (const selector of ['header.nav a.btn', '[data-analytics="hero-primary"]']) {
+  for (const selector of ['header.nav .nav-actions a[href="/pricing"]', '[data-analytics="hero-primary"]']) {
     const contrast = await page.locator(selector).first().evaluate(element => {
       const style = getComputedStyle(element);
       const channels = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
@@ -16,7 +16,18 @@ test("filled navigation and hero actions keep readable labels", async ({ page })
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       };
       const foreground = luminance(style.color);
-      const background = luminance(style.backgroundColor);
+      let ancestor: Element | null = element;
+      let ground = "rgb(255, 255, 255)";
+      while (ancestor) {
+        const value = getComputedStyle(ancestor).backgroundColor;
+        const rgba = value.match(/[\d.]+/g)?.map(Number) ?? [];
+        if (rgba.length === 3 || (rgba.length === 4 && rgba[3]! >= 0.99)) {
+          ground = value;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      const background = luminance(ground);
       return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
     });
     expect(contrast, `${selector} label contrast`).toBeGreaterThanOrEqual(4.5);
@@ -28,26 +39,30 @@ test("filled navigation and hero actions keep readable labels", async ({ page })
   source-linked explanation in Scene 02 keep the wordmark's measured outer edge.
 */
 for (const path of ["/", "/ko"]) {
-  test(`${path} shares a measured outer edge and gives source evidence a readable width`, async ({ page }) => {
+  test(`${path} shares a measured outer edge and keeps the opened walkthrough inside it`, async ({ page }) => {
     await page.goto(path);
     const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
     const filmWrap = await page.locator("#s2 .lv2-wrap").boundingBox();
     const mark = await page.locator("header .wordmark").boundingBox();
-    const film = await page.locator("#s1 .paper-source").boundingBox();
-    expect(wrap && filmWrap && mark && film).toBeTruthy();
+    const bench = await page.locator("#s2 article[data-case-status]").boundingBox();
+    expect(wrap && filmWrap && mark && bench).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(filmWrap!.x - mark!.x)).toBeLessThanOrEqual(1);
-    const viewportWidth = page.viewportSize()!.width;
-    // The source and copy share two desktop columns; narrow screens stack full-width evidence.
-    expect(film!.width).toBeGreaterThanOrEqual(wrap!.width * (viewportWidth >= 1024 ? 0.5 : 1) - 2);
-    expect(film!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
-    expect(film!.x + film!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
+    expect(bench!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
+    expect(bench!.x + bench!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
+    await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
+    const disclosure = page.getByTestId("landing-hero-film");
+    await expect(disclosure).toBeVisible();
+    await expect(disclosure.locator("picture")).toBeVisible();
+    const film = (await disclosure.locator("picture").boundingBox())!;
+    expect(film.x).toBeGreaterThanOrEqual(filmWrap!.x - 1);
+    expect(film.x + film.width).toBeLessThanOrEqual(filmWrap!.x + filmWrap!.width + 1);
   });
 }
 
 test("every source has matching upright typography, not a substituted italic face", async ({ page }) => {
   await page.goto("/");
-  const typography = await page.locator("h1 span").evaluate(element => {
+  const typography = await page.locator("h1#lv2-hero-title .lv2-h1-line").first().evaluate(element => {
     const style = getComputedStyle(element);
     const parent = getComputedStyle(element.closest("h1")!);
     return { family: style.fontFamily, parentFamily: parent.fontFamily, size: style.fontSize,

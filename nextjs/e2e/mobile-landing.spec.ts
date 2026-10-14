@@ -66,7 +66,7 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
   expect(boxes.actions!.right).toBeLessThanOrEqual(boxes.viewport + 1);
 });
 
-test("the mobile menu exposes three section choices plus Sign in, and the action stays in the header", async ({ page }, testInfo) => {
+test("the mobile menu exposes four section choices plus Sign in, and the action stays in the header", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
   await page.goto("/");
   const menu = page.locator("header.nav details.mobile-primary-nav");
@@ -74,11 +74,13 @@ test("the mobile menu exposes three section choices plus Sign in, and the action
   const panel = menu.locator(":scope > nav");
   await expect(panel).toBeVisible();
   const direct = panel.locator("a.mobile-nav-direct");
-  await expect(direct).toHaveCount(3);
-  await expect(direct).toHaveText(["Product", "Explore", "Developers"]);
+  await expect(direct).toHaveCount(4);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs"]);
   // BQ-059: the header keeps the action at every width; the sheet is the sections.
   await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
-  await expect(page.locator("header .nav-actions .btn")).toHaveCount(1);
+  const pricing = page.locator('header .nav-actions a[href="/pricing"]');
+  await expect(pricing).toHaveCount(1);
+  await expect(pricing).toHaveText("Pricing");
   /*
     Landing V2: Sign in moved the other way, and the two halves of that are one assertion each.
 
@@ -239,7 +241,10 @@ test.describe("on a touch screen", () => {
         if (style.webkitLineClamp !== "none" || style.getPropertyValue("line-clamp")) continue;
         const selector = `${element.tagName}.${String(element.className).slice(0, 36)}`;
         const hides = (axis: string) => axis === "hidden" || axis === "clip";
-        if (hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
+        // Only the source workbench's intended image crop is exempt vertically; width is still checked.
+        const pageWindowCrop = element.hasAttribute("data-page-window") &&
+          element.closest("article[data-case-status]") !== null && element.querySelector("img") !== null;
+        if (!pageWindowCrop && hides(style.overflowY) && element.scrollHeight - element.clientHeight > 2) {
           result.push({ selector, axis: "y", hidden: element.scrollHeight - element.clientHeight });
         }
         if (hides(style.overflowX) && element.scrollWidth - element.clientWidth > 2) {

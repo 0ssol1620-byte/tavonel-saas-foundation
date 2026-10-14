@@ -100,7 +100,8 @@ test("phone and tablet use real navigation targets instead of clickable decorati
   await page.goto("/");
   await dismissConsent(page);
   await expect(page.locator(".bar-ticks button.bt")).toHaveCount(0);
-  const pricingAction = page.locator("header.nav .nav-actions > a.btn");
+  const pricingAction = page.locator('header.nav .nav-actions > a[href="/pricing"]');
+  await expect(pricingAction).toHaveCount(1);
   await expect(pricingAction).toHaveText("Pricing");
   await expect(pricingAction).toHaveAttribute("href", "/pricing");
   const menu = page.locator("header.nav details.mobile-primary-nav");
@@ -117,7 +118,7 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     };
   }));
   /*
-    The exact sheet contract is three section destinations and Sign in. Pricing is not a sheet
+    The exact sheet contract is four section destinations and Sign in. Pricing is not a sheet
     row: PublicSiteHeader keeps it as the persistent commercial action beside the menu at every
     width. Pinning both names and hrefs makes this assertion catch an omitted section, an invented
     menu destination, or Pricing being duplicated into the disclosure. Geometry still proves each
@@ -125,11 +126,12 @@ test("phone and tablet use real navigation targets instead of clickable decorati
   */
   expect(targets.map(({ text, href }) => ({ text, href }))).toEqual([
     { text: "Product", href: "/product" },
-    { text: "Explore", href: "/explore" },
-    { text: "Developers", href: "/developers" },
+    { text: "How it works", href: "/how-it-works" },
+    { text: "Resources", href: "/resources" },
+    { text: "Docs", href: "/docs" },
     { text: "Sign in", href: "/login" },
   ]);
-  expect(targets).toHaveLength(4);
+  expect(targets).toHaveLength(5);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);
@@ -145,7 +147,7 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   const nav = page.locator("header.nav .nav-actions");
   const box = await nav.boundingBox();
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  expect(await nav.locator(".btn").evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
+  expect(await nav.getByRole("link", { name: "Pricing", exact: true }).evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
 
 test("the home first screen shows source evidence without colliding with public chrome", async ({ page }) => {

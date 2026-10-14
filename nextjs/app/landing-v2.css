@@ -1,4 +1,6 @@
-/* 2026-09-20 visual refinement: shared geometry and source-first hierarchy. */
+@layer reset, tokens, base, components, utilities, overrides;
+@layer components {
+/* Shared scene defaults stay below route-specific compositions in the cascade. */
 
 .lv2 {
   --lv2-display: clamp(46px, 5.1vw, 64px);
@@ -624,4 +626,5 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-lo);
+}
 }

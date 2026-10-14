@@ -28,7 +28,7 @@ test("the entry page keeps its public product routes actionable, with no console
   // The six-beat page keeps the public sample reachable from the proof and closing scenes.
   const proof = page.locator("section#s3");
   await proof.scrollIntoViewIfNeeded();
-  const proofLinks = proof.locator('a[href^="/explore"]');
+  const proofLinks = proof.locator('a[href="/explore"], a[href^="/explore?"], a[href^="/explore#"]');
   expect(await proofLinks.count()).toBeGreaterThan(0);
   for (const link of await proofLinks.all()) {
     expect(await link.getAttribute("href")).toMatch(/^\/explore(?:[?#/]|$)/);
@@ -39,19 +39,21 @@ test("the entry page keeps its public product routes actionable, with no console
   await expect(close.locator('a[href="/explore"]')).toHaveCount(1);
   await expect(close.locator('a[href="/pricing"]')).toHaveCount(1);
 
-  // The commercial posture's own destination is on the page twice: the hero and the close.
-  const access = page.locator('main a[href="/pricing"]');
-  expect(await access.count(), "Pricing is reachable from the hero and the close")
-    .toBeGreaterThanOrEqual(2);
+  // The hero offers arranged evaluation or live access; the close retains Pricing.
+  const access = page.locator('#s1 [data-analytics="hero-secondary"]');
+  await expect(access).toHaveAttribute("href", /^\/(login|evaluation)$/);
 
   // Every one of those next actions clears the touch floor.
-  for (const scene of [proof, close]) {
-    const box = await scene.locator("a.lv2-text-link").first().boundingBox();
+  for (const link of [access, proofLinks.first(), close.locator("a.lv2-text-link").first()]) {
+    const box = await link.boundingBox();
     expect(box?.height ?? 0, "44px touch floor").toBeGreaterThanOrEqual(44);
   }
 
-  // The fold this section used to carry is gone; the pages it opened are still one click away.
-  await expect(proof.locator("details")).toHaveCount(0);
+  // Source metadata can be inspected without dominating the record's initial view.
+  const sourceDetails = proof.locator("article details");
+  await expect(sourceDetails).toHaveCount(1);
+  await sourceDetails.locator("summary").click();
+  await expect(sourceDetails.locator("dl")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });

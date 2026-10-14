@@ -73,7 +73,7 @@ export function PublicSiteHeader({
       <DesktopPrimaryNav korean={korean} />
       <MobilePrimaryNav korean={korean} signedIn={signedIn} />
       <span className="nav-actions">
-        <Link className="btn small" href={korean ? "/ko/pricing" : "/pricing"}>{pricingLabel}</Link>
+        <Link className={`small ${chrome.pricingLink}`} href={korean ? "/ko/pricing" : "/pricing"}>{pricingLabel}</Link>
         {/*
           Below the desktop switch this link is in the phone sheet instead, where it gets a 44px
           row of its own. At 360px the row was wordmark + toggle + a 109px filled button + Sign in

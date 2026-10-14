@@ -3,14 +3,12 @@ import { LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-hero-copy";
 import HeroFilmDisclosure from "./hero-film-disclosure";
 
 /*
-  Optional continuation of the home story. The opening screen stays grounded in the committed
-  source workbench; this component adds the four-cut product walkthrough at the foot of scene 02,
-  after the difficulties that passage shows. The client disclosure owns the conditional player
-  mount and asks the player to open a phone on the whole frame.
+  Visible opening media, directly after the Home headline. The four approved recordings are
+  illustrative examples; their caption remains visible. The source workbench follows in scene02.
 
   The player uses the approved recordings and its existing intersection-based playback, visibility
-  resume, poster fallback and WCAG motion control. Its poster does not claim the eager image slot
-  reserved for the opening source card.
+  resume, poster fallback and WCAG motion control. The opening poster owns the priority image
+  slot, while the lower source workbench loads lazily.
 */
 
 /**

@@ -1,5 +1,6 @@
 /**
- * The public header, as a reader uses it: Product, Explore and Developers, with Pricing as its action.
+ * The public header, as a reader uses it: Product, How it works, Resources and Docs, with Pricing as
+ * its action. Explore and Developers stay reachable through the Home action, the footer and the hub.
  *
  * The five questions below are the design document's own find-tasks (§12) and they are still why
  * this file exists. What changed is the IA that answers them. The 2026-09-17 brand-quality pass
@@ -90,7 +91,7 @@ const TASKS = [
 ] as const;
 
 /** The four section links; Pricing has its own emphasized header control. */
-const CUSTOMER_HREFS = ["/product", "/explore", "/developers"] as const;
+const CUSTOMER_HREFS = ["/product", "/how-it-works", "/resources", "/docs"] as const;
 
 const BAR = 'header.nav nav[aria-label="Sections"]';
 const SHEET = "header.nav details.mobile-primary-nav";
@@ -141,7 +142,7 @@ const DESKTOP: Scenario[] = [
     run: (page: Page) => followTrail(page, task.trail),
   })),
   {
-    name: "the bar publishes Product, Explore and Developers, with Pricing as its action",
+    name: "the bar publishes Product, How it works, Resources and Docs, with Pricing as its action",
     width: 1440,
     run: async (page) => {
       await page.goto("/");
@@ -169,9 +170,9 @@ const DESKTOP: Scenario[] = [
     run: async (page) => {
       for (const entry of [
         { path: "/product", owner: "/product", current: "page" },
-        { path: "/developers", owner: "/developers", current: "page" },
-        { path: "/docs/mcp", owner: "/developers", current: "location" },
-        { path: "/sources", owner: "/product", current: "location" },
+        { path: "/how-it-works", owner: "/how-it-works", current: "page" },
+        { path: "/docs/mcp", owner: "/docs", current: "location" },
+        { path: "/research", owner: "/resources", current: "location" },
       ]) {
         await page.goto(entry.path);
         await expect(page.locator(`${BAR} a[href="${entry.owner}"]`)).toHaveAttribute("aria-current", entry.current);
@@ -179,17 +180,17 @@ const DESKTOP: Scenario[] = [
         expect(await page.locator(`${BAR} a[aria-current="page"]`).count(), entry.path)
           .toBe(entry.current === "page" ? 1 : 0);
       }
-      await page.goto("/research");
+      await page.goto("/sources");
       expect(
         await page.locator(`${BAR} a[aria-current]`).count(),
-        "Research must stay unowned by a different primary section",
+        "Sources is a footer row and must stay unowned by any primary section",
       ).toBe(0);
       await expect(page.locator('footer.site a[href="/research"]').first()).toHaveAttribute("href", "/research");
 
       // Explore intentionally replaces public chrome with its immersive sample header.
-      // Follow the public entry, prove the current act, then use its named exit back home.
+      // Follow the Home entry, prove the current act, then use its named exit back home.
       await page.goto("/");
-      await activateLink(page, page.locator(`${BAR} a[href="/explore"]`));
+      await activateLink(page, page.locator('#s1 a[href="/explore"]'));
       await expect(page).toHaveURL(arrivedAt("/explore"));
       const stage = page.locator('[data-visual-world="explore"]');
       await expect(stage).toBeVisible();
@@ -205,7 +206,7 @@ const DESKTOP: Scenario[] = [
       await expect(exit).toHaveAttribute("href", "/");
       await activateLink(page, exit);
       await expect(page).toHaveURL(/\/$/);
-      await expect(page.locator(`${BAR} a[href="/explore"]`)).toBeVisible();
+      await expect(page.locator('#s1 a[href="/explore"]')).toBeVisible();
       await expect(page.locator(`${BAR} a[aria-current]`)).toHaveCount(0);
     },
   },
@@ -238,7 +239,7 @@ const PHONE: Scenario[] = [
     run: (page: Page) => followTrail(page, ["/docs", "/docs/mcp"]),
   },
   {
-    name: "the phone sheet offers the same three sections as the bar, flat",
+    name: "the phone sheet offers the same four sections as the bar, flat",
     width: 390,
     touch: true,
     run: async (page) => {
@@ -251,7 +252,7 @@ const PHONE: Scenario[] = [
       // Landing V2: Sign in is the sheet's last row at this width, and the access action is not
       // in the sheet at all -- it is in the header, visible without opening anything.
       await expect(page.locator(`${SHEET} > nav a.mobile-nav-signin`)).toHaveCount(1);
-      await expect(page.locator("header.nav .nav-actions .btn")).toBeVisible();
+      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
     },
   },
   {
@@ -328,7 +329,7 @@ test.describe("chromium", () => {
         /*
           One project runs this file; the widths and the second engine are the spec's variables.
 
-          It was `1280`, the width the deleted section row needed. The bar is three direct links
+          It was `1280`, the width the deleted section row needed. The bar is four direct links
           at every width now, so the gate moves to `1440` -- the project the brand-quality run
           actually drives, and the one where this file was silently skipping every scenario.
         */

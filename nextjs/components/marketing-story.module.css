@@ -1,0 +1,53 @@
+@layer reset, tokens, base, components, utilities, overrides;
+
+@layer overrides {
+  .process, .product { --text-hi: #19201f; --text-mid: #58615e; --source: #244ac8; --hairline: #d9ded9; --hairline-hi: #c7cdc7; background: #faf9f6; color: var(--text-hi); font-family: var(--f-sans); padding-top: clamp(40px, 5vw, 72px); }
+  /* H1 column gets the wider share so "A World you can inspect." holds one line beside the lede at desktop widths. */
+  .lead { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(32px, 4vw, 56px); align-items: end; margin-bottom: clamp(40px, 5vw, 64px); }
+  .lead h1 { max-width: 15em; margin: 0; font-size: clamp(34px, 3.6vw, 56px); font-weight: 560; line-height: 1.08; letter-spacing: -0.03em; text-wrap: balance; }
+  .lead p { max-width: 46ch; margin: 0; font: 18px/1.6 var(--f-sans); }
+  /* Timeline: the rail runs through the centre of each marker; markers mask it with the paper background. */
+  .pipeline { --mark: 64px; margin: 0 0 clamp(40px, 5vw, 64px); padding: 0; list-style: none; }
+  .pipeline li { position: relative; display: grid; grid-template-columns: var(--mark) minmax(0, 1fr); align-content: start; gap: 6px clamp(20px, 3vw, 36px); padding: 0 0 clamp(40px, 4.5vw, 56px); min-width: 0; }
+  .pipeline li::before { content: ""; position: absolute; left: calc(var(--mark) / 2 - 0.5px); top: 0; bottom: 0; width: 1px; background: var(--hairline-hi); }
+  .pipeline li:first-child::before { top: calc(var(--mark) / 2); }
+  .pipeline li:last-child { padding-bottom: 0; }
+  .pipeline li:last-child::before { display: none; }
+  .stepArt { position: relative; grid-row: span 4; box-sizing: border-box; width: var(--mark); height: var(--mark); padding: calc(var(--mark) / 8); border: 1px solid var(--hairline-hi); border-radius: 4px; fill: none; stroke: var(--source); stroke-width: 1.5; background: #faf9f6; }
+  .stepFlow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 24px; font: 13px/1.5 var(--f-sans); color: var(--text-mid); }
+  .stepFlow strong { color: var(--source); font-weight: 560; }
+  .pipeline h2 { margin: 2px 0 0; font: 560 clamp(20px, 2vw, 24px)/1.25 var(--f-sans); letter-spacing: -0.02em; }
+  .pipeline p { margin: 2px 0 0; max-width: 60ch; color: var(--text-mid); font: 15px/1.7 var(--f-sans); }
+  .pipeline a { justify-self: start; }
+  .pipeline a, .processClose a, .outcome a, .boundary summary { display: inline-flex; align-items: center; min-height: 44px; font: 15px/1.5 var(--f-sans); }
+  .processClose { display: flex; flex-wrap: wrap; gap: 8px 28px; border-top: 1px solid var(--hairline); padding-top: clamp(24px, 3vw, 32px); }
+  .processClose p { flex-basis: 100%; max-width: 82ch; margin: 0 0 4px; color: var(--text-mid); font: 14px/1.7 var(--f-sans); }
+  .world { margin: 0 0 clamp(48px, 6vw, 80px); }
+  .outcomes { display: grid; gap: 0; }
+  .outcome { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(32px, 5vw, 64px); border-top: 1px solid var(--hairline-hi); padding: clamp(32px, 3.5vw, 48px) 0; }
+  .outcome h2 { margin: 0; font: 560 clamp(24px, 2.5vw, 36px)/1.2 var(--f-sans); letter-spacing: -0.025em; }
+  .outcome p { max-width: 60ch; margin: 0 0 12px; font: 17px/1.6 var(--f-sans); color: var(--text-mid); }
+  .proof { margin: 20px 0; padding-left: 20px; border-left: 2px solid var(--source); overflow-wrap: anywhere; }
+  .proof blockquote { margin: 0 0 12px; font: 16px/1.6 var(--f-sans); }
+  .proof figcaption { font: 13px/1.6 var(--f-sans); color: var(--text-mid); }
+  .proof figcaption span { display: block; }
+  .process a, .product a { color: var(--source); }
+  .process :global(.btn), .product :global(.btn) { background: var(--source); border-color: var(--source); color: white; border-radius: 4px; }
+  .process :global(.btn.ghost), .product :global(.btn.ghost) { background: transparent; color: var(--text-hi); border-color: var(--hairline-hi); }
+  .boundary { margin: clamp(32px, 4vw, 48px) 0; border-block: 1px solid var(--hairline); padding: 8px 0; }
+  .boundary summary { cursor: pointer; }
+  .close { display: flex; flex-wrap: wrap; gap: 12px 16px; padding-top: 8px; }
+  @media (max-width: 767px) {
+    .lead, .outcome { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .lead { margin-bottom: 32px; }
+    .lead h1 { font-size: clamp(30px, 8.4vw, 40px); }
+    .lead p, .outcome p { font-size: 16px; }
+    .pipeline { --mark: 40px; }
+    .pipeline li { gap: 4px 16px; padding-bottom: 32px; }
+    .stepArt { border-radius: 3px; }
+    .pipeline p { font-size: 15px; line-height: 1.65; }
+    .world { margin-bottom: 40px; }
+    .outcome { padding-block: 28px; }
+    .proof { padding-left: 14px; }
+  }
+}

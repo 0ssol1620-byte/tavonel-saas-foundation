@@ -138,18 +138,18 @@ test("draws the whole source-change flow, and says which half of it runs here", 
   A fourth card in a three-column grid leaves one card beside two empty tracks on row two, which
   the visual rules bar. This lane added the fourth card, so this lane checks the row.
 */
-test("leaves no orphan slot in the product surface grid", async ({ page }: { page: Page }) => {
+test("leaves no empty row in the three product outcomes", async ({ page }: { page: Page }) => {
   await page.goto("/product");
 
   const layout = await page.evaluate(() => {
-    const grid = document.querySelector(".product-surface-grid");
+    const grid = [...document.querySelectorAll("h2")].find(heading => heading.textContent === "Inspect the evidence")?.parentElement?.parentElement;
     if (!grid) return { columns: 0, cards: 0, rows: [] as number[] };
     const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
     const rows = [...new Set([...grid.children].map((card) => Math.round(card.getBoundingClientRect().top)))];
     return { columns, cards: grid.children.length, rows };
   });
 
-  expect(layout.cards).toBeGreaterThan(0);
+  expect(layout.cards).toBe(3);
   expect(layout.columns).toBeGreaterThan(0);
   expect(
     layout.cards % layout.columns,

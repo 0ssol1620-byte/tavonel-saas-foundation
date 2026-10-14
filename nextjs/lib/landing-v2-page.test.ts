@@ -31,7 +31,8 @@ vi.mock("./commercial-state", async importOriginal => {
 });
 
 import LandingPage from "../components/landing-v2/landing-page";
-import { HERO_FILM_POSTER } from "../components/landing-v2/hero-film";
+import EvaluationPage from "../components/evaluation-page";
+import HeroActions from "../components/landing-v2/hero-actions";
 import { primaryCallToAction } from "./commercial-state";
 import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
@@ -44,7 +45,7 @@ import {
   RETIRED_NAMES,
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
-import { ACCESS_CTA, BRAND_LINE, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
 
 /*
   THE COMPOSITION GUARD (contract D9, D13).
@@ -76,14 +77,14 @@ describe("Home reading guide integration", () => {
     expect(close).toBeGreaterThan(start);
     const guide = main.slice(start, close);
     const text = readable(guide);
-    expect(elements(guide, "li")).toHaveLength(4);
+    expect(elements(guide, "li")).toHaveLength(0);
     const disclosures = [...guide.matchAll(/<details(?:\s[^>]*)?>([\s\S]*?)<\/details>/g)];
     expect(disclosures).toHaveLength(3);
     for (const disclosure of disclosures) {
       expect(disclosure[0]).not.toMatch(/<details[^>]*\sopen(?:=|\s|>)/);
       expect(disclosure[1]).toMatch(/^<summary>[\s\S]+<\/summary><p>[\s\S]+<\/p>$/);
     }
-    expect(elements(guide, "a").map(open => attr(open, "href"))).toEqual(["#s1"]);
+    expect(elements(guide, "a").map(open => attr(open, "href"))).toEqual([]);
     expect(guide).not.toMatch(/<form|<input|<textarea|data-consent|<video|<img/);
     expect(text).not.toContain("Shared workspace policy");
     expect(text).not.toContain("Example studio");
@@ -206,7 +207,7 @@ describe("landing v2 -- the composition", () => {
     "%s renders the six homepage beats, once each, in order",
     locale => {
       const main = mainOf(render(locale));
-      const sections = elements(main, "section");
+      const sections = elements(main, "section").filter(open => attr(open, "data-scene"));
       expect(sections).toHaveLength(6);
       expect(sections.map(open => attr(open, "id"))).toEqual([...HOME_SCENES]);
       for (const open of sections) {
@@ -221,7 +222,7 @@ describe("landing v2 -- the composition", () => {
     "%s reserves paper for actual proof and source evidence",
     locale => {
       const main = mainOf(render(locale));
-      const grounds = elements(main, "section").map(open =>
+      const grounds = elements(main, "section").filter(open => attr(open, "data-scene")).map(open =>
         /\blv2-obsidian\b/.test(attr(open, "class") ?? "")
           ? "obsidian"
           : "paper"
@@ -231,7 +232,7 @@ describe("landing v2 -- the composition", () => {
   );
 
   it.each(LOCALES)(
-    "%s has one h1, and it is the founder-owned headline",
+    "%s has one h1 with the source-first story",
     locale => {
       const html = render(locale);
       const main = mainOf(html);
@@ -249,8 +250,8 @@ describe("landing v2 -- the composition", () => {
       const bare = (value: string) => value.replace(/\s+/g, "");
       const expected =
         locale === "ko"
-          ? LANDING_V2_COPY.ko.hero.headline
-          : BRAND_LINE.headline;
+          ? "내 문서. 연결된 지식."
+          : "Your documents. Connected knowledge.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
     }
   );
@@ -262,8 +263,8 @@ describe("landing v2 -- the composition", () => {
       const levels = [...main.matchAll(/<h([1-6])(\s[^>]*)?>/g)].map(match =>
         Number(match[1])
       );
-      // The six existing scene headings plus the reader guide and its FAQ.
-      expect(levels.filter(level => level === 2)).toHaveLength(8);
+      // Six scenes and the FAQ; historical evaluation metrics live on Benchmarks.
+      expect(levels.filter(level => level === 2)).toHaveLength(7);
       expect(levels[0]).toBe(1);
       // An h3 may only appear under a heading one level above it: no h1 -> h3 jump anywhere.
       levels.reduce((previous, level) => {
@@ -367,14 +368,15 @@ describe("landing v2 -- the composition", () => {
     the page, and no media competes with the source page.
   */
   it.each(LOCALES)(
-    "%s renders no specimen, no question framing and no hero media",
+    "%s renders a static source-inspection poster without fabricated question answers or autoplay",
     locale => {
       const main = mainOf(render(locale));
       expect(main).not.toContain("<video");
       expect(main).not.toContain("<iframe");
       expect(main).not.toContain("<canvas");
       expect(main).not.toContain("data-compiler-specimen");
-      expect(main).not.toContain('role="tablist"');
+      expect(elements(sceneOf(main, "s1"), "div").filter(open => attr(open, "role") === "tablist")).toHaveLength(0);
+      expect(sceneOf(main, "s1")).toContain("data-source-inspection-film");
       const text = readable(main);
       for (const tab of buildProofTabs()) expect(text).not.toContain(tab.question);
       expect(text).not.toMatch(/verified answer/i);
@@ -468,7 +470,7 @@ describe("landing v2 -- the lead and the workbench", () => {
   it.each(LOCALES)(
     "%s shows the source identity, location, full digest and the prepared, extracted status",
     locale => {
-      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const hero = sceneOf(mainOf(render(locale)), "s2");
       const view = buildHeroView();
       const text = readable(hero);
       expect(hero).toContain(`src="${escaped(view.image!.src)}"`);
@@ -490,7 +492,7 @@ describe("landing v2 -- the lead and the workbench", () => {
   );
 
   it.each(LOCALES)("%s puts the source page right under its name, ahead of the quoted passage", locale => {
-    const hero = sceneOf(mainOf(render(locale)), "s1");
+    const hero = sceneOf(mainOf(render(locale)), "s2");
     const name = hero.indexOf(escaped(buildHeroView().source.filename));
     const page = hero.indexOf(`src="${escaped(buildHeroView().image!.src)}"`);
     expect(name).toBeGreaterThan(-1);
@@ -501,7 +503,7 @@ describe("landing v2 -- the lead and the workbench", () => {
   it.each(LOCALES)(
     "%s quotes the selected source passage untranslated, marked as English, once",
     locale => {
-      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const hero = sceneOf(mainOf(render(locale)), "s2");
       const value = homeCase();
       const selected = value.regions.find(region => region.id === value.selectedRegionId)!;
       const quotes = elements(hero, "blockquote");
@@ -514,7 +516,7 @@ describe("landing v2 -- the lead and the workbench", () => {
   it.each(LOCALES)(
     "%s links the quoted passage to the same evidence in Explore",
     locale => {
-      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const hero = sceneOf(mainOf(render(locale)), "s2");
       const value = homeCase();
       const selected = value.regions.find(region => region.id === value.selectedRegionId)!;
       expect(selected.href).toMatch(/^\/explore\?/);
@@ -528,7 +530,7 @@ describe("landing v2 -- the lead and the workbench", () => {
   it.each(LOCALES)(
     "%s offers region selection as native, pressed-state buttons, one per region",
     locale => {
-      const hero = sceneOf(mainOf(render(locale)), "s1");
+      const hero = sceneOf(mainOf(render(locale)), "s2");
       const buttons = elements(hero, "button");
       expect(buttons).toHaveLength(homeCase().regions.length);
       for (const open of buttons) expect(attr(open, "type")).toBe("button");
@@ -542,35 +544,20 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(text).toContain(locale === "ko" ? "자체 원문 접수는 별도 협의" : "Own-source intake by arrangement");
     // Before the workbench in reading order, so it is part of the lead, not a footnote.
     expect(text.indexOf(locale === "ko" ? "자체 원문 접수는 별도 협의" : "Own-source intake by arrangement"))
-      .toBeLessThan(text.indexOf(buildHeroView().source.filename));
+      .toBeLessThan(readable(mainOf(render(locale))).indexOf(buildHeroView().source.filename));
   });
 
-  it.each(LOCALES)(
-    "%s keeps the walkthrough film closed at the foot of scene 02, with no player mounted",
-    locale => {
-      const main = mainOf(render(locale));
-      expect(sceneOf(main, "s1")).not.toContain("lv2-film");
-
-      // Scene 02 is where `LandingAnalytics` counts `hero_demo_interact` on the film's controls.
-      const difficulty = sceneOf(main, "s2");
-      const films = elements(difficulty, "details").filter(
-        open => attr(open, "data-testid") === "landing-film-disclosure"
-      );
-      expect(films).toHaveLength(1);
-      expect(films[0]).not.toMatch(/\sopen(=|\s|$)/);
-      const filmAt = difficulty.indexOf('data-testid="landing-film-disclosure"');
-      // An optional illustration after the difficulties, never ahead of them.
-      expect(difficulty.indexOf('id="lv2-difficulty-title"')).toBeLessThan(filmAt);
-      expect(readable(difficulty.slice(filmAt))).toContain(
-        locale === "ko" ? "예시 제품 흐름 영상 보기" : "Watch the illustrative product walkthrough"
-      );
-
-      // Closed means unmounted: no player wrapper, no media element, no poster request.
-      expect(main).not.toMatch(/class="(?:[^"]*\s)?lv2-film(?:\s[^"]*)?"/);
-      expect(main).not.toMatch(/<video|autoplay/i);
-      expect(main).not.toContain(HERO_FILM_POSTER);
-    }
-  );
+  it.each(LOCALES)("%s shows the prepared source-inspection film immediately after the headline", locale => {
+    const main = mainOf(render(locale));
+    const hero = sceneOf(main, "s1");
+    const filmAt = hero.indexOf('data-testid="landing-hero-film"');
+    expect(filmAt).toBeGreaterThan(hero.indexOf('</h1>'));
+    expect(filmAt).toBeLessThan(hero.indexOf('lv2-hero-support'));
+    expect(hero).toContain("/film/source-inspection/desktop.webp");
+    expect(hero).toContain('data-source-inspection-film');
+    expect(readable(hero)).toContain(locale === "ko" ? "고객 결과가 아닙니다" : "Not a new OCR or compilation run, or customer results");
+    expect(sceneOf(main, "s2")).not.toContain('data-testid="landing-hero-film"');
+  });
 });
 
 /*
@@ -682,5 +669,46 @@ describe("landing v2 -- difficulty and record", () => {
         ? "값을 기간, 단위, 버전과 묶습니다. 이 미리보기에서는 실행하지 않았습니다."
         : "Joins a value to its period, unit or version. Not run for this preview."
     );
+  });
+});
+
+describe("current-main bounded evaluation entry", () => {
+  it("preserves existing pricing callers while accepting the resolved Home access action", () => {
+    const legacy = renderToStaticMarkup(createElement(HeroActions, {
+      exploreLabel: "Explore", exploreHref: "/explore", pricingLabel: "Pricing", scene: "1",
+    }));
+    expect(legacy).toContain('href="/pricing"');
+    const localized = renderToStaticMarkup(createElement(HeroActions, {
+      exploreLabel: "Explore", exploreHref: "/explore", pricingLabel: "Pricing", pricingHref: "/ko/pricing",
+      scene: "1", ctaOrderVariant: "b",
+    }));
+    expect(localized.indexOf('href="/ko/pricing"')).toBeLessThan(localized.indexOf('href="/explore"'));
+    const access = renderToStaticMarkup(createElement(HeroActions, {
+      exploreLabel: "Explore", exploreHref: "/explore", startLabel: "Evaluate documents", startHref: "/evaluation", scene: "1",
+    }));
+    expect(access).toContain('href="/evaluation"');
+    expect(access).not.toContain('href="/pricing"');
+  });
+
+  it.each(["en", "ko"] as const)("%s offers the blank localized worksheet without uploading documents", locale => {
+    const html = renderToStaticMarkup(createElement(EvaluationPage, { korean: locale === "ko" }));
+    expect(html).toContain(`lang="${locale}"`);
+    expect(html).toContain(`href="/evaluation/pilot-worksheet.${locale}.md"`);
+    expect(html).toContain(`download="tavonel-pilot-worksheet.${locale}.md"`);
+    expect(html).toContain('type="text/markdown"');
+    expect(html).not.toContain('type="file"');
+    expect(html).toContain('id="evaluation-request-title"');
+    const requiredControls = (html.match(/<(?:input|select|textarea)\b[^>]*>/g) ?? [])
+      .filter(tag => /\srequired(?:=""|(?=\s|>))/.test(tag));
+    expect(requiredControls).toHaveLength(3);
+    expect(html).toContain(`href="${locale === "ko" ? "/evaluation" : "/ko/evaluation"}"`);
+  });
+
+  it("an English inquiry retains the processing and payment boundary", () => {
+    const html = renderToStaticMarkup(createElement(EvaluationPage));
+    expect(html).toContain("An inquiry does not start processing, enable a connection, or create a payment commitment.");
+    expect(html).toContain("Please do not include private documents or credentials.");
+    expect(html).toContain("Downloading it only retrieves the blank file");
+    expect(html).toContain("Filling in your copy does not by itself send what you write to us.");
   });
 });

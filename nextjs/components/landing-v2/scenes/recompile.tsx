@@ -5,6 +5,7 @@ import { LANDING_V2_SCENE_ORDER, type LandingV2RecompileCopy } from "@/lib/landi
 import { landingV2StateWord, type RecompileView } from "@/lib/landing-v2-runtime";
 import { RECOMPILE_ACTIONS, RECOMPILE_COUNTS_QUALIFIER } from "@/lib/landing-v2-recompile";
 import styles from "./recompile.module.css";
+import homeStyles from "../source-first-home.module.css";
 
 /*
   Scene 05 -- Recompile (blueprint section 15, contract D12 and rule 7).
@@ -65,6 +66,7 @@ export default function Scene({
   data,
   sectionId = SCENE_ID,
   sceneIndex,
+  compact = false,
 }: {
   locale: "en" | "ko";
   copy: LandingV2RecompileCopy;
@@ -72,6 +74,7 @@ export default function Scene({
   data: RecompileView;
   sectionId?: string;
   sceneIndex?: number;
+  compact?: boolean;
 }) {
   const titleId = `lv2-${SCENE_ID}-title`;
   const countsId = `lv2-${SCENE_ID}-counts`;
@@ -107,6 +110,34 @@ export default function Scene({
     { key: "untouched", value: data.counts.untouched, label: copy.countLabels.untouched, tone: styles.untouched },
   ].filter((count) => count.key !== "removed" || count.value > 0);
 
+  const impact = <>
+    <div className={styles.columns}>
+      <RevisionBadge beforeLabel={beforeLabel} afterLabel={afterLabel} arrivalsLabel={copy.arrivalsLabel}
+        arrivals={data.arrivals} className={styles.source} />
+      <svg className={styles.fan} viewBox={FAN_VIEWBOX} preserveAspectRatio="none" aria-hidden="true">
+        <path d={fanPath(data.affectedSample.length)} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className={styles.objects}>
+        <p className="lv2-meta" id={objectsId}>{copy.affectedLabel}{sharedState ? ` · ${landingV2StateWord(sharedState, locale)}` : ""}</p>
+        <ul className={styles.objectList} aria-labelledby={objectsId}>
+          {data.affectedSample.map(node => <li key={node.id} className={styles.object}>
+            <span className={styles.objectLabel} data-derived="1">{node.label}</span>
+            {sharedState ? null : <span className={`lv2-meta ${styles.objectState}`}>{landingV2StateWord(node.state, locale)}</span>}
+          </li>)}
+        </ul>
+      </div>
+    </div>
+    <div className={styles.counts}>
+      <p className="lv2-meta" id={countsId}>{copy.compareLabel}</p>
+      <ul className={styles.countList} aria-labelledby={countsId}>
+        {counts.map(count => <li key={count.key} className={`${styles.count} ${count.tone}`}>
+          <b data-derived="1">{count.value.toLocaleString("en-US")}</b><span className="lv2-meta">{count.label}</span>
+        </li>)}
+      </ul>
+      <p className={`lv2-meta ${styles.qualifier}`}>{RECOMPILE_COUNTS_QUALIFIER[locale]}</p>
+    </div>
+  </>;
+
   return (
     <section
       id={sectionId}
@@ -118,7 +149,6 @@ export default function Scene({
       <div className="lv2-wrap">
         <div className="lv2-split">
           <div className="lv2-scene-head">
-            <p className="lv2-eyebrow lv2-meta">{copy.eyebrow}</p>
             <h2 className="lv2-h2" id={titleId}>
               <span className="lv2-h2-line">{copy.headline}</span>
               {copy.headlineAccent ? (
@@ -147,81 +177,13 @@ export default function Scene({
           </div>
 
           <div className={styles.impact}>
-            <div className={styles.columns}>
-              {/* The corpus as it stood, and what landed on it. Amber is the arrival colour. */}
-              <RevisionBadge
-                beforeLabel={beforeLabel}
-                afterLabel={afterLabel}
-                arrivalsLabel={copy.arrivalsLabel}
-                arrivals={data.arrivals}
-                className={styles.source}
-              />
-
-              {/*
-                The relation, drawn once. Decorative: both ends are named in text on either side
-                of it, so a reader who never sees it loses nothing.
-              */}
-              <svg
-                aria-hidden="true"
-                className={styles.fan}
-                viewBox={FAN_VIEWBOX}
-                preserveAspectRatio="none"
-                focusable="false"
-              >
-                <path d={fanPath(data.affectedSample.length)} pathLength={1} vectorEffect="non-scaling-stroke" />
-              </svg>
-
-              <div className={styles.objects}>
-                {/*
-                  D5: the state word is the COLUMN's label, not a tag repeated on every row.
-
-                  Every object in this deterministic sample holds the same state, so the rows read
-                  PUBLISHED SAMPLE once each -- a column of identical tags rather than information.
-                  The word is still on the page, still the World's own, still beside the objects it
-                  describes; it is said once. If a future sample ever mixes states the shared word
-                  disappears and every row carries its own, because one label over rows that
-                  disagree would be an average, and this project does not publish those.
-                */}
-                <p className="lv2-meta" id={objectsId}>
-                  {copy.affectedLabel}
-                  {sharedState ? ` · ${landingV2StateWord(sharedState, locale)}` : ""}
-                </p>
-                <ul className={styles.objectList} aria-labelledby={objectsId}>
-                  {data.affectedSample.map((node) => (
-                    <li key={node.id} className={styles.object}>
-                      {/* The compiler labels an object with its own text, digits included. */}
-                      <span className={styles.objectLabel} data-derived="1">
-                        {node.label}
-                      </span>
-                      {sharedState ? null : (
-                        <span className={`lv2-meta ${styles.objectState}`}>
-                          {landingV2StateWord(node.state, locale)}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/*
-              The counts, each printed with the noun that says what it counts, and the qualifier
-              that says which engine emitted them (BA-034) directly underneath.
-            */}
-            <div className={styles.counts}>
-              <p className="lv2-meta" id={countsId}>
-                {copy.compareLabel}
-              </p>
-              <ul className={styles.countList} aria-labelledby={countsId}>
-                {counts.map((count) => (
-                  <li key={count.key} className={`${styles.count} ${count.tone}`}>
-                    <b data-derived="1">{count.value.toLocaleString("en-US")}</b>
-                    <span className="lv2-meta">{count.label}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className={`lv2-meta ${styles.qualifier}`}>{RECOMPILE_COUNTS_QUALIFIER[locale]}</p>
-            </div>
+            {compact ? <>
+              <p className="lv2-body-l" data-derived="1">{beforeLabel}<br />{afterLabel}</p>
+              <details className={homeStyles.compactDetails}>
+                <summary>{locale === "ko" ? "변경 기록과 영향받은 객체" : "Change record and affected objects"}</summary>
+                {impact}
+              </details>
+            </> : impact}
 
             <p className={styles.actions}>
               <Link className="lv2-text-link" href={data.hrefs.change as Route} prefetch={false}>
