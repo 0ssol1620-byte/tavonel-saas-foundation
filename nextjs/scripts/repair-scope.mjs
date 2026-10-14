@@ -2029,6 +2029,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('pilot-evaluation-worksheet', new RegExp(`^nextjs/(?:${exactPathAlternation(PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS)})$`),
     { unitFiles: PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
+  // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
+  // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
+  affectedGroup('ocr-cpu-worker', /^workers\/foundation-ocr-cpu-raster\/(?:app\.py|SYNTHETIC_TABLE_BINDING\.md|tests\/fixtures\/synthetic-grid-profile\.json|tests\/test_synthetic_table_caller\.py)$/),
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
   affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/test_app\.py)$/),

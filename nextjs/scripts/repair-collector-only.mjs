@@ -1642,10 +1642,10 @@ export function verifyAffectedSource({headSha,intent=classifyAffectedIntent({hea
 export function affectedPlan(normal,proof){
  const map=proof?.map;
  if(!proof?.eligible||proof.profile!==AFFECTED_PROFILE||!map||map.failures.length||map.headSha!==normal.headSha||proof.headSha!==normal.headSha||normal.repairAnchorSha!==FULL_ANCHOR)throw Error('Affected plan requires a clean fail-closed map for the exact head.');
- const fresh=map.nativeEvidence.disposition===NATIVE_FRESH_RUN_REQUIRED,h=AFFECTED_HISTORICAL_EVIDENCE,gpu=map.groups.includes('ocr-gpu-worker');
+ const fresh=map.nativeEvidence.disposition===NATIVE_FRESH_RUN_REQUIRED,h=AFFECTED_HISTORICAL_EVIDENCE,cpu=map.groups.includes('ocr-cpu-worker'),gpu=map.groups.includes('ocr-gpu-worker');
  // Deferred, never passed here: the race group name stays distinct from the exact race profile's own hosted group.
  // The GPU worker is qualified only by its external image workflow; no local CPU/CDR check stands in for it.
- const deferredGroups=[...(map.databaseChanged?['database-contract']:[]),...(fresh?['native-world-race-fresh-run']:[]),...(gpu?['ocr-gpu-worker']:[])];
+ const deferredGroups=[...(map.databaseChanged?['database-contract']:[]),...(fresh?['native-world-race-fresh-run']:[]),...(cpu?['ocr-cpu-worker']:[]),...(gpu?['ocr-gpu-worker']:[])];
  const debt=[...new Set([...deferredGroups,...EXPLORE_REPAIR_PENDING_DEBT])].sort();
  return{schemaVersion:1,repository:normal.repository,pullRequest:normal.pullRequest,pullRequestBaseSha:normal.pullRequestBaseSha,repairAnchorSha:normal.repairAnchorSha,headSha:normal.headSha,
   selector:'affected-integration-v1',source:'verified-baseline incremental affected map; cumulative PR/full release debt tracked separately',affectedIntegration:map,
@@ -1661,6 +1661,7 @@ export function affectedPlan(normal,proof){
   deferredGroups,pendingQualificationDebt:debt,pendingDebt:debt,pendingFullDebt:[...normal.pendingFullDebt],fullQualification:'pending',inheritedChecks:{},
   qualificationReasons:[`Incremental checks cover only the delta from verified baseline ${AFFECTED_BASELINE.commit} (tree ${AFFECTED_BASELINE.tree}); Repair ${h.repairRunId}, DB classifier ${h.databaseClassifierRunId} and native race ${h.nativeRaceRunId} (${h.nativeLinuxDbCases} Linux DB cases, aggregate job ${h.nativeRaceAggregateJobId}) are historical inputs only, not full release and not current-head evidence.`,
    map.nativeEvidence.status,
+   ...(cpu?[`ocr-cpu-worker is pending independent verification: the external .github/workflows/foundation-ocr-cpu-raster.yml job must run on exact head ${normal.headSha} with the worker pytest and zero skips; Repair neither executes nor inherits it, and no CDR or GPU pass substitutes for it.`]:[]),
    ...(gpu?[`ocr-gpu-worker is pending independent verification: the external .github/workflows/foundation-ocr-gpu-image.yml job candidate must run on exact head ${normal.headSha} with the worker pytest and the non-publishing CUDA image build plus provider/runtime checks; Repair neither executes nor inherits it, and no local CPU/CDR pass substitutes for it.`]:[]),
    'Cumulative PR/full release debt stays pending separately.']};
 }

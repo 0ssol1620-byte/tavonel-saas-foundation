@@ -6986,6 +6986,37 @@ test('affected directory pagination shared helper retains its original owner and
   assert.deepEqual(missing.failures, ['selected owner check is absent at head: lib/world-directory-and-ontology.test.ts']);
 });
 // END CUSTOMER PAGINATION DEPENDENCY CONTRACT
+test('affected CPU OCR synthetic binding owns exactly four paths and defers its exact-head worker workflow', () => {
+  const paths = [
+    'workers/foundation-ocr-cpu-raster/app.py',
+    'workers/foundation-ocr-cpu-raster/SYNTHETIC_TABLE_BINDING.md',
+    'workers/foundation-ocr-cpu-raster/tests/fixtures/synthetic-grid-profile.json',
+    'workers/foundation-ocr-cpu-raster/tests/test_synthetic_table_caller.py',
+  ];
+  const records = paths.map(path => affectedRecord('M', [path]));
+  const map = affectedMap(records);
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.changedPaths], [[], [], ['ocr-cpu-worker'], [...paths].sort()]);
+  assert.deepEqual([map.unitFiles, map.browserFiles, map.databaseTests], [[], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  assert.deepEqual(map.nativeEvidence.invalidatingPaths, [...paths].sort());
+  assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
+  const plan = affectedAskPlan(map);
+  assert.ok(plan.deferredGroups.includes('ocr-cpu-worker'));
+  assert.ok(plan.pendingDebt.includes('ocr-cpu-worker'));
+  assert.equal(plan.runCdrWorkerChecks, false);
+  assert.ok(plan.qualificationReasons.some(reason => reason.includes('foundation-ocr-cpu-raster.yml') && reason.includes(plan.headSha)));
+  for (const adjacent of [
+    'workers/foundation-ocr-cpu-raster/requirements.txt',
+    'workers/foundation-ocr-cpu-raster/tests/test_synthetic_table_caller_v2.py',
+    'workers/foundation-ocr-cpu-raster/tests/fixtures/synthetic-grid-profile-v2.json',
+    'workers/foundation-ocr-cpu-raster/tests/fixtures/real-document-profile.json',
+  ]) {
+    const unknown = affectedMap([...records, affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual(unknown.unmappedPaths, [adjacent], adjacent);
+    assert.deepEqual(unknown.failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+    assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
+  }
+});
 test('affected pilot worksheet runner admits the exact registered component suite and refuses unregistered siblings', async () => {
   const { buildUnitArgs, validateSelectedPath } = await import('./run-repair-check.mjs');
   const file = 'components/evaluation-page.test.tsx';
