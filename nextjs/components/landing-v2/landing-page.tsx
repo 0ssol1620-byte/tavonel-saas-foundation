@@ -143,7 +143,7 @@ const HOME_COPY = {
     },
   },
   ko: {
-    support: "원문에서, 사람과 AI가 쓰는 지식으로.",
+    support: "원문에서, 사람과 AI가 사용하는 지식으로.",
     intake: "자체 원문 접수는 별도 협의",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
