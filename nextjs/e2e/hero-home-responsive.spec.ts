@@ -7,7 +7,10 @@ test("first-visit phone actions remain visible with the consent panel", async ({
   await page.reload();
   await expect(page.locator("[data-marketing-consent-panel]")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
-  for (const action of await page.locator("#s1 .lv2-actions a").all()) {
+  const actions = page.locator("#s1 .lv2-actions a");
+  await expect(actions).toHaveCount(2);
+  for (const action of await actions.all()) {
+    await expect(action).toBeVisible();
     const rect = await action.boundingBox();
     expect(rect).not.toBeNull();
     expect(rect!.y).toBeGreaterThanOrEqual(0);
