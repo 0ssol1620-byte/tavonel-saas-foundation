@@ -348,12 +348,16 @@ export default function CompileStagePlayer({
   }, [focusStage, go, stages.length]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // Arrow navigation follows the focused tab, including externally restored focus.
+    const focusedTab = event.target instanceof HTMLElement ? event.target.closest('[role="tab"]') : null;
+    const focusedIndex = stages.findIndex(stage => tabId(stage.id) === focusedTab?.id);
+    const origin = focusedIndex >= 0 ? focusedIndex : index;
     const move = (next: number) => {
       event.preventDefault();
       chooseStage(next, true);
     };
-    if (event.key === "ArrowRight") move(index + 1);
-    if (event.key === "ArrowLeft") move(index - 1);
+    if (event.key === "ArrowRight") move(origin + 1);
+    if (event.key === "ArrowLeft") move(origin - 1);
     if (event.key === "Home") move(0);
     if (event.key === "End") move(stages.length - 1);
   };

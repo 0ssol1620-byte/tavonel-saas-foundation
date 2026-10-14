@@ -10,6 +10,8 @@ async function dismissConsent(page: import("@playwright/test").Page) {
 }
 
 test("the title leads directly into four selectable and playing demo recordings", async ({ page }, testInfo) => {
+  // Four cold decoders share one case; preserve the per-film progress assertions.
+  test.setTimeout(60_000);
   await page.goto("/");
   await dismissConsent(page);
   const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');

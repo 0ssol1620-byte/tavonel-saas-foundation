@@ -35,20 +35,21 @@
   .home.home > header :global(.site-nav-direct), .home.home > header :global(.nav-actions) > a { color: var(--ink); }
   .home.home :global(.lv2-wrap) { max-width: 1200px; width: calc(100% - 48px); padding-inline: 0; }
   .home.home :global(.lv2-scene) { min-height: 0; padding-block: 96px; border-bottom: 1px solid #d9ded9; }
-  .home.home :global(#s1) { padding-top: 96px; padding-bottom: 64px; }
+  .home.home :global(#s1) { padding-top: 88px; padding-bottom: 64px; }
   .home.home :global(#s1 > .lv2-wrap) { display: block; }
   .home.home :global(.lv2-hero-grid), .home.home :global(.lv2-hero-text) { display: block; }
   .home.home :global(.lv2-hero-h1) {
-    max-width: 1040px; margin: 0 auto 32px; text-align: center;
-    font: 560 clamp(44px, 4.6vw, 64px)/1.08 var(--f-sans); font-variation-settings: "wght" 560; font-synthesis: none; letter-spacing: -0.035em;
+    max-width: 1040px; margin: 0 auto 20px; text-align: center;
+    font: 560 clamp(44px, 4.6vw, 56px)/1.08 var(--f-sans); font-variation-settings: "wght" 560; font-synthesis: none; letter-spacing: -0.035em;
   }
   .home.home :global(.lv2-h1-line) { display: block; }
   .home.home :global(.lv2-h2) { font: 560 clamp(32px, 3.6vw, 52px)/1.12 var(--f-sans); letter-spacing: -0.03em; color: var(--ink); }
   .home.home :global(.lv2-scene-support) { color: #58615e; font: 17px/1.65 var(--f-sans); }
   .home.home :global(main a) { display: inline-flex; align-items: center; min-height: 44px; }
   .home.home :global(main summary) { min-height: 44px; }
-  .home.home :global(#s1 .lv2-film-story) { margin: 0 auto; max-width: 960px; }
-  .home.home :global(#s1 .lv2-film) { --lv2-film-w: 960px; }
+  /* Legacy film figure/body margins are unlayered; reset only this opening figure. */
+  .home.home :global(#s1 .lv2-film-story) { margin: 0 auto !important; border: 0; max-width: 760px; }
+  .home.home :global(#s1 .lv2-film) { --lv2-film-w: 760px; margin-top: 0 !important; padding-bottom: 0; }
   .home.home :global(#s1 .compile-film-sequence) { gap: 12px; }
   .home.home :global(#s1 .compile-film-stages) { border-top: 0; border-bottom: 1px solid var(--home-rule); }
   .home.home :global(#s1 .compile-film-stages button) {
@@ -58,9 +59,10 @@
   .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
   .home.home :global(#s1 .compile-film-viewport) { border-radius: 6px; border-color: var(--home-rule-strong); }
   .home.home :global(#s1 .compile-film-caption) { gap: 12px; align-items: start; }
-  .home.home :global(#s1 .compile-film-caption p) { color: var(--home-muted); font: 14px/1.5 var(--f-sans); }
+  .home.home :global(#s1 .compile-film-caption p) { color: var(--home-ink); font: 15px/1.5 var(--f-sans); }
+  .home.home :global(#s1 .compile-film-progress) { display: none; }
   .home.home :global(#s1 .lv2-film-story > figcaption) { margin-top: 8px; color: var(--home-muted); font: 12px/1.5 var(--f-sans); text-align: center; }
-  .heroAside { min-width: 0; margin: 24px auto 0; display: grid; gap: 12px; justify-items: center; }
+  .heroAside { min-width: 0; max-width: 760px; margin: 16px auto 0; display: grid; gap: 8px 24px; justify-items: center; }
   .heroAside :global(.lv2-hero-support) { margin: 0; max-width: 62ch; font: 18px/1.5 var(--f-sans); color: var(--ink); text-align: center; }
   .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: center; gap: 16px; margin-top: 0; }
   .home.home :global(.btn), .play { min-height: 48px; border-radius: 4px; }
@@ -107,6 +109,12 @@
     .heroAside :global(.lv2-hero-support) { max-width: 60ch; font-size: 18px; }
     .home.home :global(#s4 .lv2-split) { grid-template-columns: 1fr; gap: 32px; }
   }
+  @media (min-width: 900px) {
+    .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: 475px; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }
+    .heroAside { grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: start; }
+    .heroAside :global(.lv2-hero-support) { font-size: 16px; text-align: left; }
+    .heroAside .intake { grid-column: 2; margin: 0; }
+  }
   @media (max-width: 767px) {
     .home.home :global(.lv2-wrap) { width: calc(100% - 40px); }
     .home.home :global(.lv2-scene) { padding-block: 64px; }
@@ -114,7 +122,8 @@
     .home.home :global(.lv2-hero-h1) { font-size: 38px; line-height: 1.1; margin-bottom: 24px; }
     .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 38px; line-height: 1.2; letter-spacing: -0.03em; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 13px; padding-inline: 4px; min-height: 48px; }
-    .home.home :global(#s1 .compile-film-caption p) { font-size: 13px; }
+    .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; }
+    .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 12px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
     .heroAside { margin-top: 20px; }
     .heroAside :global(.lv2-hero-support) { font-size: 16px; line-height: 1.5; }
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; gap: 8px 20px; }
