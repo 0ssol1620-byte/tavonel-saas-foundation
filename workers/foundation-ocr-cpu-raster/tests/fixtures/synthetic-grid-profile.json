@@ -1,0 +1,27 @@
+{
+  "bindingVersion": "tavonel.saved_table_binding.v1",
+  "kind": "synthetic-ruled-grid-fixture",
+  "inputSha256": "sha256:86d9431490db103540eb3adc366f5d46d3e7cac7e9fa904b568e85bf63fa2e51",
+  "sourcePixelsSha256": "8a375dc530ea8d1c3f5d50d1651256d04b15c895c3b68ce8d050e4006d23d0e8",
+  "pageIndex0": 0,
+  "pageSizePixels": [
+    600,
+    400
+  ],
+  "sourceRegionsSha256": "sha256:751d5668efb55017dc416e32a12eef01b8d295be9f7a9b80b919d60ccb4a4c8e",
+  "bbox1000": [
+    150,
+    200,
+    850,
+    600
+  ],
+  "rulingsY1000": [
+    200,
+    300,
+    400,
+    500,
+    600
+  ],
+  "columns": 3,
+  "noTextLabelsOrCorrectedValuesUsedToInferOrder": true
+}

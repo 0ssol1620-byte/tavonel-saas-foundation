@@ -423,9 +423,17 @@ def normalized_bbox(left: float, top: float, right: float, bottom: float, width:
     return [x1, y1, x2, y2]
 
 
-def raster_page_regions(page, index: int, order: int) -> list[OcrRegion]:
+def raster_page_regions(page, index: int, order: int, *, qualified_table=None,
+                        source_payload=None, approved_profile_sha256=None) -> list[OcrRegion]:
     """Reads one scanned or image-only page from its rendered pixels."""
+    binding_requested = any(value is not None for value in (
+        qualified_table, source_payload, approved_profile_sha256))
+    if binding_requested:
+        validate_table_input(qualified_table, approved_profile_sha256=approved_profile_sha256,
+                             source_payload=source_payload, page_index0=index)
     image = render_page(page)
+    if binding_requested and list(image.size) != qualified_table["pageSizePixels"]:
+        raise TableBindingError("Rendered page dimensions do not match the profile")
     with _engine_lock:
         general_engine, korean_engine = rapidocr_engines()
         # The Korean pass always runs: the general recognizer drops Hangul lines without a trace.
@@ -452,6 +460,11 @@ def raster_page_regions(page, index: int, order: int) -> list[OcrRegion]:
             "confidence": line["confidence"],
             "authority": "informal",
         })
+    if binding_requested:
+        regions, _ = apply_bound_table(
+            regions, profile=qualified_table, approved_profile_sha256=approved_profile_sha256,
+            source_payload=source_payload, page_index0=index, page_size_pixels=image.size,
+        )
     return regions
 
 
@@ -629,8 +642,16 @@ def raster_pixels(width: float, height: float) -> int:
     return pixels
 
 
-def extract_text(payload: bytes) -> tuple[str, int, list[OcrRegion]]:
+def extract_text(payload: bytes, *, _development_profile_registry=None) -> tuple[str, int, list[OcrRegion]]:
     """Pages with embedded text keep it; scanned or image-only pages are rasterized and read on CPU."""
+    development_profiles = None
+    if _development_profile_registry is not None:
+        if type(payload) is not bytes or not payload:
+            raise TableBindingError("Development profiles require immutable input bytes")
+        input_digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+        development_profiles = _development_profile_registry.get(input_digest)
+        if development_profiles is None:
+            raise TableBindingError("Input has no reviewed development profile")
     try:
         document = pdfium.PdfDocument(payload)
     except Exception as exc:
@@ -639,6 +660,14 @@ def extract_text(payload: bytes) -> tuple[str, int, list[OcrRegion]]:
         page_count = len(document)
         if page_count < 1 or page_count > MAX_PAGES:
             raise HTTPException(422, "OCR source page count is not qualified")
+        if development_profiles is not None:
+            if set(development_profiles) != set(range(page_count)):
+                raise TableBindingError("Document pages do not match the reviewed development registry")
+            # Qualify every selected profile before the first render or OCR.
+            for index in range(page_count):
+                profile, approved_digest = development_profiles[index]
+                validate_table_input(profile, approved_profile_sha256=approved_digest,
+                                     source_payload=payload, page_index0=index)
         # Every page is checked before the first render, so a later unsafe page refuses the whole
         # document. Reading the text layer renders nothing, so only pages without one are budgeted.
         native: list[OcrRegion | None] = []
@@ -663,11 +692,21 @@ def extract_text(payload: bytes) -> tuple[str, int, list[OcrRegion]]:
         regions: list[OcrRegion] = []
         for index, region in enumerate(native):
             if region is not None:
+                if development_profiles is not None:
+                    raise TableBindingError("Reviewed development fixture requires a raster-only page")
                 regions.append({**region, "order": len(regions)})
                 continue
             page = document[index]
             try:
-                regions.extend(raster_page_regions(page, index, len(regions)))
+                if development_profiles is None:
+                    regions.extend(raster_page_regions(page, index, len(regions)))
+                else:
+                    profile, approved_digest = development_profiles[index]
+                    # This is the same immutable payload used to create document.
+                    regions.extend(raster_page_regions(
+                        page, index, len(regions), qualified_table=profile,
+                        source_payload=payload, approved_profile_sha256=approved_digest,
+                    ))
             finally:
                 page.close()
         text = "\n".join(region["text"] for region in regions).strip()
@@ -780,3 +819,182 @@ def ocr(
         source.file.close()
     text, page_count, regions = extract_text(payload)
     return JSONResponse(content=ocr_result_body(text, page_count, regions, expected_digest), headers=dict(NO_STORE))
+
+
+"""Opt-in ordering for an operator-qualified ruled table, after source region IDs exist.
+
+No OCR, text correction, cell-value concatenation, diagram-wide sorting or automatic
+table qualification occurs here. Unqualified/ambiguous rows retain their input slots.
+"""
+from copy import deepcopy
+import math
+
+
+def qualified_table_order(regions, *, page_index0, bbox1000, rulings_y1000, columns=7):
+    original = deepcopy(regions)
+    report = {"qualified": False, "rows": [], "deferred": []}
+    if (type(page_index0) is not int or type(columns) is not int or not 2 <= columns <= 32
+            or len(bbox1000) != 4 or len(rulings_y1000) < 3):
+        raise ValueError("Explicit page, bounded table and at least two ruled bands required")
+    values = [*bbox1000, *rulings_y1000]
+    if any(type(value) not in (float, int) or not math.isfinite(value) for value in values):
+        raise ValueError("Table geometry must be finite numeric data")
+    x1, y1, x2, y2 = bbox1000
+    if not 0 <= x1 < x2 <= 1000 or not 0 <= y1 < y2 <= 1000:
+        raise ValueError("Table ROI is outside the displayed page")
+    rules = list(rulings_y1000)
+    if any(a >= b for a, b in zip(rules, rules[1:])) or rules[0] < y1 or rules[-1] > y2:
+        raise ValueError("Rulings must be ordered inside the qualified ROI")
+    if len({r["regionId"] for r in regions}) != len(regions):
+        raise ValueError("Source region identities must be unique")
+    bands = [[] for _ in rules[:-1]]
+    centers = [(a + b) / 2 for a, b in zip(rules, rules[1:])]
+    unsafe = set()
+    for index, region in enumerate(regions):
+        if region["pageIndex0"] != page_index0:
+            continue
+        left, top, right, bottom = region["bbox1000"]
+        if not (x1 <= left < right <= x2 and y1 <= top < bottom <= y2):
+            continue
+        cy = (top + bottom) / 2
+        matches = [row for row, (a, b) in enumerate(zip(rules, rules[1:])) if a <= cy < b]
+        if not matches:
+            continue
+        row = matches[0]
+        bands[row].append(index)
+        spanned = {number for number, center in enumerate(centers) if top <= center <= bottom}
+        if len(spanned) > 1:
+            unsafe.update(spanned | {row})
+
+    def cells(indices):
+        groups = []
+        for index in sorted(indices, key=lambda i: regions[i]["bbox1000"][0]):
+            left, _, right, _ = regions[index]["bbox1000"]
+            matching = []
+            for number, group in enumerate(groups):
+                gl = min(regions[i]["bbox1000"][0] for i in group)
+                gr = max(regions[i]["bbox1000"][2] for i in group)
+                overlap = max(0, min(right, gr) - max(left, gl))
+                if overlap >= 0.6 * min(right - left, gr - gl):
+                    matching.append(number)
+            if len(matching) > 1:
+                return None
+            if matching:
+                groups[matching[0]].append(index)
+            else:
+                groups.append([index])
+        return groups
+
+    header = cells(bands[0])
+    if 0 in unsafe or header is None or len(header) != columns:
+        report["deferred"].append({"row": 0, "reason": "unqualified-header-geometry"})
+        return original, report
+    column_centers = [(min(regions[i]["bbox1000"][0] for i in group)
+                       + max(regions[i]["bbox1000"][2] for i in group)) / 2 for group in header]
+    result = deepcopy(regions)
+    for row, indices in enumerate(bands):
+        groups = cells(indices)
+        if row in unsafe or groups is None or len(groups) != columns:
+            report["deferred"].append({"row": row, "reason": "merged-spanning-or-incomplete-row"})
+            continue
+        assigned = {}
+        ambiguous = False
+        for group in groups:
+            left = min(regions[i]["bbox1000"][0] for i in group)
+            right = max(regions[i]["bbox1000"][2] for i in group)
+            hits = [column for column, center in enumerate(column_centers) if left <= center <= right]
+            if len(hits) != 1 or hits[0] in assigned:
+                ambiguous = True
+                break
+            assigned[hits[0]] = sorted(group, key=lambda i: (
+                regions[i]["bbox1000"][1], regions[i]["bbox1000"][0], i))
+        if ambiguous or len(assigned) != columns:
+            report["deferred"].append({"row": row, "reason": "ambiguous-column-span"})
+            continue
+        permutation = [i for column in range(columns) for i in assigned[column]]
+        for slot, source in zip(sorted(indices), permutation):
+            result[slot] = deepcopy(regions[source])
+            result[slot]["order"] = regions[slot]["order"]
+        report["rows"].append({"row": row, "yBand1000": rules[row:row + 2],
+            "cells": [{"column": column, "sourceRegionIds": [regions[i]["regionId"]
+                for i in assigned[column]], "multilineRegionsKeptSeparate": len(assigned[column]) > 1}
+                for column in range(columns)]})
+    report["qualified"] = True
+    report["tableOnly"] = True
+    report["sourceRegionCount"] = len(regions)
+    assert len(result) == len(regions)
+    assert {r["regionId"] for r in result} == {r["regionId"] for r in regions}
+    return result, report
+
+
+"""Exact approved-profile/input/region binding for the local optional BOM hook.
+
+The approval digest is trusted caller configuration, never a request field or a
+digest recomputed from an unapproved profile by the production caller.
+"""
+import hashlib
+import hmac
+import json
+import re
+
+
+class TableBindingError(ValueError):
+    """No table reordering may occur when the approved binding is incomplete."""
+
+
+def canonical_sha256(value):
+    try:
+        data = json.dumps(value, sort_keys=True, separators=(',', ':'),
+                          ensure_ascii=False, allow_nan=False).encode('utf-8')
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise TableBindingError('Binding data is not canonical JSON') from exc
+    return 'sha256:' + hashlib.sha256(data).hexdigest()
+
+
+def validate_table_input(profile, *, approved_profile_sha256, source_payload, page_index0):
+    required = {'bindingVersion', 'kind', 'inputSha256', 'sourcePixelsSha256',
+                'pageIndex0', 'pageSizePixels', 'sourceRegionsSha256', 'bbox1000',
+                'rulingsY1000', 'columns', 'noTextLabelsOrCorrectedValuesUsedToInferOrder'}
+    if type(profile) is not dict or set(profile) != required:
+        raise TableBindingError('Approved profile is missing or has an invalid schema')
+    if not isinstance(approved_profile_sha256, str) or not re.fullmatch(r'sha256:[a-f0-9]{64}', approved_profile_sha256):
+        raise TableBindingError('Trusted approved-profile digest is required')
+    if not hmac.compare_digest(canonical_sha256(profile), approved_profile_sha256):
+        raise TableBindingError('Profile digest does not match trusted approval')
+    if profile['bindingVersion'] != 'tavonel.saved_table_binding.v1':
+        raise TableBindingError('Unsupported table binding version')
+    for field in ('inputSha256', 'sourceRegionsSha256'):
+        if not isinstance(profile[field], str) or not re.fullmatch(r'sha256:[a-f0-9]{64}', profile[field]):
+            raise TableBindingError('Profile digest field is invalid')
+    if not isinstance(profile['sourcePixelsSha256'], str) or not re.fullmatch(r'[a-f0-9]{64}', profile['sourcePixelsSha256']):
+        raise TableBindingError('Source-pixel provenance digest is invalid')
+    if type(source_payload) is not bytes or not source_payload:
+        raise TableBindingError('Actual source bytes are required')
+    if not hmac.compare_digest('sha256:' + hashlib.sha256(source_payload).hexdigest(), profile['inputSha256']):
+        raise TableBindingError('Actual input bytes do not match the approved profile')
+    if type(page_index0) is not int or type(profile['pageIndex0']) is not int or page_index0 != profile['pageIndex0']:
+        raise TableBindingError('Profile belongs to another page')
+    size = profile['pageSizePixels']
+    if (type(size) is not list or len(size) != 2
+            or any(type(n) is not int or not 1 <= n <= 10000 for n in size)):
+        raise TableBindingError('Approved displayed-page dimensions are invalid')
+    if (type(profile['bbox1000']) is not list or type(profile['rulingsY1000']) is not list
+            or type(profile['columns']) is not int
+            or profile['noTextLabelsOrCorrectedValuesUsedToInferOrder'] is not True):
+        raise TableBindingError('Profile geometry or provenance contract is invalid')
+    try:
+        qualified_table_order([], page_index0=page_index0, bbox1000=profile['bbox1000'],
+                              rulings_y1000=profile['rulingsY1000'], columns=profile['columns'])
+    except (TypeError, ValueError, KeyError) as exc:
+        raise TableBindingError('Approved table geometry is invalid') from exc
+
+
+def apply_bound_table(regions, *, profile, approved_profile_sha256, source_payload, page_index0, page_size_pixels):
+    validate_table_input(profile, approved_profile_sha256=approved_profile_sha256,
+                         source_payload=source_payload, page_index0=page_index0)
+    if list(page_size_pixels) != profile['pageSizePixels']:
+        raise TableBindingError('Rendered page dimensions do not match the profile')
+    if not hmac.compare_digest(canonical_sha256(regions), profile['sourceRegionsSha256']):
+        raise TableBindingError('Source OCR regions do not match the approved profile')
+    return qualified_table_order(regions, page_index0=page_index0, bbox1000=profile['bbox1000'],
+                                 rulings_y1000=profile['rulingsY1000'], columns=profile['columns'])
