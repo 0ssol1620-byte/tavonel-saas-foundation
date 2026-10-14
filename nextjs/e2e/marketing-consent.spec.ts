@@ -20,8 +20,10 @@ test("decision A counts prepared source UI engagement once without source or act
   await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
   await regions.nth(2).click();
   await expect(regions.nth(2)).toHaveAttribute("aria-pressed", "true");
-  await page.locator("#s1 [data-source-inspection-film] button").click();
-  await expect(page.locator("#s1 [data-source-inspection-film] video")).toHaveCount(1);
+  const filmTab = page.locator('#s1 [data-testid="landing-hero-film"]').getByRole("tab").nth(1);
+  await filmTab.click();
+  await expect(filmTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('#s1 [data-testid="landing-hero-film"] video')).toHaveCount(1);
   const events = await page.evaluate(() =>
     (window as Window & { __preparedEngagement: Record<string, unknown>[] }).__preparedEngagement,
   );
