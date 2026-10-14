@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 // No machine paths, task folders, installation, phase flag or runtime fixture is involved.
 const require = createRequire(import.meta.url);
 const nextRequire = createRequire(require.resolve("next/package.json"));
-type CssNode = { type: string; name?: string; parent?: CssNode };
+type CssNode = { type: string; name?: string; params?: string; parent?: CssNode };
 type CssRule = CssNode & {
   selectors: string[];
   walkDecls(property: string, visit: (declaration: { value: string; important?: boolean }) => void): void;
@@ -19,33 +19,58 @@ type Baseline = {
   modulePath: string; globalPath: string; baselineBlob: string; baselineSha256: string; baselineBytes: number;
   reviewedCandidateBlob: string; reviewedCandidateSha256: string; reviewedCandidateBytes: number;
   addedDeclarations: number; addedBytes: number; ink: string; paper: string; globalHeadingInk: string;
-  minimumContrast: number; headings: Heading[];
+  minimumContrast: number; headings: Heading[]; historicalReviewedModuleSource: string;
+  currentSource: { inputCommit: string; moduleBlob: string; moduleSha256: string; moduleBytes: number; ink: string; paper: string; tokenLayer: string; tokenImportant: boolean; activeRoot: { path: string; sha256: string; bytes: number; ink: string; paper: string } };
 };
 const packageRoot = new URL("../", import.meta.url);
 const baseline = JSON.parse(readFileSync(new URL("scripts/fixtures/home-reader-heading-css-baseline.json", packageRoot), "utf8")) as Baseline;
-const moduleBytes = readFileSync(new URL(baseline.modulePath, packageRoot));
+// Verify canonical Git source bytes on both Linux and CRLF working checkouts.
+const moduleBytes = Buffer.from(readFileSync(new URL(baseline.modulePath, packageRoot), "utf8").replace(/\r\n/g, "\n"));
 const moduleSource = moduleBytes.toString("utf8");
 const moduleCss = postcss.parse(moduleSource);
+const activeRootBytes = Buffer.from(readFileSync(new URL(baseline.currentSource.activeRoot.path, packageRoot), "utf8").replace(/\r\n/g, "\n"));
+const activeRootCss = postcss.parse(activeRootBytes.toString("utf8"));
 const globalCss = postcss.parse(readFileSync(new URL(baseline.globalPath, packageRoot), "utf8"));
 
 function declaration(root: CssRoot, selector: string, property: string) {
   const found: Array<{ value: string; important: boolean; layered: boolean }> = [];
+  const layers: string[][] = [];
   root.walkRules((rule) => {
     if (!rule.selectors.includes(selector)) return;
     rule.walkDecls(property, (decl) => {
       let layered = false;
+      const names: string[] = [];
       for (let parent = rule.parent; parent; parent = parent.parent) {
-        if (parent.type === "atrule" && parent.name === "layer") layered = true;
+        if (parent.type === "atrule" && parent.name === "layer") { layered = true; names.push(parent.params ?? ""); }
       }
       found.push({ value: decl.value, important: Boolean(decl.important), layered });
+      layers.push(names);
     });
   });
+  if (root === moduleCss && selector === ".home" && ["--home-ink", "--home-paper"].includes(property)) {
+    // This bounded source contract admits only the two actual declarations: old unlayered normal
+    // token, then the reviewed important token in overrides. Extra/renamed layers fail closed.
+    expect(found, `base plus reviewed override ${property}`).toHaveLength(2);
+    const isInk = property === "--home-ink";
+    expect(found[0]).toEqual({ value: isInk ? baseline.ink : baseline.paper, important: false, layered: false });
+    expect(layers[0]).toEqual([]);
+    expect(found[1]).toEqual({ value: isInk ? baseline.currentSource.ink : baseline.currentSource.paper, important: true, layered: true });
+    expect(layers[1]).toEqual([baseline.currentSource.tokenLayer]);
+    expect(baseline.currentSource.tokenImportant).toBe(true);
+    // Important beats normal; layered important beats unlayered important; order is last tiebreak.
+    const winner = found.map((value, order) => ({ ...value, order })).sort((a, b) =>
+      Number(a.important) - Number(b.important)
+      || (a.important ? Number(a.layered) - Number(b.layered) : Number(!a.layered) - Number(!b.layered))
+      || a.order - b.order).at(-1)!;
+    expect(winner.order).toBe(1);
+    return found[winner.order];
+  }
   expect(found, `exactly one ${selector}/${property} declaration`).toHaveLength(1);
   return found[0];
 }
 
 function opaqueToken(name: string) {
-  const root = name.startsWith("--home-") ? moduleCss : globalCss;
+  const root = name.startsWith("--home-") ? activeRootCss : globalCss;
   const selector = name.startsWith("--home-") ? ".home" : ":root";
   const value = declaration(root, selector, name).value;
   expect(value).toMatch(/^#[0-9a-f]{6}$/i);
@@ -87,8 +112,8 @@ function headingWitness(heading: Heading, globalLast: boolean) {
   const winner = declarations.at(-1)!;
   const color = resolveColor(winner.value);
   const paper = resolveColor(declaration(moduleCss, ".readerGuide", "background").value);
-  expect(opaqueToken("--home-ink")).toBe(baseline.ink);
-  expect(opaqueToken("--home-paper")).toBe(baseline.paper);
+  expect(opaqueToken("--home-ink")).toBe(baseline.currentSource.activeRoot.ink);
+  expect(opaqueToken("--home-paper")).toBe(baseline.currentSource.activeRoot.paper);
   expect(opaqueToken("--text-hi")).toBe(baseline.globalHeadingInk);
   return { selector: winner.selector, color, paper, contrast: contrast(color, paper) };
 }
@@ -97,8 +122,8 @@ describe("reviewed Home reader heading CSS source contract", () => {
   it.each(baseline.headings)("$name has direct ink and at least 4.5 contrast on actual paper", (heading) => {
     const result = headingWitness(heading, false);
     expect(result.selector).toBe(heading.selector);
-    expect(result.color).toBe(baseline.ink);
-    expect(result.paper).toBe(baseline.paper);
+    expect(result.color).toBe(baseline.currentSource.activeRoot.ink);
+    expect(result.paper).toBe(baseline.currentSource.activeRoot.paper);
     expect(baseline.minimumContrast).toBe(4.5);
     expect(result.contrast).toBeGreaterThanOrEqual(baseline.minimumContrast);
   });
@@ -109,15 +134,16 @@ describe("reviewed Home reader heading CSS source contract", () => {
       for (const heading of baseline.headings) {
         const result = headingWitness(heading, globalLast);
         expect(result.selector).toBe(heading.selector);
-        expect(result.color).toBe(baseline.ink);
+        expect(result.color).toBe(baseline.currentSource.activeRoot.ink);
         expect(result.contrast).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 
-  it("differs from the exact reviewed baseline only by the two direct heading color additions", () => {
+  it("preserves the historical isolated heading patch bytes separately from the current CSS source", () => {
     const prefixes = [".readerHead h2,\n.readerFaq h2 {\n  margin: 0;", ".readerChecks h3 {\n  margin: 0;"];
-    let reconstructed = moduleSource;
+    const historicalBytes = Buffer.from(baseline.historicalReviewedModuleSource, "utf8");
+    let reconstructed = baseline.historicalReviewedModuleSource;
     for (const prefix of prefixes) {
       const addition = `${prefix}\n  color: var(--home-ink);`;
       expect(reconstructed.split(addition)).toHaveLength(2);
@@ -129,11 +155,34 @@ describe("reviewed Home reader heading CSS source contract", () => {
     expect(baseline.addedDeclarations).toBe(2);
     expect(baseline.addedBytes).toBe(52);
     expect(before.length).toBe(baseline.baselineBytes);
-    expect(moduleBytes.length).toBe(baseline.reviewedCandidateBytes);
-    expect(moduleBytes.length - before.length).toBe(52);
+    expect(historicalBytes.length).toBe(baseline.reviewedCandidateBytes);
+    expect(historicalBytes.length - before.length).toBe(52);
     expect(sha256(before)).toBe(baseline.baselineSha256);
     expect(blob(before)).toBe(baseline.baselineBlob);
-    expect(sha256(moduleBytes)).toBe(baseline.reviewedCandidateSha256);
-    expect(blob(moduleBytes)).toBe(baseline.reviewedCandidateBlob);
+    expect(sha256(historicalBytes)).toBe(baseline.reviewedCandidateSha256);
+    expect(blob(historicalBytes)).toBe(baseline.reviewedCandidateBlob);
   });
+  it("binds the current whole-module hash and actual palette without replacing the historical pins", () => {
+    expect(baseline.currentSource.inputCommit).toMatch(/^[a-f0-9]{40}$/);
+    expect(moduleBytes.length).toBe(baseline.currentSource.moduleBytes);
+    expect(createHash("sha256").update(moduleBytes).digest("hex")).toBe(baseline.currentSource.moduleSha256);
+    expect(createHash("sha1").update(Buffer.from(`blob ${moduleBytes.length}\0`)).update(moduleBytes).digest("hex")).toBe(baseline.currentSource.moduleBlob);
+    expect(baseline.currentSource.ink).toBe("#15191d");
+    expect(baseline.currentSource.paper).toBe("#fbfaf7");
+    expect(baseline.currentSource.tokenLayer).toBe("overrides");
+    expect(baseline.currentSource.moduleBlob).not.toBe(baseline.reviewedCandidateBlob);
+  });
+
+  it("keeps the legacy important token cascade distinct from the mounted Home root", () => {
+    expect(declaration(moduleCss, ".home", "--home-ink")).toEqual({ value: "#15191d", important: true, layered: true });
+    expect(declaration(moduleCss, ".home", "--home-paper")).toEqual({ value: "#fbfaf7", important: true, layered: true });
+    expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "#19201f", important: false, layered: true });
+    expect(declaration(activeRootCss, ".home", "--home-paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
+    const page = readFileSync(new URL("components/landing-v2/landing-page.tsx", packageRoot), "utf8");
+    expect(page).toContain('className={`page lv2 ${sourceStyles.home}`}');
+    expect(page).not.toContain('${heroStyles.home}');
+    expect(activeRootBytes.length).toBe(baseline.currentSource.activeRoot.bytes);
+    expect(createHash("sha256").update(activeRootBytes).digest("hex")).toBe(baseline.currentSource.activeRoot.sha256);
+  });
+
 });
