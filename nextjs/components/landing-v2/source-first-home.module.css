@@ -115,6 +115,14 @@
     .heroAside :global(.lv2-hero-support) { grid-column: 1; grid-row: 1; font-size: 16px; text-align: left; }
     .heroAside :global(.lv2-actions) { grid-column: 2; grid-row: 1; }
     .heroAside .intake { grid-column: 2; margin: 0; }
+    /* First-visit consent adds an in-flow header. Keep the complete film and
+       actions together, with room for the own-source access condition below. */
+    :global(body:has([data-marketing-consent-panel])) .home.home :global(#s1) { padding-top: 16px; }
+    :global(body:has([data-marketing-consent-panel])) .home.home :global(#s1 .lv2-hero-h1) { font-size: clamp(44px, 4.45vw, 60px); }
+    :global(body:has([data-marketing-consent-panel])) .home.home :global(#s1 .lv2-film-story) { max-width: 624px; }
+    :global(body:has([data-marketing-consent-panel])) .home.home :global(#s1 .lv2-film) { --lv2-film-w: 624px; }
+    :global(body:has([data-marketing-consent-panel])) .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: 390px; }
+    :global(body:has([data-marketing-consent-panel])) .heroAside { margin-top: 12px; }
   }
   @media (max-width: 767px) {
     .home.home :global(.lv2-scene) { padding-block: 64px; }
@@ -124,7 +132,7 @@
     .home.home :global(.lv2-hero-h1) { font-size: 36px; line-height: 1.06; margin-bottom: 16px; }
     .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 36px; line-height: 1.16; letter-spacing: -0.03em; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-inline: 4px; min-height: 48px; }
-    .home.home :global(#s1 .compile-film-caption p) { font-size: 15px; }
+    .home.home :global(#s1 .compile-film-caption p) { font-size: 14px; }
     .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 12px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
     .heroAside { margin-top: 12px; }
     .heroAside :global(.lv2-hero-support) { font-size: 16px; line-height: 1.5; }

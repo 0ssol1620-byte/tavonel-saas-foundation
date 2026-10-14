@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+test("first-visit desktop actions leave room below the consent-visible hero", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator("[data-marketing-consent-panel]")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const actions = page.locator("#s1 .lv2-actions a");
+  await expect(actions).toHaveCount(2);
+  for (const action of await actions.all()) {
+    await expect(action).toBeVisible();
+    const rect = await action.boundingBox();
+    expect(rect).not.toBeNull();
+    expect(rect!.y).toBeGreaterThanOrEqual(0);
+    expect(rect!.y + rect!.height).toBeLessThanOrEqual(876);
+    expect(rect!.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
 test("first-visit phone actions remain visible with the consent panel", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -14,7 +33,7 @@ test("first-visit phone actions remain visible with the consent panel", async ({
     const rect = await action.boundingBox();
     expect(rect).not.toBeNull();
     expect(rect!.y).toBeGreaterThanOrEqual(0);
-    expect(rect!.y + rect!.height).toBeLessThanOrEqual(844);
+    expect(rect!.y + rect!.height).toBeLessThanOrEqual(820);
     expect(rect!.height).toBeGreaterThanOrEqual(44);
   }
 });

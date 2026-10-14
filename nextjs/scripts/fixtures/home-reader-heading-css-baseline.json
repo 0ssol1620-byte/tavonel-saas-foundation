@@ -45,12 +45,12 @@
     "boundary": "Canonical Git LF bytes at the existing341 source; no new product CSS, browser pixels, release qualification or renaming of historical evidence.",
     "activeRoot": {
       "path": "components/landing-v2/source-first-home.module.css",
-      "sha256": "6dda84520e83088a1fdde37717f46a65324f8e07dc1584c757902f5ebca33c95",
-      "bytes": 11315,
+      "sha256": "ed87c4094b730fc6397b4271c174bee72135cf166c08d6bb526a209f1cebdd45",
+      "bytes": 12191,
       "ink": "#15191d",
       "paper": "#faf9f6",
-      "boundary": "CandidateA1 root CSS from exact90ce; source hash is the actual current Git-canonical LF postimage. Legacy/historical module pins remain separate and unchanged.",
-      "baseInputCommit": "90ce780a7dd0484186de5db7652e4265c4209e80"
+      "boundary": "First-visit fold candidate from exacte155; actual canonical LF root CSS postimage. Legacy/historical module pins remain separate and unchanged.",
+      "baseInputCommit": "e155e7a14ddc130317ee38b15203e48f41bffbcb"
     }
   }
 }
