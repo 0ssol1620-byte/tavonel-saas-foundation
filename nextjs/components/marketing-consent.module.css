@@ -24,6 +24,12 @@
   Escape or either answer, and still first in DOM and Tab order (it mounts before the page in
   `app/layout.tsx`). G2-006's cost is accepted for the one screen before a reader answers.
 
+  Release 2 (orchestrator decision, 2026-10-15): the card covered the film centre at 1440 and the
+  film's foot and reading line at 390/412, and the first plan action on /pricing. It is no longer
+  on the first paint (`CONSENT_REVEAL` in the component: first scroll past 200px or 8 s), it is a
+  small bottom-left card of at most 360px from 900px up, and below 900px it is two compact rows
+  -- the sentence with its Privacy link, then the two equal answers -- inside 96px.
+
   G1-024 capped the phone height at 56px, and BQ-054 is where that cap stops being worth its
   price: it only held because the sentence was set at 11px, under the site's 12px floor, on the
   one paragraph every visitor is asked to read before answering. Three constraints meet here --
@@ -56,15 +62,14 @@
   z-index: 55;
   inset:
     auto
-    max(12px, env(safe-area-inset-right))
-    max(12px, env(safe-area-inset-bottom))
-    max(12px, env(safe-area-inset-left));
-  max-width: 760px;
-  margin-inline: auto;
+    auto
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  width: min(360px, calc(100vw - 32px));
   max-height: 25vh;
   max-height: 25dvh;
   overflow-y: auto;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border: 1px solid var(--hairline-hi);
   border-radius: 8px;
   background: var(--g2);
@@ -73,8 +78,16 @@
 
 .inner {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+/* Arrival from the edge it sits on; a reader who asked for less motion gets the card in place. */
+@media (prefers-reduced-motion: no-preference) {
+  .panel { animation: consent-in 180ms ease-out; }
+}
+@keyframes consent-in {
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 .panel p {
@@ -197,18 +210,25 @@
   .floating:hover { color: var(--text-hi); border-color: var(--text-lo); }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 899.98px) {
   /*
-    BQ-054. On a phone the sentence sits above two equal buttons. Brief move 6 keeps it at 13px
-    (the meta floor) and inside the 25% cap: 133px at 360 and 390 wide (headless Chromium, EN and KO).
+    BQ-054 / Release 2. Two rows: the sentence and its Privacy link at the 12px floor, then two
+    equal 44px answers. 7 + two 15.6px lines + 4 + 44 + 7 + 2px of border is 95px; a sentence that
+    needs a third line breaks that cap, which is why the prompt copy is held to two lines at 360.
   */
-  .panel { padding: 12px; }
-  .inner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+  .panel {
+    inset:
+      auto
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    width: auto;
+    padding: 7px 12px;
   }
-  .actions { gap: 8px; }
-  .actions button { flex: 1 1 0; justify-content: center; padding: 10px; }
+  .inner { gap: 4px; }
+  .panel p { font-size: 12px; line-height: 1.3; }
+  /* 15, not 14: at 12px/1.3 the line is 15.6px, and 15.6 + 28 is under the 44px touch floor. */
+  .panel p a { font-size: 12px; padding-block: 15px; margin-block: -15px; }
+  .actions button { justify-content: center; min-height: 44px; padding: 0 10px; }
   .floating { inset: auto auto 8px 0.5rem; }
 }
