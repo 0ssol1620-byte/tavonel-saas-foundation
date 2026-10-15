@@ -211,9 +211,11 @@ export async function runCollectionCompile(
   }
   // The v3 conflict contract is region-scoped. Never silently discard an
   // unrecognized sidecar or let an unknown OCR version fall back to v2.
+  // A v1 read is known, not unknown: it reaches OCR_REGIONS_REQUIRED below and is never dispatched.
   if (bodies.some((body) => {
     const json = body as Record<string, unknown>;
-    return (json.schemaVersion !== "tavonel.ocr_result.v2" && json.schemaVersion !== "tavonel.ocr_result.v3") ||
+    return (json.schemaVersion !== "tavonel.ocr_result.v1" && json.schemaVersion !== "tavonel.ocr_result.v2" &&
+        json.schemaVersion !== "tavonel.ocr_result.v3") ||
       json.recognitionConflicts !== undefined ||
       (json.schemaVersion === "tavonel.ocr_result.v3" && Object.keys(json).some((key) =>
         !new Set(["schemaVersion", "status", "text", "pageCount", "inputSha256", "sourceImmutableKey", "regions",
