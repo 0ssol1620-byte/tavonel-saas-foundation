@@ -45,16 +45,21 @@ export default function SourceRegion({
   );
 }
 
+
 /*
   The same box cut out of the page instead of drawn on it (brief move 8), for the place beside a
   passage where a reader matches the extractor's text to the printed lines it came from.
 
-  No new pixels and no canvas: it is the page raster the caller already serves, positioned so only
-  `bbox1000` shows. The per-mille box maps to percentages exactly as above, and the crop keeps the
-  box's true aspect (box width x raster width over box height x raster height), so nothing is
-  stretched. The frame fills whatever height its row gives it and centres the crop; the crop takes
-  the frame's width, capped so a tall box never grows past `maxHeight`. The coordinates are written
-  back onto the frame as `data-bbox1000`, the record's own numbers.
+  No new pixels, no canvas and no `<img>`: the committed page raster the caller already serves is
+  the element's background, sized and positioned so only `bbox1000` shows. A background has no
+  box of its own, so nothing overflows and nothing has to be clipped. The element keeps the box's
+  true aspect (box width x raster width over box height x raster height), so nothing is stretched;
+  it takes the width it is given, capped so a tall box never grows past `maxHeight`. The record's
+  coordinates are written back as `data-bbox1000`.
+
+  Background percentages: a size of 1000/w per mille of the page puts the page at the right scale,
+  and a position p% places the image's p% point on the box's p% point, so the box's left edge lands
+  on x0 when p = x0 / (1000 - w). A box spanning the full width has nothing to offset (p = 0).
 
   Hidden from assistive technology: the passage beside it is the same content as text.
 */
@@ -66,7 +71,7 @@ export function SourceRegionCrop({
   maxHeight = "12rem",
   className,
 }: {
-  /** The committed page raster -- the same file the page view shows, not a derivative. */
+  /** The committed page raster -- the same file the page view serves, not a derivative. */
   src: string;
   width: number;
   height: number;
@@ -76,9 +81,10 @@ export function SourceRegionCrop({
 }) {
   if (!isSourceRegionBox(bbox1000)) return null;
   const [x0, y0, x1, y1] = bbox1000;
-  const boxWidth = x1 - x0;
-  const boxHeight = y1 - y0;
-  const aspect = (boxWidth * width) / (boxHeight * height);
+  const w = x1 - x0;
+  const h = y1 - y0;
+  const aspect = (w * width) / (h * height);
+  const at = (start: number, span: number) => (span === 1000 ? 0 : (100 * start) / (1000 - span));
   return (
     <span
       className={className}
@@ -89,32 +95,16 @@ export function SourceRegionCrop({
     >
       <span
         style={{
-          position: "relative",
           display: "block",
-          overflow: "hidden",
           width: "100%",
           maxWidth: `calc(${maxHeight} * ${aspect})`,
           aspectRatio: String(aspect),
+          backgroundImage: `url(${JSON.stringify(src)})`,
+          backgroundRepeat: "no-repeat",
+          backgroundSize: `${100000 / w}% ${100000 / h}%`,
+          backgroundPosition: `${at(x0, w)}% ${at(y0, h)}%`,
         }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- a committed raster, positioned rather than re-encoded */}
-        <img
-          src={src}
-          width={width}
-          height={height}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          style={{
-            position: "absolute",
-            maxWidth: "none",
-            width: `${100000 / boxWidth}%`,
-            height: `${100000 / boxHeight}%`,
-            left: `${(-100 * x0) / boxWidth}%`,
-            top: `${(-100 * y0) / boxHeight}%`,
-          }}
-        />
-      </span>
+      />
     </span>
   );
 }

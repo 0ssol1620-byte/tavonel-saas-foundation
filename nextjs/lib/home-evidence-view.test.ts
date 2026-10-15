@@ -478,16 +478,21 @@ describe("the workbench passage and its crop", () => {
       const record = buildHeroView().regions.find(item => item.id === region.id)!;
       const markup = html(createElement(SourceRegionCrop, { src: image.src, width: image.width, height: image.height, bbox1000: region.bbox1000 }));
       expect(markup).toContain(`data-bbox1000="${record.bbox1000.join(",")}"`);
-      expect(markup.match(/<img /g)).toHaveLength(1);
-      expect(markup).toContain(`src="${image.src}"`);
+      // A background of the served raster, not a new image element or asset.
+      expect(markup).not.toContain("<img");
+      expect(unescape(markup)).toContain(`background-image:url("${image.src}")`);
       const [x0, y0, x1, y1] = record.bbox1000;
-      const style = markup.match(/<img[^>]*style="([^"]*)"/)?.[1] ?? "";
-      expect(style).toContain(`width:${100000 / (x1 - x0)}%`);
-      expect(style).toContain(`height:${100000 / (y1 - y0)}%`);
-      expect(style).toContain(`left:${(-100 * x0) / (x1 - x0)}%`);
-      expect(style).toContain(`top:${(-100 * y0) / (y1 - y0)}%`);
-      expect(markup).toContain(`aspect-ratio:${((x1 - x0) * image.width) / ((y1 - y0) * image.height)}`);
+      const [w, h] = [x1 - x0, y1 - y0];
+      expect(markup).toContain(`background-size:${100000 / w}% ${100000 / h}%`);
+      expect(markup).toContain(`background-position:${(100 * x0) / (1000 - w)}% ${(100 * y0) / (1000 - h)}%`);
+      expect(markup).toContain(`aspect-ratio:${(w * image.width) / (h * image.height)}`);
     }
+  });
+
+  it("offsets nothing along an axis the box spans in full", () => {
+    const markup = html(createElement(SourceRegionCrop, { src: "/fixture.webp", width: 10, height: 10, bbox1000: [0, 100, 1000, 300] }));
+    expect(markup).toContain("background-size:100% 500%");
+    expect(markup).toContain("background-position:0% 12.5%");
   });
 
   it("draws nothing for a box that is not a region", () => {
