@@ -10,6 +10,7 @@ import HeroActions from "./hero-actions";
 import HeroSourceCard from "./hero-source-card";
 import HeroStatement from "./hero-statement";
 import HomeReaderGuide from "./home-reader-guide";
+import HomeMeasures from "./home-measures";
 import heroStyles from "./landing-hero.module.css";
 import sourceStyles from "./source-first-home.module.css";
 import LandingAnalytics from "./landing-analytics";
@@ -313,6 +314,9 @@ export default function LandingPage({
             </div>
           </div>
         </section>
+
+        {/* Release 3 move 7: measured figures with their denominators and receipts, under the hero. */}
+        <HomeMeasures korean={korean} />
 
         {/*
           02 Why this case is difficult. Every difficulty points at a region the workbench above
