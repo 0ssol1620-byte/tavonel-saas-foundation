@@ -80,6 +80,9 @@ const FOOTNOTE: Record<LandingV2Locale, string> = {
   ko: "TAVONEL이 무엇을 실행하고 무엇을 실행하지 않는지, 구성 요소별로",
 };
 
+/* The per-proof link text. The accessible name adds the proof's label after it. */
+const READ: Record<LandingV2Locale, string> = { en: "Read", ko: "읽기" };
+
 const SCENE_INDEX = LANDING_V2_SCENE_ORDER.indexOf("trust") + 1;
 const TITLE_ID = "lv2-trust-title";
 
@@ -125,17 +128,23 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
                 four looked different for a reason nothing on the page explains. So the route
                 moved instead of the markup: /contact publishes the same sentence in the FAQ D6
                 moved there, every proof is an `lv2-inline-link`, and no destination is twice.
+
+                REDESIGN R2 (2026-10-15): the label is a plain heading again and the link is a
+                quiet "Read" under the scope sentence. Four blue underlined titles read as a terms
+                page. The link's name still carries the label, so the receipt stays one thing.
               */}
-              <p className="lv2-proof-label">
+              <h3 className="lv2-proof-label">{proof.label}</h3>
+              <p className="lv2-proof-note lv2-small">{proof.note}</p>
+              <p className="lv2-proof-read">
                 <Link className="lv2-inline-link"
                   href={(locale === "ko" && proof.href === "/contact" ? "/ko/contact" : proof.href) as Route}
                   hrefLang={locale === "ko" && proof.href !== "/contact" ? "en" : undefined}
-                  aria-label={locale === "ko" && proof.href !== "/contact" ? `${proof.label} (영문 페이지)` : undefined}
+                  aria-label={`${READ[locale]}: ${proof.label}${locale === "ko" && proof.href !== "/contact" ? " (영문 페이지)" : ""}`}
                   prefetch={false}>
-                  {proof.label}
+                  {READ[locale]}
+                  <span aria-hidden="true">→</span>
                 </Link>
               </p>
-              <p className="lv2-proof-note lv2-small">{proof.note}</p>
             </li>
           ))}
         </ul>
