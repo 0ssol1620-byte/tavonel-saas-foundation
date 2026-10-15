@@ -62,6 +62,13 @@ describe("approved one-path experience", () => {
     expect(data.length).toBe(bytes);
     expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
   });
+  /* Release 3 Tier 1 re-cut: each Home poster is held to its bytes and names a cut that is itself locked. */
+  it.each(films.posters)("preserves the re-cut poster $file bytes and its cut", ({ file, bytes, sha256, cut, cutSha256 }) => {
+    const data = readFileSync(fileURLToPath(new URL(`../public/film/${file}`, import.meta.url)));
+    expect(data.length).toBe(bytes);
+    expect(createHash("sha256").update(data).digest("hex")).toBe(sha256);
+    expect(films.files.find(row => row.file === cut)?.sha256, `${file} names a cut that is not locked`).toBe(cutSha256);
+  });
   /*
     The film opens under the centered hero message. Scene 02 follows with the source-linked
     CompilerSpecimen and public Evidence Inspector. The order below is read as positions so
@@ -109,7 +116,7 @@ describe("approved one-path experience", () => {
     expect(film).toContain('src: "/film/compile-cut.mp4"');
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
-    expect(film).toContain('poster: "/film/poster-1-hero-2x.webp"');
+    expect(film).toContain('poster: "/film/poster-1-t3.00-2x.webp"');
     const disclosure = text("components/landing-v2/hero-film-disclosure.tsx");
     expect(film).toContain("<HeroFilmDisclosure");
     expect(disclosure).toContain('data-testid="landing-hero-film"');

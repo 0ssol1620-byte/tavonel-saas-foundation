@@ -104,3 +104,92 @@
     border-left: 0;
   }
 }
+
+/*
+  Release 3 (brief move 2c, §5.3): the Home film opens readable.
+
+  On a desktop the film opens on a 2x Focus crop of the stage's two reading panes (the window is
+  STAGE_FRAMES[stage].crop, passed in as --film-crop-x/-y). The box keeps its size, so nothing below
+  it moves; the poster, the Tier 2 mask over it and the playing cut are drawn at 2x and shifted so
+  the window's corner sits on the box's corner. "Fit full frame" (viewControl) returns the whole
+  frame; a phone keeps its own Fit/Focus button, so exactly one of the two is ever displayed. No
+  transition: the change of view is the visitor's press, not an animation.
+*/
+.viewControl {
+  display: none;
+}
+
+/* The SVG's viewBox and xMidYMid meet give it the still's contain fit inside the same box. */
+.mask {
+  grid-area: 1 / 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  .story[data-narrow="0"] .viewControl {
+    display: inline-flex;
+    align-items: center;
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    justify-self: end;
+    min-height: 44px;
+    margin: 0;
+    padding: 8px 14px;
+    border: 1px solid var(--home-rule-strong, rgb(21 25 29 / 32%));
+    border-radius: 4px;
+    background: transparent;
+    color: var(--home-ink, #15191d);
+    font: 560 15px/1.4 var(--f-sans);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .story[data-narrow="0"] .viewControl:focus-visible {
+    outline: 2px solid var(--home-cobalt, #244ac8);
+    outline-offset: 2px;
+  }
+
+  .story[data-narrow="0"] :global(.compile-film-caption) {
+    grid-column: 1;
+  }
+
+  .story[data-narrow="0"][data-wide-view="crop"] :is(:global(.compile-film-video), :global(.compile-film-still), .mask) {
+    transform-origin: 0 0;
+    transform: scale(2) translate(calc(-1 * var(--film-crop-x, 0%)), calc(-1 * var(--film-crop-y, 0%)));
+  }
+
+  /*
+    Release 3 reading layer: the pane names are read at 15px on a desktop, where a quarter of the
+    frame is 300px wide. A phone keeps the 13px meta size: at 15px MARKDOWN (90.7px) and ONTOLOGY
+    (85.7px) outgrow a 77-85px quarter at 360-390 and would break mid-word.
+  */
+  .story[data-narrow="0"] .panes li {
+    font-size: 15px;
+  }
+
+  /* The strip names only the two panes in the window, each under its half. */
+  .story[data-narrow="0"][data-wide-view="crop"] .panes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .story[data-narrow="0"][data-wide-view="crop"] .panes li:not([data-in-crop]) {
+    display: none;
+  }
+}
+
+/*
+  Phone Focus: the pan surface is 1960 x 1225 (0.68 CSS px per source px) instead of the shared
+  1120 x 700, so the cuts' smallest body type (7px source x-height, Organize's MARKDOWN) lands at
+  a 4.8px x-height, about 9px type. One quarter-frame snap is 490px, so a pane is panned within as
+  well as across. Fit is unchanged and stays the phone's default.
+*/
+@media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
+  .story[data-mobile-view="focus"] :is(:global(.compile-film-panes), :global(.compile-film-video), :global(.compile-film-still), .mask) {
+    width: 1960px;
+    height: 1225px;
+  }
+}

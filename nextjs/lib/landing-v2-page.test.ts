@@ -585,7 +585,7 @@ describe("landing v2 -- the lead and the workbench", () => {
         ? "TAVONEL이 문서를 그 지식으로 컴파일합니다. 각 진술은 원문 페이지에 연결된 채 남고, 원문이 바뀌면 다시 컴파일됩니다."
         : "TAVONEL compiles your documents into it. Each statement stays linked to the page it came from, and the knowledge recompiles when a source changes.",
     );
-    expect(hero).toContain("/film/poster-1-hero-2x.webp");
+    expect(hero).toContain("/film/poster-1-t3.00-2x.webp");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
     expect(hero).toContain('data-mobile-view="fit"');
     expect(hero).not.toContain('data-source-inspection-film');

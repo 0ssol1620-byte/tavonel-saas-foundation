@@ -12,6 +12,8 @@ export type CompileStage = {
   /** Narrow-screen compatibility encode; falls back to fallbackSrc when absent. */
   fallbackPhoneSrc?: string;
   poster: string;
+  /** A 1440px copy of `poster` (which is then the 2880px file), so a phone in Fit can take the smaller one. */
+  poster1x?: string;
 };
 
 /*
