@@ -27,10 +27,12 @@ const HERO_CUT = {
 } as const;
 
 /*
-  Tier 1 poster re-cut (brief §5.3, approved for Release 3): one frame of each locked cut, as a
+  Tier 1 poster re-cut (brief §5.3, a founder-gated item): selected by the Release 3 orchestrator
+  under the founder's 2026-10-03 delegated authority, founder veto open (RESUME-20261015-LEDGER);
+  no founder approval is on record. One frame of each locked cut, as a
   2880x1800 file and a 1440x900 copy. Stage 1 is t = 3.00s of compile-cut.mp4 (the fine search found
   no frame without the document eyebrow overprint, so it also carries the Tier 2 mask in
-  STAGE_FRAMES); stages 2-4 are t = 17.96s, the founder-approved candidates. Frame times, cut and
+  STAGE_FRAMES); stages 2-4 are t = 17.96s, the Release 2 candidates. Frame times, cut and
   file sha256 are rows in public/film/README.md and lib/locked-film-assets.json `posters`, whose
   bytes one-path-contract.test.ts holds. New names, not new bytes under old names: /film/* is
   served immutable for a year.

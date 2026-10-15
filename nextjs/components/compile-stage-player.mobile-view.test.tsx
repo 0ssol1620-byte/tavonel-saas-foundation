@@ -167,12 +167,14 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
   it("opens the Home film on the crop with a Fit full frame control, and names only the window's panes", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
     expect(en).toContain('data-wide-view="crop"');
-    expect(en).toContain("--film-crop-x:25%;--film-crop-y:20%");
-    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true">Fit full frame<\/button>/);
+    expect(en).toContain("--film-crop-x:25%;--film-crop-y:50%");
+    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+">Fit full frame<\/button>/);
     expect(en).toMatch(/<li>SOURCES<\/li><li data-marked="1" data-in-crop="1">ORIGINAL<\/li><li data-in-crop="1">EXTRACT<\/li><li>WORLD<\/li>/);
-    // The phone keeps Fit as its default (brief §2); only the desktop view starts cropped.
+    // The phone keeps Fit as its default (brief §2); only the desktop view starts cropped (R3-D1).
     expect(en).toContain('data-mobile-view="fit"');
-    expect(renderToStaticMarkup(<HeroFilm korean />)).toMatch(/aria-pressed="true">전체 프레임 보기<\/button>/);
+    // On Home neither view toggle carries a pressed state: each label names the view it opens (M1).
+    expect(focusControl(en)).toEqual({ attrs: expect.not.stringContaining("aria-pressed"), label: "Focus details" });
+    expect(renderToStaticMarkup(<HeroFilm korean />)).toMatch(/class="compile-film-view-control [^"]+" aria-controls="[^"]+">전체 프레임 보기<\/button>/);
     const plain = renderToStaticMarkup(<CompileStagePlayer />);
     for (const homeOnly of ["data-wide-view", "compile-film-view-control", "--film-crop-x", "data-in-crop"]) expect(plain).not.toContain(homeOnly);
   });

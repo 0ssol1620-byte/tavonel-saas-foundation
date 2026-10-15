@@ -55,7 +55,7 @@
     --hairline-hi: rgb(21 25 29 / 0.22) !important;
     color: #15191d !important;
   }
-  .panel p a { color: #2347b8 !important; }
+  .panel p a { color: #005bb3 !important; }
   /* On Home the accent is not a link colour: the notice link is ink with its underline. */
   :global(body:has([data-home-ia])) .panel p a { color: var(--text-hi) !important; }
   .panel .actions button { font-weight: 510 !important; }

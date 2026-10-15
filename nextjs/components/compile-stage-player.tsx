@@ -64,6 +64,15 @@ export type ReadingTarget = { pane: 0 | 1 | 2 | 3; text: string; mono: boolean; 
   Release 2 frame pool): WORKING COPY.md at y 1052, # Payment terms at y 242-1522 (the 450-1350
   window always holds one), CHANGED at y 278-720, nodes lit at y 1670. "Fit full frame" is one
   press away and shows the whole cut.
+
+  Stage 1 starts at y 0.5, not 0.2 (Release 3 fix round, B1). Cut 1 loads a new document about
+  every 1.08s, and each load clears EXTRACT's page copy (rows ~190-735) and wipes it back in from
+  the top. A 1440x900 first screen shows only the window's top 359 of its 750px, so at y 0.2
+  (rows 360-791) the right half of the first screen was nothing but dark in 129 of the cut's 446
+  presented frames. At y 0.5 (rows 900-1800; first screen 900-1331) that half is the WORKING
+  COPY.md editor under its label, and no presented frame of the 18s cut leaves either visible
+  pane without ink (redesign-r3-20261015/fix/BLANK-SCAN.json; e2e hero-home-responsive "no blank
+  pane"). The window's smallest text is then the editor's 9px (source) x-height, not 7px.
 */
 export type FilmCrop = { x: 0 | 0.25 | 0.5; y: number };
 
@@ -84,7 +93,7 @@ export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, str
   sources: {
     panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"],
     readingTarget: { pane: 1, text: "WORKING COPY.md", mono: true, line: "The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in {q}.", lineKo: "ORIGINAL 패널은 원문 페이지를 한 장씩 열고, EXTRACT 패널은 그 내용을 {q}에 옮겨 적습니다." },
-    crop: { x: 0.25, y: 0.2 },
+    crop: { x: 0.25, y: 0.5 },
     posterMask: { poster: "/film/poster-1-t3.00-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
   },
   read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", mono: true, line: "Look for {q} in the MARKDOWN pane.", lineKo: "MARKDOWN 패널에서 {q} 줄을 찾아보세요." }, crop: { x: 0.25, y: 0.25 } },
@@ -543,12 +552,20 @@ export default function CompileStagePlayer({
         </button>
   );
 
+  /*
+    On Home both view toggles name the view a press opens ("Focus details" / "Fit full frame"), so
+    neither carries aria-pressed: a label that changes with the state plus a pressed state was read
+    as "Fit full frame, pressed" while the crop was on screen (Release 3 fix round, M1; WAI-ARIA APG:
+    a toggle button's label does not change). The view on screen is the other one, and on a phone
+    the polite hint below says which. Other callers keep main304's markup byte for byte
+    (home-player-main304-parity.test.ts), pressed state included.
+  */
   const mobileTools = (<div className="compile-film-mobile-tools">
         <button
           type="button"
           className="compile-film-focus-control"
           aria-controls={panelId}
-          aria-pressed={!mobileFilmFit}
+          aria-pressed={storyLayout ? undefined : !mobileFilmFit}
           onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
         >
           {mobileFilmFit
@@ -564,7 +581,7 @@ export default function CompileStagePlayer({
       </div>);
   /* Home desktop: the same Fit/Focus pair as the phone, on its own crop state (CSS shows one of the two). */
   const viewControl = storyLayout ? (
-    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} aria-pressed={!wideFit} onClick={() => setWideFit(fit => !fit)}>
+    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} onClick={() => setWideFit(fit => !fit)}>
       {wideFit ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
     </button>
   ) : null;

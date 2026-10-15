@@ -14,6 +14,13 @@
  * not build. Headline figures are read from the claim's `numbers`; denominators the claim does not
  * carry are read from the receipt bytes the claim is bound to. No figure is typed here.
  *
+ * WHAT EACH FACT MUST SAY
+ * Each fact ends on its claim's `must_say_en` / `must_say`, read from the pack and printed verbatim
+ * (decision.md A-11: the constraint wording is part of the generated evidence, so writing it here
+ * would author the constraint rather than carry it). A claim on the band without both is refused.
+ * A number inside a must-say is printed as a figure of that claim, so the entry-page digit walk
+ * binds it like any other, and it must be a value the claim carries or the module throws.
+ *
  * WHAT IS NOT ON THE BAND, AND WHY
  * - Completion (99.98%) and recovery (99.94% of 1,797): both approved, but their receipt -- the
  *   completion ledger -- is not served by this site. Its bytes name recovery trees and rounds, and
@@ -43,20 +50,39 @@ export type HomeMeasure = {
   readonly ko: MeasureCopy;
 };
 
-type PackClaim = { id: string; status: string; evidence_sha256?: string | string[]; numbers?: unknown };
+type PackClaim = { id: string; status: string; evidence_sha256?: string | string[]; numbers?: unknown; must_say?: string; must_say_en?: string };
+
+const fig = (n: number, d = 0): Figure => ({ n, d });
+
+function numericLeaves(value: unknown, into: number[] = []): number[] {
+  if (typeof value === "number") into.push(value);
+  else if (value && typeof value === "object") for (const child of Object.values(value)) numericLeaves(child, into);
+  return into;
+}
+
+/** A must-say as the pack states it, each number in it turned into a figure the claim carries. */
+export function carried(id: string, text: string, values: readonly number[]): Part[] {
+  return text.split(/(\d[\d,]*(?:\.\d+)?)/).filter(piece => piece !== "").map(piece => {
+    if (!/^\d/.test(piece)) return piece;
+    const n = Number(piece.replaceAll(",", "")), d = piece.split(".")[1]?.length ?? 0;
+    const printed = formatFigure(fig(n, d));
+    if (!values.includes(n) || printed !== piece) throw new Error(`Home measure: "${piece}" in the must-say of "${id}" is not a figure of the claim`);
+    return fig(n, d);
+  });
+}
 
 /** The approved claim `id`, provided its evidence is the receipt `receiptId` this site serves. */
-function bound<T>(id: string, receiptId: string): { numbers: T; receipt: EvidenceReceipt } {
+function bound<T>(id: string, receiptId: string): { numbers: T; receipt: EvidenceReceipt; mustSay: { en: Part[]; ko: Part[] } } {
   const claim = (pack.claims as PackClaim[]).find(entry => entry.id === id);
   const receipt = EVIDENCE.find(entry => entry.receipt?.id === receiptId)?.receipt;
   if (claim?.status !== "approved") throw new Error(`Home measure: "${id}" is not an approved claim`);
   if (!receipt || claim.evidence_sha256 !== `sha256:${receipt.digest}`) {
     throw new Error(`Home measure: receipt ${receiptId} is not the evidence of claim "${id}"`);
   }
-  return { numbers: claim.numbers as T, receipt };
+  if (!claim.must_say_en || !claim.must_say) throw new Error(`Home measure: claim "${id}" has no must-say in both languages`);
+  const values = numericLeaves(claim.numbers);
+  return { numbers: claim.numbers as T, receipt, mustSay: { en: carried(id, claim.must_say_en, values), ko: carried(id, claim.must_say, values) } };
 }
-
-const fig = (n: number, d = 0): Figure => ({ n, d });
 
 /** How every figure on the band is printed: one formatter, so a receipt value cannot be restyled into another number. */
 export const formatFigure = ({ n, d }: Figure) => (d > 0 ? n.toFixed(d) : n.toLocaleString("en-US"));
@@ -84,7 +110,7 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
       detail: [
         "Of ", fig(structure.numbers.documents_exercised), " documents offered, ", fig(vault.documents_compiled),
         " compiled and ", fig(vault.documents_refused_for_broken_links),
-        " were refused for a link that could not be resolved. Structure only; text correctness is measured separately.",
+        " were refused for a link that could not be resolved. ", ...structure.mustSay.en,
       ],
     },
     ko: {
@@ -93,7 +119,7 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
       detail: [
         "제공된 문서 ", fig(structure.numbers.documents_exercised), "건 중 ", fig(vault.documents_compiled),
         "건을 컴파일했고, 확인할 수 없는 링크가 있는 ", fig(vault.documents_refused_for_broken_links),
-        "건은 내보내지 않고 거부했습니다. 구조에 관한 측정이며, 텍스트의 정확성은 따로 측정합니다.",
+        "건은 내보내지 않고 거부했습니다. ", ...structure.mustSay.ko,
       ],
     },
   },
@@ -104,16 +130,14 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
       figure: [fig(recovery.numbers.with_recovery, 1)],
       label: ["olmOCR-Bench score with recovery; ", fig(recovery.numbers.without_recovery, 1), " with only recovery switched off"],
       detail: [
-        "Same pipeline, evaluator and ", fig(r01.held_constant.input_count), " documents (",
-        fig(r01.held_constant.test_count), " checks). Only recovery changed.",
+        fig(r01.held_constant.input_count), " documents, ", fig(r01.held_constant.test_count), " checks. ", ...recovery.mustSay.en,
       ],
     },
     ko: {
       figure: [fig(recovery.numbers.with_recovery, 1)],
       label: ["복구를 켠 olmOCR-Bench 점수. 복구만 끄면 ", fig(recovery.numbers.without_recovery, 1)],
       detail: [
-        "같은 파이프라인, 같은 평가기, 같은 문서 ", fig(r01.held_constant.input_count), "건(검사 ",
-        fig(r01.held_constant.test_count), "개)에서 복구만 바꿨습니다.",
+        "문서 ", fig(r01.held_constant.input_count), "건, 검사 ", fig(r01.held_constant.test_count), "개. ", ...recovery.mustSay.ko,
       ],
     },
   },
@@ -124,16 +148,16 @@ export const HOME_MEASURES: readonly HomeMeasure[] = [
       figure: [fig(weakest.accuracy_percent, 1), "%"],
       label: ["of checks passed on low-quality scans"],
       detail: [
-        fig(weakest.checks_passed), " of ", fig(weakest.checks_total), " checks: our weakest document type. Standard digital documents: ",
-        fig(standard.checks_passed), " of ", fig(standard.checks_total), " (", fig(standard.accuracy_percent, 1), "%).",
+        fig(weakest.checks_passed), " of ", fig(weakest.checks_total), " checks on low-quality scans; ",
+        fig(standard.checks_passed), " of ", fig(standard.checks_total), " on standard digital documents. ", ...byType.mustSay.en,
       ],
     },
     ko: {
       figure: [fig(weakest.accuracy_percent, 1), "%"],
       label: ["저품질 스캔본에서 통과한 검사 비율"],
       detail: [
-        "검사 ", fig(weakest.checks_total), "개 중 ", fig(weakest.checks_passed), "개로, 가장 약한 문서 유형입니다. 표준 디지털 문서는 ",
-        fig(standard.checks_total), "개 중 ", fig(standard.checks_passed), "개(", fig(standard.accuracy_percent, 1), "%)입니다.",
+        "저품질 스캔본 검사 ", fig(weakest.checks_total), "개 중 ", fig(weakest.checks_passed), "개, 표준 디지털 문서 ",
+        fig(standard.checks_total), "개 중 ", fig(standard.checks_passed), "개. ", ...byType.mustSay.ko,
       ],
     },
   },

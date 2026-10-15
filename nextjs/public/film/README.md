@@ -31,7 +31,7 @@ One frame of each locked cut, drawn by Chrome 155.0.8059.40 seeking a `<video>` 
 | `poster-4-t17.96-2x.webp` | 4 | 2x | 2880×1800 | 191,694 | `3fd52503c3615647e5c0587f9b5ce43d12c432f0e14c9e3cca34a48840d58912` | `compile-cut-4.mp4` | 17.96 s | `480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732` |
 | `poster-4-t17.96.webp` | 4 | 1x | 1440×900 | 80,582 | `77625e4584b4723fd1e53bd9c0254bcedd9505d8c8386b61d2901be47d095089` | `compile-cut-4.mp4` | 17.96 s | `480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732` |
 
-- Stages 2–4: the founder-approved Release 2 candidates (`poster-candidates/stage-<n>-t18.png`, drawn at 17.96 s of an 18.00 s cut; PNG sha256 `fd3c6992362c58320f7892ff7c9550900d54cbbb753afa12904d1143dc7e1035`, `800460fdc789634c0d325e5dd903e550f0b7bf81e15176a4a5be560109641610`, `f6eab683949c55a50454cecd0759f2a45a18acd0c33cb6dbea3ba832cdf7cf3b`).
+- Stages 2–4: the Release 2 candidates, selected by the Release 3 orchestrator under the founder's 2026-10-03 delegated authority; the founder's veto is open (RESUME-20261015-LEDGER). No founder approval of the re-cut is on record. (`poster-candidates/stage-<n>-t18.png`, drawn at 17.96 s of an 18.00 s cut; PNG sha256 `fd3c6992362c58320f7892ff7c9550900d54cbbb753afa12904d1143dc7e1035`, `800460fdc789634c0d325e5dd903e550f0b7bf81e15176a4a5be560109641610`, `f6eab683949c55a50454cecd0759f2a45a18acd0c33cb6dbea3ba832cdf7cf3b`).
 - Stage 1: a fine search of `compile-cut.mp4` every 0.25 s from 0 to 18.00 s (73 frames; the cut is 18.00 s long). t = 3.00 s is the frame chosen: ORIGINAL and EXTRACT show the same document (Operations Manual), the EXTRACT page ends on a complete line, `WORKING COPY.md` has 12 lines, WORLD is populated. PNG sha256 `714ee095c83002fd00ab5ce708ad47e59149fb7f5afe4f430159641d64d0c425`.
 - **No stage-1 frame is free of the label overprint.** Every document page in cut 1 draws its eyebrow (`OPERATIONS · INTERNAL · REV 9`, `ACME HOLDINGS · CONFIDENTIAL`, `SCAN 0140 · NO TEXT LAYER`, `PEOPLE · POLICY`, `FINANCE · MODEL`) over its title in ORIGINAL and EXTRACT, in all 73 frames. So stage 1 also takes the Tier 2 mask below.
 
@@ -46,4 +46,4 @@ An HTML overlay (`.compile-film-mask`, `STAGE_FRAMES.sources.posterMask` in `com
 
 - The bars stop above the title, so no title pixel is covered; 2–3 rows of eyebrow ink stay touching the cap line (about 1 CSS px at Fit on a 1440 screen).
 - The mask is drawn only while the still is showing and only over the poster whose path it names. The playing cut, and the `<video poster>` frame before playback starts, are not masked: the overprint stays in the video pixels (Tier 3, re-rendering the cuts, was not done).
-- In the desktop Focus crop the stage-1 window (rows 360–1260) does not include the eyebrow line.
+- In the desktop Focus crop the stage-1 window (rows 900–1800, since the Release 3 fix round) does not include the eyebrow line, so the bars are drawn but fall outside the window.

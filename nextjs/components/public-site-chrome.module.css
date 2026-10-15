@@ -66,17 +66,18 @@
   /*
     The header's one filled control: the same action, words and cobalt as the Home hero and close.
     `!important` because Home re-inks every `.nav-actions > a` with an unlayered ink colour.
-    The colour is Home's `--action` token where Home defines it (decision.md's 255° accent) and
-    the site's cobalt everywhere else, so the header and the hero action never differ on one page.
+    The colour is Home's `--action` token where Home defines it, and the same 255° accent
+    (decision.md G-H, #005bb3 / hover #0169cd) as the fallback everywhere else: the header action
+    is one colour on every page (Release 3 fix round, M2; it was the 265° #244ac8 off Home).
   */
   .header .cta {
     display: inline-flex !important;
     align-items: center !important;
     min-height: 44px !important;
     padding: 0 18px !important;
-    border: 1px solid var(--action, #244ac8) !important;
+    border: 1px solid var(--action, #005bb3) !important;
     border-radius: 4px !important;
-    background: var(--action, #244ac8) !important;
+    background: var(--action, #005bb3) !important;
     color: #ffffff !important;
     font: 560 15px/1.2 var(--f-sans) !important;
     letter-spacing: 0 !important;
@@ -84,9 +85,9 @@
     text-decoration: none !important;
     white-space: nowrap !important;
   }
-  .header .cta:focus-visible { outline: 2px solid var(--action, #244ac8) !important; outline-offset: 2px !important; }
+  .header .cta:focus-visible { outline: 2px solid var(--action, #005bb3) !important; outline-offset: 2px !important; }
   @media (hover: hover) and (pointer: fine) {
-    .header .cta:hover { background: var(--action-hover, #173692) !important; border-color: var(--action-hover, #173692) !important; }
+    .header .cta:hover { background: var(--action-hover, #0169cd) !important; border-color: var(--action-hover, #0169cd) !important; }
   }
   /* Brief move 6: below the desktop switch the row is wordmark + Menu; Pricing and Sign in are in the sheet. */
   @media (max-width: 1249px) {
@@ -107,7 +108,7 @@
     --verified: #1a6d51;
     --verified-dim: #278366;
     --verified-deep: #dcece4;
-    --source: #2347b8;
+    --source: #005bb3;
     --relation: #5f42a1;
     --changed: #8c5217;
     --changed-deep: #f5e9d4;
@@ -126,7 +127,7 @@
     --g1: #ffffff;
     --g2: #f2f0eb;
     --ground: #fbfaf7;
-    --verified: #2347b8;
+    --verified: #005bb3;
     background: #fbfaf7 !important;
     color: #15191d !important;
     border-bottom-color: rgb(21 25 29 / 0.12) !important;
@@ -177,7 +178,7 @@
   .header.header :global(.one-path-mobile-nav > summary)::after { transform: translateY(4.5px) !important; }
   .header.header :global(.one-path-mobile-nav[open] > summary)::before { transform: rotate(45deg) !important; box-shadow: none !important; }
   .header.header :global(.one-path-mobile-nav[open] > summary)::after { transform: rotate(-45deg) !important; }
-  .header.header :global(.one-path-mobile-nav > summary):focus-visible { outline: 2px solid var(--action, #244ac8) !important; outline-offset: 2px !important; }
+  .header.header :global(.one-path-mobile-nav > summary):focus-visible { outline: 2px solid var(--action, #005bb3) !important; outline-offset: 2px !important; }
   @media (prefers-reduced-motion: reduce) {
     .header.header :global(.one-path-mobile-nav > summary)::before,
     .header.header :global(.one-path-mobile-nav > summary)::after { transition: none; }

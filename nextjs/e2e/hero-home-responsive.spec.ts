@@ -211,7 +211,8 @@ test("the film opens on a readable crop at 1440 and reads at 9px or more in phon
     expect(ratio).toBeLessThan(0.65);
     const fit = film.getByRole("button", { name: "Fit full frame", exact: true });
     await expect(fit).toBeVisible();
-    await expect(fit).toHaveAttribute("aria-pressed", "true");
+    // The label names the view a press opens, so the button carries no pressed state (fix round, M1).
+    await expect(fit).not.toHaveAttribute("aria-pressed");
     expect((await fit.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await expect(film.getByRole("button", { name: "Focus details", exact: true })).toHaveCount(0);
     // The crop sits inside the frame: the frame's box does not grow, nothing below it moves.
@@ -241,7 +242,7 @@ test("the film opens on a readable crop at 1440 and reads at 9px or more in phon
       await expectMaskOnPicture(film);
     }
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
-    await expect(focus).toHaveAttribute("aria-pressed", "false");
+    await expect(focus).not.toHaveAttribute("aria-pressed");
     await focus.press("Enter");
     await expect(sequence).toHaveAttribute("data-wide-view", "crop");
     await page.screenshot({ path: testInfo.outputPath(`film-1440${reduced ? "-reduced" : ""}.png`) });
@@ -266,3 +267,103 @@ test("the film opens on a readable crop at 1440 and reads at 9px or more in phon
   }
   await testInfo.attach("film-legibility", { body: JSON.stringify(measurements, null, 2), contentType: "application/json" });
 });
+
+/*
+  Release 3 fix round (B1; brief §5.4: no blank black screen on the film's first screen).
+
+  The crop that opens a 1440x900 desktop is only partly on the first screen: the frame's top 359 of
+  750px. While cut 1 plays, EXTRACT loads a new document about every 1.08s and wipes its page copy
+  back in from the top, so a window on that page copy (stage 1 at y 0.2) left the right half of the
+  first screen dark in 85 of 446 presented frames. This plays the cut in the page, on the visitor's
+  own <video>, and reads the frame the browser presented (requestVideoFrameCallback) over exactly
+  the source rectangle the first screen shows: the video's drawn rect, clipped by its frame and the
+  viewport, mapped back to source pixels. Each of the window's two panes is cut into 24x24
+  source-px cells; a cell holds ink when its luma range is 48 or more. A pane is BLANK when 99% or
+  more of its cells hold none, i.e. it shows nothing at all. Zero blank samples, in EN and KO.
+
+  Why not "80% dark": the critic's probe counted luma < 40 as blank, which also counts a dark-themed
+  editor full of text (the WORKING COPY.md pane reads 94-98% "dark" with twelve lines on it). The
+  80%-empty share is attached for the record, not asserted: EXTRACT clears per document in every
+  window, and what this guards is the pane going black, not the pane being rewritten.
+*/
+for (const path of ["/", "/ko"]) {
+  test(`the playing desktop crop never leaves a first-screen pane blank (${path})`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "1440", "sets its own viewport");
+    test.setTimeout(60_000);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(path);
+    const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+    const sequence = film.locator(".compile-film-sequence");
+    await expect(sequence).toHaveAttribute("data-wide-view", "crop");
+    // Hold stage 1 so the cut loops in place instead of advancing mid-sample (the crop is unchanged).
+    await film.getByRole("tab").first().click();
+    await expect(sequence).toHaveAttribute("data-video-primary-src", "/film/compile-cut.mp4");
+    const video = sequence.locator("video.compile-film-video");
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 2 && !v.paused && v.currentTime > 0), { timeout: 20_000 }).toBe(true);
+    const run = await video.evaluate(async (v: HTMLVideoElement, wanted: number) => {
+      const W = v.videoWidth, H = v.videoHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const context = canvas.getContext("2d", { willReadFrequently: true })!;
+      const geometry = () => {
+        const drawn = v.getBoundingClientRect();
+        const clip = v.closest(".compile-film-viewport")!.getBoundingClientRect();
+        const left = Math.max(clip.left, 0), right = Math.min(clip.right, innerWidth);
+        const top = Math.max(clip.top, 0), bottom = Math.min(clip.bottom, innerHeight);
+        const sx = (x: number) => Math.round(((x - drawn.left) / drawn.width) * W);
+        const sy = (y: number) => Math.round(((y - drawn.top) / drawn.height) * H);
+        return { aspect: drawn.width / drawn.height, x0: sx(left), x1: sx(right), y0: sy(top), y1: sy(bottom), visibleCssRows: bottom - top };
+      };
+      const emptyShare = (x0: number, x1: number, y0: number, y1: number) => {
+        const CELL = 24, w = x1 - x0, h = y1 - y0, data = context.getImageData(x0, y0, w, h).data;
+        let cells = 0, empty = 0;
+        for (let cy = 0; cy + CELL <= h; cy += CELL) {
+          for (let cx = 0; cx + CELL <= w; cx += CELL) {
+            let lo = 255, hi = 0;
+            for (let y = cy; y < cy + CELL; y += 2) {
+              for (let x = cx; x < cx + CELL; x += 2) {
+                const i = (y * w + x) * 4;
+                const luma = 0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!;
+                if (luma < lo) lo = luma;
+                if (luma > hi) hi = luma;
+              }
+            }
+            cells++;
+            if (hi - lo < 48) empty++;
+          }
+        }
+        return empty / cells;
+      };
+      const samples: { t: number; src: string; region: ReturnType<typeof geometry>; left: number; right: number }[] = [];
+      let next = 0;
+      await new Promise<void>(done => {
+        const timeout = setTimeout(done, 25_000);
+        const tick = (_now: number, meta: VideoFrameCallbackMetadata) => {
+          if (meta.mediaTime >= next) {
+            const region = geometry();
+            context.drawImage(v, 0, 0, W, H);
+            const mid = Math.round((region.x0 + region.x1) / 2);
+            samples.push({ t: meta.mediaTime, src: v.currentSrc, region, left: emptyShare(region.x0, mid, region.y0, region.y1), right: emptyShare(mid, region.x1, region.y0, region.y1) });
+            next = meta.mediaTime + 0.37;
+          }
+          if (samples.length >= wanted) { clearTimeout(timeout); done(); return; }
+          v.requestVideoFrameCallback(tick);
+        };
+        v.requestVideoFrameCallback(tick);
+      });
+      return { W, H, samples };
+    }, 16);
+    await testInfo.attach(`film-blank-${path === "/" ? "en" : "ko"}`, { body: JSON.stringify(run, null, 2), contentType: "application/json" });
+    expect(run.samples.length).toBeGreaterThanOrEqual(12);
+    for (const sample of run.samples) {
+      expect(sample.src).toContain("/film/compile-cut.mp4");
+      // The drawn video is the 16:10 cut at 2x, and the first screen shows a real part of it.
+      expect(Math.abs(sample.region.aspect - 1.6)).toBeLessThan(0.01);
+      expect(sample.region.visibleCssRows).toBeGreaterThan(200);
+    }
+    const blank = run.samples.filter(sample => sample.left >= 0.99 || sample.right >= 0.99);
+    expect(blank.map(sample => `t=${sample.t.toFixed(2)} left ${sample.left.toFixed(2)} right ${sample.right.toFixed(2)}`)).toEqual([]);
+  });
+}

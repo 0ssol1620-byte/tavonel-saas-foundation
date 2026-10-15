@@ -43,7 +43,7 @@
         "text": "WORKING COPY.md",
         "box": {"x": 1478, "w": 140, "h": 22},
         "yAt": {"0": [1052], "2": [1052], "4": [1052], "6": [1052], "8": [1052], "10": [1052], "12": [1052], "14": [1052], "16": [1052], "18": [1052]},
-        "smallestXHeight": {"px": 7, "text": "EXTRACT table cell \"do not start\"", "at": "poster-1-t3.00 x1752 y367"}
+        "smallestXHeight": {"px": 9, "text": "WORKING COPY.md body line (mono)", "at": "poster-1-t3.00 x1522 y1100", "window": "rows 900-1800 since the Release 3 fix round (crop y 0.5); measured with the same row-ink profile, redesign-r3-20261015/fix/XHEIGHT-Y50.json. The y 0.2 window's 7px table cell is outside it."}
       },
       "read": {
         "text": "# Payment terms",

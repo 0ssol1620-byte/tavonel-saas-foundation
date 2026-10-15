@@ -26,6 +26,8 @@ test("the title leads directly into four selectable and playing demo recordings"
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
   // Release 3: a desktop opens on the 2x reading crop and offers the whole frame; a phone keeps Fit.
+  // This supersedes handoff §5.1-4 / brief §2 "Fit default" on desktop only: decision R3-D1 under the
+  // founder's 2026-10-03 delegated authority, founder veto open (RESUME-20261015-LEDGER.md).
   await expect(sequence).toHaveAttribute("data-wide-view", "crop");
   await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveCount(page.viewportSize()!.width >= 1024 ? 1 : 0);
   const tabs = film.getByRole("tab");
@@ -49,11 +51,12 @@ test("the title leads directly into four selectable and playing demo recordings"
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (testInfo.project.name === "390") {
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
-    await expect(focus).toHaveAttribute("aria-pressed", "false");
+    // The label names the view a press opens; no pressed state (fix round, M1).
+    await expect(focus).not.toHaveAttribute("aria-pressed");
     expect((await focus.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await focus.click();
     await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
-    await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).not.toHaveAttribute("aria-pressed");
     await page.screenshot({ path: testInfo.outputPath("phone-focus-details.png") });
     await film.getByRole("button", { name: "Fit full frame", exact: true }).click();
     await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
