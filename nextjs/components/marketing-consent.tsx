@@ -184,7 +184,7 @@ export default function MarketingConsent() {
     if (anchored) return null;
     return <button className={`${styles.settings} ${styles.floating}`} onClick={() => setEditing(true)}>{copy.settings}</button>;
   }
-  return <section className={styles.panel} aria-label={copy.region}>
+  return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="">
     <div className={styles.inner}>
       <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
       <div className={styles.actions}>

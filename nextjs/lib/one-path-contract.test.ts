@@ -70,15 +70,15 @@ describe("approved one-path experience", () => {
   it("orders the landing as visible film, source, record, change, trust and action", () => {
     const page = text("components/landing-v2/landing-page.tsx");
     expect(page.match(/<CompileStagePlayer/g), "the composition mounts a player of its own").toBeNull();
-    expect(page).toContain("<SourceInspectionFilm");
+    expect(page).toContain("<HeroFilm");
     expect(page).toContain("<HeroSourceCard");
     expect(page).not.toContain("<CompilerSpecimen");
     expect(page).not.toContain("<HeroProof");
     const order = [
       'id="s1"',
       "<HeroStatement",
-      "<SourceInspectionFilm",
       "<HeroActions",
+      "<HeroFilm",
       'id="s2"',
       "<HeroSourceCard",
       'id="s3"',
@@ -87,12 +87,25 @@ describe("approved one-path experience", () => {
       "<StartScene",
     ].map(token => page.indexOf(token));
     expect(order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1]!))).toBe(true);
+    const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
+    expect(hero, "the four-stage film follows the title inside the hero").toContain("<HeroFilm korean={korean} />");
+    expect(hero.indexOf("<HeroFilm")).toBeGreaterThan(hero.indexOf("<HeroStatement"));
+    expect(hero).not.toContain("<SourceInspectionFilm");
+    /* The hero layout grid sets no columns of its own. */
+    const css = text("components/landing-v2/landing-hero.module.css");
+    const layout = css.slice(css.indexOf("section.hero .layout {"), css.indexOf("}", css.indexOf("section.hero .layout {")));
+    expect(layout).toContain("display: grid");
+    expect(layout).not.toContain("grid-template-columns");
+    /* The workbench takes the case the server selected, so the reserved case can never lead it. */
+    expect(page).toContain("selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE])");
+    expect(page).toContain("{home ? <HeroSourceCard view={home} korean={korean} /> : null}");
     expect(page).toContain("tabIndex={-1}");
     expect(page).toContain('aria-labelledby="lv2-hero-title"');
     for (const gone of ['id="top"', 'id="compile"', 'id="how-it-works"', 'id="connect"', "one-path-works-film", "one-path-film-note"]) {
       expect(page, `${gone} belongs to the retired landing`).not.toContain(gone);
     }
     const film = text("components/landing-v2/hero-film.tsx");
+    expect(film).not.toContain('"use client"');
     expect(film).toContain('src: "/film/compile-cut.mp4"');
     expect(film).toContain('fallbackSrc: "/film/compile-cut-hq.mp4"');
     expect(film).toContain('fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4"');
@@ -104,10 +117,13 @@ describe("approved one-path experience", () => {
     expect(disclosure).toContain("<CompileStagePlayer");
     expect(disclosure).toContain("preferVideo");
     expect(disclosure).toContain("priorityPoster");
-    expect(disclosure).toContain("Illustrative product walkthrough");
+    expect(disclosure).toContain("Illustrative product demo · examples, not customer results.");
+    expect(disclosure).toContain('LANDING_MOBILE_FILM_VIEW: MobileFilmView = "fit"');
+    expect(film).toContain("COMPILE_STAGES.map");
     expect(film, "internal recreation disclaimers do not belong on the customer route")
       .not.toContain("landingV2HeroExtra");
     expect(film).not.toContain("lv2-film-note");
+    expect(disclosure).not.toContain("lv2-film-note");
     expect(text("lib/landing-v2-hero-copy.ts")).not.toContain("filmNote");
   });
 
