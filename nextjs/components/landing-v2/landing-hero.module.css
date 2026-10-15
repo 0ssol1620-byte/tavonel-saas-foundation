@@ -190,10 +190,10 @@ section.hero .intake {
   text-align: start;
 }
 
-/* The workbench: one top rule, numbered steps, no nested panels. */
+/* The workbench: one top rule (the page's one rule weight, 1px), no nested panels. */
 .bench {
   min-width: 0;
-  border-top: 2px solid var(--home-ink);
+  border-top: 1px solid var(--home-rule);
   color: var(--home-ink);
   text-align: start;
 }
@@ -228,7 +228,7 @@ section.hero .intake {
   gap: 0.5rem;
   margin: 0;
   color: var(--home-muted);
-  font: 500 0.8125rem/1.4 var(--home-mono);
+  font: 500 13px/1.45 var(--f-sans);
 }
 
 .runStatus::before {
@@ -298,10 +298,13 @@ section.hero .intake {
   line-height: 1.5;
 }
 
-.metaField {
-  font: 600 0.75rem/1 var(--home-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* Labels are sans 500 13px, untracked, in their own case; mono is for filenames, coordinates, versions and hashes. */
+.metaField,
+.extracted,
+.regionsLabel {
+  font: 500 13px/1.45 var(--f-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .sourceLinks {
@@ -347,6 +350,7 @@ section.hero .intake {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--home-rule);
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -418,15 +422,14 @@ section.hero .intake {
 /* A label of what the text is, in ink -- deliberately not a coloured badge. */
 .extracted {
   padding: 0.125rem 0.5rem;
-  border: 1px solid var(--home-ink);
-  font: 600 0.75rem/1.5 var(--home-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  border: 1px solid var(--home-rule-strong);
 }
 
 /* The page region and the passage read from it, one unit: crop above, extractor's text below. */
 .passageMatch {
+  overflow: hidden;
   border: 1px solid var(--home-rule);
+  border-radius: 8px;
 }
 
 .crop {
@@ -470,9 +473,6 @@ section.hero .intake {
 .regionsLabel {
   margin: 0 0 0.5rem;
   color: var(--home-muted);
-  font: 600 0.75rem/1.4 var(--home-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .regionList {
@@ -493,6 +493,7 @@ section.hero .intake {
   min-height: 3rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--home-rule-strong);
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -550,15 +551,18 @@ section.hero .intake {
 
 .regionWhere {
   color: var(--home-muted);
-  font: 0.8125rem/1.4 var(--home-mono);
+  font: 500 13px/1.45 var(--f-sans);
   overflow-wrap: anywhere;
 }
 
 /* The record strip: what a reader can take away from this one passage. */
+/* One rule above it, the disclosure's own; an ink rule here doubled it. */
 .record {
   margin-top: clamp(1.5rem, 3vw, 2.25rem);
-  padding-top: 1rem;
-  border-top: 1px solid var(--home-ink);
+}
+
+.record > .details {
+  margin-top: 0;
 }
 
 .recordList {
@@ -606,7 +610,13 @@ section.hero .intake {
   border-top: 1px solid var(--home-rule);
 }
 
-.detailsSummary {
+/* s2's second disclosure is a row under the first, drawn the same way. */
+.contextDisclosure {
+  border-top: 1px solid var(--home-rule);
+}
+
+.detailsSummary,
+.contextDisclosure > summary {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -617,11 +627,13 @@ section.hero .intake {
   list-style: none;
 }
 
-.detailsSummary::-webkit-details-marker {
+.detailsSummary::-webkit-details-marker,
+.contextDisclosure > summary::-webkit-details-marker {
   display: none;
 }
 
-.detailsSummary::before {
+.detailsSummary::before,
+.contextDisclosure > summary::before {
   content: "";
   flex: none;
   border-block: 0.3125rem solid transparent;
@@ -629,11 +641,13 @@ section.hero .intake {
   transition: transform 150ms var(--home-ease);
 }
 
-.details[open] > .detailsSummary::before {
+.details[open] > .detailsSummary::before,
+.contextDisclosure[open] > summary::before {
   transform: rotate(90deg);
 }
 
-.detailsSummary:focus-visible {
+.detailsSummary:focus-visible,
+.contextDisclosure > summary:focus-visible {
   outline: 2px solid var(--home-cobalt);
   outline-offset: 2px;
 }
@@ -699,8 +713,16 @@ section.hero .intake {
 
 /* Paper, not a stone band: section boundaries are one 1px rule (brief 2026-10-15, move 4). */
 section.difficulty {
+  /* It ends on two disclosure rows, not on a block: 120px under them read as an empty band. */
+  padding-bottom: 72px;
   background: var(--home-paper);
   color: var(--home-ink);
+}
+
+@media (max-width: 767px) {
+  section.difficulty {
+    padding-bottom: 48px;
+  }
 }
 
 .split {
@@ -724,6 +746,11 @@ section.difficulty {
   min-width: 0;
 }
 
+/* The head stands clear of the bench's rule by the same step s3 leaves above its record. */
+.splitHead {
+  margin-bottom: clamp(1.75rem, 4vw, 3rem);
+}
+
 .splitHead :global(.lv2-scene-support),
 .receiveHead :global(.lv2-scene-support) {
   color: var(--home-muted);
@@ -743,7 +770,7 @@ section.difficulty {
   grid-template-columns: 3.5rem minmax(0, 1fr);
   column-gap: 1rem;
   padding-block: 1.25rem;
-  border-top: 1px solid var(--home-rule-strong);
+  border-top: 1px solid var(--home-rule);
 }
 
 
@@ -815,14 +842,13 @@ section.receive {
   }
 }
 
-/* The one raised object on the page: a record, set like a sheet of paper. */
+/* A record, set like a sheet of paper: the page's one card shape (1px rule, 8px corners, no shadow). */
 .recordSheet {
   min-width: 0;
   padding: clamp(1.25rem, 3vw, 2.25rem);
   border: 1px solid var(--home-rule);
-  border-top: 3px solid var(--home-ink);
+  border-radius: 8px;
   background: var(--home-sheet);
-  box-shadow: 0 24px 48px -32px rgb(20 23 26 / 0.35);
 }
 
 .recordKind {
@@ -831,13 +857,18 @@ section.receive {
   justify-content: space-between;
   gap: 0.25rem 1rem;
   margin: 0 0 1rem;
-  font: 600 0.8125rem/1.4 var(--home-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px/1.45 var(--f-sans);
+  letter-spacing: 0;
 }
 
+/* The state vocabulary is stored upper case ("PUBLISHED SAMPLE"); as a label it reads in sentence case. */
 .recordState {
   color: var(--home-muted);
+  text-transform: lowercase;
+}
+
+.recordState::first-letter {
+  text-transform: uppercase;
 }
 
 .recordQuote {
@@ -865,8 +896,8 @@ section.receive {
 
 .recordFields dt {
   color: var(--home-muted);
-  font: 600 0.75rem/1.6 var(--home-mono);
-  letter-spacing: 0.06em;
+  font: 500 13px/1.6 var(--f-sans);
+  letter-spacing: 0;
 }
 
 .recordFields dd {
@@ -896,7 +927,6 @@ section.receive {
   What stays folded keeps a visible marker. The shared sheet turns every summary into inline-flex
   on touch and below 1080px, which drops ::marker; list-item restores it, padding holds 44px.
 */
-.contextDisclosure > summary,
 .receiveNotes > summary,
 .readerFaq summary {
   display: list-item;
@@ -915,7 +945,7 @@ section.receive {
 
 .noteList li {
   padding-top: 0.875rem;
-  border-top: 1px solid var(--home-rule-strong);
+  border-top: 1px solid var(--home-rule);
 }
 
 .noteList h3,
@@ -935,8 +965,8 @@ section.receive {
 
 .method {
   margin-top: 2rem;
-  padding: 1.25rem;
-  background: var(--home-stone);
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--home-rule);
 }
 
 .method ol {
@@ -1171,7 +1201,7 @@ section.receive {
 
 .readerChecks li {
   padding-block-start: 1rem;
-  border-top: 1px solid var(--home-rule-strong);
+  border-top: 1px solid var(--home-rule);
 }
 
 .readerChecks h3 {
@@ -1181,9 +1211,9 @@ section.receive {
   line-height: 1.4;
 }
 
+/* The section's own 1px boundary is the rule above it; a 2px ink rule here was a second one. */
 .readerFaq {
-  padding-block-start: 1.5rem;
-  border-top: 2px solid var(--home-ink);
+  padding-block-start: 0;
 }
 
 .readerFaq details {
@@ -1224,7 +1254,8 @@ section.receive {
 @media (prefers-reduced-motion: reduce) {
   section.hero .actionsBlock :global(.btn.lv2-cta),
   .regionButton,
-  .detailsSummary::before {
+  .detailsSummary::before,
+  .contextDisclosure > summary::before {
     transition: none;
   }
 

@@ -33,6 +33,8 @@
     --home-rule-strong: rgb(21 25 29 / 32%);
     --home-mono: ui-monospace, Consolas, monospace;
     --home-ease: cubic-bezier(0.23, 1, 0.32, 1);
+    /* One card corner on Home: the recompile cards and the revision card read --radius-md. */
+    --radius-md: 8px;
     --f-sans: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif;
     --text-hi: var(--ink);
     --text-mid: var(--ink-muted);
@@ -73,13 +75,21 @@
   .home.home :global(.lv2-h2) { font: 600 clamp(32px, 3.6vw, 52px)/1.04 var(--f-sans); font-variation-settings: "wght" 600; letter-spacing: -0.03em; color: var(--ink); }
   .home.home :global(.lv2-scene-support) { max-width: var(--measure); color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
   /* Meta is sans 500 at 13px; mono is kept for derived coordinates, versions, dates and hashes. */
-  .home.home :global(main .lv2-meta) { font: 500 13px/1.45 var(--f-sans); letter-spacing: 0; }
+  .home.home :global(main .lv2-meta) { font: 500 13px/1.45 var(--f-sans); letter-spacing: 0; text-transform: none; }
   .home.home :global(main .lv2-meta[data-derived="1"]) { font-family: var(--f-mono); }
   /* §4.5: no uppercase tracking on Hangul. */
   .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button)) { letter-spacing: 0; text-transform: none; }
   .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.08; letter-spacing: -0.02em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-h2) { line-height: 1.2; letter-spacing: -0.015em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.75; word-break: keep-all; }
+  /* WEIGHT-HOOK-START */
+  /* Playwright WebKit on Windows applies the wght axis to advances (HVAR) but draws every outline
+     at the 400 default, so 600 renders thin there. `data-static-wght` is set only by a measured
+     ink test (HANDOFF.md, font outline probe); where the axis draws, nothing below matches.
+     The stroke is this font's stem difference: l is 0.082em at 400, 0.112em at 560, 0.120em at 600. */
+  :global(html[data-static-wght="1"]) .home.home :global(:is(.lv2-hero-h1, .lv2-h2, [data-home-reader-guide] h2, #s5 .lv2-proof-label)) { -webkit-text-stroke: 0.038em currentColor; }
+  :global(html[data-static-wght="1"]) .home.home :global(:is(#s1 .compile-film-stages button, .lv2-cta)) { -webkit-text-stroke: 0.03em currentColor; }
+  /* WEIGHT-HOOK-END */
   .home.home :global(main a) { display: inline-flex; align-items: center; min-height: 44px; }
   .home.home :global(main summary) { min-height: 44px; }
   /* Legacy film figure/body margins are unlayered; reset only this opening figure.
@@ -95,7 +105,7 @@
   .home[lang="ko"].home :global(#s1 .compile-film-stages button) { letter-spacing: 0; text-transform: none; }
   .home.home :global(#s1 .compile-film-stages button[data-active="1"]) { color: var(--home-ink); border-bottom-color: var(--home-cobalt); }
   /* The film stage is one of the page's two dark surfaces (the other is the footer). */
-  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 3; border-radius: 6px; border-color: var(--home-rule-strong); background: var(--obsidian); }
+  .home.home :global(#s1 .compile-film-viewport) { grid-column: 1 / -1; grid-row: 3; border-radius: 8px; border-color: var(--home-rule-strong); background: var(--obsidian); }
   /* A legacy unlayered cover rule crops the still even when the player says fit. */
   .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-still) { object-fit: contain !important; }
   .home.home :global(#s1 .compile-film-caption) { grid-column: 1; grid-row: 2; align-self: center; gap: 12px; align-items: start; }
@@ -137,12 +147,19 @@
   .home.home :global(#s4 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
   .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: #58615e; }
   .home.home :global(#s4 .lv2-split) { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; }
-  .home.home :global(#s4 .lv2-inline-link), .home.home :global(#s5 .lv2-inline-link) { color: #244ac8; }
+  .home.home :global(#s4 .lv2-inline-link) { color: #244ac8; }
   .home.home :global(#s4 .lv2-meta), .home.home :global(#s5 .lv2-meta) { color: #47534e; }
-  .home.home :global(#s5 .lv2-proof-list) { display: block; max-width: 100%; margin-top: 32px; }
-  .home.home :global(#s5 .lv2-proof) { border-top: 1px solid #c7cdc7; padding-block: 16px; }
-  .home.home :global(#s5 .lv2-proof-label) { margin: 0; }
-  .home.home :global(#s5 .lv2-proof-note) { max-width: 68ch; margin-top: 8px; color: #58615e; }
+  /* The four proofs: an editorial two-column list over the full container -- a title, its scope
+     sentence, and a quiet ink "Read" link. Not blue underlined titles in a half-empty column. */
+  .home.home :global(#s5 .lv2-proof-list) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 64px; max-width: none; margin-top: 48px; }
+  .home.home :global(#s5 .lv2-proof) { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border-top: 1px solid var(--rule); padding-block: 24px 32px; }
+  .home.home :global(#s5 .lv2-proof-label) { margin: 0; color: var(--ink); font: 600 24px/1.25 var(--f-sans); letter-spacing: -0.01em; }
+  .home.home :global(#s5 .lv2-proof-note) { max-width: 52ch; margin: 0; color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
+  .home.home :global(#s5 .lv2-proof-read) { margin: 0; }
+  .home.home :global(#s5 .lv2-proof-read .lv2-inline-link) { gap: 6px; color: var(--ink); font: 500 15px/1.45 var(--f-sans); text-decoration-color: var(--rule); }
+  .home.home :global(#s5 .lv2-proof-read .lv2-inline-link:hover) { text-decoration-color: currentColor; }
+  .home[lang="ko"].home :global(#s5 :is(.lv2-proof-label, .lv2-proof-note)) { word-break: keep-all; }
+  .home[lang="ko"].home :global(#s5 .lv2-proof-note) { line-height: 1.75; }
   .home.home :global(#s6 .lv2-h2), .home.home :global(#s6 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
   .home.home :global(#s6 .lv2-scene-support) { color: #58615e; }
   @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
@@ -162,6 +179,10 @@
       background: var(--home-ink) !important; color: #ffffff !important; border-color: var(--home-ink) !important;
     }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control:focus-visible) { outline: 2px solid var(--home-cobalt) !important; outline-offset: 3px; }
+  }
+  @media (max-width: 899px) {
+    .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
+    .home.home :global(#s5 .lv2-proof-label) { font-size: 20px; }
   }
   @media (max-width: 1023px) {
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; }
