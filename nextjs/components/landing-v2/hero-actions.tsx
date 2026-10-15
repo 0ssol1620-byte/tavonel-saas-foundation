@@ -31,7 +31,7 @@ export default function HeroActions(props: HeroActionsProps) {
     <div className="lv2-actions" data-scene-actions={scene}>
       <Link className="btn lv2-cta" href={primary.href as Route} prefetch={false}
         onClick={onSelect(primary)} data-analytics="hero-primary">
-        {primary.label}
+        {primary.label}<span aria-hidden="true">&nbsp;→</span>
       </Link>
       <Link className="lv2-text-link" href={secondary.href as Route} prefetch={false}
         onClick={onSelect(secondary)} data-analytics="hero-secondary">

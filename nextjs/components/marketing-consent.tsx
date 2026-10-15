@@ -76,6 +76,17 @@ type AnalyticsWindow = Window & {
  */
 export const CONSENT_REVEAL = { scrollPx: 200, delayMs: 8000 } as const;
 
+/*
+  Fix round 3 (judge gap 3). On a Home phone the revealed card is a bottom sheet that never opens
+  over the hero film: at 8 s with no scroll the film fills the foot of a 360-430px first screen,
+  which is exactly where the sheet sits. The sheet's zone is its 96px two-row cap plus the 8px
+  inset; while the film is in that zone the prompt waits, and it shows as soon as a scroll moves
+  the film out of it (the 200px scroll path is always clear). Desktop keeps the row under the
+  header, which already clears the film.
+*/
+const PHONE_SHEET_ZONE_PX = 104;
+const PHONE = "(max-width: 899.98px)";
+
 const denied = { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" };
 
 function disableAnalytics() {
@@ -100,6 +111,8 @@ export default function MarketingConsent() {
   const [anchored, setAnchored] = useState(false);
   // Release 2: whether the first-time prompt may show yet (see CONSENT_REVEAL).
   const [revealed, setRevealed] = useState(false);
+  // Fix round 3: whether a Home phone's bottom sheet is clear of the hero film (see PHONE_SHEET_ZONE_PX).
+  const [filmClear, setFilmClear] = useState(true);
 
   /*
     The server and the first client render draw nothing: the prompt is a fixed card that reserves
@@ -132,6 +145,20 @@ export default function MarketingConsent() {
     onScroll(); // a restored scroll position already counts
     return () => { window.clearTimeout(timer); window.removeEventListener("scroll", onScroll); };
   }, [revealed]);
+
+  useEffect(() => {
+    const film = document.querySelector("[data-home-ia] #s1 .compile-film-viewport");
+    if (!film) { setFilmClear(true); return; }
+    const phone = window.matchMedia(PHONE);
+    const check = () => {
+      const box = film.getBoundingClientRect();
+      setFilmClear(!phone.matches || box.bottom <= window.innerHeight - PHONE_SHEET_ZONE_PX || box.top >= window.innerHeight);
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); };
+  }, [pathname]);
 
   // Per navigation: a route with the site footer and a route without it are different answers,
   // and a client-side navigation between them changes nothing else this component watches.
@@ -196,7 +223,7 @@ export default function MarketingConsent() {
 
   const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
   if (surface === "nothing") return null;
-  if (surface === "prompt" && !revealed) return null;
+  if (surface === "prompt" && (!revealed || !filmClear)) return null;
   /*
     G1-033. After a choice the reopen control is the footer's, so this draws nothing -- unless the
     page has no footer to carry it, in which case the old floating pill is the only withdrawal

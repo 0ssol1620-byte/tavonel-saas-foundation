@@ -8,8 +8,8 @@ import {
   LANDING_VARIANT_QUERY,
   landingVariantState,
 } from "@/lib/landing-experiments";
+import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { pageMetadata } from "@/lib/page-seo";
-import { KO_CHROME } from "@/lib/site-navigation";
 
 /*
   한국어 진입 페이지. Landing V2, 2026-09-19.
@@ -31,17 +31,18 @@ import { KO_CHROME } from "@/lib/site-navigation";
 
 export const dynamic = "force-dynamic";
 /*
-  탭 제목은 영문 `/`의 `TAVONEL — ${BRAND_LINE.descriptor}`를 그대로 옮긴 것이다.
+  탭 제목은 영문 `/`의 `TAVONEL — ${BRAND_LINE.headline}`을 그대로 옮긴 것이다(수정 2차,
+  2026-10-16: H1과 같은 결과 문장. 그 한국어 번역은 `lib/landing-v2-copy.ts`의 hero.headline).
 
   이전 제목 "내 자료를 AI가 사용하는 지식으로 — TAVONEL"에는 두 가지 문제가 있었다. 첫째,
   영문 제목의 번역이 아니라 별도의 문장이어서 D12(한국어는 문자 그대로의 번역이며 새 주장을
   하지 않는다)에 어긋났다. 둘째, 이 배포판은 아직 고객의 파일을 컴파일하지 않는데
   (`activationPolicy.customerData.enabled === false`) 검색 결과에 그 기능을 아무 조건 없이
-  약속하는 문장으로 노출됐다. `KO_CHROME.tagline`은 `BRAND_LINE.descriptor`의 한국어 번역이고
-  푸터가 이미 그 문장을 쓰고 있다 — 제목이 여섯 번째 포지셔닝 문장을 새로 쓰지 않는다.
+  약속하는 문장으로 노출됐다. 제목은 H1이 이미 쓰는 번역을 읽을 뿐, 여섯 번째 포지셔닝 문장을
+  새로 쓰지 않는다.
 */
 export const metadata: Metadata = pageMetadata({
-  title: `TAVONEL — ${KO_CHROME.tagline}`,
+  title: `TAVONEL — ${landingV2Copy(true).hero.headline}`,
   description:
     "완성된 공개 Compiled World를 살펴보고, 결과 하나를 정확한 원문 영역까지 따라가고, 변경 내용과 허용 원문 및 배포 경계를 확인한 뒤 직접 가진 원문을 논의하세요.",
   canonical: "/ko",

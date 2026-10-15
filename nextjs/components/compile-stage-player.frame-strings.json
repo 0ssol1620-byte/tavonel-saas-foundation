@@ -64,5 +64,17 @@
         "smallestXHeight": {"px": 11, "text": "WORLD footer \"1 source · 1 page\"", "at": "poster-4-t17.96 x2600 y1666"}
       }
     }
+  },
+  "blankScan": {
+    "method": "Release 3 fix round 3 (B1). Every presented frame of each locked cut at 1x (Chrome, requestVideoFrameCallback), drawn at 2880x1800, over the stage's whole 2x crop window: columns crop.x .. crop.x + 0.5 split into its two panes, rows crop.y .. crop.y + 0.5. Each pane is cut into 24x24 source-px cells from the window origin; a cell holds ink when its luma range (sampled every 2px) is >= 48, and a pane is blank when >= blankAt of its cells hold none. share = frames with neither pane blank / frames. A stage may open cropped (defaultView crop) only when share >= threshold; otherwise it opens on Fit.",
+    "receipt": "outputs/tavonel-research-replan-20261013/resume-20261015/redesign-r3-20261015/fix2/BLANK-SCAN-2.json (ai-knowledge-compiler), tool fix2/blank-scan.cjs",
+    "blankAt": 0.99,
+    "threshold": 0.85,
+    "stages": {
+      "sources": {"crop": {"x": 0.25, "y": 0.5}, "frames": 397, "inkBoth": 397, "share": 1, "lastBlankT": null, "defaultView": "crop"},
+      "read": {"crop": {"x": 0.25, "y": 0.25}, "frames": 363, "inkBoth": 363, "share": 1, "lastBlankT": null, "defaultView": "crop"},
+      "structure": {"crop": {"x": 0, "y": 0}, "frames": 377, "inkBoth": 377, "share": 1, "lastBlankT": null, "defaultView": "crop"},
+      "world": {"crop": {"x": 0.5, "y": 0.45}, "frames": 424, "inkBoth": 169, "share": 0.399, "lastBlankT": 10.76, "defaultView": "fit"}
+    }
   }
 }

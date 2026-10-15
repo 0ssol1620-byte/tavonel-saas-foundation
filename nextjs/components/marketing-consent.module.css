@@ -227,19 +227,26 @@
   keep the card above.
 */
 @media (min-width: 900px) {
+  /*
+    Fix round 3 (judge gap 3): the row read as a pale band -- #faf9f6 on the #faf9f6 page, a
+    #d8ddd9 rule at 1.31:1 and answer borders at 1.6:1. It is white now with a #6b737b rule and
+    answer borders (4.82:1 on white, 4.59:1 on the page paper; text stays #15191d, 17.7:1), so it
+    reads as its own row under the header. e2e/marketing-consent.spec.ts measures all three.
+  */
   :global(body:has([data-home-ia])) .panel {
     inset: 64px 0 auto 0;
     width: auto;
     max-height: none;
-    /* 3 + 36 + 3 + the 1px rule = 43px: the row ends at 107px, clear of the H1 box at 112px. */
+    /* 3 + 36 + 3 + the 1px rule = 43px: the row ends at 107px, clear of the eyebrow box at 112px. */
     padding: 3px max(20px, calc((100% - 1200px) / 2));
     border: 0;
-    border-bottom: 1px solid #d8ddd9;
+    border-bottom: 1px solid #6b737b;
     border-radius: 0;
-    background: #faf9f6;
+    background: #ffffff;
     box-shadow: none;
   }
   :global(body:has([data-home-ia])) .inner { flex-direction: row; align-items: center; gap: 24px; }
+  :global(body:has([data-home-ia])) .actions button { border-color: #6b737b; }
 }
 /* A fine pointer takes a 36px answer (over the 24px WCAG 2.5.8 floor); a coarse one keeps 44px. */
 @media (min-width: 900px) and (pointer: fine) {

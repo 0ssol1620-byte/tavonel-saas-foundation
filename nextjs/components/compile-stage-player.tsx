@@ -73,8 +73,19 @@ export type ReadingTarget = { pane: 0 | 1 | 2 | 3; text: string; mono: boolean; 
   COPY.md editor under its label, and no presented frame of the 18s cut leaves either visible
   pane without ink (redesign-r3-20261015/fix/BLANK-SCAN.json; e2e hero-home-responsive "no blank
   pane"). The window's smallest text is then the editor's 9px (source) x-height, not 7px.
+
+  The crop is the desktop default only where it stays inked (Release 3 fix round 3, B1). Every
+  presented frame of each cut was scanned over the stage's whole 2x window with the same 24px-cell
+  rule (blank = a pane with >= 99% of its cells ink-free); a stage opens cropped only when both
+  panes hold ink in >= 85% of frames. Stages 1-3 score 100%. Stage 4's window on "nodes lit" leaves
+  TERMINAL blank for its first ~11s (39.9%), and no window holds both its reading targets -- the
+  ASSISTANT answers (pane 0) and WORLD's "nodes lit" (pane 3) -- so stage 4 opens on Fit, the whole
+  frame, and its crop is what "Focus details" shows when the visitor asks for it. The numbers and
+  the threshold are `blankScan` in compile-stage-player.frame-strings.json, which the unit test and
+  e2e/hero-home-responsive hold `wideView` to (redesign-r3-20261015/fix2/BLANK-SCAN-2.json).
 */
 export type FilmCrop = { x: 0 | 0.25 | 0.5; y: number };
+export type WideView = "crop" | "fit";
 
 /*
   Tier 2 mask (brief §5.3), stage 1 poster only. No frame of cut 1 is free of the document eyebrow
@@ -89,16 +100,17 @@ export type FilmCrop = { x: 0 | 0.25 | 0.5; y: number };
 */
 export type PosterMask = { poster: string; color: string; rects: readonly { x: number; y: number; w: number; h: number }[] };
 
-export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; posterMask?: PosterMask }> = {
+export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget; crop: FilmCrop; wideView: WideView; posterMask?: PosterMask }> = {
   sources: {
     panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"],
     readingTarget: { pane: 1, text: "WORKING COPY.md", mono: true, line: "The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in {q}.", lineKo: "ORIGINAL 패널은 원문 페이지를 한 장씩 열고, EXTRACT 패널은 그 내용을 {q}에 옮겨 적습니다." },
     crop: { x: 0.25, y: 0.5 },
+    wideView: "crop",
     posterMask: { poster: "/film/poster-1-t3.00-2x.webp", color: "#f2eee7", rects: [{ x: 796, y: 206, w: 282, h: 11 }, { x: 1499, y: 204, w: 278, h: 9 }] },
   },
-  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", mono: true, line: "Look for {q} in the MARKDOWN pane.", lineKo: "MARKDOWN 패널에서 {q} 줄을 찾아보세요." }, crop: { x: 0.25, y: 0.25 } },
-  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED", mono: false, line: "In the SOURCES pane, {q} marks the edited file and TOUCHED marks the files it reaches.", lineKo: "SOURCES 패널에서 {q}는 수정된 파일, TOUCHED는 그 변경이 닿는 파일을 표시합니다." }, crop: { x: 0, y: 0 } },
-  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit", mono: false, line: "In the WORLD pane, {q} counts the nodes the current answer cites; it falls to zero when nothing is cited.", lineKo: "WORLD 패널의 {q}는 지금 답이 인용한 노드 수입니다. 인용이 없으면 하나도 켜지지 않습니다." }, crop: { x: 0.5, y: 0.45 } },
+  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", mono: true, line: "Look for {q} in the MARKDOWN pane.", lineKo: "MARKDOWN 패널에서 {q} 줄을 찾아보세요." }, crop: { x: 0.25, y: 0.25 }, wideView: "crop" },
+  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED", mono: false, line: "In the SOURCES pane, {q} marks the edited file and TOUCHED marks the files it reaches.", lineKo: "SOURCES 패널에서 {q}는 수정된 파일, TOUCHED는 그 변경이 닿는 파일을 표시합니다." }, crop: { x: 0, y: 0 }, wideView: "crop" },
+  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit", mono: false, line: "In the WORLD pane, {q} counts the nodes the current answer cites; it falls to zero when nothing is cited.", lineKo: "WORLD 패널의 {q}는 지금 답이 인용한 노드 수입니다. 인용이 없으면 하나도 켜지지 않습니다." }, crop: { x: 0.5, y: 0.45 }, wideView: "fit" },
 };
 
 /*
@@ -218,14 +230,12 @@ const FILM_ERROR_KO = "이 브라우저에서는 영상을 재생할 수 없습�
 const MOBILE_FILM_VIEW = {
   en: {
     focus: "Focus details",
-    fit: "Fit full frame",
     focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame.",
     fittedHint: "Full frame · Focus details to inspect small type.",
     panes: "Film panes",
   },
   ko: {
     focus: "세부 내용 확대",
-    fit: "전체 프레임 보기",
     focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요.",
     fittedHint: "전체 프레임 · 작은 글자는 세부 내용 확대에서 확인하세요.",
     panes: "영상 패널",
@@ -301,8 +311,8 @@ export default function CompileStagePlayer({
   const [saveData, setSaveData] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(true);
   const [mobileFilmFit, setMobileFilmFit] = useState(initialMobileFilmView === "fit");
-  /* Home desktop (not narrow): the Focus crop is the default; "Fit full frame" shows the whole cut. */
-  const [wideFit, setWideFit] = useState(false);
+  /* Home desktop (not narrow): the visitor's own Focus/Fit choice, which then holds across stages. */
+  const [wideChoice, setWideChoice] = useState<WideView | null>(null);
   const [videoError, setVideoError] = useState(false);
   const [failedPreferredSrc, setFailedPreferredSrc] = useState<string | null>(null);
   /*
@@ -349,6 +359,8 @@ export default function CompileStagePlayer({
   const target = stageFrame?.readingTarget;
   const focusPane = storyLayout ? (target?.pane ?? 0) : (MOBILE_FOCUS_PANE[index] ?? 0);
   const crop = stageFrame?.crop;
+  /* Until the visitor chooses, each stage opens on its own default (STAGE_FRAMES[].wideView). */
+  const wideFit = (wideChoice ?? stageFrame?.wideView ?? "crop") === "fit";
   /* A Home phone in Focus starts on the same rows the desktop crop shows. */
   const cropTop = crop?.y;
   /* The quarter-frame pane a panning phone is looking at; drives the visible pane indicator. */
@@ -535,7 +547,10 @@ export default function CompileStagePlayer({
           className="compile-film-motion-control"
           data-control={control}
           aria-label={korean ? FILM_CONTROL_LABEL_KO[control] : FILM_CONTROL_LABEL[control].label}
-          aria-pressed={control === "pause"}
+          /* The label names the next action (Play/Pause/Resume/Replay), so on Home it carries no
+             pressed state: "Pause, pressed" while the film plays was the inverted reading (fix
+             round 2, M1). Other callers keep main304's markup (home-player-main304-parity). */
+          aria-pressed={storyLayout ? undefined : control === "pause"}
           onClick={() => {
             if (control === "pause") { setPaused(true); return; }
             if (control === "replay") {
@@ -553,24 +568,23 @@ export default function CompileStagePlayer({
   );
 
   /*
-    On Home both view toggles name the view a press opens ("Focus details" / "Fit full frame"), so
-    neither carries aria-pressed: a label that changes with the state plus a pressed state was read
-    as "Fit full frame, pressed" while the crop was on screen (Release 3 fix round, M1; WAI-ARIA APG:
-    a toggle button's label does not change). The view on screen is the other one, and on a phone
-    the polite hint below says which. Other callers keep main304's markup byte for byte
-    (home-player-main304-parity.test.ts), pressed state included.
+    Both view toggles are one WAI-ARIA toggle button each (Release 3 fix round 3, M1): the label
+    names the action and never changes ("Focus details"), and aria-pressed names the state -- true
+    exactly while the focused view (the desktop 2x crop, the phone's panning frame) is on screen.
+    The round before dropped the pressed state and flipped the label instead, and non-Home callers
+    flipped the label while pressed, which read "Fit full frame, pressed" with the frame focused.
+    A first render in Fit is unchanged for every caller ("Focus details", aria-pressed="false"), so
+    main304's server markup still holds (home-player-main304-parity.test.ts).
   */
   const mobileTools = (<div className="compile-film-mobile-tools">
         <button
           type="button"
           className="compile-film-focus-control"
           aria-controls={panelId}
-          aria-pressed={storyLayout ? undefined : !mobileFilmFit}
+          aria-pressed={!mobileFilmFit}
           onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
         >
-          {mobileFilmFit
-            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
-            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
+          {MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus}
         </button>
         {panning ? motionControl : null}
         <p aria-live="polite">
@@ -579,10 +593,10 @@ export default function CompileStagePlayer({
             : MOBILE_FILM_VIEW[korean ? "ko" : "en"].focusedHint}
         </p>
       </div>);
-  /* Home desktop: the same Fit/Focus pair as the phone, on its own crop state (CSS shows one of the two). */
+  /* Home desktop: the same toggle as the phone, on its own crop state (CSS shows one of the two). */
   const viewControl = storyLayout ? (
-    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} onClick={() => setWideFit(fit => !fit)}>
-      {wideFit ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
+    <button type="button" className={`compile-film-view-control ${readingStyles.viewControl}`} aria-controls={panelId} aria-pressed={!wideFit} onClick={() => setWideChoice(wideFit ? "crop" : "fit")}>
+      {MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus}
     </button>
   ) : null;
   const stageCaption = !compact ? <div className="compile-film-caption">

@@ -101,17 +101,23 @@
   .home.home :global(#s1) { padding-top: 112px; padding-bottom: 72px; }
   .home.home :global(#s1 > .lv2-wrap) { display: block; }
   .home.home :global(.lv2-hero-grid), .home.home :global(.lv2-hero-text) { display: block; max-width: none; }
-  /* §4.4 display: Wanted Sans 600, clamp(44px, 5.6vw, 80px) / 0.98 / -0.035em.
-     Release 3: the H1 is the category name, one line from 768 up, so it measures the container
-     rather than --hero-measure (1040px, which broke "The Knowledge Compiler for AI." at 80px);
-     balance keeps a phone's two lines even instead of leaving "for AI." alone. */
+  /* §4.4 display: Wanted Sans 600 / 0.98 / -0.035em. Fix round 3 (judge gap 1): the H1 is the
+     outcome sentence (BRAND_LINE.headline, 46 characters) under the category eyebrow. It measures
+     the container rather than --hero-measure and is set at clamp(44px, 4.2vw, 60px) so it holds one
+     line from 1024 up (1,186px of 1,200 at 1440): the eyebrow and a second H1 line would otherwise
+     push the film -- the LCP element -- 110px down the first screen (fix2/LCP-*.json). Balance keeps
+     a phone's three lines even. */
+  .home.home :global(.lv2-hero-eyebrow) {
+    margin: 0 auto 12px; text-align: center; color: var(--home-muted);
+    font: 600 13px/1.4 var(--f-sans); letter-spacing: 0.08em; text-transform: uppercase;
+  }
   .home.home :global(.lv2-hero-h1) {
     max-width: none; margin: 0 auto 16px; text-align: center; text-wrap: balance;
-    font: 600 clamp(44px, 5.6vw, 80px)/0.98 var(--f-sans); font-variation-settings: "wght" 600; font-synthesis: none; letter-spacing: -0.035em;
+    font: 600 clamp(44px, 4.2vw, 60px)/0.98 var(--f-sans); font-variation-settings: "wght" 600; font-synthesis: none; letter-spacing: -0.035em;
   }
   .home.home :global(.lv2-h1-line) { display: block; }
   /* The hero support sentence: this is its one rule (the !important chain in landing-hero.module.css is gone). */
-  .home.home :global(.lv2-hero-support) { max-width: 40rem; margin: 0 auto 32px; text-align: center; text-wrap: balance; color: var(--ink-muted); font: 400 20px/1.55 var(--f-sans); letter-spacing: 0; }
+  .home.home :global(.lv2-hero-support) { max-width: 40rem; margin: 0 auto 24px; text-align: center; text-wrap: balance; color: var(--ink-muted); font: 400 20px/1.55 var(--f-sans); letter-spacing: 0; }
   .home.home :global(.lv2-h2) { font: 600 clamp(32px, 3.6vw, 52px)/1.04 var(--f-sans); font-variation-settings: "wght" 600; letter-spacing: -0.03em; color: var(--ink); }
   .home.home :global(.lv2-scene-support) { max-width: var(--measure); color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
   /* Meta is sans 500 at 13px; mono is kept for derived coordinates, versions, dates and hashes. */
@@ -154,8 +160,9 @@
   .home.home :global(#s1 .compile-film-mobile-tools p) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .home.home :global(#s1 .compile-film-progress) { display: none; }
   .home.home :global(#s1 .lv2-film-story > figcaption) { max-width: none; margin-top: 12px; color: var(--home-muted); font: 13px/1.5 var(--f-sans); text-align: center; }
-  /* §4.2 hero rhythm: H1 -> support 16, support -> actions 32, actions -> film tabs 48. */
-  .heroAside { min-width: 0; max-width: var(--hero-measure); margin: 32px auto 48px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  /* §4.2 hero rhythm, tightened in fix round 3 to pay for the eyebrow: H1 -> support 16,
+     support -> actions 24, actions -> film tabs 32. */
+  .heroAside { min-width: 0; max-width: var(--hero-measure); margin: 24px auto 32px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
   .heroAside :global(.lv2-actions) { display: flex; flex-direction: row; justify-content: center; gap: 16px; margin-top: 0; }
   .home.home :global(.btn), .play { min-height: 48px; border-radius: 4px; }
   .home.home :global(.lv2-cta) { background: var(--action); color: white; border-color: var(--action); padding: 12px 24px; font: 560 15px/1.5 var(--f-sans); }
@@ -225,6 +232,10 @@
     .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
     .home.home :global(#s5 .lv2-proof-label) { font-size: 20px; }
   }
+  /* From 1024 the intake offer reads beside the action it explains, on the actions' row. */
+  @media (min-width: 1024px) {
+    .heroAside { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px 24px; }
+  }
   @media (max-width: 1023px) {
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; }
     .home.home :global(#s4 .lv2-split) { grid-template-columns: 1fr; gap: 32px; }
@@ -246,16 +257,24 @@
   @media (max-width: 767px) {
     .home.home > header { height: 56px !important; min-height: 56px; }
     .home.home :global(.lv2-scene) { padding-block: 72px; }
-    .home.home :global(#s1) { padding-top: 96px; padding-bottom: 48px; }
-    .home.home :global(.lv2-hero-h1) { font-size: 40px; line-height: 1.04; margin-bottom: 16px; }
-    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 40px; line-height: 1.16; letter-spacing: -0.02em; }
-    .home.home :global(.lv2-hero-support) { font-size: 18px; line-height: 1.6; margin-bottom: 24px; }
-    .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.75; }
+    /*
+      Fix round 3: the eyebrow and a three-line outcome H1 are paid for in the hero's own spacing,
+      so the film's top on the first screen does not move down at 360-430 (EN 633/609/574/545px,
+      KO 598/559px against 636/612/613/583 and 601/601 before) and the poster's LCP area does not
+      shrink (fix2/LCP-before-8d68c53.json vs fix2/LCP-after.json).
+    */
+    .home.home :global(#s1) { padding-top: 70px; padding-bottom: 48px; }
+    .home.home :global(.lv2-hero-eyebrow) { margin-bottom: 8px; line-height: 1.3; }
+    .home.home :global(.lv2-hero-h1) { font-size: 34px; line-height: 1.04; margin-bottom: 12px; }
+    .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 34px; line-height: 1.16; letter-spacing: -0.02em; }
+    .home.home :global(.lv2-hero-support) { font-size: 18px; line-height: 1.6; margin-bottom: 20px; }
+    .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.7; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-inline: 4px; min-height: 48px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 16px; }
     .home.home :global(#s1 .compile-film-focus-control) { padding: 8px 12px; border: 1px solid var(--home-rule-strong); border-radius: 4px; color: var(--home-ink); font: 560 14px/1.4 var(--f-sans); }
-    .heroAside { margin: 24px auto 32px; }
-    .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 4px; }
+    .heroAside { margin: 16px auto 24px; gap: 4px; }
+    .heroAside :global(.lv2-actions) { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 320px); gap: 0; }
+    .heroAside :global(.lv2-text-link) { min-height: 44px; }
     .heroAside :global(.lv2-actions a) { width: 100%; justify-content: center; }
     .filmFrame { aspect-ratio: 390 / 270; }
     .play { right: 12px; bottom: 12px; }

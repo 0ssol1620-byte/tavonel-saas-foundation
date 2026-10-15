@@ -3,10 +3,11 @@ import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
 const FILM = '#s1 figure[data-testid="landing-hero-film"]';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
-/* While the server resolves access to /contact, the hero offers the document evaluation instead. */
+/* While the server resolves access to /contact, the hero offers the document evaluation instead,
+   named as the start path it is (fix round 3, judge gap 4). */
 const EVALUATION = {
-  "/": { href: "/evaluation", label: "Evaluate your documents" },
-  "/ko": { href: "/ko/evaluation", label: "내 문서 평가 상담" },
+  "/": { href: "/evaluation", label: "Bring your own documents" },
+  "/ko": { href: "/ko/evaluation", label: "내 문서 가져오기" },
 } as const;
 async function visibleFilm(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /./);
@@ -142,7 +143,10 @@ for (const route of ["/", "/ko"]) {
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("The Knowledge Compiler for AI.");
+  // Fix round 3 (judge gap 1): the outcome sentence, with the category as the eyebrow above it.
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Turn documents into context your AI can cite.");
+  await expect(page.locator("#s1 .lv2-hero-eyebrow + h1#lv2-hero-title")).toHaveCount(1);
+  await expect(page.locator("#s1 .lv2-hero-eyebrow")).toHaveText("The Knowledge Compiler for AI");
 });
 test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
   await page.goto("/ko");
@@ -150,8 +154,9 @@ test("Korean close repeats the public-sample action and keeps Korean pricing", a
   await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
   // Brief 2026-10-15 move 1: same words and destination as the hero and the header.
   await expect(action).toHaveAttribute("href", "/explore");
-  await expect(action).toHaveText("공개 샘플 살펴보기");
-  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveText("공개 샘플 살펴보기");
+  await expect(action).toHaveText("컴파일된 샘플 열기");
+  // The hero's arrow is aria-hidden, so the action's name is the same words.
+  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveAccessibleName("컴파일된 샘플 열기");
   await Promise.all([page.waitForURL(url => url.pathname === "/explore"), action.click()]);
 });
 test("the English close keeps its start action on an English destination", async ({ page }) => {

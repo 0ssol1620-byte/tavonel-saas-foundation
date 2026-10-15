@@ -94,15 +94,18 @@ function homeData(): HomeData {
 const HOME_COPY = {
   en: {
     /*
-      Release 3 hero: the category in one sentence -- the constitution's North Star, "the Knowledge
-      Compiler for AI", in the words the layout title already uses. The support line is that North
-      Star rewritten for a buyer and kept to what the page below shows: a statement bound to its
-      page and region. No figure, no "verified", no "every source". Open to founder veto.
+      Release 3 hero. Fix round 3 (judge gap 1): the category -- the constitution's North Star, "the
+      Knowledge Compiler for AI" -- is the eyebrow, and the H1 is `BRAND_LINE.headline`, one outcome
+      sentence (input, verb, output), read from the copy deck rather than typed here. The support
+      line is unchanged: what the page below shows, a statement bound to its page and region. No
+      figure, no "verified", no "every source". Open to founder veto.
     */
-    headline: "The Knowledge Compiler for AI.",
+    eyebrow: "The Knowledge Compiler for AI",
     support:
       "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
-    intake: "Own-source intake by arrangement",
+    /* Fix round 3 (judge gap 4): an offer, not a refusal -- the copy deck's own intake sentence. */
+    intake: "We arrange intake for your own sources with you.",
+    bringOwn: "Bring your own documents",
     difficulty: {
       eyebrow: "Why this passage is hard",
       title: "A value is printed in one place. What it counts is printed in another.",
@@ -154,10 +157,12 @@ const HOME_COPY = {
   },
   ko: {
     // D12 literal translation: KO_TERMS spells "Knowledge Compiler" 지식 컴파일러 and claim/statement 진술.
-    headline: "AI를 위한 지식 컴파일러.",
+    eyebrow: "AI를 위한 지식 컴파일러",
     support:
       "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다.",
-    intake: "자체 원문 접수는 별도 협의",
+    // The copy deck's Korean for the same intake sentence (lib/landing-v2-copy.ts, hero.support).
+    intake: "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",
+    bringOwn: "내 문서 가져오기",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
       title: "값은 한곳에, 그 값이 무엇인지는 다른 곳에 인쇄되어 있습니다.",
@@ -263,7 +268,7 @@ export default function LandingPage({
   };
   const access = primaryCallToAction();
   const heroStart = {
-    label: access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : korean ? KO_CHROME.cta[access.href] : access.label,
+    label: access.href === "/contact" ? page.bringOwn : korean ? KO_CHROME.cta[access.href] : access.label,
     href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href,
   };
 
@@ -302,7 +307,7 @@ export default function LandingPage({
           <div className="lv2-wrap">
             <div className={sourceStyles.intro}>
               <HeroStatement
-                copy={{ ...copy.hero, headline: page.headline, headlineExperiment: undefined, support: page.support }}
+                copy={{ ...copy.hero, eyebrow: page.eyebrow, headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
               >

@@ -15,6 +15,7 @@ const crossCheck = JSON.parse(readFileSync(new URL("./compile-stage-player.frame
   times: number[];
   stages: Record<string, { cut: string; strings: Record<string, { pane: string; visibleAt: number[] }> }>;
   cropCheck: { stages: Record<string, { text: string; box: { x: number; w: number; h: number }; yAt: Record<string, number[]> }> };
+  blankScan: { threshold: number; blankAt: number; stages: Record<string, { crop: { x: number; y: number }; frames: number; inkBoth: number; share: number; defaultView: "crop" | "fit" }> };
 };
 
 describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
@@ -113,7 +114,8 @@ describe("mobile film view", () => {
     const markup = renderToStaticMarkup(<CompileStagePlayer preferVideo initialMobileFilmView="focus" />);
     expect(markup).toContain('data-mobile-view="focus"');
     const control = focusControl(markup);
-    expect(control.label).toBe("Fit full frame");
+    // Fix round 3 (M1): one toggle -- the label names the action and stays; pressed = Focus on screen.
+    expect(control.label).toBe("Focus details");
     expect(control.attrs).toContain('aria-pressed="true"');
     expect(markup).toContain("Focused view · Swipe or use arrow keys to inspect the frame.");
   });
@@ -126,7 +128,7 @@ describe("mobile film view", () => {
 
     const focus = renderToStaticMarkup(<CompileStagePlayer preferVideo korean initialMobileFilmView="focus" />);
     expect(focus).toContain('data-mobile-view="focus"');
-    expect(focusControl(focus).label).toBe("전체 프레임 보기");
+    expect(focusControl(focus)).toEqual({ attrs: expect.stringContaining('aria-pressed="true"'), label: "세부 내용 확대" });
     expect(focus).toContain("확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요.");
   });
 
@@ -164,19 +166,47 @@ describe("Home Focus crop and re-cut posters (Release 3)", () => {
     }
   });
 
-  it("opens the Home film on the crop with a Fit full frame control, and names only the window's panes", () => {
+  it("opens the Home film on the crop with a pressed Focus details toggle, and names only the window's panes", () => {
     const en = renderToStaticMarkup(<HeroFilm />);
     expect(en).toContain('data-wide-view="crop"');
     expect(en).toContain("--film-crop-x:25%;--film-crop-y:50%");
-    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+">Fit full frame<\/button>/);
+    // Fix round 3 (M1): the pressed state is the visible state -- the crop is on screen, so pressed.
+    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true">Focus details<\/button>/);
     expect(en).toMatch(/<li>SOURCES<\/li><li data-marked="1" data-in-crop="1">ORIGINAL<\/li><li data-in-crop="1">EXTRACT<\/li><li>WORLD<\/li>/);
     // The phone keeps Fit as its default (brief §2); only the desktop view starts cropped (R3-D1).
     expect(en).toContain('data-mobile-view="fit"');
-    // On Home neither view toggle carries a pressed state: each label names the view it opens (M1).
-    expect(focusControl(en)).toEqual({ attrs: expect.not.stringContaining("aria-pressed"), label: "Focus details" });
-    expect(renderToStaticMarkup(<HeroFilm korean />)).toMatch(/class="compile-film-view-control [^"]+" aria-controls="[^"]+">전체 프레임 보기<\/button>/);
+    // The phone toggle in Fit: same label, not pressed.
+    expect(focusControl(en)).toEqual({ attrs: expect.stringContaining('aria-pressed="false"'), label: "Focus details" });
+    expect(renderToStaticMarkup(<HeroFilm korean />)).toMatch(/class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true">세부 내용 확대<\/button>/);
+    // On Home the motion control names its next action and carries no pressed state (M1).
+    expect(en).toMatch(/<button type="button" class="compile-film-motion-control" data-control="pause" aria-label="Pause the compilation film">/);
     const plain = renderToStaticMarkup(<CompileStagePlayer />);
     for (const homeOnly of ["data-wide-view", "compile-film-view-control", "--film-crop-x", "data-in-crop"]) expect(plain).not.toContain(homeOnly);
+  });
+
+  /*
+    Fix round 3 (B1). A stage opens on the 2x crop only where the crop stays inked: the blank scan of
+    every presented frame over the stage's whole window (blankScan in the frame-strings table,
+    redesign-r3-20261015/fix2/BLANK-SCAN-2.json) must show ink in both panes for >= threshold of the
+    frames. A new crop window, or a crop default on a stage that fails, fails here until it is
+    re-scanned and recorded.
+  */
+  it("opens each stage cropped only where the blank scan of that exact window clears the threshold", () => {
+    const scan = crossCheck.blankScan;
+    expect(scan.threshold).toBe(0.85);
+    expect(scan.blankAt).toBe(0.99);
+    for (const stage of COMPILE_STAGES) {
+      const frame = STAGE_FRAMES[stage.id]!;
+      const row = scan.stages[stage.id];
+      expect(row, stage.id).toBeDefined();
+      expect(row!.crop, stage.id).toEqual(frame.crop);
+      expect(row!.share, stage.id).toBeCloseTo(row!.inkBoth / row!.frames, 3);
+      expect(frame.wideView, stage.id).toBe(row!.defaultView);
+      if (frame.wideView === "crop") expect(row!.share, `${stage.id} opens cropped`).toBeGreaterThanOrEqual(scan.threshold);
+    }
+    // The failure path this guards: stage 4's window on "nodes lit" leaves TERMINAL blank for ~11 s.
+    expect(scan.stages.world!.share).toBeLessThan(scan.threshold);
+    expect(STAGE_FRAMES.world!.wideView).toBe("fit");
   });
 
   it("serves the stage-1 re-cut poster at 2x for the crop and 1x for a phone in Fit, masked only on its own frame", () => {

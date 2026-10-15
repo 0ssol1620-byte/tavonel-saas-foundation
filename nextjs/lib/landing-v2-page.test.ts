@@ -366,10 +366,11 @@ describe("landing v2 -- the composition", () => {
       string and nothing else; where it breaks is the hero lane's measurement.
     */
       const bare = (value: string) => value.replace(/\s+/g, "");
+      // Fix round 3 (judge gap 1): the outcome sentence, BRAND_LINE.headline and its translation.
       const expected =
         locale === "ko"
-          ? "AI를 위한 지식 컴파일러."
-          : "The Knowledge Compiler for AI.";
+          ? "문서를 AI가 인용할 수 있는 맥락으로 바꿉니다."
+          : "Turn documents into context your AI can cite.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
     }
   );
@@ -678,13 +679,24 @@ describe("landing v2 -- the lead and the workbench", () => {
     }
   );
 
-  it.each(LOCALES)("%s keeps own-source intake by arrangement beside the actions", locale => {
+  // Fix round 3 (judge gap 4): the intake line is an offer, not "by arrangement".
+  it.each(LOCALES)("%s offers own-source intake beside the actions", locale => {
     const hero = sceneOf(mainOf(render(locale)), "s1");
     const text = readable(hero);
-    expect(text).toContain(locale === "ko" ? "자체 원문 접수는 별도 협의" : "Own-source intake by arrangement");
+    const offer = locale === "ko" ? "내 자료의 연결과 컴파일은 상담 후 함께 설정합니다." : "We arrange intake for your own sources with you.";
+    expect(text).toContain(offer);
+    expect(text).not.toContain(locale === "ko" ? "별도 협의" : "by arrangement");
     // Before the workbench in reading order, so it is part of the lead, not a footnote.
-    expect(text.indexOf(locale === "ko" ? "자체 원문 접수는 별도 협의" : "Own-source intake by arrangement"))
-      .toBeLessThan(readable(mainOf(render(locale))).indexOf(buildHeroView().source.filename));
+    expect(text.indexOf(offer)).toBeLessThan(readable(mainOf(render(locale))).indexOf(buildHeroView().source.filename));
+  });
+
+  // Fix round 3 (judge gap 1): the category is the eyebrow, directly above the outcome H1.
+  it.each(LOCALES)("%s names the category in the eyebrow above the H1", locale => {
+    const hero = sceneOf(mainOf(render(locale)), "s1");
+    expect(hero).toMatch(/<p class="lv2-eyebrow lv2-hero-eyebrow">([^<]+)<\/p><h1/);
+    expect(hero.match(/<p class="lv2-eyebrow lv2-hero-eyebrow">([^<]+)<\/p>/)![1]).toBe(
+      locale === "ko" ? "AI를 위한 지식 컴파일러" : "The Knowledge Compiler for AI",
+    );
   });
 
   it.each(LOCALES)("%s shows four demo stages immediately after the headline", locale => {
@@ -747,7 +759,8 @@ describe("landing v2 -- hero actions by commercial state", () => {
       const secondary = action(sceneOf(main, "s1"), "hero-secondary");
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
-      expect(readable(secondary![1]!).trim()).toBe(locale === "ko" ? "내 문서 평가 상담" : "Evaluate your documents");
+      // Fix round 3 (judge gap 4): the quiet secondary is the start path, to the same evaluation route.
+      expect(readable(secondary![1]!).trim()).toBe(locale === "ko" ? "내 문서 가져오기" : "Bring your own documents");
       // Brief 2026-10-15 move 1: the close fills the hero's public-sample action beside the price link, in both languages.
       const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
       expect(close).toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
