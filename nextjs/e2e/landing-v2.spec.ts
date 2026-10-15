@@ -142,7 +142,7 @@ for (const route of ["/", "/ko"]) {
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Knowledge your AI can trust.");
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("The Knowledge Compiler for AI.");
 });
 test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
   await page.goto("/ko");

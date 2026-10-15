@@ -1,6 +1,27 @@
 @layer reset, tokens, base, components, utilities, overrides;
 
 @layer overrides {
+  /*
+    Release 3: one brand accent, and only one. decision.md G-H fixes the accent hue at 255°
+    (`--brand oklch(48% 0.20 255)`, hover 53%, dark ground 72% / 0.14); it wins over the brief's
+    #244ac8, which is 265.7°. Chroma 0.20 is outside sRGB at 48% / 255°, so each token is
+    decision.md's lightness and hue at the sRGB chroma boundary -- what CSS gamut mapping draws for
+    it -- written as hex so the contrast is the same on every screen:
+      --action          oklch(48% 0.158 255)  white on it 6.67:1, on paper 6.34:1
+      --action-hover    oklch(53% 0.174 255)  white on it 5.38:1
+      --action-on-dark  oklch(72% 0.139 255)  7.68:1 on obsidian (the focus ring on the footer)
+    The accent paints in four places only (DESIGN_MASTER_V3 §6.2): the filled action, the active
+    tab marker, the focus ring and the Evidence Line. Never a logo, a heading, a link or body text.
+    The tokens sit on <body> while Home is mounted so the two Home surfaces rendered outside
+    `.home` -- the layout's skip link and the consent card -- read the same values.
+  */
+  :global(body):has(.home) {
+    --action: #005bb3;
+    --action-hover: #0169cd;
+    --action-on-dark: #65a7fa;
+  }
+  :global(body):has(.home) > :global(.skip) { border-color: var(--action); outline-color: var(--action); }
+
   /* Brief 2026-10-15 §4: one container, one paper, one ink. Header, hero, film and every
      section share --page-w, so at 1440 they all run x=120-1320 and at 390 x=20-370. */
   .home {
@@ -18,19 +39,33 @@
     --obsidian: #0e1013;
     --on-obsidian: #edf2f5;
     --on-obsidian-muted: #9ba0a8;
-    --action: #244ac8;
     --home-paper: var(--paper);
     --home-stone: var(--paper);
     --home-sheet: #ffffff;
     --home-ink: var(--ink);
     --home-muted: var(--ink-muted);
     --home-cobalt: var(--action);
-    --home-cobalt-deep: #173692;
+    --home-cobalt-deep: var(--action-hover);
     --home-amber: #f2b73a;
     --home-amber-wash: #fff1c7;
-    --home-amber-ink: #795400; /* §4.3 --source: source regions only. `--source` itself is a shared token (focus rings). */
+    --home-amber-ink: #795400; /* §4.3 --source: source regions only. The shared `--source` token (Evidence Line, focus) is --action, below. */
     --home-rule: var(--rule);
     --home-rule-strong: rgb(21 25 29 / 32%);
+    /*
+      The shared landing and chrome tokens that painted a second and third blue (#2259ce, #7da7ff),
+      a violet fan, a mint focus ring, a brown "changed" count and a navy-tinted ink on Home,
+      re-pointed so the accent above is the only hue CSS paints here besides the source amber.
+    */
+    --source: var(--action);
+    --source-ink: var(--action);
+    --verified: var(--action);
+    --verified-ink: var(--action);
+    --relation: var(--home-rule-strong);
+    --relation-ink: var(--home-rule-strong);
+    --changed: var(--ink);
+    --changed-ink: var(--ink);
+    --text-on-paper: var(--ink);
+    --text-muted-paper: var(--ink-muted);
     --home-mono: ui-monospace, Consolas, monospace;
     --home-ease: cubic-bezier(0.23, 1, 0.32, 1);
     /* One card corner on Home: the recompile cards and the revision card read --radius-md. */
@@ -43,7 +78,9 @@
     color: var(--ink);
     font-family: var(--f-sans);
   }
-  .home.home > footer { --ink: var(--on-obsidian); --text-hi: var(--on-obsidian); --text-mid: #b7c3d2; --text-lo: #b7c3d2; }
+  .home.home > footer { --ink: var(--on-obsidian); --text-hi: var(--on-obsidian); --text-mid: #b7c3d2; --text-lo: #b7c3d2; --action: var(--action-on-dark); }
+  /* One focus ring on Home: the accent at 2px. On the footer --action is the dark-ground accent. */
+  .home.home :global(:is(a, button, summary, [tabindex]):focus-visible) { outline-color: var(--action); }
   .intro { display: block; }
   /* Main304 has unlayered shared chrome; carry the reviewed header fixes only on Home. */
   .home.home > header { background: var(--paper) !important; color: var(--ink); border-bottom: 1px solid var(--home-rule) !important; }
@@ -64,9 +101,12 @@
   .home.home :global(#s1) { padding-top: 112px; padding-bottom: 72px; }
   .home.home :global(#s1 > .lv2-wrap) { display: block; }
   .home.home :global(.lv2-hero-grid), .home.home :global(.lv2-hero-text) { display: block; max-width: none; }
-  /* §4.4 display: Wanted Sans 600, clamp(44px, 5.6vw, 80px) / 0.98 / -0.035em. */
+  /* §4.4 display: Wanted Sans 600, clamp(44px, 5.6vw, 80px) / 0.98 / -0.035em.
+     Release 3: the H1 is the category name, one line from 768 up, so it measures the container
+     rather than --hero-measure (1040px, which broke "The Knowledge Compiler for AI." at 80px);
+     balance keeps a phone's two lines even instead of leaving "for AI." alone. */
   .home.home :global(.lv2-hero-h1) {
-    max-width: var(--hero-measure); margin: 0 auto 16px; text-align: center;
+    max-width: none; margin: 0 auto 16px; text-align: center; text-wrap: balance;
     font: 600 clamp(44px, 5.6vw, 80px)/0.98 var(--f-sans); font-variation-settings: "wght" 600; font-synthesis: none; letter-spacing: -0.035em;
   }
   .home.home :global(.lv2-h1-line) { display: block; }
@@ -121,6 +161,8 @@
   .home.home :global(.lv2-cta) { background: var(--action); color: white; border-color: var(--action); padding: 12px 24px; font: 560 15px/1.5 var(--f-sans); }
   .home.home :global(.lv2-cta:hover) { background: var(--home-cobalt-deep); }
   .home.home :global(.lv2-text-link) { color: var(--ink); font-family: var(--f-sans); }
+  /* A link's hover darkens its own underline; the accent is not a link colour. */
+  .home.home :global(.lv2-text-link:hover) { text-decoration-color: currentColor; }
   .heroAside :global(.lv2-text-link) { min-height: 48px; }
   .intake { margin: 0; color: var(--home-muted); font: 13px/1.6 var(--f-sans); text-align: center; }
   /* Brief move 3: the accepted formats are substance, so they are printed, not folded. */
@@ -130,11 +172,11 @@
   .filmFrame { position: relative; overflow: hidden; background: #f0f0eb; border: 1px solid #79827b; border-radius: 8px; aspect-ratio: 16 / 10; }
   .filmFrame picture, .filmFrame img, .filmFrame video { display: block; width: 100%; height: 100%; }
   .filmFrame img, .filmFrame video { object-fit: contain; }
-  .play { position: absolute; right: 16px; bottom: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 16px; border: 1px solid #244ac8; background: #244ac8; color: white; cursor: pointer; font: 560 14px/1.5 var(--f-sans); }
-  .play:hover { background: #173692; }
+  .play { position: absolute; right: 16px; bottom: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 16px; border: 1px solid var(--action); background: var(--action); color: white; cursor: pointer; font: 560 14px/1.5 var(--f-sans); }
+  .play:hover { background: var(--action-hover); }
   .play:active { transform: translateY(1px); }
-  .play:focus-visible { outline: 3px solid #244ac8; outline-offset: 4px; }
-  .film figcaption, .transcript, .filmError { font: 13px/1.6 var(--f-sans); color: #58615e; }
+  .play:focus-visible { outline: 3px solid var(--action); outline-offset: 4px; }
+  .film figcaption, .transcript, .filmError { font: 13px/1.6 var(--f-sans); color: var(--ink-muted); }
   .film figcaption { margin-top: 12px; }
   .transcript { margin-top: 8px; }
   /* A disclosure keeps its marker: list-item, not inline-flex (which drops ::marker). */
@@ -143,12 +185,11 @@
   /* #s4 and #s5 carry `lv2-obsidian`; on Home they are paper, so their shared dark-ground
      tokens are re-pointed. The recompile fan was --relation (violet); it is a neutral rule here. */
   .home.home :global(#s4), .home.home :global(#s5) { --ink-900: #ffffff; --hairline: var(--rule); --hairline-hi: #c7cdc7; --relation: var(--home-rule-strong); }
-  .home.home :global(#s4) { --source: #244ac8; --changed: #865600; }
   .home.home :global(#s4 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
-  .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: #58615e; }
+  .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: var(--ink-muted); }
   .home.home :global(#s4 .lv2-split) { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; }
-  .home.home :global(#s4 .lv2-inline-link) { color: #244ac8; }
-  .home.home :global(#s4 .lv2-meta), .home.home :global(#s5 .lv2-meta) { color: #47534e; }
+  .home.home :global(#s4 .lv2-inline-link) { color: var(--ink); }
+  .home.home :global(#s4 .lv2-meta), .home.home :global(#s5 .lv2-meta) { color: var(--ink-muted); }
   /* The four proofs: an editorial two-column list over the full container -- a title, its scope
      sentence, and a quiet ink "Read" link. Not blue underlined titles in a half-empty column. */
   .home.home :global(#s5 .lv2-proof-list) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 64px; max-width: none; margin-top: 48px; }
@@ -161,7 +202,7 @@
   .home[lang="ko"].home :global(#s5 :is(.lv2-proof-label, .lv2-proof-note)) { word-break: keep-all; }
   .home[lang="ko"].home :global(#s5 .lv2-proof-note) { line-height: 1.75; }
   .home.home :global(#s6 .lv2-h2), .home.home :global(#s6 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
-  .home.home :global(#s6 .lv2-scene-support) { color: #58615e; }
+  .home.home :global(#s6 .lv2-scene-support) { color: var(--ink-muted); }
   @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
     /* Shared unlayered pan rules otherwise block vertical inspection and keep ghost snap
        panes wider than Fit. Restrict both corrections to the Home story opt-in. */

@@ -92,10 +92,15 @@ function homeData(): HomeData {
 */
 const HOME_COPY = {
   en: {
-    /* Release 2 hero: the orchestrator's decision under delegated authority, open to founder veto. */
-    headline: "Knowledge your AI can trust.",
+    /*
+      Release 3 hero: the category in one sentence -- the constitution's North Star, "the Knowledge
+      Compiler for AI", in the words the layout title already uses. The support line is that North
+      Star rewritten for a buyer and kept to what the page below shows: a statement bound to its
+      page and region. No figure, no "verified", no "every source". Open to founder veto.
+    */
+    headline: "The Knowledge Compiler for AI.",
     support:
-      "TAVONEL compiles your documents into it. Each statement stays linked to the page it came from, and the knowledge recompiles when a source changes.",
+      "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
     intake: "Own-source intake by arrangement",
     difficulty: {
       eyebrow: "Why this passage is hard",
@@ -147,10 +152,10 @@ const HOME_COPY = {
     },
   },
   ko: {
-    // Not "믿고 쓰는": lib/ko-terms.ts (D12) bars 쓰다 for "use" -- it also reads as "the AI writes it".
-    headline: "AI가 믿고 사용하는 지식.",
+    // D12 literal translation: KO_TERMS spells "Knowledge Compiler" 지식 컴파일러 and claim/statement 진술.
+    headline: "AI를 위한 지식 컴파일러.",
     support:
-      "TAVONEL이 문서를 그 지식으로 컴파일합니다. 각 진술은 원문 페이지에 연결된 채 남고, 원문이 바뀌면 다시 컴파일됩니다.",
+      "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다.",
     intake: "자체 원문 접수는 별도 협의",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
