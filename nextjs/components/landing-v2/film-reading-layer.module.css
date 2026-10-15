@@ -26,7 +26,8 @@
   padding-top: 6px;
   border-top: 2px solid var(--home-rule, rgb(21 25 29 / 16%));
   color: var(--home-muted, #58606a);
-  font: 500 12px/1.4 var(--f-mono);
+  /* Pane names are labels, not filenames: the page's sans at the 13px meta size (brief §4.4). */
+  font: 500 13px/1.45 var(--f-sans);
   overflow-wrap: anywhere;
 }
 
@@ -61,13 +62,45 @@
   font: 500 16px/1.5 var(--f-sans);
 }
 
+/* A quoted on-screen label (CHANGED, nodes lit) stays in the sans; only a quoted filename or
+   source line takes mono (brief §4.4: mono for filenames and coordinates only). */
 .quote {
+  font: 600 16px/1.5 var(--f-sans);
+}
+
+.mono {
   font: 500 15px/1.5 var(--f-mono);
   white-space: pre-wrap;
 }
 
 @media (max-width: 767px) {
-  .line {
+  .line,
+  .quote {
     font-size: 15px;
+  }
+}
+
+/*
+  Stage tabs on the Home story layout, 900px and up: a compact left-aligned group instead of four
+  equal columns across the 1200px container. Unlayered on purpose: the four-column grid comes from
+  the shared `.compile-film-stages` rule in a cascade layer, which an unlayered rule outranks
+  without !important. Padding-inline 0 keeps the active underline (the Home rule's border-bottom)
+  under the label only; 44px is the tap target in both directions. Below 900px nothing changes.
+*/
+@media (min-width: 900px) {
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0 36px;
+    border-block: 0;
+  }
+
+  .tabs > button {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: 0;
+    border-left: 0;
   }
 }

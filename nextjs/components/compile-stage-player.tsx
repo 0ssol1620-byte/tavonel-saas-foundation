@@ -38,29 +38,27 @@ const MOBILE_FOCUS_PANE = [0, 1, 0, 0] as const;
 
 /*
   Home reading layer (redesign brief 2026-10-15, move 2b/2c). The cuts' own type is 8-10px and
-  the micro-labels are baked into the pixels, so each stage names ONE string to read and prints it
-  as HTML below the frame. Keyed by stage id, not position, so a narrowed stage list cannot point
-  a stage at another cut's string.
+  the micro-labels are baked into the pixels, so each stage prints ONE reading line as HTML below
+  the frame. Keyed by stage id, not position, so a narrowed stage list cannot point a stage at
+  another cut's string.
 
-  `panes` are the four pane headers and `text` a string as it appears in the locked frame --
-  transcribed, never paraphrased (poster or cut where it was read):
-  - sources: ORIGINAL title, poster-1-hero-2x.webp / poster-1.webp
-  - read: MARKDOWN heading of the first focus (PaymentTerms), poster-2.webp
-  - structure: MARKDOWN added line of the last delta (handbook-2026.pdf §12), poster-3.webp
-  - world: TERMINAL citation line (two spaces, as drawn), poster-4.webp
-  The cuts are recorded once, in English, so `textKo` quotes the same characters: a translated
-  quote would be a string that is not in the frame. A stage without a clean string gets
-  `{ pane: null, reason }` rather than a guess. Focus details opens on the target pane on Home.
+  The line has to be true for the whole loop, not for one frame (Release 1 critic: "Site visit
+  notes" is on screen for 2 of 10 sampled seconds of cut 1). So `text` is a string that is on
+  screen in `pane` at >= 80% of the sampled timestamps, proven in
+  `compile-stage-player.frame-strings.json` (derived from the frame cross-check table
+  FILM-STRING-CROSSCHECK.md, redesign-r2-20261015), and `line`/`lineKo` say what the pane shows
+  for the whole cut with `{q}` where the quote goes. The cuts are recorded once, in English, so
+  the quote is the same characters in both locales; a translated quote would not be in the frame.
+  `mono` marks a quote that is a filename or source line (set in mono); labels stay in the sans.
+  Focus details opens on `pane` on Home.
 */
-export type ReadingTarget =
-  | { pane: 0 | 1 | 2 | 3; text: string; textKo: string }
-  | { pane: null; reason: string };
+export type ReadingTarget = { pane: 0 | 1 | 2 | 3; text: string; mono: boolean; line: string; lineKo: string };
 
 export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget }> = {
-  sources: { panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"], readingTarget: { pane: 1, text: "Site visit notes", textKo: "Site visit notes" } },
-  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", textKo: "# Payment terms" } },
-  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "+ fourteen (14) days’ written notice", textKo: "+ fourteen (14) days’ written notice" } },
-  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 2, text: "handbook-2026.pdf  p.12", textKo: "handbook-2026.pdf  p.12" } },
+  sources: { panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"], readingTarget: { pane: 1, text: "WORKING COPY.md", mono: true, line: "The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in {q}.", lineKo: "ORIGINAL 패널은 원문 페이지를 한 장씩 열고, EXTRACT 패널은 그 내용을 {q}에 옮겨 적습니다." } },
+  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", mono: true, line: "Look for {q} in the MARKDOWN pane.", lineKo: "MARKDOWN 패널에서 {q} 줄을 찾아보세요." } },
+  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 0, text: "CHANGED", mono: false, line: "In the SOURCES pane, {q} marks the edited file and TOUCHED marks the files it reaches.", lineKo: "SOURCES 패널에서 {q}는 수정된 파일, TOUCHED는 그 변경이 닿는 파일을 표시합니다." } },
+  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 3, text: "nodes lit", mono: false, line: "In the WORLD pane, {q} counts the nodes the current answer cites; it falls to zero when nothing is cited.", lineKo: "WORLD 패널의 {q}는 지금 답이 인용한 노드 수입니다. 인용이 없으면 하나도 켜지지 않습니다." } },
 };
 
 /*
@@ -459,7 +457,7 @@ export default function CompileStagePlayer({
     ? fallbackVideoSrc
     : preferredVideoSrc;
 
-  const stageTabs = !compact ? <div className="compile-film-stages" role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
+  const stageTabs = !compact ? <div className={storyLayout ? `compile-film-stages ${readingStyles.tabs}` : "compile-film-stages"} role="tablist" aria-label={text.stages} onKeyDown={onKeyDown}>
     {stages.map((stage, position) => (
       <button key={stage.id} type="button" role="tab" id={tabId(stage.id)} aria-selected={position === index} aria-controls={panelId} tabIndex={position === index ? 0 : -1} data-active={position === index ? 1 : 0} onClick={() => chooseStage(position)}>{stage.label}</button>
     ))}
@@ -544,11 +542,10 @@ export default function CompileStagePlayer({
           </li>
         ))}
       </ol>
-      {target.pane !== null ? (() => {
-        const pane = stageFrame.panes[target.pane];
-        const quote = <q className={readingStyles.quote} lang={korean ? "en" : undefined}>{korean ? target.textKo : target.text}</q>;
-        return <p className={readingStyles.line}>{korean ? <>{pane} 패널에서 볼 것: {quote}</> : <>Look for {quote} in the {pane} pane.</>}</p>;
-      })() : null}
+      {(() => {
+        const [before, after] = (korean ? target.lineKo : target.line).split("{q}");
+        return <p className={readingStyles.line}>{before}<q className={target.mono ? readingStyles.mono : readingStyles.quote} lang={korean ? "en" : undefined}>{target.text}</q>{after}</p>;
+      })()}
     </div>
   ) : null;
 
