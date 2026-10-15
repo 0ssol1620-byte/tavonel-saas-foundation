@@ -7124,6 +7124,7 @@ test('OCR v3 admission owns exactly the six newly encountered endpoints and sele
     'nextjs/lib/collection-download.ts',
     'nextjs/lib/collection-download.test.ts',
     'nextjs/lib/core-runtime-v2.ts',
+    'nextjs/lib/core-runtime-v2.test.ts',
   ]);
   assert.deepEqual(OCR_V3_CONTRACT_AFFECTED_UNIT_FILES, [
     'lib/collection-compile-run.test.ts',

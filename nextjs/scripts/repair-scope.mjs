@@ -1752,7 +1752,7 @@ export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES = Object.freeze([
 export const OCR_V3_CONTRACT_AFFECTED_PATHS = Object.freeze([
   'lib/collection-compiler.ts',
   'lib/collection-download.ts', 'lib/collection-download.test.ts',
-  'lib/core-runtime-v2.ts',
+  'lib/core-runtime-v2.ts', 'lib/core-runtime-v2.test.ts',
 ]);
 export const OCR_V3_CONTRACT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/collection-compile-run.test.ts',
