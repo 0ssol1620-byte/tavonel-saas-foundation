@@ -249,6 +249,41 @@ export function selectHomeCase(candidates: readonly (EvidenceCase | null)[]): Ev
   return null;
 }
 
+/* ---------------------------------------------------------------- the "What you receive" claim */
+
+/*
+  Which World claim Home quotes under "What you receive" (brief move 8). The rule is mechanical so
+  the choice is never a matter of which sentence reads best: it looks only at the claim's text as
+  the World stores it, and the first candidate that passes, in the order given (the World's node
+  order), is the one quoted. A claim that fails is skipped, never rewritten to pass.
+
+  A claim passes when its text
+    1. is one sentence: it opens with an uppercase letter, ends with ".", "!" or "?" (a closing
+       quote or bracket may follow), and has no sentence end followed by a capitalised word inside;
+    2. ends at its own sentence end, not at an abbreviation the splitter cut at ("... Apple Inc.");
+    3. carries no "®" or "™": the extractor leaves those marks as detached tokens, often between a
+       heading and the sentence under it;
+    4. does not open with a heading: its first two words are not both capitalised. A heading the
+       extractor ran into the body ("Business Company Background The Company designs ...") opens
+       the text with a run of capitalised words.
+  Rule 4 also turns away clean sentences that open with two capitalised words ("This Annual Report
+  ..."). That is deliberate: the rule may pass over a clean claim; it must not admit a run-on.
+*/
+const SPLIT_ABBREVIATION = /\b(?:Inc|Co|Corp|Ltd|No)\.$/u;
+
+export function isClaimWithoutHeadingRunOn(text: string): boolean {
+  if (!/^\p{Lu}/u.test(text) || !/[.!?]["”’)]?$/u.test(text)) return false;
+  if (/[.!?]["”’)]?\s+["“‘(]?\p{Lu}/u.test(text)) return false;
+  if (SPLIT_ABBREVIATION.test(text) || /[®™]/u.test(text)) return false;
+  const second = text.split(/\s+/u)[1];
+  return second === undefined || !/^\p{Lu}/u.test(second);
+}
+
+/** The first candidate whose `label` passes `isClaimWithoutHeadingRunOn`, or null. */
+export function selectReceiveClaim<T extends { label: string }>(candidates: readonly T[]): T | null {
+  return candidates.find(candidate => isClaimWithoutHeadingRunOn(candidate.label)) ?? null;
+}
+
 /* ------------------------------------------------------------------------------ the default */
 
 /*
