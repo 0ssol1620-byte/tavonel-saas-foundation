@@ -11,7 +11,7 @@ import { HERO_STATS } from "./hero-stats";
 import { exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import { toVisualWorldModel } from "./visual-world-model";
 import { landingV2PageImage } from "./landing-v2-assets";
-import { isClaimWithoutHeadingRunOn, selectReceiveClaim } from "./home-evidence-view";
+import { isRepresentativeClaim, selectReceiveClaim } from "./home-evidence-view";
 
 const file = path.resolve(process.cwd(), "lib/landing-v2-snapshot.json");
 
@@ -74,10 +74,11 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
   /*
     Brief move 8. The candidates are the ones the record builder can already bind (a Claim whose
     first region is on an original-representation page with a committed page raster), in World
-    order; the rule in `selectReceiveClaim` picks among them. This pins what it picks, and that the
-    claim Home quotes today is one the rule turns away.
+    order; the rule in `selectReceiveClaim` picks among them. This pins what it picks, that every
+    earlier candidate fails the rule, and that both claims Home used to quote are turned away: the
+    heading run-on, and the safe-harbour sentence Release 1 picked.
   */
-  it("finds a sample claim without a heading run-on, among claims the record builder can bind", () => {
+  it("finds the first representative sample claim, among claims the record builder can bind", () => {
     const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
     const evidence = new Map(world.evidence.map(item => [item.id, item] as const));
     const candidates = world.nodes.filter(node => {
@@ -88,10 +89,13 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     const picked = selectReceiveClaim(candidates);
     expect(picked?.kind).toBe("Claim");
     expect(picked?.label).toBe(
-      "For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements.",
+      "Unless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years.",
     );
-    expect(candidates.slice(0, candidates.indexOf(picked!)).some(node => isClaimWithoutHeadingRunOn(node.label))).toBe(false);
-    expect(isClaimWithoutHeadingRunOn(buildEvidenceRecord().claim.label)).toBe(false);
+    expect(candidates.slice(0, candidates.indexOf(picked!)).some(node => isRepresentativeClaim(node.label))).toBe(false);
+    expect(isRepresentativeClaim(buildEvidenceRecord().claim.label)).toBe(false);
+    expect(isRepresentativeClaim(
+      "For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements.",
+    )).toBe(false);
     expect(buildReceiveRecord().claim.label).toBe(picked?.label);
   });
 });
