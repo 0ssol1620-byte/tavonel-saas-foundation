@@ -238,9 +238,12 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
   const panel = page.locator("header.nav details.mobile-primary-nav > nav");
   await expect(panel).toBeVisible();
   // The source-first paper surface uses the same 2px blue keyboard ring for every control.
+  // Release 2 (main dbe22b1e) draws it in the header cobalt #244ac8
+  // (`.one-path-mobile-nav > summary:focus-visible` in components/public-site-chrome.module.css);
+  // measured on the merged build at 390x844: 2px solid rgb(36, 74, 200), offset 2px.
   await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "2px");
   await expect(summary).toHaveCSS("outline-offset", "2px");
-  await expect(summary).toHaveCSS("outline-color", "rgb(36, 71, 179)");
+  await expect(summary).toHaveCSS("outline-color", "rgb(36, 74, 200)");
   await expect(summary).not.toHaveCSS("outline-style", "none");
   const ring = await summary.evaluate(element => ({ color: getComputedStyle(element).outlineColor, background: getComputedStyle(element).backgroundColor }));
   expect(contrastRatio(ring.color, ring.background), "visible keyboard ring contrast").toBeGreaterThanOrEqual(3);
@@ -253,8 +256,12 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
 const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product", "/ko", "/ko/pricing"] as const;
 /*
   Home (PR #148, main 0969755b) paints its whole page, header disclosure included, in its paper token
-  (--paper #faf9f6 in components/landing-v2/source-first-home.module.css). Every other public route keeps the
-  white header. The contrast assertions below hold on both surfaces.
+  (--paper #faf9f6 in components/landing-v2/source-first-home.module.css). Release 2 (main dbe22b1e) makes
+  the Menu control a borderless 44px icon with a transparent fill everywhere else
+  (components/public-site-chrome.module.css), so on those routes it sits on the header ground and its
+  three lines are drawn in #15191d. Measured on the merged build at 390x844: Home summary fill
+  rgb(250, 249, 246); other routes rgba(0, 0, 0, 0) over rgb(251, 250, 247); label and ::before glyph
+  rgb(21, 25, 29). The contrast assertions below measure against the surface the control actually sits on.
 */
 const HOME_ROUTES: readonly string[] = ["/", "/ko"];
 const HOME_PAPER = "rgb(250, 249, 246)";
@@ -265,15 +272,19 @@ for (const route of PUBLIC_HEADER_ROUTES) {
     await page.goto(route);
     const summary = page.locator("header.nav details.mobile-primary-nav > summary");
     await expect(summary).toBeVisible();
-    await expect(summary).toHaveCSS("background-color", HOME_ROUTES.includes(route) ? HOME_PAPER : "rgb(255, 255, 255)");
+    await expect(summary).toHaveCSS("background-color", HOME_ROUTES.includes(route) ? HOME_PAPER : "rgba(0, 0, 0, 0)");
     await expect(summary).toHaveCSS("color", "rgb(21, 25, 29)");
     await expect(summary).toHaveCSS("border-radius", "6px");
-    const style = await summary.evaluate((element) => ({
-      background: getComputedStyle(element).backgroundColor,
-      color: getComputedStyle(element).color,
-      glyph: getComputedStyle(element, "::before").color,
-    }));
-    expect(style.glyph).toBe("rgb(17, 21, 25)");
+    const style = await summary.evaluate((element) => {
+      // The nearest painted surface: the control's own fill, else the first ancestor with one.
+      let background = "rgba(0, 0, 0, 0)";
+      for (let node: Element | null = element; node && background === "rgba(0, 0, 0, 0)"; node = node.parentElement) {
+        background = getComputedStyle(node).backgroundColor;
+      }
+      return { background, color: getComputedStyle(element).color, glyph: getComputedStyle(element, "::before").color };
+    });
+    expect(style.background, "the Menu control sits on a painted surface").not.toBe("rgba(0, 0, 0, 0)");
+    expect(style.glyph).toBe("rgb(21, 25, 29)");
     expect(contrastRatio(style.color, style.background), "Menu label contrast").toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(style.glyph, style.background), "Menu glyph contrast").toBeGreaterThanOrEqual(4.5);
     const bounds = await summary.boundingBox();
@@ -292,18 +303,30 @@ async function expectHomeLeadBelowHeader(page: Page) {
   })).toBe(true);
 }
 
+/*
+  Release 2 (main dbe22b1e): the consent card is not on the first paint. It appears after the first
+  scroll past 200px or 8 s (CONSENT_REVEAL in components/marketing-consent.tsx) and then stays until
+  answered, so these tests reveal it with a scroll and measure the first screen back at the top.
+*/
+async function revealConsentAtTop(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 300));
+  const panel = page.locator("section[data-marketing-consent-panel]");
+  await expect(panel).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return panel;
+}
+
 test("the consent notice, header, and home headline occupy separate phone bands", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await expect(page.locator("section[data-marketing-consent-panel]")).toBeVisible();
+  await revealConsentAtTop(page);
   await expectHomeLeadBelowHeader(page);
 });
 
 test("dismissing the consent notice leaves the fixed header above the home headline", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  const panel = page.locator("section[data-marketing-consent-panel]");
-  await expect(panel).toBeVisible();
+  const panel = await revealConsentAtTop(page);
   await panel.locator("button").first().click();
   await expect(panel).toBeHidden();
   await expectHomeLeadBelowHeader(page);

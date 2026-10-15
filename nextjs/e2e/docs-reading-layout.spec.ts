@@ -80,9 +80,22 @@ for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli", "/docs/mcp"])
   });
 }
 
-async function dismissConsent(page: import("@playwright/test").Page) {
+/*
+  Release 2 (main dbe22b1e): the consent card is not on the first paint. It appears after the first
+  scroll past 200px or 8 s (CONSENT_REVEAL in components/marketing-consent.tsx), stays until answered,
+  and is a bottom-fixed card rather than a band above the header. Reveal it with a scroll and measure
+  the reading position back at the top.
+*/
+async function revealConsentAtTop(page: import("@playwright/test").Page) {
+  await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(panel).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return panel;
+}
+
+async function dismissConsent(page: import("@playwright/test").Page) {
+  const panel = await revealConsentAtTop(page);
   await panel.getByRole("button", { name: "No thanks", exact: true }).click();
   await expect(panel).toBeHidden();
 }
@@ -92,8 +105,7 @@ test("MCP reading controls and title clear the shared header with either consent
   test.skip(width !== 390 && width !== 1440, "This focused layout check runs at the phone and desktop reference widths.");
 
   await page.goto("/docs/mcp");
-  const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
-  await expect(consent).toBeVisible();
+  await revealConsentAtTop(page);
 
   const expectReadingPosition = async (consentVisible: boolean) => {
     const layout = await page.evaluate(() => {
@@ -148,12 +160,21 @@ test("MCP reading controls and title clear the shared header with either consent
     expect(hasVisibleArea(layout.summary)).toBe(true);
     expect(layout.paragraphSize).toBeGreaterThanOrEqual(layout.width <= 600 ? 16 : 17);
     if (layout.width <= 1079) expect(layout.title.top).toBeGreaterThanOrEqual(layout.index.bottom - 1);
+    /*
+      Release 2: the card sits at the viewport's bottom edge, below the header, and must clear the
+      search, title and summary; the Docs index starts above it (at 1440 it is the full-height
+      sidebar the bottom-left card overlaps near its foot). Measured on the merged build with the
+      card shown at scroll 0: 390x844 card 740.8-836, summary ends 281.8; 1440x900 card 743.4-884,
+      summary ends 245, index starts 153.9.
+    */
     if (consentVisible && layout.banner) {
       expect(doesNotOverlap(layout.banner, layout.header)).toBe(true);
-      expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
-      for (const content of [layout.search, layout.index, layout.title, layout.summary]) {
-        expect(content.top).toBeGreaterThanOrEqual(layout.banner.bottom - 1);
+      expect(layout.banner.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
+      expect(layout.banner.bottom).toBeLessThanOrEqual(layout.height + 1);
+      for (const content of [layout.search, layout.title, layout.summary]) {
+        expect(doesNotOverlap(content, layout.banner)).toBe(true);
       }
+      expect(layout.index.top).toBeLessThan(layout.banner.top);
     }
 
     await test.info().attach(consentVisible ? "mcp-reading-consent-visible" : "mcp-reading-consent-dismissed", {

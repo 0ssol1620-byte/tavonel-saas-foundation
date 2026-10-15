@@ -67,10 +67,13 @@ test("all plan prices fit in the compact phone comparison before detailed plan c
       for (const route of ROUTES) {
         await checked.goto(route);
         if (route === "/pricing") {
+          // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+          await checked.evaluate(() => window.scrollTo(0, 300));
           const consent = checked.getByRole("region", { name: "Optional analytics", exact: true });
           await expect(consent).toBeVisible();
           await consent.getByRole("button", { name: "No thanks", exact: true }).click();
           await expect(consent).toBeHidden();
+          await checked.evaluate(() => window.scrollTo(0, 0));
         }
         const nav = overview(checked, route);
         if (profile.width > 700) {
