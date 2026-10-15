@@ -2060,7 +2060,8 @@ test('persisted OCR safety receipt fails when actual worker execution is missing
 
 test('reviewed OCR safety runs the existing normal eight-file worker suite and types in automatic Repair', () => {
   const ci = readFileSync(resolve(process.cwd(), '..', '.github/workflows/ci.yml'), 'utf8');
-  assert.ok(ci.includes('types: [ready_for_review]'));
+  // Full CI runs on every PR event (main's trigger set), so this automatic Repair step is not the only run.
+  assert.ok(/pull_request:\r?\n  push:/.test(ci) && !/pull_request:\r?\n\s+types:/.test(ci));
   assert.ok(!ci.includes('codex/masterplan-checkpoint-2026-09-30'));
   const workflow = readFileSync(resolve(process.cwd(), '..', '.github/workflows/repair-scope.yml'), 'utf8');
   const start = workflow.indexOf('      - name: Run the normal CDR worker unit suite and types for reviewed OCR safety');

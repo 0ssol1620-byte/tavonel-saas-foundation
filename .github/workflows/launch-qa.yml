@@ -1,11 +1,13 @@
 name: Launch QA
 
 on:
+  # Every PR event main runs on (opened, synchronize, reopened): the full suite runs on each push
+  # to a PR, not only when it leaves draft.
   pull_request:
-    types: [ready_for_review]
   push:
     branches:
       - main
+      - "agent/**"
       - codex/gate-acl-integration-20260927
       - codex/gate-lifecycle-integration-20260927
       - codex/operations-integration-20260830

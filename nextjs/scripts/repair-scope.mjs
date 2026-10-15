@@ -1528,7 +1528,7 @@ export function buildRepairPlan({ pullRequestBaseSha, repairAnchorSha, headSha, 
     if (!matched) { groups.add('unknown'); unknownPaths.push(path); broader = true; }
   }
 
-  if (workflowConfigChanged) qualificationReasons.add('workflow config changed; full CI/Launch still required on ready_for_review');
+  if (workflowConfigChanged) qualificationReasons.add('workflow config changed; full CI/Launch still required on the pull request');
   const plan = {
     schemaVersion: 1,
     repository: '0ssol1620-byte/tavonel-saas-foundation',

@@ -50,7 +50,9 @@ const mountedExpected = ['review-1440x900', 'review-390x844', 'receipt-1440x900'
 assert(JSON.stringify(mountedPaths.sort()) === JSON.stringify(mountedExpected.sort()), 'upload must include only the four explicit mounted PNG/geometry pairs; no isolated images or reports');
 assert(repair.includes('WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}'), 'mounted capture gate must consume the actual step outcome without a success fallback');
 const assertFullEvents = (workflow, name) => {
-  assert(/pull_request:\n\s+types: \[ready_for_review\]/.test(workflow), `${name}: full PR run must be ready_for_review only`);
+  // main's event set: every PR event (no types filter) and pushes to main and agent/**.
+  assert(/\n  pull_request:\n  push:\n/.test(workflow) && !/pull_request:\n\s+types:/.test(workflow), `${name}: full PR run must run on every PR event, not a narrowed types list`);
+  assert(workflow.includes('- "agent/**"'), `${name}: push to agent/** must run the full suite`);
   assert(workflow.includes('workflow_dispatch:'), `${name}: manual full run is missing`);
   for (const branch of branches) assert(workflow.includes(`- ${branch}`), `${name}: missing actual integration branch ${branch}`);
 };
