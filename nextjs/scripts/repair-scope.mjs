@@ -1747,6 +1747,20 @@ export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS = Object.freeze([
 export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/collection-compile-run.test.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs',
 ]);
+// OCR v3 changes the collection/Core contract and signed download decision. Keep
+// this owner finite and distinct from the already registered compile-run owner.
+export const OCR_V3_CONTRACT_AFFECTED_PATHS = Object.freeze([
+  'lib/collection-compiler.ts',
+  'lib/collection-download.ts', 'lib/collection-download.test.ts',
+  'lib/core-runtime-v2.ts',
+]);
+export const OCR_V3_CONTRACT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/collection-compile-run.test.ts',
+  'lib/collection-compiler.test.ts',
+  'lib/collection-compiler-fail-closed.test.ts',
+  'lib/collection-download.test.ts',
+  'lib/core-runtime-v2.test.ts',
+]);
 // Explorer navigation: exactly the existing explorer, its CSS, the navigation model and the direct navigation suite.
 // Product workspace UI, so never nativeReuse; no adjacent world route or model is admitted by this finite owner.
 export const WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS = Object.freeze([
@@ -2007,6 +2021,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Compile observations and explorer navigation are finite owners, with no browser, database, worker or build lane of their own.
   affectedGroup('compile-source-observations', new RegExp(`^nextjs/(?:${exactPathAlternation(COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS)})$`),
     { unitFiles: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES }),
+  affectedGroup('ocr-v3-contract', new RegExp(`^nextjs/(?:${exactPathAlternation(OCR_V3_CONTRACT_AFFECTED_PATHS)})$`),
+    { unitFiles: OCR_V3_CONTRACT_AFFECTED_UNIT_FILES }),
   affectedGroup('world-explorer-navigation', new RegExp(`^nextjs/(?:${exactPathAlternation(WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS)})$`),
     { unitFiles: WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES }),
   // World version diff: the seven exact paths above select three direct suites only; no browser, database, worker or build lane.
@@ -2031,10 +2047,10 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.
-  affectedGroup('ocr-cpu-worker', /^workers\/foundation-ocr-cpu-raster\/(?:app\.py|SYNTHETIC_TABLE_BINDING\.md|tests\/fixtures\/synthetic-grid-profile\.json|tests\/test_synthetic_table_caller\.py)$/),
+  affectedGroup('ocr-cpu-worker', /^workers\/foundation-ocr-cpu-raster\/(?:app\.py|SYNTHETIC_TABLE_BINDING\.md|tests\/fixtures\/synthetic-grid-profile\.json|tests\/(?:test_synthetic_table_caller|test_cpu_ocr_v3_contract)\.py)$/),
   // GPU OCR worker: only its two actual application/test paths. No worker flag (never the CDR/CPU checks) and not nativeReuse; its
   // qualification is the external foundation-ocr-gpu-image candidate job, which affectedPlan defers as pending debt.
-  affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/test_app\.py)$/),
+  affectedGroup('ocr-gpu-worker', /^workers\/foundation-ocr-gpu\/(?:app\.py|tests\/(?:test_app|test_gpu_ocr_v3_contract)\.py)$/),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',

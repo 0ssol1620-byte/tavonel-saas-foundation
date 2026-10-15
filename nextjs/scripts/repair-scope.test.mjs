@@ -7111,3 +7111,53 @@ test('affected production-hardening admission uses only projects with actual gua
   assert.match(source,/testInfo\.project\.name !== "1440"/);
   assert.throws(()=>planBrowserRuns(['e2e/unreviewed.spec.ts'],false),/No reviewed Playwright project mapping/);
 });
+
+test('OCR v3 admission owns exactly the six newly encountered endpoints and selects direct contract checks', async () => {
+  const { OCR_V3_CONTRACT_AFFECTED_PATHS, OCR_V3_CONTRACT_AFFECTED_UNIT_FILES } = await import('./repair-scope.mjs');
+  const contract = OCR_V3_CONTRACT_AFFECTED_PATHS.map(path => `nextjs/${path}`);
+  const workers = [
+    'workers/foundation-ocr-cpu-raster/tests/test_cpu_ocr_v3_contract.py',
+    'workers/foundation-ocr-gpu/tests/test_gpu_ocr_v3_contract.py',
+  ];
+  assert.deepEqual(contract, [
+    'nextjs/lib/collection-compiler.ts',
+    'nextjs/lib/collection-download.ts',
+    'nextjs/lib/collection-download.test.ts',
+    'nextjs/lib/core-runtime-v2.ts',
+  ]);
+  assert.deepEqual(OCR_V3_CONTRACT_AFFECTED_UNIT_FILES, [
+    'lib/collection-compile-run.test.ts',
+    'lib/collection-compiler.test.ts',
+    'lib/collection-compiler-fail-closed.test.ts',
+    'lib/collection-download.test.ts',
+    'lib/core-runtime-v2.test.ts',
+  ]);
+  for (const path of [...contract, ...workers]) {
+    const owners = AFFECTED_GROUPS.filter(owner => owner.match.test(path)).map(owner => owner.group);
+    assert.deepEqual(owners, [contract.includes(path) ? 'ocr-v3-contract' :
+      path.includes('cpu-raster') ? 'ocr-cpu-worker' : 'ocr-gpu-worker'], path);
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.unmappedPaths], [[], []], path);
+    if (contract.includes(path)) {
+      for (const file of OCR_V3_CONTRACT_AFFECTED_UNIT_FILES) assert.ok(map.unitFiles.includes(file), `${path}: ${file}`);
+    } else {
+      assert.deepEqual(map.unitFiles, [], path);
+      assert.ok(affectedAskPlan(map).pendingDebt.includes(owners[0]), path);
+    }
+  }
+  const combined = affectedMap([...contract, ...workers].map(path => affectedRecord('M', [path])));
+  assert.deepEqual([combined.failures, combined.unmappedPaths], [[], []]);
+  for (const file of OCR_V3_CONTRACT_AFFECTED_UNIT_FILES) assert.ok(combined.unitFiles.includes(file), file);
+  for (const adjacent of [
+    'nextjs/lib/collection-compiler-v3.ts',
+    'nextjs/lib/collection-download-v3.test.ts',
+    'workers/foundation-ocr-cpu-raster/tests/test_cpu_ocr_v4_contract.py',
+    'workers/foundation-ocr-gpu/tests/test_gpu_ocr_v4_contract.py',
+  ]) {
+    const refused = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual(refused.failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+    assert.throws(() => affectedAskPlan(refused), /clean fail-closed map/, adjacent);
+  }
+  const oldOwner = AFFECTED_GROUPS.filter(owner => owner.match.test('nextjs/lib/collection-compile-run.ts'));
+  assert.deepEqual(oldOwner.map(owner => owner.group), ['compile-source-observations']);
+});

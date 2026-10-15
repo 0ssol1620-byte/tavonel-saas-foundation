@@ -280,7 +280,13 @@ def test_comparable_confidence_chinese_is_not_replaced_by_hangul() -> None:
     worker = importlib.import_module("app")
     general = [raster_line("客户文件处理验证：整理合同和设计资料。", 0.85, 0)]
     korean = [raster_line("고객문서처리", 0.9, 0)]
-    assert worker.merge_korean_lines(general, korean) == general
+    merged = worker.merge_korean_lines(general, korean)
+    assert len(merged) == 1
+    assert merged[0]["text"] == general[0]["text"]  # Chinese remains the selected reading
+    assert merged[0]["confidence"] == general[0]["confidence"]
+    assert [candidate["text"] for candidate in merged[0]["recognitionCandidates"]] == [
+        general[0]["text"], korean[0]["text"]
+    ]  # Neither disagreeing source reading is discarded.
 
 
 def test_raster_pages_always_get_the_korean_pass_without_the_angle_classifier(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -294,6 +300,7 @@ def test_raster_pages_always_get_the_korean_pass_without_the_angle_classifier(mo
     monkeypatch.setattr(worker, "_self_test", {"state": "passed", "detail": None})
     monkeypatch.setattr(worker, "_general_rapidocr", sys.modules["rapidocr"].RapidOCR(params={}))
     monkeypatch.setattr(worker, "_korean_rapidocr", sys.modules["rapidocr"].RapidOCR(params={"Rec.lang_type": "korean"}))
+    monkeypatch.setattr(worker, "OCR_CONFLICT_V3_ENABLED", True)
     blank = pdfium.PdfDocument.new()
     blank.new_page(612, 792).close()
     buffer = io.BytesIO()
@@ -307,6 +314,36 @@ def test_raster_pages_always_get_the_korean_pass_without_the_angle_classifier(mo
     ]
     assert "".join(text.split()) == "".join("".join(SPARSE_MIXED_EXPECTED).split())
     assert [region["regionId"] for region in regions] == [f"ocr-p0001-l{n:05d}" for n in range(1, 5)]
+    assert [candidate["text"] for candidate in regions[0]["recognitionConflict"]["candidates"]] == [
+        SPARSE_MIXED_GENERAL[0]["text"], SPARSE_MIXED_KOREAN[0]["text"]
+    ]
+
+
+def test_raster_disagreement_refuses_v2_before_returning_regions(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker, calls = install_fake_rapidocr(
+        monkeypatch,
+        read={
+            "general": [(line["text"], line["confidence"], row) for row, line in zip((0, 2), SPARSE_MIXED_GENERAL)],
+            "korean": [(line["text"], line["confidence"], row) for row, line in enumerate(SPARSE_MIXED_KOREAN)],
+        },
+    )
+    monkeypatch.setattr(worker, "_self_test", {"state": "passed", "detail": None})
+    monkeypatch.setattr(worker, "_general_rapidocr", sys.modules["rapidocr"].RapidOCR(params={}))
+    monkeypatch.setattr(worker, "_korean_rapidocr", sys.modules["rapidocr"].RapidOCR(params={"Rec.lang_type": "korean"}))
+    monkeypatch.setattr(worker, "OCR_CONFLICT_V3_ENABLED", False)
+    blank = pdfium.PdfDocument.new()
+    blank.new_page(612, 792).close()
+    buffer = io.BytesIO()
+    blank.save(buffer)
+
+    with pytest.raises(HTTPException) as refused:
+        worker.extract_text(buffer.getvalue())
+    assert refused.value.status_code == 422
+    assert refused.value.detail == "OCR recognition conflict requires qualified v3 reader"
+    assert [call for call in calls if "options" in call] == [
+        {"engine": "general", "options": {}},
+        {"engine": "korean", "options": {"use_cls": False}},
+    ]
 
 
 def test_rejects_non_pdf(client: TestClient) -> None:
