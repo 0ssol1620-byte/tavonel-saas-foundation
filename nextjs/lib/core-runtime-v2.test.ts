@@ -96,6 +96,8 @@ async function digest(value: string) {
 }
 
 const requiredPaths = [
+  // The Core always emits its source manifest, and the signed download refuses a package without one.
+  "source/collection-files.json",
   "ontology/knowledge.jsonld",
   "ontology/knowledge.ttl",
   "graph/nodes.csv",
@@ -111,7 +113,12 @@ async function candidateFixture() {
   const files = await Promise.all(requiredPaths.map(async (path) => {
     const content = path === "validation/report.json"
       ? `${JSON.stringify({ status: "passed", reviewReasons: [] })}\n`
-      : `${path}\n`;
+      : path === "source/collection-files.json"
+        // A v2 Core manifest row: no OCR v3 reader metadata.
+        ? `${JSON.stringify(inputs().map((input) => ({
+          documentId: input.documentId, documentVersionId: input.versionKey, sourceSha256: input.inputSha256,
+        })))}\n`
+        : `${path}\n`;
     return {
       path,
       mediaType: path.endsWith(".csv") ? "text/csv" : "application/json",
