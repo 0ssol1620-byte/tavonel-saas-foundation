@@ -92,7 +92,10 @@ function homeData(): HomeData {
 */
 const HOME_COPY = {
   en: {
-    support: "Your sources, connected for people and AI.",
+    /* Release 2 hero: the orchestrator's decision under delegated authority, open to founder veto. */
+    headline: "Knowledge your AI can trust.",
+    support:
+      "TAVONEL compiles your documents into it. Each statement stays linked to the page it came from, and the knowledge recompiles when a source changes.",
     intake: "Own-source intake by arrangement",
     difficulty: {
       eyebrow: "Why this passage is hard",
@@ -144,7 +147,10 @@ const HOME_COPY = {
     },
   },
   ko: {
-    support: "원문에서, 사람과 AI가 사용하는 지식으로.",
+    // Not "믿고 쓰는": lib/ko-terms.ts (D12) bars 쓰다 for "use" -- it also reads as "the AI writes it".
+    headline: "AI가 믿고 사용하는 지식.",
+    support:
+      "TAVONEL이 문서를 그 지식으로 컴파일합니다. 각 진술은 원문 페이지에 연결된 채 남고, 원문이 바뀌면 다시 컴파일됩니다.",
     intake: "자체 원문 접수는 별도 협의",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
@@ -290,7 +296,7 @@ export default function LandingPage({
           <div className="lv2-wrap">
             <div className={sourceStyles.intro}>
               <HeroStatement
-                copy={{ ...copy.hero, headline: korean ? "내 문서. 연결된 지식." : "Your documents. Connected knowledge.", headlineExperiment: undefined, support: page.support }}
+                copy={{ ...copy.hero, headline: page.headline, headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
               >
