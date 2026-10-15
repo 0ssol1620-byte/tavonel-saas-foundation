@@ -9,10 +9,14 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   GA still loads only after consent.
 */
 const PANEL = { name: /^(Optional analytics|선택 분석)$/ };
+// The card arrives with a 180ms translate; measure where it lands, not where it is mid-flight.
+const settle = (panel: import("@playwright/test").Locator) =>
+  panel.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished)));
 async function revealConsent(page: import("@playwright/test").Page) {
   await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.getByRole("region", PANEL);
   await expect(panel).toBeVisible();
+  await settle(panel);
   return panel;
 }
 
@@ -25,12 +29,19 @@ async function revealConsent(page: import("@playwright/test").Page) {
 type Box = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, box: Box) {
+/*
+  `atReveal`: the moment the row appears (after the 300px scroll, or at 8 s unscrolled) it must
+  not sit on the film stage. Scrolled further, content passes under it as it passes under the
+  header, so only its place is checked then.
+*/
+async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, box: Box, atReveal = true) {
   const header = await page.locator("header.nav").boundingBox();
   expect(Math.abs(box.y - (header!.y + header!.height)), "the row starts at the header's foot").toBeLessThanOrEqual(1);
   expect(box.height, "one row, not a card").toBeLessThanOrEqual(56);
+  if (!atReveal) return;
   const stage = await page.locator("#s1 .compile-film-viewport").boundingBox();
-  if (stage) expect(overlaps(box, stage), "the row never covers the film stage").toBe(false);
+  expect(stage, "the film stage is measured").not.toBeNull();
+  expect(overlaps(box, stage!), "the row does not open over the film stage").toBe(false);
 }
 
 test("analytics remains optional, persists refusal, and fits the viewport", async ({ page }, testInfo) => {
@@ -95,7 +106,7 @@ test("the consent notice never covers homepage or pricing actions at 1440, 390 a
     await page.evaluate(() => window.scrollTo(0, Math.min(1_000, document.documentElement.scrollHeight - innerHeight)));
     const movedPanel = await panel.boundingBox();
     expect(movedPanel, "the fixed card keeps its box after a scroll").not.toBeNull();
-    if (homeRow) await expectHomeRowUnderHeader(page, movedPanel!);
+    if (homeRow) await expectHomeRowUnderHeader(page, movedPanel!, false);
     else expect(movedPanel!.y + movedPanel!.height, "the card stays at the viewport bottom").toBeGreaterThan(page.viewportSize()!.height - 40);
     const stuckHeader = await page.locator("header.nav").boundingBox();
     expect(stuckHeader, "public header should remain available after a scroll").not.toBeNull();
@@ -112,6 +123,7 @@ test("on Home from 900px the 8 s prompt covers no title, support, action or film
   // The timer path: no scroll at all, so the whole first screen is what the row must clear.
   await page.clock.fastForward(8_000);
   await expect(panel).toBeVisible();
+  await settle(panel);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   const box = (await panel.boundingBox())!;
   await expectHomeRowUnderHeader(page, box);
