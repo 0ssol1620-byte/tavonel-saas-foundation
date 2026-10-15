@@ -429,6 +429,30 @@ export default function CompileStagePlayer({
     ))}
   </div> : null;
 
+  const externalMotionControl = storyLayout && narrow && !mobileFilmFit;
+  const motionControl = (
+        <button
+          type="button"
+          className="compile-film-motion-control"
+          data-control={control}
+          aria-label={korean ? FILM_CONTROL_LABEL_KO[control] : FILM_CONTROL_LABEL[control].label}
+          aria-pressed={control === "pause"}
+          onClick={() => {
+            if (control === "pause") { setPaused(true); return; }
+            if (control === "replay") {
+              const element = videoRef.current;
+              if (element) { element.currentTime = 0; void element.play().catch(() => {}); }
+              setEnded(false);
+            }
+            setVideoError(false);
+            setPaused(false);
+            setPlayRequested(true);
+          }}
+        >
+          <FilmControlMark control={control} />
+        </button>
+  );
+
   const mobileTools = (<div className="compile-film-mobile-tools">
         <button
           type="button"
@@ -441,6 +465,7 @@ export default function CompileStagePlayer({
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
             : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
         </button>
+        {externalMotionControl ? motionControl : null}
         <p aria-live="polite">
           {mobileFilmFit
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].fittedHint
@@ -532,27 +557,8 @@ export default function CompileStagePlayer({
             setPaused(true);
           }} />
         )}
-        {/* Always rendered: the two states that most need it were the two that hid it. */}
-        <button
-          type="button"
-          className="compile-film-motion-control"
-          data-control={control}
-          aria-label={korean ? FILM_CONTROL_LABEL_KO[control] : FILM_CONTROL_LABEL[control].label}
-          aria-pressed={control === "pause"}
-          onClick={() => {
-            if (control === "pause") { setPaused(true); return; }
-            if (control === "replay") {
-              const element = videoRef.current;
-              if (element) { element.currentTime = 0; void element.play().catch(() => {}); }
-              setEnded(false);
-            }
-            setVideoError(false);
-            setPaused(false);
-            setPlayRequested(true);
-          }}
-        >
-          <FilmControlMark control={control} />
-        </button>
+        {/* Focus inspection keeps the motion control outside the source pixels. */}
+        {!externalMotionControl ? motionControl : null}
       </div>
 
       {!storyLayout ? mobileTools : null}

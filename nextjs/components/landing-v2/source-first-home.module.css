@@ -121,6 +121,24 @@
   .home.home :global(#s6) { background: var(--paper); color: var(--ink); }
   .home.home :global(#s6 .lv2-h2), .home.home :global(#s6 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
   .home.home :global(#s6 .lv2-scene-support) { color: #58615e; }
+  @media (max-width: 899px), (pointer: coarse) and (max-width: 1023px) {
+    /* Shared unlayered pan rules otherwise block vertical inspection and keep ghost snap
+       panes wider than Fit. Restrict both corrections to the Home story opt-in. */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-viewport) { overflow: auto !important; grid-row: 4; }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-panes) { display: none !important; }
+    /* Inspection controls sit above the pan surface; they cannot permanently cover a quote. */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-caption) { grid-column: 1 / -1; }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools) {
+      grid-column: 1 / -1; grid-row: 3; display: flex !important; flex-wrap: wrap;
+      align-items: center; justify-content: space-between; gap: 6px 12px;
+    }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control) {
+      position: static !important; margin: 0; flex: none; min-width: 44px; min-height: 44px;
+      width: 44px; height: 44px; opacity: 1 !important;
+      background: var(--home-ink) !important; color: #ffffff !important; border-color: var(--home-ink) !important;
+    }
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="focus"] .compile-film-mobile-tools .compile-film-motion-control:focus-visible) { outline: 2px solid var(--home-cobalt) !important; outline-offset: 3px; }
+  }
   @media (max-width: 1023px) {
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; }
     .home.home :global(#s4 .lv2-split) { grid-template-columns: 1fr; gap: 32px; }
