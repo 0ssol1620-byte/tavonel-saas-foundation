@@ -585,7 +585,7 @@ describe("landing v2 -- the lead and the workbench", () => {
         ? "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다."
         : "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
     );
-    expect(hero).toContain("/film/poster-1-hero-2x.webp");
+    expect(hero).toContain("/film/poster-1-t3.00-2x.webp");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
     expect(hero).toContain('data-mobile-view="fit"');
     expect(hero).not.toContain('data-source-inspection-film');

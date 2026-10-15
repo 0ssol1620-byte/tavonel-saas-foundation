@@ -24,11 +24,26 @@ const HERO_CUT = {
   src: "/film/compile-cut.mp4",
   fallbackSrc: "/film/compile-cut-hq.mp4",
   fallbackPhoneSrc: "/film/compile-cut-hq-1440.mp4",
-  poster: "/film/poster-1-hero-2x.webp",
 } as const;
 
-/** URL of the byte-locked poster shown when the optional walkthrough is opened. */
-export const HERO_FILM_POSTER: string = HERO_CUT.poster;
+/*
+  Tier 1 poster re-cut (brief §5.3, approved for Release 3): one frame of each locked cut, as a
+  2880x1800 file and a 1440x900 copy. Stage 1 is t = 3.00s of compile-cut.mp4 (the fine search found
+  no frame without the document eyebrow overprint, so it also carries the Tier 2 mask in
+  STAGE_FRAMES); stages 2-4 are t = 17.96s, the founder-approved candidates. Frame times, cut and
+  file sha256 are rows in public/film/README.md and lib/locked-film-assets.json `posters`, whose
+  bytes one-path-contract.test.ts holds. New names, not new bytes under old names: /film/* is
+  served immutable for a year.
+*/
+const HOME_POSTERS = [
+  { poster: "/film/poster-1-t3.00-2x.webp", poster1x: "/film/poster-1-t3.00.webp" },
+  { poster: "/film/poster-2-t17.96-2x.webp", poster1x: "/film/poster-2-t17.96.webp" },
+  { poster: "/film/poster-3-t17.96-2x.webp", poster1x: "/film/poster-3-t17.96.webp" },
+  { poster: "/film/poster-4-t17.96-2x.webp", poster1x: "/film/poster-4-t17.96.webp" },
+] as const;
+
+/** URL of the opening poster (stage 1, 2880px file). */
+export const HERO_FILM_POSTER: string = HOME_POSTERS[0].poster;
 
 function heroStages(korean: boolean): CompileStage[] {
   const lines = korean
@@ -36,6 +51,7 @@ function heroStages(korean: boolean): CompileStage[] {
     : ["Read original pages beside their extracted content.", "Explore the entities, claims and their sources.", "Follow a changed source to the knowledge it affects.", "Use the same knowledge and citations across AI tools."];
   return COMPILE_STAGES.map((stage, index) => ({
     ...stage,
+    ...HOME_POSTERS[index],
     ...(index === 0 ? HERO_CUT : {}),
     ...(korean ? LANDING_V2_FILM_STAGES_KO[index] : {}),
     line: lines[index],

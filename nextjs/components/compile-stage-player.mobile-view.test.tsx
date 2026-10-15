@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import CompileStagePlayer, { STAGE_FRAMES, toggleMobileFilmFit, type MobileFilmView } from "@/components/compile-stage-player";
+import CompileStagePlayer, { FILM_POSTER_SIZES, STAGE_FRAMES, toggleMobileFilmFit, type MobileFilmView } from "@/components/compile-stage-player";
 import HeroFilm from "@/components/landing-v2/hero-film";
 import { LANDING_MOBILE_FILM_VIEW } from "@/components/landing-v2/hero-film-disclosure";
 import { COMPILE_STAGES } from "@/lib/compile-stages";
@@ -14,6 +14,7 @@ import { COMPILE_STAGES } from "@/lib/compile-stages";
 const crossCheck = JSON.parse(readFileSync(new URL("./compile-stage-player.frame-strings.json", import.meta.url), "utf8")) as {
   times: number[];
   stages: Record<string, { cut: string; strings: Record<string, { pane: string; visibleAt: number[] }> }>;
+  cropCheck: { stages: Record<string, { text: string; box: { x: number; w: number; h: number }; yAt: Record<string, number[]> }> };
 };
 
 describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
@@ -46,7 +47,7 @@ describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
     expect(story).toMatch(/The ORIGINAL pane opens one source page at a time; EXTRACT writes it out in <q[^>]*>WORKING COPY\.md<\/q>\./);
     expect(story.indexOf("data-film-reading")).toBeGreaterThan(story.indexOf('class="compile-film-viewport"'));
     // The strip only repeats the line's pane name outside a panning phone.
-    expect(story).toMatch(/<ol[^>]*aria-hidden="true"[^>]*><li>SOURCES<\/li><li data-marked="1">ORIGINAL<\/li>/);
+    expect(story).toMatch(/<ol[^>]*aria-hidden="true"[^>]*><li>SOURCES<\/li><li data-marked="1"[^>]*>ORIGINAL<\/li>/);
     expect(renderToStaticMarkup(<CompileStagePlayer />)).not.toContain("data-film-reading");
 
     const ko = renderToStaticMarkup(<CompileStagePlayer storyLayout korean />);
@@ -136,5 +137,55 @@ describe("mobile film view", () => {
     expect(view(fit)).toBe("focus");
     fit = toggleMobileFilmFit(fit);
     expect(view(fit)).toBe("fit");
+  });
+});
+
+/*
+  Release 3 (brief move 2c, §5.3). The Home desktop opens on a 2x crop of each stage; the window
+  has to hold the string the reading line quotes for the whole loop, not for the poster alone, so
+  it is checked against where that string sits in every sampled second of its cut (cropCheck).
+*/
+describe("Home Focus crop and re-cut posters (Release 3)", () => {
+  it("keeps each quoted string inside its stage's 2x window at every sampled second", () => {
+    for (const stage of COMPILE_STAGES) {
+      const frame = STAGE_FRAMES[stage.id]!;
+      const row = crossCheck.cropCheck.stages[stage.id];
+      expect(row, stage.id).toBeDefined();
+      expect(row!.text).toBe(frame.readingTarget.text);
+      // At 2x the window is half the 2880x1800 frame each way, starting at crop.x / crop.y.
+      const x0 = frame.crop.x * 2880, y0 = frame.crop.y * 1800;
+      expect(y0 + 900, stage.id).toBeLessThanOrEqual(1800);
+      expect(row!.box.x, stage.id).toBeGreaterThanOrEqual(x0);
+      expect(row!.box.x + row!.box.w, stage.id).toBeLessThanOrEqual(x0 + 1440);
+      const inside = crossCheck.times.filter(t => (row!.yAt[String(t)] ?? []).some(y => y >= y0 && y + row!.box.h <= y0 + 900));
+      expect(inside, stage.id).toEqual(crossCheck.times);
+      // The pane the line names is one of the two the window shows.
+      expect([frame.crop.x * 4, frame.crop.x * 4 + 1], stage.id).toContain(frame.readingTarget.pane);
+    }
+  });
+
+  it("opens the Home film on the crop with a Fit full frame control, and names only the window's panes", () => {
+    const en = renderToStaticMarkup(<HeroFilm />);
+    expect(en).toContain('data-wide-view="crop"');
+    expect(en).toContain("--film-crop-x:25%;--film-crop-y:20%");
+    expect(en).toMatch(/<button type="button" class="compile-film-view-control [^"]+" aria-controls="[^"]+" aria-pressed="true">Fit full frame<\/button>/);
+    expect(en).toMatch(/<li>SOURCES<\/li><li data-marked="1" data-in-crop="1">ORIGINAL<\/li><li data-in-crop="1">EXTRACT<\/li><li>WORLD<\/li>/);
+    // The phone keeps Fit as its default (brief §2); only the desktop view starts cropped.
+    expect(en).toContain('data-mobile-view="fit"');
+    expect(renderToStaticMarkup(<HeroFilm korean />)).toMatch(/aria-pressed="true">전체 프레임 보기<\/button>/);
+    const plain = renderToStaticMarkup(<CompileStagePlayer />);
+    for (const homeOnly of ["data-wide-view", "compile-film-view-control", "--film-crop-x", "data-in-crop"]) expect(plain).not.toContain(homeOnly);
+  });
+
+  it("serves the stage-1 re-cut poster at 2x for the crop and 1x for a phone in Fit, masked only on its own frame", () => {
+    const en = renderToStaticMarkup(<HeroFilm />);
+    const still = en.match(/<img[^>]*class="compile-film-still"[^>]*>/)?.[0] ?? "";
+    expect(still).toContain('src="/film/poster-1-t3.00-2x.webp"');
+    expect(still).toMatch(/srcSet="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
+    expect(still).toContain(`sizes="${FILM_POSTER_SIZES}"`);
+    expect(en).toContain('data-poster-mask="/film/poster-1-t3.00-2x.webp"');
+    // The mask is bound to the poster it was measured on: any other stage-1 poster draws none.
+    expect(renderToStaticMarkup(<CompileStagePlayer storyLayout />)).not.toContain("data-poster-mask");
+    expect(STAGE_FRAMES.sources!.posterMask!.rects.every(rect => rect.x + rect.w <= 2880 && rect.y + rect.h <= 1800)).toBe(true);
   });
 });

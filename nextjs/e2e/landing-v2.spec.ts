@@ -192,12 +192,19 @@ test("four-stage video stays static with reduced motion until explicit play and 
 test("server-renders the visible film poster as its priority image", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
-  // Next transmits this early hint in the HTTP Link header before streaming the body.
+  // Release 3: the poster is a 1x/2x srcset (a phone in Fit takes the 1440px file). React does not put a
+  // srcset preload in the HTTP Link header, so the hint is the first-party <link rel=preload> in the
+  // streamed <head>, ahead of the body; the header must not point at a superseded poster either.
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
-  expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
+  expect(posterHint).not.toMatch(/\/film\/poster-/);
+  const head = html.slice(0, html.indexOf("</head>"));
+  const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
+  expect(preloads).toHaveLength(1);
+  expect(preloads[0]).toMatch(/fetchpriority="high"/i);
+  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
+  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-1-t3.00-2x.webp"');
+  expect(high[0]).toMatch(/srcset="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   expect(sourceImages).toHaveLength(1);

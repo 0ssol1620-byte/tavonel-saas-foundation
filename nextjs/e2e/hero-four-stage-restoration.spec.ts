@@ -25,6 +25,9 @@ test("the title leads directly into four selectable and playing demo recordings"
   await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  // Release 3: a desktop opens on the 2x reading crop and offers the whole frame; a phone keeps Fit.
+  await expect(sequence).toHaveAttribute("data-wide-view", "crop");
+  await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveCount(page.viewportSize()!.width >= 1024 ? 1 : 0);
   const tabs = film.getByRole("tab");
   await expect(tabs).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   const playback = [];

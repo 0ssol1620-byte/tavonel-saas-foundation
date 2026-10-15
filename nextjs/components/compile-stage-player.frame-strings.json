@@ -35,5 +35,34 @@
         "handbook-2026.pdf  p.12": { "pane": "TERMINAL", "visibleAt": [12, 14, 16, 18] }
       }
     }
+  },
+  "cropCheck": {
+    "method": "Release 3: template match of each quoted string over the same sampled frames (redesign-r3-20261015/demo/CROP-CHECK.json). box = the string ink box in source px of the 2880x1800 frame; yAt = its top edge at each sampled second. smallestXHeight = smallest measured x-height (source px) of any text in the stage crop window, on the poster frame.",
+    "stages": {
+      "sources": {
+        "text": "WORKING COPY.md",
+        "box": {"x": 1478, "w": 140, "h": 22},
+        "yAt": {"0": [1052], "2": [1052], "4": [1052], "6": [1052], "8": [1052], "10": [1052], "12": [1052], "14": [1052], "16": [1052], "18": [1052]},
+        "smallestXHeight": {"px": 7, "text": "EXTRACT table cell \"do not start\"", "at": "poster-1-t3.00 x1752 y367"}
+      },
+      "read": {
+        "text": "# Payment terms",
+        "box": {"x": 822, "w": 178, "h": 19},
+        "yAt": {"0": [242, 1062], "2": [702, 1522], "4": [342, 1162], "6": [802], "8": [442, 1262], "10": [902], "12": [542, 1362], "14": [1002], "16": [642, 1462], "18": [302, 1122]},
+        "smallestXHeight": {"px": 7, "text": "MARKDOWN body line; TBox field rows", "at": "poster-2-t17.96 x825 y1160"}
+      },
+      "structure": {
+        "text": "CHANGED",
+        "box": {"x": 626, "w": 68, "h": 14},
+        "yAt": {"0": [278], "2": [278], "4": [278], "6": [618], "8": [618], "10": [448], "12": [448], "14": [720], "16": [720], "18": [720]},
+        "smallestXHeight": {"px": 7, "text": "MARKDOWN NODE.md body line", "at": "poster-3-t17.96 x815 y264"}
+      },
+      "world": {
+        "text": "nodes lit",
+        "box": {"x": 2203, "w": 112, "h": 22},
+        "yAt": {"0": [1670], "2": [1670], "4": [1670], "6": [1670], "8": [1670], "10": [1670], "12": [1670], "14": [1670], "16": [1670], "18": [1670]},
+        "smallestXHeight": {"px": 11, "text": "WORLD footer \"1 source · 1 page\"", "at": "poster-4-t17.96 x2600 y1666"}
+      }
+    }
   }
 }
