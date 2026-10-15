@@ -144,7 +144,7 @@ test("the Home first screen puts actions before its four-stage film and source p
   await page.goto("/");
   const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(consent).toBeVisible();
-  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
   const measure = async () => page.evaluate(() => {

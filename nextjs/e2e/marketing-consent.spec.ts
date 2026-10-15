@@ -16,12 +16,11 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   const bounds = await panel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await expect(panel).toHaveCSS("position", "relative");
-  const header = page.locator("header.nav");
-  const headerBounds = await header.boundingBox();
-  expect(headerBounds, "public header has no box").not.toBeNull();
-  expect(bounds!.y + bounds!.height, "consent must end before the public header begins")
-    .toBeLessThanOrEqual((headerBounds?.y ?? 0) + 1);
+  // Brief 2026-10-15 move 6: a bottom-fixed card, never more than a quarter of the viewport.
+  await expect(panel).toHaveCSS("position", "fixed");
+  const viewportHeight = page.viewportSize()!.height;
+  expect(bounds!.y + bounds!.height, "the card sits inside the viewport").toBeLessThanOrEqual(viewportHeight + 1);
+  expect(bounds!.height, "the card is capped at 25% of the viewport").toBeLessThanOrEqual(viewportHeight * 0.25 + 1);
   expect(await page.evaluate(() => getComputedStyle(document.body).paddingBottom)).toBe("0px");
   await testInfo.attach("analytics-choice", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
@@ -33,40 +32,54 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   await expect(panel).toBeVisible();
 });
 
-test("the consent notice never covers homepage or pricing actions at 1440 and 390", async ({ page }, testInfo) => {
-  test.skip(!["1440", "390"].includes(testInfo.project.name), "focused visual contract widths");
+test("the consent notice never covers homepage or pricing actions at 1440, 390 and 360", async ({ page }, testInfo) => {
+  test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "focused visual contract widths");
+  const intersects = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) => !(
+    a.y + a.height <= b.y || b.y + b.height <= a.y || a.x + a.width <= b.x || b.x + b.width <= a.x
+  );
   for (const route of ["/", "/pricing"]) {
     await page.goto(route);
     const panel = page.getByRole("region", { name: "Optional analytics" });
     await expect(panel).toBeVisible();
     const panelBox = await panel.boundingBox();
-    const headerBox = await page.locator("header.nav").boundingBox();
     expect(panelBox).not.toBeNull();
-    expect(headerBox).not.toBeNull();
-    expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(headerBox!.y + 1);
-
-    const target = route === "/"
-      ? page.locator('#s1 a[href="/explore"]')
-      : page.locator(".plan-action a").first();
-    await expect(target).toBeVisible();
-    const targetBox = await target.boundingBox();
-    expect(targetBox).not.toBeNull();
-    const intersects = !(
-      panelBox!.y + panelBox!.height <= targetBox!.y ||
-      targetBox!.y + targetBox!.height <= panelBox!.y ||
-      panelBox!.x + panelBox!.width <= targetBox!.x ||
-      targetBox!.x + targetBox!.width <= panelBox!.x
-    );
-    expect(intersects, `${route} primary action is obscured at ${testInfo.project.name}px`).toBe(false);
+    // Brief 2026-10-15 move 6: the card is at the bottom, so the first screen's H1, support line
+    // and action stay readable above it.
+    const targets = route === "/"
+      ? [page.locator("#s1 h1"), page.locator("#s1 .lv2-hero-support"), page.locator('#s1 a[href="/explore"]').first()]
+      : [page.locator(".plan-action a").first()];
+    for (const target of targets) {
+      await expect(target).toBeVisible();
+      const targetBox = await target.boundingBox();
+      expect(targetBox).not.toBeNull();
+      expect(intersects(panelBox!, targetBox!), `${route} first-screen content is obscured at ${testInfo.project.name}px`).toBe(false);
+    }
 
     await page.evaluate(() => window.scrollTo(0, Math.min(1_000, document.documentElement.scrollHeight - innerHeight)));
     const movedPanel = await panel.boundingBox();
-    expect(movedPanel, "document-flow notice should still have a box").not.toBeNull();
-    expect(movedPanel!.y + movedPanel!.height).toBeLessThanOrEqual(0);
+    expect(movedPanel, "the fixed card keeps its box after a scroll").not.toBeNull();
+    expect(movedPanel!.y + movedPanel!.height, "the card stays at the viewport bottom").toBeGreaterThan(page.viewportSize()!.height - 40);
     const stuckHeader = await page.locator("header.nav").boundingBox();
-    expect(stuckHeader, "public header should remain available after the notice scrolls away").not.toBeNull();
+    expect(stuckHeader, "public header should remain available after a scroll").not.toBeNull();
     expect(Math.abs(stuckHeader!.y)).toBeLessThanOrEqual(1);
   }
+});
+
+test("Escape inside the consent card refuses, persists, and loads no analytics", async ({ page }) => {
+  const googleRequests: string[] = [];
+  page.on("request", request => {
+    if (/google-analytics\.com|googletagmanager\.com/.test(request.url())) googleRequests.push(request.url());
+  });
+  await page.goto("/");
+  const panel = page.getByRole("region", { name: "Optional analytics" });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "No thanks", exact: true }).focus();
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await page.reload();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Analytics preferences" })).toBeVisible();
+  expect(googleRequests).toEqual([]);
 });
 
 test("consented measurement sanitizes URLs and excludes private events and routes", async ({ page, baseURL }) => {

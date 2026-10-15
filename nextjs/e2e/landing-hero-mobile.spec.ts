@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-const FILM = '#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
+const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
 test.describe("phone four-stage film", () => {
   test.beforeEach(async ({ page }, info) => {
     test.skip(!["360", "390"].includes(info.project.name), "phone composition");

@@ -96,7 +96,10 @@ test.describe("at 1440", () => {
         })
         .map((element) => (element.textContent ?? "").trim().slice(0, 24)),
     );
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toHaveLength(0);
+    // Brief 2026-10-15 move 1: the bar carries exactly one filled control, the public-sample action
+    // the Home hero and close repeat. Pricing stays a plain link at link weight.
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual(["Explore the public sample"]);
+    await expect(action).toHaveCSS("font-weight", "400");
 
     const signIn = page.locator(`${HEADER} .nav-signin`);
     await expect(signIn).toHaveAttribute("href", "/login");
@@ -193,9 +196,8 @@ test.describe("at 390", () => {
 
   test("opens a sheet of the five destinations plus Sign in, with the action still in the row", async ({ page }) => {
     await page.goto("/product");
-    // The action is reachable without opening anything: §29's commercial CTA may not be behind a
-    // disclosure, which is the whole reason the sheet does not carry a second copy of it.
-    await expect(page.locator(`${HEADER} .nav-actions a[href="/pricing"]`)).toBeVisible();
+    // Brief 2026-10-15 move 6: the phone row is the wordmark and Menu; Pricing is a sheet row.
+    await expect(page.locator(`${HEADER} .nav-actions`)).toBeHidden();
 
     await page.locator(`${SHEET} > summary`).click();
     const panel = page.locator(`${SHEET} > nav`);

@@ -217,13 +217,13 @@ const PHONE: Scenario[] = [
       await page.goto("/");
       await openPhoneMenu(page);
       const rows = page.locator(`${SHEET} > nav a.mobile-nav-direct`);
-      await expect(rows).toHaveCount(CUSTOMER_HREFS.length);
-      expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS]);
+      // Brief 2026-10-15 move 6: the sections, then Pricing as the last row.
+      await expect(rows).toHaveCount(CUSTOMER_HREFS.length + 1);
+      expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS, "/pricing"]);
       await expect(page.locator(`${SHEET} details.mobile-nav-group`)).toHaveCount(0);
-      // Landing V2: Sign in is the sheet's last row at this width, and the access action is not
-      // in the sheet at all -- it is in the header, visible without opening anything.
+      // Sign in is still the sheet's own row; the header row is the wordmark and Menu only.
       await expect(page.locator(`${SHEET} > nav a.mobile-nav-signin`)).toHaveCount(1);
-      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
+      await expect(page.locator("header.nav .nav-actions")).toBeHidden();
     },
   },
   {
@@ -233,7 +233,7 @@ const PHONE: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      await activateLink(page, page.locator('header.nav .nav-actions a[href="/pricing"]'));
+      await activateLink(page, page.locator(`${SHEET} > nav a.mobile-nav-direct[href="/pricing"]`));
       await expect(page).toHaveURL(/\/pricing$/);
     },
   },
