@@ -1,0 +1,73 @@
+/*
+  Home film reading layer (brief 2026-10-15 move 2b/2c). Sits below the frame, outside the locked
+  pixels, spanning the same width so the four cells line up under the four panes. The reading
+  line is 15-16px HTML text; nothing here animates.
+*/
+.reading {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  width: min(100%, var(--lv2-film-w, 100%));
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panes li {
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 2px solid var(--home-rule, rgb(21 25 29 / 16%));
+  color: var(--home-muted, #58606a);
+  font: 500 12px/1.4 var(--f-mono);
+  overflow-wrap: anywhere;
+}
+
+.panes li[data-marked] {
+  border-top-color: var(--home-cobalt, #244ac8);
+  color: var(--home-ink, #15191d);
+}
+
+.panes button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.panes button:focus-visible {
+  outline: 2px solid var(--home-cobalt, #244ac8);
+  outline-offset: 2px;
+}
+
+.line {
+  margin: 0;
+  color: var(--home-ink, #15191d);
+  font: 500 16px/1.5 var(--f-sans);
+}
+
+.quote {
+  font: 500 15px/1.5 var(--f-mono);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 767px) {
+  .line {
+    font-size: 15px;
+  }
+}
