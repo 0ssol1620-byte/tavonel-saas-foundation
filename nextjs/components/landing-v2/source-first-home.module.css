@@ -78,7 +78,7 @@
   .home.home :global(main .lv2-meta) { font: 500 13px/1.45 var(--f-sans); letter-spacing: 0; text-transform: none; }
   .home.home :global(main .lv2-meta[data-derived="1"]) { font-family: var(--f-mono); }
   /* §4.5: no uppercase tracking on Hangul. */
-  .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button)) { letter-spacing: 0; text-transform: none; }
+  .home[lang="ko"].home :global(:is(.lv2-meta, [class*="eyebrow"], .compile-film-stages button, .lv2-revision-title)) { letter-spacing: 0; text-transform: none; }
   .home[lang="ko"].home :global(.lv2-hero-h1) { line-height: 1.08; letter-spacing: -0.02em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-h2) { line-height: 1.2; letter-spacing: -0.015em; word-break: keep-all; }
   .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.75; word-break: keep-all; }
@@ -147,7 +147,7 @@
   .home.home :global(#s4 .lv2-h2-accent) { color: var(--ink); font-style: normal; }
   .home.home :global(#s4 .lv2-body-l), .home.home :global(#s5 .lv2-body-l) { color: #58615e; }
   .home.home :global(#s4 .lv2-split) { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; }
-  .home.home :global(#s4 .lv2-inline-link) { color: #244ac8; }
+  .home.home :global(#s4 .lv2-inline-link) { color: var(--ink); font-weight: 500; text-decoration-color: var(--home-rule-strong); }
   .home.home :global(#s4 .lv2-meta), .home.home :global(#s5 .lv2-meta) { color: #47534e; }
   /* The four proofs: an editorial two-column list over the full container -- a title, its scope
      sentence, and a quiet ink "Read" link. Not blue underlined titles in a half-empty column. */
@@ -156,7 +156,7 @@
   .home.home :global(#s5 .lv2-proof-label) { margin: 0; color: var(--ink); font: 600 24px/1.25 var(--f-sans); letter-spacing: -0.01em; }
   .home.home :global(#s5 .lv2-proof-note) { max-width: 52ch; margin: 0; color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
   .home.home :global(#s5 .lv2-proof-read) { margin: 0; }
-  .home.home :global(#s5 .lv2-proof-read .lv2-inline-link) { gap: 6px; color: var(--ink); font: 500 15px/1.45 var(--f-sans); text-decoration-color: var(--rule); }
+  .home.home :global(#s5 .lv2-proof-read .lv2-inline-link) { gap: 6px; color: var(--ink); font: 500 15px/1.45 var(--f-sans); text-decoration-color: var(--home-rule-strong); }
   .home.home :global(#s5 .lv2-proof-read .lv2-inline-link:hover) { text-decoration-color: currentColor; }
   .home[lang="ko"].home :global(#s5 :is(.lv2-proof-label, .lv2-proof-note)) { word-break: keep-all; }
   .home[lang="ko"].home :global(#s5 .lv2-proof-note) { line-height: 1.75; }
@@ -187,6 +187,16 @@
   @media (max-width: 1023px) {
     .heroAside :global(.lv2-actions) { flex-direction: row; flex-wrap: wrap; }
     .home.home :global(#s4 .lv2-split) { grid-template-columns: 1fr; gap: 32px; }
+  }
+  /* s4's H2 takes the whole row like every other section's, so it sets in two lines rather than
+     four in the 5fr column; the support and note sit beside the impact view under it. */
+  @media (min-width: 1024px) {
+    .home.home :global(#s4 .lv2-split) { grid-template-rows: auto auto 1fr; row-gap: 0; }
+    .home.home :global(#s4 .lv2-split > .lv2-scene-head) { display: contents; }
+    .home.home :global(#s4 .lv2-split > .lv2-scene-head > .lv2-h2) { grid-column: 1 / -1; margin-bottom: 48px; }
+    .home.home :global(#s4 .lv2-split > .lv2-scene-head > p) { grid-column: 1; }
+    .home.home :global(#s4 .lv2-split > .lv2-scene-head > .lv2-scene-support) { margin-top: 0; }
+    .home.home :global(#s4 .lv2-split > .lv2-scene-head + *) { grid-column: 2; grid-row: 2 / span 2; }
   }
   @media (min-width: 900px) {
     .home.home :global(#s1 .compile-film-sequence[data-mobile-view="fit"] .compile-film-viewport) { height: auto; min-height: 0; max-height: none; aspect-ratio: 8 / 5; }

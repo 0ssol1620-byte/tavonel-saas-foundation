@@ -16,6 +16,23 @@ async function revealConsent(page: import("@playwright/test").Page) {
   return panel;
 }
 
+/*
+  Release 3 (2026-10-15): on Home from 900px the prompt is one row directly under the header
+  (components/marketing-consent.module.css). The Release 2 bottom-left card opened over the film's
+  SOURCES pane at 1440 on both triggers, and no bottom placement clears a film that fills the
+  lower half of the first screen. Phones and every other page keep the bottom card.
+*/
+type Box = { x: number; y: number; width: number; height: number };
+const overlaps = (a: Box, b: Box) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, box: Box) {
+  const header = await page.locator("header.nav").boundingBox();
+  expect(Math.abs(box.y - (header!.y + header!.height)), "the row starts at the header's foot").toBeLessThanOrEqual(1);
+  expect(box.height, "one row, not a card").toBeLessThanOrEqual(56);
+  const stage = await page.locator("#s1 .compile-film-viewport").boundingBox();
+  if (stage) expect(overlaps(box, stage), "the row never covers the film stage").toBe(false);
+}
+
 test("analytics remains optional, persists refusal, and fits the viewport", async ({ page }, testInfo) => {
   const googleRequests: string[] = [];
   page.on("request", request => {
@@ -39,12 +56,11 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   expect(bounds!.y + bounds!.height, "the card sits inside the viewport").toBeLessThanOrEqual(viewportHeight + 1);
   expect(bounds!.height, "the card is capped at 25% of the viewport").toBeLessThanOrEqual(viewportHeight * 0.25 + 1);
   expect(await page.evaluate(() => getComputedStyle(document.body).paddingBottom)).toBe("0px");
-  expect(bounds!.y + bounds!.height, "the card sits at the bottom").toBeGreaterThan(viewportHeight - 40);
   if (page.viewportSize()!.width < 900) {
+    expect(bounds!.y + bounds!.height, "the card sits at the bottom").toBeGreaterThan(viewportHeight - 40);
     expect(bounds!.height, "the phone card is two rows, at most 96px").toBeLessThanOrEqual(96);
   } else {
-    expect(bounds!.width, "the desktop card is at most 360px wide").toBeLessThanOrEqual(360);
-    expect(bounds!.x, "the desktop card sits bottom-left").toBeLessThanOrEqual(24);
+    await expectHomeRowUnderHeader(page, bounds!);
   }
   await testInfo.attach("analytics-choice", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
@@ -68,20 +84,43 @@ test("the consent notice never covers homepage or pricing actions at 1440, 390 a
         await expect(target).toBeVisible();
       }
     }
-    // (e) Once revealed, the card is at the viewport bottom.
+    // (e) Once revealed, the card is at the viewport bottom -- or, on Home from 900px, under the header.
+    const homeRow = route === "/" && page.viewportSize()!.width >= 900;
     await revealConsent(page);
     const panelBox = await panel.boundingBox();
     expect(panelBox).not.toBeNull();
-    expect(panelBox!.y + panelBox!.height, `${route} card sits at the bottom at ${testInfo.project.name}px`).toBeGreaterThan(page.viewportSize()!.height - 40);
+    if (homeRow) await expectHomeRowUnderHeader(page, panelBox!);
+    else expect(panelBox!.y + panelBox!.height, `${route} card sits at the bottom at ${testInfo.project.name}px`).toBeGreaterThan(page.viewportSize()!.height - 40);
 
     await page.evaluate(() => window.scrollTo(0, Math.min(1_000, document.documentElement.scrollHeight - innerHeight)));
     const movedPanel = await panel.boundingBox();
     expect(movedPanel, "the fixed card keeps its box after a scroll").not.toBeNull();
-    expect(movedPanel!.y + movedPanel!.height, "the card stays at the viewport bottom").toBeGreaterThan(page.viewportSize()!.height - 40);
+    if (homeRow) await expectHomeRowUnderHeader(page, movedPanel!);
+    else expect(movedPanel!.y + movedPanel!.height, "the card stays at the viewport bottom").toBeGreaterThan(page.viewportSize()!.height - 40);
     const stuckHeader = await page.locator("header.nav").boundingBox();
     expect(stuckHeader, "public header should remain available after a scroll").not.toBeNull();
     expect(Math.abs(stuckHeader!.y)).toBeLessThanOrEqual(1);
   }
+});
+
+test("on Home from 900px the 8 s prompt covers no title, support, action or film", async ({ page }, testInfo) => {
+  test.skip(!["1920", "1440", "1280", "1024"].includes(testInfo.project.name), "the Home row exists from 900px");
+  await page.clock.install();
+  await page.goto("/");
+  const panel = page.getByRole("region", PANEL);
+  await expect(panel).toHaveCount(0);
+  // The timer path: no scroll at all, so the whole first screen is what the row must clear.
+  await page.clock.fastForward(8_000);
+  await expect(panel).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const box = (await panel.boundingBox())!;
+  await expectHomeRowUnderHeader(page, box);
+  for (const target of ["#s1 h1", "#s1 .lv2-hero-support", "#s1 .lv2-actions", "#s1 .compile-film-viewport"]) {
+    const rect = await page.locator(target).first().boundingBox();
+    expect(rect, target).not.toBeNull();
+    expect(overlaps(box, rect!), `the 8 s row covers ${target}`).toBe(false);
+  }
+  await testInfo.attach("home-row-8s", { body: await page.screenshot(), contentType: "image/png" });
 });
 
 test("Escape inside the consent card refuses, persists, and loads no analytics", async ({ page }) => {

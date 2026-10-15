@@ -114,6 +114,14 @@ describe("Home reading guide integration", () => {
     expect(text).toContain(locale === "ko" ? "별도 협의" : "by arrangement");
     expect(text).toContain(locale === "ko" ? "사용자의 파일을 업로드하거나 처리하지 않습니다" : "does not upload or process your files");
     if (locale === "ko") expect(text).not.toContain("Before relying on");
+    /*
+      Release 3: the receive-claim rule is stated as `isRepresentativeClaim` applies it. It excludes
+      safe-harbour language and example fragments, not document conventions -- and the claim it
+      picks today is the 10-K's fiscal-calendar convention -- so the FAQ may not call the pick
+      "not boilerplate", and says that a convention can be what the rule picks.
+    */
+    expect(text).not.toMatch(locale === "ko" ? /상투 문구/ : /not boilerplate/);
+    expect(text).toContain(locale === "ko" ? "문서의 표기 관례일 수 있습니다" : "can be a document convention rather than a finding");
   });
 
   it("keeps the Home film mark distinguishable across scene backgrounds", () => {
