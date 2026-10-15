@@ -72,7 +72,11 @@ function declaration(root: CssRoot, selector: string, property: string) {
 function opaqueToken(name: string) {
   const root = name.startsWith("--home-") ? activeRootCss : globalCss;
   const selector = name.startsWith("--home-") ? ".home" : ":root";
-  const value = declaration(root, selector, name).value;
+  let value = declaration(root, selector, name).value;
+  // Release 2 (main dbe22b1e) names the mounted Home palette once (--ink, --paper) and aliases the
+  // --home-* tokens to it in the same .home rule. Follow exactly that one hop; the end must be a hex.
+  const alias = root === activeRootCss ? /^var\((--[a-z-]+)\)$/.exec(value) : null;
+  if (alias) value = declaration(root, selector, alias[1]).value;
   expect(value).toMatch(/^#[0-9a-f]{6}$/i);
   return value.toLowerCase();
 }
@@ -176,8 +180,11 @@ describe("reviewed Home reader heading CSS source contract", () => {
   it("keeps the legacy important token cascade distinct from the mounted Home root", () => {
     expect(declaration(moduleCss, ".home", "--home-ink")).toEqual({ value: "#15191d", important: true, layered: true });
     expect(declaration(moduleCss, ".home", "--home-paper")).toEqual({ value: "#fbfaf7", important: true, layered: true });
-    expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "#15191d", important: false, layered: true });
-    expect(declaration(activeRootCss, ".home", "--home-paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
+    // Release 2: the mounted root aliases its tokens to one named palette; the values behind them are unchanged.
+    expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "var(--ink)", important: false, layered: true });
+    expect(declaration(activeRootCss, ".home", "--ink")).toEqual({ value: "#15191d", important: false, layered: true });
+    expect(declaration(activeRootCss, ".home", "--home-paper")).toEqual({ value: "var(--paper)", important: false, layered: true });
+    expect(declaration(activeRootCss, ".home", "--paper")).toEqual({ value: "#faf9f6", important: false, layered: true });
     const page = readFileSync(new URL("components/landing-v2/landing-page.tsx", packageRoot), "utf8");
     expect(page).toContain('className={`page lv2 ${sourceStyles.home}`}');
     expect(page).not.toContain('${heroStyles.home}');
