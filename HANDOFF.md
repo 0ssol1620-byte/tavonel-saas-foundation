@@ -29,7 +29,7 @@ lane, but they cannot land before the snapshot carries `receive`.
 The worktrees use `core.autocrlf=true`, so apply the diff to the index and then refresh the working tree:
 
 ```sh
-git apply --cached HANDOFF-move8.diff        # verified: `git apply --check --cached` passes on 8884523's tree
+git show codex/hr-example-20261015:HANDOFF-move8.diff | git apply --cached -   # read from git: LF; verified with --check
 git checkout -- nextjs/components/landing-v2/hero-source-card.tsx nextjs/components/landing-v2/landing-hero.module.css \
   nextjs/components/landing-v2/landing-page.tsx nextjs/lib/landing-v2-page.test.ts nextjs/lib/landing-v2-proof.ts \
   nextjs/lib/landing-v2-runtime.ts nextjs/lib/landing-v2-runtime.test.ts
