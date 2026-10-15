@@ -1658,18 +1658,19 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
-// Ordinary Home landing owner: exactly these seventeen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// Ordinary Home landing owner: exactly these eighteen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
 export const HOME_AFFECTED_PATHS = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/compile-stage-player.tsx',
   'components/landing-v2/hero-actions.tsx', 'components/landing-v2/hero-film-disclosure.tsx', 'components/landing-v2/hero-film.tsx',
   'components/landing-v2/hero-source-card.test.tsx', 'components/landing-v2/hero-source-card.tsx', 'components/landing-v2/landing-analytics.tsx',
   'components/landing-v2/home-reader-guide.tsx',
   'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'e2e/landing-v2.spec.ts', 'lib/film-motion-control.test.ts',
-  'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts',
+  'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts',
 ]);
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'lib/home-evidence-view.test.ts',
   'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
+  'lib/home-player-main304-parity.test.ts',
 ]);
 export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
 // Portable source contracts for the exact reviewed reader-heading CSS correction. Additive to Home's existing owner.

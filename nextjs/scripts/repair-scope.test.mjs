@@ -3927,15 +3927,15 @@ test('affected Explore admission: readAffectedExecution rereads the five-unit an
     assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
-// ---- Affected Home admission: seventeen exact paths, seven direct suites and one browser suite in 1440/390/360/reduced-motion; the global
+// ---- Affected Home admission: eighteen exact paths, eight direct suites and one browser suite in 1440/390/360/reduced-motion; the global
 // Vitest config is admitted apart from Home as finite shared test-discovery configuration ----
 import { HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_AFFECTED_BROWSER_FILE, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, VITEST_DISCOVERY_CONFIG_PATH, VITEST_DISCOVERY_INCLUDES, vitestDiscoveryConfigFailures } from './repair-scope.mjs';
 const AFFECTED_HOME_PATHS=Object.freeze(['nextjs/components/compile-stage-player.mobile-view.test.tsx','nextjs/components/compile-stage-player.tsx','nextjs/components/landing-v2/hero-actions.tsx',
   'nextjs/components/landing-v2/hero-film-disclosure.tsx','nextjs/components/landing-v2/hero-film.tsx','nextjs/components/landing-v2/hero-source-card.test.tsx','nextjs/components/landing-v2/hero-source-card.tsx',
   'nextjs/components/landing-v2/landing-analytics.tsx','nextjs/components/landing-v2/home-reader-guide.tsx','nextjs/components/landing-v2/landing-hero.module.css','nextjs/components/landing-v2/landing-page.tsx','nextjs/e2e/landing-v2.spec.ts',
-  'nextjs/lib/film-motion-control.test.ts','nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/landing-v2-page.test.ts','nextjs/lib/one-path-contract.test.ts']);
+  'nextjs/lib/film-motion-control.test.ts','nextjs/lib/home-evidence-view.test.ts','nextjs/lib/home-evidence-view.ts','nextjs/lib/home-player-main304-parity.test.ts','nextjs/lib/landing-v2-page.test.ts','nextjs/lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SUITES=Object.freeze(['components/compile-stage-player.mobile-view.test.tsx','components/landing-v2/hero-source-card.test.tsx','lib/film-motion-control.test.ts','lib/home-evidence-view.test.ts',
-  'lib/landing-v2-page.test.ts','lib/marketing-analytics.test.ts','lib/one-path-contract.test.ts']);
+  'lib/home-player-main304-parity.test.ts','lib/landing-v2-page.test.ts','lib/marketing-analytics.test.ts','lib/one-path-contract.test.ts']);
 const AFFECTED_HOME_SPEC='e2e/landing-v2.spec.ts',AFFECTED_HOME_TSX='components/compile-stage-player.mobile-view.test.tsx',AFFECTED_HOME_PROJECTS=Object.freeze(['1440','390','360','reduced-motion']);
 const AFFECTED_HOME_FULL_DEBT=['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair'];
 
@@ -4013,9 +4013,9 @@ const AFFECTED_HOME_FRAME_FAILURE='changed outside its include list (root, runti
 const affectedHomeSwap=(text,from,to)=>{assert.ok(text.includes(from),'fixture anchor: '+from);return text.replace(from,to);};
 const affectedHomeConfigMap=(records,source=AFFECTED_HOME_FINAL_CONFIG,headHasFile)=>buildAffectedMap({headSha:affectedHeadSha,records,headHasFile,
   readHeadFile:path=>{assert.equal(path,VITEST_DISCOVERY_CONFIG_PATH);return source;}});
-test('affected Home admission: exactly seventeen owner paths retain seven suites and add only the exact reader CSS overlap', () => {
-  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,17);
-  // The film-motion-control suite is both an owner endpoint and one of the seven selected suites; the selection does not grow.
+test('affected Home admission: exactly eighteen owner paths retain eight suites and add only the exact reader CSS overlap', () => {
+  assert.deepEqual(HOME_AFFECTED_PATHS.map(path=>'nextjs/'+path),AFFECTED_HOME_PATHS);assert.equal(new Set(AFFECTED_HOME_PATHS).size,18);
+  // The film-motion-control and main304 parity suites are both owner endpoints and selected suites; the selection does not grow past eight.
   assert.ok(AFFECTED_HOME_PATHS.includes('nextjs/lib/film-motion-control.test.ts')&&AFFECTED_HOME_SUITES.includes('lib/film-motion-control.test.ts'));
   assert.ok(!AFFECTED_HOME_PATHS.includes('nextjs/lib/marketing-analytics.test.ts'),'marketing-analytics stays a selected suite only');
   assert.deepEqual([...HOME_AFFECTED_UNIT_FILES].sort(),AFFECTED_HOME_SUITES);assert.equal(HOME_AFFECTED_BROWSER_FILE,AFFECTED_HOME_SPEC);
@@ -4108,7 +4108,7 @@ test('affected Home admission: mixed changes union and dedupe with the Explore, 
     affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
   const map=affectedMap(records);
   assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','home-landing','ocr-gpu-worker','review-queue','workspace-lifecycle']]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,26);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,27);
   assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -4208,7 +4208,7 @@ test('affected Home admission: planBrowserRuns maps landing-v2 to exactly the fo
   for (const project of ['1920','1280','1024','768','audit','audit-768','audit-1280','launch-chromium']) assert.ok(!runs.some(run=>run.project===project),project);
   for (const spec of ['e2e/landing-v2-extra.spec.ts','e2e/landing-v2/hero.spec.ts','e2e/landing.spec.ts']) assert.throws(()=>planBrowserRuns([spec],false),/No reviewed Playwright project mapping/,spec);
 });
-test('affected Home admission: readAffectedExecution rereads seven units and four project reports; missing, malformed, omitted and wrong-project reports refuse while explicit skips survive', () => {
+test('affected Home admission: readAffectedExecution rereads eight units and four project reports; missing, malformed, omitted and wrong-project reports refuse while explicit skips survive', () => {
   const map=affectedMap([affectedRecord('M',['nextjs/components/landing-v2/hero-actions.tsx'])]);assert.deepEqual(map.failures,[]);
   const plan={unitFiles:map.unitFiles,browserFiles:map.browserFiles,runDetailIntegrity:false};
   const root=mkdtempSync(resolve(tmpdir(),'affected-home-reports-'));
@@ -4230,7 +4230,7 @@ test('affected Home admission: readAffectedExecution rereads seven units and fou
     assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-4\.json/);
     write(pw(4),playwright('reduced-motion'));
     const result=readAffectedExecution(root,plan);
-    assert.deepEqual(result.units,{files:7,passed:7,skipped:0,failed:0});
+    assert.deepEqual(result.units,{files:8,passed:8,skipped:0,failed:0});
     assert.deepEqual(result.browsers.map(b=>[b.project,b.files,b.passed,b.skipped,b.flaky,b.failed]),AFFECTED_HOME_PROJECTS.map(project=>[project,1,1,0,0,0]));
     const rejected=[
       [vitestPath,'{',/Vitest report is malformed JSON/],
@@ -4255,9 +4255,9 @@ test('affected Home admission: readAffectedExecution rereads seven units and fou
     write(vitestPath,vitest(AFFECTED_HOME_SUITES,[AFFECTED_HOME_TSX]));
     write(pw(4),playwright('reduced-motion',AFFECTED_HOME_SPEC,[pass('reduced-motion'),skip('reduced-motion')]));
     const skipped=readAffectedExecution(root,plan);
-    assert.deepEqual(skipped.units,{files:7,passed:7,skipped:1,failed:0});
+    assert.deepEqual(skipped.units,{files:8,passed:8,skipped:1,failed:0});
     assert.deepEqual(skipped.browsers.map(b=>[b.project,b.passed,b.skipped]),[['1440',1,0],['390',1,0],['360',1,0],['reduced-motion',1,1]]);
-    restore();assert.equal(readAffectedExecution(root,plan).units.passed,7,'the restored actual reports qualify again');
+    restore();assert.equal(readAffectedExecution(root,plan).units.passed,8,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
 test('affected Home admission: the shared test-discovery contract keeps every include, admits only the mobile-view addition and refuses everything else', () => {
@@ -5147,10 +5147,10 @@ test('affected sample analytics admission: either selected suite missing at head
   assert.deepEqual([home.groups,home.failures],[['home-landing'],['selected owner check is absent at head: lib/marketing-analytics.test.ts']]);
 });
 test('affected sample analytics admission: shared Home, review page, source-agent, cloud intake, connector and docs owners keep their selections and union exactly', () => {
-  // Home keeps its seven suites; the relay suite it already selects dedupes with the new owner's pair.
+  // Home keeps its eight suites; the relay suite it already selects dedupes with the new owner's pair.
   const home=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH]),affectedRecord('M',[AFFECTED_ANALYTICS_RELAY])]);
   assert.deepEqual([home.failures,home.groups,home.unitFiles,home.browserFiles],[[],['home-landing',AFFECTED_ANALYTICS_GROUP],affectedUnion(AFFECTED_HOME_SUITES,AFFECTED_ANALYTICS_SUITES),[AFFECTED_HOME_SPEC]]);
-  assert.equal(home.unitFiles.length,8);
+  assert.equal(home.unitFiles.length,9);
   const homeAlone=affectedMap([affectedRecord('M',[AFFECTED_HOME_PAGE_PATH])]);
   assert.deepEqual([homeAlone.groups,homeAlone.unitFiles,homeAlone.browserFiles],[['home-landing'],AFFECTED_HOME_SUITES,[AFFECTED_HOME_SPEC]]);
   // The relay suite path itself belongs only to the new owner, never to Home.
