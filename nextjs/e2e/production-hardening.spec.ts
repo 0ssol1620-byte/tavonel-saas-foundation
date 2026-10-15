@@ -67,9 +67,9 @@ test("odd grids compose the final item instead of painting an empty cell", async
 test("landing scenes flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
   await page.goto("/");
-  const geometry = await page.locator('main > section[data-scene], main > [data-home-measurement], main > [data-home-reader-guide]').evaluateAll(sections => sections.map(section => {
+  const geometry = await page.locator('main > section[data-scene], main > [data-home-measurement], main > [data-home-measures], main > [data-home-reader-guide]').evaluateAll(sections => sections.map(section => {
     const rect = section.getBoundingClientRect();
-    return { id: section.id || (section.hasAttribute("data-home-measurement") ? "measurement" : "reader-guide"), top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
+    return { id: section.id || (section.hasAttribute("data-home-measurement") ? "measurement" : section.hasAttribute("data-home-measures") ? "measures" : "reader-guide"), top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
   }));
   /*
     Landing V2, 2026-09-20: six scenes. Two of the three rules are unchanged -- the
@@ -82,7 +82,14 @@ test("landing scenes flow continuously without artificial viewport oceans", asyn
     thing the old rule was actually protecting: no scene may floor at more than one viewport, and
     no scene may be taller than two. An ocean is still a failure; a composed frame is not one.
   */
-  expect(geometry.map(item => item.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "reader-guide", "s6"]);
+  /*
+    Release 3 (2026-10-16): the receipted measurement band (`section[data-home-measures]`, brief
+    move 7) sits between s1 and s2. Measured on build sRc4B7jgCEvbjOa4NSbYo at 1440, s2 started
+    one band height (469px EN) below s1's bottom because the band was not in this list. It is in
+    the list now, so the same three rules apply to it: it butts against s1 and s2, it is not
+    collapsed, and it is not an ocean.
+  */
+  expect(geometry.map(item => item.id)).toEqual(["s1", "measures", "s2", "s3", "s4", "s5", "reader-guide", "s6"]);
   for (let index = 1; index < geometry.length; index += 1) {
     expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
   }
