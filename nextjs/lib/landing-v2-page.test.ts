@@ -271,8 +271,8 @@ describe("landing v2 -- the composition", () => {
       const bare = (value: string) => value.replace(/\s+/g, "");
       const expected =
         locale === "ko"
-          ? "AI가 믿고 사용하는 지식."
-          : "Knowledge your AI can trust.";
+          ? "AI를 위한 지식 컴파일러."
+          : "The Knowledge Compiler for AI.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
     }
   );
@@ -582,8 +582,8 @@ describe("landing v2 -- the lead and the workbench", () => {
     expect(supportAt).toBeLessThan(actionsAt);
     expect(readable(hero)).toContain(
       locale === "ko"
-        ? "TAVONEL이 문서를 그 지식으로 컴파일합니다. 각 진술은 원문 페이지에 연결된 채 남고, 원문이 바뀌면 다시 컴파일됩니다."
-        : "TAVONEL compiles your documents into it. Each statement stays linked to the page it came from, and the knowledge recompiles when a source changes.",
+        ? "TAVONEL은 문서를 AI와 에이전트를 위한 맥락으로 컴파일하며, 각 진술은 그것이 나온 페이지와 영역에 연결됩니다."
+        : "TAVONEL compiles your documents into context for AI and agents, with each statement linked to the page and region it came from.",
     );
     expect(hero).toContain("/film/poster-1-hero-2x.webp");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);

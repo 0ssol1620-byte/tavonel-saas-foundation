@@ -43,6 +43,8 @@
 }
 /* Home sets Wanted Sans on its own wrapper; this card mounts outside it, so it would fall back to the root Geist. */
 :global(body:has([data-home-ia])) .panel { font-family: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif; }
+/* Home has one accent (`--action`, on <body> while Home is mounted): the card's focus ring uses it. */
+:global(body:has([data-home-ia])) .panel { --verified: var(--action); }
 
 @layer overrides {
   .panel {
@@ -54,6 +56,8 @@
     color: #15191d !important;
   }
   .panel p a { color: #2347b8 !important; }
+  /* On Home the accent is not a link colour: the notice link is ink with its underline. */
+  :global(body:has([data-home-ia])) .panel p a { color: var(--text-hi) !important; }
   .panel .actions button { font-weight: 510 !important; }
 }
 

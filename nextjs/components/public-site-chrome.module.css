@@ -66,15 +66,17 @@
   /*
     The header's one filled control: the same action, words and cobalt as the Home hero and close.
     `!important` because Home re-inks every `.nav-actions > a` with an unlayered ink colour.
+    The colour is Home's `--action` token where Home defines it (decision.md's 255° accent) and
+    the site's cobalt everywhere else, so the header and the hero action never differ on one page.
   */
   .header .cta {
     display: inline-flex !important;
     align-items: center !important;
     min-height: 44px !important;
     padding: 0 18px !important;
-    border: 1px solid #244ac8 !important;
+    border: 1px solid var(--action, #244ac8) !important;
     border-radius: 4px !important;
-    background: #244ac8 !important;
+    background: var(--action, #244ac8) !important;
     color: #ffffff !important;
     font: 560 15px/1.2 var(--f-sans) !important;
     letter-spacing: 0 !important;
@@ -82,9 +84,9 @@
     text-decoration: none !important;
     white-space: nowrap !important;
   }
-  .header .cta:focus-visible { outline: 2px solid #244ac8 !important; outline-offset: 2px !important; }
+  .header .cta:focus-visible { outline: 2px solid var(--action, #244ac8) !important; outline-offset: 2px !important; }
   @media (hover: hover) and (pointer: fine) {
-    .header .cta:hover { background: #173692 !important; border-color: #173692 !important; }
+    .header .cta:hover { background: var(--action-hover, #173692) !important; border-color: var(--action-hover, #173692) !important; }
   }
   /* Brief move 6: below the desktop switch the row is wordmark + Menu; Pricing and Sign in are in the sheet. */
   @media (max-width: 1249px) {
@@ -175,7 +177,7 @@
   .header.header :global(.one-path-mobile-nav > summary)::after { transform: translateY(4.5px) !important; }
   .header.header :global(.one-path-mobile-nav[open] > summary)::before { transform: rotate(45deg) !important; box-shadow: none !important; }
   .header.header :global(.one-path-mobile-nav[open] > summary)::after { transform: rotate(-45deg) !important; }
-  .header.header :global(.one-path-mobile-nav > summary):focus-visible { outline: 2px solid #244ac8 !important; outline-offset: 2px !important; }
+  .header.header :global(.one-path-mobile-nav > summary):focus-visible { outline: 2px solid var(--action, #244ac8) !important; outline-offset: 2px !important; }
   @media (prefers-reduced-motion: reduce) {
     .header.header :global(.one-path-mobile-nav > summary)::before,
     .header.header :global(.one-path-mobile-nav > summary)::after { transition: none; }
