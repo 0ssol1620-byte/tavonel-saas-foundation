@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import CompileStagePlayer from "../components/compile-stage-player";
@@ -67,6 +68,8 @@ import {
 } from "./landing-v2-copy.test";
 import { koTermDrift } from "./ko-terms";
 import { ACCESS_CTA, EXPLORE_CTA, KO_CHROME, SELF_SERVE_CTA } from "./site-navigation";
+import { EVIDENCE } from "./evidence-record";
+import claimsPack from "../content/evidence/public-claims-pack.json";
 
 /*
   THE COMPOSITION GUARD (contract D9, D13).
@@ -148,6 +151,92 @@ function mainOf(html: string): string {
   return html.slice(start, end);
 }
 
+/*
+  Release 3 (2026-10-15), brief move 7. THE ENTRY-PAGE CLAIM ALLOWLIST.
+
+  The measurement band under the hero prints figures that do not come from the World, so
+  `data-derived` cannot vouch for them. They are vouched for here instead, keyed by claims-pack id
+  and the sha256 of the receipt that claim is bound to. A figure leaves the digit walk only when:
+
+    1. its element names a claim on this list, with this list's sha;
+    2. that claim is approved in the byte-pinned pack copy with exactly that `evidence_sha256`;
+    3. the receipt this site serves for that sha hashes to it; and
+    4. every number in the element is a value of that claim or of those receipt bytes -- an
+       integer exactly, a fraction only at the precision printed (80.6 passes; 81 does not).
+
+  Anything else stays in the text and fails the digit check exactly as before. The list is literal
+  on purpose: putting another claim on the entry page is a reviewed edit to this file.
+*/
+const HOME_CLAIM_ALLOWLIST: Readonly<Record<string, string>> = {
+  "compilation-guarantees": "936b859c484fb54a8bdff3175d89d2fd47d695d48ec93b99fcfd93ac53ee2e25",
+  "recovery-contribution-olmocr": "1f5b6220c1fa569e8e33530d933a16eb7ad6b856c56e22f1744f8fa96efe33e0",
+  "accuracy-by-document-type": "4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559",
+};
+
+type PackClaim = { id: string; status: string; evidence_sha256?: unknown; numbers?: unknown };
+const PACK_CLAIMS = (claimsPack as { claims: PackClaim[] }).claims;
+
+function numericLeaves(value: unknown, into: number[] = []): number[] {
+  if (typeof value === "number") into.push(value);
+  else if (value && typeof value === "object") for (const child of Object.values(value)) numericLeaves(child, into);
+  return into;
+}
+
+/** Every printed form a figure may take: integers exactly, fractions (and rates as %) at 1 or 2 places. */
+function printedForms(values: number[]): Set<string> {
+  const forms = new Set<string>();
+  for (const value of values) {
+    if (Number.isInteger(value)) {
+      forms.add(value.toLocaleString("en-US"));
+      forms.add(value.toFixed(1));
+      continue;
+    }
+    for (const scaled of value <= 1 ? [value, value * 100] : [value]) {
+      forms.add(scaled.toFixed(1));
+      forms.add(scaled.toFixed(2));
+    }
+  }
+  return forms;
+}
+
+const claimFormsCache = new Map<string, Set<string>>();
+function claimForms(id: string, sha: string): Set<string> {
+  expect(HOME_CLAIM_ALLOWLIST[id], `claim "${id}" with receipt ${sha} is not on the entry-page allowlist`).toBe(sha);
+  const cached = claimFormsCache.get(id);
+  if (cached) return cached;
+  const claim = PACK_CLAIMS.find(entry => entry.id === id);
+  expect(claim?.status, `claim "${id}" is approved in the claims pack`).toBe("approved");
+  expect(claim!.evidence_sha256, `claim "${id}" is bound to receipt ${sha}`).toBe(`sha256:${sha}`);
+  const receipt = EVIDENCE.find(entry => entry.receipt?.digest === sha)?.receipt;
+  expect(receipt, `a published receipt with sha256 ${sha}`).toBeDefined();
+  const bytes = readFileSync(new URL(`../public${receipt!.url}`, import.meta.url));
+  expect(createHash("sha256").update(bytes).digest("hex"), `${receipt!.url} hashes to its digest`).toBe(sha);
+  const forms = printedForms([...numericLeaves(claim!.numbers), ...numericLeaves(JSON.parse(bytes.toString("utf8")))]);
+  claimFormsCache.set(id, forms);
+  return forms;
+}
+
+/** The markup with every receipted figure removed, each one checked against its claim on the way out. */
+function claimBoundStripped(html: string): string {
+  return html
+    .replace(/<span data-claim="([^"]*)" data-claim-sha="([^"]*)">([^<]*)<\/span>/g, (_, id: string, sha: string, text: string) => {
+      const forms = claimForms(id, sha);
+      for (const token of text.match(/\d[\d,]*(?:\.\d+)?/g) ?? []) {
+        expect(forms.has(token), `"${token}" is not a value of claim "${id}" or of its receipt`).toBe(true);
+      }
+      return " ";
+    })
+    .replace(/<a\s[^>]*data-receipt="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g, (_, id: string, inner: string) => {
+      const text = inner.replace(/<[^>]*>/g, "");
+      const receipt = EVIDENCE.find(entry => entry.receipt?.id === id)?.receipt;
+      expect(receipt && Object.values(HOME_CLAIM_ALLOWLIST).includes(receipt.digest), `receipt ${id} backs an allowlisted claim`).toBe(true);
+      const parts = [id, receipt!.date, `sha256 ${receipt!.digest.slice(0, 8)}`];
+      for (const part of parts) expect(text, `the receipt link names ${part}`).toContain(part);
+      // What is left of the link text still goes through the digit walk.
+      return ` ${parts.reduce((rest, part) => rest.replace(part, " "), text)} `;
+    });
+}
+
 /**
  * Everything a reader can read, minus every element that carries a receipt for its figures.
  *
@@ -158,7 +247,7 @@ function mainOf(html: string): string {
  * reader sees.
  */
 function undeclaredText(html: string): string {
-  return html
+  return claimBoundStripped(html)
     .replace(/<(\w+)[^>]*\sdata-derived="1"[^>]*>[\s\S]*?<\/\1>/g, " ")
     .replace(/<[^>]*>/g, " ")
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
@@ -284,8 +373,8 @@ describe("landing v2 -- the composition", () => {
       const levels = [...main.matchAll(/<h([1-6])(\s[^>]*)?>/g)].map(match =>
         Number(match[1])
       );
-      // Six scenes and the FAQ; historical evaluation metrics live on Benchmarks.
-      expect(levels.filter(level => level === 2)).toHaveLength(7);
+      // Six scenes, the receipted measurement band (Release 3 move 7) and the FAQ.
+      expect(levels.filter(level => level === 2)).toHaveLength(8);
       expect(levels[0]).toBe(1);
       // An h3 may only appear under a heading one level above it: no h1 -> h3 jump anywhere.
       levels.reduce((previous, level) => {
@@ -326,6 +415,27 @@ describe("landing v2 -- the composition", () => {
 
   it.each(LOCALES)("%s prints no figure without a receipt", locale => {
     expect(undeclaredText(mainOf(render(locale)))).not.toMatch(/\d/);
+  });
+
+  /*
+    Release 3 move 7. The band sits between the hero and the workbench, every figure in it is
+    claim-bound (the walk above checks each one), and every fact links to the receipt that holds it.
+    The weakest row is asserted by name: a band that kept only its flattering figures would pass
+    the digit walk and still be the thing the evidence rules forbid.
+  */
+  it.each(LOCALES)("%s shows three receipted measures under the hero, weakest row included", locale => {
+    const main = mainOf(render(locale));
+    const band = main.slice(main.lastIndexOf("<section", main.indexOf("data-home-measures")), main.indexOf('<section id="s2"'));
+    expect(main.indexOf("data-home-measures")).toBeGreaterThan(main.indexOf('<section id="s1"'));
+    expect(main.indexOf("data-home-measures")).toBeLessThan(main.indexOf('<section id="s2"'));
+    expect([...band.matchAll(/data-claim-id="([^"]+)"/g)].map(match => match[1])).toEqual(Object.keys(HOME_CLAIM_ALLOWLIST));
+    const receipts = elements(band, "a").filter(open => attr(open, "data-receipt")).map(open => [attr(open, "href"), attr(open, "data-receipt")]);
+    expect(receipts).toEqual([["/research/notes#R-02", "R-02"], ["/research/notes#R-01", "R-01"], ["/research/notes#R-03", "R-03"]]);
+    expect(readable(band)).toContain(locale === "ko" ? "저품질 스캔본" : "low-quality scans");
+    expect(band).toContain('data-claim-sha="4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559">36.9</span>');
+    // The completion share is never called accuracy, and is not on the band without a served receipt.
+    expect(readable(band).toLowerCase()).not.toContain("accuracy");
+    expect(readable(band)).not.toContain("99.98");
   });
 
   /*
@@ -771,4 +881,39 @@ describe("Home substance renders expanded (redesign brief 2026-10-15, move 3)", 
       expect(s2).toMatch(/<details[^>]*\sopen=""[^>]*><summary>(The context this passage needs|이 구절에 필요한 맥락)<\/summary>/);
     });
   }
+});
+
+/*
+  The failure path of the Release 3 allowlist. Extending the figure walk must not have opened it:
+  each case below is a figure the entry page must still refuse.
+*/
+describe("the entry-page figure allowlist still fails closed", () => {
+  const recovery = HOME_CLAIM_ALLOWLIST["recovery-contribution-olmocr"]!;
+  const span = (id: string, sha: string, text: string) => `<p><span data-claim="${id}" data-claim-sha="${sha}">${text}</span></p>`;
+
+  it("leaves a figure with no claim in the text", () => {
+    expect(undeclaredText("<p>Trusted on 5,000 documents</p>")).toMatch(/\d/);
+  });
+
+  it("refuses an approved claim that is not on the allowlist", () => {
+    // completion-rate is approved in the pack, but its receipt is not served by this site.
+    expect(() => undeclaredText(span("completion-rate", "3dcaf2ae6ef143e9ef37e0efa347b14bcc14fb50207d0ae9eab873a160d61f0d", "99.98"))).toThrow();
+  });
+
+  it("refuses an allowlisted claim under another receipt's sha", () => {
+    expect(() => undeclaredText(span("recovery-contribution-olmocr", HOME_CLAIM_ALLOWLIST["compilation-guarantees"]!, "80.6"))).toThrow();
+  });
+
+  it("refuses a number its claim and receipt do not carry, including a rounded one", () => {
+    expect(undeclaredText(span("recovery-contribution-olmocr", recovery, "80.6"))).not.toMatch(/\d/);
+    expect(() => undeclaredText(span("recovery-contribution-olmocr", recovery, "81"))).toThrow();
+    expect(() => undeclaredText(span("recovery-contribution-olmocr", recovery, "92.4"))).toThrow();
+  });
+
+  it("keeps a digit typed into a receipt link in the walk", () => {
+    const link = (text: string) => `<a href="/research/notes#R-01" data-receipt="R-01">${text}</a>`;
+    expect(undeclaredText(link("Receipt R-01 · 2026-08-08 · sha256 1f5b6220"))).not.toMatch(/\d/);
+    expect(undeclaredText(link("Receipt R-01 · 2026-08-08 · sha256 1f5b6220 · 3x faster"))).toMatch(/\d/);
+    expect(() => undeclaredText(link("Receipt R-01 · sha256 1f5b6220"))).toThrow();
+  });
 });
