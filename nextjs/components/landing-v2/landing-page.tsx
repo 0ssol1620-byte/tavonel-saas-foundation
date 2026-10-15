@@ -19,13 +19,13 @@ import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
 import {
-  buildEvidenceRecord,
   buildHeroView,
   buildProofTabs,
+  buildReceiveRecord,
   buildRecompileView,
   landingV2StateWord,
   SOURCES_COPY,
-  type EvidenceRecord,
+  type ReceiveRecord,
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import {
@@ -70,7 +70,8 @@ import {
 */
 type HomeData = {
   home: EvidenceCase | null;
-  record: EvidenceRecord;
+  /** "What you receive": the first sample claim `selectReceiveClaim` accepts. */
+  record: ReceiveRecord;
   recompile: RecompileView;
   /** How many extracted regions the workbench's page holds, read from the page view. */
   pageRegionCount: number;
@@ -79,7 +80,7 @@ let homeMemo: HomeData | undefined;
 function homeData(): HomeData {
   return (homeMemo ??= {
     home: selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE]),
-    record: buildEvidenceRecord(),
+    record: buildReceiveRecord(),
     recompile: buildRecompileView(),
     pageRegionCount: buildHeroView().regions.length,
   });
@@ -249,14 +250,9 @@ export default function LandingPage({
     exploreHref: SAMPLE_CTA.href,
   };
   const access = primaryCallToAction();
-  const startActions = {
-    ...heroActions,
-    accessHref: korean && access.href === "/contact" ? "/ko/contact" : access.href,
-    accessLabel: korean ? KO_CHROME.cta[access.href] : access.label,
-  };
   const heroStart = {
-    label: access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : startActions.accessLabel,
-    href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref,
+    label: access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : korean ? KO_CHROME.cta[access.href] : access.label,
+    href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href,
   };
 
   return (
@@ -468,7 +464,7 @@ export default function LandingPage({
         />
         <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
         <HomeReaderGuide korean={korean} faqOnly />
-        <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
+        <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />
     </div>

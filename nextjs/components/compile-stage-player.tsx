@@ -189,7 +189,7 @@ const MOBILE_FILM_VIEW = {
     focus: "세부 내용 확대",
     fit: "전체 프레임 보기",
     focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요.",
-    fittedHint: "전체 화면 · 작은 글자는 세부 내용 확대에서 확인하세요.",
+    fittedHint: "전체 프레임 · 작은 글자는 세부 내용 확대에서 확인하세요.",
     panes: "영상 패널",
   },
 } as const;

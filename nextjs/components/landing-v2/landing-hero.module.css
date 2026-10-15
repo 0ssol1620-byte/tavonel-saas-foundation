@@ -424,14 +424,26 @@ section.hero .intake {
   text-transform: uppercase;
 }
 
+/* The page region and the passage read from it, one unit: crop above, extractor's text below. */
+.passageMatch {
+  border: 1px solid var(--home-rule);
+}
+
+.crop {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--home-rule);
+  background: #fff;
+}
+
+/* The extractor's text, as extracted: mono, its own line breaks kept (brief move 8). */
 .quote {
   margin: 0;
   padding: 1rem 1.125rem;
   border-left: 3px solid var(--home-amber);
   background: var(--home-sheet);
-  font-size: 1.125rem;
+  font: 0.9375rem/1.6 var(--home-mono);
   font-variant-numeric: tabular-nums;
-  line-height: 1.6;
+  white-space: pre-wrap;
   overflow-wrap: break-word;
 }
 
@@ -1051,7 +1063,7 @@ section.receive {
 
   .quote {
     padding: 0.75rem 0.875rem;
-    font-size: 1.0625rem;
+    font-size: 0.875rem;
   }
 
   .diffList > li {

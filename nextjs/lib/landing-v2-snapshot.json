@@ -194,6 +194,47 @@
     },
     "citation": "10-K · filed 2025-10-31 · apple-2025-form-10-k.pdf (original PDF) · page 4 of 80 · bbox 30,291,971,380 (per mille) · sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab"
   },
+  "receive": {
+    "claim": {
+      "nodeId": "claim-da11803424f1e6a0e7f26d825d2217d1",
+      "kind": "Claim",
+      "label": "For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements.",
+      "excerpt": "For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements.",
+      "excerptTruncated": false
+    },
+    "status": {
+      "state": "candidate",
+      "label": "PUBLISHED SAMPLE"
+    },
+    "source": {
+      "form": "10-K",
+      "filingDate": "2025-10-31",
+      "filename": "apple-2025-form-10-k.pdf",
+      "page": 4,
+      "pageCount": 80,
+      "digest": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "representationKind": "original",
+      "officialHref": "https://d18rn0p25nwr6d.cloudfront.net/CIK-0000320193/c24e7a28-5254-4dfa-9447-62aaa3c24bb1.pdf",
+      "secHref": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
+    },
+    "region": {
+      "id": "evidence-0dffdde3c8def7d25da7d9eb4bd303d3:chunk-256255b698d7122b91cc3f9e888d9f3b",
+      "bbox1000": [
+        30,
+        97,
+        971,
+        217
+      ]
+    },
+    "version": {
+      "digest": "sha256:108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "short": "sha256:1085900…"
+    },
+    "hrefs": {
+      "evidence": "/explore?act=evidence&evidence=evidence-0dffdde3c8def7d25da7d9eb4bd303d3%3Achunk-256255b698d7122b91cc3f9e888d9f3b",
+      "original": "/explore-sample/apple-2025-form-10-k.pdf#page=4"
+    }
+  },
   "recompile": {
     "before": {
       "form": "10-K",

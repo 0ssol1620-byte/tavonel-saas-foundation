@@ -88,11 +88,6 @@ export default function Scene({ locale, copy, sectionId = "trust", sceneIndex }:
   copy: LandingV2TrustCopy;
   sectionId?: string;
   sceneIndex?: number;
-  /**
-   * Ignored. Each proof's scope sentence is substance and always renders under its label
-   * (redesign brief 2026-10-15, move 3). Kept only until the Home call site drops it.
-   */
-  compact?: boolean;
 }) {
   const byHref = (href: string) => copy.links.find((link) => link.href === href);
   const next = byHref(NEXT_HREF);

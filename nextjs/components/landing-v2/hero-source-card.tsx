@@ -6,6 +6,7 @@ import { getImageProps } from "next/image";
 import type { Route } from "next";
 import { caseStatus, displayableRegions, publishableClaims, type EvidenceCase, type EvidenceRegion } from "@/lib/home-evidence-view";
 import styles from "./landing-hero.module.css";
+import { SourceRegionCrop } from "./source-region";
 
 /*
   The Home workbench: source -> highlighted passage -> inspectable record.
@@ -278,9 +279,25 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
             <span className={styles.extracted}>{t.existing}</span>
             <span>{t.roles[active.role]}</span>
           </p>
-          <blockquote className={styles.quote} lang="en" data-derived="1">
-            {active.passage}{active.passageTruncated ? "…" : ""}
-          </blockquote>
+          {/*
+            Brief move 8: the page region the passage was read from, cut out of the same committed
+            raster at the region's own bbox, straight above the extractor's text. The text is left
+            exactly as extracted; the crop is what lets a reader match it to the printed lines.
+          */}
+          <div className={styles.passageMatch}>
+            {page.image ? (
+              <SourceRegionCrop
+                className={styles.crop}
+                src={page.image.src}
+                width={page.image.width}
+                height={page.image.height}
+                bbox1000={active.bbox1000}
+              />
+            ) : null}
+            <blockquote className={styles.quote} lang="en" data-derived="1">
+              {active.passage}{active.passageTruncated ? "…" : ""}
+            </blockquote>
+          </div>
           <p className={styles.contextNote}>{active.role === "selected" ? t.selectedNote : t.contextNote}</p>
           {active.href ? (
             <Link className={styles.evidenceLink} href={active.href as Route} prefetch={false} data-hero-evidence data-analytics="source-open">

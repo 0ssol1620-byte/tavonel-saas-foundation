@@ -69,7 +69,7 @@
   }
   .home.home :global(.lv2-h1-line) { display: block; }
   /* The hero support sentence: this is its one rule (the !important chain in landing-hero.module.css is gone). */
-  .home.home :global(.lv2-hero-support) { max-width: 40rem; margin: 0 auto; text-align: center; color: var(--ink-muted); font: 400 20px/1.55 var(--f-sans); letter-spacing: 0; }
+  .home.home :global(.lv2-hero-support) { max-width: 40rem; margin: 0 auto 32px; text-align: center; text-wrap: balance; color: var(--ink-muted); font: 400 20px/1.55 var(--f-sans); letter-spacing: 0; }
   .home.home :global(.lv2-h2) { font: 600 clamp(32px, 3.6vw, 52px)/1.04 var(--f-sans); font-variation-settings: "wght" 600; letter-spacing: -0.03em; color: var(--ink); }
   .home.home :global(.lv2-scene-support) { max-width: var(--measure); color: var(--ink-muted); font: 17px/1.65 var(--f-sans); }
   /* Meta is sans 500 at 13px; mono is kept for derived coordinates, versions, dates and hashes. */
@@ -177,7 +177,7 @@
     .home.home :global(#s1) { padding-top: 96px; padding-bottom: 48px; }
     .home.home :global(.lv2-hero-h1) { font-size: 40px; line-height: 1.04; margin-bottom: 16px; }
     .home[lang="ko"].home :global(.lv2-hero-h1) { font-size: 40px; line-height: 1.16; letter-spacing: -0.02em; }
-    .home.home :global(.lv2-hero-support) { font-size: 18px; line-height: 1.6; }
+    .home.home :global(.lv2-hero-support) { font-size: 18px; line-height: 1.6; margin-bottom: 24px; }
     .home[lang="ko"].home :global(.lv2-hero-support) { line-height: 1.75; }
     .home.home :global(#s1 .compile-film-stages button) { font-size: 14px; padding-inline: 4px; min-height: 48px; }
     .home.home :global(#s1 .compile-film-caption p) { font-size: 16px; }

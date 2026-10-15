@@ -100,7 +100,7 @@ describe("mobile film view", () => {
     const fit = renderToStaticMarkup(<CompileStagePlayer preferVideo korean />);
     expect(fit).toContain('data-mobile-view="fit"');
     expect(focusControl(fit).label).toBe("세부 내용 확대");
-    expect(fit).toContain("전체 화면 · 작은 글자는 세부 내용 확대에서 확인하세요.");
+    expect(fit).toContain("전체 프레임 · 작은 글자는 세부 내용 확대에서 확인하세요.");
 
     const focus = renderToStaticMarkup(<CompileStagePlayer preferVideo korean initialMobileFilmView="focus" />);
     expect(focus).toContain('data-mobile-view="focus"');

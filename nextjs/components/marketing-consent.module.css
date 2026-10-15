@@ -35,6 +35,8 @@
   color: var(--text-hi);
   font: inherit;
 }
+/* Home sets Wanted Sans on its own wrapper; this card mounts outside it, so it would fall back to the root Geist. */
+:global(body:has([data-home-ia])) .panel { font-family: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif; }
 
 @layer overrides {
   .panel {

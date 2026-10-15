@@ -14,7 +14,7 @@ const COPY = {
     ],
     faqTitle: "About the sample on this page",
     faq: [
-      ["Has this demonstration been verified?", "No. The workbench shows existing extracted text from the published sample, with its source and location. Processing has not been run for this prepared demonstration; interpretation and verification are separate steps."],
+      ["Has this demonstration been verified?", "No. The workbench shows existing extracted text from the published sample, with its source and location. Processing has not been run for this prepared demonstration; interpretation and verification are separate steps. The record under What you receive is picked by a fixed rule, not by how it reads: the first claim in the sample that is one complete sentence with no heading run into it."],
       ["Is the page image the original filing?", "The image is a reference render. Open full filing (SEC) links to the original HTML filing; Open full page opens the committed page image. Source details keeps the version and publication basis alongside the passage."],
       ["Can I use my own documents?", "Own-source intake is by arrangement. Use the access action on this page to discuss your documents. The public sample does not upload or process your files."],
     ],
@@ -31,7 +31,7 @@ const COPY = {
     ],
     faqTitle: "이 페이지의 샘플에 대해",
     faq: [
-      ["이 시연은 검증을 거쳤나요?", "아닙니다. 작업대는 공개 샘플에서 기존에 추출한 텍스트를 출처와 위치와 함께 보여 줍니다. 이 준비된 시연에서 실제 처리는 실행하지 않았으며, 해석과 검증은 별도의 단계입니다."],
+      ["이 시연은 검증을 거쳤나요?", "아닙니다. 작업대는 공개 샘플에서 기존에 추출한 텍스트를 출처와 위치와 함께 보여 줍니다. 이 준비된 시연에서 실제 처리는 실행하지 않았으며, 해석과 검증은 별도의 단계입니다. 받게 되는 것 아래의 기록은 읽기 좋은지가 아니라 정해진 규칙으로 고릅니다. 샘플에서 제목이 본문에 붙지 않은 완결된 한 문장인 첫 번째 진술입니다."],
       ["페이지 이미지가 원본 공시인가요?", "이미지는 참조 렌더입니다. 전체 공시 열기 (SEC)는 원본 HTML 공시로 연결되고, 원본 페이지 열기는 저장된 페이지 이미지를 엽니다. 출처 상세에는 구절의 버전과 게시 근거가 있습니다."],
       ["내 문서를 사용할 수 있나요?", "자체 자료 도입은 별도 협의가 필요합니다. 이 페이지의 이용 안내를 통해 문서에 관해 상담하세요. 공개 샘플은 사용자의 파일을 업로드하거나 처리하지 않습니다."],
     ],

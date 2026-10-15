@@ -72,11 +72,6 @@ export default function Scene({
   data: RecompileView;
   sectionId?: string;
   sceneIndex?: number;
-  /**
-   * Ignored. The affected objects, counts and fan are the scene's substance and always render
-   * expanded (redesign brief 2026-10-15, move 3). Kept only until the Home call site drops it.
-   */
-  compact?: boolean;
 }) {
   const titleId = `lv2-${SCENE_ID}-title`;
   const countsId = `lv2-${SCENE_ID}-counts`;

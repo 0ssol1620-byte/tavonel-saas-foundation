@@ -2,6 +2,7 @@ import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-cha
 import { chooseExploreEntryProof, excerptPreview } from "./explore-entry-proof";
 import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
 import { buildExploreAnswerViews } from "./explore-story";
+import { selectReceiveClaim } from "./home-evidence-view";
 import { landingV2PageImage, landingV2RegionImage } from "./landing-v2-assets";
 import { sourcePageQualifier } from "./source-page-rasters";
 import { toVisualWorldModel, type VisualState } from "./visual-world-model";
@@ -108,6 +109,11 @@ export type EvidenceRecord = {
   hrefs: { evidence: string; original: string };
   /** The citation a reader copies, assembled from the record rather than written. */
   citation: string;
+};
+
+/** Home's "What you receive" record: the fields that section prints, and nothing more. */
+export type ReceiveRecord = Omit<EvidenceRecord, "rasters" | "citation" | "region"> & {
+  region: { id: string; bbox1000: number[] };
 };
 
 export type RecompileView = {
@@ -291,6 +297,40 @@ export function buildEvidenceRecord(): EvidenceRecord {
     },
     /* The representation travels with the citation: a pasted line says which bytes it points at. */
     citation: `${source.form} · filed ${source.filingDate} · ${source.filename} (${sourcePageQualifier(source.representationKind)}) · page ${source.page} of ${source.pageCount} · bbox ${region.bbox1000.join(",")} (per mille) · ${region.digest}`,
+  };
+}
+
+/**
+ * Home's "What you receive" claim (brief move 8).
+ *
+ * The candidates are the World's claims whose first region is on an original-representation page
+ * with a committed page raster, in World order; `selectReceiveClaim` in
+ * `lib/home-evidence-view.ts` states and applies the rule that picks one of them. No passing
+ * claim is a build failure, never a fallback to one that does not pass.
+ */
+export function buildReceiveRecord(): ReceiveRecord {
+  const evidence = new Map(world.evidence.map((item) => [item.id, item] as const));
+  const regionOf = (node: (typeof world.nodes)[number]) => evidence.get(node.evidenceRefs[0] ?? "");
+  const node = selectReceiveClaim(world.nodes.filter((item) => {
+    const region = item.kind === "Claim" ? regionOf(item) : undefined;
+    return Boolean(region && (region.representationKind ?? "original") === "original" &&
+      landingV2PageImage(region.digest, region.page));
+  }));
+  const region = node ? regionOf(node) : undefined;
+  if (!node || !region) throw new Error("landing_v2_receive_has_no_claim_without_a_heading_run_on");
+  const document = exploreSampleDocuments.find((entry) => entry.documentId === region.sourceId);
+  if (!document) throw new Error(`landing_v2_receive_source_record_missing: ${region.sourceId}`);
+  const preview = excerptPreview(node.label, EXCERPT_LIMIT);
+  return {
+    claim: { nodeId: node.id, kind: node.kind, label: node.label, excerpt: preview.text, excerptTruncated: preview.truncated },
+    status: { state: node.state, label: LANDING_V2_STATE_WORD[node.state] },
+    source: { ...sourceOf(region), officialHref: document.officialHref ?? null, secHref: document.secHref ?? null },
+    region: { id: region.id, bbox1000: [...region.bbox1000] },
+    version: { digest: region.digest, short: `${region.digest.slice(0, 14)}…` },
+    hrefs: {
+      evidence: `/explore?act=evidence&evidence=${encodeURIComponent(region.id)}`,
+      original: `${document.href}#page=${region.page}`,
+    },
   };
 }
 

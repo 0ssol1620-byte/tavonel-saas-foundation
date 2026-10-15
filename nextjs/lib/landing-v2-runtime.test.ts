@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
-  buildEvidenceRecord, buildProofTabs, buildRecompileView,
+  buildEvidenceRecord, buildProofTabs, buildReceiveRecord, buildRecompileView,
   LANDING_V2_STATE_WORD, LANDING_V2_STATE_WORD_KO,
 } from "./landing-v2-proof";
 import { buildSourcesScene, SOURCES_COPY } from "./landing-v2-sources";
@@ -19,7 +19,7 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
   it("exactly reproduces every field from the real compiler-backed builders", () => {
     const expected = {
       schema: "tavonel.landing-public-proof.v1",
-      tabs: buildProofTabs(), record: buildEvidenceRecord(), recompile: buildRecompileView(),
+      tabs: buildProofTabs(), record: buildEvidenceRecord(), receive: buildReceiveRecord(), recompile: buildRecompileView(),
       heroView: sampleEvidencePage(), heroStats: HERO_STATS,
       sources: buildSourcesScene(), sourcesCopy: SOURCES_COPY,
       stateWords: { en: LANDING_V2_STATE_WORD, ko: LANDING_V2_STATE_WORD_KO },
@@ -59,6 +59,7 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     const runtime = await import("./landing-v2-runtime");
     expect(runtime.buildProofTabs()).toEqual(buildProofTabs());
     expect(runtime.buildEvidenceRecord()).toEqual(buildEvidenceRecord());
+    expect(runtime.buildReceiveRecord()).toEqual(buildReceiveRecord());
     expect(runtime.buildRecompileView()).toEqual(buildRecompileView());
     expect(runtime.buildHeroView()).toEqual(sampleEvidencePage());
     expect(runtime.buildHeroStats()).toEqual(HERO_STATS);
@@ -91,5 +92,6 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     );
     expect(candidates.slice(0, candidates.indexOf(picked!)).some(node => isClaimWithoutHeadingRunOn(node.label))).toBe(false);
     expect(isClaimWithoutHeadingRunOn(buildEvidenceRecord().claim.label)).toBe(false);
+    expect(buildReceiveRecord().claim.label).toBe(picked?.label);
   });
 });

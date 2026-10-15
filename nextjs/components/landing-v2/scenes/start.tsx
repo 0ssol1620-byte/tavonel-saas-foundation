@@ -56,9 +56,6 @@ const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: 
 export type StartActions = {
   exploreLabel: string;
   exploreHref: string;
-  // ponytail: the close no longer renders these two (move 1); drop them with lib/landing-v2-start.test.ts's actionsFor.
-  accessLabel: string;
-  accessHref: string;
 };
 
 export default function Scene({
