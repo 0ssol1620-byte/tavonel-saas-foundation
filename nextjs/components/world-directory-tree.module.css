@@ -94,7 +94,6 @@ button.name[data-selected="true"] { color: var(--dir-accent); }
 .pagination { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-variant-numeric: tabular-nums; }
 .pagination button { min-height: 44px; padding: 4px 10px; border: 1px solid var(--dir-line); border-radius: 4px; color: var(--dir-ink); }
 .pagination button:disabled { color: var(--dir-faint); opacity: .6; cursor: default; }
-.pagination button:focus-visible, .controls input:focus-visible, .disclosure:focus-visible, button.name:focus-visible { outline: 2px solid var(--dir-accent); outline-offset: 2px; }
 .selection { margin: 0; overflow-wrap: anywhere; }
 .context { font-style: italic; }
 .row[data-context="true"] > .rowHead { color: var(--dir-muted); }

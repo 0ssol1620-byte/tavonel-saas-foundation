@@ -48,7 +48,6 @@
 .filters button { min-height: 44px; padding: 8px 12px; color: var(--diff-ink); border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); font: 500 13px var(--f-sans, sans-serif); }
 .filters button:disabled { color: var(--diff-faint); cursor: default; }
 .filters input::placeholder { color: var(--diff-faint); }
-.filters :is(input, select, button):focus-visible { outline: 2px solid var(--diff-added); outline-offset: 3px; }
 .filters .note { flex-basis: 100%; }
 .sectionCount { color: var(--diff-muted); font: 12px var(--f-mono, monospace); letter-spacing: normal; text-transform: none; }
 
@@ -89,4 +88,3 @@
 .pagination { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; color: var(--diff-muted); font: 12px var(--f-sans, sans-serif); }
 .pagination button { min-height: 44px; padding: 8px 12px; color: var(--diff-ink); border: 1px solid var(--diff-line); border-radius: var(--r-inst, 6px); font: 500 13px var(--f-sans, sans-serif); }
 .pagination button:disabled { color: var(--diff-faint); cursor: default; }
-.pagination button:focus-visible { outline: 2px solid var(--diff-added); outline-offset: 3px; }

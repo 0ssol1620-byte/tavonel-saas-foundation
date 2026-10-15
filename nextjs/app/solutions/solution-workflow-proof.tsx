@@ -117,7 +117,7 @@ export default function SolutionWorkflowProof({ kind, pick }: { kind: WorkflowKi
             <div><dt>Region box · 0–1000</dt><dd>{region.bbox.join(", ")}</dd></div>
             <div><dt>Read representation</dt><dd>{document.representationKind === "original" ? "Original PDF" : "Reference-render PDF"}</dd></div>
           </dl>
-          <Link href={`${document.href}#page=${region.page}` as Route}>Open the read PDF at this page</Link>
+          <Link href={`/${document.href.replace(/^\/+/, "")}#page=${region.page}` as Route}>Open the read PDF at this page</Link>
           <p>This printed-region sample does not establish degraded-scan accuracy or recovered table grids.</p>
         </div>
       )}

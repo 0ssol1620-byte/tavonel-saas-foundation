@@ -499,6 +499,28 @@ describe("a source read before region capture", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  it("is refused the same way when a v1 result carries regions it never read, and no bbox is passed on", async () => {
+    readyWorkspace();
+    // Well-formed v2-shaped geometry inside a v1 body. v1 records no regions, so these are not
+    // evidence of where anything was; they must not reach the Core as if they were.
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v1", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+
+    expect(run.ok).toBe(false);
+    if (!run.ok) {
+      expect(run.status).toBe(422);
+      expect(run.code).toBe("OCR_REGIONS_REQUIRED");
+      expect(run.payload).toEqual({ documentIds: [DOCUMENT] });
+    }
+    expect(dispatched).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it("is refused the same way when the result is v2 but carries an empty region list", async () => {
     readyWorkspace();
     fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", []) });

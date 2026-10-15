@@ -237,7 +237,9 @@ export async function runCollectionCompile(
       readerRevision: json.readerRevision,
       readerBindingSha256: json.readerBindingSha256,
       recognitionConflictCount: json.recognitionConflictCount,
-      regions: json.regions,
+      // Only a region-capturing reader (v2, v3) may supply regions. A v1 body that carries some
+      // anyway is refused as OCR_REGIONS_REQUIRED below, never compiled on geometry v1 never read.
+      regions: json.schemaVersion === "tavonel.ocr_result.v2" || json.schemaVersion === "tavonel.ocr_result.v3" ? json.regions : undefined,
     };
   });
 

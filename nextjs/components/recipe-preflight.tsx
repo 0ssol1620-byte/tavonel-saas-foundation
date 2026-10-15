@@ -133,9 +133,9 @@ export function RecipeContinuation({
   const next = start === null
     ? "This recipe has no starting control in the workspace yet. Its page lists the next steps, including who to talk to."
     : needsFiles && processing === null
-      ? "Checking whether this deployment accepts customer files."
+      ? "Checking whether your workspace accepts customer files."
       : needsFiles && processing === false
-        ? "Customer file processing is not open on this deployment yet, so this recipe cannot take your files here today. The workspace shows where your access stands."
+        ? "Customer file processing is not open for this workspace, so this recipe cannot take your files here today. The workspace shows where your access stands."
         : needsFiles
           ? "Files you choose are counted and quoted before anything is processed, and nothing runs until you confirm the quote."
           : "Keys are issued there only if your plan includes them.";

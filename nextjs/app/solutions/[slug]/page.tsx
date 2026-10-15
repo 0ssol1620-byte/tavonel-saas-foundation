@@ -219,7 +219,7 @@ export const SOLUTIONS = {
         with us rather than bought at a checkout. The roadmap half belongs in the pricing footnote
         where a reader is comparing plans, and goes to `copy-commerce-legal` as a cross-lane item.
       */
-      "Team setup is arranged with us rather than bought at a checkout. This deployment supports a single-member workspace; shared roles, invitations and organization administration are not available.",
+      "Team setup is arranged with us rather than bought at a checkout. Each workspace is a single-member workspace; shared roles, invitations and organization administration are not available.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },

@@ -154,7 +154,7 @@ test.describe("recipe continuation across sign-in", () => {
     await installFixtureSession(page);
     await prepare(page, { processing: false });
     await page.goto(recipeLogin(RECIPE));
-    await expect(page.getByText("not open on this deployment yet")).toBeVisible();
+    await expect(page.getByText("not open for this workspace")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open your workspace" })).toHaveAttribute("href", "/workspace");
     await expect(page.getByRole("link", { name: "Choose your documents" })).toHaveCount(0);
   });

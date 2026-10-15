@@ -51,15 +51,58 @@ export type WorldVersionDiff = {
   sourceRevisions: { added: string[]; removed: string[]; unchanged: number };
 };
 
-function changesBetween(
-  before: Record<string, string>,
-  after: Record<string, string>,
-): FieldChange[] {
+/*
+  A compared field is a plain value, or a reference list read as a set ("members") or as the size
+  of that set ("count"). Lists are kept as lists until they are known to differ: the sorted JSON a
+  change prints is built only for a field that changed. Building it for every object made the
+  sample's five-snapshot timeline sort and serialise 1.1M evidence ids per World, and a diff that
+  took about 40 ms took seconds.
+*/
+type FieldValue = string | { members: readonly string[] } | { count: readonly string[] };
+type Fields = Record<string, FieldValue>;
+
+function listOf(value: Exclude<FieldValue, string>) {
+  return "members" in value ? value.members : value.count;
+}
+
+// ponytail: cached by list identity, because a read model is never mutated once built; a caller
+// that edits a list in place after diffing it would read the stale canonical form.
+const canonicalByList = new WeakMap<readonly string[], { json: string; size: number }>();
+
+function canonical(ids: readonly string[]) {
+  let cached = canonicalByList.get(ids);
+  if (!cached) {
+    const sorted = membership(ids);
+    cached = { json: JSON.stringify(sorted), size: sorted.length };
+    canonicalByList.set(ids, cached);
+  }
+  return cached;
+}
+
+function render(value: FieldValue | undefined): string {
+  if (value === undefined) return "";
+  if (typeof value === "string") return value;
+  return "members" in value ? canonical(value.members).json : String(canonical(value.count).size);
+}
+
+function sameValue(before: FieldValue | undefined, after: FieldValue | undefined) {
+  if (before === undefined || after === undefined || typeof before === "string" || typeof after === "string") {
+    return before === after;
+  }
+  if (("members" in before) !== ("members" in after)) return false;
+  const left = listOf(before);
+  const right = listOf(after);
+  // An unchanged object holds the same ids in the same order: one pass, nothing allocated.
+  if (left.length === right.length && left.every((id, index) => id === right[index])) return true;
+  return render(before) === render(after);
+}
+
+function changesBetween(before: Fields, after: Fields): FieldChange[] {
   return Object.keys({ ...before, ...after })
     .sort()
-    .flatMap((field) => (before[field] === after[field]
+    .flatMap((field) => (sameValue(before[field], after[field])
       ? []
-      : [{ field, before: before[field] ?? "", after: after[field] ?? "" }]));
+      : [{ field, before: render(before[field]), after: render(after[field]) }]));
 }
 
 /*
@@ -85,29 +128,26 @@ function membership(ids: readonly string[]): string[] {
   and first-seen/last-changed history are read values the compiled artifact does not yet carry,
   and stay out of the comparison for the same reason they are absent from the model.
 */
-function objectFields(object: WorldReadModel["objects"][number]): Record<string, string> {
-  const evidenceRefs = membership(object.evidenceRefs);
-  const relationRefs = membership(object.relations);
+function objectFields(object: WorldReadModel["objects"][number]): Fields {
   return {
     label: object.label,
     type: object.type,
-    evidence: String(evidenceRefs.length),
-    relations: String(relationRefs.length),
-    evidenceRefs: JSON.stringify(evidenceRefs),
-    relationRefs: JSON.stringify(relationRefs),
-    claims: JSON.stringify(membership(object.claims)),
-    sourceVersions: JSON.stringify(membership(object.sourceVersions)),
+    evidence: { count: object.evidenceRefs },
+    relations: { count: object.relations },
+    evidenceRefs: { members: object.evidenceRefs },
+    relationRefs: { members: object.relations },
+    claims: { members: object.claims },
+    sourceVersions: { members: object.sourceVersions },
   };
 }
 
-function relationFields(relation: WorldReadModel["relations"][number]): Record<string, string> {
-  const evidenceRefs = membership(relation.evidenceRefs);
+function relationFields(relation: WorldReadModel["relations"][number]): Fields {
   return {
     predicate: relation.predicate,
     subject: relation.subject,
     object: relation.object,
-    evidence: String(evidenceRefs.length),
-    evidenceRefs: JSON.stringify(evidenceRefs),
+    evidence: { count: relation.evidenceRefs },
+    evidenceRefs: { members: relation.evidenceRefs },
   };
 }
 
@@ -117,7 +157,7 @@ function relationFields(relation: WorldReadModel["relations"][number]): Record<s
   A page or a box that moved while the text stayed the same is the more dangerous change: the
   quote still reads correctly and no longer points at where it came from.
 */
-function evidenceFields(evidence: WorldReadModel["evidence"][number]): Record<string, string> {
+function evidenceFields(evidence: WorldReadModel["evidence"][number]): Fields {
   return {
     page: String(evidence.page),
     bbox: evidence.bbox.join(","),
@@ -130,7 +170,7 @@ function evidenceFields(evidence: WorldReadModel["evidence"][number]): Record<st
 function partition<T extends { id: string }>(
   left: readonly T[],
   right: readonly T[],
-  fields: (item: T) => Record<string, string>,
+  fields: (item: T) => Fields,
 ) {
   const byIdLeft = new Map(left.map((item) => [item.id, item] as const));
   const byIdRight = new Map(right.map((item) => [item.id, item] as const));

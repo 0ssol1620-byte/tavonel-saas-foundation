@@ -482,7 +482,7 @@ describe("continuing a recipe after sign-in", () => {
       expect(hrefs(html), String(processing)).not.toContain("/workspace/sources");
       expect(hrefs(html), String(processing)).toContain("/workspace");
     }
-    expect(continuation(intent, false)).toContain("not open on this deployment yet");
+    expect(continuation(intent, false)).toContain("not open for this workspace");
   });
 
   it("says so honestly when a recipe has no start control, and still offers an existing one", () => {
