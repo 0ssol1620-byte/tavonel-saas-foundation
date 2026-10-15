@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { ArrowUpRight } from "lucide-react";
 import { trackFunnel } from "@/lib/funnel-events";
 
 type HeroActionsProps = {
@@ -36,7 +35,7 @@ export default function HeroActions(props: HeroActionsProps) {
       </Link>
       <Link className="lv2-text-link" href={secondary.href as Route} prefetch={false}
         onClick={onSelect(secondary)} data-analytics="hero-secondary">
-        {secondary.label}<ArrowUpRight size={17} aria-hidden="true" />
+        {secondary.label}
       </Link>
     </div>
   );

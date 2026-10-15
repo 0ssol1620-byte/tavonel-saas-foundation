@@ -6,10 +6,10 @@ import styles from "./start.module.css";
 /*
   Scene 06 -- the close (§19, D5, D6, D9).
 
-  Obsidian again, Full Bleed, and the one place on this landing where the filled control is the
-  commercial action rather than Explore. The hero fills Explore because a reader who has seen
-  nothing yet should be sent to the finished World first; by the closing scene that reader has seen
-  it, so the close asks. Both actions are on screen either way -- the hierarchy is what changes.
+  Brief 2026-10-15, move 1: one primary action on the page. The close fills the same public-sample
+  action, with the same words and colour, as the header and the hero, and offers the price link
+  beside it -- the same pair in English and Korean. It used to fill the commercial action instead,
+  in a different pair per language.
 
   WHY THIS SCENE DOES NOT RESERVE A VIEWPORT
   `.lv2-scene--full` and `.lv2-scene--proof` pin a scene to a screen height so a visual has room.
@@ -56,6 +56,7 @@ const PRICING_LABEL: Record<LandingV2Locale, string> = { en: "See pricing", ko: 
 export type StartActions = {
   exploreLabel: string;
   exploreHref: string;
+  // ponytail: the close no longer renders these two (move 1); drop them with lib/landing-v2-start.test.ts's actionsFor.
   accessLabel: string;
   accessHref: string;
 };
@@ -98,19 +99,14 @@ export default function Scene({
             {/* §39's one next action for this scene, and the page's conversion. */}
             <Link
               className={`btn lv2-cta ${styles.cta}`}
-              href={(locale === "ko" ? actions.accessHref : "/pricing") as Route}
-              hrefLang={locale === "ko" && actions.accessHref !== "/ko/contact" ? "en" : undefined}
+              href={actions.exploreHref as Route}
               prefetch={false}
               data-scene-next="start"
             >
-              {locale === "ko" ? actions.accessLabel : PRICING_LABEL.en}
+              {actions.exploreLabel}
             </Link>
-            {/*
-              `EXPLORE_CTA.label` as the page resolved it. "Explore the public World" -- the wording
-              §19 types -- is on `RETIRED_NAMES`; the constant is the only spelling of this action.
-            */}
-            <Link className={`lv2-text-link ${styles.link}`} href={(locale === "ko" ? "/ko/pricing" : actions.exploreHref) as Route} prefetch={false}>
-              {locale === "ko" ? PRICING_LABEL.ko : actions.exploreLabel}
+            <Link className={`lv2-text-link ${styles.link}`} href={(locale === "ko" ? "/ko/pricing" : "/pricing") as Route} prefetch={false}>
+              {PRICING_LABEL[locale]}
               <span aria-hidden="true">→</span>
             </Link>
           </div>
