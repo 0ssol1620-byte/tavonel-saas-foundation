@@ -208,6 +208,7 @@ const browserProjectsByFile = new Map([
   ['e2e/public-layout-balance.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/workspace-source-observation.spec.ts', ['1440']],
   ['e2e/failure-states-audit.spec.ts', ['audit']],
+  ['e2e/dialog-focus-audit.spec.ts', ['audit']],
   ['e2e/site-nav.spec.ts', ['1440']],
   ['e2e/site-chrome-v2.spec.ts', ['1440', '390']],
   ['e2e/mobile-landing.spec.ts', ['360', '390', '768']],
@@ -221,6 +222,8 @@ const browserProjectsByFile = new Map([
   ['e2e/world-lifecycle.spec.ts', ['1440', '390', 'reduced-motion']],
   ['e2e/explore.spec.ts', ['1440']],
   ['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],
+  ['e2e/home-evidence-line.spec.ts', ['1440', '390', '360', 'reduced-motion']],
+  ['e2e/sources.spec.ts', ['1440']],
   ['e2e/recipe-continuation.spec.ts', ['1440', '390', '360', 'reduced-motion']],
   ['e2e/login-capability.spec.ts', ['1440']],
 ]);

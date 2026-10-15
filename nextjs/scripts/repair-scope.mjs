@@ -1658,19 +1658,23 @@ export const DROPBOX_DATABASE_DEPENDENCIES = Object.freeze({
   'supabase/tests/connector_document_bindings.sql': 'dropbox-connector: connector document binding recorded by source-import',
   'supabase/tests/connector_source_suspensions.sql': 'dropbox-connector: source suspension written by sync-worker',
 });
-// Ordinary Home landing owner: exactly these eighteen nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// Ordinary Home landing owner: exactly these twenty-six nextjs-relative paths, no glob. Product UI, so never nativeReuse.
+// Home Release 2 (main dbe22b1e, PR #149) added the player frame strings, the film reading layer, the evidence connector and
+// source region, and the receive record in landing-v2-proof with its runtime snapshot; landing-v2-runtime.test.ts is their suite.
 export const HOME_AFFECTED_PATHS = Object.freeze([
-  'components/compile-stage-player.mobile-view.test.tsx', 'components/compile-stage-player.tsx',
+  'components/compile-stage-player.frame-strings.json', 'components/compile-stage-player.mobile-view.test.tsx', 'components/compile-stage-player.tsx',
+  'components/landing-v2/evidence-connector.tsx', 'components/landing-v2/film-reading-layer.module.css',
   'components/landing-v2/hero-actions.tsx', 'components/landing-v2/hero-film-disclosure.tsx', 'components/landing-v2/hero-film.tsx',
   'components/landing-v2/hero-source-card.test.tsx', 'components/landing-v2/hero-source-card.tsx', 'components/landing-v2/landing-analytics.tsx',
   'components/landing-v2/home-reader-guide.tsx',
-  'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'e2e/landing-v2.spec.ts', 'lib/film-motion-control.test.ts',
-  'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts',
+  'components/landing-v2/landing-hero.module.css', 'components/landing-v2/landing-page.tsx', 'components/landing-v2/source-region.tsx', 'e2e/landing-v2.spec.ts', 'lib/film-motion-control.test.ts',
+  'lib/home-evidence-view.test.ts', 'lib/home-evidence-view.ts', 'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-page.test.ts',
+  'lib/landing-v2-proof.ts', 'lib/landing-v2-runtime.test.ts', 'lib/landing-v2-runtime.ts', 'lib/landing-v2-snapshot.json', 'lib/one-path-contract.test.ts',
 ]);
 export const HOME_AFFECTED_UNIT_FILES = Object.freeze([
   'components/compile-stage-player.mobile-view.test.tsx', 'components/landing-v2/hero-source-card.test.tsx', 'lib/home-evidence-view.test.ts',
   'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/film-motion-control.test.ts', 'lib/marketing-analytics.test.ts',
-  'lib/home-player-main304-parity.test.ts',
+  'lib/home-player-main304-parity.test.ts', 'lib/landing-v2-runtime.test.ts',
 ]);
 export const HOME_AFFECTED_BROWSER_FILE = 'e2e/landing-v2.spec.ts';
 // Portable source contracts for the exact reviewed reader-heading CSS correction. Additive to Home's existing owner.
@@ -1810,6 +1814,14 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // Exact public marketing endpoints observed at published024. No wildcard or default owner.
 // Source, styles, SEO, media and their changed browser/unit contracts stay checked together.
 // This adds no inherited PASS and always invalidates historical native reuse.
+// Home Release 2 (main dbe22b1e, PR #149) adds the shared chrome it changed (root layout, font probe, both primary navs),
+// the recompile scene stylesheet, the three suites for scenes this owner already holds, the consent reveal suite and five
+// public specs (pricing-plan-overview reveals the card before refusing it). The Explore and workspace audit specs changed
+// only to start from a stored consent refusal now that the card appears after 8 s. dialog-focus-audit runs in the audit
+// project. explore-guided-entry and failure-states-audit are owned here without a browser row: the shared project map admits
+// Explore only as explore.spec.ts in 1440, and failure-states-audit's three workspace-intake cases still look for the
+// pre-triage 'Approve maximum & upload' preflight control, which this branch moved behind the triage review (unrelated to
+// Release 2; open debt for the workspace intake owner, measured failing on the merged build).
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/evaluation/opengraph-image.tsx",
   "nextjs/app/how-it-works/opengraph-image.tsx",
@@ -1817,12 +1829,15 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/ko/evaluation/opengraph-image.tsx",
   "nextjs/app/ko/pricing/opengraph-image.tsx",
   "nextjs/app/landing-v2.css",
+  "nextjs/app/layout.tsx",
   "nextjs/app/product/page.tsx",
   "nextjs/app/sitemap.ts",
   "nextjs/components/evaluation-page.module.css",
   "nextjs/components/evidence/region-highlight.module.css",
+  "nextjs/components/font-outline-probe.tsx",
   "nextjs/components/landing-v2/hero-statement.tsx",
   "nextjs/components/landing-v2/home-measurement.tsx",
+  "nextjs/components/landing-v2/scenes/recompile.module.css",
   "nextjs/components/landing-v2/scenes/recompile.tsx",
   "nextjs/components/landing-v2/scenes/start.tsx",
   "nextjs/components/landing-v2/scenes/trust.tsx",
@@ -1830,13 +1845,19 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/components/landing-v2/source-inspection-film.tsx",
   "nextjs/components/marketing-consent.module.css",
   "nextjs/components/marketing-story.module.css",
+  "nextjs/components/mobile-primary-nav.tsx",
   "nextjs/components/public-site-chrome.module.css",
   "nextjs/components/public-site-chrome.tsx",
+  "nextjs/components/site-nav/desktop-primary-nav.tsx",
   "nextjs/e2e/compiler-contract.spec.ts",
   "nextjs/e2e/detail-integrity.spec.ts",
+  "nextjs/e2e/dialog-focus-audit.spec.ts",
   "nextjs/e2e/evidence-first.spec.ts",
+  "nextjs/e2e/explore-guided-entry.spec.ts",
+  "nextjs/e2e/failure-states-audit.spec.ts",
   "nextjs/e2e/hero-four-stage-restoration.spec.ts",
   "nextjs/e2e/hero-home-responsive.spec.ts",
+  "nextjs/e2e/home-evidence-line.spec.ts",
   "nextjs/e2e/home-source-routes.spec.ts",
   "nextjs/e2e/landing-hero-mobile.spec.ts",
   "nextjs/e2e/launch-qa-accessibility.spec.ts",
@@ -1845,16 +1866,23 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/e2e/marketing-story.spec.ts",
   "nextjs/e2e/mobile-landing.spec.ts",
   "nextjs/e2e/premium-craft.spec.ts",
+  "nextjs/e2e/pricing-plan-overview.spec.ts",
   "nextjs/e2e/production-hardening.spec.ts",
   "nextjs/e2e/public-composition.spec.ts",
+  "nextjs/e2e/public-layout-balance.spec.ts",
   "nextjs/e2e/public-package-proof.spec.ts",
   "nextjs/e2e/site-chrome-v2.spec.ts",
   "nextjs/e2e/site-nav.spec.ts",
+  "nextjs/e2e/sources.spec.ts",
   "nextjs/e2e/ux-polish.spec.ts",
   "nextjs/e2e/visual-continuity.spec.ts",
   "nextjs/e2e/visual-refinement.spec.ts",
   "nextjs/lib/brand-copy.test.ts",
+  "nextjs/lib/landing-v2-hero-statement.test.ts",
   "nextjs/lib/landing-v2-motion.test.ts",
+  "nextjs/lib/landing-v2-start.test.ts",
+  "nextjs/lib/landing-v2-trust.test.ts",
+  "nextjs/lib/marketing-consent-reveal.test.ts",
   "nextjs/lib/marketing-story.test.ts",
   "nextjs/lib/og-card-frame.test.ts",
   "nextjs/lib/product-left-column.test.ts",
@@ -1873,9 +1901,13 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
 ]);
 export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
   "lib/brand-copy.test.ts",
+  "lib/landing-v2-hero-statement.test.ts",
   "lib/landing-v2-motion.test.ts",
   "lib/landing-v2-page.test.ts",
+  "lib/landing-v2-start.test.ts",
+  "lib/landing-v2-trust.test.ts",
   "lib/marketing-analytics.test.ts",
+  "lib/marketing-consent-reveal.test.ts",
   "lib/marketing-story.test.ts",
   "lib/og-card-frame.test.ts",
   "lib/one-path-contract.test.ts",
@@ -1889,9 +1921,11 @@ export const PUBLIC_MARKETING_AFFECTED_UNIT_FILES = Object.freeze([
 export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
   "e2e/compiler-contract.spec.ts",
   "e2e/detail-integrity.spec.ts",
+  "e2e/dialog-focus-audit.spec.ts",
   "e2e/evidence-first.spec.ts",
   "e2e/hero-four-stage-restoration.spec.ts",
   "e2e/hero-home-responsive.spec.ts",
+  "e2e/home-evidence-line.spec.ts",
   "e2e/home-source-routes.spec.ts",
   "e2e/landing-hero-mobile.spec.ts",
   "e2e/launch-qa-accessibility.spec.ts",
@@ -1900,11 +1934,14 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
   "e2e/marketing-story.spec.ts",
   "e2e/mobile-landing.spec.ts",
   "e2e/premium-craft.spec.ts",
+  "e2e/pricing-plan-overview.spec.ts",
   "e2e/production-hardening.spec.ts",
   "e2e/public-composition.spec.ts",
+  "e2e/public-layout-balance.spec.ts",
   "e2e/public-package-proof.spec.ts",
   "e2e/site-chrome-v2.spec.ts",
   "e2e/site-nav.spec.ts",
+  "e2e/sources.spec.ts",
   "e2e/ux-polish.spec.ts",
   "e2e/visual-continuity.spec.ts",
   "e2e/visual-refinement.spec.ts",
@@ -1994,7 +2031,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // of the shared map. Separate from the historical 424 Explore repair report, which keeps its own planExploreRepairBrowserRuns.
   affectedGroup('explore-answer', /^nextjs\/(?:lib\/explore-(?:(?:sample|story)(?:\.test)?|entry-proof\.test)\.ts|components\/explore\/(?:ask-overlay|evidence-workbench(?:\.test)?)\.tsx|e2e\/explore\.spec\.ts)$/,
     { unitFiles: ['lib/explore-entry-proof.test.ts', 'lib/explore-sample.test.ts', 'lib/explore-story.test.ts', 'lib/visual-world-model.test.ts', 'components/explore/evidence-workbench.test.tsx'], browserFiles: ['e2e/explore.spec.ts'] }),
-  // Ordinary Home landing: the seventeen exact paths above select seven direct suites and one browser suite, which runs only in
+  // Ordinary Home landing: the twenty-six exact paths above select nine direct suites and one browser suite, which runs only in
   // projects 1440, 390, 360 and reduced-motion of the shared map.
   affectedGroup('home-landing', new RegExp(`^nextjs/(?:${HOME_AFFECTED_PATHS.map(path => path.replaceAll('.', '\\.')).join('|')})$`),
     { unitFiles: HOME_AFFECTED_UNIT_FILES, browserFiles: [HOME_AFFECTED_BROWSER_FILE] }),
