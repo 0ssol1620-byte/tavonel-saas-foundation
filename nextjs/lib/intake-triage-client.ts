@@ -72,7 +72,8 @@ export type TriageProcessingQuote = {
 
 export type TriageClientError = { code: string; status: number; detail?: unknown };
 export type StageTriageResult =
-  | { kind: "disabled" }
+  /** `approvalLineage`: the server can create whole-set approvals; false means main's per-file upload. */
+  | { kind: "disabled"; approvalLineage: boolean }
   | { kind: "blocked"; error: TriageClientError }
   | { kind: "ready"; batchId: string; staged: TriageStage[] };
 
@@ -234,7 +235,9 @@ export async function stageTriage(
   }
   const { response, json } = stagedReply;
 
-  if (!response.ok && json.code === "INTAKE_TRIAGE_DISABLED") return { kind: "disabled" };
+  if (!response.ok && json.code === "INTAKE_TRIAGE_DISABLED") {
+    return { kind: "disabled", approvalLineage: json.intakeApproval === "enabled" };
+  }
   const staged = Array.isArray(json.staged) ? json.staged as TriageStage[] : [];
   if (!response.ok || json.code !== "TRIAGE_STAGE_READY" || staged.length !== files.length
     || staged.some((row, index) => row.index !== index || typeof row.stageId !== "string"

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFoundationIntakeApproval, reserveFoundationCompute, settleFoundationCompute } from "./compute-reservation";
 
+// Both switches are code constants; these getters let one file pin each combination.
+const rollout = vi.hoisted(() => ({ approval: true, triage: true }));
+vi.mock("./intake-approval-rollout", () => ({ get INTAKE_APPROVAL_ROLLOUT_ENABLED() { return rollout.approval; } }));
+vi.mock("./intake-triage-rollout", () => ({ get INTAKE_TRIAGE_ROLLOUT_ENABLED() { return rollout.triage; } }));
+
 const base = {
   workspaceKey: "pilot-4444444444444444",
   documentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -9,7 +14,7 @@ const base = {
 };
 
 describe("Foundation compute ledger", () => {
-  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); rollout.approval = true; rollout.triage = true; });
 
   function configure() {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
@@ -225,7 +230,12 @@ describe("Foundation compute ledger", () => {
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining("settle_foundation_compute_v3"), expect.any(Object));
   });
 
-  describe("lineage-aware approval reads while rollout is off", () => {
+  /*
+    The lineage-aware read (v2) exists only in the never-applied triage draft, so it is called only
+    with triage on. Before 2026-10-16 it was called with triage off too, which made every approval
+    read fail closed against a database that has only the approval migration.
+  */
+  describe("lineage-aware approval reads with triage on", () => {
     const attemptKey = "attempt_0123456789abcdef";
     const legacyPayload = {
       approvalId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", attemptKey,
@@ -243,7 +253,7 @@ describe("Foundation compute ledger", () => {
       workspaceKey: base.workspaceKey, userId: base.userId, attemptKey,
     });
 
-    it("reads actual triage lineage from the v2 RPC even when the rollout flag is off", async () => {
+    it("reads actual triage lineage from the v2 RPC", async () => {
       configure();
       const triageReceiptId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -284,6 +294,33 @@ describe("Foundation compute ledger", () => {
       await expect(call()).resolves.toEqual({ ok: false, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 });
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0]?.[0]).toContain("read_foundation_intake_approval_v2");
+    });
+
+    it("with triage off, reads the approval migration's own RPC and never the draft-only v2", async () => {
+      configure();
+      rollout.triage = false;
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(legacyPayload), { status: 200 })));
+      await expect(call()).resolves.toMatchObject({ ok: true, result: { attemptKey } });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toMatch(/[/]rpc[/]read_foundation_intake_approval$/);
+    });
+
+    it("with the lineage on, a database without the approval function fails closed as unavailable", async () => {
+      configure();
+      rollout.triage = false;
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        code: "PGRST202", message: "Could not find the function public.read_foundation_intake_approval",
+      }), { status: 404 })));
+      await expect(call()).resolves.toEqual({ ok: false, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 });
+    });
+
+    it("with the approval lineage off, makes no database call at all", async () => {
+      configure();
+      rollout.approval = false;
+      rollout.triage = false;
+      vi.stubGlobal("fetch", vi.fn());
+      await expect(call()).resolves.toEqual({ ok: false, code: "INTAKE_APPROVAL_DISABLED", status: 404 });
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });

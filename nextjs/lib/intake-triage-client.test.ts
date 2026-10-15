@@ -359,7 +359,12 @@ describe("server triage client rollout boundary", () => {
     const disabled = await stageTriage([], "token", vi.fn(async () => new Response(
       JSON.stringify({ code: "INTAKE_TRIAGE_DISABLED" }), { status: 404 },
     )) as typeof fetch);
-    expect(disabled).toEqual({ kind: "disabled" });
+    // No signal is main's per-file upload: the approval lineage is never assumed.
+    expect(disabled).toEqual({ kind: "disabled", approvalLineage: false });
+    const withLineage = await stageTriage([], "token", vi.fn(async () => new Response(
+      JSON.stringify({ code: "INTAKE_TRIAGE_DISABLED", intakeApproval: "enabled" }), { status: 404 },
+    )) as typeof fetch);
+    expect(withLineage).toEqual({ kind: "disabled", approvalLineage: true });
 
     const unavailable = await stageTriage([], "token", vi.fn(async () => new Response(
       JSON.stringify({ code: "COMPUTE_LEDGER_NOT_CONFIGURED" }), { status: 503 },

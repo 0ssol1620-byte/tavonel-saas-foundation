@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { cancelFoundationIntakeApprovedFile, readFoundationIntakeApproval } from "@/lib/compute-reservation";
+import { cancelFoundationIntakeApprovedFile, readFoundationIntakeApproval, settleFoundationCompute } from "@/lib/compute-reservation";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { headFoundationQuarantineObject, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN } from "@/lib/intake-approval";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   if (!DOCUMENT_ID_PATTERN.test(documentId)) {
     return NextResponse.json({ code: "UPLOAD_RELEASE_BODY_INVALID" }, { status: 400, headers });
   }
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return releaseLegacy(auth.principal.workspaceKey, documentId);
   const attemptKey = typeof body.attemptKey === "string" ? body.attemptKey : "";
   const fileKey = typeof body.fileKey === "string" ? body.fileKey : "";
   if (!ATTEMPT_KEY_PATTERN.test(attemptKey) || !FILE_KEY_PATTERN.test(fileKey)) {
@@ -51,6 +53,30 @@ export async function POST(request: Request) {
   const released = await cancelFoundationIntakeApprovedFile({
     workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId,
     attemptKey, fileKey, documentId, reasonCode: "UPLOAD_TRANSFER_FAILED",
+  });
+  if (!released.ok) return NextResponse.json({ code: released.code }, { status: 503, headers });
+  return NextResponse.json({ code: "UPLOAD_CREDITS_RELEASED", result: released.result }, { headers });
+}
+
+/*
+  The approval lineage is off (lib/intake-approval-rollout.ts): main dbe22b1e's release, unchanged.
+  The per-file hold settle_foundation_compute_v3 created is returned once nothing was stored.
+*/
+async function releaseLegacy(workspaceKey: string, documentId: string) {
+  const signer = readR2SignerEnv();
+  if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers });
+  const object = await headFoundationQuarantineObject(signer, workspaceKey, documentId);
+  if (!object.ok) return NextResponse.json({ code: object.code }, { status: 503, headers });
+  if (object.exists) {
+    return NextResponse.json({ code: "UPLOAD_ALREADY_STORED" }, { status: 409, headers });
+  }
+
+  const released = await settleFoundationCompute({
+    workspaceKey,
+    documentId,
+    outcome: "released",
+    actualCredits: 0,
+    reasonCode: "UPLOAD_TRANSFER_FAILED",
   });
   if (!released.ok) return NextResponse.json({ code: released.code }, { status: 503, headers });
   return NextResponse.json({ code: "UPLOAD_CREDITS_RELEASED", result: released.result }, { headers });

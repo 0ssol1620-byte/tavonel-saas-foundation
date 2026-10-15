@@ -6,11 +6,15 @@ import {
   readFoundationIntakeApproval,
 } from "@/lib/compute-reservation";
 import { ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_DISABLED" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
   const auth = await authorizeFoundationRequest(request, "documents:intake", "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
   const parsed = await readBoundedJson(request, 1024);

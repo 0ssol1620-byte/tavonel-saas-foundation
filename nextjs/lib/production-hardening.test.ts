@@ -37,7 +37,7 @@ describe("2026-09-05 production hardening", () => {
     const triageReview = workspace.replace(/\/\*[\s\S]*?\*\//g, "").match(/<IntakeTriageReview\b[\s\S]*?\n\s*\/>/)?.[0];
     expect(triageReview).toBeDefined();
     expect(triageReview).toContain("disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen}");
-    expect(triageReview).toContain("onLegacyFallback={() => void startStagedCompile()}");
+    expect(triageReview).toContain("onLegacyFallback={(approvalLineage) => void startStagedCompile(approvalLineage)}");
     expect(triageReview).toContain("onProcessingApproval={startTriageCompile}");
     expect(workspace).toContain("Compile one or more ready sources");
     expect(workspace).not.toContain("Compile at least two ready sources");

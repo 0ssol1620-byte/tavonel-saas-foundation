@@ -5,8 +5,8 @@
  */
 export const INTAKE_TRIAGE_ROLLOUT_ENABLED = false;
 
-export function intakeTriageDisabledResponse() {
-  return Response.json({ code: "INTAKE_TRIAGE_DISABLED" }, {
+export function intakeTriageDisabledResponse(extra: Record<string, unknown> = {}) {
+  return Response.json({ code: "INTAKE_TRIAGE_DISABLED", ...extra }, {
     status: 404,
     headers: { "Cache-Control": "no-store" },
   });

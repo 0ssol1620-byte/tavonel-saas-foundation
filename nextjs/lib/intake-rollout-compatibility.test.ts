@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   sessionProduct: vi.fn(), signatureCheck: vi.fn(), trialReuse: vi.fn(), sourceIdempotency: vi.fn(),
 }));
 
+// These cases run the whole-set approval lineage; its rollout-off path is pinned in
+// lib/intake-approval-rollout-off.test.ts.
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 vi.mock("@/lib/intake-triage-rollout", () => ({
   INTAKE_TRIAGE_ROLLOUT_ENABLED: false,
   intakeTriageDisabledResponse: () => Response.json({ code: "INTAKE_TRIAGE_DISABLED" }, { status: 404 }),

@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ config: vi.fn(), request: vi.fn(), fingerprint: vi.fn() }));
 
+// These cases run the whole-set approval lineage; its rollout-off path is pinned in
+// lib/intake-approval-rollout-off.test.ts.
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 vi.mock("@/lib/intake-triage-rollout", () => ({ INTAKE_TRIAGE_ROLLOUT_ENABLED: false }));
 vi.mock("@/lib/supabase-admin", () => ({ readSupabaseAdminConfig: mocks.config, supabaseAdminRequest: mocks.request }));
 vi.mock("@/lib/usage-pricing", () => ({ intakePricingFingerprint: mocks.fingerprint }));
 
 import { assertFoundationIntakeCompileSet } from "./compute-reservation";
 
-describe("disabled triage compile compatibility", () => {
+describe("disabled triage compile compatibility (approval lineage on)", () => {
   it("runs the baseline compile-set RPC without requiring the versioned triage RPC", async () => {
     mocks.config.mockReturnValue({ endpoint: "synthetic" });
     mocks.request.mockResolvedValue(new Response(JSON.stringify({ allowed: true, approvalRequired: false }), {

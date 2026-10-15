@@ -1818,10 +1818,10 @@ const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}(
 // the recompile scene stylesheet, the three suites for scenes this owner already holds, the consent reveal suite and five
 // public specs (pricing-plan-overview reveals the card before refusing it). The Explore and workspace audit specs changed
 // only to start from a stored consent refusal now that the card appears after 8 s. dialog-focus-audit runs in the audit
-// project. explore-guided-entry and failure-states-audit are owned here without a browser row: the shared project map admits
-// Explore only as explore.spec.ts in 1440, and failure-states-audit's three workspace-intake cases still look for the
-// pre-triage 'Approve maximum & upload' preflight control, which this branch moved behind the triage review (unrelated to
-// Release 2; open debt for the workspace intake owner, measured failing on the merged build).
+// project. explore-guided-entry is owned here without a browser row: the shared project map admits Explore only as
+// explore.spec.ts in 1440. failure-states-audit has its browser row again (audit, audit-768, audit-1280, as its
+// Playwright width list declares): since the PR #141 fix of 2026-10-16 its workspace-intake cases open the source review
+// first, then take the 'Approve maximum & upload' fallback, on both the per-file and the whole-set approval path.
 export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/evaluation/opengraph-image.tsx",
   "nextjs/app/how-it-works/opengraph-image.tsx",
@@ -1923,6 +1923,7 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
   "e2e/detail-integrity.spec.ts",
   "e2e/dialog-focus-audit.spec.ts",
   "e2e/evidence-first.spec.ts",
+  "e2e/failure-states-audit.spec.ts",
   "e2e/hero-four-stage-restoration.spec.ts",
   "e2e/hero-home-responsive.spec.ts",
   "e2e/home-evidence-line.spec.ts",

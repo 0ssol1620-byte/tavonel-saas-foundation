@@ -1059,6 +1059,8 @@ test('selected browser files route to projects that discover and execute them', 
   ]);
   assert.deepEqual(planBrowserRuns(['e2e/failure-states-audit.spec.ts'], false), [
     { kind: 'project', project: 'audit', files: ['e2e/failure-states-audit.spec.ts'] },
+    { kind: 'project', project: 'audit-768', files: ['e2e/failure-states-audit.spec.ts'] },
+    { kind: 'project', project: 'audit-1280', files: ['e2e/failure-states-audit.spec.ts'] },
   ]);
   assert.deepEqual(planBrowserRuns(['e2e/marketing-consent.spec.ts'], false), [
     { kind: 'project', project: '1440', files: ['e2e/marketing-consent.spec.ts'] },

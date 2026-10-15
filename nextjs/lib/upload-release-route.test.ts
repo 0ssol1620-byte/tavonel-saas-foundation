@@ -7,6 +7,9 @@ const { authorize, cancel, readApproval, head } = vi.hoisted(() => ({
   head: vi.fn(),
 }));
 
+// These cases run the whole-set approval lineage; its rollout-off path is pinned in
+// lib/intake-approval-rollout-off.test.ts.
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
 vi.mock("@/lib/compute-reservation", () => ({ cancelFoundationIntakeApprovedFile: cancel, readFoundationIntakeApproval: readApproval }));
 vi.mock("@/lib/r2-synthetic-canary", () => ({

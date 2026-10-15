@@ -10,6 +10,7 @@ import { FOUNDATION_TRIAL_INTAKE_MAX_BYTES } from "@/lib/r2-presign";
 import { presignFoundationTriageStagingPut } from "@/lib/r2-presign";
 import { readR2SignerEnv, FOUNDATION_TRIAGE_MAX_SOURCE_BYTES } from "@/lib/r2-synthetic-canary";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED, intakeTriageDisabledResponse } from "@/lib/intake-triage-rollout";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +29,10 @@ function safeRelativePath(value: unknown): value is string {
 }
 
 export async function POST(request: Request) {
-  if (!INTAKE_TRIAGE_ROLLOUT_ENABLED) return intakeTriageDisabledResponse();
+  // The workspace's fallback reads `intakeApproval`: off, it uploads file by file as main does.
+  if (!INTAKE_TRIAGE_ROLLOUT_ENABLED) {
+    return intakeTriageDisabledResponse({ intakeApproval: INTAKE_APPROVAL_ROLLOUT_ENABLED ? "enabled" : "disabled" });
+  }
   if (!activationPolicy.customerIntake.enabled) {
     return NextResponse.json({ code: "INTAKE_DISABLED", reason: activationPolicy.customerIntake.reason }, { status: 503, headers: NO_STORE });
   }

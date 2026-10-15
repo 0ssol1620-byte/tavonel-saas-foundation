@@ -17,6 +17,7 @@ import { readReadyUploadTriage } from "@/lib/intake-triage-server";
 import { ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
 import { intakePricingFingerprint } from "@/lib/usage-pricing";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -57,6 +58,52 @@ const RPC_ERRORS: Array<[string, string, number]> = [
   ["foundation_intake_source_digest_conflict", "SOURCE_DIGEST_CONFLICT", 409],
   ["foundation_intake_source_digest_invalid", "INVALID_SOURCE_DIGEST", 400],
 ];
+
+/*
+  The approval lineage is off (lib/intake-approval-rollout.ts): main dbe22b1e's confirmation,
+  unchanged -- confirm_foundation_intake_admission, which production has today.
+*/
+async function confirmLegacyAdmission(value: {
+  workspaceKey: string;
+  documentId: string;
+  userId: string;
+  sourceSha256: string | null;
+  observedBytes: number | null;
+  observedMime: string | null;
+}) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "INTAKE_CONFIRMATION_NOT_CONFIGURED", status: 503 };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/confirm_foundation_intake_admission", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: value.workspaceKey,
+        p_document_id: value.documentId,
+        p_user_id: value.userId,
+        p_source_sha256: value.sourceSha256,
+        p_observed_bytes: value.observedBytes,
+        p_observed_mime: value.observedMime,
+      }),
+    });
+  } catch {
+    return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 };
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: unknown } | null;
+    const message = typeof body?.message === "string" ? body.message : "";
+    const mapped = RPC_ERRORS.find(([needle]) => message.includes(needle));
+    return mapped
+      ? { ok: false as const, code: mapped[1], status: mapped[2] }
+      : { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 };
+  }
+  const result = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!result || result.documentId !== value.documentId || result.status !== "confirmed"
+    || typeof result.confirmedAt !== "string" || !Number.isFinite(Date.parse(result.confirmedAt))) {
+    return { ok: false as const, code: "INTAKE_CONFIRMATION_RECEIPT_INVALID", status: 503 };
+  }
+  return { ok: true as const, result };
+}
 
 async function confirmAdmission(value: {
   workspaceKey: string; documentId: string; userId: string; attemptKey: string; scopeDigest: string; fileKey: string;
@@ -119,6 +166,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INVALID_SOURCE_DIGEST" }, { status: 400, headers });
   }
   const sourceSha256 = typeof body.sourceSha256 === "string" ? body.sourceSha256 : null;
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return confirmLegacy(auth.principal, documentId, sourceSha256);
   const attemptKey = typeof body.attemptKey === "string" ? body.attemptKey : "";
   const scopeDigest = typeof body.scopeDigest === "string" ? body.scopeDigest : "";
   const fileKey = typeof body.fileKey === "string" ? body.fileKey : "";
@@ -262,4 +310,70 @@ export async function POST(request: Request) {
   if (!confirmed.ok) return NextResponse.json({ code: confirmed.code }, { status: confirmed.status, headers });
 
   return NextResponse.json({ code: "UPLOAD_CONFIRMED", result: confirmed.result, approvedFile: confirmed.approvedFile }, { headers });
+}
+
+/*
+  main dbe22b1e's confirmation after the body is read, verbatim, for when the approval lineage is
+  off: the digest may be absent (a page without a secure context cannot compute one) and is
+  recorded as absent, and nothing is checked against an approval that does not exist.
+*/
+async function confirmLegacy(principal: { workspaceKey: string; userId: string }, documentId: string, sourceSha256: string | null) {
+  // Approval may be revoked after a short-lived capability was issued.
+  if (!await canAdmitCustomerSource(principal.workspaceKey, "direct_upload")) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers });
+  }
+
+  const signer = readR2SignerEnv();
+  if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers });
+  const object = await headFoundationQuarantineObject(signer, principal.workspaceKey, documentId);
+  if (!object.ok) return NextResponse.json({ code: object.code }, { status: 503, headers });
+  if (!object.exists) return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+
+  // The 512-byte signature check, fail closed on an unreadable prefix (see POST above).
+  const signature = await headFoundationQuarantineSignature(signer, principal.workspaceKey, documentId);
+  if (!signature.ok) return NextResponse.json({ code: signature.code }, { status: 503, headers });
+  if (!signature.exists) {
+    return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+  }
+  const verdict = verifySourceSignature(object.contentType, signature.bytes);
+  if (!verdict.ok) return NextResponse.json({ code: verdict.code }, { status: 415, headers });
+
+  // Free evaluation's exact-content reuse gate, before the admission is confirmed (see POST above).
+  const access = await authorizeFoundationSessionProduct(principal.workspaceKey, principal.userId, "observer");
+  if (!access.ok) return NextResponse.json({ code: access.code }, { status: access.status, headers });
+  if (access.access.source === "trial") {
+    if (!sourceSha256) {
+      return NextResponse.json({ code: "SOURCE_DIGEST_REQUIRED" }, { status: 400, headers });
+    }
+    const assessed = await assessTrialSourceReuse({
+      workspaceKey: principal.workspaceKey,
+      userId: principal.userId,
+      documentId,
+      sourceSha256,
+    });
+    if (!assessed.ok) {
+      return NextResponse.json(
+        { code: assessed.code },
+        {
+          status: assessed.code === "TRIAL_SOURCE_REVIEW_REQUIRED" ? 429 : 503,
+          headers: {
+            ...headers,
+            ...(assessed.code === "TRIAL_SOURCE_REVIEW_REQUIRED" ? { "Retry-After": "86400" } : {}),
+          },
+        },
+      );
+    }
+  }
+
+  const confirmed = await confirmLegacyAdmission({
+    workspaceKey: principal.workspaceKey,
+    documentId,
+    userId: principal.userId,
+    sourceSha256,
+    observedBytes: object.sizeBytes,
+    observedMime: object.contentType,
+  });
+  if (!confirmed.ok) return NextResponse.json({ code: confirmed.code }, { status: confirmed.status, headers });
+
+  return NextResponse.json({ code: "UPLOAD_CONFIRMED", result: confirmed.result }, { headers });
 }

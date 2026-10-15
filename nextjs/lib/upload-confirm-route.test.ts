@@ -27,6 +27,9 @@ const { authorize, authorizeSession, gate, head, headSignature, assessSource, ad
     fingerprint: vi.fn(),
   }));
 
+// These cases run the whole-set approval lineage; its rollout-off path is pinned in
+// lib/intake-approval-rollout-off.test.ts.
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
 vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: gate }));
 vi.mock("@/lib/self-service-trial", () => ({ authorizeFoundationSessionProduct: authorizeSession }));

@@ -10,6 +10,7 @@ import {
 } from "./intake-approval";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "./intake-triage-rollout";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
 import { intakePricingFingerprint, quoteCompilePages, type IntakePageBasis } from "./usage-pricing";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -327,6 +328,9 @@ export async function finishFoundationIntakeTriageStage(value: {
 }
 
 async function approvalRpc(path: string, payload: Record<string, unknown>): Promise<{ ok: true; json: unknown } | ApprovalRpcFailure> {
+  // The one door every approval and triage RPC goes through. With the lineage off nothing passes
+  // it, so no request can reach a function the production database does not have.
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return { ok: false, code: "INTAKE_APPROVAL_DISABLED", status: 404 };
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false, code: "COMPUTE_LEDGER_NOT_CONFIGURED", status: 503 };
   let response: Response;
@@ -339,9 +343,10 @@ async function approvalRpc(path: string, payload: Record<string, unknown>): Prom
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { message?: unknown; code?: unknown } | null;
     const message = typeof body?.message === "string" ? body.message : "";
-    if (path === "read_foundation_intake_approval_v2"
-      && ((body?.code === "PGRST202" || body?.code === "42883")
-        || /function .*read_foundation_intake_approval_v2.* does not exist/i.test(message))) {
+    // A function this database does not have (PostgREST PGRST202, Postgres 42883) means the
+    // lineage's migrations were not applied. Say that, rather than report a ledger outage.
+    if (body?.code === "PGRST202" || body?.code === "42883"
+      || new RegExp(`function .*${path}.* does not exist`, "i").test(message)) {
       return { ok: false, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 };
     }
     return { ok: false, ...approvalErrorCode(message) };
@@ -440,6 +445,9 @@ export async function assertFoundationIntakeCompileSet(value: {
   userId: string;
   documentIds: string[];
 }): Promise<{ ok: true } | ApprovalRpcFailure> {
+  // main's compile path has no approval gate, and with the lineage off there is no approval to
+  // check: the set is admitted exactly as before, without a database call.
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return { ok: true };
   if (!validPrincipal(value.workspaceKey, value.userId) || value.documentIds.length < 1
     || value.documentIds.some((id) => !UUID.test(id)) || new Set(value.documentIds).size !== value.documentIds.length) {
     return { ok: false, code: "INTAKE_APPROVAL_COMPILE_SET_INVALID", status: 400 };
@@ -478,13 +486,19 @@ export async function readFoundationIntakeApproval(value: {
     p_user_id: value.userId,
     p_attempt_key: value.attemptKey,
   };
-  // Read through the lineage-aware RPC even while the feature flag is off. A prior triage
-  // approval remains privileged state in a mixed deployment and must not be mistaken for a
-  // legacy approval by the capability/confirm fallback routes.
-  const called = await approvalRpc("read_foundation_intake_approval_v2", payload);
+  /*
+    The lineage-aware read (v2) exists only in the triage draft (supabase/drafts/migrations/
+    20261004120000, never applied), so it is called only with triage on -- which cannot be enabled
+    before that draft becomes a reviewed migration. With triage off the approval migration's own
+    read (20261003120000) answers. It carries no triage lineage, and no triage approval can exist
+    in a database the triage migration never reached.
+  */
+  const called = await approvalRpc(INTAKE_TRIAGE_ROLLOUT_ENABLED
+    ? "read_foundation_intake_approval_v2" : "read_foundation_intake_approval", payload);
   if (!called.ok) return called;
   const envelope = called.json as Record<string, unknown> | null;
-  if (called.json === null || typeof called.json !== "object" || envelope?.triageLineageVersion !== 1) {
+  if (called.json === null || typeof called.json !== "object"
+    || (INTAKE_TRIAGE_ROLLOUT_ENABLED && envelope?.triageLineageVersion !== 1)) {
     return { ok: false, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 };
   }
   const result = readApprovalPayload(called.json);

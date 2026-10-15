@@ -67,10 +67,13 @@ async function expectNoGlobalUploadDenial(page: Page) {
   await expect(page.locator("body")).not.toContainText(/Nothing (?:has been|was|is) uploaded|No (?:file )?bytes have been (?:uploaded|transferred)/i);
 }
 
+// These fallback cases exercise the whole-set approval, so the disabled reply says the approval
+// lineage is on. With it off (the production default) the fallback is main's per-file upload,
+// covered by e2e/failure-states-audit.spec.ts.
 async function disabledTriage(page: Page, onRequest?: (route: Route) => void) {
   await page.route("**/api/v1/uploads/triage/stage", async route => {
     onRequest?.(route);
-    await route.fulfill({ status: 404, json: { code: "INTAKE_TRIAGE_DISABLED" } });
+    await route.fulfill({ status: 404, json: { code: "INTAKE_TRIAGE_DISABLED", intakeApproval: "enabled" } });
   });
 }
 
@@ -745,7 +748,7 @@ test("changing the selected source while staging is delayed ignores the old resp
       firstFinished();
       return;
     }
-    await route.fulfill({ status: 404, json: { code: "INTAKE_TRIAGE_DISABLED" } });
+    await route.fulfill({ status: 404, json: { code: "INTAKE_TRIAGE_DISABLED", intakeApproval: "enabled" } });
   });
   await selectPdf(page, "scan-a.pdf");
   await page.getByRole("button", { name: "Review sources before processing" }).click();

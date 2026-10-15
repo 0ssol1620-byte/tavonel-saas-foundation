@@ -43,6 +43,7 @@ import {
   type IntakeAttemptRecord,
 } from "@/lib/intake-approval";
 import type { TriageProcessingQuote } from "@/lib/intake-triage-client";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { collectDroppedWorkspaceFiles, prepareWorkspaceSelection, type WorkspaceSelection, type WorkspaceUploadFile } from "@/lib/workspace-intake";
 import { qualifiedDocumentInputs, sourceFamilyChips, uploadAcceptAttribute, validateQualifiedDocumentInput, normalizeDocumentMimeType } from "@/lib/qualified-input";
 import { runBounded } from "@/lib/concurrent";
@@ -299,6 +300,8 @@ function readWorkspaceLocation(): { surface: WorkspaceSurface; tab: WorkspaceTab
 export default function WorkspacePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+  /** Distinguishes two uploads of the same file in one session (the per-file path below). */
+  const uploadSeq = useRef(0);
   const [notice, setNotice] = useState<string | null>(null);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
@@ -1166,6 +1169,168 @@ export default function WorkspacePage() {
   const patchUpload = (localId: string, patch: Partial<LocalUpload>) =>
     setUploads((current) => current.map((item) => (item.localId === localId ? { ...item, ...patch } : item)));
 
+  /*
+    The per-file upload main dbe22b1e ships, unchanged except for its name and for carrying the
+    limit a refusal states. It runs whenever the whole-set approval lineage is off
+    (lib/intake-approval-rollout.ts) -- the production default -- because then the server answers
+    capability, confirm and release exactly as main does: each file reserves its own compute, and
+    no approval exists to reference.
+  */
+  const uploadLegacyDocument = async (file: File, manageBusy = true, onRefusal?: (reason: string) => void): Promise<string | null> => {
+    if (!intakeOpen) { setNotice(intakeClosedCopy); onRefusal?.(intakeClosedCopy); return null; }
+    const sourceLabel = (file as WorkspaceUploadFile).tavonelRelativePath || file.name;
+    if (manageBusy) setBusy(true);
+    // The id is local until the capability call returns one. The board needs a row immediately,
+    // because issuing the capability is itself a wait the visitor should be able to see.
+    const localId = `local-${file.name}-${file.size}-${uploadSeq.current++}`;
+    /*
+      Every refusal path below already wrote its reason onto the upload row; `refuse` is that same
+      write with a second reader. The reason existed and was reachable -- it was on the board and in
+      a notice this function set -- and then the batch summary overwrote the one notice slot
+      milliseconds later, so the sentence that survived was a count. A visitor over the file ceiling
+      was told one file did not upload and never told it was too large, which is the only fact that
+      says what to do next.
+    */
+    const refuse = (reason: string) => {
+      patchUpload(localId, { phase: "failed", reason });
+      onRefusal?.(reason);
+    };
+    setUploads((current) => [
+      ...current,
+      { localId, filename: sourceLabel, bytes: file.size, documentId: null, phase: "issuing", loaded: 0 },
+    ]);
+    try {
+      const client = getSupabaseBrowserClient();
+      if (!client) {
+        refuse("not signed in");
+        setNotice("Sign in with Google first.");
+        return null;
+      }
+      const { data } = await client.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        refuse("not signed in");
+        setNotice("Sign in with Google first.");
+        return null;
+      }
+      const capability = await fetch("/api/uploads/capability", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          originalFilename: file.name,
+          declaredMimeType: file.type || "application/pdf",
+          requestedBytes: file.size,
+          estimatedPages: estimateBillablePages({
+            bytes: file.size,
+            mimeType: file.type || "application/pdf",
+          })?.pages,
+        }),
+      });
+      const json = await capability.json() as { code?: string; documentId?: string; uploadUrl?: string; declaredMimeType?: string; limit?: unknown };
+      if (!capability.ok || !json.uploadUrl) {
+        if (json.code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
+        // The code, and the limit when the refusal names one (a processing-ceiling 413 does).
+        const why = `${failureSentence(json.code, capability.status)}${typeof json.limit === "string" ? ` ${json.limit}` : ""}`;
+        refuse(why);
+        setNotice(`Upload was not issued. ${why}`);
+        return null;
+      }
+
+      /*
+       * The PUT moved from `fetch` to `XMLHttpRequest` for one reason: fetch cannot report upload
+       * progress, so a large scan was a frozen button for as long as it took. These are bytes the
+       * transport acknowledged on the way to the quarantine bucket -- the application server is
+       * not in this path, and showing the transfer did not put it there.
+       */
+      patchUpload(localId, { documentId: json.documentId ?? null, phase: "sending", loaded: 0 });
+      // The one moment both halves exist in the same scope: the id the server just issued, and
+      // the name the visitor picked the file by.
+      if (json.documentId) setNames(rememberDocumentName(json.documentId, sourceLabel));
+      const transfer = putWithProgress(
+        json.uploadUrl,
+        file,
+        json.declaredMimeType ?? file.type,
+        ({ loaded }) => patchUpload(localId, { loaded }),
+      );
+      const result = await transfer.done;
+      if (!result.ok) {
+        const reason = result.reason === "http"
+          ? `secure upload failed (${result.status})`
+          : result.reason === "aborted" ? "transfer cancelled" : "network did not complete the transfer";
+        if (json.documentId) {
+          const client = getSupabaseBrowserClient();
+          const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+          const token = data.session?.access_token;
+          if (token) {
+            await fetch("/api/uploads/release", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+              body: JSON.stringify({ documentId: json.documentId }),
+            }).catch(() => undefined);
+          }
+        }
+        refuse(reason);
+        setNotice(`${reason}. The file never entered the app server.`);
+        return null;
+      }
+      if (json.documentId) {
+        /*
+         * The digest travels with the confirmation, taken by SubtleCrypto over the very bytes the
+         * transfer sent. It is what lets the server compare the stored object against the
+         * capability it issued without downloading the source back onto the application server --
+         * which is how free evaluation used to be fingerprinted, through a 5 MiB-capped read that
+         * refused every larger trial upload with a 503 the board showed as "needs review".
+         *
+         * A page served without a secure context has no SubtleCrypto and reports null; the server
+         * records that as absent rather than inventing one, and refuses the trial gate outright
+         * instead of quietly skipping it.
+         */
+        const confirmed = await fetch("/api/uploads/confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            documentId: json.documentId,
+            ...(result.sourceSha256 ? { sourceSha256: result.sourceSha256 } : {}),
+          }),
+        });
+        if (!confirmed.ok) {
+          // "Needs review" was the wrong word for every one of these: confirmation refuses with a
+          // typed code, and calling that a review invented a queue nobody is working. Say the
+          // code, and say that the source stops here until it succeeds.
+          const failure = await confirmed.json().catch(() => null) as { code?: string } | null;
+          const code = failure?.code ?? `HTTP ${confirmed.status}`;
+          if (code === "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE") setCustomerDataAccess("closed");
+          refuse(failureSentence(code, confirmed.status));
+          setNotice(`${file.name} reached storage but was not confirmed. ${failureSentence(code, confirmed.status)} It is not queued for processing.`);
+          await loadDocuments();
+          return json.documentId;
+        }
+      }
+      patchUpload(localId, { phase: "stored", loaded: file.size });
+      // Stored, not issued: a capability that was never transferred is not a source.
+      trackFunnelOnce("workspace_first_source_added", { mode: "upload" });
+
+      /*
+       * What finished is the transfer, and that is all this may claim.
+       *
+       * It used to announce that TAVONEL was preparing and reading the source the moment the PUT
+       * returned -- before the CDR worker had seen the object, and regardless of whether it would
+       * refuse it seconds later. For everything above the processing ceiling that sentence was
+       * simply false, and it was the last thing the customer was told before the row went quiet.
+       * The board is now the place an outcome appears, because it is the only place that reads
+       * one, so this points there instead of guessing.
+       */
+      setNotice(activationPolicy.cdr.enabled && activationPolicy.ocrGpu.enabled
+        ? `${file.name} reached quarantine storage. Preparation has started; the source pipeline shows whether it is accepted or refused.`
+        : `${file.name} reached quarantine storage. This source needs operator review before reading can continue.`);
+      await loadDocuments();
+      return json.documentId ?? null;
+    } finally {
+      if (manageBusy) setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   const sessionToken = async () => {
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -1570,9 +1735,50 @@ export default function WorkspacePage() {
    * failure and silently abandoned the rest; the ones already in the bucket are still there and
    * still being read, so the report now names the failure and keeps going.
    */
-  const uploadDocuments = async (files: File[], measured = stagedPageCounts, triageApproval?: { quote: TriageProcessingQuote }): Promise<true | "stale" | "uncertain" | undefined> => {
+  // main's batch over the per-file upload above, for when the approval lineage is off.
+  const uploadLegacyDocuments = async (files: File[]) => {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
+    setBusy(true);
+    setCollectionResult(null);
+    clearWorldState();
+    try {
+      setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
+      const refusals: string[] = [];
+      const settled = await runBounded(files, UPLOAD_CEILING, (file) =>
+        uploadLegacyDocument(file, false, (reason) => { refusals.push(reason); }));
+      const ids = settled.flatMap((result) => (result.ok && result.value ? [result.value] : []));
+      const lost = files.length - ids.length;
+      if (lost > 0) {
+        // Deduplicated: twenty files over the same ceiling is one fact, not twenty sentences.
+        const why = [...new Set(refusals)].join("; ");
+        setNotice(`${ids.length} of ${files.length} files uploaded. ${lost} did not, and nothing was retried automatically.${why ? ` Why: ${why}.` : ""}`);
+      }
+      /*
+        One uploaded file is a compile.
+
+        This gate compared the uploaded count against two, the last place the old floor
+        survived. The route accepts one, the compiler accepts one, and the preflight panel
+        offers one -- and then a visitor who dropped a single PDF watched it upload, sanitize
+        and read, and nothing happened. No error: the batch simply ended. Judging the set with
+        the shared verdict means this path cannot drift from the route again.
+      */
+      if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadDocuments = async (
+    files: File[],
+    measured = stagedPageCounts,
+    triageApproval?: { quote: TriageProcessingQuote },
+    approvalLineage = INTAKE_APPROVAL_ROLLOUT_ENABLED,
+  ): Promise<true | "stale" | "uncertain" | undefined> => {
+    if (files.length === 0) return;
+    if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
+    // No whole-set approval to create: upload file by file, exactly as main does.
+    if (!approvalLineage && !triageApproval) { await uploadLegacyDocuments(files); return; }
     setBusy(true);
     setCollectionResult(null);
     clearWorldState();
@@ -1722,11 +1928,18 @@ export default function WorkspacePage() {
             setNotice("The quote or receipt was rejected, but the saved attempt could not be safely cleared. Keep it for reconciliation; do not submit another approval until status is confirmed.");
             return "uncertain";
           }
+          /*
+            A refused intake says why, and what it did not do (main's guarantee). The refusal came
+            before any capability was issued, so no byte of this set moved -- unless triage had
+            already sealed it for inspection, the one case that may not say "nothing was uploaded".
+          */
+          const nothingUploaded = triageApproval ? "" : " Nothing was uploaded.";
+          const why = ` Why: ${failureSentence(submitted.code, submitted.status)}${submitted.limit ? ` ${submitted.limit}` : ""}`;
           setNotice(submitted.code === "INTAKE_PRICE_STALE"
-            ? "Pricing changed since this estimate. This approval request was rejected. Review the refreshed maximum and approve again."
+            ? `Pricing changed since this estimate. This approval request was rejected.${nothingUploaded} Review the refreshed maximum and approve again.`
             : submitted.code === "INTAKE_APPROVAL_AGGREGATE_MISMATCH"
-              ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. This approval request was rejected. Review and approve the refreshed quote again.`
-              : "This approval request for the complete set was rejected. Review the reason and retry the complete set.");
+              ? `The server recalculated this set's maximum as ${formatUsd(typeof submitted.quote?.maximumUsd === "number" ? submitted.quote.maximumUsd : Number.NaN)}. This approval request was rejected.${nothingUploaded} Review and approve the refreshed quote again.`
+              : `This approval request for the complete set was rejected. Review the reason and retry the complete set.${nothingUploaded}${why}`);
           return;
         }
       }
@@ -2028,7 +2241,8 @@ export default function WorkspacePage() {
 
   const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
 
-  const startStagedCompile = async () => {
+  // `approvalLineage` is the server's answer to the triage availability check (stage route).
+  const startStagedCompile = async (approvalLineage = INTAKE_APPROVAL_ROLLOUT_ENABLED) => {
     if (!stagedSelection?.files.length) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     // The button is already disabled for this, but the guard is what makes it a contract
@@ -2055,7 +2269,7 @@ export default function WorkspacePage() {
     */
     navigateSurface("sources");
 
-    await uploadDocuments(files, counts);
+    await uploadDocuments(files, counts, undefined, approvalLineage);
   };
 
   const startTriageCompile = async (quote: TriageProcessingQuote): Promise<"completed" | "stale" | "uncertain" | "blocked"> => {
@@ -2088,6 +2302,8 @@ export default function WorkspacePage() {
         return;
       }
       const proofFile = new File([bytes], "w3c-dummy.pdf", { type: "application/pdf" });
+      // main's proof path: one file, its own reservation, no compile.
+      if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) { await uploadLegacyDocument(proofFile); return; }
       const quote = quoteIntakeManifest([{ bytes: proofFile.size, mimeType: proofFile.type, claimedPages: null, claimedBasis: null }]);
       if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`)) return;
       await uploadDocuments([proofFile], null);
@@ -3013,7 +3229,7 @@ export default function WorkspacePage() {
                         const { data } = client ? await client.auth.getSession() : { data: { session: null } };
                         return data.session?.access_token ?? null;
                       }}
-                      onLegacyFallback={() => void startStagedCompile()}
+                      onLegacyFallback={(approvalLineage) => void startStagedCompile(approvalLineage)}
                       onProcessingApproval={startTriageCompile}
                     />
                     <button type="button" disabled={busy} onClick={() => { setStagedSelection(null); setStagedSelectionRevision(""); }}>Clear</button>

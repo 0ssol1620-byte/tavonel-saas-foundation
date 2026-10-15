@@ -516,7 +516,7 @@ export type ApprovalPostResult =
   | { kind: "approved"; approval: ApprovalPayload }
   | { kind: "not_found" }
   | { kind: "unavailable" }
-  | { kind: "rejected"; status: number; code: string | null; quote: Record<string, unknown> | null };
+  | { kind: "rejected"; status: number; code: string | null; quote: Record<string, unknown> | null; limit: string | null };
 
 /** Submit/replay the same attempt identity and reconcile every ambiguous reply by status. */
 export async function postApprovalAndReconcile(
@@ -533,6 +533,8 @@ export async function postApprovalAndReconcile(
         code: typeof reply.json.code === "string" ? reply.json.code : null,
         quote: reply.json.quote && typeof reply.json.quote === "object" && !Array.isArray(reply.json.quote)
           ? reply.json.quote as Record<string, unknown> : null,
+        // The processing-ceiling refusal states the limit; the notice repeats it.
+        limit: typeof reply.json.limit === "string" ? reply.json.limit : null,
       };
     }
     if (reply.kind === "answer" && reply.status >= 200 && reply.status < 300) {

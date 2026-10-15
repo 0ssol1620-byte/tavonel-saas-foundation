@@ -19,6 +19,7 @@ import {
 } from "@/lib/intake-approval";
 import { readReadyUploadTriage } from "@/lib/intake-triage-server";
 import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
 import {
   FOUNDATION_INTAKE_MAX_BYTES,
@@ -56,6 +57,8 @@ function refuse(code: string, status: number, extra: Record<string, unknown> = {
   shown a different maximum, or when the price it was shown under is no longer the price.
 */
 export async function POST(request: Request) {
+  // Off, there is no approval lineage to write to; the client uploads one file at a time instead.
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return refuse("INTAKE_APPROVAL_DISABLED", 404);
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json") || !Number.isFinite(contentLength) || contentLength > MAX_BODY_BYTES) {
@@ -209,6 +212,7 @@ export async function POST(request: Request) {
 
 /** The authoritative state of one attempt, for a reload or a lost reply. Read-only. */
 export async function GET(request: Request) {
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return refuse("INTAKE_APPROVAL_DISABLED", 404);
   const auth = await authorizeFoundationRequest(request, "documents:intake", "observer");
   if (!auth.ok) return refuse(auth.code, auth.status);
   const attemptKey = new URL(request.url).searchParams.get("attemptKey") ?? "";

@@ -33,17 +33,22 @@ const pdfFixture = (name = "audit-fixture.pdf") => ({
   buffer: Buffer.from("%PDF-1.7\n% audit fixture\n"),
 });
 
-/** Drive the intake to a refusal issued while approving the complete set. */
-async function refuseIntake(page: import("@playwright/test").Page, code: string, status = 400) {
-  await installFixtureSession(page);
-  await installWorkspaceRoutes(page);
-  // The server validates the full manifest and current quote before any capability or bytes move.
-  let approvalCalls = 0;
-  await page.route("**/api/uploads/approval", route => {
-    approvalCalls += 1;
-    return route.fulfill({ status, json: { code } });
-  });
+type Page = import("@playwright/test").Page;
 
+/**
+ * Select the fixture, open source review, and return the full-scope approval control.
+ *
+ * Production ships server triage off, so review answers INTAKE_TRIAGE_DISABLED and the panel falls
+ * back to "Approve maximum & upload". That reply also says whether the whole-set approval lineage
+ * exists (lib/intake-approval-rollout.ts). Off -- the production default -- the fallback uploads
+ * file by file through /api/uploads/capability, exactly as main dbe22b1e does; on, it asks
+ * /api/uploads/approval for the complete set first.
+ */
+async function openFallbackApproval(page: Page, approvalLineage: boolean) {
+  await page.route("**/api/v1/uploads/triage/stage", route => route.fulfill({
+    status: 404,
+    json: { code: "INTAKE_TRIAGE_DISABLED", intakeApproval: approvalLineage ? "enabled" : "disabled" },
+  }));
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".workspace-intake")).toHaveAttribute("data-inventory-state", "ready");
   await page.locator('input[type="file"][multiple]').first().setInputFiles(pdfFixture());
@@ -60,23 +65,89 @@ async function refuseIntake(page: import("@playwright/test").Page, code: string,
     above a control that could never be pressed. Enabled is the assertion; the refusal this file
     is about cannot even be reached without it.
   */
-  await expect(
-    preflight.getByRole("button", { name: "Approve maximum & upload", exact: true }),
-    "an unknown-page set must still be explicitly approved at its full maximum",
-  ).toBeEnabled();
-  await preflight.getByRole("button", { name: "Approve maximum & upload", exact: true }).click();
+  const review = preflight.getByRole("button", { name: "Review sources before processing", exact: true });
+  await expect(review, "an unknown-page set must still be reviewable").toBeEnabled();
+  await review.click();
+  const approve = preflight.getByRole("button", { name: "Approve maximum & upload", exact: true });
+  await expect(approve, "an unknown-page set must still be explicitly approved at its full maximum").toBeEnabled();
+  return approve;
+}
+
+/** Drive the intake to a refusal issued by `/api/uploads/capability` (approval lineage off). */
+async function refuseIntake(page: Page, code: string, status = 400, extra: Record<string, unknown> = {}) {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+  // The server enforces the byte and page ceilings, so the refusal is mocked at the boundary it
+  // is issued from rather than by pushing a 5 MiB fixture through the browser.
+  let capabilityCalls = 0;
+  await page.route("**/api/uploads/capability", route => {
+    capabilityCalls += 1;
+    return route.fulfill({ status, json: { code, ...extra } });
+  });
+  // With the lineage off nothing may ask for a whole-set approval.
+  let approvalCalls = 0;
+  await page.route("**/api/uploads/approval**", route => {
+    approvalCalls += 1;
+    return route.fulfill({ status: 404, json: { code: "INTAKE_APPROVAL_DISABLED" } });
+  });
+  await (await openFallbackApproval(page, false)).click();
+  return () => ({ capability: capabilityCalls, approval: approvalCalls });
+}
+
+/** Drive the intake to a refusal issued while approving the complete set (approval lineage on). */
+async function refuseApproval(page: Page, code: string, status = 400, extra: Record<string, unknown> = {}) {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+  // The server validates the full manifest and current quote before any capability or bytes move.
+  let approvalCalls = 0;
+  await page.route("**/api/uploads/approval", route => {
+    approvalCalls += 1;
+    return route.fulfill({ status, json: { code, ...extra } });
+  });
+  await (await openFallbackApproval(page, true)).click();
   return () => approvalCalls;
 }
 
 test("a refused intake ends in a sentence and a usable control, not a spinner", async ({ page }) => {
-  const calls = await refuseIntake(page, "INTAKE_PRICE_STALE");
+  const calls = await refuseIntake(page, "INTAKE_FILE_TOO_LARGE");
+  const notice = page.locator("p.notice");
+  await expect(notice).toContainText("0 of 1 files uploaded");
+  // Honest about state: nothing was retried behind the visitor's back.
+  await expect(notice).toContainText("nothing was retried automatically");
+  expect(calls(), "the refusal was never requested").toEqual({ capability: 1, approval: 0 });
+  // Not a spinner: the intake's own control is back, at every width. The header's Upload button
+  // is not asserted here -- the topbar collapses below the desktop breakpoint and this check is
+  // about the state the intake is left in, not about which chrome renders it.
+  await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
+  await expect(page.getByText("Uploading & compiling…")).toHaveCount(0);
+});
+
+test("a refused intake says why", async ({ page }) => {
+  /*
+    Fixed at integration (stage 2 C7): the batch summary carries the per-file reasons, deduped,
+    so the sentence that survives says why and not only how many.
+  */
+  await refuseIntake(page, "INTAKE_FILE_TOO_LARGE");
+  await expect(page.locator("p.notice")).toContainText("INTAKE_FILE_TOO_LARGE", { timeout: 10_000 });
+});
+
+test("a processing-ceiling refusal names the code and the limit", async ({ page }) => {
+  const limit = "TAVONEL processes sources up to 50 MB and 80 pages.";
+  const calls = await refuseIntake(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { maxBytes: 52_428_800, maxPages: 80, limit });
+  const notice = page.locator("p.notice");
+  await expect(notice).toContainText("0 of 1 files uploaded", { timeout: 10_000 });
+  await expect(notice).toContainText("SOURCE_EXCEEDS_PROCESSING_CEILING");
+  await expect(notice).toContainText(limit);
+  expect(calls()).toEqual({ capability: 1, approval: 0 });
+  await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
+});
+
+test("a refused whole-set approval ends in a sentence and a usable control, not a spinner", async ({ page }) => {
+  const calls = await refuseApproval(page, "INTAKE_PRICE_STALE", 409);
   const notice = page.locator("p.notice");
   await expect(notice).toContainText("Pricing changed since this estimate");
   await expect(notice).toContainText("Nothing was uploaded");
   expect(calls(), "the approval refusal was never requested").toBe(1);
-  // Not a spinner: the intake's own control is back, at every width. The header's Upload button
-  // is not asserted here -- the topbar collapses below the desktop breakpoint and this check is
-  // about the state the intake is left in, not about which chrome renders it.
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
   await expect(page.getByText("Uploading & compiling…")).toHaveCount(0);
 });
@@ -86,11 +157,14 @@ test("a processing-ceiling refusal keeps the complete set out and leaves a retry
     The approval endpoint uses SOURCE_EXCEEDS_PROCESSING_CEILING (413) when a selected file is
     above the processor's supported byte/page ceiling. Keep this distinct from stale pricing.
   */
-  const calls = await refuseIntake(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413);
+  const limit = "TAVONEL processes sources up to 50 MB and 80 pages.";
+  const calls = await refuseApproval(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { index: 0, maxBytes: 52_428_800, maxPages: 80, limit });
   const notice = page.locator("p.notice");
-  await expect(notice).toContainText("The complete set was not approved.", { timeout: 10_000 });
+  await expect(notice).toContainText("This approval request for the complete set was rejected.", { timeout: 10_000 });
   await expect(notice).toContainText("Nothing was uploaded.");
   await expect(notice).toContainText("Review the reason and retry the complete set.");
+  await expect(notice).toContainText("SOURCE_EXCEEDS_PROCESSING_CEILING");
+  await expect(notice).toContainText(limit);
   expect(calls(), "the ceiling refusal was never returned by approval").toBe(1);
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
 });
@@ -184,12 +258,7 @@ test("native fetch sends capability and reads approval state after a lost capabi
     return route.fallback();
   });
 
-  await page.goto("/workspace", { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".workspace-intake")).toHaveAttribute("data-inventory-state", "ready");
-  await page.locator('input[type="file"][multiple]').first().setInputFiles(pdfFixture());
-  const preflight = page.getByRole("region", { name: "Compile preflight" });
-  await expect(preflight.getByRole("button", { name: "Approve maximum & upload", exact: true })).toBeEnabled();
-  await preflight.getByRole("button", { name: "Approve maximum & upload", exact: true }).click();
+  await (await openFallbackApproval(page, true)).click();
 
   await expect(page.locator("p.notice")).toContainText("Intake outcome is uncertain. Reselect the exact same files to recover status.", { timeout: 15_000 });
   expect(approvalPosts).toBe(1);

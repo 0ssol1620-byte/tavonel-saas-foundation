@@ -19,7 +19,8 @@ import {
 type Props = {
   files: TriageUploadFile[];
   getToken: () => Promise<string | null>;
-  onLegacyFallback: () => void;
+  /** Runs the fallback upload; `approvalLineage` is the server's answer from the triage check. */
+  onLegacyFallback: (approvalLineage: boolean) => void;
   initialEstimate: { minimumUsd: number; maximumUsd: number } | null;
   selectionRevision: string;
   disabled?: boolean;
@@ -127,6 +128,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
   const revisionRef = useRef(selectionRevision);
   const controllerRef = useRef<AbortController | null>(null);
   const fallbackGateRef = useRef(createLegacyFallbackGate());
+  const approvalLineageRef = useRef(false);
 
   const resetForFreshReceiptState = () => resetForFreshReceipt({
     setBatch, setApprovalId, setReview, setChoices, setReceipt, setProcessingQuote, setProcessingConsent,
@@ -140,6 +142,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
     busyRef.current = false;
     mountedRef.current = true;
     fallbackGateRef.current = createLegacyFallbackGate();
+    approvalLineageRef.current = false;
     setBatch(null);
     setApprovalId(null);
     setReview([]);
@@ -192,16 +195,17 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
       const result = await stageTriage(files, token, fetch, operation.controller.signal);
       if (!operationIsCurrent(operation)) return;
       if (result.kind === "disabled") {
+        approvalLineageRef.current = result.approvalLineage;
         fallbackGateRef.current.markDisabled();
         setLegacyFallbackPending(true);
         setNotice("Server triage is disabled. This availability check does not upload file bytes. Review the full-scope maximum below.");
         return;
       }
-      if (result.kind === "blocked") { setNotice(`Triage is blocked (${result.error.code}). No legacy fallback was used.`); return; }
+      if (result.kind === "blocked") { setNotice(`Triage is blocked (${result.error.code}). Nothing was uploaded, and no legacy fallback was used.`); return; }
       setBatch(result);
       setNotice(triageUploadNotice("inventory_staged"));
     } catch {
-      if (operationIsCurrent(operation)) setNotice("Triage could not be reached. No legacy fallback was used.");
+      if (operationIsCurrent(operation)) setNotice("Triage could not be reached. Nothing was uploaded, and no legacy fallback was used.");
     } finally {
       endOperation(operation);
     }
@@ -211,7 +215,7 @@ export default function IntakeTriageReview({ files, getToken, onLegacyFallback, 
     confirmLegacyFallback(fallbackGateRef.current, legacyFallbackPending, busyRef.current, () => {
       busyRef.current = true;
       setBusy(true);
-      onLegacyFallback();
+      onLegacyFallback(approvalLineageRef.current);
     });
   };
 
