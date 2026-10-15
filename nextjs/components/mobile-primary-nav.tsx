@@ -75,6 +75,10 @@ export default function MobilePrimaryNav({ korean = false, signedIn = false }: {
             aria-current={customerNavOwns(item.href, pathname) ? "page" : undefined}
             onClick={close}>{korean ? KO_CHROME.nav[item.href] ?? item.label : item.label}</a>
         ))}
+        {/* Brief move 6: below the desktop switch the header is wordmark + Menu, so Pricing is a row here. */}
+        <a className="mobile-nav-direct" href={korean ? "/ko/pricing" : "/pricing"}
+          aria-current={customerNavOwns("/pricing", pathname) ? "page" : undefined}
+          onClick={close}>{korean ? KO_CHROME.nav["/pricing"] : "Pricing"}</a>
         {/*
           BQ-059. The panel no longer repeats the header's action.
 

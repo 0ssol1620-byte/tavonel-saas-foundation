@@ -3,6 +3,7 @@ import type { Route } from "next";
 import {
   PublicSiteFooter,
   PublicSiteHeader,
+  SAMPLE_CTA,
 } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
@@ -36,7 +37,6 @@ import {
   type EvidenceCase,
   type EvidenceRegion,
 } from "@/lib/home-evidence-view";
-import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { KO_CHROME } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import {
@@ -234,7 +234,6 @@ export default function LandingPage({
     home && region.href ? (
       <Link key={region.id} className={heroStyles.diffLink} href={region.href as Route} prefetch={false}>
         {page.difficulty.open(regionMark(home, region))}
-        <span aria-hidden="true">↗</span>
       </Link>
     ) : null;
   const formats = korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats;
@@ -242,12 +241,12 @@ export default function LandingPage({
   /*
     A reader can inspect the sample before choosing a plan. The access action is resolved from
     the current commercial state rather than written here. While that state resolves to
-    `/contact`, the hero's access action is the document evaluation instead; the close keeps its
-    own separately authored CTA copy and the resolved access link in `./scenes/start`.
+    `/contact`, the hero's access action is the document evaluation instead. The close repeats
+    the sample action (`SAMPLE_CTA`, also the header's) beside its price link in `./scenes/start`.
   */
   const heroActions = {
-    exploreLabel: korean ? "공개 샘플 살펴보기" : "Explore the public sample",
-    exploreHref: EXPLORE_CTA.href,
+    exploreLabel: korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label,
+    exploreHref: SAMPLE_CTA.href,
   };
   const access = primaryCallToAction();
   const startActions = {
@@ -298,7 +297,6 @@ export default function LandingPage({
                 copy={{ ...copy.hero, headline: korean ? "내 문서. 연결된 지식." : "Your documents. Connected knowledge.", headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
-                showSupport={false}
               >
                 <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
@@ -468,9 +466,8 @@ export default function LandingPage({
           data={data.recompile}
           sectionId="s4"
           sceneIndex={4}
-          compact
         />
-        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} compact />
+        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
         <HomeReaderGuide korean={korean} faqOnly />
         <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
       </main>

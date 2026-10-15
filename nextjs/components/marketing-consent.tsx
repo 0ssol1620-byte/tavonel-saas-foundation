@@ -184,7 +184,13 @@ export default function MarketingConsent() {
     if (anchored) return null;
     return <button className={`${styles.settings} ${styles.floating}`} onClick={() => setEditing(true)}>{copy.settings}</button>;
   }
-  return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="">
+  // Escape closes the card as the refuse button does; reopened from the footer, it only closes.
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    if (consent === null) choose(false);
+    else setEditing(false);
+  };
+  return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="" onKeyDown={onKeyDown}>
     <div className={styles.inner}>
       <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
       <div className={styles.actions}>

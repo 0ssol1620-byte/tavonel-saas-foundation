@@ -5,8 +5,16 @@ import MobilePrimaryNav from "@/components/mobile-primary-nav";
 import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
-import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME } from "@/lib/site-navigation";
+import { BRAND_LINE, EXPLORE_CTA, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME } from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
+
+/**
+ * The one primary action, spelled once (brief 2026-10-15, move 1).
+ *
+ * The public sample is the action every reader can take today, so the header's filled button,
+ * the Home hero and the Home close all say this, in this colour. Read by `landing-page.tsx`.
+ */
+export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Explore the public sample", ko: "공개 샘플 살펴보기" } as const;
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -83,6 +91,10 @@ export function PublicSiteHeader({
           disclosure.
         */}
         {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
+        {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this. */}
+        <Link className={`btn ${chrome.cta}`} href={SAMPLE_CTA.href as Route} prefetch={false}>
+          {korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label}
+        </Link>
       </span>
     </header>
   );
