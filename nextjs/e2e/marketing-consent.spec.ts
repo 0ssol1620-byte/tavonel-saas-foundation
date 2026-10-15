@@ -2,17 +2,34 @@ const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/te
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
+/*
+  Release 2 (2026-10-15): the consent card is not on the first paint. It appears after the first
+  scroll past 200px or 8 s after mount, whichever comes first (CONSENT_REVEAL in
+  components/marketing-consent.tsx), and at once from the footer's Analytics preferences button.
+  GA still loads only after consent.
+*/
+const PANEL = { name: /^(Optional analytics|선택 분석)$/ };
+async function revealConsent(page: import("@playwright/test").Page) {
+  await page.evaluate(() => window.scrollTo(0, 300));
+  const panel = page.getByRole("region", PANEL);
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
 test("analytics remains optional, persists refusal, and fits the viewport", async ({ page }, testInfo) => {
   const googleRequests: string[] = [];
   page.on("request", request => {
     if (/google-analytics\.com|googletagmanager\.com/.test(request.url())) googleRequests.push(request.url());
   });
   const serverResponse = await page.request.get("/");
-  expect(await serverResponse.text(), "the server must reserve consent geometry before hydration")
-    .toContain('aria-label="Optional analytics"');
+  expect(await serverResponse.text(), "the prompt is not on the first paint")
+    .not.toContain("data-marketing-consent-panel");
   await page.goto("/");
-  const panel = page.getByRole("region", { name: "Optional analytics" });
-  await expect(panel).toBeVisible();
+  // (a) At scroll 0 and well under 8 s, no card.
+  await page.waitForTimeout(1_500);
+  await expect(page.getByRole("region", { name: "Optional analytics" })).toHaveCount(0);
+  // (b) After a scroll it appears at the bottom of the viewport.
+  const panel = await revealConsent(page);
   const bounds = await panel.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -22,6 +39,13 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   expect(bounds!.y + bounds!.height, "the card sits inside the viewport").toBeLessThanOrEqual(viewportHeight + 1);
   expect(bounds!.height, "the card is capped at 25% of the viewport").toBeLessThanOrEqual(viewportHeight * 0.25 + 1);
   expect(await page.evaluate(() => getComputedStyle(document.body).paddingBottom)).toBe("0px");
+  expect(bounds!.y + bounds!.height, "the card sits at the bottom").toBeGreaterThan(viewportHeight - 40);
+  if (page.viewportSize()!.width < 900) {
+    expect(bounds!.height, "the phone card is two rows, at most 96px").toBeLessThanOrEqual(96);
+  } else {
+    expect(bounds!.width, "the desktop card is at most 360px wide").toBeLessThanOrEqual(360);
+    expect(bounds!.x, "the desktop card sits bottom-left").toBeLessThanOrEqual(24);
+  }
   await testInfo.attach("analytics-choice", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
   await page.reload();
@@ -34,26 +58,21 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
 
 test("the consent notice never covers homepage or pricing actions at 1440, 390 and 360", async ({ page }, testInfo) => {
   test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "focused visual contract widths");
-  const intersects = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) => !(
-    a.y + a.height <= b.y || b.y + b.height <= a.y || a.x + a.width <= b.x || b.x + b.width <= a.x
-  );
   for (const route of ["/", "/pricing"]) {
     await page.goto(route);
     const panel = page.getByRole("region", { name: "Optional analytics" });
-    await expect(panel).toBeVisible();
+    if (route === "/") {
+      // (d) The first screen has no card at all at scroll 0, so nothing can cover H1, support or action.
+      await expect(panel).toHaveCount(0);
+      for (const target of [page.locator("#s1 h1"), page.locator("#s1 .lv2-hero-support"), page.locator('#s1 a[href="/explore"]').first()]) {
+        await expect(target).toBeVisible();
+      }
+    }
+    // (e) Once revealed, the card is at the viewport bottom.
+    await revealConsent(page);
     const panelBox = await panel.boundingBox();
     expect(panelBox).not.toBeNull();
-    // Brief 2026-10-15 move 6: the card is at the bottom, so the first screen's H1, support line
-    // and action stay readable above it.
-    const targets = route === "/"
-      ? [page.locator("#s1 h1"), page.locator("#s1 .lv2-hero-support"), page.locator('#s1 a[href="/explore"]').first()]
-      : [page.locator(".plan-action a").first()];
-    for (const target of targets) {
-      await expect(target).toBeVisible();
-      const targetBox = await target.boundingBox();
-      expect(targetBox).not.toBeNull();
-      expect(intersects(panelBox!, targetBox!), `${route} first-screen content is obscured at ${testInfo.project.name}px`).toBe(false);
-    }
+    expect(panelBox!.y + panelBox!.height, `${route} card sits at the bottom at ${testInfo.project.name}px`).toBeGreaterThan(page.viewportSize()!.height - 40);
 
     await page.evaluate(() => window.scrollTo(0, Math.min(1_000, document.documentElement.scrollHeight - innerHeight)));
     const movedPanel = await panel.boundingBox();
@@ -71,8 +90,7 @@ test("Escape inside the consent card refuses, persists, and loads no analytics",
     if (/google-analytics\.com|googletagmanager\.com/.test(request.url())) googleRequests.push(request.url());
   });
   await page.goto("/");
-  const panel = page.getByRole("region", { name: "Optional analytics" });
-  await expect(panel).toBeVisible();
+  const panel = await revealConsent(page);
   await panel.getByRole("button", { name: "No thanks", exact: true }).focus();
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
@@ -96,6 +114,7 @@ test("consented measurement sanitizes URLs and excludes private events and route
     await route.fulfill({ contentType: "application/javascript", body: "/* vendor intentionally stubbed */" });
   });
   await page.goto("https://tavonel.com/?email=private@example.com");
+  await page.evaluate(() => window.scrollTo(0, 300));
   await expect(page.getByRole("button", { name: "Allow analytics" })).toBeVisible();
   expect(tagRequests).toBe(0);
   await page.getByRole("button", { name: "Allow analytics" }).click();
@@ -124,6 +143,7 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   let success = false;
   await page.route("**/api/contact", route => route.fulfill({ status: success ? 200 : 503, contentType: "application/json", body: success ? "{}" : '{"error":"Unavailable"}' }));
   await page.goto("/contact");
+  await page.evaluate(() => window.scrollTo(0, 300));
   await page.getByRole("button", { name: "No thanks" }).click();
   await page.getByRole("textbox", { name: /^Name\b/ }).fill("Test Visitor");
   await page.getByRole("textbox", { name: "Work email" }).fill("test@example.com");
@@ -149,6 +169,7 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
 */
 test("the Korean entry page asks for consent in Korean, and other pages do not", async ({ page }) => {
   await page.goto("/ko");
+  await revealConsent(page);
   const korean = page.getByRole("region", { name: "선택 분석" });
   await expect(korean).toBeVisible();
   await expect(page.getByRole("button", { name: "분석 허용", exact: true })).toBeVisible();

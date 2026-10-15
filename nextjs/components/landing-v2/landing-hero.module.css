@@ -192,6 +192,7 @@ section.hero .intake {
 
 /* The workbench: one top rule (the page's one rule weight, 1px), no nested panels. */
 .bench {
+  position: relative;
   min-width: 0;
   border-top: 1px solid var(--home-rule);
   color: var(--home-ink);
@@ -609,6 +610,18 @@ section.hero .intake {
   margin-top: 1rem;
   border-top: 1px solid var(--home-rule);
 }
+
+/* Brief move 5: the Evidence Line's label on the passage card, where the line itself is not drawn. */
+.lineLabel {
+  margin: 0.5rem 0 0;
+  color: var(--home-cobalt);
+  font: 500 0.75rem/1.45 var(--home-mono);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.lineLabel span { font-family: var(--f-sans); color: var(--home-ink); }
+.lineLabel code { font: inherit; }
+@media (min-width: 960px) { .lineLabel { display: none; } }
 
 /* s2's second disclosure is a row under the first, drawn the same way. */
 .contextDisclosure {

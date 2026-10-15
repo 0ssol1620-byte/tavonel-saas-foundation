@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test";
 async function dismissConsent(page: import("@playwright/test").Page) {
   // Each test starts with fresh storage. The banner mounts after hydration;
   // an immediate visibility probe can miss it and measure controls underneath it.
+  // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+  await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "No thanks", exact: true }).click();
   await expect(panel).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 /*
@@ -152,7 +155,9 @@ test("the Home first screen puts actions before its four-stage film and source p
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
-  await expect(consent).toBeVisible();
+  // Release 2: the first screen has no consent card at scroll 0, so the "card clears title and
+  // action" branch below has nothing to measure until the reader scrolls (marketing-consent.spec).
+  await expect(consent).toHaveCount(0);
   const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");

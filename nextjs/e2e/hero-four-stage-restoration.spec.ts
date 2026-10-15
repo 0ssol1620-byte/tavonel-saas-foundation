@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test";
 const FILMS = ["/film/compile-cut.mp4", "/film/compile-cut-2.mp4", "/film/compile-cut-3.mp4", "/film/compile-cut-4.mp4"];
 
 async function dismissConsent(page: import("@playwright/test").Page) {
+  // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+  await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "No thanks", exact: true }).click();
   await expect(panel).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 test("the title leads directly into four selectable and playing demo recordings", async ({ page }, testInfo) => {

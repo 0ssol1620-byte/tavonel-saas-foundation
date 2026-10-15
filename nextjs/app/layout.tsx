@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Geist, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
+import FontOutlineProbe from "@/components/font-outline-probe";
 import MarketingConsent from "@/components/marketing-consent";
 import SkipLink from "@/components/skip-link";
 import { BRAND_LINE } from "@/lib/site-navigation";
@@ -159,6 +160,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           (The mode badge, the four section links and the scene rail this comment used to name
           belonged to the client landing that Landing V2 replaced on 2026-09-19.)
         */}
+        <FontOutlineProbe />
         <SkipLink />
         {/*
           Organization + WebSite + SoftwareApplication. No availability, offer, or

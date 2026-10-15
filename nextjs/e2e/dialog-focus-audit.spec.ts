@@ -32,6 +32,9 @@ const askBar = (page: import("@playwright/test").Page) =>
   page.locator("button[aria-expanded]").filter({ hasText: /ask/i }).first();
 
 async function openExploreAsk(page: import("@playwright/test").Page) {
+  // Release 2: the consent card appears 8 s after mount and could cover a target mid-test; this spec is
+  // not about consent, so it starts with a stored refusal.
+  await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
   await page.goto("/explore");
   // The entry act's "Try sample questions" button is replaced when the stage moves on, and focus
   // cannot return to a control that left the DOM. Enter the World and use the persistent Ask bar.

@@ -763,6 +763,12 @@ describe("Home substance renders expanded (redesign brief 2026-10-15, move 3)", 
       expect(s5.match(/class="lv2-proof-note/g)).toHaveLength(4);
       expect(s1).not.toMatch(/<summary>(Supported source formats|지원하는 원문 형식)<\/summary>/);
       expect(s1).toContain(korean ? "업로드에서 허용하는 형식" : "Accepted at upload");
+      // Release 2: the s3 record notes print in the right column, and s2 ends on its context, not a folded label.
+      const s2 = scene("s2", 'id="s3"');
+      const s3 = scene("s3", 'id="s4"');
+      expect(s3).not.toMatch(/<summary>(Read the record|기록 읽기)<\/summary>/);
+      expect(s3).toContain('class="');
+      expect(s2).toMatch(/<details[^>]*\sopen=""[^>]*><summary>(The context this passage needs|이 구절에 필요한 맥락)<\/summary>/);
     });
   }
 });

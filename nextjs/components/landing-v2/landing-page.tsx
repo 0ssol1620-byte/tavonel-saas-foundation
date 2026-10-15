@@ -331,7 +331,7 @@ export default function LandingPage({
               <p className="lv2-scene-support">{korean ? "인용에는 문서 버전, 페이지와 좌표가 함께 남습니다." : "The document version, page and coordinates stay with the citation."}</p>
             </div>
             {home ? <HeroSourceCard view={home} korean={korean} /> : null}
-            <details className={heroStyles.contextDisclosure}>
+            <details className={heroStyles.contextDisclosure} open>
               <summary>{korean ? "이 구절에 필요한 맥락" : "The context this passage needs"}</summary>
               <p>{page.difficulty.support}</p>
             {home && selected ? (
@@ -431,8 +431,7 @@ export default function LandingPage({
                 </p>
               </article>
 
-              <details className={heroStyles.receiveNotes}>
-                <summary>{korean ? "기록 읽기" : "Read the record"}</summary>
+              <div className={heroStyles.receiveNotes}>
                 <ul className={heroStyles.noteList}>
                   {page.receive.notes.map(note => (
                     <li key={note.title}>
@@ -452,7 +451,7 @@ export default function LandingPage({
                   </ol>
                 </div>
                 <p className={heroStyles.rights}>{page.receive.rights}</p>
-              </details>
+              </div>
             </div>
             <p className="lv2-scene-note lv2-small">{landingV2HeroExtra(korean).entityDisclaimer}</p>
           </div>
