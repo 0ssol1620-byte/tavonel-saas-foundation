@@ -58,7 +58,7 @@ import { primaryCallToAction } from "./commercial-state";
 import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
 import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
 import { landingV2HeroExtra } from "./landing-v2-hero-copy";
-import { buildEvidenceRecord, buildHeroView, buildProofTabs, landingV2StateWord } from "./landing-v2-runtime";
+import { buildHeroView, buildProofTabs, buildReceiveRecord, landingV2StateWord } from "./landing-v2-runtime";
 import {
   BARRED,
   LANDING_V2_FORBIDDEN,
@@ -271,8 +271,8 @@ describe("landing v2 -- the composition", () => {
       const bare = (value: string) => value.replace(/\s+/g, "");
       const expected =
         locale === "ko"
-          ? "내 문서. 연결된 지식."
-          : "Your documents. Connected knowledge.";
+          ? "AI가 믿고 사용하는 지식."
+          : "Knowledge your AI can trust.";
       expect(bare(heading.replace(/<[^>]*>/g, ""))).toBe(bare(expected));
     }
   );
@@ -576,7 +576,15 @@ describe("landing v2 -- the lead and the workbench", () => {
     const actionsAt = hero.indexOf('data-testid="landing-hero-actions"');
     expect(actionsAt).toBeGreaterThan(hero.indexOf('</h1>'));
     expect(filmAt).toBeGreaterThan(actionsAt);
-    expect(hero).not.toContain('class="lv2-hero-support lv2-body-l"');
+    // Brief 2026-10-15 move 1: the one support sentence sits between the H1 and the actions.
+    const supportAt = hero.indexOf('class="lv2-hero-support lv2-body-l"');
+    expect(supportAt).toBeGreaterThan(hero.indexOf('</h1>'));
+    expect(supportAt).toBeLessThan(actionsAt);
+    expect(readable(hero)).toContain(
+      locale === "ko"
+        ? "TAVONEL이 문서를 그 지식으로 컴파일합니다. 각 진술은 원문 페이지에 연결된 채 남고, 원문이 바뀌면 다시 컴파일됩니다."
+        : "TAVONEL compiles your documents into it. Each statement stays linked to the page it came from, and the knowledge recompiles when a source changes.",
+    );
     expect(hero).toContain("/film/poster-1-hero-2x.webp");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
     expect(hero).toContain('data-mobile-view="fit"');
@@ -622,10 +630,9 @@ describe("landing v2 -- hero actions by commercial state", () => {
       expect(secondary).not.toBeNull();
       expect(attr(secondary![0], "href")).toBe(locale === "ko" ? "/ko/evaluation" : "/evaluation");
       expect(readable(secondary![1]!).trim()).toBe(locale === "ko" ? "내 문서 평가 상담" : "Evaluate your documents");
-      // The close is not remapped: Korean keeps the localized contact route, English its price link.
+      // Brief 2026-10-15 move 1: the close fills the hero's public-sample action beside the price link, in both languages.
       const close = elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"));
-      expect(close).toContain(locale === "ko" ? "/ko/contact" : "/pricing");
-      expect(close).not.toContain(locale === "ko" ? "/ko/evaluation" : "/evaluation");
+      expect(close).toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
     }
   );
 
@@ -643,9 +650,9 @@ describe("landing v2 -- hero actions by commercial state", () => {
         locale === "ko" ? KO_CHROME.cta[SELF_SERVE_CTA.href] : SELF_SERVE_CTA.label
       );
       expect(main).not.toMatch(/href="(?:\/ko)?\/evaluation"/);
-      if (locale === "ko") {
-        expect(elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href"))).toContain(SELF_SERVE_CTA.href);
-      }
+      // The close does not change with commercial posture (brief move 1).
+      expect(elements(sceneOf(main, "s6"), "a").map(open => attr(open, "href")))
+        .toEqual([EXPLORE_CTA.href, locale === "ko" ? "/ko/pricing" : "/pricing"]);
     }
   );
 });
@@ -671,8 +678,10 @@ describe("landing v2 -- difficulty and record", () => {
 
   it.each(LOCALES)("%s prints the sample record with its own status, version and links", locale => {
     const receive = sceneOf(mainOf(render(locale)), "s3");
-    const record = buildEvidenceRecord();
+    const record = buildReceiveRecord();
     const text = readable(receive);
+    const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
+    expect(quote).toBe(escaped(record.claim.excerpt) + (record.claim.excerptTruncated ? "…" : ""));
     expect(text).toContain(record.claim.excerpt);
     expect(text).toContain(landingV2StateWord(record.status.state, locale));
     expect(text).toContain(record.version.digest);
@@ -737,4 +746,29 @@ describe("current-main bounded evaluation entry", () => {
     expect(html).toContain("Downloading it only retrieves the blank file");
     expect(html).toContain("Filling in your copy does not by itself send what you write to us.");
   });
+});
+
+describe("Home substance renders expanded (redesign brief 2026-10-15, move 3)", () => {
+  for (const korean of [false, true]) {
+    it(`${korean ? "/ko" : "/"} prints the affected objects, the four scopes and the formats unfolded`, () => {
+      const html = renderToStaticMarkup(createElement(LandingPage, { korean }));
+      const scene = (id: string, end: string) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(end));
+      const s1 = scene("s1", 'id="s2"');
+      const s4 = scene("s4", 'id="s5"');
+      const s5 = scene("s5", "data-home-reader-guide");
+      expect(s4).not.toContain("<details");
+      expect(s4).toContain('id="lv2-recompile-objects"');
+      expect(s4).toContain('id="lv2-recompile-counts"');
+      expect(s5).not.toContain("<details");
+      expect(s5.match(/class="lv2-proof-note/g)).toHaveLength(4);
+      expect(s1).not.toMatch(/<summary>(Supported source formats|지원하는 원문 형식)<\/summary>/);
+      expect(s1).toContain(korean ? "업로드에서 허용하는 형식" : "Accepted at upload");
+      // Release 2: the s3 record notes print in the right column, and s2 ends on its context, not a folded label.
+      const s2 = scene("s2", 'id="s3"');
+      const s3 = scene("s3", 'id="s4"');
+      expect(s3).not.toMatch(/<summary>(Read the record|기록 읽기)<\/summary>/);
+      expect(s3).toContain('class="');
+      expect(s2).toMatch(/<details[^>]*\sopen=""[^>]*><summary>(The context this passage needs|이 구절에 필요한 맥락)<\/summary>/);
+    });
+  }
 });

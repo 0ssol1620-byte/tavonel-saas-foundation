@@ -32,6 +32,9 @@ test("sample questions retain the actual modal and return path", async ({ page }
 });
 
 test("guided entry has no page overflow and keeps the main entry action reachable", async ({ page }) => {
+  // Release 2: the consent card appears 8 s after mount and could cover a target mid-test; this spec is
+  // not about consent, so it starts with a stored refusal.
+  await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
   await page.goto("/explore");
   const no=page.getByRole("button",{name:"No thanks",exact:true});
   if(await no.isVisible()) await no.click();

@@ -270,6 +270,9 @@ test("a compile that fails on the server names the failure and where to look", a
 });
 
 test("the prepared-question filter has an honest empty state and a usable reset", async ({ page }) => {
+  // Release 2: the consent card appears 8 s after mount and could cover a target mid-test; this spec is
+  // not about consent, so it starts with a stored refusal.
+  await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
   await page.goto("/explore");
   await expect(page.getByText("Free-form AI queries are not running", { exact: false })).toBeVisible();
   await page.getByLabel("Find a sample question").fill("a question outside this prepared sample");

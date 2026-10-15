@@ -23,6 +23,8 @@ const CUSTOMER_LINKS = [
   { label: "How it works", href: "/how-it-works" },
   { label: "Resources", href: "/resources" },
   { label: "Docs", href: "/docs" },
+  // Brief 2026-10-15 move 6: Pricing is the sheet's last section row below the desktop switch.
+  { label: "Pricing", href: "/pricing" },
 ] as const;
 
 async function openMenu(page: Page) {

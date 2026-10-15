@@ -1,16 +1,17 @@
 import snapshotJson from "./landing-v2-snapshot.json";
-import type { EvidenceRecord, ProofTab, RecompileView } from "./landing-v2-proof";
+import type { EvidenceRecord, ProofTab, ReceiveRecord, RecompileView } from "./landing-v2-proof";
 import type { SourcesCopy, SourcesSceneData } from "./landing-v2-sources";
 import type { VisualState } from "./visual-world-model";
 import type { EvidencePageView } from "./evidence-regions";
 import type { HeroStat } from "./hero-stats";
 
-export type { EvidenceRecord, ProofTab, RecompileView, SourcesSceneData };
+export type { EvidenceRecord, ProofTab, ReceiveRecord, RecompileView, SourcesSceneData };
 
 type LandingSnapshot = {
   schema: string;
   tabs: ProofTab[];
   record: EvidenceRecord;
+  receive: ReceiveRecord;
   recompile: RecompileView;
   heroView: EvidencePageView;
   heroStats: HeroStat[];
@@ -49,6 +50,7 @@ if (snapshotJson.schema !== "tavonel.landing-public-proof.v1") throw new Error("
 const snapshot: LandingSnapshot = {
   ...snapshotJson,
   record: { ...snapshotJson.record, status: { ...snapshotJson.record.status, state: state(snapshotJson.record.status.state) } },
+  receive: { ...snapshotJson.receive, status: { ...snapshotJson.receive.status, state: state(snapshotJson.receive.status.state) } },
   recompile: { ...snapshotJson.recompile, affectedSample: snapshotJson.recompile.affectedSample.map(item => ({ ...item, state: state(item.state) })) },
   heroView: {
     ...snapshotJson.heroView,
@@ -63,6 +65,7 @@ const snapshot: LandingSnapshot = {
 
 export const buildProofTabs = (): ProofTab[] => snapshot.tabs;
 export const buildEvidenceRecord = (): EvidenceRecord => snapshot.record;
+export const buildReceiveRecord = (): ReceiveRecord => snapshot.receive;
 export const buildRecompileView = (): RecompileView => snapshot.recompile;
 export const buildHeroView = (): EvidencePageView => snapshot.heroView;
 export const buildHeroStats = (): readonly HeroStat[] => snapshot.heroStats;

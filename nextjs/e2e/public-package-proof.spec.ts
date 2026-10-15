@@ -25,10 +25,13 @@ test("the actual sample package remains readable and keyboard usable at narrow w
     const proofPage = await context.newPage();
     try {
       await proofPage.goto("/product/compiled-world");
+      // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+      await proofPage.evaluate(() => window.scrollTo(0, 300));
       const consent = proofPage.getByRole("region", { name: "Optional analytics", exact: true });
       await expect(consent).toBeVisible();
       await consent.getByRole("button", { name: "No thanks", exact: true }).click();
       await expect(consent).toBeHidden();
+      await proofPage.evaluate(() => window.scrollTo(0, 0));
       const proof = proofPage.locator("#public-package-proof");
       await expect(proof.getByRole("heading", { name: "One World. Files you can inspect." })).toBeVisible();
       // The surrounding document uses light heading ink; this pale sample panel must supply its own.

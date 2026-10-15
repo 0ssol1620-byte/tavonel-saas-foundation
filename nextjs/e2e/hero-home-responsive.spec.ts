@@ -5,7 +5,10 @@ test("first-visit desktop actions leave room below the consent-visible hero", as
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+  // Release 2: the card appears after a 200px scroll (or 8 s); reveal it, then measure the first screen.
+  await page.evaluate(() => window.scrollTo(0, 300));
   await expect(page.locator("[data-marketing-consent-panel]")).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   const actions = page.locator("#s1 .lv2-actions a");
   await expect(actions).toHaveCount(2);
@@ -24,7 +27,10 @@ test("first-visit phone actions remain visible with the consent panel", async ({
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+  // Release 2: the card appears after a 200px scroll (or 8 s); reveal it, then measure the first screen.
+  await page.evaluate(() => window.scrollTo(0, 300));
   await expect(page.locator("[data-marketing-consent-panel]")).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   const actions = page.locator("#s1 .lv2-actions a");
   await expect(actions).toHaveCount(2);
@@ -71,7 +77,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.goto("/");
     const consent = page.getByRole("button", { name: "No thanks", exact: true });
     if (await consent.isVisible()) await consent.click();
-    const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+    const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film).toBeVisible();
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
@@ -89,6 +95,20 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
       };
     });
     expect(geometry.overflow).toBe(false);
+    if (width >= 900) {
+      // Release 2: a compact left-aligned tab group, labels 32-40px apart.
+      const rects = geometry.tabs.map(tab => tab.rect);
+      for (let i = 1; i < rects.length; i++) {
+        const gap = rects[i]!.left - rects[i - 1]!.right;
+        expect(gap).toBeGreaterThanOrEqual(32);
+        expect(gap).toBeLessThanOrEqual(40);
+      }
+      for (const rect of rects) expect(rect.width).toBeGreaterThanOrEqual(44);
+    }
+    // Release 2: the reading line under the film, at least 15px, at every width.
+    const reading = film.locator("[data-film-reading] p");
+    await expect(reading).toBeVisible();
+    expect(parseFloat(await reading.evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(15);
     for (const target of [...geometry.tabs, ...geometry.actions]) {
       expect(target.rect.height).toBeGreaterThanOrEqual(44);
       expect(target.rect.left).toBeGreaterThanOrEqual(0);
@@ -103,6 +123,9 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.reload();
     await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
     await expect(film.locator("video")).toHaveCount(0);
+    // ... and under reduced motion.
+    await expect(reading).toBeVisible();
+    expect(parseFloat(await reading.evaluate(node => getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(15);
     await page.screenshot({ path: testInfo.outputPath(`home-en-${width}-reduced.png`) });
     if (width === 1440 || width === 390) {
       for (let index = 0; index < 4; index++) {
@@ -115,7 +138,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.goto("/ko");
-    const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+    const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(film.locator("figcaption")).toHaveText("제품 흐름 예시 · 실제 고객 결과가 아닙니다.");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

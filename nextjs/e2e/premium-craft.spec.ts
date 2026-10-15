@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test";
 async function dismissConsent(page: import("@playwright/test").Page) {
   // Each test starts with fresh storage. The banner mounts after hydration;
   // an immediate visibility probe can miss it and measure controls underneath it.
+  // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+  await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "No thanks", exact: true }).click();
   await expect(panel).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 /*
@@ -118,20 +121,23 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     };
   }));
   /*
-    The exact sheet contract is four section destinations and Sign in. Pricing is not a sheet
-    row: PublicSiteHeader keeps it as the persistent commercial action beside the menu at every
-    width. Pinning both names and hrefs makes this assertion catch an omitted section, an invented
-    menu destination, or Pricing being duplicated into the disclosure. Geometry still proves each
+    The exact sheet contract is four section destinations, Pricing and Sign in. Release 2 (brief
+    2026-10-15 move 6) hides the header actions below the desktop switch, so Pricing is the
+    sheet's last section row there; its header link stays in the DOM for the desktop row. Pinning
+    both names and hrefs makes this assertion catch an omitted section, an invented menu
+    destination, or Pricing appearing twice in the disclosure. Geometry still proves each
     rendered row is a usable target and that its centre hit-tests to the row itself.
   */
+  // Brief 2026-10-15 move 6: four sections, Pricing, then Sign in.
   expect(targets.map(({ text, href }) => ({ text, href }))).toEqual([
     { text: "Product", href: "/product" },
     { text: "How it works", href: "/how-it-works" },
     { text: "Resources", href: "/resources" },
     { text: "Docs", href: "/docs" },
+    { text: "Pricing", href: "/pricing" },
     { text: "Sign in", href: "/login" },
   ]);
-  expect(targets).toHaveLength(5);
+  expect(targets).toHaveLength(6);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);
@@ -145,9 +151,17 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   await expect(page.locator(".docs-copy").first()).toBeVisible();
   expect(await page.locator(".docs-copy").first().evaluate(e => e.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   const nav = page.locator("header.nav .nav-actions");
-  const box = await nav.boundingBox();
-  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  expect(await nav.getByRole("link", { name: "Pricing", exact: true }).evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
+  // Brief 2026-10-15 move 6: below 1250px the actions move into the phone sheet.
+  const pricing = page.viewportSize()!.width < 1250
+    ? (await page.locator("header.nav details.mobile-primary-nav > summary").click(), page.locator('header.nav details.mobile-primary-nav > nav a.mobile-nav-direct[href="/pricing"]'))
+    : nav.getByRole("link", { name: "Pricing", exact: true });
+  if (page.viewportSize()!.width < 1250) await expect(nav).toBeHidden();
+  else {
+    const box = await nav.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  }
+  await expect(pricing).toBeVisible();
+  expect(await pricing.evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
 
 
@@ -157,8 +171,10 @@ test("the Home first screen puts actions before its four-stage film and source p
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
-  await expect(consent).toBeVisible();
-  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  // Release 2: the first screen has no consent card at scroll 0, so the "card clears title and
+  // action" branch below has nothing to measure until the reader scrolls (marketing-consent.spec).
+  await expect(consent).toHaveCount(0);
+  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
   const measure = async () => page.evaluate(() => {
@@ -181,7 +197,12 @@ test("the Home first screen puts actions before its four-stage film and source p
     expect(layout.action.top).toBeGreaterThanOrEqual(layout.title.bottom);
     expect(layout.action.bottom).toBeLessThanOrEqual(layout.film.top);
     if (!consentVisible && width === 1440) expect(layout.action.bottom).toBeLessThanOrEqual(900);
-    if (consentVisible && layout.banner) expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
+    // Brief 2026-10-15 move 6: the consent card is bottom-fixed and must clear the title and action.
+    if (consentVisible && layout.banner) {
+      expect(layout.banner.bottom).toBeLessThanOrEqual(layout.height + 1);
+      expect(layout.banner.top).toBeGreaterThanOrEqual(layout.title.bottom);
+      expect(layout.banner.top).toBeGreaterThanOrEqual(layout.action.bottom);
+    }
     await test.info().attach("home-first-screen-" + width + "-consent-" + consentVisible, {body: await page.screenshot({animations: "disabled"}), contentType: "image/png"});
   }
   const source = page.locator("#s2 article[data-case-status]");

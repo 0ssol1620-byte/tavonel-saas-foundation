@@ -18,8 +18,17 @@
   the RunPod row on /subprocessors, the submit region on /contact and body copy on seven more
   pages. Reserved space at the bottom only works if the thing occupying it is *at* the bottom.
 
-  The surface now lives before the public page in document flow. It reads as a compact privacy
-  notice, moves away with the page, and cannot cover the hero, a plan action or a safe-area inset.
+  2026-10-15 (redesign brief, move 6): the document-flow band above the header pushed the phone
+  first screen down until the H1 and its action shared the fold with a privacy notice. It is a
+  bottom-fixed card again, now capped at a quarter of the viewport, safe-area aware, closed by
+  Escape or either answer, and still first in DOM and Tab order (it mounts before the page in
+  `app/layout.tsx`). G2-006's cost is accepted for the one screen before a reader answers.
+
+  Release 2 (orchestrator decision, 2026-10-15): the card covered the film centre at 1440 and the
+  film's foot and reading line at 390/412, and the first plan action on /pricing. It is no longer
+  on the first paint (`CONSENT_REVEAL` in the component: first scroll past 200px or 8 s), it is a
+  small bottom-left card of at most 360px from 900px up, and below 900px it is two compact rows
+  -- the sentence with its Privacy link, then the two equal answers -- inside 96px.
 
   G1-024 capped the phone height at 56px, and BQ-054 is where that cap stops being worth its
   price: it only held because the sentence was set at 11px, under the site's 12px floor, on the
@@ -32,6 +41,8 @@
   color: var(--text-hi);
   font: inherit;
 }
+/* Home sets Wanted Sans on its own wrapper; this card mounts outside it, so it would fall back to the root Geist. */
+:global(body:has([data-home-ia])) .panel { font-family: "Wanted Sans Variable", Arial, "Malgun Gothic", sans-serif; }
 
 @layer overrides {
   .panel {
@@ -47,56 +58,36 @@
 }
 
 .panel {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  padding:
-    max(8px, env(safe-area-inset-top))
-    max(clamp(16px, 4vw, 32px), env(safe-area-inset-right))
-    8px
-    max(clamp(16px, 4vw, 32px), env(safe-area-inset-left));
-  border-bottom: 1px solid var(--hairline-hi);
-  background: var(--g1);
+  position: fixed;
+  z-index: 55;
+  inset:
+    auto
+    auto
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  width: min(360px, calc(100vw - 32px));
+  max-height: 25vh;
+  max-height: 25dvh;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 8px;
+  background: var(--g2);
+  box-shadow: 0 6px 24px rgb(21 25 29 / 0.12);
 }
 
 .inner {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  width: min(100%, 1280px);
-  margin-inline: auto;
-  min-height: 60px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
-
-/*
-  The public header is normally fixed at the viewport edge. While this notice is present, keep
-  the header sticky in normal flow after the notice. Its real height then separates the header
-  from the first line of page content instead of letting the two occupy the same band. The
-  document routes reduce their existing fixed-header offset below; the home hero keeps its
-  availability statement below the header.
-*/
-:global(body):has(.panel) :global(header.nav) {
-  position: sticky;
-  top: 0;
-  margin-bottom: 0;
+/* Arrival from the edge it sits on; a reader who asked for less motion gets the card in place. */
+@media (prefers-reduced-motion: no-preference) {
+  .panel { animation: consent-in 180ms ease-out; }
 }
-
-/*
-  A sticky header now owns its normal flow height. Public document sections already reserve an
-  offset for the fixed header, so only the first section gives that offset back while the consent
-  panel is present. The home hero is intentionally excluded: its availability sentence must begin
-  below the newly in-flow header.
-*/
-:global(body):has(.panel) :global(.public-page) :global(main > .scene:first-child) {
-  --doc-section-padding-top: max(0px, calc(clamp(112px, 11vw, 156px) - var(--chrome-header-height, 64px)));
-}
-:global(body):has(.panel) :global(.pricing-page) :global(main > .scene:first-child) {
-  padding-top: max(0px, calc(76px - var(--chrome-header-height, 64px)));
-}
-@media (max-width: 720px) {
-  :global(body):has(.panel) :global(.public-page) :global(main > .scene:first-child) {
-    --doc-section-padding-top: max(0px, calc(92px - var(--chrome-header-height, 56px)));
-  }
+@keyframes consent-in {
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 .panel p {
@@ -139,7 +130,7 @@
   identical border, identical colour -- if a reader has to look twice to tell which is which,
   that is the correct outcome for a choice the site is not entitled to nudge.
 */
-.actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; flex: 0 0 auto; gap: 8px; }
 .actions button {
   min-height: 44px;
   padding: 10px 16px;
@@ -219,35 +210,25 @@
   .floating:hover { color: var(--text-hi); border-color: var(--text-lo); }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 899.98px) {
   /*
-    BQ-054. The 56px cap gives way to the 12px floor, and the row becomes two rows.
-
-    The cap was 44px of control plus 6px above and below, which only held because the sentence
-    was set at 11px -- below the site's floor, on the one paragraph every visitor is asked to
-    read before answering. The three constraints that meet here are the floor, the 44px control
-    and the four facts the sentence has to name; the height is the one that may move, so it does.
-
-    `height` becomes `min-height`, the sentence sits above the buttons rather than beside them,
-    and `:has()` pays the page back the exact room the bar takes (BQ-055) so nothing -- including
-    the footer's own links -- ends up underneath it.
+    BQ-054 / Release 2. Two rows: the sentence and its Privacy link at the 12px floor, then two
+    equal 44px answers. 7 + two 15.6px lines + 4 + 44 + 7 + 2px of border is 95px; a sentence that
+    needs a third line breaks that cap, which is why the prompt copy is held to two lines at 360.
   */
   .panel {
-    padding:
-      max(10px, env(safe-area-inset-top))
-      max(12px, env(safe-area-inset-right))
-      12px
-      max(12px, env(safe-area-inset-left));
+    inset:
+      auto
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    width: auto;
+    padding: 7px 12px;
   }
-  .inner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    min-height: 0;
-  }
-  .panel p { font-size: 12px; line-height: 1.4; }
-  .panel p a { padding-block: 15px; margin-block: -15px; } /* 12px type: 16.8px line + 30px = 46.8px, above the 44px floor */
-  .actions { gap: 8px; }
-  .actions button { flex: 1 1 0; justify-content: center; padding: 10px; font-size: 12px; }
+  .inner { gap: 4px; }
+  .panel p { font-size: 12px; line-height: 1.3; }
+  /* 15, not 14: at 12px/1.3 the line is 15.6px, and 15.6 + 28 is under the 44px touch floor. */
+  .panel p a { font-size: 12px; padding-block: 15px; margin-block: -15px; }
+  .actions button { justify-content: center; min-height: 44px; padding: 0 10px; }
   .floating { inset: auto auto 8px 0.5rem; }
 }

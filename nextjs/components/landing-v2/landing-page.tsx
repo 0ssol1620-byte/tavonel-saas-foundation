@@ -3,6 +3,7 @@ import type { Route } from "next";
 import {
   PublicSiteFooter,
   PublicSiteHeader,
+  SAMPLE_CTA,
 } from "@/components/public-site-chrome";
 import HeroFilm from "./hero-film";
 import HeroActions from "./hero-actions";
@@ -18,13 +19,13 @@ import TrustScene from "./scenes/trust";
 import { landingV2Copy } from "@/lib/landing-v2-copy";
 import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
 import {
-  buildEvidenceRecord,
   buildHeroView,
   buildProofTabs,
+  buildReceiveRecord,
   buildRecompileView,
   landingV2StateWord,
   SOURCES_COPY,
-  type EvidenceRecord,
+  type ReceiveRecord,
   type RecompileView,
 } from "@/lib/landing-v2-runtime";
 import {
@@ -36,7 +37,6 @@ import {
   type EvidenceCase,
   type EvidenceRegion,
 } from "@/lib/home-evidence-view";
-import { EXPLORE_CTA } from "@/lib/site-navigation";
 import { KO_CHROME } from "@/lib/site-navigation";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import {
@@ -70,7 +70,8 @@ import {
 */
 type HomeData = {
   home: EvidenceCase | null;
-  record: EvidenceRecord;
+  /** "What you receive": the first sample claim `selectReceiveClaim` accepts. */
+  record: ReceiveRecord;
   recompile: RecompileView;
   /** How many extracted regions the workbench's page holds, read from the page view. */
   pageRegionCount: number;
@@ -79,7 +80,7 @@ let homeMemo: HomeData | undefined;
 function homeData(): HomeData {
   return (homeMemo ??= {
     home: selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE]),
-    record: buildEvidenceRecord(),
+    record: buildReceiveRecord(),
     recompile: buildRecompileView(),
     pageRegionCount: buildHeroView().regions.length,
   });
@@ -91,7 +92,10 @@ function homeData(): HomeData {
 */
 const HOME_COPY = {
   en: {
-    support: "Your sources, connected for people and AI.",
+    /* Release 2 hero: the orchestrator's decision under delegated authority, open to founder veto. */
+    headline: "Knowledge your AI can trust.",
+    support:
+      "TAVONEL compiles your documents into it. Each statement stays linked to the page it came from, and the knowledge recompiles when a source changes.",
     intake: "Own-source intake by arrangement",
     difficulty: {
       eyebrow: "Why this passage is hard",
@@ -143,7 +147,10 @@ const HOME_COPY = {
     },
   },
   ko: {
-    support: "원문에서, 사람과 AI가 사용하는 지식으로.",
+    // Not "믿고 쓰는": lib/ko-terms.ts (D12) bars 쓰다 for "use" -- it also reads as "the AI writes it".
+    headline: "AI가 믿고 사용하는 지식.",
+    support:
+      "TAVONEL이 문서를 그 지식으로 컴파일합니다. 각 진술은 원문 페이지에 연결된 채 남고, 원문이 바뀌면 다시 컴파일됩니다.",
     intake: "자체 원문 접수는 별도 협의",
     difficulty: {
       eyebrow: "이 구절이 어려운 이유",
@@ -234,7 +241,6 @@ export default function LandingPage({
     home && region.href ? (
       <Link key={region.id} className={heroStyles.diffLink} href={region.href as Route} prefetch={false}>
         {page.difficulty.open(regionMark(home, region))}
-        <span aria-hidden="true">↗</span>
       </Link>
     ) : null;
   const formats = korean ? copy.hero.microProofFormats.replace(" or ", " 또는 ") : copy.hero.microProofFormats;
@@ -242,22 +248,17 @@ export default function LandingPage({
   /*
     A reader can inspect the sample before choosing a plan. The access action is resolved from
     the current commercial state rather than written here. While that state resolves to
-    `/contact`, the hero's access action is the document evaluation instead; the close keeps its
-    own separately authored CTA copy and the resolved access link in `./scenes/start`.
+    `/contact`, the hero's access action is the document evaluation instead. The close repeats
+    the sample action (`SAMPLE_CTA`, also the header's) beside its price link in `./scenes/start`.
   */
   const heroActions = {
-    exploreLabel: korean ? "공개 샘플 살펴보기" : "Explore the public sample",
-    exploreHref: EXPLORE_CTA.href,
+    exploreLabel: korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label,
+    exploreHref: SAMPLE_CTA.href,
   };
   const access = primaryCallToAction();
-  const startActions = {
-    ...heroActions,
-    accessHref: korean && access.href === "/contact" ? "/ko/contact" : access.href,
-    accessLabel: korean ? KO_CHROME.cta[access.href] : access.label,
-  };
   const heroStart = {
-    label: access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : startActions.accessLabel,
-    href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref,
+    label: access.href === "/contact" ? (korean ? "내 문서 평가 상담" : "Evaluate your documents") : korean ? KO_CHROME.cta[access.href] : access.label,
+    href: access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href,
   };
 
   return (
@@ -295,10 +296,9 @@ export default function LandingPage({
           <div className="lv2-wrap">
             <div className={sourceStyles.intro}>
               <HeroStatement
-                copy={{ ...copy.hero, headline: korean ? "내 문서. 연결된 지식." : "Your documents. Connected knowledge.", headlineExperiment: undefined, support: page.support }}
+                copy={{ ...copy.hero, headline: page.headline, headlineExperiment: undefined, support: page.support }}
                 titleId="lv2-hero-title"
                 headlineVariant={experiment.headlineVariant}
-                showSupport={false}
               >
                 <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
@@ -308,10 +308,9 @@ export default function LandingPage({
                 <HeroFilm korean={korean} />
               </HeroStatement>
             </div>
-            <details className={sourceStyles.formats}>
-              <summary>{korean ? "지원하는 원문 형식" : "Supported source formats"}</summary>
+            <div className={sourceStyles.formats}>
               <p className={`lv2-hero-intake lv2-meta ${heroStyles.intake}`}>{SOURCES_COPY[locale].formatsLabel} · {formats}</p>
-            </details>
+            </div>
           </div>
         </section>
 
@@ -332,7 +331,7 @@ export default function LandingPage({
               <p className="lv2-scene-support">{korean ? "인용에는 문서 버전, 페이지와 좌표가 함께 남습니다." : "The document version, page and coordinates stay with the citation."}</p>
             </div>
             {home ? <HeroSourceCard view={home} korean={korean} /> : null}
-            <details className={heroStyles.contextDisclosure}>
+            <details className={heroStyles.contextDisclosure} open>
               <summary>{korean ? "이 구절에 필요한 맥락" : "The context this passage needs"}</summary>
               <p>{page.difficulty.support}</p>
             {home && selected ? (
@@ -432,8 +431,7 @@ export default function LandingPage({
                 </p>
               </article>
 
-              <details className={heroStyles.receiveNotes}>
-                <summary>{korean ? "기록 읽기" : "Read the record"}</summary>
+              <div className={heroStyles.receiveNotes}>
                 <ul className={heroStyles.noteList}>
                   {page.receive.notes.map(note => (
                     <li key={note.title}>
@@ -453,7 +451,7 @@ export default function LandingPage({
                   </ol>
                 </div>
                 <p className={heroStyles.rights}>{page.receive.rights}</p>
-              </details>
+              </div>
             </div>
             <p className="lv2-scene-note lv2-small">{landingV2HeroExtra(korean).entityDisclaimer}</p>
           </div>
@@ -468,11 +466,10 @@ export default function LandingPage({
           data={data.recompile}
           sectionId="s4"
           sceneIndex={4}
-          compact
         />
-        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} compact />
+        <TrustScene locale={locale} copy={copy.trust} sectionId="s5" sceneIndex={5} />
         <HomeReaderGuide korean={korean} faqOnly />
-        <StartScene locale={locale} copy={copy.start} actions={startActions} sectionId="s6" sceneIndex={6} />
+        <StartScene locale={locale} copy={copy.start} actions={heroActions} sectionId="s6" sceneIndex={6} />
       </main>
       <PublicSiteFooter korean={korean} />
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   CONSENT_ANCHOR_ATTRIBUTE,
@@ -44,16 +44,21 @@ export function MarketingConsentLink() {
         Four separate review lenses reported the same run-on string. Owning the separator here
         means it cannot outlive the thing it separates -- and the label itself still comes from
         `consentCopy`, never from a word typed into this file.
+
+        Release 2: the separator is its own aria-hidden span, between two items, so the footer can
+        drop it where the legal row becomes a grid (no line may start with a stray dot).
       */}
-      {" · "}
-      <button
-        type="button"
-        className={styles.settings}
-        {...{ [CONSENT_ANCHOR_ATTRIBUTE]: "" }}
-        onClick={() => window.dispatchEvent(new CustomEvent(CONSENT_EDIT_EVENT))}
-      >
-        {consentCopy(pathname).settings}
-      </button>
+      <span className="site-footer-legal-sep" aria-hidden="true">·</span>
+      <span className="site-footer-legal-pair">
+        <button
+          type="button"
+          className={styles.settings}
+          {...{ [CONSENT_ANCHOR_ATTRIBUTE]: "" }}
+          onClick={() => window.dispatchEvent(new CustomEvent(CONSENT_EDIT_EVENT))}
+        >
+          {consentCopy(pathname).settings}
+        </button>
+      </span>
     </>
   );
 }
@@ -63,6 +68,14 @@ type AnalyticsWindow = Window & {
   gtag?: (...args: unknown[]) => void;
   "ga-disable-G-XQ6Z2RJME7"?: boolean;
 };
+/**
+ * Release 2 (orchestrator decision, 2026-10-15): the first-time prompt is not on the first paint.
+ * It appears after the first scroll past `scrollPx` or `delayMs` after load, whichever comes first,
+ * and at once when the footer's reopen control asks for it. Nothing loads before a
+ * choice either way -- the vendor gate below reads `consent`, not this.
+ */
+export const CONSENT_REVEAL = { scrollPx: 200, delayMs: 8000 } as const;
+
 const denied = { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" };
 
 function disableAnalytics() {
@@ -85,14 +98,14 @@ export default function MarketingConsent() {
   // passed down, because the footer is a server component several trees away and the only thing
   // this component needs to know about it is whether it is there.
   const [anchored, setAnchored] = useState(false);
+  // Release 2: whether the first-time prompt may show yet (see CONSENT_REVEAL).
+  const [revealed, setRevealed] = useState(false);
 
   /*
-    The server and the first client render reserve the prompt's real document-flow geometry.
-    Read a stored choice in the layout phase so a returning reader loses that reservation before
-    the browser paints; a first-time reader keeps the same box the server sent. Using a passive
-    effect here inserted the whole notice after first paint and shifted every public route.
+    The server and the first client render draw nothing: the prompt is a fixed card that reserves
+    no document-flow space, so mounting it later shifts nothing.
   */
-  useLayoutEffect(() => {
+  useEffect(() => {
     try { setConsent(readConsent(window.localStorage)); } catch { /* storage denied: ask, do not collect */ }
     setReady(true);
     const sync = () => {
@@ -101,7 +114,7 @@ export default function MarketingConsent() {
     window.addEventListener("storage", sync);
     const onNav = (event: Event) => setNavOpen(Boolean((event as CustomEvent).detail?.open));
     window.addEventListener(NAV_OPEN_EVENT, onNav);
-    const onEdit = () => setEditing(true);
+    const onEdit = () => { setEditing(true); setRevealed(true); };
     window.addEventListener(CONSENT_EDIT_EVENT, onEdit);
     return () => {
       window.removeEventListener("storage", sync);
@@ -109,6 +122,16 @@ export default function MarketingConsent() {
       window.removeEventListener(CONSENT_EDIT_EVENT, onEdit);
     };
   }, []);
+
+  useEffect(() => {
+    if (revealed) return;
+    const reveal = () => setRevealed(true);
+    const onScroll = () => { if (window.scrollY > CONSENT_REVEAL.scrollPx) reveal(); };
+    const timer = window.setTimeout(reveal, CONSENT_REVEAL.delayMs);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll(); // a restored scroll position already counts
+    return () => { window.clearTimeout(timer); window.removeEventListener("scroll", onScroll); };
+  }, [revealed]);
 
   // Per navigation: a route with the site footer and a route without it are different answers,
   // and a client-side navigation between them changes nothing else this component watches.
@@ -171,10 +194,9 @@ export default function MarketingConsent() {
     if (!allowed && document.getElementById("tavonel-google-tag")) window.location.reload();
   }
 
-  const surface = !ready && location && !navOpen
-    ? "prompt"
-    : consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
+  const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
   if (surface === "nothing") return null;
+  if (surface === "prompt" && !revealed) return null;
   /*
     G1-033. After a choice the reopen control is the footer's, so this draws nothing -- unless the
     page has no footer to carry it, in which case the old floating pill is the only withdrawal
@@ -184,7 +206,13 @@ export default function MarketingConsent() {
     if (anchored) return null;
     return <button className={`${styles.settings} ${styles.floating}`} onClick={() => setEditing(true)}>{copy.settings}</button>;
   }
-  return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="">
+  // Escape closes the card as the refuse button does; reopened from the footer, it only closes.
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    if (consent === null) choose(false);
+    else setEditing(false);
+  };
+  return <section className={styles.panel} aria-label={copy.region} data-marketing-consent-panel="" onKeyDown={onKeyDown}>
     <div className={styles.inner}>
       <p>{copy.prompt} <a href="/privacy">{copy.privacy}</a></p>
       <div className={styles.actions}>

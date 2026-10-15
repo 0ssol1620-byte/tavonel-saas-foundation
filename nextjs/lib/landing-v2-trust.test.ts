@@ -170,6 +170,18 @@ describe("landing scene 08 -- trust", () => {
     expect(hrefs, "the trust scene links a destination twice").toEqual([...new Set(hrefs)]);
   });
 
+  /*
+    Redesign R2 (2026-10-15): each proof's title is a plain heading and its link is a quiet "Read"
+    under the scope sentence, whose accessible name still starts with that word and carries the title.
+  */
+  it.each(LOCALES)("%s titles each proof as a heading, not a link, and names its Read link by the title", (locale) => {
+    const html = render(locale);
+    const read = locale === "ko" ? "읽기" : "Read";
+    expect(html.match(/<h3 class="lv2-proof-label">[^<]+<\/h3>/g)).toHaveLength(4);
+    expect(html.match(new RegExp(`aria-label="${read}: [^"]+"`, "g"))).toHaveLength(4);
+    expect(html.match(/class="lv2-proof-read"/g)).toHaveLength(4);
+  });
+
   it.each(LOCALES)("%s prints no figure, because this scene measured nothing", (locale) => {
     expect(text(render(locale))).not.toMatch(/\d/);
   });

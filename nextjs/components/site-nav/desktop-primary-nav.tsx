@@ -5,6 +5,17 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { HEADER_NAV, KO_CHROME, customerNavCurrent } from "@/lib/site-navigation";
 
+/**
+ * The header's filled action, which never points at the page it is on (Release 2 critic: on
+ * /explore it linked to itself). Route-aware, so it lives in this client file; the header passes
+ * the words and the class.
+ */
+export function HeaderCta({ href, label, className }: { href: string; label: string; className: string }) {
+  const pathname = usePathname();
+  if (pathname === href || pathname === `/ko${href}`) return null;
+  return <Link className={className} href={href as Route} prefetch={false}>{label}</Link>;
+}
+
 /** Three direct destinations; no menu that makes customers learn the repository structure. */
 export default function DesktopPrimaryNav({ korean = false }: { korean?: boolean }) {
   const pathname = usePathname();

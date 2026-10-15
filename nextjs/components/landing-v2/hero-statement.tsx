@@ -7,14 +7,12 @@ export default function HeroStatement({
   accent,
   headlineVariant = "a",
   children,
-  showSupport = true,
 }: {
   copy: LandingV2HeroCopy;
   titleId: string;
   accent?: string;
   headlineVariant?: LandingVariant;
   children?: React.ReactNode;
-  showSupport?: boolean;
 }) {
   const arm = headlineVariant === "a" ? undefined : copy.headlineExperiment?.[headlineVariant];
   const lines = arm ? arm.split(SENTENCES).filter(Boolean) : copy.headline.split(SENTENCES).filter(Boolean);
@@ -39,8 +37,9 @@ export default function HeroStatement({
           );
         })}
       </h1>
+      {/* Brief move 1: the one sentence that says what this is comes before any action or film. */}
+      <p className="lv2-hero-support lv2-body-l">{copy.support}</p>
       {children}
-      {showSupport ? <p className="lv2-hero-support lv2-body-l">{copy.support}</p> : null}
     </div>
   );
 }

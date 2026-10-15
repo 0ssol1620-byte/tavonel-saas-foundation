@@ -261,10 +261,13 @@ test("keeps the summary first and supports keyboard reading and Change navigatio
   const width = page.viewportSize()!.width;
   expect([390, 1440]).toContain(width);
   await page.goto(ROUTE);
+  // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+  await page.evaluate(() => window.scrollTo(0, 300));
   const consent = page.getByRole("region", { name: "Optional analytics" });
   await expect(consent).toBeVisible();
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
   await expect(consent).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, 0));
 
   const summary = page.locator('[aria-labelledby="working-summary"]');
   const compare = summary.getByRole("link", { name: "Compare the public World versions", exact: true });

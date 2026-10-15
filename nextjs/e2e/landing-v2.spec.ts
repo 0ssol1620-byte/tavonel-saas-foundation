@@ -113,10 +113,8 @@ for (const route of ["/", "/ko"]) {
   */
   test(`${route} maps the hero's access action from the commercial state to a locale-correct destination`, async ({ page }) => {
     const path = route as keyof typeof EVALUATION;
-    await page.goto("/ko");
-    const resolved = await page.locator('#s6 [data-scene-next="start"]').getAttribute("href");
-    expect(resolved).toMatch(/^\/[a-z]/);
-
+    // Brief 2026-10-15 move 1: the close no longer prints the commercial action, so the hero's own
+    // access link is what tells the two postures apart.
     await page.goto(path);
     const actions = page.locator("#s1 .lv2-actions");
     const hrefs = await actions.locator("a").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));
@@ -126,7 +124,9 @@ for (const route of ["/", "/ko"]) {
     await expect(access).toHaveCount(1);
     if (path === "/ko") expect(await access.getAttribute("href"), "the Korean hero never sends a reader to the English inquiry").not.toBe("/contact");
 
-    if (resolved === "/ko/contact") {
+    const resolved = await access.getAttribute("href");
+    expect(resolved).toMatch(/^\/[a-z]/);
+    if (resolved === EVALUATION[path].href) {
       const evaluation = EVALUATION[path];
       await expect(access).toHaveAttribute("href", evaluation.href);
       await expect(access).toHaveText(evaluation.label);
@@ -142,25 +142,17 @@ for (const route of ["/", "/ko"]) {
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Your documents. Connected knowledge.");
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Knowledge your AI can trust.");
 });
-test("Korean close follows its commercial destination and keeps Korean pricing", async ({ page }) => {
+test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
   await page.goto("/ko");
   const close = page.locator("#s6"), action = close.locator('[data-scene-next="start"]');
   await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
-  const destination = await action.getAttribute("href");
-  expect(destination).toMatch(/^(\/ko\/contact|\/login)$/);
-  await Promise.all([page.waitForURL(url => url.pathname === destination), action.click()]);
-  if (destination === "/ko/contact") {
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("도입을 함께 검토합니다");
-    await expect(page.getByRole("button", { name: "문의 보내기" })).toBeVisible();
-    await expect(page.locator('input[name="name"]')).toHaveAttribute("required", "");
-    await expect(page.getByRole("contentinfo").getByRole("link", { name: "English" })).toHaveAttribute("href", "/contact");
-    if ((page.viewportSize()?.width ?? 1440) <= 390) {
-      const formTop = await page.locator("form").evaluate((form) => form.getBoundingClientRect().top);
-      expect(formTop, "the mobile inquiry form should begin in the first viewport").toBeLessThan(844);
-    }
-  } else await expect(page.locator('input[type="email"]')).toBeVisible();
+  // Brief 2026-10-15 move 1: same words and destination as the hero and the header.
+  await expect(action).toHaveAttribute("href", "/explore");
+  await expect(action).toHaveText("공개 샘플 살펴보기");
+  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveText("공개 샘플 살펴보기");
+  await Promise.all([page.waitForURL(url => url.pathname === "/explore"), action.click()]);
 });
 test("the English close keeps its start action on an English destination", async ({ page }) => {
   await page.goto("/");
@@ -173,7 +165,7 @@ test("the English close keeps its start action on an English destination", async
 test("film follows the headline actions without a separate opening action", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film).toBeVisible();
   await expect(film.locator("img")).toHaveCount(1);
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);

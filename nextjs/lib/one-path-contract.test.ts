@@ -263,12 +263,12 @@ describe("approved one-path experience", () => {
     expect(composition, "the evaluation action names the actual bilingual destination")
       .toContain('korean ? "/ko/evaluation" : "/evaluation"');
     expect(composition).toContain("startHref={heroStart.href}");
-    expect(composition).toContain("const startActions");
+    // Brief 2026-10-15 move 1: the close takes the hero's own sample action, not a separate access pair.
+    expect(composition).toContain("actions={heroActions}");
     expect(text("components/landing-v2/scenes/start.tsx"), "the pricing link remains in the Korean journey")
       .toContain('"/ko/pricing"');
-    expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : startActions.accessHref');
+    expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href');
     expect(composition).not.toContain("pricingHref");
-    expect(composition, "the close keeps the resolved access actions").toContain("actions={startActions}");
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');
