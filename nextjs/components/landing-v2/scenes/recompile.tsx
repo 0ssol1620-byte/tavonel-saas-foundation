@@ -112,7 +112,7 @@ export default function Scene({
       <RevisionBadge beforeLabel={beforeLabel} afterLabel={afterLabel} arrivalsLabel={copy.arrivalsLabel}
         arrivals={data.arrivals} className={styles.source} />
       <svg className={styles.fan} viewBox={FAN_VIEWBOX} preserveAspectRatio="none" aria-hidden="true">
-        <path d={fanPath(data.affectedSample.length)} vectorEffect="non-scaling-stroke" />
+        <path d={fanPath(data.affectedSample.length)} pathLength={1} vectorEffect="non-scaling-stroke" />
       </svg>
       <div className={styles.objects}>
         <p className="lv2-meta" id={objectsId}>{copy.affectedLabel}{sharedState ? ` · ${landingV2StateWord(sharedState, locale)}` : ""}</p>
