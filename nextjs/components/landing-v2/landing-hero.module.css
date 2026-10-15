@@ -112,13 +112,7 @@ section.hero .layout {
   letter-spacing: -0.035em;
 }
 
-.intro :global(.lv2-hero-support) {
-  margin: 0;
-  max-width: 34rem;
-  color: var(--home-muted);
-  font-size: 1.0625rem;
-  line-height: 1.5;
-}
+/* The hero support sentence has one rule: `.lv2-hero-support` in source-first-home.module.css. */
 
 @media (min-width: 960px) {
   .intro {
@@ -131,7 +125,6 @@ section.hero .layout {
 
   .intro :global(.lv2-eyebrow) { grid-area: eyebrow; }
   .intro :global(.lv2-hero-h1) { grid-area: title; }
-  .intro :global(.lv2-hero-support) { grid-area: support; }
   .actionsBlock { grid-area: actions; }
 }
 
@@ -692,8 +685,9 @@ section.hero .intake {
 
 /* -------------------------------------------------------------- 02 why this case is difficult */
 
+/* Paper, not a stone band: section boundaries are one 1px rule (brief 2026-10-15, move 4). */
 section.difficulty {
-  background: var(--home-stone);
+  background: var(--home-paper);
   color: var(--home-ink);
 }
 
@@ -716,12 +710,6 @@ section.difficulty {
 .splitHead,
 .receiveHead {
   min-width: 0;
-}
-
-.splitHead :global(.lv2-h2) {
-  font-size: clamp(1.75rem, 1.1rem + 2.2vw, 2.75rem);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
 }
 
 .splitHead :global(.lv2-scene-support),
@@ -800,12 +788,6 @@ section.receive {
 
 .receiveHead {
   max-width: 52rem;
-}
-
-.receiveHead :global(.lv2-h2) {
-  font-size: clamp(2rem, 1.2rem + 3vw, 3.5rem);
-  line-height: 1.04;
-  letter-spacing: -0.035em;
 }
 
 .receiveGrid {
@@ -896,6 +878,19 @@ section.receive {
 
 .receiveNotes {
   min-width: 0;
+}
+
+/*
+  What stays folded keeps a visible marker. The shared sheet turns every summary into inline-flex
+  on touch and below 1080px, which drops ::marker; list-item restores it, padding holds 44px.
+*/
+.contextDisclosure > summary,
+.receiveNotes > summary,
+.readerFaq summary {
+  display: list-item;
+  min-height: 44px;
+  padding-block: 0.625rem;
+  cursor: pointer;
 }
 
 .noteList {
@@ -1005,11 +1000,6 @@ section.receive {
     display: inline;
   }
 
-  .intro :global(.lv2-hero-support) {
-    font-size: 1rem;
-    line-height: 1.5;
-  }
-
   .actionsBlock :global(.lv2-actions) {
     gap: 0.25rem 1rem;
   }
@@ -1107,10 +1097,18 @@ section.receive {
 }
 
 /* The accepted concept's reading guide, with the current sample's status and real access path. */
+/* Same rhythm and boundary as every Home section: 120 / 72 and one 1px rule. */
 .readerGuide {
-  padding-block: clamp(2.5rem, 6vw, 4.5rem);
+  padding-block: 120px;
+  border-bottom: 1px solid var(--home-rule);
   background: var(--home-paper);
   color: var(--home-ink);
+}
+
+@media (max-width: 767px) {
+  .readerGuide {
+    padding-block: 72px;
+  }
 }
 
 .readerLayout {
@@ -1124,13 +1122,22 @@ section.receive {
   min-width: 0;
 }
 
+/* A section H2 like every other on Home (brief §4.4: 52px / 1.04 / -0.03em, 600). */
 .readerHead h2,
 .readerFaq h2 {
   margin: 0;
   color: var(--home-ink);
-  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
+  font-size: clamp(32px, 3.6vw, 52px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+.readerHead h2:lang(ko),
+.readerFaq h2:lang(ko) {
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  word-break: keep-all;
 }
 
 .readerGuide p {
@@ -1323,12 +1330,6 @@ section.receive {
   overflow-wrap: anywhere !important;
 }
 
-.home section.hero .intro :global(.lv2-hero-support) {
-  max-width: 38rem !important;
-  font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem) !important;
-  line-height: 1.6 !important;
-}
-.home section.hero .intro :global(.lv2-hero-support):lang(ko) { line-height: 1.75 !important; word-break: keep-all !important; }
 
 .home section.hero .actionsBlock :global(.btn.lv2-cta) {
   min-height: 48px !important;
@@ -1436,17 +1437,11 @@ section.receive {
   .home section.hero .intro :global(.lv2-hero-text) { display: block !important; max-width: none !important; }
   .home section.hero .intro :global(.lv2-hero-h1) { max-width: none !important; margin-inline: auto; font-size: clamp(36px, 4.2vw, 64px) !important; line-height: 1.1 !important; }
   .home section.hero .intro :global(.lv2-h1-line) { display: inline !important; white-space: normal !important; }
-  .home section.hero .intro :global(.lv2-hero-support) { max-width: 56ch !important; margin: 24px auto 0 !important; }
   .home section.hero .actionsBlock { margin: 20px auto 0; text-align: center !important; }
   .home section.hero .actionsBlock :global(.lv2-hero-actions) { justify-content: center; }
-  .home .film { width: min(100%, 1040px); margin: 28px auto 0 !important; border: 0 !important; }
   .home .filmBody { margin: 0 !important; padding: 0 !important; }
   .home .film figcaption { margin-top: 12px; font-size: 13px; line-height: 1.5; color: var(--home-muted); }
   .home .proofLayout { display: grid; gap: 28px; }
-  .home .contextDisclosure { width: min(100%, 840px); margin-inline: auto; border-top: 1px solid var(--home-rule); }
-  .home .contextDisclosure > summary, .home .receiveNotes > summary { min-height: 44px; padding-block: 12px; cursor: pointer; color: var(--home-ink); font-size: 16px; }
-  .home .contextDisclosure .diffList { margin-top: 20px; }
-  .home .receiveNotes { border-top: 1px solid var(--home-rule); padding-top: 0; }
   .home .readerLayout { display: block !important; max-width: 900px; }
   .home .readerFaq { width: 100%; }
   .measurement { padding-block: clamp(44px, 6vw, 80px); background: #fbfaf7; color: #15191d; border-top: 1px solid #d8d5ce; }
@@ -1473,8 +1468,7 @@ section.receive {
 }
 
 @layer overrides {
-  .home section.hero .intro :global(.lv2-hero-h1),
-  .home section.hero .intro :global(.lv2-hero-support) { text-align: center !important; }
+  .home section.hero .intro :global(.lv2-hero-h1) { text-align: center !important; }
   .home section.hero .film :global(.compile-film-caption p),
   .home section.hero .film :global(.compile-film-progress),
   .home section.hero .film :global(.compile-film-mobile-tools p) { color: #4b5057 !important; }

@@ -308,10 +308,9 @@ export default function LandingPage({
                 <HeroFilm korean={korean} />
               </HeroStatement>
             </div>
-            <details className={sourceStyles.formats}>
-              <summary>{korean ? "지원하는 원문 형식" : "Supported source formats"}</summary>
+            <div className={sourceStyles.formats}>
               <p className={`lv2-hero-intake lv2-meta ${heroStyles.intake}`}>{SOURCES_COPY[locale].formatsLabel} · {formats}</p>
-            </details>
+            </div>
           </div>
         </section>
 
