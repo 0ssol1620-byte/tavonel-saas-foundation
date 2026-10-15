@@ -212,7 +212,8 @@ describe("approved one-path experience", () => {
     expect(composition, "the evaluation action names the actual bilingual destination")
       .toContain('korean ? "/ko/evaluation" : "/evaluation"');
     expect(composition).toContain("startHref={heroStart.href}");
-    expect(composition).toContain("const startActions");
+    // Brief 2026-10-15 move 1: the close takes the hero's own sample action, not a separate access pair.
+    expect(composition).toContain("actions={heroActions}");
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');

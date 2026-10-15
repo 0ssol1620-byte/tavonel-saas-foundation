@@ -28,12 +28,11 @@ test("mobile public navigation remains reachable", async ({ page }, testInfo) =>
     every section the bar offers is reachable on a phone.
   */
   const direct = menu.locator(":scope > nav a.mobile-nav-direct");
-  await expect(direct).toHaveCount(4);
-  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs"]);
-  await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
-  // BQ-059: the header keeps the action at every width; the sheet is the sections and Sign in.
+  // Brief 2026-10-15 move 6: below the desktop switch Pricing is the sheet's last section row.
+  await expect(direct).toHaveCount(5);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
+  await expect(page.locator("header.nav .nav-actions")).toBeHidden();
   await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
-  await expect(page.locator('header .nav-actions a[href="/pricing"]')).toHaveCount(1);
   await expect(menu.locator("details.mobile-nav-group")).toHaveCount(0);
 });
 

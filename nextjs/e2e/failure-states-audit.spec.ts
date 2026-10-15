@@ -160,6 +160,9 @@ test("a compile that fails on the server names the failure and where to look", a
 });
 
 test("the Explore stage has no free-text search, so it has no empty result to strand anyone in", async ({ page }) => {
+  // Release 2: the consent card appears 8 s after mount and could cover a target mid-test; this spec is
+  // not about consent, so it starts with a stored refusal.
+  await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
   await page.goto("/explore");
   const dismiss = page.getByRole("button", { name: "No thanks", exact: true });
   if (await dismiss.isVisible()) await dismiss.click();

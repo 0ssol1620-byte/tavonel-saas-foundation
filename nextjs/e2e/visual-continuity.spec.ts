@@ -47,7 +47,7 @@ test.describe("visual continuity — locked film side", () => {
       (.one-path-world-stage, one-path-works-film) still stays out.
     */
     await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
-    await expect(page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
+    await expect(page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]')).toHaveCount(1);
     await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();

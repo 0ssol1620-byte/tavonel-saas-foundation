@@ -4,8 +4,10 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { getImageProps } from "next/image";
 import type { Route } from "next";
-import { caseStatus, displayableRegions, publishableClaims, type EvidenceCase, type EvidenceRegion } from "@/lib/home-evidence-view";
+import { caseStatus, displayableRegions, evidenceLineLabel, publishableClaims, type EvidenceCase, type EvidenceRegion } from "@/lib/home-evidence-view";
 import styles from "./landing-hero.module.css";
+import { WorkbenchEvidenceLine } from "./evidence-connector";
+import { SourceRegionCrop } from "./source-region";
 
 /*
   The Home workbench: source -> highlighted passage -> inspectable record.
@@ -188,6 +190,11 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
   const qualifier = source.representation === "reference_render" ? QUALIFIER[locale].reference_render : QUALIFIER[locale].original;
   const where = (region: EvidenceRegion) =>
     `${korean ? `${region.page}쪽` : `p.${region.page}`} · bbox ${region.bbox1000.join(",")}`;
+  /* Brief move 5: one data-derived label per region, by the letter the workbench prints beside it. */
+  const lineLabels = Object.fromEntries(
+    regions.map((region, index) => [region.id, evidenceLineLabel(source, region, letter(index), korean)]),
+  );
+  const activeLabel = lineLabels[active.id]!;
   /* The page window spans the regions plus a margin each way, so every selectable box is in view. */
   const windowStart = Math.max(0, Math.min(...regions.map(region => region.bbox1000[1])) - 80);
   const windowEnd = Math.min(1000, Math.max(...regions.map(region => region.bbox1000[3])) + 80);
@@ -273,14 +280,34 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
           </p>
         </div>
 
-        <div className={`${styles.passagePane} ${styles.step}`} data-step={t.steps.passage} id={passageId} aria-live="polite">
+        <div className={`${styles.passagePane} ${styles.step}`} data-step={t.steps.passage} id={passageId} aria-live="polite" data-line-region={active.id}>
           <p className={styles.paneLabel}>
             <span className={styles.extracted}>{t.existing}</span>
             <span>{t.roles[active.role]}</span>
           </p>
-          <blockquote className={styles.quote} lang="en" data-derived="1">
-            {active.passage}{active.passageTruncated ? "…" : ""}
-          </blockquote>
+          {/* Where no line can be drawn (below 960px the grid stacks), the line's label sits on the card. */}
+          <p className={styles.lineLabel} data-derived="1" data-evidence-card-label="">
+            <span>{activeLabel.human}</span> <code>{activeLabel.coordinates}</code>
+          </p>
+          {/*
+            Brief move 8: the page region the passage was read from, cut out of the same committed
+            raster at the region's own bbox, straight above the extractor's text. The text is left
+            exactly as extracted; the crop is what lets a reader match it to the printed lines.
+          */}
+          <div className={styles.passageMatch}>
+            {page.image ? (
+              <SourceRegionCrop
+                className={styles.crop}
+                src={page.image.src}
+                width={page.image.width}
+                height={page.image.height}
+                bbox1000={active.bbox1000}
+              />
+            ) : null}
+            <blockquote className={styles.quote} lang="en" data-derived="1">
+              {active.passage}{active.passageTruncated ? "…" : ""}
+            </blockquote>
+          </div>
           <p className={styles.contextNote}>{active.role === "selected" ? t.selectedNote : t.contextNote}</p>
           {active.href ? (
             <Link className={styles.evidenceLink} href={active.href as Route} prefetch={false} data-hero-evidence data-analytics="source-open">
@@ -299,6 +326,7 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
                   className={styles.regionButton}
                   aria-pressed={region.id === active.id}
                   aria-controls={passageId}
+                  data-line-region={region.id}
                   aria-label={`${t.roles[region.role]} ${where(region)}`}
                   onClick={() => setSelectedId(region.id)}
                 >
@@ -376,6 +404,7 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
           </ul>
         </details>
       </footer>
+      <WorkbenchEvidenceLine labels={lineLabels} />
     </article>
   );
 }

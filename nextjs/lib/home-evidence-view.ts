@@ -249,6 +249,92 @@ export function selectHomeCase(candidates: readonly (EvidenceCase | null)[]): Ev
   return null;
 }
 
+/* ---------------------------------------------------------------- the "What you receive" claim */
+
+/*
+  Which World claim Home quotes under "What you receive" (brief move 8). The rule is mechanical so
+  the choice is never a matter of which sentence reads best: it looks only at the claim's text as
+  the World stores it, and the first candidate that passes, in the order given (the World's node
+  order), is the one quoted. A claim that fails is skipped, never rewritten to pass.
+
+  A claim passes when its text
+    1. is one sentence: it opens with an uppercase letter, ends with ".", "!" or "?" (a closing
+       quote or bracket may follow), and has no sentence end followed by a capitalised word inside;
+    2. ends at its own sentence end, not at an abbreviation the splitter cut at ("... Apple Inc.");
+    3. carries no "®" or "™": the extractor leaves those marks as detached tokens, often between a
+       heading and the sentence under it;
+    4. does not open with a heading: its first two words are not both capitalised. A heading the
+       extractor ran into the body ("Business Company Background The Company designs ...") opens
+       the text with a run of capitalised words.
+  Rule 4 also turns away clean sentences that open with two capitalised words ("This Annual Report
+  ..."). That is deliberate: the rule may pass over a clean claim; it must not admit a run-on.
+
+  A clean sentence can still be boilerplate rather than something the document says about its
+  subject, so a claim is representative only when it also
+    5. carries no forward-looking / safe-harbour language: none of "forward-looking", "safe
+       harbor", "Private Securities Litigation Reform Act" or "undue reliance" (any case);
+    6. does not open as a fragment of an example or a list: not "For example," nor "Such as";
+    7. has at least 12 words, counted as whitespace-separated tokens.
+  Rules 5-7 read the same stored text, so they too can only skip a claim, never edit one.
+*/
+const SPLIT_ABBREVIATION = /\b(?:Inc|Co|Corp|Ltd|No)\.$/u;
+const SAFE_HARBOUR = /forward[-\s]looking|safe[-\s]harbou?r|Private Securities Litigation Reform Act|undue reliance/iu;
+const FRAGMENT_OPENING = /^(?:For example,|Such as\b)/iu;
+const MIN_CLAIM_WORDS = 12;
+
+export function isClaimWithoutHeadingRunOn(text: string): boolean {
+  if (!/^\p{Lu}/u.test(text) || !/[.!?]["”’)]?$/u.test(text)) return false;
+  if (/[.!?]["”’)]?\s+["“‘(]?\p{Lu}/u.test(text)) return false;
+  if (SPLIT_ABBREVIATION.test(text) || /[®™]/u.test(text)) return false;
+  const second = text.split(/\s+/u)[1];
+  return second === undefined || !/^\p{Lu}/u.test(second);
+}
+
+/** Rules 5-7: safe-harbour language, an example/list fragment, or too short to say anything. */
+export function isBoilerplateClaim(text: string): boolean {
+  const trimmed = text.trim();
+  return SAFE_HARBOUR.test(trimmed) || FRAGMENT_OPENING.test(trimmed) ||
+    trimmed.split(/\s+/u).length < MIN_CLAIM_WORDS;
+}
+
+/** Rules 1-7: one clean sentence that is not boilerplate. */
+export function isRepresentativeClaim(text: string): boolean {
+  return isClaimWithoutHeadingRunOn(text) && !isBoilerplateClaim(text);
+}
+
+/** The first candidate, in the order given, whose `label` passes `isRepresentativeClaim`, or null. */
+export function selectReceiveClaim<T extends { label: string }>(candidates: readonly T[]): T | null {
+  return candidates.find(candidate => isRepresentativeClaim(candidate.label)) ?? null;
+}
+
+/* ------------------------------------------------------------- brief move 5: the Evidence Line */
+
+export type EvidenceLineLabel = {
+  /** `SOURCE · 10-Q · p.4 · [x0,y0 → x1,y1]`: the record's form, page and bbox, nothing else. */
+  coordinates: string;
+  /** The same place for a reader who does not read coordinates: `page 4 · region A`. */
+  human: string;
+};
+
+/**
+ * The label the Evidence Line carries to a region. Every figure is the record's own: the form as
+ * the source states it (left out when the source has none), the page, and the bbox in per mille
+ * exactly as stored. `mark` is the letter the workbench already prints beside the region.
+ */
+export function evidenceLineLabel(
+  source: Pick<EvidenceSource, "form">,
+  region: Pick<EvidenceRegion, "page" | "bbox1000">,
+  mark: string,
+  korean = false,
+): EvidenceLineLabel {
+  const [x0, y0, x1, y1] = region.bbox1000;
+  return {
+    coordinates: ["SOURCE", source.form, `p.${region.page}`, `[${x0},${y0} → ${x1},${y1}]`]
+      .filter(Boolean).join(" · "),
+    human: korean ? `${region.page}쪽 · 영역 ${mark}` : `page ${region.page} · region ${mark}`,
+  };
+}
+
 /* ------------------------------------------------------------------------------ the default */
 
 /*

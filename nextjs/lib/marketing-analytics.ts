@@ -129,14 +129,15 @@ export type ConsentCopy = {
   was.
 
   The length is a layout constraint and it is worth writing down rather than leaving as a mystery
-  for the next editor: the banner is a 56px bar on a phone, the buttons beside the sentence take
-  ~190px of a 412px viewport and may not shrink below the 44px touch floor, and the sentence has
-  three 11px lines to live in. A sentence added here comes out of nothing else -- it comes out of
-  the bar's height.
+  for the next editor: below 900px the card is two rows, the sentence with its Privacy link
+  (12px/1.3) above two equal 44px buttons, and it may not grow past 96px tall at 360px wide.
+  Release 2 (2026-10-15) folded "Workspace content is never included." into ", never workspace
+  content." because the old sentence measured 110.8px at 360 and the new one 95.2px. A sentence
+  added here comes out of nothing else -- it comes out of the card's height.
 */
 const CONSENT_COPY_EN: ConsentCopy = {
   region: "Optional analytics",
-  prompt: "Google Analytics cookies measure visits and clicks on public pages. Workspace content is never included.",
+  prompt: "Google Analytics cookies measure visits and clicks on public pages, never workspace content.",
   privacy: "Privacy notice",
   refuse: "No thanks",
   allow: "Allow analytics",
@@ -145,7 +146,7 @@ const CONSENT_COPY_EN: ConsentCopy = {
 
 const CONSENT_COPY_KO: ConsentCopy = {
   region: "선택 분석",
-  prompt: "Google Analytics 쿠키는 공개 페이지의 방문과 클릭을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
+  prompt: "Google Analytics 쿠키는 공개 페이지의 방문과 클릭을 측정하며, 워크스페이스 내용은 제외합니다.",
   privacy: "개인정보 처리방침",
   refuse: "허용하지 않음",
   allow: "분석 허용",

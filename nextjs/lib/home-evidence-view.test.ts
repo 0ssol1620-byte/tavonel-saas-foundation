@@ -1,19 +1,29 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import HeroSourceCard from "../components/landing-v2/hero-source-card";
+import { CROP_MARGIN_PX, SourceRegionCrop } from "../components/landing-v2/source-region";
+import { WorkbenchEvidenceLine, workbenchLineGeometry } from "../components/landing-v2/evidence-connector";
 import {
   assertEvidenceCase,
   buildHomeEvidenceCase,
   caseStatus,
   claimPublication,
   displayableRegions,
+  evidenceLineLabel,
   HOME_RESERVED_CASE,
+  isBoilerplateClaim,
+  isClaimWithoutHeadingRunOn,
+  isRepresentativeClaim,
   officialFilingFor,
   publishableClaims,
   selectHomeCase,
+  selectReceiveClaim,
   type EvidenceCase,
   type EvidenceClaim,
   type EvidenceRegion,
 } from "./home-evidence-view";
-import { buildHeroView, buildProofTabs } from "./landing-v2-runtime";
+import { buildEvidenceRecord, buildHeroView, buildProofTabs } from "./landing-v2-runtime";
 
 /*
   The Home evidence projection. Two halves:
@@ -410,5 +420,184 @@ describe("rights and the replaceable slot", () => {
     const broken = fixture();
     broken.regions[0] = { ...broken.regions[0]!, digest: DIGEST_B };
     expect(() => selectHomeCase([broken])).toThrow(/digest mismatch/);
+  });
+});
+
+/* ------------------------------------------------------------------- brief move 8: the example */
+
+describe("the What you receive claim rule", () => {
+  it("rejects the claim Home quotes today, whose heading runs into its sentence", () => {
+    const label = buildEvidenceRecord().claim.label;
+    expect(isClaimWithoutHeadingRunOn(label)).toBe(false);
+    expect(selectReceiveClaim([{ label }])).toBeNull();
+  });
+
+  it.each([
+    ["two capitalised opening words", "Fixture Heading The fixture sentence ends here."],
+    ["a detached mark", "The fixture ® line ends here."],
+    ["two sentences", "The fixture ends here. Another fixture follows."],
+    ["a closing quote, then a second sentence", "The fixture says “stop.” Another fixture follows."],
+    ["a cut at an abbreviation", "The fixture belongs to Fixture Inc."],
+    ["a lowercase opening", "and the fixture continues here."],
+    ["no sentence end", "The fixture never ends"],
+  ])("rejects %s", (_reason, text) => {
+    expect(isClaimWithoutHeadingRunOn(text)).toBe(false);
+  });
+
+  it.each([
+    ["forward-looking language", "The fixture sentence here says that these fixture lines are forward-looking statements."],
+    ["a safe harbor", "The fixture sentence here relies on the safe harbor for every fixture line it prints."],
+    ["the Reform Act", "The fixture sentence here cites the Private Securities Litigation Reform Act of the fixture."],
+    ["undue reliance", "The fixture sentence here warns readers not to place undue reliance on any fixture line."],
+    ["an example fragment", "For example, the fixture sentence here runs on for well more than twelve words in all."],
+    ["a list fragment", "Such as the fixture sentence here, which runs on for well more than twelve words in all."],
+    ["fewer than twelve words", "The fixture sentence here has exactly eleven words in it now."],
+  ])("treats %s as boilerplate, even in one clean sentence", (_reason, text) => {
+    expect(isBoilerplateClaim(text)).toBe(true);
+    expect(isRepresentativeClaim(text)).toBe(false);
+    expect(selectReceiveClaim([{ label: text }])).toBeNull();
+  });
+
+  it("accepts one plain sentence, and selects the first passing candidate in the order given", () => {
+    expect(isClaimWithoutHeadingRunOn("For example, the fixture sentence ends here.")).toBe(true);
+    expect(isClaimWithoutHeadingRunOn("The fixture says “stop.”")).toBe(true);
+    const twelve = "The fixture sentence here has exactly twelve words in it right now.";
+    expect(isBoilerplateClaim(twelve)).toBe(false);
+    expect(isRepresentativeClaim(twelve)).toBe(true);
+    const picked = selectReceiveClaim([
+      { id: 1, label: "Fixture Heading The fixture sentence ends here, after more than twelve words in all." },
+      { id: 2, label: "For example, the second fixture runs on for well more than twelve words in all." },
+      { id: 3, label: "The third fixture is the first one here that runs on for twelve words or more." },
+      { id: 4, label: "The fourth fixture also passes, and it too runs on for twelve words or more." },
+    ]);
+    expect(picked?.id).toBe(3);
+  });
+});
+
+describe("the workbench passage and its crop", () => {
+  const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
+  const unescape = (value: string) => value.replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+  it("renders every passage byte-for-byte as the snapshot records it", () => {
+    const value = homeCase();
+    const regions = displayableRegions(value);
+    expect(regions.length).toBeGreaterThan(1);
+    for (const region of regions) {
+      const record = buildHeroView().regions.find(item => item.id === region.id);
+      expect(region.passage).toBe(record?.excerpt);
+      const markup = html(createElement(HeroSourceCard, { view: { ...value, selectedRegionId: region.id } }));
+      const quoted = markup.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
+      expect(quoted, region.id).toBeDefined();
+      expect(unescape(quoted!)).toBe(record!.excerpt);
+    }
+  });
+
+  it("crops the page at exactly the record's bbox, from the page image the case already serves", () => {
+    const value = homeCase();
+    const image = value.pages[0]!.image!;
+    for (const region of displayableRegions(value)) {
+      const record = buildHeroView().regions.find(item => item.id === region.id)!;
+      const markup = html(createElement(SourceRegionCrop, { src: image.src, width: image.width, height: image.height, bbox1000: region.bbox1000, marginPx: 0 }));
+      expect(markup).toContain(`data-bbox1000="${record.bbox1000.join(",")}"`);
+      // A background of the served raster, not a new image element or asset.
+      expect(markup).not.toContain("<img");
+      expect(unescape(markup)).toContain(`background-image:url("${image.src}")`);
+      const [x0, y0, x1, y1] = record.bbox1000;
+      const [w, h] = [x1 - x0, y1 - y0];
+      expect(markup).toContain(`background-size:${100000 / w}% ${100000 / h}%`);
+      expect(markup).toContain(`background-position:${(100 * x0) / (1000 - w)}% ${(100 * y0) / (1000 - h)}%`);
+      expect(markup).toContain(`aspect-ratio:${(w * image.width) / (h * image.height)}`);
+    }
+  });
+
+  /*
+    The extractor's box for the selected passage ends inside its last printed row, so the crop shows
+    a display margin around it. The margin changes what is shown, never what is cited.
+  */
+  it("shows a display margin around the box while its data attributes keep the record's bbox", () => {
+    const value = homeCase();
+    const image = value.pages[0]!.image!;
+    expect(CROP_MARGIN_PX).toBeGreaterThanOrEqual(8);
+    for (const region of displayableRegions(value)) {
+      const record = buildHeroView().regions.find(item => item.id === region.id)!;
+      const markup = html(createElement(SourceRegionCrop, { src: image.src, width: image.width, height: image.height, bbox1000: region.bbox1000 }));
+      expect(markup).toContain(`data-bbox1000="${record.bbox1000.join(",")}"`);
+      expect(region.bbox1000).toEqual(record.bbox1000);
+      const crop = markup.match(/data-crop1000="([^"]+)"/)?.[1]?.split(",").map(Number);
+      const [x0, y0, x1, y1] = record.bbox1000;
+      const mx = (1000 * CROP_MARGIN_PX) / image.width;
+      const my = (1000 * CROP_MARGIN_PX) / image.height;
+      expect(crop).toEqual([Math.max(0, x0 - mx), Math.max(0, y0 - my), Math.min(1000, x1 + mx), Math.min(1000, y1 + my)]);
+      // At least eight raster pixels below the box's bottom edge, where the last row's glyphs end.
+      expect((crop![3]! - y1) * image.height / 1000).toBeGreaterThanOrEqual(Math.min(8, (1000 - y1) * image.height / 1000));
+      const [w, h] = [crop![2]! - crop![0]!, crop![3]! - crop![1]!];
+      expect(markup).toContain(`background-size:${100000 / w}% ${100000 / h}%`);
+      expect(markup).toContain(`aspect-ratio:${(w * image.width) / (h * image.height)}`);
+    }
+  });
+
+  it("clamps the display margin to the page", () => {
+    const markup = html(createElement(SourceRegionCrop, { src: "/fixture.webp", width: 100, height: 100, bbox1000: [0, 10, 1000, 990], marginPx: 16 }));
+    expect(markup).toContain('data-bbox1000="0,10,1000,990"');
+    expect(markup).toContain('data-crop1000="0,0,1000,1000"');
+    expect(markup).toContain("background-size:100% 100%");
+  });
+
+  it("offsets nothing along an axis the box spans in full", () => {
+    const markup = html(createElement(SourceRegionCrop, { src: "/fixture.webp", width: 10, height: 10, bbox1000: [0, 100, 1000, 300], marginPx: 0 }));
+    expect(markup).toContain("background-size:100% 500%");
+    expect(markup).toContain("background-position:0% 12.5%");
+  });
+
+  it("draws nothing for a box that is not a region", () => {
+    expect(html(createElement(SourceRegionCrop, { src: "/fixture.webp", width: 10, height: 10, bbox1000: [500, 10, 400, 20] }))).toBe("");
+  });
+});
+
+/* ---------------------------------------------------------- brief move 5: the Evidence Line */
+
+describe("the Evidence Line", () => {
+  it("labels every workbench region with the snapshot record's form, page and bbox", () => {
+    const value = homeCase();
+    const source = value.sources[0]!;
+    const tab = buildProofTabs().find(item => item.region.id === value.selectedRegionId)!;
+    expect(source.form).toBe(tab.source.form);
+    displayableRegions(value).forEach((region, index) => {
+      const record = buildHeroView().regions.find(item => item.id === region.id)!;
+      const [x0, y0, x1, y1] = record.bbox1000;
+      const mark = String.fromCharCode(65 + index);
+      const label = evidenceLineLabel(source, region, mark);
+      expect(label.coordinates).toBe(`SOURCE · ${tab.source.form} · p.${buildHeroView().source.page} · [${x0},${y0} → ${x1},${y1}]`);
+      expect(label.human).toBe(`page ${buildHeroView().source.page} · region ${mark}`);
+      expect(evidenceLineLabel(source, region, mark, true).human).toBe(`${buildHeroView().source.page}쪽 · 영역 ${mark}`);
+    });
+  });
+
+  it("leaves out a form the source does not state, rather than inventing one", () => {
+    expect(evidenceLineLabel({ form: null }, { page: 3, bbox1000: [1, 2, 3, 4] }, "A").coordinates).toBe("SOURCE · p.3 · [1,2 → 3,4]");
+  });
+
+  const rect = (left: number, top: number, width: number, height: number) =>
+    ({ left, top, width, height, right: left + width });
+
+  it("runs from the passage card's left edge to the box's right edge, relative to the overlay", () => {
+    const line = workbenchLineGeometry(rect(100, 1000, 1200, 800), rect(900, 1100, 400, 300), rect(150, 1400, 500, 60));
+    expect(line).toEqual({ ax: 800, ay: 128, bx: 550, by: 430, top: 400 });
+  });
+
+  it("draws nothing when the layout is stacked or an end has no size", () => {
+    const root = rect(0, 0, 800, 2000);
+    expect(workbenchLineGeometry(root, rect(0, 900, 800, 300), rect(40, 400, 700, 60))).toBeNull();
+    expect(workbenchLineGeometry(root, rect(600, 100, 0, 300), rect(40, 400, 300, 60))).toBeNull();
+    expect(workbenchLineGeometry(root, rect(600, 100, 200, 300), rect(40, 400, 300, 0))).toBeNull();
+  });
+
+  it("renders an empty, hidden, absolutely positioned overlay until a region is hovered or focused", () => {
+    const markup = renderToStaticMarkup(createElement(WorkbenchEvidenceLine, { labels: {} }));
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain('data-evidence-line="none"');
+    expect(markup).toContain("position:absolute");
+    expect(markup).not.toContain("<line");
   });
 });

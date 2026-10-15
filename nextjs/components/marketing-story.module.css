@@ -19,7 +19,7 @@
   .pipeline h2 { margin: 2px 0 0; font: 560 clamp(20px, 2vw, 24px)/1.25 var(--f-sans); letter-spacing: -0.02em; }
   .pipeline p { margin: 2px 0 0; max-width: 60ch; color: var(--text-mid); font: 15px/1.7 var(--f-sans); }
   .pipeline a { justify-self: start; }
-  .pipeline a, .processClose a, .outcome a, .boundary summary { display: inline-flex; align-items: center; min-height: 44px; font: 15px/1.5 var(--f-sans); }
+  .pipeline a, .processClose a, .outcome a { display: inline-flex; align-items: center; min-height: 44px; font: 15px/1.5 var(--f-sans); }
   .processClose { display: flex; flex-wrap: wrap; gap: 8px 28px; border-top: 1px solid var(--hairline); padding-top: clamp(24px, 3vw, 32px); }
   .processClose p { flex-basis: 100%; max-width: 82ch; margin: 0 0 4px; color: var(--text-mid); font: 14px/1.7 var(--f-sans); }
   .world { margin: 0 0 clamp(48px, 6vw, 80px); }
@@ -35,7 +35,8 @@
   .process :global(.btn), .product :global(.btn) { background: var(--source); border-color: var(--source); color: white; border-radius: 4px; }
   .process :global(.btn.ghost), .product :global(.btn.ghost) { background: transparent; color: var(--text-hi); border-color: var(--hairline-hi); }
   .boundary { margin: clamp(32px, 4vw, 48px) 0; border-block: 1px solid var(--hairline); padding: 8px 0; }
-  .boundary summary { cursor: pointer; }
+  /* list-item keeps the disclosure marker that inline-flex removed; padding holds the 44px target. */
+  .boundary summary { display: list-item; min-height: 44px; padding-block: 11px; cursor: pointer; font: 15px/1.5 var(--f-sans); }
   .close { display: flex; flex-wrap: wrap; gap: 12px 16px; padding-top: 8px; }
   @media (max-width: 767px) {
     .lead, .outcome { grid-template-columns: minmax(0, 1fr); gap: 16px; }

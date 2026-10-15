@@ -2,11 +2,19 @@ import Link from "next/link";
 import type { Route } from "next";
 import Logomark from "@/components/logomark";
 import MobilePrimaryNav from "@/components/mobile-primary-nav";
-import DesktopPrimaryNav from "@/components/site-nav/desktop-primary-nav";
+import DesktopPrimaryNav, { HeaderCta } from "@/components/site-nav/desktop-primary-nav";
 import HeaderScrollState from "@/components/site-nav/header-scroll-state";
 import { MarketingConsentLink } from "@/components/marketing-consent";
-import { BRAND_LINE, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME } from "@/lib/site-navigation";
+import { BRAND_LINE, EXPLORE_CTA, FOOTER_GROUPS, FOOTER_LEGAL_ROW, KO_CHROME } from "@/lib/site-navigation";
 import chrome from "./public-site-chrome.module.css";
+
+/**
+ * The one primary action, spelled once (brief 2026-10-15, move 1).
+ *
+ * The public sample is the action every reader can take today, so the header's filled button,
+ * the Home hero and the Home close all say this, in this colour. Read by `landing-page.tsx`.
+ */
+export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Explore the public sample", ko: "공개 샘플 살펴보기" } as const;
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.
@@ -83,6 +91,9 @@ export function PublicSiteHeader({
           disclosure.
         */}
         {signedIn ? null : <Link className="nav-signin chrome-v2-signin" href="/login">{korean ? KO_CHROME.signIn : "Sign in"}</Link>}
+        {/* Desktop only: below the switch the header is the wordmark and Menu, and the hero carries this.
+            Absent on the sample itself (/explore, /ko/explore): an action may not point at its own page. */}
+        <HeaderCta className={`btn ${chrome.cta}`} href={SAMPLE_CTA.href} label={korean ? SAMPLE_CTA.ko : SAMPLE_CTA.label} />
       </span>
     </header>
   );
@@ -164,28 +175,27 @@ export function PublicSiteFooter({ korean = false, onePath = false, languageHref
           deliberately absent; see `FOOTER_LEGAL_ROW`.
         */}
         {/*
-          landing-14: every separator travels with the link after it.
+          landing-14, then Release 2: separators sit only between items.
 
-          The row wrapped between a " · " and its link, so the line ended on a dangling middle dot
-          and "Analytics preferences" was orphaned onto a row of its own at 412. Each pair is one
-          nowrap span, so the row breaks between pairs or not at all.
+          Each dot is its own aria-hidden span between two pairs, never inside one, so where the
+          row becomes a two-column grid on a phone the dots are dropped and no line starts with
+          one (the 390 capture ended on "· Analytics preferences").
         */}
-        <p className="fine site-footer-legal">
-          <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>{" "}
+        <p className={`fine site-footer-legal ${chrome.legal}`}>
+          <span className="site-footer-legal-pair">{FOOTER_LEGAL_ROW.copyright}</span>
+          <span className="site-footer-legal-sep" aria-hidden="true">·</span>
           <span className="site-footer-legal-pair">
-            {"· "}
             {/* T1-014 again (ROUND3-P2): the one footer link that was missing the flag, so /ko
                 fired an RSC prefetch for `/` that the browser then aborted. */}
             <Link href={(languageHref ?? language.href) as Route} hrefLang={korean ? "en" : "ko"} lang={korean ? "en" : "ko"} prefetch={false}>{language.label}</Link>
-          </span>{" "}
+          </span>
+          <span className="site-footer-legal-sep" aria-hidden="true">·</span>
           <span className="site-footer-legal-pair">
-            {"· "}
             <a href={`mailto:${FOOTER_LEGAL_ROW.security}`}>{FOOTER_LEGAL_ROW.security}</a>
-          </span>{" "}
+          </span>
           {/* G1-033 / G2-006: the consent-withdrawal path lives here after a choice, not in a floating pill.
-              It owns its own separator (BQ-051, because it returns null off a measured path), so the
-              nowrap span goes around the component rather than inside the row. */}
-          <span className="site-footer-legal-pair"><MarketingConsentLink /></span>
+              It renders its own separator and pair (BQ-051: it returns null off a measured path). */}
+          <MarketingConsentLink />
         </p>
       </div>
     </footer>

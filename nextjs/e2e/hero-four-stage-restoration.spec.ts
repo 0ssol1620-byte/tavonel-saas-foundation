@@ -3,10 +3,13 @@ import { expect, test } from "@playwright/test";
 const FILMS = ["/film/compile-cut.mp4", "/film/compile-cut-2.mp4", "/film/compile-cut-3.mp4", "/film/compile-cut-4.mp4"];
 
 async function dismissConsent(page: import("@playwright/test").Page) {
+  // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
+  await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "No thanks", exact: true }).click();
   await expect(panel).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 test("the title leads directly into four selectable and playing demo recordings", async ({ page }, testInfo) => {
@@ -14,7 +17,7 @@ test("the title leads directly into four selectable and playing demo recordings"
   test.setTimeout(60_000);
   await page.goto("/");
   await dismissConsent(page);
-  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film).toHaveCount(1);
   await expect(film).toBeVisible();
   await expect(page.locator('#s1 [data-source-inspection-film]')).toHaveCount(0);
@@ -62,7 +65,7 @@ test("reduced motion keeps four stages static until explicitly played", async ({
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await dismissConsent(page);
-  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film.getByRole("tab")).toHaveCount(4);
   const play = film.getByRole("button", { name: "Play the compilation film", exact: true });
   await expect(play).toBeVisible();

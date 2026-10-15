@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
-  buildEvidenceRecord, buildProofTabs, buildRecompileView,
+  buildEvidenceRecord, buildProofTabs, buildReceiveRecord, buildRecompileView,
   LANDING_V2_STATE_WORD, LANDING_V2_STATE_WORD_KO,
 } from "./landing-v2-proof";
 import { buildSourcesScene, SOURCES_COPY } from "./landing-v2-sources";
 import { sampleEvidencePage } from "./evidence-regions";
 import { HERO_STATS } from "./hero-stats";
+import { exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+import { toVisualWorldModel } from "./visual-world-model";
+import { landingV2PageImage } from "./landing-v2-assets";
+import { isRepresentativeClaim, selectReceiveClaim } from "./home-evidence-view";
 
 const file = path.resolve(process.cwd(), "lib/landing-v2-snapshot.json");
 
@@ -15,7 +19,7 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
   it("exactly reproduces every field from the real compiler-backed builders", () => {
     const expected = {
       schema: "tavonel.landing-public-proof.v1",
-      tabs: buildProofTabs(), record: buildEvidenceRecord(), recompile: buildRecompileView(),
+      tabs: buildProofTabs(), record: buildEvidenceRecord(), receive: buildReceiveRecord(), recompile: buildRecompileView(),
       heroView: sampleEvidencePage(), heroStats: HERO_STATS,
       sources: buildSourcesScene(), sourcesCopy: SOURCES_COPY,
       stateWords: { en: LANDING_V2_STATE_WORD, ko: LANDING_V2_STATE_WORD_KO },
@@ -55,6 +59,7 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     const runtime = await import("./landing-v2-runtime");
     expect(runtime.buildProofTabs()).toEqual(buildProofTabs());
     expect(runtime.buildEvidenceRecord()).toEqual(buildEvidenceRecord());
+    expect(runtime.buildReceiveRecord()).toEqual(buildReceiveRecord());
     expect(runtime.buildRecompileView()).toEqual(buildRecompileView());
     expect(runtime.buildHeroView()).toEqual(sampleEvidencePage());
     expect(runtime.buildHeroStats()).toEqual(HERO_STATS);
@@ -66,4 +71,31 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     }
   });
 
+  /*
+    Brief move 8. The candidates are the ones the record builder can already bind (a Claim whose
+    first region is on an original-representation page with a committed page raster), in World
+    order; the rule in `selectReceiveClaim` picks among them. This pins what it picks, that every
+    earlier candidate fails the rule, and that both claims Home used to quote are turned away: the
+    heading run-on, and the safe-harbour sentence Release 1 picked.
+  */
+  it("finds the first representative sample claim, among claims the record builder can bind", () => {
+    const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
+    const evidence = new Map(world.evidence.map(item => [item.id, item] as const));
+    const candidates = world.nodes.filter(node => {
+      const region = node.kind === "Claim" ? evidence.get(node.evidenceRefs[0] ?? "") : undefined;
+      return Boolean(region && (region.representationKind ?? "original") === "original" &&
+        landingV2PageImage(region.digest, region.page));
+    });
+    const picked = selectReceiveClaim(candidates);
+    expect(picked?.kind).toBe("Claim");
+    expect(picked?.label).toBe(
+      "Unless otherwise stated, all information presented herein is based on the Company’s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company’s fiscal years ended in September and the associated quarters, months and periods of those fiscal years.",
+    );
+    expect(candidates.slice(0, candidates.indexOf(picked!)).some(node => isRepresentativeClaim(node.label))).toBe(false);
+    expect(isRepresentativeClaim(buildEvidenceRecord().claim.label)).toBe(false);
+    expect(isRepresentativeClaim(
+      "For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements.",
+    )).toBe(false);
+    expect(buildReceiveRecord().claim.label).toBe(picked?.label);
+  });
 });

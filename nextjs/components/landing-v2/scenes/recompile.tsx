@@ -5,7 +5,6 @@ import { LANDING_V2_SCENE_ORDER, type LandingV2RecompileCopy } from "@/lib/landi
 import { landingV2StateWord, type RecompileView } from "@/lib/landing-v2-runtime";
 import { RECOMPILE_ACTIONS, RECOMPILE_COUNTS_QUALIFIER } from "@/lib/landing-v2-recompile";
 import styles from "./recompile.module.css";
-import homeStyles from "../source-first-home.module.css";
 
 /*
   Scene 05 -- Recompile (blueprint section 15, contract D12 and rule 7).
@@ -66,7 +65,6 @@ export default function Scene({
   data,
   sectionId = SCENE_ID,
   sceneIndex,
-  compact = false,
 }: {
   locale: "en" | "ko";
   copy: LandingV2RecompileCopy;
@@ -74,7 +72,6 @@ export default function Scene({
   data: RecompileView;
   sectionId?: string;
   sceneIndex?: number;
-  compact?: boolean;
 }) {
   const titleId = `lv2-${SCENE_ID}-title`;
   const countsId = `lv2-${SCENE_ID}-counts`;
@@ -177,13 +174,7 @@ export default function Scene({
           </div>
 
           <div className={styles.impact}>
-            {compact ? <>
-              <p className="lv2-body-l" data-derived="1">{beforeLabel}<br />{afterLabel}</p>
-              <details className={homeStyles.compactDetails}>
-                <summary>{locale === "ko" ? "변경 기록과 영향받은 객체" : "Change record and affected objects"}</summary>
-                {impact}
-              </details>
-            </> : impact}
+            {impact}
 
             <p className={styles.actions}>
               <Link className="lv2-text-link" href={data.hrefs.change as Route} prefetch={false}>

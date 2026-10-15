@@ -143,6 +143,12 @@
   letter-spacing: 0.08em;
 }
 
+/* Hangul has no case and takes no tracking (brief 2026-10-15 §4.5). */
+.objectState:lang(ko) {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 /* --------------------------------------------------------------------------------- the counts */
 
 .counts {

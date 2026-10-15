@@ -60,10 +60,10 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
   });
   expect(boxes.wordmark).not.toBeNull();
   expect(boxes.menu).not.toBeNull();
-  expect(boxes.actions).not.toBeNull();
+  // Brief 2026-10-15 move 6: the narrow row is the wordmark and Menu; the actions are in the sheet.
+  await expect(page.locator("header.nav .nav-actions")).toBeHidden();
   expect(boxes.wordmark!.right).toBeLessThanOrEqual(boxes.menu!.left + 1);
-  expect(boxes.menu!.right).toBeLessThanOrEqual(boxes.actions!.left + 1);
-  expect(boxes.actions!.right).toBeLessThanOrEqual(boxes.viewport + 1);
+  expect(boxes.menu!.right).toBeLessThanOrEqual(boxes.viewport + 1);
 });
 
 test("the mobile menu exposes the five customer choices plus Sign in, and the action stays in the header", async ({ page }, testInfo) => {
@@ -74,13 +74,12 @@ test("the mobile menu exposes the five customer choices plus Sign in, and the ac
   const panel = menu.locator(":scope > nav");
   await expect(panel).toBeVisible();
   const direct = panel.locator("a.mobile-nav-direct");
-  await expect(direct).toHaveCount(4);
-  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs"]);
-  // BQ-059: the header keeps the action at every width; the sheet is the sections.
+  // Brief 2026-10-15 move 6: Pricing is the sheet's last section row; the hero carries the action.
+  await expect(direct).toHaveCount(5);
+  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
+  await expect(direct.last()).toHaveAttribute("href", "/pricing");
   await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
-  const pricing = page.locator('header .nav-actions a[href="/pricing"]');
-  await expect(pricing).toHaveCount(1);
-  await expect(pricing).toHaveText("Pricing");
+  await expect(page.locator("header .nav-actions")).toBeHidden();
   /*
     Landing V2: Sign in moved the other way, and the two halves of that are one assertion each.
 
@@ -114,7 +113,7 @@ test("Resources owns the hub routes and using a mobile customer link closes the 
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
   await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "page");
-  await page.locator('header.nav .nav-actions a[href="/pricing"]').click({ noWaitAfter: true });
+  await menu.locator('a.mobile-nav-direct[href="/pricing"]').click({ noWaitAfter: true });
   await expect(menu.locator(":scope > nav")).toBeHidden();
 
   await page.goto("/sources");
