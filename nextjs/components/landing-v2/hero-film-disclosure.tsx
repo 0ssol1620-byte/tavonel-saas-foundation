@@ -26,7 +26,7 @@ export default function HeroFilmDisclosure({
       data-testid="landing-hero-film"
     >
         <div className={`lv2-film ${styles.filmBody}`}>
-          <CompileStagePlayer stages={stages} preferVideo priorityPoster korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} />
+          <CompileStagePlayer stages={stages} preferVideo priorityPoster korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} storyLayout />
         </div>
       <figcaption className="fine">{korean ? "제품 흐름 예시 · 실제 고객 결과가 아닙니다." : "Illustrative product demo · examples, not customer results."}</figcaption>
     </figure>

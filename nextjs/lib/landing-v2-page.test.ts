@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
+import CompileStagePlayer from "../components/compile-stage-player";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -12,6 +13,26 @@ import { afterEach, describe, expect, it, vi } from "vitest";
   harness -- and "/" is the one value that makes the header's own "current page" logic run.
 */
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+
+describe("Home story presentation is opt-in", () => {
+  it("leaves the shared player's default markup unchanged", () => {
+    const normal = renderToStaticMarkup(createElement(CompileStagePlayer));
+    const explicit = renderToStaticMarkup(createElement(CompileStagePlayer, { storyLayout: false }));
+    expect(normal).toBe(explicit);
+    expect(normal).not.toContain('data-story-layout="1"');
+    expect(normal.indexOf('class="compile-film-caption"')).toBeGreaterThan(normal.indexOf('class="compile-film-viewport"'));
+  });
+
+  it("puts the Home explanation before its media without dropping stages or controls", () => {
+    const story = renderToStaticMarkup(createElement(CompileStagePlayer, { storyLayout: true }));
+    expect(story).toContain('data-story-layout="1"');
+    expect(story.indexOf('class="compile-film-caption"')).toBeLessThan(story.indexOf('class="compile-film-viewport"'));
+    expect(story.match(/role="tab"/g)).toHaveLength(4);
+    expect(story).toContain('class="compile-film-motion-control"');
+    expect(story).toContain('class="compile-film-focus-control"');
+    expect(story).toContain('data-mobile-view="fit"');
+  });
+});
 
 /*
   The live commercial posture cannot be reached through the environment here: `isLiveCommerce()`
@@ -552,8 +573,10 @@ describe("landing v2 -- the lead and the workbench", () => {
     const main = mainOf(render(locale));
     const hero = sceneOf(main, "s1");
     const filmAt = hero.indexOf('data-testid="landing-hero-film"');
-    expect(filmAt).toBeGreaterThan(hero.indexOf('</h1>'));
-    expect(filmAt).toBeLessThan(hero.indexOf('lv2-hero-support'));
+    const actionsAt = hero.indexOf('data-testid="landing-hero-actions"');
+    expect(actionsAt).toBeGreaterThan(hero.indexOf('</h1>'));
+    expect(filmAt).toBeGreaterThan(actionsAt);
+    expect(hero).not.toContain('class="lv2-hero-support lv2-body-l"');
     expect(hero).toContain("/film/poster-1-hero-2x.webp");
     expect(elements(hero, "button").filter(open => attr(open, "role") === "tab")).toHaveLength(4);
     expect(hero).toContain('data-mobile-view="fit"');

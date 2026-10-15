@@ -1325,8 +1325,9 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<HeroFilm",
+      "<HeroStatement",
       "<HeroActions",
+      "<HeroFilm",
       'id="s2"',
       "<HeroSourceCard",
       'id="s3"',

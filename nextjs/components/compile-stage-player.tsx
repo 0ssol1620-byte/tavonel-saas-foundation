@@ -191,6 +191,7 @@ export default function CompileStagePlayer({
   priorityPoster = false,
   korean = false,
   initialMobileFilmView = "fit",
+  storyLayout = false,
 }: {
   stages?: readonly CompileStage[];
   onStageChange?: (stage: CompileStage, index: number) => void;
@@ -208,6 +209,8 @@ export default function CompileStagePlayer({
   korean?: boolean;
   /** The view a narrow frame opens on. Defaults to "fit"; the visitor's toggle still switches it. */
   initialMobileFilmView?: MobileFilmView;
+  /** Home-only story ordering; other callers keep their existing composition. */
+  storyLayout?: boolean;
 }) {
   const text = korean ? FILM_TEXT.ko : FILM_TEXT.en;
   const instanceId = useId().replaceAll(":", "");
@@ -426,14 +429,72 @@ export default function CompileStagePlayer({
     ))}
   </div> : null;
 
+  const externalMotionControl = storyLayout && narrow && !mobileFilmFit;
+  const motionControl = (
+        <button
+          type="button"
+          className="compile-film-motion-control"
+          data-control={control}
+          aria-label={korean ? FILM_CONTROL_LABEL_KO[control] : FILM_CONTROL_LABEL[control].label}
+          aria-pressed={control === "pause"}
+          onClick={() => {
+            if (control === "pause") { setPaused(true); return; }
+            if (control === "replay") {
+              const element = videoRef.current;
+              if (element) { element.currentTime = 0; void element.play().catch(() => {}); }
+              setEnded(false);
+            }
+            setVideoError(false);
+            setPaused(false);
+            setPlayRequested(true);
+          }}
+        >
+          <FilmControlMark control={control} />
+        </button>
+  );
+
+  const mobileTools = (<div className="compile-film-mobile-tools">
+        <button
+          type="button"
+          className="compile-film-focus-control"
+          aria-controls={panelId}
+          aria-pressed={!mobileFilmFit}
+          onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
+        >
+          {mobileFilmFit
+            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
+            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
+        </button>
+        {externalMotionControl ? motionControl : null}
+        <p aria-live="polite">
+          {mobileFilmFit
+            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].fittedHint
+            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].focusedHint}
+        </p>
+      </div>);
+  const stageCaption = !compact ? <div className="compile-film-caption">
+        <p>{videoError ? text.errorLong : active.line}</p>
+        {/*
+          `data-derived` because both halves of this counter are read rather than typed: the
+          position is the player's own index and the total is `stages.length`. The landing's
+          figure walk (`e2e/landing-v2.spec.ts`, `lib/landing-v2-page.test.ts`) accepts a digit on
+          the entry pages only inside an element that declares it was measured, and contract rule
+          4's other half is satisfied too -- the figure is printed with its denominator.
+        */}
+        <span className="compile-film-progress" aria-hidden="true" data-derived="1">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
+      </div> : null;
+
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012). The separate tab strip chooses
        the cut and may sit behind a native disclosure on the landing page. */
-    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={MOBILE_FOCUS_PANE[index] ?? 0}>
+    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={MOBILE_FOCUS_PANE[index] ?? 0}>
       {stageDisclosureLabel && stageTabs ? <details className="compile-film-stage-disclosure">
         <summary>{stageDisclosureLabel}</summary>
         {stageTabs}
       </details> : stageTabs}
+
+      {storyLayout ? stageCaption : null}
+      {storyLayout ? mobileTools : null}
 
       {/*
         G1-012. The live canvas already refuses to mount below 900px (NARROW_FRAME above), but the
@@ -496,60 +557,14 @@ export default function CompileStagePlayer({
             setPaused(true);
           }} />
         )}
-        {/* Always rendered: the two states that most need it were the two that hid it. */}
-        <button
-          type="button"
-          className="compile-film-motion-control"
-          data-control={control}
-          aria-label={korean ? FILM_CONTROL_LABEL_KO[control] : FILM_CONTROL_LABEL[control].label}
-          aria-pressed={control === "pause"}
-          onClick={() => {
-            if (control === "pause") { setPaused(true); return; }
-            if (control === "replay") {
-              const element = videoRef.current;
-              if (element) { element.currentTime = 0; void element.play().catch(() => {}); }
-              setEnded(false);
-            }
-            setVideoError(false);
-            setPaused(false);
-            setPlayRequested(true);
-          }}
-        >
-          <FilmControlMark control={control} />
-        </button>
+        {/* Focus inspection keeps the motion control outside the source pixels. */}
+        {!externalMotionControl ? motionControl : null}
       </div>
 
-      <div className="compile-film-mobile-tools">
-        <button
-          type="button"
-          className="compile-film-focus-control"
-          aria-controls={panelId}
-          aria-pressed={!mobileFilmFit}
-          onClick={() => setMobileFilmFit(toggleMobileFilmFit)}
-        >
-          {mobileFilmFit
-            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
-            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
-        </button>
-        <p aria-live="polite">
-          {mobileFilmFit
-            ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].fittedHint
-            : MOBILE_FILM_VIEW[korean ? "ko" : "en"].focusedHint}
-        </p>
-      </div>
+      {!storyLayout ? mobileTools : null}
 
       {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}
-      {!compact ? <div className="compile-film-caption">
-        <p>{videoError ? text.errorLong : active.line}</p>
-        {/*
-          `data-derived` because both halves of this counter are read rather than typed: the
-          position is the player's own index and the total is `stages.length`. The landing's
-          figure walk (`e2e/landing-v2.spec.ts`, `lib/landing-v2-page.test.ts`) accepts a digit on
-          the entry pages only inside an element that declares it was measured, and contract rule
-          4's other half is satisfied too -- the figure is printed with its denominator.
-        */}
-        <span className="compile-film-progress" aria-hidden="true" data-derived="1">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
-      </div> : null}
+      {!storyLayout ? stageCaption : null}
     </div>
   );
 }

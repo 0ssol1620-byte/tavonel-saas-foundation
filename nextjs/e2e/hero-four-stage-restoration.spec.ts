@@ -14,7 +14,7 @@ test("the title leads directly into four selectable and playing demo recordings"
   test.setTimeout(60_000);
   await page.goto("/");
   await dismissConsent(page);
-  const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film).toHaveCount(1);
   await expect(film).toBeVisible();
   await expect(page.locator('#s1 [data-source-inspection-film]')).toHaveCount(0);
@@ -62,7 +62,7 @@ test("reduced motion keeps four stages static until explicitly played", async ({
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await dismissConsent(page);
-  const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film.getByRole("tab")).toHaveCount(4);
   const play = film.getByRole("button", { name: "Play the compilation film", exact: true });
   await expect(play).toBeVisible();

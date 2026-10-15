@@ -45,12 +45,12 @@
     "boundary": "Canonical Git LF bytes at the existing341 source; no new product CSS, browser pixels, release qualification or renaming of historical evidence.",
     "activeRoot": {
       "path": "components/landing-v2/source-first-home.module.css",
-      "sha256": "8a5c1c3699cd032b25443a9bb8fa7fd2ce75e0cb03a04aee198af22736798e85",
-      "bytes": 12405,
+      "sha256": "02bd07047bea7e62d23016ff8efb95971b52ab1cbb879a8aca4e8ae420b56807",
+      "bytes": 14403,
       "ink": "#15191d",
       "paper": "#faf9f6",
-      "boundary": "First-visit fold candidate from exacte155; actual canonical LF root CSS postimage. Legacy/historical module pins remain separate and unchanged.",
-      "baseInputCommit": "e155e7a14ddc130317ee38b15203e48f41bffbcb"
+      "boundary": "Re-measured 2026-10-15 at the merge of main 0969755b (Home release PR #148) into codex/masterplan-checkpoint-2026-09-30; actual canonical LF root CSS postimage of that merge. Legacy/historical module pins remain separate and unchanged.",
+      "baseInputCommit": "0969755b5dbdd38bf42b201e7ce71c807ebf2520"
     }
   }
 }

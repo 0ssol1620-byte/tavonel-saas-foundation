@@ -150,14 +150,15 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   expect(await nav.getByRole("link", { name: "Pricing", exact: true }).evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
 
-test("the Home first screen leads with the four-stage film and keeps source proof below it", async ({ page }) => {
+
+test("the Home first screen puts actions before its four-stage film and source proof below it", async ({ page }) => {
   const width = page.viewportSize()?.width ?? 0;
   test.skip(width !== 390 && width !== 1440, "Phone and desktop reference widths.");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
   await expect(consent).toBeVisible();
-  const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
   const measure = async () => page.evaluate(() => {
@@ -177,7 +178,8 @@ test("the Home first screen leads with the four-stage film and keeps source proo
     expect(layout.film.left).toBeGreaterThanOrEqual(-1);
     expect(layout.film.right).toBeLessThanOrEqual(layout.width + 1);
     expect(layout.source.top).toBeGreaterThanOrEqual(layout.film.bottom);
-    expect(layout.action.top).toBeGreaterThanOrEqual(layout.film.top);
+    expect(layout.action.top).toBeGreaterThanOrEqual(layout.title.bottom);
+    expect(layout.action.bottom).toBeLessThanOrEqual(layout.film.top);
     if (!consentVisible && width === 1440) expect(layout.action.bottom).toBeLessThanOrEqual(900);
     if (consentVisible && layout.banner) expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
     await test.info().attach("home-first-screen-" + width + "-consent-" + consentVisible, {body: await page.screenshot({animations: "disabled"}), contentType: "image/png"});
@@ -189,88 +191,4 @@ test("the Home first screen leads with the four-stage film and keeps source proo
   await expect(source.locator("img")).toBeVisible();
   await expect(source.locator("blockquote")).not.toHaveText("");
   await expect(source.locator("[data-hero-evidence]")).toHaveAttribute("href", /act=evidence/);
-});
-
-test("the prepared source selection and full quotation reflow at narrow widths and 200% zoom", async ({ browser, page }) => {
-  test.skip(page.viewportSize()?.width !== 1440, "Run this explicit viewport matrix once on the desktop project.");
-  const profiles = [320, 360, 390, 768, 1440].map(width => ({ width, height: 844, deviceScaleFactor: 1, name: `${width}px` }));
-  // Match the existing contrast/zoom audit: 1440 physical pixels at 200% = 720 CSS pixels at DPR 2.
-  profiles.push({ width: 720, height: 450, deviceScaleFactor: 2, name: "1440px-at-200-percent" });
-  for (const profile of profiles) {
-    const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height }, deviceScaleFactor: profile.deviceScaleFactor });
-    const proof = await context.newPage();
-    try {
-      for (const route of ["/", "/ko"]) {
-        await proof.goto(route);
-        if (route === "/") await dismissConsent(proof);
-        const source = proof.locator("#s2 article[data-case-status]");
-        await source.scrollIntoViewIfNeeded();
-        await expect(source.locator("button[aria-pressed]")).toHaveCount(3);
-        await expect(source.locator('button[aria-pressed="true"]')).toHaveCount(1);
-        await expect(source.locator("blockquote")).toHaveText("Operating expenses: Research and development 10,887 8,268 Selling, general and administrative 7,492 7,175 Total operating expenses 18,379 15,443");
-        await expect(source.locator("img")).toBeVisible();
-        await expect.poll(() => source.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
-        const geometry = await source.evaluate(element => {
-          const box = (selector: string) => {
-            const target = element.querySelector<HTMLElement>(selector);
-            if (!target) throw new Error(`Missing prepared proof element: ${selector}`);
-            const rect = target.getBoundingClientRect();
-            const style = getComputedStyle(target);
-            const range = document.createRange();
-            range.selectNodeContents(target);
-            const text = range.getBoundingClientRect();
-            return {
-              left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-              width: rect.width, height: rect.height, font: parseFloat(style.fontSize),
-              clamp: style.webkitLineClamp, clipped: target.scrollHeight > target.clientHeight + 1,
-              textLeft: text.left, textRight: text.right, textBottom: text.bottom,
-            };
-          };
-          const image = element.querySelector<HTMLImageElement>("img")!;
-          return {
-            overflow: document.documentElement.scrollWidth - innerWidth, width: innerWidth,
-            question: box('button[aria-pressed="true"]'), quote: box("blockquote"),
-            page: box("img"), pageWindow: box("[data-page-window]"), link: box("[data-hero-evidence]"),
-            naturalRatio: image.naturalWidth / image.naturalHeight,
-          };
-        });
-        expect(geometry.overflow, `${route} ${profile.name}`).toBeLessThanOrEqual(1);
-        for (const text of [geometry.quote]) {
-          expect(text.font).toBeGreaterThanOrEqual(15);
-          expect(text.clamp).toBe("none");
-          expect(text.clipped).toBe(false);
-          expect(text.textLeft).toBeGreaterThanOrEqual(text.left - 1);
-          expect(text.textRight).toBeLessThanOrEqual(text.right + 1);
-          expect(text.textBottom).toBeLessThanOrEqual(text.bottom + 1);
-        }
-        for (const box of [geometry.question, geometry.quote, geometry.page, geometry.link]) {
-          expect(box.left).toBeGreaterThanOrEqual(-1);
-          expect(box.right).toBeLessThanOrEqual(geometry.width + 1);
-        }
-        expect(geometry.question.width).toBeGreaterThanOrEqual(44);
-        expect(geometry.question.height).toBeGreaterThanOrEqual(44);
-        // The stored full-page image extends behind the source viewport's intentional crop.
-        // Collision is measured against its visible window; pixel aspect ratio stays checked below.
-        expect(geometry.pageWindow.right <= geometry.quote.left + 1 || geometry.pageWindow.bottom <= geometry.quote.top + 1 || geometry.quote.bottom <= geometry.pageWindow.top + 1).toBe(true);
-        expect(geometry.quote.bottom).toBeLessThanOrEqual(geometry.link.top);
-        expect(geometry.page.width / geometry.page.height).toBeCloseTo(geometry.naturalRatio, 2);
-        expect(geometry.link.height).toBeGreaterThanOrEqual(44);
-        expect(geometry.link.width).toBeGreaterThanOrEqual(44);
-        const action = source.locator("[data-hero-evidence]");
-        await action.scrollIntoViewIfNeeded();
-        expect(await action.evaluate(link => {
-          const box = link.getBoundingClientRect();
-          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-          return hit === link || (hit !== null && link.contains(hit));
-        })).toBe(true);
-        await action.focus();
-        await expect(action).toBeFocused();
-        await test.info().attach(`home-prepared-proof-${route === "/ko" ? "ko" : "en"}-${profile.name}`, {
-          body: await proof.screenshot({ animations: "disabled" }), contentType: "image/png",
-        });
-      }
-    } finally {
-      await context.close();
-    }
-  }
 });

@@ -170,10 +170,10 @@ test("the English close keeps its start action on an English destination", async
   expect(href).toMatch(/^\/[a-z]/);
   expect(href, "the English close never sends a reader to the Korean pages").not.toMatch(/^\/ko(\/|$)/);
 });
-test("film is visible directly after the headline without an opening action", async ({ page }) => {
+test("film follows the headline actions without a separate opening action", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film).toBeVisible();
   await expect(film.locator("img")).toHaveCount(1);
   await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);

@@ -71,7 +71,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
     await page.goto("/");
     const consent = page.getByRole("button", { name: "No thanks", exact: true });
     if (await consent.isVisible()) await consent.click();
-    const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+    const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film).toBeVisible();
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
@@ -115,7 +115,7 @@ test("the restored hero keeps its title, stages and actions at seven widths", as
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.goto("/ko");
-    const film = page.locator('#s1 h1 + figure[data-testid="landing-hero-film"]');
+    const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
     await expect(film.getByRole("tab")).toHaveCount(4);
     await expect(film.locator("figcaption")).toHaveText("제품 흐름 예시 · 실제 고객 결과가 아닙니다.");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

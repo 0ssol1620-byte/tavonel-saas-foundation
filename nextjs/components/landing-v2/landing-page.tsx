@@ -300,13 +300,12 @@ export default function LandingPage({
                 headlineVariant={experiment.headlineVariant}
                 showSupport={false}
               >
-                <HeroFilm korean={korean} />
-                <div className={sourceStyles.heroAside}>
+                <div className={sourceStyles.heroAside} data-testid="landing-hero-actions">
                     <HeroActions {...heroActions} startLabel={heroStart.label} startHref={heroStart.href}
                       scene="1" ctaOrderVariant={experiment.ctaOrderVariant} />
-                    <p className="lv2-hero-support lv2-body-l">{page.support}</p>
                     <p className={sourceStyles.intake}>{page.intake}</p>
                 </div>
+                <HeroFilm korean={korean} />
               </HeroStatement>
             </div>
             <details className={sourceStyles.formats}>

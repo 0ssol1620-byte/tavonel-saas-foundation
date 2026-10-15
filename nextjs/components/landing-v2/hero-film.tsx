@@ -3,7 +3,7 @@ import { LANDING_V2_FILM_STAGES_KO } from "@/lib/landing-v2-hero-copy";
 import HeroFilmDisclosure from "./hero-film-disclosure";
 
 /*
-  Visible opening media, directly after the Home headline. The four approved recordings are
+  Visible opening media, after the Home headline and primary actions. The four approved recordings are
   illustrative examples; their caption remains visible. The source workbench follows in scene02.
 
   The player uses the approved recordings and its existing intersection-based playback, visibility
@@ -32,8 +32,8 @@ export const HERO_FILM_POSTER: string = HERO_CUT.poster;
 
 function heroStages(korean: boolean): CompileStage[] {
   const lines = korean
-    ? ["원문에서 구조화된 자료, 연결된 지식으로.", "개체와 진술, 그 근거가 된 원문을 함께 살펴보세요.", "원문의 변경이 어떤 지식에 닿는지 확인하세요.", "같은 지식과 인용을 여러 AI 도구에서 사용하세요."]
-    : ["Files → structured content → connected knowledge.", "Explore the entities, claims and their sources.", "Follow a changed source to the knowledge it affects.", "Use the same knowledge and citations across AI tools."];
+    ? ["원문 페이지와 추출된 자료를 나란히 살펴보세요.", "개체와 진술, 그 근거가 된 원문을 함께 살펴보세요.", "원문의 변경이 어떤 지식에 닿는지 확인하세요.", "같은 지식과 인용을 여러 AI 도구에서 사용하세요."]
+    : ["Read original pages beside their extracted content.", "Explore the entities, claims and their sources.", "Follow a changed source to the knowledge it affects.", "Use the same knowledge and citations across AI tools."];
   return COMPILE_STAGES.map((stage, index) => ({
     ...stage,
     ...(index === 0 ? HERO_CUT : {}),
