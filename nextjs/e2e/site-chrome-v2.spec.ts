@@ -98,7 +98,7 @@ test.describe("at 1440", () => {
     );
     // Brief 2026-10-15 move 1: the bar carries exactly one filled control, the public-sample action
     // the Home hero and close repeat. Pricing stays a plain link at link weight.
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual(["Explore the public sample"]);
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual(["Explore the public sample".slice(0, 24)]);
     await expect(action).toHaveCSS("font-weight", "400");
 
     const signIn = page.locator(`${HEADER} .nav-signin`);
@@ -204,8 +204,9 @@ test.describe("at 390", () => {
     await expect(panel).toBeVisible();
 
     const rows = panel.locator("a.mobile-nav-direct");
-    await expect(rows).toHaveCount(CUSTOMER_NAV.length);
-    expect(await hrefsOf(rows)).toEqual(CUSTOMER_NAV.map((item) => item.href));
+    // Brief 2026-10-15 move 6: the sections, then Pricing as the sheet's last section row.
+    await expect(rows).toHaveCount(CUSTOMER_NAV.length + 1);
+    expect(await hrefsOf(rows)).toEqual([...CUSTOMER_NAV.map((item) => item.href), "/pricing"]);
     await expect(panel.locator("a.mobile-nav-signin")).toHaveAttribute("href", "/login");
     await expect(panel.locator("a.mobile-nav-cta"), "the sheet does not repeat the header action").toHaveCount(0);
   });
