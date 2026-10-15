@@ -1,0 +1,282 @@
+diff --git a/nextjs/components/landing-v2/hero-source-card.tsx b/nextjs/components/landing-v2/hero-source-card.tsx
+--- a/nextjs/components/landing-v2/hero-source-card.tsx
++++ b/nextjs/components/landing-v2/hero-source-card.tsx
+@@ -6,6 +6,7 @@ import { getImageProps } from "next/image";
+ import type { Route } from "next";
+ import { caseStatus, displayableRegions, publishableClaims, type EvidenceCase, type EvidenceRegion } from "@/lib/home-evidence-view";
+ import styles from "./landing-hero.module.css";
++import { SourceRegionCrop } from "./source-region";
+ 
+ /*
+   The Home workbench: source -> highlighted passage -> inspectable record.
+@@ -278,9 +279,25 @@ export default function HeroSourceCard({ view, korean = false }: { view: Evidenc
+             <span className={styles.extracted}>{t.existing}</span>
+             <span>{t.roles[active.role]}</span>
+           </p>
+-          <blockquote className={styles.quote} lang="en" data-derived="1">
+-            {active.passage}{active.passageTruncated ? "…" : ""}
+-          </blockquote>
++          {/*
++            Brief move 8: the page region the passage was read from, cut out of the same committed
++            raster at the region's own bbox, straight above the extractor's text. The text is left
++            exactly as extracted; the crop is what lets a reader match it to the printed lines.
++          */}
++          <div className={styles.passageMatch}>
++            {page.image ? (
++              <SourceRegionCrop
++                className={styles.crop}
++                src={page.image.src}
++                width={page.image.width}
++                height={page.image.height}
++                bbox1000={active.bbox1000}
++              />
++            ) : null}
++            <blockquote className={styles.quote} lang="en" data-derived="1">
++              {active.passage}{active.passageTruncated ? "…" : ""}
++            </blockquote>
++          </div>
+           <p className={styles.contextNote}>{active.role === "selected" ? t.selectedNote : t.contextNote}</p>
+           {active.href ? (
+             <Link className={styles.evidenceLink} href={active.href as Route} prefetch={false} data-hero-evidence data-analytics="source-open">
+diff --git a/nextjs/components/landing-v2/landing-hero.module.css b/nextjs/components/landing-v2/landing-hero.module.css
+--- a/nextjs/components/landing-v2/landing-hero.module.css
++++ b/nextjs/components/landing-v2/landing-hero.module.css
+@@ -431,14 +431,26 @@ section.hero .intake {
+   text-transform: uppercase;
+ }
+ 
++/* The page region and the passage read from it, one unit: crop above, extractor's text below. */
++.passageMatch {
++  border: 1px solid var(--home-rule);
++}
++
++.crop {
++  padding: 0.5rem 0.75rem;
++  border-bottom: 1px solid var(--home-rule);
++  background: #fff;
++}
++
++/* The extractor's text, as extracted: mono, its own line breaks kept (brief move 8). */
+ .quote {
+   margin: 0;
+   padding: 1rem 1.125rem;
+   border-left: 3px solid var(--home-amber);
+   background: var(--home-sheet);
+-  font-size: 1.125rem;
++  font: 0.9375rem/1.6 var(--home-mono);
+   font-variant-numeric: tabular-nums;
+-  line-height: 1.6;
++  white-space: pre-wrap;
+   overflow-wrap: break-word;
+ }
+ 
+@@ -1061,7 +1073,7 @@ section.receive {
+ 
+   .quote {
+     padding: 0.75rem 0.875rem;
+-    font-size: 1.0625rem;
++    font-size: 0.875rem;
+   }
+ 
+   .diffList > li {
+diff --git a/nextjs/components/landing-v2/landing-page.tsx b/nextjs/components/landing-v2/landing-page.tsx
+--- a/nextjs/components/landing-v2/landing-page.tsx
++++ b/nextjs/components/landing-v2/landing-page.tsx
+@@ -18,13 +18,13 @@ import TrustScene from "./scenes/trust";
+ import { landingV2Copy } from "@/lib/landing-v2-copy";
+ import { landingV2HeroExtra } from "@/lib/landing-v2-hero-copy";
+ import {
+-  buildEvidenceRecord,
+   buildHeroView,
+   buildProofTabs,
++  buildReceiveRecord,
+   buildRecompileView,
+   landingV2StateWord,
+   SOURCES_COPY,
+-  type EvidenceRecord,
++  type ReceiveRecord,
+   type RecompileView,
+ } from "@/lib/landing-v2-runtime";
+ import {
+@@ -70,7 +70,8 @@ import {
+ */
+ type HomeData = {
+   home: EvidenceCase | null;
+-  record: EvidenceRecord;
++  /** "What you receive": the first sample claim `selectReceiveClaim` accepts. */
++  record: ReceiveRecord;
+   recompile: RecompileView;
+   /** How many extracted regions the workbench's page holds, read from the page view. */
+   pageRegionCount: number;
+@@ -79,7 +80,7 @@ let homeMemo: HomeData | undefined;
+ function homeData(): HomeData {
+   return (homeMemo ??= {
+     home: selectHomeCase([buildHomeEvidenceCase(buildHeroView(), buildProofTabs()), HOME_RESERVED_CASE]),
+-    record: buildEvidenceRecord(),
++    record: buildReceiveRecord(),
+     recompile: buildRecompileView(),
+     pageRegionCount: buildHeroView().regions.length,
+   });
+diff --git a/nextjs/lib/landing-v2-page.test.ts b/nextjs/lib/landing-v2-page.test.ts
+--- a/nextjs/lib/landing-v2-page.test.ts
++++ b/nextjs/lib/landing-v2-page.test.ts
+@@ -58,7 +58,7 @@ import { primaryCallToAction } from "./commercial-state";
+ import { buildHomeEvidenceCase, type EvidenceCase } from "./home-evidence-view";
+ import { LANDING_V2_COPY, type LandingV2Locale } from "./landing-v2-copy";
+ import { landingV2HeroExtra } from "./landing-v2-hero-copy";
+-import { buildEvidenceRecord, buildHeroView, buildProofTabs, landingV2StateWord } from "./landing-v2-runtime";
++import { buildHeroView, buildProofTabs, buildReceiveRecord, landingV2StateWord } from "./landing-v2-runtime";
+ import {
+   BARRED,
+   LANDING_V2_FORBIDDEN,
+@@ -671,8 +671,10 @@ describe("landing v2 -- difficulty and record", () => {
+ 
+   it.each(LOCALES)("%s prints the sample record with its own status, version and links", locale => {
+     const receive = sceneOf(mainOf(render(locale)), "s3");
+-    const record = buildEvidenceRecord();
++    const record = buildReceiveRecord();
+     const text = readable(receive);
++    const quote = receive.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
++    expect(quote).toBe(escaped(record.claim.excerpt) + (record.claim.excerptTruncated ? "…" : ""));
+     expect(text).toContain(record.claim.excerpt);
+     expect(text).toContain(landingV2StateWord(record.status.state, locale));
+     expect(text).toContain(record.version.digest);
+diff --git a/nextjs/lib/landing-v2-proof.ts b/nextjs/lib/landing-v2-proof.ts
+--- a/nextjs/lib/landing-v2-proof.ts
++++ b/nextjs/lib/landing-v2-proof.ts
+@@ -2,6 +2,7 @@ import { exploreChangeBaselineDocument, exploreChangeStory } from "./explore-cha
+ import { chooseExploreEntryProof, excerptPreview } from "./explore-entry-proof";
+ import { exploreSampleAnswers, exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+ import { buildExploreAnswerViews } from "./explore-story";
++import { selectReceiveClaim } from "./home-evidence-view";
+ import { landingV2PageImage, landingV2RegionImage } from "./landing-v2-assets";
+ import { sourcePageQualifier } from "./source-page-rasters";
+ import { toVisualWorldModel, type VisualState } from "./visual-world-model";
+@@ -110,6 +111,11 @@ export type EvidenceRecord = {
+   citation: string;
+ };
+ 
++/** Home's "What you receive" record: the fields that section prints, and nothing more. */
++export type ReceiveRecord = Omit<EvidenceRecord, "rasters" | "citation" | "region"> & {
++  region: { id: string; bbox1000: number[] };
++};
++
+ export type RecompileView = {
+   /*
+     The baseline snapshot as two measured fields, never as a label.
+@@ -294,6 +300,40 @@ export function buildEvidenceRecord(): EvidenceRecord {
+   };
+ }
+ 
++/**
++ * Home's "What you receive" claim (brief move 8).
++ *
++ * The candidates are the World's claims whose first region is on an original-representation page
++ * with a committed page raster, in World order; `selectReceiveClaim` in
++ * `lib/home-evidence-view.ts` states and applies the rule that picks one of them. No passing
++ * claim is a build failure, never a fallback to one that does not pass.
++ */
++export function buildReceiveRecord(): ReceiveRecord {
++  const evidence = new Map(world.evidence.map((item) => [item.id, item] as const));
++  const regionOf = (node: (typeof world.nodes)[number]) => evidence.get(node.evidenceRefs[0] ?? "");
++  const node = selectReceiveClaim(world.nodes.filter((item) => {
++    const region = item.kind === "Claim" ? regionOf(item) : undefined;
++    return Boolean(region && (region.representationKind ?? "original") === "original" &&
++      landingV2PageImage(region.digest, region.page));
++  }));
++  const region = node ? regionOf(node) : undefined;
++  if (!node || !region) throw new Error("landing_v2_receive_has_no_claim_without_a_heading_run_on");
++  const document = exploreSampleDocuments.find((entry) => entry.documentId === region.sourceId);
++  if (!document) throw new Error(`landing_v2_receive_source_record_missing: ${region.sourceId}`);
++  const preview = excerptPreview(node.label, EXCERPT_LIMIT);
++  return {
++    claim: { nodeId: node.id, kind: node.kind, label: node.label, excerpt: preview.text, excerptTruncated: preview.truncated },
++    status: { state: node.state, label: LANDING_V2_STATE_WORD[node.state] },
++    source: { ...sourceOf(region), officialHref: document.officialHref ?? null, secHref: document.secHref ?? null },
++    region: { id: region.id, bbox1000: [...region.bbox1000] },
++    version: { digest: region.digest, short: `${region.digest.slice(0, 14)}…` },
++    hrefs: {
++      evidence: `/explore?act=evidence&evidence=${encodeURIComponent(region.id)}`,
++      original: `${document.href}#page=${region.page}`,
++    },
++  };
++}
++
+ /**
+  * Scene 05's dependency-impact view.
+  *
+diff --git a/nextjs/lib/landing-v2-runtime.test.ts b/nextjs/lib/landing-v2-runtime.test.ts
+--- a/nextjs/lib/landing-v2-runtime.test.ts
++++ b/nextjs/lib/landing-v2-runtime.test.ts
+@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
+ import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+ import path from "node:path";
+ import {
+-  buildEvidenceRecord, buildProofTabs, buildRecompileView,
++  buildEvidenceRecord, buildProofTabs, buildReceiveRecord, buildRecompileView,
+   LANDING_V2_STATE_WORD, LANDING_V2_STATE_WORD_KO,
+ } from "./landing-v2-proof";
+ import { buildSourcesScene, SOURCES_COPY } from "./landing-v2-sources";
+@@ -19,7 +19,7 @@ describe("frozen landing proof, without request-time corpus compilation", () =>
+   it("exactly reproduces every field from the real compiler-backed builders", () => {
+     const expected = {
+       schema: "tavonel.landing-public-proof.v1",
+-      tabs: buildProofTabs(), record: buildEvidenceRecord(), recompile: buildRecompileView(),
++      tabs: buildProofTabs(), record: buildEvidenceRecord(), receive: buildReceiveRecord(), recompile: buildRecompileView(),
+       heroView: sampleEvidencePage(), heroStats: HERO_STATS,
+       sources: buildSourcesScene(), sourcesCopy: SOURCES_COPY,
+       stateWords: { en: LANDING_V2_STATE_WORD, ko: LANDING_V2_STATE_WORD_KO },
+@@ -59,6 +59,7 @@ describe("frozen landing proof, without request-time corpus compilation", () =>
+     const runtime = await import("./landing-v2-runtime");
+     expect(runtime.buildProofTabs()).toEqual(buildProofTabs());
+     expect(runtime.buildEvidenceRecord()).toEqual(buildEvidenceRecord());
++    expect(runtime.buildReceiveRecord()).toEqual(buildReceiveRecord());
+     expect(runtime.buildRecompileView()).toEqual(buildRecompileView());
+     expect(runtime.buildHeroView()).toEqual(sampleEvidencePage());
+     expect(runtime.buildHeroStats()).toEqual(HERO_STATS);
+@@ -91,5 +92,6 @@ describe("frozen landing proof, without request-time corpus compilation", () =>
+     );
+     expect(candidates.slice(0, candidates.indexOf(picked!)).some(node => isClaimWithoutHeadingRunOn(node.label))).toBe(false);
+     expect(isClaimWithoutHeadingRunOn(buildEvidenceRecord().claim.label)).toBe(false);
++    expect(buildReceiveRecord().claim.label).toBe(picked?.label);
+   });
+ });
+diff --git a/nextjs/lib/landing-v2-runtime.ts b/nextjs/lib/landing-v2-runtime.ts
+--- a/nextjs/lib/landing-v2-runtime.ts
++++ b/nextjs/lib/landing-v2-runtime.ts
+@@ -1,16 +1,17 @@
+ import snapshotJson from "./landing-v2-snapshot.json";
+-import type { EvidenceRecord, ProofTab, RecompileView } from "./landing-v2-proof";
++import type { EvidenceRecord, ProofTab, ReceiveRecord, RecompileView } from "./landing-v2-proof";
+ import type { SourcesCopy, SourcesSceneData } from "./landing-v2-sources";
+ import type { VisualState } from "./visual-world-model";
+ import type { EvidencePageView } from "./evidence-regions";
+ import type { HeroStat } from "./hero-stats";
+ 
+-export type { EvidenceRecord, ProofTab, RecompileView, SourcesSceneData };
++export type { EvidenceRecord, ProofTab, ReceiveRecord, RecompileView, SourcesSceneData };
+ 
+ type LandingSnapshot = {
+   schema: string;
+   tabs: ProofTab[];
+   record: EvidenceRecord;
++  receive: ReceiveRecord;
+   recompile: RecompileView;
+   heroView: EvidencePageView;
+   heroStats: HeroStat[];
+@@ -49,6 +50,7 @@ if (snapshotJson.schema !== "tavonel.landing-public-proof.v1") throw new Error("
+ const snapshot: LandingSnapshot = {
+   ...snapshotJson,
+   record: { ...snapshotJson.record, status: { ...snapshotJson.record.status, state: state(snapshotJson.record.status.state) } },
++  receive: { ...snapshotJson.receive, status: { ...snapshotJson.receive.status, state: state(snapshotJson.receive.status.state) } },
+   recompile: { ...snapshotJson.recompile, affectedSample: snapshotJson.recompile.affectedSample.map(item => ({ ...item, state: state(item.state) })) },
+   heroView: {
+     ...snapshotJson.heroView,
+@@ -63,6 +65,7 @@ const snapshot: LandingSnapshot = {
+ 
+ export const buildProofTabs = (): ProofTab[] => snapshot.tabs;
+ export const buildEvidenceRecord = (): EvidenceRecord => snapshot.record;
++export const buildReceiveRecord = (): ReceiveRecord => snapshot.receive;
+ export const buildRecompileView = (): RecompileView => snapshot.recompile;
+ export const buildHeroView = (): EvidencePageView => snapshot.heroView;
+ export const buildHeroStats = (): readonly HeroStat[] => snapshot.heroStats;

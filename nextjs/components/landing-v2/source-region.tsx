@@ -44,3 +44,67 @@ export default function SourceRegion({
     />
   );
 }
+
+
+/*
+  The same box cut out of the page instead of drawn on it (brief move 8), for the place beside a
+  passage where a reader matches the extractor's text to the printed lines it came from.
+
+  No new pixels, no canvas and no `<img>`: the committed page raster the caller already serves is
+  the element's background, sized and positioned so only `bbox1000` shows. A background has no
+  box of its own, so nothing overflows and nothing has to be clipped. The element keeps the box's
+  true aspect (box width x raster width over box height x raster height), so nothing is stretched;
+  it takes the width it is given, capped so a tall box never grows past `maxHeight`. The record's
+  coordinates are written back as `data-bbox1000`.
+
+  Background percentages: a size of 1000/w per mille of the page puts the page at the right scale,
+  and a position p% places the image's p% point on the box's p% point, so the box's left edge lands
+  on x0 when p = x0 / (1000 - w). A box spanning the full width has nothing to offset (p = 0).
+
+  Hidden from assistive technology: the passage beside it is the same content as text.
+*/
+export function SourceRegionCrop({
+  src,
+  width,
+  height,
+  bbox1000,
+  maxHeight = "12rem",
+  className,
+}: {
+  /** The committed page raster -- the same file the page view serves, not a derivative. */
+  src: string;
+  width: number;
+  height: number;
+  bbox1000: readonly number[];
+  maxHeight?: string;
+  className?: string;
+}) {
+  if (!isSourceRegionBox(bbox1000)) return null;
+  const [x0, y0, x1, y1] = bbox1000;
+  const w = x1 - x0;
+  const h = y1 - y0;
+  const aspect = (w * width) / (h * height);
+  const at = (start: number, span: number) => (span === 1000 ? 0 : (100 * start) / (1000 - span));
+  return (
+    <span
+      className={className}
+      aria-hidden="true"
+      data-derived="1"
+      data-bbox1000={bbox1000.join(",")}
+      style={{ display: "flex", alignItems: "center" }}
+    >
+      <span
+        style={{
+          display: "block",
+          width: "100%",
+          maxWidth: `calc(${maxHeight} * ${aspect})`,
+          aspectRatio: String(aspect),
+          backgroundImage: `url(${JSON.stringify(src)})`,
+          backgroundRepeat: "no-repeat",
+          backgroundSize: `${100000 / w}% ${100000 / h}%`,
+          backgroundPosition: `${at(x0, w)}% ${at(y0, h)}%`,
+        }}
+      />
+    </span>
+  );
+}

@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import HeroSourceCard from "../components/landing-v2/hero-source-card";
+import { SourceRegionCrop } from "../components/landing-v2/source-region";
 import {
   assertEvidenceCase,
   buildHomeEvidenceCase,
@@ -6,14 +10,16 @@ import {
   claimPublication,
   displayableRegions,
   HOME_RESERVED_CASE,
+  isClaimWithoutHeadingRunOn,
   officialFilingFor,
   publishableClaims,
   selectHomeCase,
+  selectReceiveClaim,
   type EvidenceCase,
   type EvidenceClaim,
   type EvidenceRegion,
 } from "./home-evidence-view";
-import { buildHeroView, buildProofTabs } from "./landing-v2-runtime";
+import { buildEvidenceRecord, buildHeroView, buildProofTabs } from "./landing-v2-runtime";
 
 /*
   The Home evidence projection. Two halves:
@@ -410,5 +416,86 @@ describe("rights and the replaceable slot", () => {
     const broken = fixture();
     broken.regions[0] = { ...broken.regions[0]!, digest: DIGEST_B };
     expect(() => selectHomeCase([broken])).toThrow(/digest mismatch/);
+  });
+});
+
+/* ------------------------------------------------------------------- brief move 8: the example */
+
+describe("the What you receive claim rule", () => {
+  it("rejects the claim Home quotes today, whose heading runs into its sentence", () => {
+    const label = buildEvidenceRecord().claim.label;
+    expect(isClaimWithoutHeadingRunOn(label)).toBe(false);
+    expect(selectReceiveClaim([{ label }])).toBeNull();
+  });
+
+  it.each([
+    ["two capitalised opening words", "Fixture Heading The fixture sentence ends here."],
+    ["a detached mark", "The fixture ® line ends here."],
+    ["two sentences", "The fixture ends here. Another fixture follows."],
+    ["a closing quote, then a second sentence", "The fixture says “stop.” Another fixture follows."],
+    ["a cut at an abbreviation", "The fixture belongs to Fixture Inc."],
+    ["a lowercase opening", "and the fixture continues here."],
+    ["no sentence end", "The fixture never ends"],
+  ])("rejects %s", (_reason, text) => {
+    expect(isClaimWithoutHeadingRunOn(text)).toBe(false);
+  });
+
+  it("accepts one plain sentence, and selects the first passing candidate in the order given", () => {
+    expect(isClaimWithoutHeadingRunOn("For example, the fixture sentence ends here.")).toBe(true);
+    expect(isClaimWithoutHeadingRunOn("The fixture says “stop.”")).toBe(true);
+    const picked = selectReceiveClaim([
+      { id: 1, label: "Fixture Heading The fixture sentence ends here." },
+      { id: 2, label: "The second fixture passes." },
+      { id: 3, label: "The third fixture also passes." },
+    ]);
+    expect(picked?.id).toBe(2);
+  });
+});
+
+describe("the workbench passage and its crop", () => {
+  const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
+  const unescape = (value: string) => value.replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+  it("renders every passage byte-for-byte as the snapshot records it", () => {
+    const value = homeCase();
+    const regions = displayableRegions(value);
+    expect(regions.length).toBeGreaterThan(1);
+    for (const region of regions) {
+      const record = buildHeroView().regions.find(item => item.id === region.id);
+      expect(region.passage).toBe(record?.excerpt);
+      const markup = html(createElement(HeroSourceCard, { view: { ...value, selectedRegionId: region.id } }));
+      const quoted = markup.match(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/)?.[1];
+      expect(quoted, region.id).toBeDefined();
+      expect(unescape(quoted!)).toBe(record!.excerpt);
+    }
+  });
+
+  it("crops the page at exactly the record's bbox, from the page image the case already serves", () => {
+    const value = homeCase();
+    const image = value.pages[0]!.image!;
+    for (const region of displayableRegions(value)) {
+      const record = buildHeroView().regions.find(item => item.id === region.id)!;
+      const markup = html(createElement(SourceRegionCrop, { src: image.src, width: image.width, height: image.height, bbox1000: region.bbox1000 }));
+      expect(markup).toContain(`data-bbox1000="${record.bbox1000.join(",")}"`);
+      // A background of the served raster, not a new image element or asset.
+      expect(markup).not.toContain("<img");
+      expect(unescape(markup)).toContain(`background-image:url("${image.src}")`);
+      const [x0, y0, x1, y1] = record.bbox1000;
+      const [w, h] = [x1 - x0, y1 - y0];
+      expect(markup).toContain(`background-size:${100000 / w}% ${100000 / h}%`);
+      expect(markup).toContain(`background-position:${(100 * x0) / (1000 - w)}% ${(100 * y0) / (1000 - h)}%`);
+      expect(markup).toContain(`aspect-ratio:${(w * image.width) / (h * image.height)}`);
+    }
+  });
+
+  it("offsets nothing along an axis the box spans in full", () => {
+    const markup = html(createElement(SourceRegionCrop, { src: "/fixture.webp", width: 10, height: 10, bbox1000: [0, 100, 1000, 300] }));
+    expect(markup).toContain("background-size:100% 500%");
+    expect(markup).toContain("background-position:0% 12.5%");
+  });
+
+  it("draws nothing for a box that is not a region", () => {
+    expect(html(createElement(SourceRegionCrop, { src: "/fixture.webp", width: 10, height: 10, bbox1000: [500, 10, 400, 20] }))).toBe("");
   });
 });

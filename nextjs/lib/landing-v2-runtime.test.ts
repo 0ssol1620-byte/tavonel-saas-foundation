@@ -8,6 +8,10 @@ import {
 import { buildSourcesScene, SOURCES_COPY } from "./landing-v2-sources";
 import { sampleEvidencePage } from "./evidence-regions";
 import { HERO_STATS } from "./hero-stats";
+import { exploreSampleDocuments, exploreSampleWorld } from "./explore-sample";
+import { toVisualWorldModel } from "./visual-world-model";
+import { landingV2PageImage } from "./landing-v2-assets";
+import { isClaimWithoutHeadingRunOn, selectReceiveClaim } from "./home-evidence-view";
 
 const file = path.resolve(process.cwd(), "lib/landing-v2-snapshot.json");
 
@@ -66,4 +70,26 @@ describe("frozen landing proof, without request-time corpus compilation", () => 
     }
   });
 
+  /*
+    Brief move 8. The candidates are the ones the record builder can already bind (a Claim whose
+    first region is on an original-representation page with a committed page raster), in World
+    order; the rule in `selectReceiveClaim` picks among them. This pins what it picks, and that the
+    claim Home quotes today is one the rule turns away.
+  */
+  it("finds a sample claim without a heading run-on, among claims the record builder can bind", () => {
+    const world = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
+    const evidence = new Map(world.evidence.map(item => [item.id, item] as const));
+    const candidates = world.nodes.filter(node => {
+      const region = node.kind === "Claim" ? evidence.get(node.evidenceRefs[0] ?? "") : undefined;
+      return Boolean(region && (region.representationKind ?? "original") === "original" &&
+        landingV2PageImage(region.digest, region.page));
+    });
+    const picked = selectReceiveClaim(candidates);
+    expect(picked?.kind).toBe("Claim");
+    expect(picked?.label).toBe(
+      "For example, statements in this Form 10-K regarding the potential future impact of macroeconomic conditions and tariffs and other measures on the Company’s business and results of operations are forward-looking statements.",
+    );
+    expect(candidates.slice(0, candidates.indexOf(picked!)).some(node => isClaimWithoutHeadingRunOn(node.label))).toBe(false);
+    expect(isClaimWithoutHeadingRunOn(buildEvidenceRecord().claim.label)).toBe(false);
+  });
 });
