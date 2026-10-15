@@ -249,6 +249,13 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
 });
 
 const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product", "/ko", "/ko/pricing"] as const;
+/*
+  Home (PR #148, main 0969755b) paints its whole page, header disclosure included, in its paper token
+  (--paper #faf9f6 in components/landing-v2/source-first-home.module.css). Every other public route keeps the
+  white header. The contrast assertions below hold on both surfaces.
+*/
+const HOME_ROUTES: readonly string[] = ["/", "/ko"];
+const HOME_PAPER = "rgb(250, 249, 246)";
 
 for (const route of PUBLIC_HEADER_ROUTES) {
   test(`the mobile menu has a high-contrast paper surface on ${route}`, async ({ page }) => {
@@ -256,7 +263,7 @@ for (const route of PUBLIC_HEADER_ROUTES) {
     await page.goto(route);
     const summary = page.locator("header.nav details.mobile-primary-nav > summary");
     await expect(summary).toBeVisible();
-    await expect(summary).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(summary).toHaveCSS("background-color", HOME_ROUTES.includes(route) ? HOME_PAPER : "rgb(255, 255, 255)");
     await expect(summary).toHaveCSS("color", "rgb(21, 25, 29)");
     await expect(summary).toHaveCSS("border-radius", "6px");
     const style = await summary.evaluate((element) => ({
