@@ -135,3 +135,46 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(await nav.getByRole("link", { name: "Pricing", exact: true }).evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
 });
+
+
+test("the Home first screen puts actions before its four-stage film and source proof below it", async ({ page }) => {
+  const width = page.viewportSize()?.width ?? 0;
+  test.skip(width !== 390 && width !== 1440, "Phone and desktop reference widths.");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
+  await expect(consent).toBeVisible();
+  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
+  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
+  await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
+  const measure = async () => page.evaluate(() => {
+    const rect = (selector: string) => { const element = document.querySelector(selector); if (!element) throw Error("Missing Home element: " + selector); return element.getBoundingClientRect().toJSON(); };
+    const banner = document.querySelector('[data-marketing-consent-panel]');
+    return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth,
+      header: rect("header.nav"), title: rect("#lv2-hero-title"), film: rect('#s1 figure[data-testid="landing-hero-film"]'),
+      action: rect("#s1 .lv2-actions a"), source: rect("#s2 article[data-case-status]"), banner: banner?.getBoundingClientRect().toJSON() ?? null };
+  });
+  for (const consentVisible of [true, false]) {
+    if (!consentVisible) await dismissConsent(page);
+    const layout = await measure();
+    expect(layout.overflow).toBeLessThanOrEqual(1);
+    expect(layout.title.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
+    expect(layout.film.top).toBeGreaterThanOrEqual(layout.title.bottom);
+    expect(layout.film.top).toBeLessThan(layout.height);
+    expect(layout.film.left).toBeGreaterThanOrEqual(-1);
+    expect(layout.film.right).toBeLessThanOrEqual(layout.width + 1);
+    expect(layout.source.top).toBeGreaterThanOrEqual(layout.film.bottom);
+    expect(layout.action.top).toBeGreaterThanOrEqual(layout.title.bottom);
+    expect(layout.action.bottom).toBeLessThanOrEqual(layout.film.top);
+    if (!consentVisible && width === 1440) expect(layout.action.bottom).toBeLessThanOrEqual(900);
+    if (consentVisible && layout.banner) expect(layout.banner.bottom).toBeLessThanOrEqual(layout.header.top + 1);
+    await test.info().attach("home-first-screen-" + width + "-consent-" + consentVisible, {body: await page.screenshot({animations: "disabled"}), contentType: "image/png"});
+  }
+  const source = page.locator("#s2 article[data-case-status]");
+  await source.scrollIntoViewIfNeeded();
+  await expect(source).toContainText("processing not yet run");
+  await expect(source.getByRole("button", {pressed: true})).toHaveCount(1);
+  await expect(source.locator("img")).toBeVisible();
+  await expect(source.locator("blockquote")).not.toHaveText("");
+  await expect(source.locator("[data-hero-evidence]")).toHaveAttribute("href", /act=evidence/);
+});

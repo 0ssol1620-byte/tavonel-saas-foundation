@@ -503,9 +503,9 @@ describe("public copy", () => {
        film opens the landmark that explains how the World was compiled. The entry pages preload
        the hero's own raster because that is the image above the fold now. */
     expect(page.indexOf("<HeroStatement")).toBeLessThan(page.indexOf("<HeroSourceCard"));
-    expect(page.indexOf("<SourceInspectionFilm")).toBeGreaterThan(0);
-    expect(page.indexOf("<SourceInspectionFilm")).toBeLessThan(page.indexOf("<HeroSourceCard"));
-    expect(page.indexOf("<SourceInspectionFilm")).toBeLessThan(page.indexOf('id="s3"'));
+    expect(page.indexOf("<HeroFilm")).toBeGreaterThan(0);
+    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf("<HeroSourceCard"));
+    expect(page.indexOf("<HeroFilm")).toBeLessThan(page.indexOf('id="s3"'));
     expect(page).toContain('id="s1"');
     expect(page).toContain('id="s2"');
     expect(page).not.toContain("<CompilerSpecimen");
@@ -1325,8 +1325,9 @@ describe("public copy", () => {
     const page = read("components/landing-v2/landing-page.tsx");
     const order = [
       'id="s1"',
-      "<SourceInspectionFilm",
+      "<HeroStatement",
       "<HeroActions",
+      "<HeroFilm",
       'id="s2"',
       "<HeroSourceCard",
       'id="s3"',

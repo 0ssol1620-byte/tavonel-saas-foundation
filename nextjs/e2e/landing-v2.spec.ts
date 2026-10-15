@@ -3,6 +3,11 @@ import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
 const FILM = '#s1 figure[data-testid="landing-hero-film"]';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
+/* While the server resolves access to /contact, the hero offers the document evaluation instead. */
+const EVALUATION = {
+  "/": { href: "/evaluation", label: "Evaluate your documents" },
+  "/ko": { href: "/ko/evaluation", label: "내 문서 평가 상담" },
+} as const;
 async function visibleFilm(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /./);
   const disclosure = page.getByTestId("landing-hero-film");
@@ -33,9 +38,13 @@ for (const route of ["/", "/ko"]) {
       await expect(section).toHaveAttribute("tabindex", "-1");
       const headingId = await section.getAttribute("aria-labelledby");
       expect(headingId).toBeTruthy();
-      await expect(page.locator(`[id=${JSON.stringify(headingId)}]`)).toHaveCount(1);
+      const heading = page.locator(`[id=${JSON.stringify(headingId)}]`);
+      await expect(heading).toHaveCount(1);
+      // Each scene landmark is named by a real page heading, not by a supporting label.
+      expect(await heading.evaluate(node => node.tagName)).toMatch(/^H[12]$/);
     }
     await expect(page.locator("main#main")).toHaveCount(1);
+    await expect(page.locator("main section section")).toHaveCount(0);
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.locator("main > [data-home-reader-guide]")).toHaveCount(1);
   });
@@ -78,6 +87,57 @@ for (const route of ["/", "/ko"]) {
     await expect(details.locator('a[href^="/explore?act=evidence"]')).toHaveCount(3);
     await expect(details).toContainText((await bench.getAttribute("data-source-digest"))!);
   });
+  test(`${route} opens the received record at its region and its original page`, async ({ page }) => {
+    await page.goto(route);
+    const record = page.locator("#s3 article");
+    await expect(record).toHaveCount(1);
+    await expect(record.locator("blockquote")).toHaveAttribute("lang", "en");
+    await expect(record.locator('[data-analytics="source-open"]')).toHaveAttribute("href", /^\/explore\?act=evidence&evidence=/);
+    await expect(record.locator('a[href^="/explore-sample/"]')).toHaveAttribute("href", /\.pdf#page=\d+$/);
+    await expect(record.locator("code")).toHaveText(/^sha256:[0-9a-f]{64}$/);
+  });
+  test(`${route} links the source change to the actual change record and its contract`, async ({ page }) => {
+    await page.goto(route);
+    const change = page.locator("#s4");
+    await expect(change.locator("a.lv2-text-link")).toHaveCount(1);
+    await expect(change.locator("a.lv2-text-link")).toHaveAttribute("href", "/explore?act=change");
+    await expect(change.locator("a.lv2-inline-link")).toHaveAttribute("href", "/product/continuous-knowledge");
+    await change.locator("a.lv2-text-link").click();
+    await expect(page).toHaveURL(/\/explore\?act=change$/);
+  });
+  /*
+    The hero's access action follows the server's commercial state. The Korean close prints that
+    resolved action unmapped (`/ko/contact` while access is by inquiry), so the state is read there
+    rather than assumed: by inquiry, the hero maps it to the localized document evaluation; live,
+    the hero keeps the resolved action and offers no evaluation link.
+  */
+  test(`${route} maps the hero's access action from the commercial state to a locale-correct destination`, async ({ page }) => {
+    const path = route as keyof typeof EVALUATION;
+    await page.goto("/ko");
+    const resolved = await page.locator('#s6 [data-scene-next="start"]').getAttribute("href");
+    expect(resolved).toMatch(/^\/[a-z]/);
+
+    await page.goto(path);
+    const actions = page.locator("#s1 .lv2-actions");
+    const hrefs = await actions.locator("a").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));
+    expect(hrefs).toHaveLength(2);
+    expect(hrefs).toContain("/explore");
+    const access = actions.locator('a:not([href="/explore"])');
+    await expect(access).toHaveCount(1);
+    if (path === "/ko") expect(await access.getAttribute("href"), "the Korean hero never sends a reader to the English inquiry").not.toBe("/contact");
+
+    if (resolved === "/ko/contact") {
+      const evaluation = EVALUATION[path];
+      await expect(access).toHaveAttribute("href", evaluation.href);
+      await expect(access).toHaveText(evaluation.label);
+      expect((await page.request.get(evaluation.href)).status(), `${evaluation.href} is a real route`).toBe(200);
+      await access.click();
+      await expect(page).toHaveURL(new RegExp(`${evaluation.href.replace(/\//g, "\\/")}$`));
+    } else {
+      await expect(access).toHaveAttribute("href", resolved!);
+      await expect(page.locator('main a[href$="/evaluation"]')).toHaveCount(0);
+    }
+  });
 }
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
@@ -96,13 +156,27 @@ test("Korean close follows its commercial destination and keeps Korean pricing",
     await expect(page.getByRole("button", { name: "문의 보내기" })).toBeVisible();
     await expect(page.locator('input[name="name"]')).toHaveAttribute("required", "");
     await expect(page.getByRole("contentinfo").getByRole("link", { name: "English" })).toHaveAttribute("href", "/contact");
+    if ((page.viewportSize()?.width ?? 1440) <= 390) {
+      const formTop = await page.locator("form").evaluate((form) => form.getBoundingClientRect().top);
+      expect(formTop, "the mobile inquiry form should begin in the first viewport").toBeLessThan(844);
+    }
   } else await expect(page.locator('input[type="email"]')).toBeVisible();
 });
-test("film is visible directly after the headline without an opening action", async ({ page }) => {
+test("the English close keeps its start action on an English destination", async ({ page }) => {
   await page.goto("/");
-  const film = page.getByTestId("landing-hero-film");
+  const start = page.locator('#s6 [data-scene-next="start"]');
+  await expect(start).toHaveCount(1);
+  const href = await start.getAttribute("href");
+  expect(href).toMatch(/^\/[a-z]/);
+  expect(href, "the English close never sends a reader to the Korean pages").not.toMatch(/^\/ko(\/|$)/);
+});
+test("film follows the headline actions without a separate opening action", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const film = page.locator('#s1 h1 + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]');
   await expect(film).toBeVisible();
-  await expect(film.locator('picture')).toHaveCount(1);
+  await expect(film.locator("img")).toHaveCount(1);
+  await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   const headline = (await page.locator('h1').boundingBox())!;
   const media = (await film.boundingBox())!;
   expect(media.y).toBeGreaterThanOrEqual(headline.y + headline.height);
@@ -111,11 +185,12 @@ test("film is visible directly after the headline without an opening action", as
   expect(actions.y).toBeGreaterThanOrEqual(headline.y + headline.height);
   await expect(film.locator("video")).toHaveCount(0);
 });
-test("inspection video loads only after a reader plays and advances", async ({ page }) => {
+test("four-stage video stays static with reduced motion until explicit play and advances", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/"); const film = await visibleFilm(page);
   await expect(film.locator("video")).toHaveCount(0);
-  await expect(film).toContainText("Prepared public sample");
-  await film.getByRole("button", { name: "Play the source inspection", exact: true }).click();
+  await expect(film).toContainText("Illustrative product demo · examples, not customer results.");
+  await film.getByRole("button", { name: "Play the compilation film", exact: true }).click();
   const video = film.locator("video");
   await expect(video).toBeVisible();
   await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(1);
@@ -127,10 +202,10 @@ test("server-renders the visible film poster as its priority image", async ({ re
   const html = await response.text();
   // Next transmits this early hint in the HTTP Link header before streaming the body.
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint).toContain("</film/source-inspection/desktop.webp>");
+  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
   expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/source-inspection/desktop.webp");
+  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   expect(sourceImages).toHaveLength(1);
@@ -140,9 +215,9 @@ test("server-renders the visible film poster as its priority image", async ({ re
 test("reduced motion keeps the prepared poster static until explicit play", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.goto("/");
   const film = await visibleFilm(page);
-  await expect(film.locator("picture img")).toBeVisible();
+  await expect(film.locator("img")).toBeVisible();
   await expect(film.locator("video")).toHaveCount(0);
-  await expect(film.getByRole("button", { name: "Play the source inspection", exact: true })).toBeVisible();
+  await expect(film.getByRole("button", { name: "Play the compilation film", exact: true })).toBeVisible();
 });
 
 test("source controls clear the touch floor and keep selected regions inside the page window", async ({ page }) => {

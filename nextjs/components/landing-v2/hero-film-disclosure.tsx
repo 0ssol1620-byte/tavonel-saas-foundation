@@ -26,9 +26,9 @@ export default function HeroFilmDisclosure({
       data-testid="landing-hero-film"
     >
         <div className={`lv2-film ${styles.filmBody}`}>
-          <CompileStagePlayer stages={stages} preferVideo priorityPoster korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} />
+          <CompileStagePlayer stages={stages} preferVideo priorityPoster korean={korean} initialMobileFilmView={LANDING_MOBILE_FILM_VIEW} storyLayout />
         </div>
-      <figcaption className="fine">{korean ? "예시 제품 흐름 영상 · 표시된 자료와 응답은 고객 결과가 아닙니다." : "Illustrative product walkthrough · displayed documents and answers are examples, not customer results."}</figcaption>
+      <figcaption className="fine">{korean ? "제품 흐름 예시 · 실제 고객 결과가 아닙니다." : "Illustrative product demo · examples, not customer results."}</figcaption>
     </figure>
   );
 }
