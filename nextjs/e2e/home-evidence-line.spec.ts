@@ -16,6 +16,9 @@ async function seedRefusal(page: import("@playwright/test").Page) {
 
 test("the Evidence Line follows keyboard focus A, B, C with its coordinates and no layout shift", async ({ page }, testInfo) => {
   test.skip(!["1440", "reduced-motion"].includes(testInfo.project.name), "side-by-side workbench widths");
+  // The reduced-motion project's `use.reducedMotion` does not reach matchMedia in this runner (measured: false),
+  // so the media is emulated here explicitly.
+  if (testInfo.project.name === "reduced-motion") await page.emulateMedia({ reducedMotion: "reduce" });
   await seedRefusal(page);
   await page.goto("/");
   const buttons = page.locator("#s2 button[data-line-region]");

@@ -146,7 +146,7 @@ const CONSENT_COPY_EN: ConsentCopy = {
 
 const CONSENT_COPY_KO: ConsentCopy = {
   region: "선택 분석",
-  prompt: "Google Analytics 쿠키는 공개 페이지의 방문과 클릭을 측정합니다. 워크스페이스 내용은 포함되지 않습니다.",
+  prompt: "Google Analytics 쿠키는 공개 페이지의 방문과 클릭을 측정하며, 워크스페이스 내용은 제외합니다.",
   privacy: "개인정보 처리방침",
   refuse: "허용하지 않음",
   allow: "분석 허용",
