@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FILM_DURATION } from "@/lib/film-script";
 import { COMPILE_STAGES, type CompileStage } from "@/lib/compile-stages";
+import readingStyles from "./landing-v2/film-reading-layer.module.css";
 
 const LIVE_FILMS = [
   dynamic(() => import("./opening-film"), { ssr: false }),
@@ -31,8 +32,36 @@ const STAGE_MS = FILM_DURATION * 1_000;
   Read opens on the compiled Markdown, Updates opens on the changed-source diff, and Use with AI
   opens on the grounded assistant. The values select existing quarter-frame snap points; they do
   not crop or alter the film and the visitor can pan through all four panes or restore full fit.
+  Non-Home callers only (their SSR markup is held to main304); Home opens on STAGE_FRAMES' pane.
 */
 const MOBILE_FOCUS_PANE = [0, 1, 0, 0] as const;
+
+/*
+  Home reading layer (redesign brief 2026-10-15, move 2b/2c). The cuts' own type is 8-10px and
+  the micro-labels are baked into the pixels, so each stage names ONE string to read and prints it
+  as HTML below the frame. Keyed by stage id, not position, so a narrowed stage list cannot point
+  a stage at another cut's string.
+
+  `panes` are the four pane headers and `text` a string as it appears in the locked frame --
+  transcribed, never paraphrased (poster or cut where it was read):
+  - sources: ORIGINAL title, poster-1-hero-2x.webp / poster-1.webp
+  - read: MARKDOWN heading of the first focus (PaymentTerms), poster-2.webp
+  - structure: MARKDOWN added line of the last delta (handbook-2026.pdf §12), poster-3.webp
+  - world: TERMINAL citation line (two spaces, as drawn), poster-4.webp
+  The cuts are recorded once, in English, so `textKo` quotes the same characters: a translated
+  quote would be a string that is not in the frame. A stage without a clean string gets
+  `{ pane: null, reason }` rather than a guess. Focus details opens on the target pane on Home.
+*/
+export type ReadingTarget =
+  | { pane: 0 | 1 | 2 | 3; text: string; textKo: string }
+  | { pane: null; reason: string };
+
+export const STAGE_FRAMES: Record<string, { panes: readonly [string, string, string, string]; readingTarget: ReadingTarget }> = {
+  sources: { panes: ["SOURCES", "ORIGINAL", "EXTRACT", "WORLD"], readingTarget: { pane: 1, text: "Site visit notes", textKo: "Site visit notes" } },
+  read: { panes: ["NODES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "# Payment terms", textKo: "# Payment terms" } },
+  structure: { panes: ["SOURCES", "MARKDOWN", "ONTOLOGY", "WORLD"], readingTarget: { pane: 1, text: "+ fourteen (14) days’ written notice", textKo: "+ fourteen (14) days’ written notice" } },
+  world: { panes: ["ASSISTANT · MCP", "EDITOR", "TERMINAL", "WORLD"], readingTarget: { pane: 2, text: "handbook-2026.pdf  p.12", textKo: "handbook-2026.pdf  p.12" } },
+};
 
 /*
   Where the live canvas is allowed to run, and why it is a width rule.
@@ -154,12 +183,14 @@ const MOBILE_FILM_VIEW = {
     fit: "Fit full frame",
     focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame.",
     fittedHint: "Full frame · Focus details to inspect small type.",
+    panes: "Film panes",
   },
   ko: {
     focus: "세부 내용 확대",
-    fit: "전체 화면 보기",
+    fit: "전체 프레임 보기",
     focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요.",
     fittedHint: "전체 화면 · 작은 글자는 세부 내용 확대에서 확인하세요.",
+    panes: "영상 패널",
   },
 } as const;
 
@@ -268,6 +299,11 @@ export default function CompileStagePlayer({
     the conservative visual fallback and does not change any source asset.
   */
   const active = stages[index] ?? stages[0] ?? COMPILE_STAGES[0]!;
+  const stageFrame = storyLayout ? STAGE_FRAMES[active.id] : undefined;
+  const target = stageFrame?.readingTarget;
+  const focusPane = storyLayout ? (target?.pane ?? 0) : (MOBILE_FOCUS_PANE[index] ?? 0);
+  /* The quarter-frame pane a panning phone is looking at; drives the visible pane indicator. */
+  const [visiblePane, setVisiblePane] = useState(0);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -299,11 +335,11 @@ export default function CompileStagePlayer({
     const viewport = viewportRef.current;
     if (!viewport || !narrow || mobileFilmFit) return;
     const frame = window.requestAnimationFrame(() => {
-      const pane = MOBILE_FOCUS_PANE[index] ?? 0;
-      viewport.scrollTo({ left: Math.round((viewport.scrollWidth / 4) * pane), top: 0, behavior: "auto" });
+      viewport.scrollTo({ left: Math.round((viewport.scrollWidth / 4) * focusPane), top: 0, behavior: "auto" });
+      setVisiblePane(focusPane);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [index, mobileFilmFit, narrow]);
+  }, [focusPane, index, mobileFilmFit, narrow]);
 
   const go = useCallback((next: number) => {
     const wrapped = ((next % stages.length) + stages.length) % stages.length;
@@ -429,7 +465,12 @@ export default function CompileStagePlayer({
     ))}
   </div> : null;
 
-  const externalMotionControl = storyLayout && narrow && !mobileFilmFit;
+  /* Home phone in Focus details: the frame pans across its four panes. */
+  const panning = storyLayout && narrow && !mobileFilmFit;
+  const panTo = (pane: number) => {
+    const viewport = viewportRef.current;
+    viewport?.scrollTo({ left: Math.round((viewport.scrollWidth / 4) * pane), top: viewport.scrollTop, behavior: reducedMotion ? "auto" : "smooth" });
+  };
   const motionControl = (
         <button
           type="button"
@@ -465,7 +506,7 @@ export default function CompileStagePlayer({
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].focus
             : MOBILE_FILM_VIEW[korean ? "ko" : "en"].fit}
         </button>
-        {externalMotionControl ? motionControl : null}
+        {panning ? motionControl : null}
         <p aria-live="polite">
           {mobileFilmFit
             ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].fittedHint
@@ -484,10 +525,37 @@ export default function CompileStagePlayer({
         <span className="compile-film-progress" aria-hidden="true" data-derived="1">{String(index + 1).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span>
       </div> : null;
 
+  /*
+    Below the frame, outside the source pixels: the four pane headers as a strip aligned under the
+    panes, the target pane marked, then the one string to read. On a panning phone the strip is the
+    pane indicator -- real buttons, the visible pane `aria-current` -- for the snap targets that are
+    aria-hidden; elsewhere it only repeats the line's pane name and is hidden from assistive tech.
+    Always rendered, so a reduced-motion poster keeps its reading line under it.
+  */
+  const markedPane = panning ? visiblePane : target?.pane;
+  const readingLayer = stageFrame && target ? (
+    <div className={readingStyles.reading} data-film-reading="">
+      <ol className={readingStyles.panes} lang={korean ? "en" : undefined} aria-label={panning ? MOBILE_FILM_VIEW[korean ? "ko" : "en"].panes : undefined} aria-hidden={panning ? undefined : true}>
+        {stageFrame.panes.map((name, pane) => (
+          <li key={pane} data-marked={pane === markedPane ? 1 : undefined}>
+            {panning
+              ? <button type="button" aria-current={pane === visiblePane ? "true" : undefined} onClick={() => panTo(pane)}>{name}</button>
+              : name}
+          </li>
+        ))}
+      </ol>
+      {target.pane !== null ? (() => {
+        const pane = stageFrame.panes[target.pane];
+        const quote = <q className={readingStyles.quote} lang={korean ? "en" : undefined}>{korean ? target.textKo : target.text}</q>;
+        return <p className={readingStyles.line}>{korean ? <>{pane} 패널에서 볼 것: {quote}</> : <>Look for {quote} in the {pane} pane.</>}</p>;
+      })() : null}
+    </div>
+  ) : null;
+
   return (
     /* Below 900px the horizontal gesture pans the film (G1-012). The separate tab strip chooses
        the cut and may sit behind a native disclosure on the landing page. */
-    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={MOBILE_FOCUS_PANE[index] ?? 0}>
+    <div className="compile-film-sequence rv" ref={frameRef} {...(narrow ? {} : touchHandlers)} data-story-layout={storyLayout ? 1 : undefined} data-film-renderer={live ? "live-canvas" : "video-fallback"} data-video-src={videoSrc} data-video-primary-src={preferredVideoSrc} data-compact={compact ? 1 : 0} data-narrow={narrow ? 1 : 0} data-mobile-view={mobileFilmFit ? "fit" : "focus"} data-mobile-focus-pane={focusPane}>
       {stageDisclosureLabel && stageTabs ? <details className="compile-film-stage-disclosure">
         <summary>{stageDisclosureLabel}</summary>
         {stageTabs}
@@ -511,7 +579,10 @@ export default function CompileStagePlayer({
         Above 900px they are `display: none` and the frame does not scroll, so the desktop
         composition is exactly what it was.
       */}
-      <div ref={viewportRef} className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact && !narrow ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)}>
+      <div ref={viewportRef} className="compile-film-viewport" role={compact ? undefined : "tabpanel"} id={panelId} tabIndex={compact && !narrow ? -1 : 0} aria-labelledby={compact ? undefined : tabId(active.id)} onScroll={panning ? (event) => {
+        const { scrollLeft, scrollWidth } = event.currentTarget;
+        setVisiblePane(Math.min(3, Math.round(scrollLeft / (scrollWidth / 4))));
+      } : undefined}>
         <div className="compile-film-panes" aria-hidden="true"><span /><span /><span /><span /></div>
         {still ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -558,9 +629,10 @@ export default function CompileStagePlayer({
           }} />
         )}
         {/* Focus inspection keeps the motion control outside the source pixels. */}
-        {!externalMotionControl ? motionControl : null}
+        {!panning ? motionControl : null}
       </div>
 
+      {readingLayer}
       {!storyLayout ? mobileTools : null}
 
       {compact && videoError ? <p className="compile-film-inline-error" role="status">{text.error}</p> : null}

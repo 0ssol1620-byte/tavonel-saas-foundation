@@ -1,8 +1,57 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import CompileStagePlayer, { toggleMobileFilmFit, type MobileFilmView } from "@/components/compile-stage-player";
+import CompileStagePlayer, { STAGE_FRAMES, toggleMobileFilmFit, type MobileFilmView } from "@/components/compile-stage-player";
+import HeroFilm from "@/components/landing-v2/hero-film";
 import { LANDING_MOBILE_FILM_VIEW } from "@/components/landing-v2/hero-film-disclosure";
+import { COMPILE_STAGES } from "@/lib/compile-stages";
+
+describe("film reading layer (brief 2026-10-15 move 2b/2c)", () => {
+  it("gives every stage one reading target, or null with a reason", () => {
+    for (const stage of COMPILE_STAGES) {
+      const frame = STAGE_FRAMES[stage.id];
+      expect(frame, stage.id).toBeDefined();
+      expect(frame!.panes.every(name => name.trim().length > 0)).toBe(true);
+      const target = frame!.readingTarget;
+      if (target.pane === null) {
+        expect(target.reason.trim().length, stage.id).toBeGreaterThan(0);
+      } else {
+        expect([0, 1, 2, 3]).toContain(target.pane);
+        expect(target.text.trim().length, stage.id).toBeGreaterThan(0);
+        // The cuts are recorded in English; KO quotes the frame, never a translation of it.
+        expect(target.textKo).toBe(target.text);
+      }
+    }
+  });
+
+  it("renders the reading line below the frame only on the Home story layout", () => {
+    const story = renderToStaticMarkup(<CompileStagePlayer storyLayout />);
+    expect(story).toContain("data-film-reading");
+    expect(story).toMatch(/Look for <q[^>]*>Site visit notes<\/q> in the ORIGINAL pane\./);
+    expect(story.indexOf("data-film-reading")).toBeGreaterThan(story.indexOf('class="compile-film-viewport"'));
+    // The strip only repeats the line's pane name outside a panning phone.
+    expect(story).toMatch(/<ol[^>]*aria-hidden="true"[^>]*><li>SOURCES<\/li><li data-marked="1">ORIGINAL<\/li>/);
+    expect(renderToStaticMarkup(<CompileStagePlayer />)).not.toContain("data-film-reading");
+
+    const ko = renderToStaticMarkup(<CompileStagePlayer storyLayout korean />);
+    expect(ko).toMatch(/ORIGINAL 패널에서 볼 것: <q[^>]*lang="en"[^>]*>Site visit notes<\/q>/);
+  });
+
+  it("opens Focus details on the reading-target pane, not SOURCES", () => {
+    const markup = renderToStaticMarkup(<CompileStagePlayer storyLayout preferVideo initialMobileFilmView="focus" />);
+    expect(markup).toContain('data-mobile-focus-pane="1"');
+    expect(STAGE_FRAMES.sources!.panes[1]).toBe("ORIGINAL");
+  });
+
+  it("keeps the hero's illustrative label and adds the reading line in both locales", () => {
+    const en = renderToStaticMarkup(<HeroFilm />);
+    expect(en).toContain("Illustrative product demo · examples, not customer results.");
+    expect(en).toContain("Site visit notes");
+    const ko = renderToStaticMarkup(<HeroFilm korean />);
+    expect(ko).toContain("제품 흐름 예시 · 실제 고객 결과가 아닙니다.");
+    expect(ko).toContain("패널에서 볼 것");
+  });
+});
 
 /*
   Every caller opens a phone on the whole frame unless it asks for the focus pane; the landing
@@ -55,7 +104,7 @@ describe("mobile film view", () => {
 
     const focus = renderToStaticMarkup(<CompileStagePlayer preferVideo korean initialMobileFilmView="focus" />);
     expect(focus).toContain('data-mobile-view="focus"');
-    expect(focusControl(focus).label).toBe("전체 화면 보기");
+    expect(focusControl(focus).label).toBe("전체 프레임 보기");
     expect(focus).toContain("확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요.");
   });
 
