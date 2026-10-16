@@ -236,6 +236,14 @@
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"]) { gap: 8px; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] [data-film-reading]) { grid-row: 3; }
     .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-viewport) { grid-row: 4; }
+    /*
+      In Fit the tools hold the toggle alone (the hint <p> is visually hidden and absolute), so the
+      shared tools grid's 12px column gap only widened the auto column (119.5px for a 107.5px
+      button) and left stage 1's caption 4.7px of slack at 360. Linux Chromium (CI) wrapped it to a
+      third line and pushed the frame from 633 to 651 at 360 (CI screenshots of 2c7fba3 and
+      2412bed). Without the gap the caption column is 204.5px and the first line needs 187.8px.
+    */
+    .home.home :global(#s1 .compile-film-sequence[data-story-layout="1"][data-mobile-view="fit"] .compile-film-mobile-tools) { column-gap: 0; }
   }
   @media (max-width: 899px) {
     .home.home :global(#s5 .lv2-proof-list) { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }

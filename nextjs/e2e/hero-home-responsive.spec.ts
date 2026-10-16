@@ -542,7 +542,10 @@ test("every stage that opens cropped keeps ink in both panes of its whole window
   at 360x800 is -43%). Fix round 4 measured EN 52,470 / 75,516 / 85,470 / 93,896 and KO 63,282 /
   75,516 / 85,470 / 94,284 (fix3/LCP-after.json). The floors are per engine: Windows WebKit lays the
   page out beside a 10px classic scrollbar (310-410px of content), so its areas are their own
-  baseline, measured on the 2c7fba3 preview (fix3/LCP-webkit-before-2c7fba3.json).
+  baseline, measured on the 2c7fba3 preview (fix3/LCP-webkit-before-2c7fba3.json). CI's Linux
+  Chromium shares the chromium floors, which are at least as strict as its own 2c7fba3 layout: its
+  frame top was 633 at 360 (as on Windows) and 633 at 390 (609 on Windows), per the CI stage-1
+  screenshots (fix3/GEOMETRY.json ciLinux).
 */
 const LCP_FLOOR: Record<string, Record<string, Record<number, number>>> = {
   chromium: {
