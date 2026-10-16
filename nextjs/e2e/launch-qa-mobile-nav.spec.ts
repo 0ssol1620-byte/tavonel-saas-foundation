@@ -238,12 +238,13 @@ test("the menu keeps a visible focus ring and does not trap the keyboard", async
   const panel = page.locator("header.nav details.mobile-primary-nav > nav");
   await expect(panel).toBeVisible();
   // The source-first paper surface uses the same 2px blue keyboard ring for every control.
-  // Release 2 (main dbe22b1e) draws it in the header cobalt #244ac8
-  // (`.one-path-mobile-nav > summary:focus-visible` in components/public-site-chrome.module.css);
-  // measured on the merged build at 390x844: 2px solid rgb(36, 74, 200), offset 2px.
+  // Release 2 (main dbe22b1e) drew it in the header cobalt #244ac8; Release 3 (main bcba7173) draws it in
+  // the 255° accent, var(--action, #005bb3) (`.one-path-mobile-nav > summary:focus-visible` in
+  // components/public-site-chrome.module.css). Measured on tavonel.com (dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2)
+  // at 390x844 on / and /ko, 2026-10-16: 2px solid rgb(0, 91, 179), offset 2px.
   await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "2px");
   await expect(summary).toHaveCSS("outline-offset", "2px");
-  await expect(summary).toHaveCSS("outline-color", "rgb(36, 74, 200)");
+  await expect(summary).toHaveCSS("outline-color", "rgb(0, 91, 179)");
   await expect(summary).not.toHaveCSS("outline-style", "none");
   const ring = await summary.evaluate(element => ({ color: getComputedStyle(element).outlineColor, background: getComputedStyle(element).backgroundColor }));
   expect(contrastRatio(ring.color, ring.background), "visible keyboard ring contrast").toBeGreaterThanOrEqual(3);
@@ -323,11 +324,20 @@ test("the consent notice, header, and home headline occupy separate phone bands"
   await expectHomeLeadBelowHeader(page);
 });
 
+/*
+  Release 3 (main bcba7173): on a Home phone the sheet waits while the hero film or its reading line is in
+  its zone (homeSheetClear in components/marketing-consent.tsx). At 390x844 that is the top of the page:
+  measured on tavonel.com, the sheet is present after the 300px scroll and absent back at scroll 0. So it is
+  answered where it shows, and the header and headline are measured back at the top.
+*/
 test("dismissing the consent notice leaves the fixed header above the home headline", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  const panel = await revealConsentAtTop(page);
+  await page.evaluate(() => window.scrollTo(0, 300));
+  const panel = page.locator("section[data-marketing-consent-panel]");
+  await expect(panel).toBeVisible();
   await panel.locator("button").first().click();
   await expect(panel).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expectHomeLeadBelowHeader(page);
 });

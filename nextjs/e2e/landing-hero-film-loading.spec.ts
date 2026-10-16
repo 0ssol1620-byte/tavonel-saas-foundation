@@ -11,14 +11,19 @@ import { expect, test } from "@playwright/test";
   - the locked poster is the media the page asks for first, and it decodes;
   - under reduced motion no recording is requested until the visitor asks, by keyboard;
   - with motion allowed the recording starts by itself, after the poster;
-  - the phone player opens fitted, and Focus details / Fit full frame and their hint follow the
+  - the phone player opens fitted, and Focus details, its pressed state and its hint follow the
     page's language and the selected stage.
+
+  Release 3 (main bcba7173, PR #150) re-cut the stage-1 poster: components/landing-v2/hero-film.tsx serves
+  /film/poster-1-t3.00.webp (1440w) and /film/poster-1-t3.00-2x.webp (2880w) as one srcset, and a phone in Fit
+  takes the 1440w file (main's e2e/landing-hero-mobile.spec.ts asserts the same currentSrc at 360 and 390).
+  The locked poster here is that file; /film/poster-1-hero-2x.webp is no longer requested by Home.
 */
 const FILM = '#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="landing-hero-film"]';
-const POSTER = "/film/poster-1-hero-2x.webp";
+const POSTER = "/film/poster-1-t3.00.webp";
 const LOCALES = [
-  { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details", fit: "Fit full frame", fittedHint: "Full frame · Focus details to inspect small type.", focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame." },
-  { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대", fit: "전체 프레임 보기", fittedHint: "전체 프레임 · 작은 글자는 세부 내용 확대에서 확인하세요.", focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요." },
+  { path: "/", language: "English", play: "Play the compilation film", focus: "Focus details", fittedHint: "Full frame · Focus details to inspect small type.", focusedHint: "Focused view · Swipe or use arrow keys to inspect the frame." },
+  { path: "/ko", language: "Korean", play: "컴파일 영상 재생", focus: "세부 내용 확대", fittedHint: "전체 프레임 · 작은 글자는 세부 내용 확대에서 확인하세요.", focusedHint: "확대 보기 · 옆으로 밀거나 방향키로 화면을 살펴보세요." },
 ] as const;
 const MOTION_PREFERENCES = [
   { preference: "reduce" as const, name: "reduced motion" },
@@ -83,7 +88,9 @@ for (const locale of LOCALES) {
       await focusControl.click();
       await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
       await expect(focusControl).toHaveAttribute("aria-pressed", "true");
-      await expect(focusControl).toHaveText(locale.fit);
+      // Release 3 fix round 3, M1 (main bcba7173, components/compile-stage-player.tsx): one WAI-ARIA toggle whose label
+      // names the action and never changes; aria-pressed names the state. The "Fit full frame" label is gone.
+      await expect(focusControl).toHaveText(locale.focus);
       await expect(hint).toHaveText(locale.focusedHint);
       await stages.nth(2).click();
       await expect(stages.nth(2)).toHaveAttribute("aria-selected", "true");
