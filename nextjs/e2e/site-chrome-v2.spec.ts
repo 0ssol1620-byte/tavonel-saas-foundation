@@ -264,9 +264,12 @@ test.describe("at 390", () => {
   Review 2 (FE-B1). The paper chrome (app/chrome-v2.css) is for the public reading pages, not Home:
   its rules are unlayered, so without the Home exclusion they beat Home's own header and footer
   (source-first-home.module.css, @layer overrides) and Release 2's dark footer turned paper. The
-  expected values are main dbe22b1e's, read off tavonel.com on 2026-10-16 at these three widths.
+  expected values are main's: first dbe22b1e's, then bcba7173's (Home Release 3), whose 255° accent
+  moved the header action to #005bb3 (rgb(0, 91, 179)) and Home's --source to var(--action). They
+  were read off tavonel.com (deployment dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2) on 2026-10-16 at these
+  three widths, and the merged build matched all 160 measured Home header and footer properties.
 */
-test.describe("Home keeps Release 2's header and footer colours", () => {
+test.describe("Home keeps main's header and footer colours", () => {
   test.beforeEach(async ({}, testInfo) => {
     test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
   });
@@ -279,8 +282,8 @@ test.describe("Home keeps Release 2's header and footer colours", () => {
       await expect(footer.locator(".site-footer-groups a").first()).toHaveCSS("color", "rgb(183, 195, 210)");
       const header = page.locator(HEADER);
       await expect(header).toHaveCSS("color", "rgb(21, 25, 29)");
-      expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#7da7ff");
-      await expect(header.locator(".nav-actions .btn")).toHaveCSS("background-color", "rgb(36, 74, 200)");
+      expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
+      await expect(header.locator(".nav-actions .btn")).toHaveCSS("background-color", "rgb(0, 91, 179)");
       if (testInfo.project.name === "1440") {
         await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");
         await expect(header.locator(".nav-signin")).toHaveCSS("color", "rgb(21, 25, 29)");
