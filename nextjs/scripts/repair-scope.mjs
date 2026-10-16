@@ -1871,6 +1871,81 @@ export const FIX_ROUND_3_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/upload-release-route.switch-off.test.ts', 'lib/visual-refinement.test.ts',
 ]);
 export const FIX_ROUND_3_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/site-chrome-v2.spec.ts']);
+// PR #141's merge of main bcba7173 (Home Release 3, PR #150): the twenty-nine changed endpoints no owner listed -- the Home and
+// Korean entry pages, the receipted measurement band (component, styles, data, its claims pack and suite, its receipt and research
+// note), the re-cut film posters with their lock file and README, the stage and copy modules, the evidence record, the public
+// package proof styles, two suites main changed, two specs, .gitattributes (which keeps the claims pack's bytes), and the DB
+// rehearsal workflow contract this round extended. Repository-relative, because .gitattributes is outside nextjs/. Selects each
+// path's direct suites and six browser suites. Product code, so never nativeReuse.
+export const PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS = Object.freeze([
+  '.gitattributes',
+  'nextjs/app/ko/page.tsx',
+  'nextjs/app/page.tsx',
+  'nextjs/app/research/notes/page.tsx',
+  'nextjs/components/landing-v2/home-measures.module.css',
+  'nextjs/components/landing-v2/home-measures.tsx',
+  'nextjs/components/public-package-proof.module.css',
+  'nextjs/content/evidence/public-claims-pack.json',
+  'nextjs/e2e/home-measures.spec.ts',
+  'nextjs/e2e/overflow-audit.spec.ts',
+  'nextjs/lib/compile-stages.ts',
+  'nextjs/lib/db-rehearsal-workflow.test.ts',
+  'nextjs/lib/design-tokens.test.ts',
+  'nextjs/lib/evidence-record.ts',
+  'nextjs/lib/home-measures.test.ts',
+  'nextjs/lib/home-measures.ts',
+  'nextjs/lib/landing-v2-copy.ts',
+  'nextjs/lib/locked-film-assets.json',
+  'nextjs/lib/trust-page-answers.test.ts',
+  'nextjs/public/film/README.md',
+  'nextjs/public/film/poster-1-t3.00-2x.webp',
+  'nextjs/public/film/poster-1-t3.00.webp',
+  'nextjs/public/film/poster-2-t17.96-2x.webp',
+  'nextjs/public/film/poster-2-t17.96.webp',
+  'nextjs/public/film/poster-3-t17.96-2x.webp',
+  'nextjs/public/film/poster-3-t17.96.webp',
+  'nextjs/public/film/poster-4-t17.96-2x.webp',
+  'nextjs/public/film/poster-4-t17.96.webp',
+  'nextjs/public/research/receipts/R-03-olmocr-bench-evaluation-2026-08-04.json',
+]);
+export const PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES = Object.freeze([
+  'components/compile-stage-player.mobile-view.test.tsx',
+  'lib/brand-copy.test.ts',
+  'lib/category-guide.test.ts',
+  'lib/copy-trust-guard.test.ts',
+  'lib/db-rehearsal-workflow.test.ts',
+  'lib/design-tokens.test.ts',
+  'lib/docs-navigation.test.ts',
+  'lib/gdp-pdf-page-data.test.ts',
+  'lib/home-measures.test.ts',
+  'lib/journey-acceptance.test.ts',
+  'lib/ko-terms.test.ts',
+  'lib/landing-experiments.test.ts',
+  'lib/landing-v2-copy.test.ts',
+  'lib/landing-v2-evidence.test.ts',
+  'lib/landing-v2-hero-copy.test.ts',
+  'lib/landing-v2-hero-statement.test.ts',
+  'lib/landing-v2-outcome-ia.test.ts',
+  'lib/landing-v2-page.test.ts',
+  'lib/landing-v2-proof-scene.test.ts',
+  'lib/landing-v2-recompile.test.ts',
+  'lib/landing-v2-runtime.test.ts',
+  'lib/landing-v2-sources.test.ts',
+  'lib/landing-v2-start.test.ts',
+  'lib/landing-v2-traceability.test.ts',
+  'lib/landing-v2-trust.test.ts',
+  'lib/landing-v2-use.test.ts',
+  'lib/landing-v2-why.test.ts',
+  'lib/one-path-contract.test.ts',
+  'lib/page-seo.test.ts',
+  'lib/product-claims-sync.test.ts',
+  'lib/prohibited-phrases.test.ts',
+  'lib/public-copy-purge.test.ts',
+  'lib/seo-surface.test.ts',
+  'lib/site-nav-model.test.ts',
+  'lib/trust-page-answers.test.ts',
+]);
+export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/home-measures.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/production-hardening.spec.ts', 'e2e/public-package-proof.spec.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2167,6 +2242,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
   affectedGroup('pr141-fix-round-3', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_3_AFFECTED_PATHS)})$`),
     { unitFiles: FIX_ROUND_3_AFFECTED_UNIT_FILES, browserFiles: FIX_ROUND_3_AFFECTED_BROWSER_FILES }),
+  // PR #141's merge of main bcba7173: the twenty-nine exact repository paths above select their direct suites and six browser suites.
+  affectedGroup('pr141-main-merge-bcba7173', new RegExp(`^(?:${exactPathAlternation(PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS)})$`),
+    { unitFiles: PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, browserFiles: PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

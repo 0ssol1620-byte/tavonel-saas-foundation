@@ -226,6 +226,8 @@ const browserProjectsByFile = new Map([
   ['e2e/sources.spec.ts', ['1440']],
   ['e2e/recipe-continuation.spec.ts', ['1440', '390', '360', 'reduced-motion']],
   ['e2e/login-capability.spec.ts', ['1440']],
+  ['e2e/home-measures.spec.ts', ['1440', '390', 'reduced-motion']],
+  ['e2e/overflow-audit.spec.ts', ['audit']],
 ]);
 
 const SOLUTIONS_ROUTES=['ai-ready-knowledge','document-intelligence','knowledge-graph','source-grounded-assistants','knowledge-operations'];
