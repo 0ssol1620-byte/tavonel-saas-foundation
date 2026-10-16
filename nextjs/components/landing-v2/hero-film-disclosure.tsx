@@ -2,7 +2,7 @@
 
 import { preload } from "react-dom";
 
-import CompileStagePlayer, { type MobileFilmView } from "@/components/compile-stage-player";
+import CompileStagePlayer, { FILM_POSTER_SIZES, filmPosterSrcSet, type MobileFilmView } from "@/components/compile-stage-player";
 import type { CompileStage } from "@/lib/compile-stages";
 import styles from "./landing-hero.module.css";
 
@@ -18,8 +18,14 @@ export default function HeroFilmDisclosure({
   stages: CompileStage[];
 }) {
   // Next supports resource hints in an SSR client component, before hydration.
-  const openingPoster = stages[0]?.poster;
-  if (openingPoster) preload(openingPoster, { as: "image", fetchPriority: "high" });
+  // With a 1x copy the preload carries the same srcset and sizes as the <img>, so a phone fetches one file.
+  const opening = stages[0];
+  const openingSrcSet = opening && filmPosterSrcSet(opening);
+  if (opening?.poster) {
+    preload(opening.poster, openingSrcSet
+      ? { as: "image", fetchPriority: "high", imageSrcSet: openingSrcSet, imageSizes: FILM_POSTER_SIZES }
+      : { as: "image", fetchPriority: "high" });
+  }
   return (
     <figure
       className={`lv2-film-story ${styles.film}`}

@@ -10,7 +10,8 @@ test.describe("phone four-stage film", () => {
   test("opens on the locked full-frame poster with readable stage and play controls", async ({ page }) => {
     const film = page.locator(FILM);
     await expect(film).toBeVisible();
-    expect(await film.locator("img").evaluate((image: HTMLImageElement) => image.currentSrc)).toContain("/film/poster-1-hero-2x.webp");
+    // Release 3 re-cut: a phone in Fit takes the 1440px copy of the stage-1 poster (the 2880px file is the desktop crop's).
+    expect(await film.locator("img.compile-film-still").evaluate((image: HTMLImageElement) => image.currentSrc)).toContain("/film/poster-1-t3.00.webp");
     await expect(film.getByRole("tab")).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
     const play = film.getByRole("button", { name: "Play the compilation film", exact: true });
     expect((await play.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -29,10 +30,14 @@ test.describe("phone four-stage film", () => {
     await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
     expect((await focus.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(focus).toHaveAttribute("aria-pressed", "false");
     await focus.click();
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
-    await film.getByRole("button", { name: "Fit full frame", exact: true }).click();
+    // Fix round 3 (M1): the same toggle, now pressed; pressing it again returns to Fit.
+    await expect(focus).toHaveAttribute("aria-pressed", "true");
+    await focus.click();
     await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
+    await expect(focus).toHaveAttribute("aria-pressed", "false");
     const tabs = film.getByRole("tab");
     await tabs.first().focus();
     await page.keyboard.press("ArrowRight");

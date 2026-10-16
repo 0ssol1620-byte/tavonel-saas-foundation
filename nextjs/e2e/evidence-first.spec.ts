@@ -26,7 +26,7 @@ const BENCH = "section#s2 article[data-case-status]";
 
 test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("Knowledge your AI can trust.");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("Turn documents into context your AI can cite.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   await expect(page.locator("[data-source-sheet]")).toHaveCount(0);
 
@@ -101,7 +101,7 @@ test("the hero and every scene below it fit the viewport at the active product-Q
 
 test("Korean visitors get the same story and the same route behind it", async ({ page }) => {
   await page.goto("/ko");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("AI가 믿고 사용하는 지식.");
+  await expect(page.locator("h1#lv2-hero-title")).toContainText("문서를 AI가 인용할 수 있는 맥락으로 바꿉니다.");
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   // The same six scenes, and the same real source page behind the same claim.
   await expect(page.locator("main > section[data-scene]")).toHaveCount(6);
@@ -114,6 +114,6 @@ test("Korean visitors get the same story and the same route behind it", async ({
   await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
   await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
   await expect(page.getByTestId("landing-hero-film")).toBeVisible();
-  await expect(page.locator('#s1').getByRole("link", { name: "공개 샘플 살펴보기" })).toHaveAttribute("href", "/explore");
+  await expect(page.locator('#s1').getByRole("link", { name: "컴파일된 샘플 열기" })).toHaveAttribute("href", "/explore");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

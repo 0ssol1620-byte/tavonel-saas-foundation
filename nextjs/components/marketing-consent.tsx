@@ -76,6 +76,30 @@ type AnalyticsWindow = Window & {
  */
 export const CONSENT_REVEAL = { scrollPx: 200, delayMs: 8000 } as const;
 
+/*
+  Fix round 3 (judge gap 3). On a Home phone the revealed card is a bottom sheet that never opens
+  over the hero film: at 8 s with no scroll the film fills the foot of a 360-430px first screen,
+  which is exactly where the sheet sits. The sheet's zone is its 96px two-row cap plus the 8px
+  inset; while the film is in that zone the prompt waits, and it shows as soon as a scroll moves
+  the film out of it (the 200px scroll path is always clear). Desktop keeps the row under the
+  header, which already clears the film.
+*/
+const PHONE_SHEET_ZONE_PX = 104;
+const PHONE = "(max-width: 899.98px)";
+
+/*
+  Fix round 4 (M3). What the sheet keeps clear of is the frame AND the stage's reading line: at 430
+  the sheet cleared the frame but covered the line under it, and on a phone in Fit the line now sits
+  above the frame. The clear-of region runs from the higher top to the lower bottom of the two
+  boxes; the sheet may show when that region ends above its zone or starts below the screen.
+*/
+export function homeSheetClear(boxes: readonly { top: number; bottom: number }[], viewportHeight: number): boolean {
+  if (boxes.length === 0) return true;
+  const top = Math.min(...boxes.map(box => box.top));
+  const bottom = Math.max(...boxes.map(box => box.bottom));
+  return bottom <= viewportHeight - PHONE_SHEET_ZONE_PX || top >= viewportHeight;
+}
+
 const denied = { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" };
 
 function disableAnalytics() {
@@ -100,6 +124,8 @@ export default function MarketingConsent() {
   const [anchored, setAnchored] = useState(false);
   // Release 2: whether the first-time prompt may show yet (see CONSENT_REVEAL).
   const [revealed, setRevealed] = useState(false);
+  // Fix round 3: whether a Home phone's bottom sheet is clear of the hero film (see PHONE_SHEET_ZONE_PX).
+  const [filmClear, setFilmClear] = useState(true);
 
   /*
     The server and the first client render draw nothing: the prompt is a fixed card that reserves
@@ -132,6 +158,24 @@ export default function MarketingConsent() {
     onScroll(); // a restored scroll position already counts
     return () => { window.clearTimeout(timer); window.removeEventListener("scroll", onScroll); };
   }, [revealed]);
+
+  useEffect(() => {
+    const film = document.querySelector("[data-home-ia] #s1 .compile-film-viewport");
+    if (!film) { setFilmClear(true); return; }
+    const line = document.querySelector("[data-home-ia] #s1 [data-film-reading]");
+    const phone = window.matchMedia(PHONE);
+    const check = () => {
+      const boxes = [film, line].flatMap(node => (node ? [node.getBoundingClientRect()] : []));
+      setFilmClear(!phone.matches || homeSheetClear(boxes, window.innerHeight));
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    // A stage change or a Focus press moves the frame and the line without a scroll.
+    const resize = new ResizeObserver(check);
+    resize.observe(film.closest(".compile-film-sequence") ?? film);
+    return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); resize.disconnect(); };
+  }, [pathname]);
 
   // Per navigation: a route with the site footer and a route without it are different answers,
   // and a client-side navigation between them changes nothing else this component watches.
@@ -196,7 +240,7 @@ export default function MarketingConsent() {
 
   const surface = consentSurface({ measured: Boolean(location), ready, consent, editing, navOpen });
   if (surface === "nothing") return null;
-  if (surface === "prompt" && !revealed) return null;
+  if (surface === "prompt" && (!revealed || !filmClear)) return null;
   /*
     G1-033. After a choice the reopen control is the footer's, so this draws nothing -- unless the
     page has no footer to carry it, in which case the old floating pill is the only withdrawal

@@ -21,5 +21,96 @@
       "bytes": 614533,
       "sha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732"
     }
-  ]
+  ],
+  "posters": [
+    {
+      "file": "poster-1-t3.00-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 256358,
+      "sha256": "1acb30d68a62a351a8c1233df002150241bf5eeec2217e0af2f5e3235eda31c0",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 3,
+      "framePngSha256": "714ee095c83002fd00ab5ce708ad47e59149fb7f5afe4f430159641d64d0c425"
+    },
+    {
+      "file": "poster-1-t3.00.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 102344,
+      "sha256": "70db5d61df9f4ddb87ec92241bbc60eb4f2cba8ea32489ecddd35bf1814bfead",
+      "cut": "compile-cut.mp4",
+      "cutSha256": "1406a9a8d6e537eadd97012c94c89ffc792276628f30fa8313ea892c8dd169b9",
+      "frameSeconds": 3,
+      "framePngSha256": "714ee095c83002fd00ab5ce708ad47e59149fb7f5afe4f430159641d64d0c425"
+    },
+    {
+      "file": "poster-2-t17.96-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 364308,
+      "sha256": "8d381efe68e406ac0dd0cca683e3a34013d299140ca119751f9d8400e6ec2282",
+      "cut": "compile-cut-2.mp4",
+      "cutSha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "frameSeconds": 17.96,
+      "framePngSha256": "fd3c6992362c58320f7892ff7c9550900d54cbbb753afa12904d1143dc7e1035"
+    },
+    {
+      "file": "poster-2-t17.96.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 141706,
+      "sha256": "921686510510b7251da4c09c4dcfd6603340cc5a3b0a782deafa9ab72833fa37",
+      "cut": "compile-cut-2.mp4",
+      "cutSha256": "d0496e6e80f83b9a11ccb647c1b23de54d7ad22d7163f2ddd4f0ae58d7152c6d",
+      "frameSeconds": 17.96,
+      "framePngSha256": "fd3c6992362c58320f7892ff7c9550900d54cbbb753afa12904d1143dc7e1035"
+    },
+    {
+      "file": "poster-3-t17.96-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 201410,
+      "sha256": "d7553131876580c15c8f6f80eba0aae4789140e7878ed9326db2b84e41500690",
+      "cut": "compile-cut-3.mp4",
+      "cutSha256": "c6d35a3a43f08e54381e7e15cb86908a70184d51726baebc52b766ac9d7f54a0",
+      "frameSeconds": 17.96,
+      "framePngSha256": "800460fdc789634c0d325e5dd903e550f0b7bf81e15176a4a5be560109641610"
+    },
+    {
+      "file": "poster-3-t17.96.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 72860,
+      "sha256": "920dd8c78f174f3664f585d9ca2e9fb093a5819365bc8d35458e470b173d9e37",
+      "cut": "compile-cut-3.mp4",
+      "cutSha256": "c6d35a3a43f08e54381e7e15cb86908a70184d51726baebc52b766ac9d7f54a0",
+      "frameSeconds": 17.96,
+      "framePngSha256": "800460fdc789634c0d325e5dd903e550f0b7bf81e15176a4a5be560109641610"
+    },
+    {
+      "file": "poster-4-t17.96-2x.webp",
+      "width": 2880,
+      "height": 1800,
+      "bytes": 191694,
+      "sha256": "3fd52503c3615647e5c0587f9b5ce43d12c432f0e14c9e3cca34a48840d58912",
+      "cut": "compile-cut-4.mp4",
+      "cutSha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
+      "frameSeconds": 17.96,
+      "framePngSha256": "f6eab683949c55a50454cecd0759f2a45a18acd0c33cb6dbea3ba832cdf7cf3b"
+    },
+    {
+      "file": "poster-4-t17.96.webp",
+      "width": 1440,
+      "height": 900,
+      "bytes": 80582,
+      "sha256": "77625e4584b4723fd1e53bd9c0254bcedd9505d8c8386b61d2901be47d095089",
+      "cut": "compile-cut-4.mp4",
+      "cutSha256": "480c7479ca2a7f3ab73291016c4d64c20bee6e6967f43444bde44e117e0cf732",
+      "frameSeconds": 17.96,
+      "framePngSha256": "f6eab683949c55a50454cecd0759f2a45a18acd0c33cb6dbea3ba832cdf7cf3b"
+    }
+  ],
+  "posterEncoder": "sharp 0.35.4 (libwebp 1.6.0, libvips 8.18.6); webp quality 82, smartSubsample, effort 6; 1x = lanczos3 resize of the same frame"
 }

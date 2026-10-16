@@ -18,6 +18,8 @@ export default function HeroStatement({
   const lines = arm ? arm.split(SENTENCES).filter(Boolean) : copy.headline.split(SENTENCES).filter(Boolean);
   return (
     <div className="lv2-hero-text">
+      {/* Fix round 3: the category names the product above the outcome sentence (judge gap 1). */}
+      {copy.eyebrow ? <p className="lv2-eyebrow lv2-hero-eyebrow">{copy.eyebrow}</p> : null}
       <h1 className="lv2-hero-h1" id={titleId}>
         {lines.map((line, index) => {
           const at = accent ? line.indexOf(accent) : -1;

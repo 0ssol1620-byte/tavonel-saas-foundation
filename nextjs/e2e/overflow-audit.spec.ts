@@ -97,6 +97,29 @@ function measureOverflow(): { documentOverflow: number; offenders: Offender[] } 
     }
     return false;
   };
+  /*
+    Release 3 (2026-10-16): the Home film's desktop reading crop, and nothing else.
+
+    From 900px the film opens on a 2x crop of the stage's two reading panes
+    (`.compile-film-sequence[data-wide-view="crop"]`), drawn as `transform: scale(2)` on the
+    media inside `.compile-film-viewport`, which clips it (`overflow: hidden`). The transform makes
+    the media's client rect twice the frame: measured on build sRc4B7jgCEvbjOa4NSbYo, the video's
+    rect is 2396px at x=-478 (1440), 2396 at x=-238 (1920), 1942 at x=-459 (1024), while its layout
+    box is 1198/1198/971px and the frame is 1200px at x=120-1320 / 360-1560 and 973px at x=26-998.
+    Nothing reaches the viewport edge: what is painted is the frame, and "Fit full frame" shows the
+    whole picture. The exemption holds only while all of that is true -- the crop is declared, the
+    frame itself clips and lies inside the viewport, and the media's untransformed box fits the
+    frame -- so a real overflow inside the film, or a frame that outgrows the page, still fails.
+  */
+  const declaredFilmCrop = (element: Element) => {
+    const frame = element.parentElement;
+    if (!frame?.matches('.compile-film-sequence[data-wide-view="crop"] .compile-film-viewport')) return false;
+    const frameStyle = getComputedStyle(frame);
+    if (frameStyle.overflowX !== "hidden" && frameStyle.overflowX !== "clip") return false;
+    const frameBox = frame.getBoundingClientRect();
+    if (frameBox.left < -1 || frameBox.right > limit + 1) return false;
+    return getComputedStyle(element).transform !== "none" && (element as HTMLElement).offsetWidth <= frameBox.width + 1;
+  };
 
   const offenders: Offender[] = [];
   for (const element of document.querySelectorAll("body *")) {
@@ -110,7 +133,7 @@ function measureOverflow(): { documentOverflow: number; offenders: Offender[] } 
     const inFlow = style.position === "static" || style.position === "relative";
     const pastEdge = inFlow && box.right > limit + 1;
     if (!wider && !pastEdge) continue;
-    if (clippedByScroller(element)) continue;
+    if (clippedByScroller(element) || declaredFilmCrop(element)) continue;
     offenders.push({
       selector: describe(element),
       reason: wider ? `wider than the ${limit}px viewport` : `extends ${Math.round(box.right - limit)}px past the right edge`,
@@ -166,6 +189,12 @@ function measureClippedRows(): ClipOffender[] {
       if (childStyle.display === "none" || childStyle.visibility === "hidden") continue;
       // Out-of-flow children are positioned against the box on purpose.
       if (childStyle.position === "absolute" || childStyle.position === "fixed") continue;
+      /* The Home film's declared desktop crop (see `declaredFilmCrop` in measureOverflow): the
+         frame clips the scale(2) media on purpose, measured 1496px drawn in a 748px frame at 1440.
+         Same conditions: declared crop, transformed media, untransformed box no taller than the frame. */
+      if (container.matches('.compile-film-sequence[data-wide-view="crop"] .compile-film-viewport')
+        && childStyle.transform !== "none"
+        && (child as HTMLElement).offsetHeight <= container.clientHeight + 1) continue;
       const childBox = child.getBoundingClientRect();
       if (childBox.height < 1) continue;
       const past = childBox.bottom - contentBottom;

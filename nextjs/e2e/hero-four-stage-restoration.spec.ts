@@ -25,6 +25,16 @@ test("the title leads directly into four selectable and playing demo recordings"
   await expect(film.locator("figcaption")).toHaveText("Illustrative product demo · examples, not customer results.");
   const sequence = film.locator(".compile-film-sequence");
   await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+  // Release 3: a desktop opens on the 2x reading crop and offers the whole frame; a phone keeps Fit.
+  // This supersedes handoff §5.1-4 / brief §2 "Fit default" on desktop only: decision R3-D1 under the
+  // founder's 2026-10-03 delegated authority, founder veto open (RESUME-20261015-LEDGER.md).
+  await expect(sequence).toHaveAttribute("data-wide-view", "crop");
+  // Fix round 3 (M1): one "Focus details" toggle per width, pressed exactly while the focused view
+  // shows -- the desktop crop (from 1024 here), not the phone's Fit.
+  const viewToggle = film.getByRole("button", { name: "Focus details", exact: true });
+  await expect(viewToggle).toHaveCount(1);
+  await expect(viewToggle).toHaveAttribute("aria-pressed", page.viewportSize()!.width >= 1024 ? "true" : "false");
+  await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveCount(0);
   const tabs = film.getByRole("tab");
   await expect(tabs).toHaveText(["Files", "Organize", "Updates", "Use with AI"]);
   const playback = [];
@@ -46,14 +56,16 @@ test("the title leads directly into four selectable and playing demo recordings"
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (testInfo.project.name === "390") {
     const focus = film.getByRole("button", { name: "Focus details", exact: true });
+    // Fix round 3 (M1): the label stays; the pressed state follows the view on screen.
     await expect(focus).toHaveAttribute("aria-pressed", "false");
     expect((await focus.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await focus.click();
     await expect(sequence).toHaveAttribute("data-mobile-view", "focus");
-    await expect(film.getByRole("button", { name: "Fit full frame", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(focus).toHaveAttribute("aria-pressed", "true");
     await page.screenshot({ path: testInfo.outputPath("phone-focus-details.png") });
-    await film.getByRole("button", { name: "Fit full frame", exact: true }).click();
+    await focus.click();
     await expect(sequence).toHaveAttribute("data-mobile-view", "fit");
+    await expect(focus).toHaveAttribute("aria-pressed", "false");
   }
   await tabs.first().focus();
   await page.keyboard.press("ArrowRight");
