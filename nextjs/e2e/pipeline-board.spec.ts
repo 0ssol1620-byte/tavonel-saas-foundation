@@ -1,10 +1,12 @@
+import { createHash } from "node:crypto";
+
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 type Page = {
   addInitScript: (fn: (...args: never[]) => unknown, arg: unknown) => Promise<void>;
-  route: (url: string, handler: (route: { fulfill: (options: { json: unknown }) => Promise<void> }) => Promise<void>) => Promise<void>;
+  route: (url: string, handler: (route: { fulfill: (options: { json?: unknown; body?: Buffer; contentType?: string }) => Promise<void> }) => Promise<void>) => Promise<void>;
 };
 
 function token() {
@@ -23,9 +25,23 @@ async function installSession(page: Page) {
   }, { accessToken: token() });
 }
 
+/*
+  The source being read, on the real progress contract (8d667edf, lib/ocr-progress.ts).
+
+  A progress object is drawn only when it is bound to the immutable source version the server
+  selected: the progress route returns that version's descriptor (documentId, versionKey,
+  sourceImmutableKey, sourceSha256 = sha256:<versionKey>) beside the readUrl, the object names
+  the same sourceImmutableKey and inputSha256, and the focused source's sanitized PDF must hash
+  to the version key. The old mock returned a bare readUrl for version "v1" and an object bound
+  to nothing, which the board now correctly refuses to draw.
+*/
+const READING_PDF = Buffer.from("%PDF-1.4\n% pipeline-board reading fixture\n%%EOF\n", "ascii");
+const READING_VERSION = createHash("sha256").update(READING_PDF).digest("hex");
+const READING_KEY = `w/doc-reading/${READING_VERSION}/sanitized.pdf`;
+
 const DOCUMENTS = [
   { documentId: "doc-read", versionKey: "v1", sanitizedKey: "w/doc-read/v1/sanitized.pdf", sanitizedSize: 481_112, ocrJsonKey: "w/doc-read/v1/ocr.json", ocrJsonSize: 24_880, hasOcrJson: true, cdrReceiptKey: "w/doc-read/v1/cdr-receipt.json", ocrReviewKey: null, processingState: "ocr_ready" },
-  { documentId: "doc-reading", versionKey: "v1", sanitizedKey: "w/doc-reading/v1/sanitized.pdf", sanitizedSize: 2_204_004, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "w/doc-reading/v1/cdr-receipt.json", ocrReviewKey: null, processingState: "sanitized" },
+  { documentId: "doc-reading", versionKey: READING_VERSION, sanitizedKey: READING_KEY, sanitizedSize: 2_204_004, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: `w/doc-reading/${READING_VERSION}/cdr-receipt.json`, ocrReviewKey: null, processingState: "sanitized" },
   { documentId: "doc-held", versionKey: "v1", sanitizedKey: "w/doc-held/v1/sanitized.pdf", sanitizedSize: 903_211, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "w/doc-held/v1/cdr-receipt.json", ocrReviewKey: "w/doc-held/v1/ocr-review.json", processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD" },
 ];
 
@@ -33,9 +49,14 @@ async function mockWorkspace(page: Page, customerDataEnabled = true, documents =
   await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled } } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents } }));
-  await page.route("**/api/documents/*/progress", route => route.fulfill({ json: { code: "OK", readUrl: "https://progress.r2.cloudflarestorage.com/progress.json" } }));
+  // Only doc-reading is mid-read, so it is the only source the board polls.
+  await page.route("**/api/documents/*/progress", route => route.fulfill({ json: {
+    code: "OK", documentId: "doc-reading", versionKey: READING_VERSION, sourceImmutableKey: READING_KEY,
+    sourceSha256: `sha256:${READING_VERSION}`, readUrl: "https://progress.r2.cloudflarestorage.com/progress.json",
+  } }));
+  await page.route("**/api/documents/doc-reading/source*", route => route.fulfill({ body: READING_PDF, contentType: "application/pdf" }));
   await page.route("https://progress.r2.cloudflarestorage.com/progress.json", route => route.fulfill({ json: {
-    schemaVersion: "tavonel.ocr_progress.v1", sourceImmutableKey: "w/doc-reading/v1/sanitized.pdf", inputSha256: `sha256:${"a".repeat(64)}`,
+    schemaVersion: "tavonel.ocr_progress.v1", sourceImmutableKey: READING_KEY, inputSha256: `sha256:${READING_VERSION}`,
     state: "reading", pagesRead: 4, pageCount: 11, regionsFound: 37,
     pages: [{ pageNumber1: 4, pageCount: 11, path: "raster", regionCount: 3, meanConfidence: 0.7412, boxes: [
       { bbox1000: [100, 120, 900, 165], confidence: 0.93, text: "제3조 (계약기간 및 갱신)", regionId: "ocr-p0004-l00001" },
