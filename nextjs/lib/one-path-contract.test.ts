@@ -157,7 +157,12 @@ describe("approved one-path experience", () => {
     expect(page.indexOf('id="s2"')).toBeGreaterThan(page.indexOf('id="s1"'));
     expect(hero).toContain("<HeroFilm");
     expect(text("components/landing-v2/hero-film-disclosure.tsx")).toContain("<CompileStagePlayer");
-    expect(text("components/compile-stage-player.tsx")).toContain('className="compile-film-sequence');
+    // Release 3 (main bcba7173) picks the frame's class by layout; both branches keep the class the arm counts.
+    const frame = text("components/compile-stage-player.tsx")
+      .match(/<div className=\{storyLayout \? `([^`]*)` : "([^"]*)"\} ref=\{frameRef\}/);
+    expect(frame, "the film frame's class expression").not.toBeNull();
+    expect(frame![1], "story layout").toMatch(/^compile-film-sequence /);
+    expect(frame![2], "default layout").toMatch(/^compile-film-sequence /);
   });
 
   /*

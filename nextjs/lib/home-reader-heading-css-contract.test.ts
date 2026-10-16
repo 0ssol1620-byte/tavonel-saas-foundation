@@ -20,7 +20,7 @@ type Baseline = {
   reviewedCandidateBlob: string; reviewedCandidateSha256: string; reviewedCandidateBytes: number;
   addedDeclarations: number; addedBytes: number; ink: string; paper: string; globalHeadingInk: string;
   minimumContrast: number; headings: Heading[]; historicalReviewedModuleSource: string;
-  currentSource: { inputCommit: string; moduleBlob: string; moduleSha256: string; moduleBytes: number; ink: string; paper: string; tokenLayer: string; tokenImportant: boolean; activeRoot: { path: string; sha256: string; bytes: number; ink: string; paper: string } };
+  currentSource: { inputCommit: string; moduleBlob: string; moduleSha256: string; moduleBytes: number; ink: string; paper: string; tokenLayer: string | null; tokenImportant: boolean; activeRoot: { path: string; sha256: string; bytes: number; ink: string; paper: string } };
 };
 const packageRoot = new URL("../", import.meta.url);
 const baseline = JSON.parse(readFileSync(new URL("scripts/fixtures/home-reader-heading-css-baseline.json", packageRoot), "utf8")) as Baseline;
@@ -48,22 +48,17 @@ function declaration(root: CssRoot, selector: string, property: string) {
     });
   });
   if (root === moduleCss && selector === ".home" && ["--home-ink", "--home-paper"].includes(property)) {
-    // This bounded source contract admits only the two actual declarations: old unlayered normal
-    // token, then the reviewed important token in overrides. Extra/renamed layers fail closed.
-    expect(found, `base plus reviewed override ${property}`).toHaveLength(2);
+    // Release 3 (main bcba7173, 86f2794d) deleted this legacy module's `@layer overrides` token block, so this bounded
+    // source contract admits exactly one declaration: the original unlayered normal token. A second declaration, an
+    // important one or a layered one fails closed. (Until dbe22b1e the module also carried the important override in
+    // overrides; that pin is in git history, not in this source.)
+    expect(found, `legacy base token only ${property}`).toHaveLength(1);
     const isInk = property === "--home-ink";
     expect(found[0]).toEqual({ value: isInk ? baseline.ink : baseline.paper, important: false, layered: false });
     expect(layers[0]).toEqual([]);
-    expect(found[1]).toEqual({ value: isInk ? baseline.currentSource.ink : baseline.currentSource.paper, important: true, layered: true });
-    expect(layers[1]).toEqual([baseline.currentSource.tokenLayer]);
-    expect(baseline.currentSource.tokenImportant).toBe(true);
-    // Important beats normal; layered important beats unlayered important; order is last tiebreak.
-    const winner = found.map((value, order) => ({ ...value, order })).sort((a, b) =>
-      Number(a.important) - Number(b.important)
-      || (a.important ? Number(a.layered) - Number(b.layered) : Number(!a.layered) - Number(!b.layered))
-      || a.order - b.order).at(-1)!;
-    expect(winner.order).toBe(1);
-    return found[winner.order];
+    expect(found[0].value).toBe(isInk ? baseline.currentSource.ink : baseline.currentSource.paper);
+    expect([baseline.currentSource.tokenLayer, baseline.currentSource.tokenImportant]).toEqual([null, false]);
+    return found[0];
   }
   expect(found, `exactly one ${selector}/${property} declaration`).toHaveLength(1);
   return found[0];
@@ -171,15 +166,16 @@ describe("reviewed Home reader heading CSS source contract", () => {
     expect(moduleBytes.length).toBe(baseline.currentSource.moduleBytes);
     expect(createHash("sha256").update(moduleBytes).digest("hex")).toBe(baseline.currentSource.moduleSha256);
     expect(createHash("sha1").update(Buffer.from(`blob ${moduleBytes.length}\0`)).update(moduleBytes).digest("hex")).toBe(baseline.currentSource.moduleBlob);
-    expect(baseline.currentSource.ink).toBe("#15191d");
-    expect(baseline.currentSource.paper).toBe("#fbfaf7");
-    expect(baseline.currentSource.tokenLayer).toBe("overrides");
+    // Release 3: the legacy module's tokens are its original base values; the mounted root names the Home palette.
+    expect(baseline.currentSource.ink).toBe(baseline.ink);
+    expect(baseline.currentSource.paper).toBe(baseline.paper);
+    expect(baseline.currentSource.tokenLayer).toBeNull();
     expect(baseline.currentSource.moduleBlob).not.toBe(baseline.reviewedCandidateBlob);
   });
 
-  it("keeps the legacy important token cascade distinct from the mounted Home root", () => {
-    expect(declaration(moduleCss, ".home", "--home-ink")).toEqual({ value: "#15191d", important: true, layered: true });
-    expect(declaration(moduleCss, ".home", "--home-paper")).toEqual({ value: "#fbfaf7", important: true, layered: true });
+  it("keeps the legacy module's base tokens distinct from the mounted Home root", () => {
+    expect(declaration(moduleCss, ".home", "--home-ink")).toEqual({ value: "#14171a", important: false, layered: false });
+    expect(declaration(moduleCss, ".home", "--home-paper")).toEqual({ value: "#f6f3ec", important: false, layered: false });
     // Release 2: the mounted root aliases its tokens to one named palette; the values behind them are unchanged.
     expect(declaration(activeRootCss, ".home", "--home-ink")).toEqual({ value: "var(--ink)", important: false, layered: true });
     expect(declaration(activeRootCss, ".home", "--ink")).toEqual({ value: "#15191d", important: false, layered: true });
