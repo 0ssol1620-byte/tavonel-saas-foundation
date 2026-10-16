@@ -729,6 +729,12 @@ export const INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS = Object.freeze([
   'lib/r2-synthetic-canary.test.ts',
 ]);
 export const INTAKE_TRIAGE_BROWSER_FILE = 'e2e/workspace-intake-triage.spec.ts';
+// FE-B2 (9abf019b): with lib/intake-approval-rollout.ts off -- production -- every case in INTAKE_TRIAGE_BROWSER_FILE skips,
+// and a selected file with no executed passing test fails the scoped gate (run 38867041310). The affected owner's browser
+// proof is then the switch-off posture of the same upload path: failure-states-audit drives main's "Upload & compile" through
+// /api/uploads/capability and asserts no source review or cost-approval wording renders. repair-scope.test.mjs fails if
+// either switch turns on, so the owner goes back to the review suite with the switch.
+export const INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE = 'e2e/failure-states-audit.spec.ts';
 
 
 const uploadTests = [
@@ -2152,7 +2158,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('marketing-tooling-lock', new RegExp(`^(?:${exactPathAlternation(Object.keys(MARKETING_TOOLING_POSTIMAGES))})$`),
     { selector: true, unitFiles: [REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE] }),
   affectedGroup('intake-triage', /^nextjs\/(?:app\/api\/(?:v1\/)?uploads\/.+|components\/intake-triage-review[^/]*|lib\/(?:intake-[^/]+|compute-reservation[^/]*|r2-triage-seal[^/]*)|e2e\/workspace-intake-triage\.spec\.ts)$/,
-    { unitFiles: INTAKE_TRIAGE_UNIT_TESTS, browserFiles: [INTAKE_TRIAGE_BROWSER_FILE] }),
+    { unitFiles: INTAKE_TRIAGE_UNIT_TESTS, browserFiles: [INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE] }),
   affectedGroup('acl', /^nextjs\/lib\/(?:(?:connector-source-access|google-drive-acl-capture|source-acl-admission-migration)(?:\.test)?\.ts|acl-refresh-core\.test\.mjs|ask-route-limits\.test\.ts)$/,
     { unitFiles: ['lib/acl-refresh-core.test.mjs', 'lib/ask-route-limits.test.ts', 'lib/connector-source-access.test.ts', 'lib/google-drive-acl-capture.test.ts', 'lib/source-acl-admission-migration.test.ts', 'lib/pgtap-fixtures.test.ts'],
       fixtureContract: Object.freeze({ suite: 'lib/pgtap-fixtures.test.ts', declaredCases: 24 }) }),

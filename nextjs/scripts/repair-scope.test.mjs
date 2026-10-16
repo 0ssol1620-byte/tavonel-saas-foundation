@@ -52,6 +52,7 @@ import {
   INTAKE_TRIAGE_UNIT_TESTS,
   INTAKE_TRIAGE_EXISTING_REGRESSION_TESTS,
   INTAKE_TRIAGE_BROWSER_FILE,
+  INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE,
   verifyIntakeTriageScopeEvidence,
   verifyWorkspaceSourceScopeEvidence,
   PUBLIC_EDITORIAL_PREDECESSOR_SHA,
@@ -3181,10 +3182,21 @@ test('affected map unions both rename endpoints and fails closed on unsupported 
   assert.deepEqual(absent.failures,['selected owner check is absent at head: lib/docs-content.test.ts']);
   assert.throws(()=>buildAffectedMap({headSha:'short',records:[]}),/exact head SHA/);
 });
+// FE-B2: the intake-triage owner's browser proof follows the code-owned switches. Both off (production): every case in
+// the review suite skips, so the owner runs failure-states-audit's switch-off posture. Turning a switch on fails here.
+test('affected intake-triage owner selects the switch-off posture while both code-owned switches are off', () => {
+  const read = rel => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
+  assert.match(read('lib/intake-approval-rollout.ts'), /^const APPROVAL_LINEAGE_SWITCH = false;$/m, 'approval switch on: select INTAKE_TRIAGE_BROWSER_FILE again');
+  assert.match(read('lib/intake-triage-rollout.ts'), /^export const INTAKE_TRIAGE_ROLLOUT_ENABLED = false;$/m, 'triage switch on: select INTAKE_TRIAGE_BROWSER_FILE again');
+  assert.match(read(INTAKE_TRIAGE_BROWSER_FILE), /^test\.skip\(!INTAKE_APPROVAL_ROLLOUT_ENABLED, /m);
+  assert.match(read(INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE), /test\("production stages with main's single control and none of the cost-approval wording"/);
+  assert.equal(INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE, 'e2e/failure-states-audit.spec.ts');
+  assert.deepEqual(affectedMap([affectedRecord('M',['nextjs/lib/intake-triage.ts'])]).browserFiles, [INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE]);
+});
 test('affected owner groups select the initial task checks for every product owner', () => {
   const select=path=>affectedMap([affectedRecord('M',[path])]);
   const intake=select('nextjs/lib/intake-triage.ts');
-  assert.deepEqual(intake.groups,['intake-triage']);assert.deepEqual(intake.unitFiles,[...INTAKE_TRIAGE_UNIT_TESTS].sort());assert.deepEqual(intake.browserFiles,[INTAKE_TRIAGE_BROWSER_FILE]);
+  assert.deepEqual(intake.groups,['intake-triage']);assert.deepEqual(intake.unitFiles,[...INTAKE_TRIAGE_UNIT_TESTS].sort());assert.deepEqual(intake.browserFiles,[INTAKE_TRIAGE_SWITCH_OFF_BROWSER_FILE]);
   const acl=select('nextjs/lib/connector-source-access.ts');
   assert.deepEqual(acl.unitFiles,['lib/acl-refresh-core.test.mjs','lib/ask-route-limits.test.ts','lib/connector-source-access.test.ts','lib/google-drive-acl-capture.test.ts','lib/pgtap-fixtures.test.ts','lib/source-acl-admission-migration.test.ts']);
   assert.deepEqual(acl.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
