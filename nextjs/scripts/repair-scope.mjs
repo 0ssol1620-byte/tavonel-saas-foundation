@@ -1849,6 +1849,28 @@ export const LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES = Object.freeze(['e
 export const PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS = Object.freeze(['components/explore/explore-stage.tsx', 'components/pricing-page-client.tsx']);
 export const PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/explore-story.test.ts', 'lib/pricing-plan-overview.test.ts']);
 export const PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/explore.spec.ts', 'e2e/pricing-plan-overview.spec.ts']);
+// PR #141 fix round 3 (review 2): the connection-batch route's switch-off documentId binding, the OAuth store's production-schema
+// insert and consume, the viewer-link revoke gate, Home's chrome exclusion, the OpenAPI and README notes on the disabled approval
+// lineage, and the four switch-off suites restored from main. Selects each path's direct suites and the site chrome browser suite
+// (its Home colour test runs in the reviewed 1440 and 390 rows). Product code, so never nativeReuse.
+export const FIX_ROUND_3_AFFECTED_PATHS = Object.freeze([
+  'app/api/openapi/route.ts', 'app/api/v1/connections/[id]/sync/route.ts',
+  'app/api/v1/oauth-connectors/viewer-links/revoke/route.ts', 'app/chrome-v2.css',
+  'lib/connector-oauth-adapters.switch-off.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/connector-oauth-store.test.ts',
+  'lib/connector-oauth-store.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/pricing-plan-overview.test.ts',
+  'lib/sync-worker.switch-off.test.ts', 'lib/upload-confirm-route.switch-off.test.ts',
+  'lib/upload-release-route.switch-off.test.ts', 'public/developer/README.md',
+]);
+export const FIX_ROUND_3_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/brand-marks.test.ts', 'lib/connector-oauth-adapters.switch-off.test.ts', 'lib/connector-oauth-callback-route.test.ts',
+  'lib/connector-oauth-route.test.ts', 'lib/connector-oauth-store.test.ts', 'lib/developer-distribution.test.ts',
+  'lib/google-drive-viewer-link-off.test.ts', 'lib/google-drive-viewer-link-request.test.ts',
+  'lib/intake-approval-rollout-off.test.ts', 'lib/openapi-completeness.test.ts', 'lib/openapi-contract.test.ts',
+  'lib/openapi-response-shape.test.ts', 'lib/openapi-routes.test.ts', 'lib/pricing-plan-overview.test.ts',
+  'lib/secret-scan.test.ts', 'lib/sync-worker.switch-off.test.ts', 'lib/upload-confirm-route.switch-off.test.ts',
+  'lib/upload-release-route.switch-off.test.ts', 'lib/visual-refinement.test.ts',
+]);
+export const FIX_ROUND_3_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/site-chrome-v2.spec.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2142,6 +2164,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // paper-product.css route ownership: the two exact components above select three direct suites and the Explore and Pricing suites.
   affectedGroup('paper-product-route-css', new RegExp(`^nextjs/(?:${exactPathAlternation(PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS)})$`),
     { unitFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, browserFiles: PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES }),
+  // PR #141 fix round 3: the fourteen exact paths above select their direct suites and the site chrome browser suite.
+  affectedGroup('pr141-fix-round-3', new RegExp(`^nextjs/(?:${exactPathAlternation(FIX_ROUND_3_AFFECTED_PATHS)})$`),
+    { unitFiles: FIX_ROUND_3_AFFECTED_UNIT_FILES, browserFiles: FIX_ROUND_3_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

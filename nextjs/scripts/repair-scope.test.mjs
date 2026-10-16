@@ -2446,8 +2446,9 @@ test('mounted collector accepts the production file attachment after Playwright 
     const sourceBytes = readFileSync(new URL('../e2e/workspace-intake-triage.spec.ts', import.meta.url));
     const sourceBlob = createHash('sha1').update(`blob ${sourceBytes.length}\0`).update(sourceBytes).digest('hex');
     // Preserve the historical mounted fix and bind only the reviewed copy follow-on, and the PR #141 fix follow-on whose
-    // two disabled-triage mocks state the approval-lineage signal (the mounted capture code below is unchanged).
-    assert.ok([WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate, 'd5f6e38f6c60f5b476014b90678680b5df0b6204', '72f68ba25ea4c01571d1752584638ade859115a7', 'eab6d2422d8d1a4b0e6eb5e8048b3a37b900d266'].includes(sourceBlob));
+    // two disabled-triage mocks state the approval-lineage signal, and fix round 3's follow-on that skips the file while the
+    // approval lineage is off (its source review does not ship). The mounted capture code below is unchanged.
+    assert.ok([WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate, 'd5f6e38f6c60f5b476014b90678680b5df0b6204', '72f68ba25ea4c01571d1752584638ade859115a7', 'eab6d2422d8d1a4b0e6eb5e8048b3a37b900d266', 'ae53749723643115d2c1f16d83b0b1b0a2733197'].includes(sourceBlob));
     const source = sourceBytes.toString('utf8');
     assert.match(source, /import \{ writeFile \} from "node:fs\/promises";/);
     const start = source.indexOf('        const name = `intake-mounted-${phase}-${viewport.width}x${viewport.height}`;');
@@ -7057,11 +7058,13 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
     SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS,
     EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES, EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS,
     LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS,
-    PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+    PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES, FIX_ROUND_3_AFFECTED_PATHS,
+    FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
   // Fix round 2: the Launch QA Product QA repins and the route-owned paper-product.css.
   for (const [group, paths, units, browsers] of [
     ['launch-qa-product-repins', LAUNCH_QA_PRODUCT_REPINS_AFFECTED_PATHS, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_UNIT_FILES, LAUNCH_QA_PRODUCT_REPINS_AFFECTED_BROWSER_FILES],
     ['paper-product-route-css', PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES, PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES],
+    ['pr141-fix-round-3', FIX_ROUND_3_AFFECTED_PATHS, FIX_ROUND_3_AFFECTED_UNIT_FILES, FIX_ROUND_3_AFFECTED_BROWSER_FILES],
   ]) {
     for (const path of paths) {
       const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
@@ -7077,7 +7080,13 @@ test('affected PR #141 fix owners: intake approval rollout, solutions proof and 
   assert.deepEqual([[...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_PATHS], [...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_UNIT_FILES], [...PAPER_PRODUCT_ROUTE_CSS_AFFECTED_BROWSER_FILES]],
     [['components/explore/explore-stage.tsx', 'components/pricing-page-client.tsx'],
     ['lib/brand-copy.test.ts', 'lib/explore-story.test.ts', 'lib/pricing-plan-overview.test.ts'], ['e2e/explore.spec.ts', 'e2e/pricing-plan-overview.spec.ts']]);
-  for (const adjacent of ['nextjs/components/compile-stage.tsx.bak', 'nextjs/e2e/pipeline-board-2.spec.ts', 'nextjs/components/explore/explore-stage-2.tsx']) {
+  // Fix round 3: exactly these fourteen paths, their direct suites and the site chrome browser suite.
+  assert.deepEqual([[...FIX_ROUND_3_AFFECTED_PATHS], [...FIX_ROUND_3_AFFECTED_UNIT_FILES], [...FIX_ROUND_3_AFFECTED_BROWSER_FILES]],
+    [['app/api/openapi/route.ts','app/api/v1/connections/[id]/sync/route.ts','app/api/v1/oauth-connectors/viewer-links/revoke/route.ts','app/chrome-v2.css','lib/connector-oauth-adapters.switch-off.test.ts','lib/connector-oauth-route.test.ts','lib/connector-oauth-store.test.ts','lib/connector-oauth-store.ts','lib/google-drive-viewer-link-off.test.ts','lib/pricing-plan-overview.test.ts','lib/sync-worker.switch-off.test.ts','lib/upload-confirm-route.switch-off.test.ts','lib/upload-release-route.switch-off.test.ts','public/developer/README.md'],
+    ['lib/brand-marks.test.ts','lib/connector-oauth-adapters.switch-off.test.ts','lib/connector-oauth-callback-route.test.ts','lib/connector-oauth-route.test.ts','lib/connector-oauth-store.test.ts','lib/developer-distribution.test.ts','lib/google-drive-viewer-link-off.test.ts','lib/google-drive-viewer-link-request.test.ts','lib/intake-approval-rollout-off.test.ts','lib/openapi-completeness.test.ts','lib/openapi-contract.test.ts','lib/openapi-response-shape.test.ts','lib/openapi-routes.test.ts','lib/pricing-plan-overview.test.ts','lib/secret-scan.test.ts','lib/sync-worker.switch-off.test.ts','lib/upload-confirm-route.switch-off.test.ts','lib/upload-release-route.switch-off.test.ts','lib/visual-refinement.test.ts'],
+    ['e2e/site-chrome-v2.spec.ts']]);
+  for (const adjacent of ['nextjs/components/compile-stage.tsx.bak', 'nextjs/e2e/pipeline-board-2.spec.ts', 'nextjs/components/explore/explore-stage-2.tsx',
+    'nextjs/lib/sync-worker.switch-off.test.tsx', 'nextjs/app/chrome-v2.css.bak', 'nextjs/lib/connector-oauth-store-2.ts']) {
     assert.deepEqual(affectedMap([affectedRecord('A', [adjacent], '000000')]).failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
   }
   assert.deepEqual([[...EVIDENCE_VIEWER_OVERLAY_AFFECTED_PATHS], [...EVIDENCE_VIEWER_OVERLAY_AFFECTED_UNIT_FILES], [...EVIDENCE_VIEWER_OVERLAY_AFFECTED_BROWSER_FILES]],
