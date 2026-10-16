@@ -123,8 +123,13 @@ async function confirmAdmission(value: {
     });
   } catch { return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 }; }
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { message?: unknown } | null;
+    const body = await response.json().catch(() => null) as { message?: unknown; code?: unknown } | null;
     const message = typeof body?.message === "string" ? body.message : "";
+    // As approvalRpc: a function this database does not have means migration 20261003120000 was
+    // not applied (runbook section 4), not a ledger outage.
+    if (body?.code === "PGRST202" || body?.code === "42883") {
+      return { ok: false as const, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 };
+    }
     const mapped = RPC_ERRORS.find(([needle]) => message.includes(needle));
     return mapped ? { ok: false as const, code: mapped[1], status: mapped[2] }
       : { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 };

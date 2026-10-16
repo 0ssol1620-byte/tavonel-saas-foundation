@@ -126,6 +126,16 @@ beforeEach(() => {
 });
 
 describe("upload confirmation route", () => {
+  it("names a missing confirm function as the unapplied lineage migration, not a ledger outage", async () => {
+    // DB-m2 (review 2): PostgREST answers PGRST202 for a function the database does not have.
+    adminRequest.mockResolvedValue(new Response(JSON.stringify({
+      code: "PGRST202", message: "Could not find the function public.confirm_foundation_intake_approved_upload",
+    }), { status: 404, headers: { "content-type": "application/json" } }));
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE" });
+  });
+
   it("hands the stored object's own size and type to the check that confirms it", async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
