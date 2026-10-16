@@ -92,7 +92,10 @@ export async function createOAuthAuthorization(input: {
         requested_scopes: input.requestedScopes,
         created_by: input.userId,
         authorization_revision: input.authorizationRevision,
-        authorization_purpose: input.authorizationPurpose ?? "connector_connection",
+        // authorization_purpose exists only in supabase/drafts/google-viewer-principal-boundary.sql
+        // (default 'connector_connection'). A connector connection omits it, so the insert matches
+        // the production schema; only a viewer link -- refused unless that flag is on -- names it.
+        ...(input.authorizationPurpose === "viewer_acl_link" ? { authorization_purpose: "viewer_acl_link" } : {}),
         expires_at: expiresAt,
       }),
     });
@@ -125,10 +128,14 @@ export async function consumeOAuthAuthorization(stateSha256: string, provider: O
       body: JSON.stringify({ p_state_sha256: stateSha256, p_provider: provider }),
     });
     const row = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes) || !Number.isSafeInteger(row.authorizationRevision) || Number(row.authorizationRevision) < 1 || (row.authorizationPurpose !== "connector_connection" && row.authorizationPurpose !== "viewer_acl_link")) {
+    // The production consume function (20260920121000) returns no authorizationPurpose: every row it
+    // can hold is a connector connection. Only the draft's viewer link carries the field, and only
+    // a known value is accepted.
+    const authorizationPurpose = row.authorizationPurpose === undefined ? "connector_connection" : row.authorizationPurpose;
+    if (!response.ok || typeof row.authorizationId !== "string" || typeof row.workspaceKey !== "string" || typeof row.userId !== "string" || typeof row.displayName !== "string" || typeof row.pkceVerifierReference !== "string" || typeof row.redirectUri !== "string" || !Array.isArray(row.requestedScopes) || !Number.isSafeInteger(row.authorizationRevision) || Number(row.authorizationRevision) < 1 || (authorizationPurpose !== "connector_connection" && authorizationPurpose !== "viewer_acl_link")) {
       return { ok: false as const, code: "OAUTH_AUTHORIZATION_INVALID" };
     }
-    return { ok: true as const, authorization: row as unknown as OAuthAuthorizationRecord };
+    return { ok: true as const, authorization: { ...row, authorizationPurpose } as unknown as OAuthAuthorizationRecord };
   } catch {
     return { ok: false as const, code: "OAUTH_AUTHORIZATION_INVALID" };
   }

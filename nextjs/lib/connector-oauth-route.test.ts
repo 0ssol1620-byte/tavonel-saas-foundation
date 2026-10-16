@@ -101,6 +101,8 @@ describe("OAuth authorization route", () => {
     const authorizationWrite = fetcher.mock.calls.find(([input]) => String(input).includes("foundation_oauth_authorizations"));
     const stored = JSON.parse(String((authorizationWrite?.[1] as RequestInit | undefined)?.body));
     expect(stored.authorization_revision).toBe(17);
+    // DB-B1: production has no authorization_purpose column; a connector start never names it.
+    expect(stored).not.toHaveProperty("authorization_purpose");
   });
 
   it("uses only Drive metadata read scope for an explicitly enabled viewer-link consent", async () => {
