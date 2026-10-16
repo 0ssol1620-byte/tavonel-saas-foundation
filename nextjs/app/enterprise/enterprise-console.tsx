@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, Fingerprint, Gauge, Globe2, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import WorkspaceMembershipPanel from "./workspace-membership-panel";
 
 type IdentityConfig = { protocol: "saml" | "scim"; storedStatus: string; effectiveStatus: string; provider: string; hasSecretReference: boolean; lastVerifiedAt: string | null; lastErrorCode: string | null };
 type Policy = { retentionDays: number; deletedObjectGraceDays: number; auditRetentionDays: number; exportFormat: "jsonl" | "csv"; exportSigningRequired: boolean; legalHoldEnabled: boolean; allowedRegions: Array<"us" | "eu" | "apac">; dedicatedDeploymentRequired: boolean; rtoMinutes: number; rpoMinutes: number };
@@ -125,6 +126,8 @@ export default function EnterpriseConsole() {
           <Metric label="Failure rate" value={dashboard ? `${(dashboard.totals.failureRate * 100).toFixed(2)}%` : "—"} detail="failed jobs / processed documents" />
         </div>
       </section>
+
+      {overview ? <WorkspaceMembershipPanel key={overview.workspace.key} workspaceKey={overview.workspace.key} workspaceName={overview.workspace.name} viewerRole={overview.workspace.role} /> : null}
 
       <div className="enterprise-columns">
         <section className="enterprise-section" aria-labelledby="identity-title">

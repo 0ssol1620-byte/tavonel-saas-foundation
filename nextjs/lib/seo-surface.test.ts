@@ -513,15 +513,15 @@ describe("public surface: the Korean subtree", () => {
 
   it("includes the Korean entry and its inquiry destination", () => {
     expect(koreanPages.map((page) => page.route).sort()).toEqual(["/ko", "/ko/contact", "/ko/evaluation", "/ko/pricing"]);
-    expect(sitemapPaths).toContain("/evaluation");
-    expect(sitemapPaths).toContain("/ko/evaluation");
-    expect(isNoindex("/evaluation")).toBe(false);
-    expect(isNoindex("/ko/evaluation")).toBe(false);
     expect(sitemapPaths).toContain("/ko");
     expect(sitemapPaths).toContain("/ko/contact");
+    expect(sitemapPaths).toContain("/evaluation");
+    expect(sitemapPaths).toContain("/ko/evaluation");
     expect(sitemapPaths).toContain("/ko/pricing");
     expect(isNoindex("/ko")).toBe(false);
     expect(isNoindex("/ko/contact")).toBe(false);
+    expect(isNoindex("/evaluation")).toBe(false);
+    expect(isNoindex("/ko/evaluation")).toBe(false);
     expect(isNoindex("/ko/pricing")).toBe(false);
   });
 

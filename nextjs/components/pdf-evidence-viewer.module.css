@@ -1,5 +1,9 @@
 .viewer {
   position: relative;
+  /* One grid cell sized by the drawn page. The 280px floor is room for the status line; the bbox
+     overlay sits in the canvas's cell, so its percentages are of the page, not of the floor. */
+  display: grid;
+  align-content: start;
   width: 100%;
   min-height: 280px;
   overflow: hidden;
@@ -25,6 +29,8 @@
 
 .viewer > i {
   position: absolute;
+  /* Explicit end lines: for an absolutely positioned grid child an `auto` line is the padding edge. */
+  grid-area: 1 / 1 / 2 / 2;
   left: var(--bbox-left);
   top: var(--bbox-top);
   width: var(--bbox-width);

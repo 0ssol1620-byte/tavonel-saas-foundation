@@ -103,6 +103,7 @@
 .stage {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   gap: clamp(14px, 2vw, 22px);
   width: 100%;
@@ -120,6 +121,9 @@
 
 .rail {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--hairline-hi);
 }
 

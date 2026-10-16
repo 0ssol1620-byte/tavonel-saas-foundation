@@ -178,6 +178,8 @@ describe("a deferral on the event ledger", () => {
     job: {
       jobId: JOB,
       workspaceKey: WORKSPACE,
+      createdByUserId: "00000000-0000-4000-8000-000000000001",
+      authorizationRevision: 1,
       documentIds: ["doc-a", "doc-b"],
       state: "structuring" as CompileState,
       collectionId: null,
@@ -338,7 +340,7 @@ describe("the paid workspace's runnable-compile cap", () => {
   }
 
   function enqueue(documentIds = ["11111111-1111-4111-8111-111111111111"]) {
-    return enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, documentIds });
+    return enqueueCompileJob({ workspaceKey: WORKSPACE, createdByUserId: USER, authorizationRevision: 1, connectorViewerEnabled: false, documentIds });
   }
 
   it("enqueues while the workspace is under its limit", async () => {

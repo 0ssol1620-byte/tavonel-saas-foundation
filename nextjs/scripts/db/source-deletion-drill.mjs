@@ -67,16 +67,25 @@ const sha256 = (value) => `sha256:${createHash("sha256").update(value).digest("h
 export function planSourceDeletionDrill({ now = new Date(), nonce = randomUUID() } = {}) {
   const suffix = createHash("sha256").update(nonce).digest("hex").slice(0, 8);
   const workspaceKey = `pilot-drill${suffix}`;
-  const documentIds = [0, 1].map((index) =>
-    // A v4-shaped uuid derived from the nonce: stable across a resumed run, unique across runs.
-    [
-      createHash("sha256").update(`${nonce}:doc:${index}`).digest("hex").slice(0, 8),
-      createHash("sha256").update(`${nonce}:doc:${index}`).digest("hex").slice(8, 12),
-      `4${createHash("sha256").update(`${nonce}:doc:${index}`).digest("hex").slice(13, 16)}`,
-      `8${createHash("sha256").update(`${nonce}:doc:${index}`).digest("hex").slice(17, 20)}`,
-      createHash("sha256").update(`${nonce}:doc:${index}`).digest("hex").slice(20, 32),
-    ].join("-"),
-  );
+  // Bindings are recorded only through the guarded writer, which refuses an identity that does not
+  // derive from the row's own fields. So the drill derives them exactly as
+  // lib/connector-source-identity.ts does: one logical source with two immutable revisions. The
+  // connection id comes from the nonce, so document ids (and object keys) are stable across a resume.
+  const hex = (value) => createHash("sha256").update(value).digest("hex");
+  const connectionHex = hex(`${nonce}:connection`);
+  const oauthConnectionId = [connectionHex.slice(0, 8), connectionHex.slice(8, 12), `4${connectionHex.slice(13, 16)}`,
+    `8${connectionHex.slice(17, 20)}`, connectionHex.slice(20, 32)].join("-");
+  const provider = "google_drive", nativeId = "drill-native";
+  const sourceId = `src-${hex(JSON.stringify(["connector.v1", workspaceKey, oauthConnectionId, provider, nativeId]))}`;
+  const bindings = ["drill-rev-0", "drill-rev-1"].map((revision) => {
+    const bytes = Buffer.from(hex(`tavonel-source-intake${workspaceKey}${hex(`${oauthConnectionId}${nativeId}${revision}`)}`), "hex").subarray(0, 16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x50;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const uuid = bytes.toString("hex");
+    return { nativeId, revision, sourceVersionId: `sv-${hex(JSON.stringify([sourceId, revision]))}`,
+      documentId: [uuid.slice(0, 8), uuid.slice(8, 12), uuid.slice(12, 16), uuid.slice(16, 20), uuid.slice(20)].join("-") };
+  });
+  const documentIds = bindings.map((binding) => binding.documentId);
   const bodies = documentIds.map((documentId, index) =>
     Buffer.from(`TAVONEL deletion drill probe ${index} for ${documentId}. Not customer data.\n`, "utf8"),
   );
@@ -111,10 +120,11 @@ export function planSourceDeletionDrill({ now = new Date(), nonce = randomUUID()
     startedAt: now.toISOString(),
     workspaceKey,
     organizationSlug: `deletion-drill-${suffix}`,
-    sourceId: `src-${createHash("sha256").update(`${nonce}:source`).digest("hex")}`,
-    oauthConnectionId: randomUUID(),
-    provider: "google_drive",
+    sourceId,
+    oauthConnectionId,
+    provider,
     documentIds,
+    bindings,
     objects,
   };
 }

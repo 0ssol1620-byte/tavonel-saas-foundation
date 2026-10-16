@@ -159,3 +159,160 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
+
+/* Solutions owns this hierarchy; no public global or cleared product surface changes. */
+.surface {
+  --ground: #f7f5ef;
+  --g1: #fff;
+  --g2: #eeede7;
+  --text-hi: #171c20;
+  --text-max: #0b1115;
+  --text-mid: #46545e;
+  --text-lo: #53606a;
+  --verified: #2447b3;
+  --source: #2447b3;
+  --seam: #d8ddd9;
+  --hairline: #d8ddd9;
+  --hairline-hi: #b7c0bc;
+  background: var(--ground);
+  color: var(--text-hi);
+}
+
+.hubIntro, .hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  max-width: 960px;
+  margin-bottom: 36px;
+  color: var(--text-hi);
+}
+
+.hero { padding-bottom: 0; border-bottom: 0; }
+
+.hubIntro :global(.document-title), .hero :global(.document-title) {
+  margin: 0;
+  max-width: 19ch;
+  color: var(--text-hi);
+  font-size: clamp(34px, 4.1vw, 62px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+}
+
+.hubIntro :global(.lede), .hero :global(.lede) {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--text-hi);
+  font-size: clamp(17px, 1.6vw, 22px);
+  line-height: 1.5;
+}
+
+.hero .audience, .card .audience { font-size: 14px; line-height: 1.5; color: var(--text-mid); }
+.hero .problem { margin: 0; max-width: 70ch; font-size: 16px; line-height: 1.6; color: var(--text-mid); }
+
+:global(.tiles).hubList {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 0 0 42px;
+  border-top: 1px solid var(--hairline-hi);
+  background: transparent;
+  border-radius: 0;
+}
+
+.hubList .card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, .65fr);
+  align-items: start;
+  gap: 26px;
+  padding: 28px 0;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--hairline-hi);
+  border-radius: 0;
+  background: transparent;
+}
+
+.cardIntro { min-width: 0; display: grid; gap: 12px; }
+.cardIntro p { margin: 0; }
+.hubList .card .cardTitle { margin: 0; font-size: clamp(22px, 2vw, 29px); line-height: 1.15; color: var(--text-hi); }
+.cardProof { min-width: 0; }
+.card .cardProof p { margin: 10px 0 0; color: var(--text-mid); font-size: 14px; line-height: 1.5; }
+.cardProof figure { margin: 0; }
+.card .cardProof :global([data-proof-kind="source-region-thumb"]) { padding: 0; background: transparent; }
+.cardProof img { min-height: 76px; }
+
+.task { display: grid; gap: 12px; margin: 0; min-width: 0; }
+.task > div { min-width: 0; }
+.task dt { margin: 0 0 4px; color: var(--text-mid); font-size: 13px; line-height: 1.4; }
+.task dd { margin: 0; color: var(--text-hi); font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; }
+.hero .task { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding-top: 22px; margin-top: 4px; border-top: 1px solid var(--hairline-hi); }
+.hero .task dd { max-width: 28ch; }
+
+.detailGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 42px; align-items: start; margin: 48px 0; }
+.workflow { min-width: 0; }
+.workflow :global(.solution-section) { margin: 0 0 30px; padding: 0; border: 0; content-visibility: visible; }
+.workflow :global(.solution-section-heading) { display: block; margin-bottom: 18px; }
+.workflow h2, .workflowProof h2, .partnership h2 { margin: 0; color: var(--text-hi); font-size: clamp(24px, 2.2vw, 32px); line-height: 1.15; letter-spacing: -.02em; }
+.workflow :global(.solution-flow).flow { grid-template-columns: minmax(0, 1fr); gap: 0; border: 0; border-radius: 0; background: transparent; overflow: visible; }
+.workflow .flow .flowStep, .workflow .flow .flowStep:last-child { display: flex; flex-direction: row; align-items: baseline; gap: 16px; padding: 16px 0; border: 0; border-top: 1px solid var(--hairline); background: transparent; }
+.workflow .flowStep span { flex: 0 0 24px; font-size: 13px; color: var(--text-mid); }
+.workflow .flowStep h3 { margin: 0; font-size: 17px; line-height: 1.4; color: var(--text-hi); }
+
+.workflowProof { min-width: 0; display: grid; gap: 18px; padding: 24px 0 0; border-top: 2px solid var(--verified); color: var(--text-hi); scroll-margin-top: calc(var(--chrome-header-height, 64px) + 20px); }
+.proofLabel { margin: 0; color: var(--verified); font-size: 14px; line-height: 1.5; }
+.workflowProof figure { margin: 0; }
+.workflowProof :global([data-evidence-id]) { display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; overflow: visible; font-size: 16px; line-height: 1.6; }
+.proofContext, .sampleQualifier, .locator p, .filePreview p { margin: 0; color: var(--text-mid); font-size: 14px; line-height: 1.6; }
+.question { margin: 0; padding-left: 16px; border-left: 2px solid var(--hairline-hi); color: var(--text-hi); font-size: 19px; line-height: 1.45; }
+.filePreview, .locator { display: grid; gap: 12px; min-width: 0; }
+.filePreview > p:first-child { color: var(--text-hi); overflow-wrap: anywhere; }
+.filePreview pre { max-width: 100%; max-height: 260px; overflow: auto; margin: 0; padding: 16px; border: 1px solid var(--hairline-hi); background: var(--g1); color: var(--text-hi); font-size: 13px; line-height: 1.6; scroll-margin-block: calc(var(--header-h, 68px) + 20px); }
+.filePreview pre:focus-visible { outline: 2px solid var(--verified); outline-offset: 3px; }
+.workflowProof a, .next a { display: inline-flex; align-items: center; min-height: 44px; width: fit-content; max-width: 100%; color: var(--verified); font-size: 14px; line-height: 1.5; text-decoration: underline; text-underline-offset: 3px; }
+.workflowProof a:focus-visible, .next a:focus-visible { outline: 2px solid var(--verified); outline-offset: 3px; }
+.locator dl { display: grid; gap: 10px; margin: 0; }
+.locator dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.locator dt, .locator dd { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-hi); overflow-wrap: anywhere; }
+.locator dt { color: var(--text-mid); }
+.sampleQualifier { padding-top: 16px; border-top: 1px solid var(--hairline); }
+.partnership { margin: 40px 0; }
+.next { font-size: 14px; }
+
+@media (max-width: 900px) {
+  .hubList .card { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cardProof { grid-column: 1 / -1; max-width: 460px; }
+  .detailGrid { grid-template-columns: minmax(0, 1fr); gap: 24px; margin: 32px 0; }
+}
+
+@media (max-width: 560px) {
+  .hubIntro, .hero { gap: 14px; margin-bottom: 24px; }
+  .hubList .card { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 24px 0; }
+  .cardProof { max-width: none; }
+  .cardProof img { max-height: 112px; }
+  .task, .hero .task { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .task > div { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; }
+  .task dt { margin: 0; padding-top: 2px; }
+  .hero .task { padding-top: 18px; margin-top: 2px; }
+  .locator dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+
+/* Public CTA states remain readable on Solutions' paper surface. */
+.surface :global(.btn):not(:global(.ghost)) {
+  background: #2447b3;
+  border-color: #2447b3;
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .surface :global(.btn):not(:global(.ghost)):hover {
+    background: #1b3586;
+    border-color: #1b3586;
+    color: #fff;
+  }
+}
+
+.surface :global(.btn):focus-visible {
+  outline: 2px solid #2447b3;
+  outline-offset: 4px;
+}

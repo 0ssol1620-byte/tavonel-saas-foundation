@@ -197,9 +197,10 @@ async function signedS3Response(
   body: Buffer | undefined,
   now = new Date(),
   extraHeaders?: Record<string, string>,
+  bodyContentType?: string,
 ) {
   const canonicalUri = `/${env.bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
-  return signedS3Request(env, method, canonicalUri, "", body, now, extraHeaders);
+  return signedS3Request(env, method, canonicalUri, "", body, now, extraHeaders, bodyContentType);
 }
 
 async function signedS3Request(
@@ -216,6 +217,7 @@ async function signedS3Request(
     canonical-request construction below identical to the one every other call already produces.
   */
   extraHeaders?: Record<string, string>,
+  bodyContentType?: string,
 ) {
   const host = `${env.accountId}.r2.cloudflarestorage.com`;
   const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
@@ -227,7 +229,7 @@ async function signedS3Request(
     "x-amz-content-sha256": payloadHash,
     "x-amz-date": xAmzDate,
   };
-  if (body) headers["content-type"] = "text/plain; charset=utf-8";
+  if (body) headers["content-type"] = bodyContentType ?? "text/plain; charset=utf-8";
   const signedHeaderNames = Object.keys(headers).sort();
   const canonicalHeaders = signedHeaderNames.map((name) => `${name}:${headers[name]}\n`).join("");
   const signedHeaders = signedHeaderNames.join(";");
@@ -262,6 +264,120 @@ async function signedS3Request(
   } catch {
     return null;
   }
+}
+
+/** Direct uploads use a different prefix from the server-sealed source key. */
+export const FOUNDATION_TRIAGE_MAX_SOURCE_BYTES = 5 * 1024 * 1024;
+const TRIAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TRIAGE_MIME = /^[A-Za-z0-9][A-Za-z0-9!#&^_.+-]{0,78}\/[A-Za-z0-9][A-Za-z0-9!#&^_.+-]{0,78}$/;
+
+export function foundationTriageStagingKey(workspaceKey: string, stageId: string) {
+  if (!WORKSPACE_ID_PATTERN.test(workspaceKey) || !TRIAGE_ID.test(stageId)) return null;
+  return `quarantine/${workspaceKey}/triage-staging/${stageId}/upload`;
+}
+
+async function readBoundedQuarantineObject(
+  env: R2SignerEnv,
+  input: { workspaceKey: string; key: string; expectedBytes: number; mimeType: string },
+  now = new Date(),
+) {
+  if (env.bucket !== FOUNDATION_R2_BUCKET || !WORKSPACE_ID_PATTERN.test(input.workspaceKey)
+    || assertFoundationDeletionKey(env.bucket, input.workspaceKey, input.key)
+    || !Number.isSafeInteger(input.expectedBytes) || input.expectedBytes < 1
+    || input.expectedBytes > FOUNDATION_TRIAGE_MAX_SOURCE_BYTES || !TRIAGE_MIME.test(input.mimeType)) {
+    return { ok: false as const, code: "TRIAGE_OBJECT_SCOPE_INVALID" };
+  }
+  const response = await signedS3Response(env, "GET", input.key, undefined, now);
+  if (!response || response.status !== 200) {
+    await response?.body?.cancel().catch(() => {});
+    return { ok: false as const, code: response?.status === 404 ? "TRIAGE_OBJECT_NOT_FOUND" : "TRIAGE_OBJECT_READ_FAILED" };
+  }
+  const declaredLength = response.headers.get("content-length");
+  const declaredType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const encoding = response.headers.get("content-encoding");
+  if ((declaredLength !== null && declaredLength !== String(input.expectedBytes))
+    || declaredType !== input.mimeType || (encoding !== null && encoding.toLowerCase() !== "identity")) {
+    await response.body?.cancel().catch(() => {});
+    return { ok: false as const, code: "TRIAGE_OBJECT_METADATA_MISMATCH" };
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return { ok: false as const, code: "TRIAGE_OBJECT_READ_FAILED" };
+  const chunks: Buffer[] = [];
+  const hash = createHash("sha256");
+  let length = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      const chunk = Buffer.from(next.value);
+      length += chunk.byteLength;
+      if (length > input.expectedBytes || length > FOUNDATION_TRIAGE_MAX_SOURCE_BYTES) {
+        await reader.cancel();
+        return { ok: false as const, code: "TRIAGE_OBJECT_TOO_LARGE" };
+      }
+      hash.update(chunk);
+      chunks.push(chunk);
+    }
+  } catch {
+    await reader.cancel().catch(() => {});
+    return { ok: false as const, code: "TRIAGE_OBJECT_READ_FAILED" };
+  }
+  if (length !== input.expectedBytes) return { ok: false as const, code: "TRIAGE_OBJECT_LENGTH_MISMATCH" };
+  return {
+    ok: true as const,
+    bytes: Buffer.concat(chunks, length),
+    byteLength: length,
+    sha256: `sha256:${hash.digest("hex")}`,
+    etag: response.headers.get("etag")?.replaceAll('"', "") ?? null,
+  };
+}
+
+/** Read the mutable upload once, cap it at the processor's 5 MiB ceiling, and hash those bytes. */
+export async function readFoundationTriageStagingObject(
+  env: R2SignerEnv,
+  input: { workspaceKey: string; stageId: string; expectedBytes: number; mimeType: string },
+  now = new Date(),
+) {
+  const key = foundationTriageStagingKey(input.workspaceKey, input.stageId);
+  if (!key) return { ok: false as const, code: "TRIAGE_OBJECT_SCOPE_INVALID" };
+  return readBoundedQuarantineObject(env, { ...input, key }, now);
+}
+
+/**
+ * Copy the exact already-hashed bytes to the server-only source key, then reread and hash the
+ * destination. No staging presigner emits a URL for this key. ETag is returned only for
+ * diagnostics; SHA-256 over the verified destination bytes is the receipt identity.
+ */
+export async function sealFoundationTriageSource(
+  env: R2SignerEnv,
+  input: { workspaceKey: string; documentId: string; bytes: Buffer; sha256: string; mimeType: string },
+  now = new Date(),
+) {
+  const key = `quarantine/${input.workspaceKey}/${input.documentId}/source`;
+  const blocked = assertFoundationQuarantineKey(env.bucket, input.workspaceKey, input.documentId, key);
+  if (blocked || !TRIAGE_ID.test(input.documentId) || input.bytes.length < 1
+    || input.bytes.length > FOUNDATION_TRIAGE_MAX_SOURCE_BYTES || !TRIAGE_MIME.test(input.mimeType)
+    || !/^sha256:[a-f0-9]{64}$/.test(input.sha256) || `sha256:${sha256Hex(input.bytes)}` !== input.sha256) {
+    return { ok: false as const, code: "TRIAGE_SEAL_INPUT_INVALID" };
+  }
+  const existing = await readBoundedQuarantineObject(env, {
+    workspaceKey: input.workspaceKey, key, expectedBytes: input.bytes.length, mimeType: input.mimeType,
+  }, now);
+  if (existing.ok) {
+    if (existing.sha256 !== input.sha256) return { ok: false as const, code: "TRIAGE_SEAL_CONFLICT" };
+    return { ok: true as const, key, sha256: existing.sha256, byteLength: existing.byteLength, etag: existing.etag, replay: true };
+  }
+  if (existing.code !== "TRIAGE_OBJECT_NOT_FOUND") return existing;
+  const put = await signedS3Response(env, "PUT", key, input.bytes, now, undefined, input.mimeType);
+  if (!put || (put.status !== 200 && put.status !== 204)) {
+    await put?.body?.cancel().catch(() => {});
+    return { ok: false as const, code: "TRIAGE_SEAL_WRITE_FAILED" };
+  }
+  const verified = await readBoundedQuarantineObject(env, {
+    workspaceKey: input.workspaceKey, key, expectedBytes: input.bytes.length, mimeType: input.mimeType,
+  }, now);
+  if (!verified.ok || verified.sha256 !== input.sha256) return { ok: false as const, code: "TRIAGE_SEAL_VERIFY_FAILED" };
+  return { ok: true as const, key, sha256: verified.sha256, byteLength: verified.byteLength, etag: verified.etag, replay: false };
 }
 
 async function signedS3(
@@ -313,6 +429,72 @@ export async function headFoundationQuarantineObject(
 /** How many leading bytes a signature check needs. Every signature this deployment knows is
  *  within the first 16, and 512 leaves room for one to grow without another deploy. */
 export const QUARANTINE_SIGNATURE_BYTES = 512;
+
+/** Read exactly one bounded range from the authenticated workspace's admitted source object. */
+export async function readFoundationQuarantineRange(
+  env: R2SignerEnv,
+  input: {
+    workspaceKey: string;
+    documentId: string;
+    start: number;
+    end: number;
+    totalBytes: number;
+    maxBytes: number;
+  },
+  now = new Date(),
+) {
+  const { workspaceKey, documentId, start, end, totalBytes, maxBytes } = input;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || !Number.isSafeInteger(totalBytes)
+    || !Number.isSafeInteger(maxBytes) || start < 0 || end < start || totalBytes < 1
+    || totalBytes > maxBytes || end >= totalBytes || end - start + 1 > 1024 * 1024) {
+    return { ok: false as const, code: "TRIAGE_BYTE_RANGE_INVALID" };
+  }
+  const key = `quarantine/${workspaceKey}/${documentId}/source`;
+  const blocked = assertFoundationQuarantineKey(env.bucket, workspaceKey, documentId, key);
+  if (blocked) return { ok: false as const, code: blocked };
+  const response = await signedS3Response(env, "GET", key, undefined, now, {
+    range: `bytes=${start}-${end}`,
+  });
+  if (!response || response.status !== 206) {
+    await response?.body?.cancel().catch(() => {});
+    return { ok: false as const, code: "TRIAGE_BYTE_RANGE_READ_FAILED" };
+  }
+  const contentRange = response.headers.get("content-range");
+  const expectedRange = `bytes ${start}-${end}/${totalBytes}`;
+  const etag = response.headers.get("etag")?.replaceAll('"', "").trim() ?? "";
+  const expectedLength = end - start + 1;
+  if (contentRange !== expectedRange || !etag) {
+    await response.body?.cancel().catch(() => {});
+    return { ok: false as const, code: "TRIAGE_BYTE_RANGE_INVALID" };
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return { ok: false as const, code: "TRIAGE_BYTE_RANGE_READ_FAILED" };
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > expectedLength) {
+        await reader.cancel();
+        return { ok: false as const, code: "TRIAGE_BYTE_RANGE_INVALID" };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    await reader.cancel().catch(() => {});
+    return { ok: false as const, code: "TRIAGE_BYTE_RANGE_READ_FAILED" };
+  }
+  if (length !== expectedLength) return { ok: false as const, code: "TRIAGE_BYTE_RANGE_INVALID" };
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true as const, contentRange, etag, bytes };
+}
 
 /**
  * The first bytes of a quarantine object, and nothing else (blueprint §36, S-66).

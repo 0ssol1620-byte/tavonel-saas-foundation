@@ -31,6 +31,8 @@ const NOT_A_CODE = new Set([
   "CONTENT_TYPE", "NO_STORE", "CACHE_CONTROL", "RETRY_AFTER", "LAST_EVENT_ID",
   // Internal enum values that are not returned as `code`
   "LOCAL_AGENT", "FILE_SERVER", "READ_ONLY", "SERVICE_ROLE",
+  // Workflow state/reason values stored by the browser and cancellation RPC, not HTTP errors.
+  "DEPENDENT_MEMBER_FAILED", "UPLOAD_TRANSFER_FAILED",
 ]);
 
 function filesUnder(root: string): string[] {
@@ -59,6 +61,17 @@ function scanned(): Map<string, string[]> {
 }
 
 describe("the API error catalogue", () => {
+  it("documents completed-read settlement failures with the route's retryable 503 status", () => {
+    for (const code of ["COMPLETED_READ_INVALID_OR_DISABLED", "COMPLETED_READ_REQUIRED",
+      "COMPLETED_READ_DISABLED", "COMPLETED_READ_INVALID", "COMPLETED_READ_DIRECT_UPLOAD_REQUIRED",
+      "COMPLETED_READ_SETTLEMENT_FAILED"]) {
+      const entries = API_ERROR_CODES.filter(entry => entry.code === code);
+      expect(entries, code).toHaveLength(1);
+      expect(entries[0]?.status, code).toBe(503);
+      expect(entries[0]?.meaning, code).not.toMatch(/page-metered|zero-charge entitlement/);
+      expect(entries[0]?.whatToDo.length, code).toBeGreaterThan(20);
+    }
+  });
   it("has a meaning and a remediation for every code, and no duplicates", () => {
     expect(API_ERROR_CODES.length).toBe(new Set(API_ERROR_CODE_NAMES).size);
     for (const entry of API_ERROR_CODES) {

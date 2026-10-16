@@ -172,3 +172,25 @@ describe("R2 document listing prefix", () => {
     await expect(getWorkspaceCollectionCandidate(env, WS, key)).resolves.toEqual({ ok: true, json: artifact });
   });
 });
+
+describe("bounded streaming OCR reads", () => {
+  const env = { accountId: "acct", bucket: FOUNDATION_R2_BUCKET, accessKeyId: "AKIAEXAMPLE", secretAccessKey: "secret" };
+  const key = `immutable/${WS}/${WS}/doc/${"ab".repeat(32)}/ocr.json`;
+  it("returns the actual streamed byte length for the collection budget", async () => {
+    vi.stubGlobal("fetch", async () => new Response('{"ok":true}'));
+    expect(await getWorkspaceOcrJson(env, WS, key, new Date(), 20)).toEqual({ ok: true, json: { ok: true }, byteLength: 11 });
+  });
+  it.each([undefined, "1", "-1", "999999"])("does not trust declared length %s and cancels overflow", async (length) => {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode("x".repeat(40))); }, cancel,
+    }), { headers: length === undefined ? {} : { "content-length": length } });
+    vi.stubGlobal("fetch", async () => response);
+    expect(await getWorkspaceOcrJson(env, WS, key, new Date(), 20)).toEqual({ ok: false, code: "JSON_TOO_LARGE" });
+    expect(cancel).toHaveBeenCalled();
+  });
+  it("measures fetched decompressed body bytes rather than a compressed content-length", async () => {
+    vi.stubGlobal("fetch", async () => new Response("x".repeat(40), { headers: { "content-encoding": "gzip", "content-length": "1" } }));
+    expect(await getWorkspaceOcrJson(env, WS, key, new Date(), 20)).toEqual({ ok: false, code: "JSON_TOO_LARGE" });
+  });
+});

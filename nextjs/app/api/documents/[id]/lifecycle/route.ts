@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import {
   customerDeletionReceipt,
   inventoryCustomerSource,
@@ -68,7 +68,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const deletion = await readCustomerSourceDeletionStatus(auth.principal.workspaceKey, id);
   if (!deletion.ok) return fail(deletion.code, 503);
   if (!deletion.status) {
-    const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, [id]);
+    const sourceAccess = await checkConnectorSourceAccessForViewer(auth.principal.workspaceKey, [id], auth.principal.userId);
     if (!sourceAccess.ok) return fail(sourceAccess.code, sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503);
   }
   const result = deletion.status ? null : await inventory(auth.principal.workspaceKey, id);
@@ -120,7 +120,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json(deletionBody("CUSTOMER_SOURCE_DELETION_ALREADY_RECORDED", existing.status), { headers: HEADERS });
   }
 
-  const sourceAccess = await checkConnectorSourceAccess(workspaceKey, [id]);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, [id], auth.principal.userId);
   if (!sourceAccess.ok) return fail(sourceAccess.code, sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503);
 
   const result = await inventory(workspaceKey, id);

@@ -25,7 +25,7 @@ const { authorize, revalidate, activeWorld, pipeline, sourceIds, sourceAccess } 
   sourceIds: vi.fn(), sourceAccess: vi.fn(),
 }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: sourceIds }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
@@ -42,6 +42,8 @@ vi.mock("@/lib/retrieval-pipeline", async (importOriginal) => ({
 }));
 
 import { POST as ask, maxDuration } from "../app/api/collections/[id]/ask/route";
+import { buildContextPacket } from "./context-packet";
+import { answerFromContextPacket, COMPILED_ANSWER_CHARACTER_LIMIT, EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./grounded-ask";
 import { WORKSPACE_ASK_CONCURRENCY, resetWorkspaceCostGuard } from "./workspace-cost-guard";
 
 const WORKSPACE = "pilot-askcost";
@@ -182,6 +184,37 @@ describe("idempotency", () => {
     expect(denied.status).toBe(403);
     expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     expect(sourceAccess).toHaveBeenCalledTimes(3);
+    expect(sourceAccess.mock.calls).toEqual(Array.from({ length: 3 }, () => [WORKSPACE, ["source-fixture"], "user-1"]));
+  });
+  it("does not cache an answer whose source is revoked while the pipeline is in flight", async () => {
+    const defaultPipeline = pipeline.getMockImplementation()!;
+    let entered = () => {};
+    const pipelineEntered = new Promise<void>((resolve) => { entered = () => resolve(); });
+    let unblock = () => {};
+    const parked = new Promise<void>((resolve) => { unblock = () => resolve(); });
+    pipeline.mockImplementationOnce(async (...args: unknown[]) => {
+      entered();
+      await parked;
+      return defaultPipeline(...args);
+    });
+
+    const inFlight = ask(question("what changed in the filing?", "source-inflight-0001"), { params });
+    await pipelineEntered;
+    expect(sourceAccess).toHaveBeenCalled();
+    expect(await sourceAccess.mock.results[0].value).toEqual({ ok: true });
+
+    sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    unblock();
+    const denied = await inFlight;
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(denied.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+
+    sourceAccess.mockResolvedValue({ ok: true });
+    const retry = await ask(question("what changed in the filing?", "source-inflight-0001"), { params });
+    expect(retry.status).toBe(200);
+    expect(retry.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    expect(pipeline).toHaveBeenCalledTimes(2);
   });
   it("does not run either answer path when the source binding cannot be resolved", async () => {
     sourceIds.mockResolvedValue({ ok: false, code: "COLLECTION_SOURCE_BINDING_INVALID" });
@@ -278,6 +311,87 @@ describe("idempotency", () => {
     const other = await ask(question("an entirely different question", "shared-key-0001"), { params });
     expect(other.status).toBe(200);
     expect(pipeline).toHaveBeenCalledTimes(2);
+  });
+});
+
+/*
+  The compiled answer envelope through the real route: the pipeline is the only stub, and the
+  answer is the real answerFromContextPacket. Evidence over COMPILED_ANSWER_CHARACTER_LIMIT is an
+  abstention with no partial answer and its verified citations kept -- and a replay serves that
+  same receipt and those same citations without running retrieval again.
+*/
+describe("a compiled answer over its envelope", () => {
+  it("abstains with its verified citations and receipt, and replays both without re-running retrieval", async () => {
+    const packet = buildContextPacket([
+      {
+        unitId: "unit-overflow",
+        text: `Renewal clause ${"x".repeat(COMPILED_ANSWER_CHARACTER_LIMIT)}`,
+        claimIds: ["claim-renewal"],
+        entityIds: ["entity-contract"],
+        sourceVersionId: "version-a",
+        evidenceIds: ["evidence-a", "evidence-b"],
+        pageNumber1: 4,
+        bbox1000: [10, 20, 900, 800],
+        authority: "official",
+        lexicalRank: 1,
+        rerankerScore: 0.5,
+      },
+      {
+        unitId: "unit-unboxed",
+        text: "The notice period is ninety days.",
+        claimIds: [],
+        entityIds: [],
+        sourceVersionId: "version-a",
+        evidenceIds: ["evidence-c"],
+        pageNumber1: null,
+        bbox1000: null,
+        authority: "official",
+        denseRank: 2,
+      },
+    ], { worldId: COLLECTION, worldVersion: "3", retrievalProfile: "p", question: "what renews?" });
+    pipeline.mockResolvedValue({
+      ok: true,
+      packet,
+      diagnostics: { compileRunId: "run-1", retrievalProfileId: "p", rerankerApplied: true, gateRejections: [], degradations: [] },
+    });
+    const expected = answerFromContextPacket(packet, { collectionId: COLLECTION, manifestDigest: `sha256:${"d".repeat(64)}` });
+
+    const first = await ask(question("what renews?", "overflow-key-0001"), { params });
+    expect(first.status).toBe(200);
+    expect(first.headers.get("x-tavonel-idempotent-replay")).toBeNull();
+    const body = await first.json();
+    expect(body).toMatchObject({
+      code: "ANSWER_ABSTAINED",
+      retrievalPath: "compiled-retrieval-v1",
+      answerMode: "evidence_excerpts",
+      status: "abstained",
+      answer: "",
+      reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT,
+    });
+    // Exactly the builder's verified citations, in packet order, with nothing invented for them.
+    expect(body.citations).toEqual(expected.citations);
+    expect(body.citations.map((citation: { evidenceId: string }) => citation.evidenceId)).toEqual(["evidence-a", "evidence-c"]);
+    expect(body.citations[0]).toMatchObject({ evidenceIds: ["evidence-a", "evidence-b"], sourceVersionId: "version-a", pageNumber1: 4, bbox1000: [10, 20, 900, 800] });
+    expect(body.citations[1]).toMatchObject({ pageNumber1: null, bbox1000: null });
+    for (const citation of body.citations) {
+      expect(citation).not.toHaveProperty("sourceId");
+      expect(citation).not.toHaveProperty("relevance");
+    }
+    // The receipt is the one the builder signed for this World, not a fixture.
+    expect(body.receipt).toEqual(expected.receipt);
+    expect(body.receipt).toMatchObject({ collectionId: COLLECTION, manifestDigest: `sha256:${"d".repeat(64)}`, retrieval: "p", candidatePromotion: false });
+    expect(body.receipt.outputSha256).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(body.contextPacket).toEqual(packet);
+    expect(pipeline).toHaveBeenCalledTimes(1);
+
+    const replay = await ask(question("what renews?", "overflow-key-0001"), { params });
+    expect(replay.status).toBe(200);
+    expect(replay.headers.get("x-tavonel-idempotent-replay")).toBe("true");
+    const replayed = await replay.json();
+    expect(replayed).toEqual(body);
+    expect(replayed.receipt).toEqual(expected.receipt);
+    expect(replayed.citations).toEqual(expected.citations);
+    expect(pipeline).toHaveBeenCalledTimes(1);
   });
 });
 

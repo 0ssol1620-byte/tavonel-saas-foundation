@@ -1,4 +1,6 @@
 import { FlatCompat } from "@eslint/eslintrc";
+import { createRequire } from "node:module";
+import { dirname } from "node:path";
 
 /**
  * There was no linter. `npm run check` ran `tsc --noEmit` and nothing else, which meant the
@@ -8,7 +10,13 @@ import { FlatCompat } from "@eslint/eslintrc";
  * `next/core-web-vitals` brings the accessibility and Next-correctness rules; the additions below
  * are the ones this product specifically wants.
  */
-const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
+const require = createRequire(import.meta.url);
+// Resolve the preset-owned plugins from that preset, without relying on pnpm hoisting.
+// This preserves all rules and works with both isolated and hoisted node_modules layouts.
+const compat = new FlatCompat({
+  baseDirectory: import.meta.dirname,
+  resolvePluginsRelativeTo: dirname(require.resolve("eslint-config-next/package.json")),
+});
 
 export default [
   ...compat.extends("next/core-web-vitals", "next/typescript"),

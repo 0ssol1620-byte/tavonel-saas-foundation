@@ -135,6 +135,62 @@ describe("approved one-path experience", () => {
   });
 
   /*
+    `hero_demo_interact` is delegated by selector, so moving the film silently stops counting its
+    controls unless the selector moves with it. The four-stage film in scene 01 is the
+    demo on Home, and its stage and motion controls must stay inside the counted selector.
+  */
+  it("counts demo engagement on the scene-one four-stage film controls", () => {
+    const analytics = text("components/landing-v2/landing-analytics.tsx");
+    const onDemo = analytics.slice(analytics.indexOf("const onDemo"), analytics.indexOf('main.addEventListener("click"'));
+    expect(onDemo, "the demo listener").not.toBe("");
+    expect(onDemo).toContain('trackFunnelOnce("hero_demo_interact", arm)');
+    const selector = onDemo.match(/target\.closest\("([^"]+)"\)/)?.[1] ?? "";
+    const parts = selector.split(",").map(part => part.trim());
+    expect(parts, "the film's controls, where the film now is").toContain("#s1 .compile-film-sequence button");
+    expect(parts, "decision A preserves prepared source UI engagement")
+      .toContain("#s2 [data-source-digest] button[aria-pressed][aria-controls]");
+    expect(onDemo, "the engagement hook adds no action or document payload")
+      .toMatch(/trackFunnelOnce\("hero_demo_interact", arm\);/);
+    expect(onDemo).not.toMatch(/source_open|digest:|regionId:|documentId:/);
+    const page = text("components/landing-v2/landing-page.tsx");
+    const hero = page.slice(page.indexOf('id="s1"'), page.indexOf('id="s2"'));
+    expect(page.indexOf('id="s2"')).toBeGreaterThan(page.indexOf('id="s1"'));
+    expect(hero).toContain("<HeroFilm");
+    expect(text("components/landing-v2/hero-film-disclosure.tsx")).toContain("<CompileStagePlayer");
+    // Release 3 (main bcba7173) picks the frame's class by layout; both branches keep the class the arm counts.
+    const frame = text("components/compile-stage-player.tsx")
+      .match(/<div className=\{storyLayout \? `([^`]*)` : "([^"]*)"\} ref=\{frameRef\}/);
+    expect(frame, "the film frame's class expression").not.toBeNull();
+    expect(frame![1], "story layout").toMatch(/^compile-film-sequence /);
+    expect(frame![2], "default layout").toMatch(/^compile-film-sequence /);
+  });
+
+  /*
+    The workbench's own contract, read where it is written: native selection, real citations,
+    full filing access and the agreed status line. The rendered behaviour is held by
+    `components/landing-v2/hero-source-card.test.tsx`; this keeps the composition from swapping
+    the card for one without them.
+  */
+  it("keeps native region selection, exact citations, full filing access and the prepared status", () => {
+    const card = text("components/landing-v2/hero-source-card.tsx");
+    expect(card).toContain('type="button"');
+    expect(card).toContain("aria-pressed={region.id === active.id}");
+    expect(card).toContain("aria-controls={passageId}");
+    expect(card).toContain('aria-live="polite"');
+    expect(card).toContain("data-hero-evidence");
+    expect(card).toContain("href={page.image.src}");
+    expect(card).toContain("href={source.officialFiling.href}");
+    expect(card).toContain('"Open full filing (SEC)"');
+    expect(card).toContain('"Prepared demonstration / processing not yet run"');
+    expect(card).toContain('"준비된 시연 / 아직 처리를 실행하지 않음"');
+    expect(card, "the status is chosen by run, not derived by splitting a string").not.toMatch(/status\.split\(/);
+    expect(card).not.toContain("Prepared demonstration ·");
+    const view = text("lib/home-evidence-view.ts");
+    expect(view, "the helper stays a projection, never the corpus build").not.toMatch(/from "\.\/(explore-sample|compile|corpus)/);
+    expect(view).not.toMatch(/[A-Z]:[\\/]/);
+  });
+
+  /*
     BQ-013. The locale thread reached the chrome and stopped at the film.
 
     /ko reused `COMPILE_STAGES[1]` and `[2]` verbatim, so the Korean page rendered English tab
@@ -221,6 +277,10 @@ describe("approved one-path experience", () => {
     expect(composition).toContain("startHref={heroStart.href}");
     // Brief 2026-10-15 move 1: the close takes the hero's own sample action, not a separate access pair.
     expect(composition).toContain("actions={heroActions}");
+    expect(text("components/landing-v2/scenes/start.tsx"), "the pricing link remains in the Korean journey")
+      .toContain('"/ko/pricing"');
+    expect(composition, "evaluation remains localized while live entry stays state controlled").toContain('access.href === "/contact" ? (korean ? "/ko/evaluation" : "/evaluation") : access.href');
+    expect(composition).not.toContain("pricingHref");
     const korean = text("app/ko/page.tsx");
     expect(korean, "/ko renders the same composition in the other language").toContain("<LandingPage korean");
     expect(korean).toContain('canonical: "/ko"');
@@ -258,7 +318,9 @@ describe("approved one-path experience", () => {
   it("retains cost approval, automatic durable compile and human activation boundaries", () => {
     const page = text("app/workspace/page.tsx");
     expect(page).toContain("stagedSelection");
-    expect(page).toContain("if (judgeCorpusSet(ids.length).ok) await startDurableCompile(ids)");
+    expect(page).toContain("const ids = approvedCompilableDocumentIds(final, fileKeys)");
+    expect(page).toContain("if (!ids || ids.length !== processingManifest.length || !judgeCorpusSet(ids.length).ok)");
+    expect(page).toContain("await startDurableCompile(ids)");
     expect(page).toContain("activationPolicy.customerIntake.enabled");
     expect(page).toContain("promoteCandidate");
     expect(page).toContain("rollbackWorld");

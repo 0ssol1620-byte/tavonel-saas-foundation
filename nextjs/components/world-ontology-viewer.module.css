@@ -5,6 +5,10 @@
   --ont-line: var(--hairline, rgb(255 255 255 / 0.12));
   --ont-accent: var(--verified, #9bb8a4);
   display: grid;
+  /* One explicit track with a zero minimum. The implicit `auto` track took the min-content width
+     of each section, so a wide table widened every row, the proposal form included, past the
+     viewer. Tables still scroll on their own below 720px. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 22px;
   min-width: 0;
 }
@@ -47,6 +51,61 @@
 .exports span { color: var(--ont-faint); font: 12px var(--f-mono, monospace); }
 .exports code { grid-column: 1 / -1; color: var(--ont-faint); font-size: 12px; overflow-wrap: anywhere; }
 
+/* Class-name proposal preview. A local draft, so nothing here moves: every change is the direct
+   answer to a key or a click, and an animation would only delay it. */
+.rename { display: grid; gap: 10px; min-width: 0; }
+.rename .note { margin: 0; }
+.rename h4 { margin: 0; color: var(--ont-faint); font: 500 12px var(--f-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; }
+
+.renameForm { display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto; gap: 8px 12px; align-items: end; min-width: 0; }
+.renameField { display: grid; gap: 6px; min-width: 0; }
+.renameField label { color: var(--ont-faint); font: 12px var(--f-sans, sans-serif); }
+.renameField select,
+.renameField input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--ont-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ont-ink);
+  font: 13px var(--f-sans, sans-serif);
+}
+.renameField option { background: var(--ground, #11120f); color: var(--ont-ink); }
+.renameField input[aria-invalid="true"] { border-color: var(--ont-ink); }
+
+.renameActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.renameButton,
+.renameSecondary {
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--ont-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ont-ink);
+  font: 500 13px var(--f-sans, sans-serif);
+  cursor: pointer;
+}
+.renameButton { border-color: var(--ont-accent); }
+.renameSecondary { color: var(--ont-muted); }
+.rename select:focus-visible,
+.rename input:focus-visible,
+
+.renameHint { grid-column: 1 / -1; margin: 0; color: var(--ont-faint); font-size: 12px; line-height: 1.6; }
+/* Kept in the layout even when empty: a live region that appears with its text is often not announced. */
+.renameStatus { margin: 0; color: var(--ont-ink); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+
+.renameResult { display: grid; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--ont-line); }
+.renameResult .table tbody th { overflow-wrap: anywhere; }
+.renameFacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); gap: 8px 16px; margin: 0; }
+.renameFacts div { min-width: 0; }
+.renameFacts dt { color: var(--ont-faint); font-size: 12px; }
+.renameFacts dd { margin: 2px 0 0; color: var(--ont-ink); font: 13px var(--f-sans, sans-serif); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.renameFacts code { font: 12px var(--f-mono, monospace); }
+.renameNotes { display: grid; gap: 4px; max-width: 640px; margin: 0; padding-left: 1.1em; color: var(--ont-faint); font-size: 12px; line-height: 1.6; }
+
 .empty { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--hairline, rgb(255 255 255 / 0.12)); }
 .empty span { color: var(--text-lo, #74736d); font: 12px var(--f-mono, monospace); letter-spacing: .12em; }
 .empty h3 { margin: 0; font: 400 18px var(--f-sans, sans-serif); }
@@ -54,4 +113,7 @@
 
 @media (max-width: 720px) {
   .table { display: block; overflow-x: auto; }
+  .renameForm { grid-template-columns: minmax(0, 1fr); }
+  .renameButton, .renameSecondary { min-height: 44px; }
+  .renameField select, .renameField input { min-height: 44px; }
 }

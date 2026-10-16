@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GET as openApi } from "../app/api/openapi/route";
 import { COMPILE_MAX_DOCUMENTS, COMPILE_MIN_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
+// The approved direct-upload path set exists only with the approval lineage on. Main's switch-off contract
+// is pinned by lib/openapi-compile-jobs.switch-off.test.ts (review 3, CI-TI-1).
+vi.mock("@/lib/intake-approval-rollout", () => ({ INTAKE_APPROVAL_ROLLOUT_ENABLED: true }));
 
 /*
   The published spec is what someone else's generated client is built from.
@@ -18,7 +21,7 @@ type PathItem = {
 };
 
 async function spec() {
-  const response = openApi(new Request("https://tavonel.com/api/openapi"));
+  const response = await openApi(new Request("https://tavonel.com/api/openapi"));
   return (await response.json()) as {
     servers: Array<{ url: string }>;
     paths: Record<string, PathItem>;
@@ -45,6 +48,18 @@ describe("the published compile contract", () => {
     ]) {
       expect(Object.keys(document.paths)).toContain(path);
     }
+  });
+
+  it("publishes the complete approved direct-upload path set", async () => {
+    const document = await spec();
+    for (const path of ["/uploads/quote", "/uploads/approval", "/uploads/capability", "/uploads/confirm", "/uploads/release"]) {
+      expect(Object.keys(document.paths)).toContain(path);
+    }
+    expect(document.paths["/uploads/approval"].get).toBeTruthy();
+    expect(document.paths["/uploads/approval"].post).toBeTruthy();
+    const quote = document.paths["/uploads/quote"].post!.requestBody!.content["application/json"].schema;
+    expect(quote.properties?.files.minItems).toBe(1);
+    expect(quote.properties?.files.maxItems).toBe(128);
   });
 
   it("says where those endpoints actually live", async () => {

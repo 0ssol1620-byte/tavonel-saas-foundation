@@ -15,6 +15,7 @@ import type { CollectionOcrInput } from "./collection-compiler";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("the execution budget is internally consistent", () => {
@@ -82,7 +83,9 @@ describe("the budget is declared in one place", () => {
   it("the Core client takes both of its numbers from the budget", () => {
     const core = source("./core-runtime-v2.ts");
     expect(core).toContain("maxLatencyMs: CORE_MAX_LATENCY_MS");
-    expect(core).toContain("AbortSignal.timeout(CORE_CLIENT_TIMEOUT_MS)");
+    expect(core).toContain("remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS");
+    expect(core).toContain("Math.min(envelope.route.maxLatencyMs, remainingLatencyMs)");
+    expect(core).toContain("AbortSignal.timeout(envelope.route.maxLatencyMs)");
     expect(core).not.toContain("maxLatencyMs: 90_000");
     expect(core).not.toContain("AbortSignal.timeout(60_000)");
   });
@@ -155,4 +158,40 @@ describe("a timeout is not the same failure as an unreachable Core", () => {
     await dispatchProductCoreV2(env, "pilot", ocrInput());
     expect(sent!.route!.maxLatencyMs).toBe(CORE_MAX_LATENCY_MS);
   });
+});
+
+
+describe("remaining worker time bounds the actual Core dispatch", () => {
+  const env = { url: "https://core.example", hmac: "h".repeat(48) };
+
+  it.each([1000, 2500, CORE_CLIENT_TIMEOUT_MS, CORE_CLIENT_TIMEOUT_MS + 10_000])(
+    "uses the same bounded %ims deadline for the wire and abort signal", async (remaining) => {
+      const controller = new AbortController();
+      const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+      const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+        const envelope = JSON.parse(String(init.body));
+        expect(envelope.route.maxLatencyMs).toBe(Math.min(CORE_MAX_LATENCY_MS, remaining));
+        expect(init.signal).toBe(controller.signal);
+        controller.abort(new DOMException("remaining deadline expired", "TimeoutError"));
+        throw controller.signal.reason;
+      });
+      vi.stubGlobal("fetch", fetch);
+      const result = await dispatchProductCoreV2(env, "pilot", ocrInput(), new Date(), null, undefined, undefined, undefined, remaining);
+      expect(timeout).toHaveBeenCalledExactlyOnceWith(Math.min(CORE_MAX_LATENCY_MS, remaining));
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(result).toEqual({ ok: false, code: "CORE_V2_TIMEOUT" });
+    },
+  );
+
+  it.each([0, 999, -1, Number.NaN, Number.POSITIVE_INFINITY, 1000.5])(
+    "refuses exhausted or malformed remaining time %s before dispatch", async (remaining) => {
+      const fetch = vi.fn();
+      const timeout = vi.spyOn(AbortSignal, "timeout");
+      vi.stubGlobal("fetch", fetch);
+      expect(await dispatchProductCoreV2(env, "pilot", ocrInput(), new Date(), null, undefined, undefined, undefined, remaining))
+        .toEqual({ ok: false, code: "CORE_V2_TIME_BUDGET_INVALID" });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(timeout).not.toHaveBeenCalled();
+    },
+  );
 });

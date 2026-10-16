@@ -210,7 +210,9 @@ export async function getWorkspaceOcrJson(
   workspaceId: string,
   key: string,
   now = new Date(),
-): Promise<{ ok: true; json: unknown } | { ok: false; code: string }> {
+  maximumBytes = MAX_DERIVED_JSON_BYTES,
+): Promise<{ ok: true; json: unknown; byteLength: number } | { ok: false; code: string }> {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes <= 0 || maximumBytes > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
   if (env.bucket !== FOUNDATION_R2_BUCKET) return { ok: false, code: "BUCKET_NOT_FOUNDATION" };
   if (!isOcrJsonKey(workspaceId, key)) return { ok: false, code: "OCR_JSON_PREFIX_REQUIRED" };
   if (key.toLowerCase().endsWith(".pdf")) return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
@@ -218,11 +220,12 @@ export async function getWorkspaceOcrJson(
   const response = await signedS3Get(env, canonicalUri, "", now);
   if (response.status === 404) return { ok: false, code: "NOT_FOUND" };
   if (!response.ok) return { ok: false, code: "GET_FAILED" };
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > MAX_DERIVED_JSON_BYTES) return { ok: false, code: "JSON_TOO_LARGE" };
+  const body = await readBoundedSourceBody(response, maximumBytes);
+  if (!body.ok) return { ok: false, code: body.code === "SOURCE_SIZE_UNQUALIFIED" ? "JSON_TOO_LARGE" : "GET_FAILED" };
+  const bytes = Buffer.from(body.bytes);
   if (bytes.subarray(0, 4).toString("utf8") === "%PDF") return { ok: false, code: "PDF_BYTES_FORBIDDEN" };
   try {
-    return { ok: true, json: JSON.parse(bytes.toString("utf8")) };
+    return { ok: true, json: JSON.parse(bytes.toString("utf8")), byteLength: bytes.length };
   } catch {
     return { ok: false, code: "NOT_JSON" };
   }

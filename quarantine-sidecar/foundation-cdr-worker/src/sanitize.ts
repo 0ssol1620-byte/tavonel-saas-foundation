@@ -9,10 +9,18 @@ import {
   cdrReceiptSiblingKey,
   immutableObjectKey,
   ocrReviewSiblingKey,
+  ocrSiblingKey,
   parseQuarantineSourceKey,
   sourcePartFromR2Object,
 } from "./keys";
-import { dispatchOcrAfterSanitize, ocrFailureKind, type OcrDispatchResult } from "./ocr";
+import {
+  OCR_FAILURE_CATEGORY,
+  OcrEvidenceRetryableError,
+  dispatchOcrAfterSanitize,
+  ocrFailureKind,
+  type OcrDispatchResult,
+  type OcrFailureCode,
+} from "./ocr";
 
 export type SanitizeResult = {
   sourceKey: string;
@@ -48,6 +56,8 @@ export type R2BucketLike = {
 };
 
 export type SanitizeEnv = {
+  FOUNDATION_COMPLETED_READ_ENABLED?: string;
+  FOUNDATION_COMPLETED_READ_BINDING?: string;
   FOUNDATION_QUARANTINE: R2BucketLike;
   TAVONEL_CDR_URL: string;
   TAVONEL_CDR_HMAC?: string;
@@ -359,6 +369,112 @@ function declaredBytesOf(object: R2ObjectLike): number | null {
   return Number.isSafeInteger(raw) && raw > 0 ? raw : null;
 }
 
+export const OCR_REVIEW_RECEIPT_SCHEMA = "tavonel.ocr_review_receipt.v2" as const;
+const LEGACY_OCR_REVIEW_RECEIPT_SCHEMA = "tavonel.ocr_review_receipt.v1";
+const LEGACY_OCR_REVIEW_FIELDS = [
+  "candidatePromotion", "immutableKey", "inputSha256", "occurredAt", "reason",
+  "reasonCode", "requestId", "retryPolicy", "schemaVersion", "status",
+].sort();
+const OCR_REVIEW_FIELDS = [...LEGACY_OCR_REVIEW_FIELDS, "billingDisposition", "computeCredits", "sourceKey"].sort();
+const MAX_OCR_REVIEW_REASON = 512;
+
+type OcrReviewBilling =
+  | { billingDisposition: "released"; computeCredits: 0 }
+  | { billingDisposition: "operator_review"; computeCredits: 2 };
+
+const RELEASED: OcrReviewBilling = { billingDisposition: "released", computeCredits: 0 };
+const OPERATOR_REVIEW: OcrReviewBilling = { billingDisposition: "operator_review", computeCredits: 2 };
+
+/** `ocr.ts` calls an empty source semantic yet charges nothing for it: the reader never ran. */
+const UNCHARGED_SEMANTIC_FAILURES: ReadonlySet<string> = new Set<OcrFailureCode>(["OCR_SOURCE_EMPTY"]);
+
+/**
+ * What a recorded OCR failure was billed, from its reason code and nothing else.
+ *
+ * The receipt existing says nothing about money. A transport failure that outlived its retries
+ * is recorded at zero credits, so "a receipt exists, charge two" turned a settlement that failed
+ * before commit into a charge, and a committed release whose reply was lost into a conflict.
+ * `OCR_REVIEW_ALREADY_EXISTS` was the old replay marker and was never a failure anyone observed,
+ * so it -- like any code outside the taxonomy -- has no billing and is never replayed.
+ */
+function recordedFailureBilling(code: unknown): OcrReviewBilling | null {
+  if (typeof code !== "string" || code === "OCR_REVIEW_ALREADY_EXISTS" || !Object.hasOwn(OCR_FAILURE_CATEGORY, code)) {
+    return null;
+  }
+  if (OCR_FAILURE_CATEGORY[code as OcrFailureCode].kind === "transport") return RELEASED;
+  return UNCHARGED_SEMANTIC_FAILURES.has(code) ? RELEASED : OPERATOR_REVIEW;
+}
+
+/**
+ * Replays the recorded OCR failure for this immutable PDF, or returns null when none exists.
+ *
+ * A present receipt is evidence only once it is bounded, parses, and binds this source, this
+ * immutable PDF and its digest to a known reason and billing disposition. Anything less throws
+ * retryable before OCR and before settlement: re-reading the document could bill it twice, and
+ * guessing the disposition could bill it wrongly once.
+ */
+async function recordedOcrReview(
+  bucket: R2BucketLike,
+  reviewKey: string,
+  binding: { sourceKey: string; immutableKey: string; inputSha256: string },
+): Promise<OcrDispatchResult | null> {
+  let size: number;
+  let bytes: ArrayBuffer;
+  try {
+    const object = await bucket.get(reviewKey);
+    if (!object) return null;
+    size = object.size;
+    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_RECEIPT_BYTES) throw new Error("size");
+    bytes = await object.arrayBuffer();
+  } catch {
+    throw new OcrEvidenceRetryableError("OCR review evidence cannot be read within its bound; retry required");
+  }
+  const unqualified = () => new OcrEvidenceRetryableError("OCR review evidence is not qualified; operator review required");
+  let record: Record<string, unknown>;
+  try {
+    if (bytes.byteLength !== size) throw new Error("length");
+    const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("shape");
+    record = parsed as Record<string, unknown>;
+  } catch {
+    throw unqualified();
+  }
+
+  const legacy = record.schemaVersion === LEGACY_OCR_REVIEW_RECEIPT_SCHEMA;
+  if (!legacy && record.schemaVersion !== OCR_REVIEW_RECEIPT_SCHEMA) throw unqualified();
+  const fields = Object.keys(record).sort();
+  const expectedFields = legacy ? LEGACY_OCR_REVIEW_FIELDS : OCR_REVIEW_FIELDS;
+  if (fields.length !== expectedFields.length || fields.some((field, index) => field !== expectedFields[index])) {
+    throw unqualified();
+  }
+  if (record.status !== "operator_review" || record.retryPolicy !== "explicit_operator_only"
+    || record.candidatePromotion !== false
+    || record.immutableKey !== binding.immutableKey || record.inputSha256 !== binding.inputSha256
+    || (!legacy && record.sourceKey !== binding.sourceKey)
+    || typeof record.reason !== "string" || record.reason.length < 1 || record.reason.length > MAX_OCR_REVIEW_REASON
+    || (record.requestId !== null
+      && (typeof record.requestId !== "string" || record.requestId.length < 1 || record.requestId.length > 160))
+    || typeof record.occurredAt !== "string" || !Number.isFinite(Date.parse(record.occurredAt))) {
+    throw unqualified();
+  }
+  // v1 recorded no disposition, so the reason code alone decides it -- the same rule v2 is checked
+  // against. `OCR_SOURCE_EMPTY` was always dispatched at zero credits, so a v1 replay releases it.
+  const billing = recordedFailureBilling(record.reasonCode);
+  if (!billing || (!legacy && (record.billingDisposition !== billing.billingDisposition
+    || record.computeCredits !== billing.computeCredits))) {
+    throw unqualified();
+  }
+  return {
+    status: "failed",
+    key: ocrSiblingKey(binding.immutableKey),
+    reasonCode: record.reasonCode as OcrFailureCode,
+    reason: record.reason as string,
+    ...(typeof record.requestId === "string" ? { requestId: record.requestId } : {}),
+    inputSha256: binding.inputSha256,
+    computeCredits: billing.computeCredits,
+  };
+}
+
 export async function sanitizeObject(
   env: SanitizeEnv,
   objectKey: string,
@@ -537,25 +653,27 @@ export async function sanitizeObject(
   }
 
   const cdrReceiptKey = cdrReceiptSiblingKey(immutableKey);
+  const reviewKey = ocrReviewSiblingKey(immutableKey);
+  const reviewBinding = { sourceKey: objectKey, immutableKey, inputSha256: outputSha256Header };
 
+  // A recorded failure is the outcome of an earlier delivery whose settlement may not have
+  // committed, or whose reply was lost. Say the same thing again; never read the document again.
+  const recorded = await recordedOcrReview(env.FOUNDATION_QUARANTINE, reviewKey, reviewBinding);
   let ocr: OcrDispatchResult;
-  try {
-    const existingReview = await env.FOUNDATION_QUARANTINE.get(ocrReviewSiblingKey(immutableKey));
-    ocr = existingReview
-      ? {
-          status: "failed",
-          reasonCode: "OCR_REVIEW_ALREADY_EXISTS",
-          reason: "an immutable operator-review receipt already exists",
-          computeCredits: 2,
-        }
-      : await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
-  } catch {
-    ocr = {
-      status: "failed",
-      reasonCode: "OCR_TIMEOUT_OR_NETWORK",
-      reason: "OCR dispatch failed after CDR",
-      computeCredits: 0,
-    };
+  if (recorded) {
+    ocr = recorded;
+  } else {
+    try {
+      ocr = await dispatchOcrAfterSanitize(env, immutableKey, fetcher, now, newRequestId);
+    } catch (error) {
+      if (error instanceof OcrEvidenceRetryableError) throw error;
+      ocr = {
+        status: "failed",
+        reasonCode: "OCR_TIMEOUT_OR_NETWORK",
+        reason: "OCR dispatch failed after CDR",
+        computeCredits: 0,
+      };
+    }
   }
 
   /*
@@ -571,28 +689,56 @@ export async function sanitizeObject(
    * caller's last attempt, and falls through to the receipt below -- at the zero credits a
    * transport failure carries, so the settlement releases the reservation rather than billing for
    * a reader that never ran.
+   *
+   * A replayed receipt is none of these: it is the terminal record of an earlier attempt, so it
+   * is settled as recorded rather than raised as if the endpoint were still booting.
    */
-  const transportFailure = ocr.status === "failed" && ocrFailureKind(ocr.reasonCode) === "transport";
+  const transportFailure = !recorded && ocr.status === "failed" && ocrFailureKind(ocr.reasonCode) === "transport";
   const onTransportFailure = options.onTransportFailure ?? "raise";
   if (transportFailure && onTransportFailure === "raise") {
     throw new RetryableError(`OCR is not available yet (${ocr.reasonCode})`);
   }
 
   let ocrReview: SanitizeResult["ocrReview"];
-  if (ocr.status === "failed" && !(transportFailure && onTransportFailure === "defer")) {
-    const reviewKey = ocrReviewSiblingKey(immutableKey);
+  if (recorded) {
+    ocrReview = { key: reviewKey, status: "exists" };
+  } else if (ocr.status === "failed" && !(transportFailure && onTransportFailure === "defer")) {
+    const reasonCode = ocr.reasonCode ?? "OCR_TIMEOUT_OR_NETWORK";
+    const billing = recordedFailureBilling(reasonCode);
+    // The disposition written here is what every replay will settle, so it must be the one this
+    // attempt is about to settle -- never a guess a later reader has to reconcile.
+    if (!billing || billing.computeCredits !== ocr.computeCredits) {
+      throw new RetryableError("OCR failure billing does not match its reason; operator review required");
+    }
     const reviewStatus = await putCreateOnceJson(env.FOUNDATION_QUARANTINE, reviewKey, {
-      schemaVersion: "tavonel.ocr_review_receipt.v1",
+      schemaVersion: OCR_REVIEW_RECEIPT_SCHEMA,
       status: "operator_review",
+      sourceKey: objectKey,
       immutableKey,
       inputSha256: ocr.inputSha256 ?? outputSha256Header,
-      reasonCode: ocr.reasonCode ?? "OCR_TIMEOUT_OR_NETWORK",
+      reasonCode,
       reason: ocr.reason ?? "OCR failed after CDR",
       requestId: ocr.requestId ?? null,
       occurredAt: now().toISOString(),
       retryPolicy: "explicit_operator_only",
       candidatePromotion: false,
+      billingDisposition: billing.billingDisposition,
+      computeCredits: billing.computeCredits,
     });
+    // The PUT's answer is not the record. Whatever it reported, the durable receipt is what every
+    // replay settles, so it is what this attempt settles: `written` is checked because a reply is
+    // not a stored object, `exists` adopts a concurrent winner rather than this attempt's losing
+    // answer, and `failed` may have committed before the error surfaced -- then the persisted
+    // disposition and reason are recovered, never guessed. No valid receipt, no settlement.
+    //
+    // This does not make OCR exactly-once. A PUT that truly never persisted leaves no record, so
+    // the redelivery this retry causes dispatches OCR again; closing that needs a durable
+    // pre-dispatch intent or provider-side idempotency, which this path does not have.
+    const durable = await recordedOcrReview(env.FOUNDATION_QUARANTINE, reviewKey, reviewBinding);
+    if (!durable) {
+      throw new OcrEvidenceRetryableError(`OCR review receipt is not durable after a ${reviewStatus} write; retry required`);
+    }
+    ocr = durable;
     ocrReview = { key: reviewKey, status: reviewStatus };
   }
 

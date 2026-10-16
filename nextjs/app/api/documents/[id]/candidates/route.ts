@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, isOcrJsonKey, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
@@ -43,7 +43,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!match?.ocrJsonKey || !isOcrJsonKey(membership.workspaceId, match.ocrJsonKey)) {
     return NextResponse.json({ code: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
-  const sourceAccess = await checkConnectorSourceAccess(membership.workspaceId, [id]);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(membership.workspaceId, [id], user.id);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },
@@ -52,7 +52,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!fetched.ok) {
     return NextResponse.json({ code: fetched.code }, { status: fetched.code === "NOT_FOUND" ? 404 : 400, headers: { "Cache-Control": "no-store" } });
   }
-  const currentAccess = await checkConnectorSourceAccess(membership.workspaceId, [id]);
+  const currentAccess = await checkConnectorSourceAccessForViewer(membership.workspaceId, [id], user.id);
   if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, {
     status: currentAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },

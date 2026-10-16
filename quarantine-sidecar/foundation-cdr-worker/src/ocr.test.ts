@@ -1,8 +1,10 @@
+import { sha256DigestHeader } from "./hmac";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ocrSiblingKey } from "./keys";
 import {
   dispatchOcrAfterSanitize,
+  OcrEvidenceRetryableError,
   isForbiddenOcrUrl,
   looksLikeFoundationOcrUrl,
   OCR_FAILURE_CATEGORY,
@@ -80,6 +82,60 @@ describe("OCR sibling key shape", () => {
       ocrSiblingKey(IMMUTABLE),
       "immutable/ws_pilot/ws_pilot/doc_1/abcdabcdabcdabcdabcdabcdabcdabcd/ocr.json",
     );
+  });
+});
+
+describe("fictional OCR v3 recognition conflicts", () => {
+  it("qualifies the paired originals and refuses malformed or downgraded evidence", async () => {
+    const digest = await sha256DigestHeader(new TextEncoder().encode("%PDF-1.4\nfictional source only"));
+    const polygonA = [[10, 20], [110, 20], [110, 40], [10, 40]];
+    const polygonB = [[11, 20], [111, 20], [111, 40], [11, 40]];
+    const conflict = {
+      sourceSha256: digest, regionId: "fictional-label-1", pageIndex0: 0,
+      bbox1000: [50, 200, 550, 400], candidates: [
+        { engineId: "general-ppocrv6", modelSha256: "sha256:6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884", text: "FICTIONAL-A", confidence: 0.71, polygon: polygonA },
+        { engineId: "korean-ppocrv5", modelSha256: "sha256:cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b", text: "FICTIONAL-B", confidence: 0.69, polygon: polygonB },
+      ],
+    };
+    const region = {
+      regionId: "fictional-label-1", pageIndex0: 0, pageNumber1: 1, order: 0,
+      blockType: "paragraph", text: "FICTIONAL-A", bbox1000: [50, 200, 550, 400],
+      confidence: 0.71, authority: "informal", recognitionConflict: conflict,
+    };
+    const valid = {
+      schemaVersion: "tavonel.ocr_result.v3", status: "ok", text: region.text,
+      pageCount: 1, inputSha256: digest, regions: [region], recognitionConflictCount: 1,
+    };
+    assert.ok(qualifyOcrResult(valid, digest));
+    const negatives: Array<(value: typeof valid) => void> = [
+      (x) => { Reflect.deleteProperty(x.regions[0], "recognitionConflict"); },
+      (x) => { x.recognitionConflictCount = 0; },
+      (x) => { x.schemaVersion = "tavonel.ocr_result.v2"; },
+      (x) => { x.inputSha256 = `sha256:${"b".repeat(64)}`; },
+      (x) => { x.regions[0].recognitionConflict.sourceSha256 = `sha256:${"b".repeat(64)}`; },
+      (x) => { x.regions[0].recognitionConflict.bbox1000[0] = 51; },
+      (x) => { x.regions[0].recognitionConflict.candidates[0].engineId = "korean-ppocrv5"; },
+      (x) => { x.regions[0].recognitionConflict.candidates[1].modelSha256 = `sha256:${"c".repeat(64)}`; },
+      (x) => { Object.assign(x.regions[0].recognitionConflict.candidates[0].polygon[0], { 0: "bad" }); },
+      (x) => { x.regions[0].recognitionConflict.candidates[1].polygon = [[500, 500], [600, 500], [600, 520], [500, 520]]; },
+      (x) => { x.regions[0].confidence = 0.72; },
+      (x) => { x.regions[0].text = "FICTIONAL-C"; x.text = "FICTIONAL-C"; },
+      (x) => { Object.assign(x.regions[0], { unregistered: 1 }); },
+      (x) => { Object.assign(x, { unregistered: 1 }); },
+      (x) => { Object.assign(x.regions[0].recognitionConflict.candidates[0], { unregistered: 1 }); },
+    ];
+    for (const [index, mutate] of negatives.entries()) {
+      const bad = structuredClone(valid);
+      mutate(bad);
+      assert.equal(Boolean(qualifyOcrResult(bad, digest)), false, `invalid case ${index}`);
+    }
+    const cleanV2 = structuredClone(valid);
+    cleanV2.schemaVersion = "tavonel.ocr_result.v2";
+    Reflect.deleteProperty(cleanV2.regions[0], "recognitionConflict");
+    Reflect.deleteProperty(cleanV2, "recognitionConflictCount");
+    assert.ok(qualifyOcrResult(cleanV2, digest));
+    const cleanV3 = { ...cleanV2, schemaVersion: "tavonel.ocr_result.v3", recognitionConflictCount: 0 };
+    assert.ok(qualifyOcrResult(cleanV3, digest));
   });
 });
 
@@ -427,7 +483,7 @@ describe("dispatchOcrAfterSanitize · streamed reading", () => {
     assert.equal(written.schemaVersion, "tavonel.ocr_result.v2");
   });
 
-  it("keeps ocr.json create-once even on the streamed path", async () => {
+  it("refuses an invalid existing ocr.json without a provider call or overwrite", async () => {
     const r2 = new FakeR2({ [IMMUTABLE]: PDF_BYTES, [OCR_JSON]: new TextEncoder().encode("{}") });
     let fetched = 0;
     const result = await dispatchOcrAfterSanitize(
@@ -435,8 +491,10 @@ describe("dispatchOcrAfterSanitize · streamed reading", () => {
       IMMUTABLE,
       async () => { fetched += 1; return ndjson([]); },
     );
-    assert.equal(result.status, "exists");
+    assert.equal(result.status, "failed");
+    assert.equal(result.reasonCode, "OCR_PERSISTED_RESULT_INVALID");
     assert.equal(fetched, 0);
+    assert.equal(r2.puts.length, 0);
   });
 });
 
@@ -457,6 +515,7 @@ describe("OCR failure taxonomy", () => {
       "OCR_HTTP_REJECTED",
       "OCR_RESPONSE_NOT_JSON",
       "OCR_RESPONSE_INVALID",
+      "OCR_PERSISTED_RESULT_INVALID",
       "OCR_RESULT_WRITE_FAILED",
     ];
     assert.deepEqual(Object.keys(OCR_FAILURE_CATEGORY).sort(), [...codes].sort());
@@ -529,5 +588,81 @@ describe("OCR failure taxonomy", () => {
     assert.equal(invalid.reasonCode, "OCR_RESPONSE_INVALID");
     assert.equal(invalid.computeCredits, 2);
     assert.equal(ocrFailureKind(invalid.reasonCode), "semantic");
+  });
+});
+
+const encodePersistedFixture = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+async function persistedOcrFixture() {
+  const pdf = new TextEncoder().encode("synthetic PDF bytes");
+  const inputSha256 = await sha256DigestHeader(pdf);
+  const key = `immutable/pilot-safe/pilot-safe/doc/${inputSha256.slice(7)}/sanitized.pdf`;
+  const ocrKey = key.replace("sanitized.pdf", "ocr.json");
+  const payload = { schemaVersion: "tavonel.ocr_result.v2", status: "ok", text: "synthetic", pageCount: 1,
+    inputSha256, sourceImmutableKey: key, regions: [{ regionId: "p1", pageIndex0: 0, pageNumber1: 1,
+      order: 0, blockType: "paragraph", text: "synthetic", bbox1000: [0, 0, 100, 100], confidence: 1, authority: "unknown" }] };
+  const objects = new Map([[key,pdf]]); let calls=0;
+  const env: OcrDispatchEnv = { FOUNDATION_OCR_URL: "https://foundation-ocr.example/v1/ocr",
+    FOUNDATION_R2_BUCKET: "foundation-quarantine", FOUNDATION_QUARANTINE: {
+      get: async key => { const bytes = objects.get(key); return bytes ? { size: bytes.length, arrayBuffer: async () => bytes.slice().buffer } : null; },
+      put: async (key,value) => { objects.set(key,new Uint8Array(value));return {}; },
+    } };
+  const run = () => dispatchOcrAfterSanitize(env,key,async () => { calls++; return Response.json(payload); });
+  return {env,objects,key,ocrKey,payload,run,calls:()=>calls};
+}
+describe("persisted OCR source validation", () => {
+  for (const stage of ["existence-get", "source-get", "source-body"] as const) {
+    it(`keeps ${stage} storage failure retryable before provider dispatch`, async () => {
+      const f = await persistedOcrFixture();
+      const get = f.env.FOUNDATION_QUARANTINE.get;
+      f.env.FOUNDATION_QUARANTINE.get = async key => {
+        if (stage === "existence-get" && key === f.ocrKey) throw new Error("synthetic R2 GET failure");
+        if (stage === "source-get" && key === f.key) throw new Error("synthetic source GET failure");
+        const object = await get(key);
+        return stage === "source-body" && key === f.key && object
+          ? { ...object, arrayBuffer: async () => { throw new Error("synthetic body-read failure"); } } : object;
+      };
+      await assert.rejects(f.run, OcrEvidenceRetryableError);
+      assert.equal(f.calls(), 0);
+    });
+  }
+  it("reads and digests the persisted bytes on fresh and crash replay paths", async () => {
+    const f=await persistedOcrFixture(); const first=await f.run(); const replay=await f.run();
+    assert.equal(first.status,"written"); assert.equal(replay.status,"exists");
+    assert.equal(first.outputSha256,await sha256DigestHeader(f.objects.get(f.ocrKey)!));
+    assert.equal(replay.outputSha256,first.outputSha256); assert.equal(replay.observedPageCount,1);
+    assert.equal(f.calls(),1);
+  });
+  it("rejects malformed, wrong-key and wrong-input existing objects without paying a provider", async () => {
+    for(const patch of [{},{sourceImmutableKey:"foreign"},{inputSha256:`sha256:${"f".repeat(64)}`}]) {
+      const f=await persistedOcrFixture();f.objects.set(f.ocrKey,encodePersistedFixture(Object.keys(patch).length ? {...f.payload,...patch}:patch));
+      assert.equal((await f.run()).reasonCode,"OCR_PERSISTED_RESULT_INVALID");assert.equal(f.calls(),0);
+    }
+  });
+  it("validates the actual winner for both thrown and null conditional-write conflicts", async () => {
+    for(const thrown of [false,true]) {
+      const f=await persistedOcrFixture();f.env.FOUNDATION_QUARANTINE.put=async key=>{
+        f.objects.set(key,encodePersistedFixture({...f.payload,sourceImmutableKey:"foreign"}));
+        if(thrown)throw new Error("precondition conflict");return null;
+      };
+      assert.equal((await f.run()).reasonCode,"OCR_PERSISTED_RESULT_INVALID");
+    }
+  });
+  it("uses a valid winner's digest rather than the candidate serialization", async () => {
+    const f=await persistedOcrFixture();const winner=new TextEncoder().encode(JSON.stringify(f.payload,null,2));
+    f.env.FOUNDATION_QUARANTINE.put=async key=>{f.objects.set(key,winner);throw new Error("already exists");};
+    const result=await f.run();assert.equal(result.status,"exists");
+    assert.equal(result.outputSha256,await sha256DigestHeader(winner));
+  });
+  it("keeps unavailable post-write evidence retryable", async () => {
+    const f=await persistedOcrFixture();f.env.FOUNDATION_QUARANTINE.put=async()=>null;
+    await assert.rejects(f.run,OcrEvidenceRetryableError);
+    assert.equal(f.calls(),1);
+  });
+  it("rejects oversized persisted evidence before loading its bytes", async () => {
+    const f=await persistedOcrFixture();let loaded=0;const get=f.env.FOUNDATION_QUARANTINE.get;
+    f.env.FOUNDATION_QUARANTINE.get=async key=>key===f.ocrKey
+      ? {size:24*1024*1024+1,arrayBuffer:async()=>{loaded++;return new ArrayBuffer(0);}} : get(key);
+    assert.equal((await f.run()).reasonCode,"OCR_PERSISTED_RESULT_INVALID");
+    assert.equal(loaded,0);assert.equal(f.calls(),0);
   });
 });

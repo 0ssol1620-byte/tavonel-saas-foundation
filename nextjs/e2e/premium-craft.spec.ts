@@ -103,25 +103,41 @@ test("phone and tablet use real navigation targets instead of clickable decorati
   await page.goto("/");
   await dismissConsent(page);
   await expect(page.locator(".bar-ticks button.bt")).toHaveCount(0);
+  const pricingAction = page.locator('header.nav .nav-actions > a[href="/pricing"]');
+  await expect(pricingAction).toHaveCount(1);
+  await expect(pricingAction).toHaveText("Pricing");
+  await expect(pricingAction).toHaveAttribute("href", "/pricing");
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
   const targets = await menu.locator(":scope > nav a").evaluateAll(elements => elements.map(e => {
     const r = e.getBoundingClientRect();
     const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-    return { width: r.width, height: r.height, inside: hit === e || e.contains(hit) };
+    return {
+      text: e.textContent?.trim() ?? "",
+      href: e.getAttribute("href"),
+      width: r.width,
+      height: r.height,
+      inside: hit === e || e.contains(hit),
+    };
   }));
   /*
-    Five, not three, and still not the commercial action. BQ-059 stopped drawing the header's
-    action a second time inside the sheet, forty pixels below the first copy of it --
-    `e2e/mobile-landing.spec.ts` and `e2e/production-hardening.spec.ts` both assert
-    `a.mobile-nav-cta` is gone, and both still do. What changed is the bar: Landing V2's §8
-    navigation is four section destinations after Pricing moved to the persistent header action,
-    and the sheet carries a Sign-in row because the header hides it below the desktop switch.
-    The rows a thumb lands on are four sections plus Sign in. What this test measures is unchanged:
-    every one of them is a real target, and the point at its centre belongs to the row.
+    The exact sheet contract is four section destinations, Pricing and Sign in. Release 2 (brief
+    2026-10-15 move 6) hides the header actions below the desktop switch, so Pricing is the
+    sheet's last section row there; its header link stays in the DOM for the desktop row. Pinning
+    both names and hrefs makes this assertion catch an omitted section, an invented menu
+    destination, or Pricing appearing twice in the disclosure. Geometry still proves each
+    rendered row is a usable target and that its centre hit-tests to the row itself.
   */
   // Brief 2026-10-15 move 6: four sections, Pricing, then Sign in.
-  expect(targets.length).toBe(6);
+  expect(targets.map(({ text, href }) => ({ text, href }))).toEqual([
+    { text: "Product", href: "/product" },
+    { text: "How it works", href: "/how-it-works" },
+    { text: "Resources", href: "/resources" },
+    { text: "Docs", href: "/docs" },
+    { text: "Pricing", href: "/pricing" },
+    { text: "Sign in", href: "/login" },
+  ]);
+  expect(targets).toHaveLength(6);
   for (const target of targets) {
     expect(target.width).toBeGreaterThan(44);
     expect(target.height).toBeGreaterThanOrEqual(44);

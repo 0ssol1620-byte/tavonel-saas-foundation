@@ -12,6 +12,12 @@ import {
 } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "@/lib/supabase-admin";
 import { assessTrialSourceReuse } from "@/lib/trial-source-risk";
+import { readFoundationIntakeApproval } from "@/lib/compute-reservation";
+import { readReadyUploadTriage } from "@/lib/intake-triage-server";
+import { ATTEMPT_KEY_PATTERN, FILE_KEY_PATTERN, SHA256_DIGEST_PATTERN } from "@/lib/intake-approval";
+import { intakePricingFingerprint } from "@/lib/usage-pricing";
+import { INTAKE_TRIAGE_ROLLOUT_ENABLED } from "@/lib/intake-triage-rollout";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,7 +59,11 @@ const RPC_ERRORS: Array<[string, string, number]> = [
   ["foundation_intake_source_digest_invalid", "INVALID_SOURCE_DIGEST", 400],
 ];
 
-async function confirmAdmission(value: {
+/*
+  The approval lineage is off (lib/intake-approval-rollout.ts): main dbe22b1e's confirmation,
+  unchanged -- confirm_foundation_intake_admission, which production has today.
+*/
+async function confirmLegacyAdmission(value: {
   workspaceKey: string;
   documentId: string;
   userId: string;
@@ -95,6 +105,45 @@ async function confirmAdmission(value: {
   return { ok: true as const, result };
 }
 
+async function confirmAdmission(value: {
+  workspaceKey: string; documentId: string; userId: string; attemptKey: string; scopeDigest: string; fileKey: string;
+  sourceSha256: string | null; observedBytes: number | null; observedMime: string | null;
+}) {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "INTAKE_CONFIRMATION_NOT_CONFIGURED", status: 503 };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/confirm_foundation_intake_approved_upload", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: value.workspaceKey, p_user_id: value.userId, p_attempt_key: value.attemptKey,
+        p_scope_digest: value.scopeDigest, p_file_key: value.fileKey, p_document_id: value.documentId,
+        p_source_sha256: value.sourceSha256, p_observed_bytes: value.observedBytes, p_observed_mime: value.observedMime,
+      }),
+    });
+  } catch { return { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 }; }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: unknown; code?: unknown } | null;
+    const message = typeof body?.message === "string" ? body.message : "";
+    // As approvalRpc: a function this database does not have means migration 20261003120000 was
+    // not applied (runbook section 4), not a ledger outage.
+    if (body?.code === "PGRST202" || body?.code === "42883") {
+      return { ok: false as const, code: "INTAKE_APPROVAL_LINEAGE_UNAVAILABLE", status: 503 };
+    }
+    const mapped = RPC_ERRORS.find(([needle]) => message.includes(needle));
+    return mapped ? { ok: false as const, code: mapped[1], status: mapped[2] }
+      : { ok: false as const, code: "INTAKE_CONFIRMATION_FAILED", status: 503 };
+  }
+  const result = await response.json().catch(() => null) as Record<string, unknown> | null;
+  const admission = result?.admission as Record<string, unknown> | null;
+  const approvedFile = result?.approvedFile as Record<string, unknown> | null;
+  if (!admission || admission.documentId !== value.documentId || admission.status !== "confirmed"
+    || typeof admission.confirmedAt !== "string" || !Number.isFinite(Date.parse(admission.confirmedAt))
+    || !approvedFile || approvedFile.fileKey !== value.fileKey || approvedFile.documentId !== value.documentId
+    || approvedFile.fileState !== "confirmed") return { ok: false as const, code: "INTAKE_CONFIRMATION_RECEIPT_INVALID", status: 503 };
+  return { ok: true as const, result: admission, approvedFile };
+}
+
 export async function POST(request: Request) {
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(declaredLength) || declaredLength > 1_024) {
@@ -108,19 +157,70 @@ export async function POST(request: Request) {
     { code: parsed.code === "REQUEST_TOO_LARGE" ? "UPLOAD_CONFIRM_REQUEST_TOO_LARGE" : "UPLOAD_CONFIRM_BODY_INVALID" },
     { status: parsed.status, headers },
   );
-  const body = parsed.value as { documentId?: unknown; sourceSha256?: unknown };
+  const body = parsed.value as {
+    documentId?: unknown; sourceSha256?: unknown; attemptKey?: unknown; scopeDigest?: unknown; fileKey?: unknown;
+  };
   const documentId = typeof body.documentId === "string" ? body.documentId : "";
   if (!DOCUMENT_ID_PATTERN.test(documentId)) {
     return NextResponse.json({ code: "UPLOAD_CONFIRM_BODY_INVALID" }, { status: 400, headers });
   }
-  // Absent is allowed and recorded as absent: a page served without a secure context cannot
-  // compute a digest, and saying so is honest where inventing one would not be. A malformed one
-  // is refused rather than dropped, because that is a client defect worth seeing.
+  // A malformed digest is refused rather than dropped. The approved manifest below binds every
+  // file to its content digest, so a missing digest cannot confirm a paid upload either.
   if (body.sourceSha256 !== undefined
     && (typeof body.sourceSha256 !== "string" || !SOURCE_SHA256.test(body.sourceSha256))) {
     return NextResponse.json({ code: "INVALID_SOURCE_DIGEST" }, { status: 400, headers });
   }
   const sourceSha256 = typeof body.sourceSha256 === "string" ? body.sourceSha256 : null;
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return confirmLegacy(auth.principal, documentId, sourceSha256);
+  const attemptKey = typeof body.attemptKey === "string" ? body.attemptKey : "";
+  const scopeDigest = typeof body.scopeDigest === "string" ? body.scopeDigest : "";
+  const fileKey = typeof body.fileKey === "string" ? body.fileKey : "";
+  if (!ATTEMPT_KEY_PATTERN.test(attemptKey) || !SHA256_DIGEST_PATTERN.test(scopeDigest) || !FILE_KEY_PATTERN.test(fileKey)) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_REQUIRED" }, { status: 428, headers });
+  }
+  const approval = await readFoundationIntakeApproval({
+    workspaceKey: auth.principal.workspaceKey, userId: auth.principal.userId, attemptKey,
+  });
+  if (!approval.ok) return NextResponse.json({ code: approval.code }, { status: approval.status, headers });
+  const hasTriageLineage = [approval.result.triageReceiptId, approval.result.triageVersion,
+    approval.result.triageInventoryDigest, approval.result.configurationRevision]
+    .some((value) => value !== null && value !== undefined);
+  if (hasTriageLineage && !INTAKE_TRIAGE_ROLLOUT_ENABLED) {
+    return NextResponse.json({ code: "INTAKE_TRIAGE_ROLLOUT_DISABLED" }, { status: 503, headers });
+  }
+  if (INTAKE_TRIAGE_ROLLOUT_ENABLED && (!approval.result.triageReceiptId || approval.result.triageVersion !== "tavonel-intake-triage-v1"
+    || !approval.result.triageInventoryDigest || !approval.result.configurationRevision)) {
+    return NextResponse.json({ code: "INTAKE_RETRIAGE_REQUIRED" }, { status: 409, headers });
+  }
+  if (approval.result.pricingFingerprint !== await intakePricingFingerprint()) {
+    return NextResponse.json({ code: "INTAKE_PRICE_STALE" }, { status: 409, headers });
+  }
+  const approvedFile = approval.result.files.find((file) => file.fileKey === fileKey);
+  if (!approvedFile || approvedFile.documentId !== documentId || approval.result.scopeDigest !== scopeDigest
+    || approvedFile.contentSha256 !== sourceSha256) {
+    return NextResponse.json({ code: "INTAKE_APPROVAL_SCOPE_MISMATCH" }, { status: 409, headers });
+  }
+  let sourceEntry: { byteLength: number; mimeType: string; contentSha256: string } = approvedFile;
+  let objectVersion: string | null = null;
+  if (INTAKE_TRIAGE_ROLLOUT_ENABLED) {
+    const triage = await readReadyUploadTriage({
+      workspaceKey: auth.principal.workspaceKey,
+      userId: auth.principal.userId,
+      receiptId: approval.result.triageReceiptId!,
+    });
+    if (!triage.ok) return NextResponse.json({ code: triage.code }, { status: triage.status, headers });
+    const observed = triage.result.entries.find((entry) => entry.fileKey === fileKey);
+    const binding = triage.result.receipt.fileBindings.find((item) => item.fileKey === fileKey);
+    if (triage.result.receipt.inventoryDigest !== approval.result.triageInventoryDigest
+      || triage.result.receipt.configurationRevision !== approval.result.configurationRevision
+      || !observed || observed.contentSha256 !== approvedFile.contentSha256
+      || !binding || binding.documentId !== documentId || typeof binding.objectVersion !== "string"
+      || binding.objectVersion.length < 1) {
+      return NextResponse.json({ code: "INTAKE_RETRIAGE_REQUIRED" }, { status: 409, headers });
+    }
+    sourceEntry = observed;
+    objectVersion = binding.objectVersion;
+  }
 
   // Approval may be revoked after a short-lived capability was issued.
   if (!await canAdmitCustomerSource(auth.principal.workspaceKey, "direct_upload")) {
@@ -132,6 +232,10 @@ export async function POST(request: Request) {
   const object = await headFoundationQuarantineObject(signer, auth.principal.workspaceKey, documentId);
   if (!object.ok) return NextResponse.json({ code: object.code }, { status: 503, headers });
   if (!object.exists) return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+  if (object.sizeBytes !== sourceEntry.byteLength || object.contentType !== sourceEntry.mimeType
+    || (objectVersion !== null && object.etag !== objectVersion)) {
+    return NextResponse.json({ code: "INTAKE_TRIAGE_OBJECT_CHANGED" }, { status: 409, headers });
+  }
 
   /*
    * What arrived, checked against what was claimed (blueprint §36, S-66).
@@ -204,6 +308,72 @@ export async function POST(request: Request) {
     workspaceKey: auth.principal.workspaceKey,
     documentId,
     userId: auth.principal.userId,
+    sourceSha256,
+    observedBytes: object.sizeBytes,
+    observedMime: object.contentType, attemptKey, scopeDigest, fileKey,
+  });
+  if (!confirmed.ok) return NextResponse.json({ code: confirmed.code }, { status: confirmed.status, headers });
+
+  return NextResponse.json({ code: "UPLOAD_CONFIRMED", result: confirmed.result, approvedFile: confirmed.approvedFile }, { headers });
+}
+
+/*
+  main dbe22b1e's confirmation after the body is read, verbatim, for when the approval lineage is
+  off: the digest may be absent (a page without a secure context cannot compute one) and is
+  recorded as absent, and nothing is checked against an approval that does not exist.
+*/
+async function confirmLegacy(principal: { workspaceKey: string; userId: string }, documentId: string, sourceSha256: string | null) {
+  // Approval may be revoked after a short-lived capability was issued.
+  if (!await canAdmitCustomerSource(principal.workspaceKey, "direct_upload")) {
+    return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers });
+  }
+
+  const signer = readR2SignerEnv();
+  if (!signer) return NextResponse.json({ code: "SIGNER_NOT_CONFIGURED" }, { status: 503, headers });
+  const object = await headFoundationQuarantineObject(signer, principal.workspaceKey, documentId);
+  if (!object.ok) return NextResponse.json({ code: object.code }, { status: 503, headers });
+  if (!object.exists) return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+
+  // The 512-byte signature check, fail closed on an unreadable prefix (see POST above).
+  const signature = await headFoundationQuarantineSignature(signer, principal.workspaceKey, documentId);
+  if (!signature.ok) return NextResponse.json({ code: signature.code }, { status: 503, headers });
+  if (!signature.exists) {
+    return NextResponse.json({ code: "QUARANTINE_OBJECT_NOT_FOUND" }, { status: 409, headers });
+  }
+  const verdict = verifySourceSignature(object.contentType, signature.bytes);
+  if (!verdict.ok) return NextResponse.json({ code: verdict.code }, { status: 415, headers });
+
+  // Free evaluation's exact-content reuse gate, before the admission is confirmed (see POST above).
+  const access = await authorizeFoundationSessionProduct(principal.workspaceKey, principal.userId, "observer");
+  if (!access.ok) return NextResponse.json({ code: access.code }, { status: access.status, headers });
+  if (access.access.source === "trial") {
+    if (!sourceSha256) {
+      return NextResponse.json({ code: "SOURCE_DIGEST_REQUIRED" }, { status: 400, headers });
+    }
+    const assessed = await assessTrialSourceReuse({
+      workspaceKey: principal.workspaceKey,
+      userId: principal.userId,
+      documentId,
+      sourceSha256,
+    });
+    if (!assessed.ok) {
+      return NextResponse.json(
+        { code: assessed.code },
+        {
+          status: assessed.code === "TRIAL_SOURCE_REVIEW_REQUIRED" ? 429 : 503,
+          headers: {
+            ...headers,
+            ...(assessed.code === "TRIAL_SOURCE_REVIEW_REQUIRED" ? { "Retry-After": "86400" } : {}),
+          },
+        },
+      );
+    }
+  }
+
+  const confirmed = await confirmLegacyAdmission({
+    workspaceKey: principal.workspaceKey,
+    documentId,
+    userId: principal.userId,
     sourceSha256,
     observedBytes: object.sizeBytes,
     observedMime: object.contentType,

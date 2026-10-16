@@ -1,3 +1,5 @@
+import { contactErrorCopy } from "../lib/contact-locale";
+
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -43,6 +45,36 @@ async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, b
   expect(stage, "the film stage is measured").not.toBeNull();
   expect(overlaps(box, stage!), "the row does not open over the film stage").toBe(false);
 }
+
+test("decision A counts prepared source UI engagement once without source or action identifiers", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & { __preparedEngagement: Record<string, unknown>[] };
+    target.__preparedEngagement = [];
+    window.addEventListener("tavonel:funnel", (event) => {
+      target.__preparedEngagement.push((event as CustomEvent).detail);
+    });
+  });
+  await page.goto("/");
+  await revealConsent(page);
+  await page.getByRole("button", { name: "No thanks", exact: true }).click();
+  const regions = page.locator("#s2 button[aria-pressed][aria-controls]");
+  await expect(regions).toHaveCount(3);
+  await regions.nth(1).click();
+  await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await regions.nth(2).click();
+  await expect(regions.nth(2)).toHaveAttribute("aria-pressed", "true");
+  const filmTab = page.locator('#s1 [data-testid="landing-hero-film"]').getByRole("tab").nth(1);
+  await filmTab.click();
+  await expect(filmTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('#s1 [data-testid="landing-hero-film"] video')).toHaveCount(1);
+  const events = await page.evaluate(() =>
+    (window as Window & { __preparedEngagement: Record<string, unknown>[] }).__preparedEngagement,
+  );
+  const engagement = events.filter((event) => event.event === "hero_demo_interact");
+  expect(engagement).toHaveLength(1);
+  expect(Object.keys(engagement[0]).filter((key) => !["event", "variant"].includes(key))).toEqual([]);
+  expect(events.filter((event) => event.event === "source_open")).toEqual([]);
+});
 
 test("analytics remains optional, persists refusal, and fits the viewport", async ({ page }, testInfo) => {
   const googleRequests: string[] = [];
@@ -357,7 +389,10 @@ test("only successful commercial inquiries produce a lead event", async ({ page 
   await page.getByRole("textbox", { name: /^What are you trying to do\?/ }).fill("Test inquiry with no production delivery.");
   await page.clock.fastForward(2_000);
   await page.getByRole("button", { name: "Send inquiry" }).click();
-  await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
+  // UX06: the status picks the public copy; the server's `error` string is never shown.
+  const failure = page.locator('form [aria-live="polite"] [data-state="error"]');
+  await expect(failure).toContainText(contactErrorCopy(503).message);
+  await expect(failure).not.toContainText("Unavailable");
   const records = () => page.evaluate(() => JSON.parse(sessionStorage.getItem("tavonel.funnel-log") ?? "[]"));
   expect(await records()).not.toContainEqual({ event: "generate_lead" });
   success = true;

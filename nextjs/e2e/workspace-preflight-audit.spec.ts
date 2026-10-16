@@ -22,6 +22,7 @@
 
 import { test, expect } from "@playwright/test";
 import { installFixtureSession, installWorkspaceRoutes } from "./fixtures/workspace-fixture";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 
 /* Two staged files: one accepted-but-lossy, one the intake cannot read at all. Bytes are
    irrelevant to every assertion below — the report is a manifest lookup on the MIME the browser
@@ -48,7 +49,19 @@ async function stage(page: import("@playwright/test").Page) {
   return preflight;
 }
 
+/*
+  Re-pinned to the copy 8682045b ("fix: clarify intake upload states and verify responsive review
+  flows") shipped in lib/preflight-report.ts (`describePreflightFile`, `describePreflightSummary`,
+  `words` -> `intakeDisplayToken`) and app/workspace/page.tsx (`stageWorkspaceFiles` notice). The
+  same three facts, in the new words, read off the 1aca28de row (Launch QA run 38835040264):
+  "Not extracted: sheet names, cell addresses, formulas, ...", "Planned conversion to PDF before
+  reading", "Expected output: page, paragraph text, Locations on the source page". The notice no
+  says "Nothing has been uploaded" only with the approval lineage off (review 2, FE-B2), so that half of
+  the promise is also asserted on the network.
+*/
 test("the preflight rows say what each staged file loses, before anything is uploaded", async ({ page }) => {
+  const uploads: string[] = [];
+  page.on("request", (request) => { if (new URL(request.url()).pathname.startsWith("/api/uploads")) uploads.push(request.url()); });
   const preflight = await stage(page);
 
   const rows = preflight.locator(".workspace-preflight-files li");
@@ -57,15 +70,19 @@ test("the preflight rows say what each staged file loses, before anything is upl
   const spreadsheet = rows.first();
   await expect(spreadsheet).toContainText(XLSX.name);
   // The three the audit named, in the manifest's own words.
-  await expect(spreadsheet).toContainText("omitted sheet names, cell addresses, formulas");
-  await expect(spreadsheet).toContainText("converted to PDF before reading");
-  await expect(spreadsheet).toContainText("preserved page, paragraph text, bbox1000");
+  await expect(spreadsheet).toContainText("Not extracted: sheet names, cell addresses, formulas");
+  await expect(spreadsheet).toContainText("Planned conversion to PDF before reading");
+  await expect(spreadsheet).toContainText("Expected output: page, paragraph text, Locations on the source page");
 
   // The qualification claim, which is the one number on this panel a buyer would quote.
-  await expect(preflight).toContainText("accepted formats carry a qualification receipt");
+  await expect(preflight).toContainText("supported formats carry a qualification receipt");
 
   // Nothing has left the browser. If this ever fails, the panel is no longer a preflight.
-  await expect(page.locator("p.notice")).toContainText("Nothing has been uploaded or processed yet");
+  // main's notice with the approval lineage off (production); the lineage's words only with it on.
+  await expect(page.locator("p.notice")).toContainText(INTAKE_APPROVAL_ROLLOUT_ENABLED
+    ? "1 supported file selected for source review. Upload checks and full processing require separate approvals."
+    : "Nothing has been uploaded or processed yet");
+  expect(uploads, "staging a selection must not call an upload route").toEqual([]);
 });
 
 test("a file the intake cannot read is reported, as a skip rather than a row", async ({ page }) => {

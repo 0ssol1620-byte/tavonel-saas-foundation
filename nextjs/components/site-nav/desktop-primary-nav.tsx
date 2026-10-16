@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { HEADER_NAV, KO_CHROME, customerNavOwns } from "@/lib/site-navigation";
+import { HEADER_NAV, KO_CHROME, customerNavCurrent } from "@/lib/site-navigation";
 
 /**
  * The header's filled action, which never points at the page it is on (Release 2 critic: on
@@ -23,7 +23,7 @@ export default function DesktopPrimaryNav({ korean = false }: { korean?: boolean
     <nav aria-label={korean ? "섹션" : "Sections"} className="site-nav one-path-primary-nav">
       {HEADER_NAV.map((item) => (
         <Link key={item.href} className="site-nav-direct" href={item.href as Route}
-          aria-current={customerNavOwns(item.href, pathname) ? "page" : undefined}>
+          aria-current={customerNavCurrent(item.href, pathname)}>
           {/* BQ-013: /ko rendered these three in English above Korean body copy. */}
           {korean ? KO_CHROME.nav[item.href] ?? item.label : item.label}
         </Link>

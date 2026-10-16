@@ -13,8 +13,17 @@
 
   Configuration rows never count as request evidence. `not_probed` never counts as success. Raw
   store/provider errors and environment values are not copied to the result.
+
+  Queue liveness is a fourth, separate question ("is queued work moving?") and is reported beside
+  this decision as `jobLiveness`, never folded into its state or alerts.
 */
 import type { ModelProviderCircuitSnapshot } from "./model-provider-circuit";
+import {
+  evaluateOperationalJobLiveness,
+  type OperationalJobLiveness,
+  type OperationalJobObservation,
+  type OperationalJobProcessingGate,
+} from "./operational-job-liveness";
 import { PROBE_DEPENDENCIES, type ProbeDependency } from "./synthetic-probe";
 import type { ProbeHistory } from "./synthetic-probe-store";
 
@@ -279,5 +288,29 @@ export function evaluateOperationalSli(stored: StoredHistory, options: Operation
     },
     modelProviders: providers.health,
     alerts,
+  };
+}
+
+export type OperationalJobLivenessInput = {
+  observation: OperationalJobObservation;
+  processingGate: OperationalJobProcessingGate;
+};
+
+export type OperationalSliWithJobLiveness = OperationalSli & { jobLiveness: OperationalJobLiveness };
+
+/**
+ * Dependency health and queue liveness as two answers side by side. Every dependency field, the
+ * state and the alerts are exactly evaluateOperationalSli's; `jobLiveness` never feeds them. An
+ * unknown or paused queue therefore cannot hide behind a green dependency state, and a healthy
+ * queue cannot make a blocked dependency look available.
+ */
+export function evaluateOperationalSliWithJobLiveness(
+  stored: StoredHistory,
+  job: OperationalJobLivenessInput,
+  options: OperationalSliOptions = {},
+): OperationalSliWithJobLiveness {
+  return {
+    ...evaluateOperationalSli(stored, options),
+    jobLiveness: evaluateOperationalJobLiveness(job.observation, job.processingGate),
   };
 }

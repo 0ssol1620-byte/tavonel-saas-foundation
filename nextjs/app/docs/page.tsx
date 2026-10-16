@@ -33,24 +33,21 @@ export const metadata: Metadata = {
 */
 export default function DocsPage() {
   /*
-    BQ-100. The title column carries the chapter list, which is what this surface has to put there.
+    BQ-100. The Docs hub pairs its introduction and featured starting points with the full index.
 
-    The decision splits the `.body` grid by surface type: a reference route puts navigation beside
-    its heading, every other route collapses to one reading measure. The collapse is expressed in
-    `app/product-polish.css` as the condition rather than as a list of routes -- a `.body` whose
-    first column holds nothing but the H1 is one column -- so the whole of the fix here is putting
-    the real navigation in that column. The rule lets go of the page the moment it does.
+    Those are the two layout children of the body: a useful introduction beside the index, rather
+    than a title stranded in a tall, empty rail. The index begins with its jump links and continues
+    into the same grouped links, so the full-page navigation remains visible on desktop. At phone
+    widths the columns collapse in source order: introduction and featured sections, then jump
+    links and the complete index.
   */
   const groups = tocEntries(DOCS_GROUPS);
 
   return (
     <PublicPageShell>
-      <section className="scene doc"><div className="shell"><div className="body">
-        <div className="stack">
+      <section className="scene doc docs-reading-surface docs-hub"><div className="shell"><div className="body docs-hub-body">
+        <div className="stack docs-hub-intro">
           <h1 className="document-title">From sources to a Compiled World.</h1>
-          <PageToc entries={groups} />
-        </div>
-        <div className="stack">
           <p className="lede">
             Upload or connect sources, confirm the preflight boundary, follow the compile as it runs
             on our servers, then read the World and the evidence under every object.
@@ -69,6 +66,9 @@ export default function DocsPage() {
               );
             })}
           </div>
+        </div>
+        <div className="stack docs-hub-index">
+          <PageToc entries={groups} />
           <div className="docs-groups">
             {groups.map(({ id, label: group }) => (
               <div className="stack" key={group}>

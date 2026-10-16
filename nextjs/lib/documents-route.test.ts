@@ -38,7 +38,7 @@ vi.mock("@/lib/r2-synthetic-canary", () => ({
   listFoundationQuarantineRejects: listRejects,
   getFoundationQuarantineReject: getReject,
 }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 vi.mock("@/lib/customer-source-lifecycle", () => ({ readTombstonedUploadDocumentIds: tombstoned }));
 
 import { GET } from "../app/api/documents/route";
@@ -75,8 +75,8 @@ async function documents() {
 }
 
 beforeEach(() => {
-  authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey } });
-  reauthorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey } });
+  authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId: "viewer-user" } });
+  reauthorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId: "viewer-user" } });
   signerEnv.mockReset().mockReturnValue({
     accountId: "account",
     accessKeyId: "key",
@@ -151,7 +151,7 @@ describe("the documents listing", () => {
     const body = await documents();
     expect(body.status).toBe(403);
     expect(getReject).toHaveBeenCalledOnce();
-    expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId]);
+    expect(sourceAccess).toHaveBeenLastCalledWith(workspaceKey, [readId, refusedId], "viewer-user");
   });
 
   it("returns no metadata if API authorization changes while documents load", async () => {

@@ -592,4 +592,67 @@
   line-height: 1.22;
   letter-spacing: -.02em;
 }
+
+
+/* Docs is a public reading surface: paper around white pages, with code kept in ink. */
+.scene.doc.docs-reading-surface {
+  --ground: #f7f5ef;
+  --g1: #fff;
+  --g2: #f0f1ec;
+  --g3: #e8e5dc;
+  --seam: #d8ddd9;
+  --hairline: #d8ddd9;
+  --hairline-hi: #88928d;
+  --text-hi: #171c20;
+  --text-mid: #53606a;
+  --text-lo: #53606a;
+  --source: #2447b3;
+  --relation: #5f42e0;
+  --verified: #226849;
+  --changed: #8a5a00;
+  --unresolved: #b42318;
+  background: #fff;
+  color: #171c20;
+  padding-top: clamp(40px, 4vw, 50px);
+  padding-bottom: 72px;
+}
+.scene.doc.docs-reading-surface .docs-code {
+  --ground: #090d14;
+  --g1: #101721;
+  --g2: #17202c;
+  --g3: #1d2938;
+  --seam: #23282d;
+  --hairline: rgba(237, 234, 228, .12);
+  --hairline-hi: #3d4854;
+  --text-hi: #f4f6fa;
+  --text-mid: #bac3d0;
+  --text-lo: #a3afbf;
+  --source: #7da7ff;
+  --relation: #a996ff;
+  --verified: #7be0be;
+  --changed: #f2a65a;
+  --unresolved: #f07d73;
+  border-color: #2e353b;
+  background: #101721;
+  color: #f4f6fa;
+}
+
+/* Balance the introduction against a useful index column; both remain in the reading flow. */
+.scene.doc.docs-hub .docs-hub-body {
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  gap: clamp(28px, 4vw, 56px);
+}
+.scene.doc.docs-hub .docs-hub-body > .stack {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .scene.doc.docs-reading-surface {
+    padding-top: 32px;
+    padding-bottom: 56px;
+  }
+  .scene.doc.docs-hub .docs-hub-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
 }

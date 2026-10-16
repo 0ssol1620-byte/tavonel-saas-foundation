@@ -66,7 +66,7 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
   expect(boxes.menu!.right).toBeLessThanOrEqual(boxes.viewport + 1);
 });
 
-test("the mobile menu exposes the five customer choices plus Sign in, and the action stays in the header", async ({ page }, testInfo) => {
+test("the mobile menu exposes four section choices, Pricing and Sign in, and the header row hides the actions", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
   await page.goto("/");
   const menu = page.locator("header.nav details.mobile-primary-nav");
@@ -101,24 +101,32 @@ test("the mobile menu exposes the five customer choices plus Sign in, and the ac
 });
 
 /*
-  Landing V2: Integrations left the bar, so the page whose ownership is worth measuring changed.
-
-  /research is one of the five hub pages Resources speaks for and has no bar item of its own, so
-  the mark appears there only if `NAV_ALSO_OWNS` is wired up. /sources, which Integrations used to
-  own, is now owned by nothing in the bar -- it is a footer row -- and the sheet must not claim it.
+  The shared bar owns Product's public sections, while Research remains a footer destination.
+  A section mark says "location"; only the Product hub itself says "page". Neither case should
+  assign a second owner, and navigating from an open sheet still closes it.
 */
-test("Resources owns the hub routes and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
+test("Product owns its public sections and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
   await page.goto("/research");
   const menu = page.locator("header.nav details.mobile-primary-nav");
   await menu.locator(":scope > summary").click();
-  await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
   await menu.locator('a.mobile-nav-direct[href="/pricing"]').click({ noWaitAfter: true });
   await expect(menu.locator(":scope > nav")).toBeHidden();
 
   await page.goto("/sources");
   await menu.locator(":scope > summary").click();
   await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+  await expect(menu.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
+
+  await menu.getByRole("link", { name: "Product", exact: true }).click();
+  await expect(page).toHaveURL(/\/product\/?$/);
+  await expect(menu.locator(":scope > nav")).toBeHidden();
+  await menu.locator(":scope > summary").click();
+  await expect(menu.getByRole("link", { name: "Product", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
+  await expect(menu.locator('a.mobile-nav-direct[aria-current="location"]')).toHaveCount(0);
 });
 
 test.describe("on a touch screen", () => {

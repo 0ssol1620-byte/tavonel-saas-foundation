@@ -114,24 +114,32 @@ export function createLiveDrillOps(env) {
         if (!result.ok) return result;
       }
 
-      for (const [index, documentId] of plan.documentIds.entries()) {
+      // Through the guarded writer, the only supported binding write: each revision against the
+      // previous one as the newest snapshot. A resumed run replays the bindings it already recorded.
+      let newest = [];
+      for (const binding of plan.bindings) {
         const object = plan.objects.find((candidate) =>
-          candidate.key === `quarantine/${plan.workspaceKey}/${documentId}/source`);
+          candidate.key === `quarantine/${plan.workspaceKey}/${binding.documentId}/source`);
         if (!object) return failed("DRILL_PLAN_MISSING_QUARANTINE_OBJECT");
-        const bound = await insert("connector_document_bindings", {
-          source_version_id: `sv-${object.sha256.slice("sha256:".length)}`,
-          source_id: plan.sourceId,
-          workspace_key: plan.workspaceKey,
-          oauth_connection_id: plan.oauthConnectionId,
-          provider: plan.provider,
-          native_id: `drill-native-${index}`,
-          provider_revision: "drill-rev-1",
-          document_id: documentId,
-          content_sha256: object.sha256,
-          byte_length: object.sizeBytes,
-          mime_type: "text/plain",
+        const bound = await rpc("record_connector_document_binding_after", {
+          p_expected_latest_source_version_ids: newest,
+          p_binding: {
+            source_version_id: binding.sourceVersionId,
+            source_id: plan.sourceId,
+            workspace_key: plan.workspaceKey,
+            oauth_connection_id: plan.oauthConnectionId,
+            provider: plan.provider,
+            native_id: binding.nativeId,
+            provider_revision: binding.revision,
+            document_id: binding.documentId,
+            content_sha256: object.sha256,
+            byte_length: object.sizeBytes,
+            mime_type: "text/plain",
+          },
         });
         if (!bound.ok) return bound;
+        if (bound.value !== "recorded" && bound.value !== "replay") return failed("DRILL_BINDING_NOT_RECORDED");
+        newest = [binding.sourceVersionId];
       }
 
       // Revoked the moment the bindings exist. request_connector_source_deletion checks the

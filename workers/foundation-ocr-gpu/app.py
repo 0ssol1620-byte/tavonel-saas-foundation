@@ -12,7 +12,7 @@ from threading import Lock, Thread
 from time import monotonic
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
-from typing import Final, TypedDict
+from typing import Final, NotRequired, TypedDict
 
 import pypdfium2 as pdfium
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -28,6 +28,9 @@ REQUEST_ID: Final = re.compile(r"^[A-Za-z0-9_-]{16,160}$")
 PDF_MAGIC: Final = b"%PDF"
 RENDER_SCALE: Final = 2.0
 OCR_ENGINE_RELEASE: Final = "rapidocr-3.9.2-ko-pass-nocls-v3-selftest"
+# This must be paired with the CDR's v3-required binding. Off preserves clean v2,
+# but refuses a discovered disagreement rather than laundering it into v2.
+OCR_CONFLICT_V3_ENABLED: Final = os.getenv("TAVONEL_OCR_CONFLICT_V3_ENABLED") == "true"
 OCR_MODEL_SHA256: Final = {
     "general-det": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
     "general-rec": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
@@ -55,12 +58,33 @@ class OcrRegion(TypedDict):
     bbox1000: list[int]
     confidence: float
     authority: str
+    recognitionConflict: NotRequired[dict]
 
 
 class RasterLine(TypedDict):
     polygon: list[list[float]]
     text: str
     confidence: float
+    rawText: NotRequired[str]
+    recognitionCandidates: NotRequired[list[dict]]
+
+
+RECOGNIZER_IDENTITIES: Final = {
+    "general-ppocrv6": "sha256:" + OCR_MODEL_SHA256["general-rec"],
+    "korean-ppocrv5": "sha256:" + OCR_MODEL_SHA256["korean-rec"],
+}
+
+
+def recognition_candidate(engine_id: str, line: RasterLine) -> dict:
+    # The exact model string precedes the legacy line-level whitespace normalization.
+    # No answer correction or candidate synthesis is allowed at this boundary.
+    return {
+        "engineId": engine_id,
+        "modelSha256": RECOGNIZER_IDENTITIES[engine_id],
+        "text": line.get("rawText", line["text"]),
+        "confidence": line["confidence"],
+        "polygon": line["polygon"],
+    }
 
 
 def cuda_available() -> bool:
@@ -204,6 +228,7 @@ def rapidocr_lines(engine, image, **options) -> list[RasterLine]:
             {
                 "polygon": points,
                 "text": text.strip(),
+                "rawText": text,
                 "confidence": max(0.0, min(1.0, float(score))),
             }
         )
@@ -273,17 +298,30 @@ def merge_korean_lines(general: list[RasterLine], korean: list[RasterLine]) -> l
             (
                 (_intersection_over_union(general_line, korean_line), index, korean_line)
                 for index, korean_line in enumerate(korean)
-                if index not in matched_korean
             ),
             reverse=True,
             key=lambda item: item[0],
         )
         if candidates and candidates[0][0] >= 0.45:
+            if len(candidates) > 1 and candidates[1][0] >= 0.45:
+                raise HTTPException(422, "OCR engine geometry match is ambiguous")
             _, index, korean_line = candidates[0]
+            if index in matched_korean:
+                raise HTTPException(422, "OCR engine geometry match is reused")
             matched_korean.add(index)
-            if _prefer_korean(general_line, korean_line):
-                merged.append(korean_line)
+            selected = korean_line if _prefer_korean(general_line, korean_line) else general_line
+            general_raw = general_line.get("rawText", general_line["text"])
+            korean_raw = korean_line.get("rawText", korean_line["text"])
+            if general_raw != korean_raw:
+                if len(general_raw) > 2000 or len(korean_raw) > 2000:
+                    raise HTTPException(422, "OCR recognition conflict exceeds candidate bound")
+                merged.append({**selected, "recognitionCandidates": [
+                    recognition_candidate("general-ppocrv6", general_line),
+                    recognition_candidate("korean-ppocrv5", korean_line),
+                ]})
                 continue
+            merged.append(selected)
+            continue
         merged.append(general_line)
 
     for index, korean_line in enumerate(korean):
@@ -310,16 +348,17 @@ def normalized_bbox(
     return [x1, y1, x2, y2]
 
 
-def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrRegion]:
-    """Reads every page. `on_page` is called once per page, as soon as that page is done.
+def raster_regions(document, on_page: PageObserver | None = None, indexes=None) -> list[OcrRegion]:
+    """Reads every page, or only `indexes`. `on_page` is called once per page, as soon as that page is done.
 
     The per-page callback exists so the reading can be watched while it happens. It changes
     nothing about what this function returns: the caller still receives the complete region list,
-    and a caller that passes no observer behaves exactly as before.
+    and a caller that passes no observer behaves exactly as before. A page that reads empty is
+    still reported, with no regions, so the observer is never left waiting on it.
     """
     regions: list[OcrRegion] = []
     order = 0
-    for index in range(len(document)):
+    for index in range(len(document)) if indexes is None else indexes:
         page = document[index]
         try:
             bitmap = page.render(scale=RENDER_SCALE)
@@ -336,13 +375,13 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
                     rapidocr_lines(general_engine, image),
                     rapidocr_lines(korean_engine, image, **KOREAN_PASS_OPTIONS),
                 )
+                if not OCR_CONFLICT_V3_ENABLED and any("recognitionCandidates" in line for line in lines):
+                    raise HTTPException(422, "OCR recognition conflict requires qualified v3 reader")
         finally:
             page.close()
-        if not lines:
-            continue
         width, height = image.size
         for line_index, line in enumerate(lines):
-            text = line["text"]
+            text = line.get("rawText", line["text"]) if "recognitionCandidates" in line else line["text"]
             points = line["polygon"]
             if not text or not points:
                 continue
@@ -351,7 +390,7 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
             bbox = normalized_bbox(min(xs), min(ys), max(xs), max(ys), width, height)
             if bbox is None:
                 continue
-            regions.append({
+            region: OcrRegion = {
                 "regionId": f"ocr-p{index + 1:04d}-l{line_index + 1:05d}",
                 "pageIndex0": index,
                 "pageNumber1": index + 1,
@@ -361,7 +400,15 @@ def raster_regions(document, on_page: PageObserver | None = None) -> list[OcrReg
                 "bbox1000": bbox,
                 "confidence": line["confidence"],
                 "authority": "informal",
-            })
+            }
+            if "recognitionCandidates" in line:
+                region["recognitionConflict"] = {
+                    "regionId": region["regionId"],
+                    "pageIndex0": index,
+                    "bbox1000": bbox,
+                    "candidates": line["recognitionCandidates"],
+                }
+            regions.append(region)
             order += 1
         if on_page is not None:
             on_page(index + 1, len(document), "raster", [r for r in regions if r["pageIndex0"] == index])
@@ -511,20 +558,23 @@ def extract_text(payload: bytes, on_page=None) -> tuple[str, int, list[OcrRegion
             textpage = page.get_textpage()
             try:
                 text = textpage.get_text_bounded().strip()
-                if text:
-                    region = native_page_region(page, textpage, text, index, len(regions))
-                    if region:
-                        regions.append(region)
+                region = native_page_region(page, textpage, text, index, len(regions)) if text else None
             finally:
                 textpage.close()
                 page.close()
             if on_page is not None:
-                on_page(index + 1, page_count, "native", [r for r in regions if r["pageIndex0"] == index])
-        if not regions:
-            # No embedded text anywhere. The raster pass re-reads the same pages, so it reports
-            # them again rather than leaving the observer stuck at the last native page.
-            regions = raster_regions(document, on_page)
+                on_page(index + 1, page_count, "native", [region] if region else [])
+            if region:
+                regions.append(region)
+                continue
+            # No usable embedded text on this page, whatever the other pages carry. The raster
+            # pass re-reads it, so it reports the page again rather than leaving the observer
+            # stuck on its empty native view. A page with usable native text is never rasterized.
+            for raster_region in raster_regions(document, on_page, (index,)):
+                regions.append({**raster_region, "order": len(regions)})
         text = "\n".join(region["text"] for region in regions).strip()
+        if sum("recognitionConflict" in region for region in regions) > 128:
+            raise HTTPException(422, "OCR recognition conflict count exceeds bound")
         if not text:
             raise HTTPException(422, "OCR source has no extractable text regions")
         return text, page_count, regions
@@ -625,13 +675,26 @@ def ocr_result_body(text: str, page_count: int, regions: list[OcrRegion], input_
     client that reads the stream and a client that reads the JSON are looking at the same object.
     Anything that qualifies one qualifies the other.
     """
+    conflicted = [region for region in regions if "recognitionConflict" in region]
+    if len(conflicted) > 128:
+        raise HTTPException(422, "OCR recognition conflict count exceeds bound")
+    if conflicted and not OCR_CONFLICT_V3_ENABLED:
+        raise HTTPException(422, "OCR recognition conflict requires qualified v3 reader")
+    if conflicted:
+        regions = [
+            {**region, "recognitionConflict": {
+                **region["recognitionConflict"], "sourceSha256": input_sha256,
+            }} if "recognitionConflict" in region else region
+            for region in regions
+        ]
     return {
-        "schemaVersion": "tavonel.ocr_result.v2",
+        "schemaVersion": "tavonel.ocr_result.v3" if OCR_CONFLICT_V3_ENABLED else "tavonel.ocr_result.v2",
         "status": "ok",
         "text": text,
         "pageCount": page_count,
         "inputSha256": input_sha256,
         "regions": regions,
+        **({"recognitionConflictCount": len(conflicted)} if OCR_CONFLICT_V3_ENABLED else {}),
     }
 
 

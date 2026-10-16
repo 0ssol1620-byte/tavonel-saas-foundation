@@ -31,7 +31,14 @@ describe("compile-stage state and payload integrity", () => {
     expect(deriveCompileStageView([], {}, world("active"), "review_required", "new").tone).toBe("attention");
   });
   it("draws only received pages belonging to listed sources, not a reported count alone", () => {
-    const progress: OcrProgress = { state: "reading", pagesRead: 0, pageCount: 1, regionsFound: 10, pages: [] };
+    const syntheticVersionKey = "b".repeat(64);
+    const progress: OcrProgress = {
+      documentId: "source-a",
+      versionKey: syntheticVersionKey,
+      sourceImmutableKey: `synthetic/compile-stage/source-a/${syntheticVersionKey}/sanitized.pdf`,
+      sourceSha256: `sha256:${syntheticVersionKey}`,
+      state: "reading", pagesRead: 0, pageCount: 1, regionsFound: 10, pages: [],
+    };
     expect(deriveCompileStageView([row()], { "source-a": progress }, null, "structuring").visual).toBe("none");
     progress.pages.push({ pageNumber1: 1, pageCount: 1, path: "page-1", regionCount: 1, meanConfidence: 1, boxes: [{ bbox1000: [10, 10, 90, 90], confidence: 1, text: "Actual received text", regionId: "r1" }] });
     expect(deriveCompileStageView([row()], { "source-a": progress }, null, "reading").visual).toBe("page");

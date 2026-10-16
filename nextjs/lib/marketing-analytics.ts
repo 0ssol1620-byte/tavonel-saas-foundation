@@ -87,6 +87,37 @@ export function publicPageLocation(path: string): string | null {
 }
 
 /*
+  UX08: the one decision the consented relay makes about a `tavonel:funnel` event, as a function.
+
+  It used to be three inline checks in `MarketingConsent`'s listener, which nothing outside a
+  browser could exercise. What it returns is built here from constants and the current pathname --
+  the event name only once it has matched `MARKETING_EVENTS`, and the canonical location of a
+  listed public path -- and nothing is copied from the incoming detail. A key a future caller adds
+  to that detail therefore has no path to the vendor, whatever it is named.
+
+  The pathname is the page the reader is on when the event fires, not one captured earlier, and it
+  is a pathname: a query or a fragment is not a listed path, so it is refused rather than trimmed.
+  This is only the Google relay. The cookieless collector `trackFunnel` also posts to is a
+  separate, explicitly flagged choice in the root layout and is not gated here.
+*/
+export type MarketingEventPayload = {
+  readonly name: string;
+  readonly params: { readonly page_location: string; readonly page_title: "TAVONEL" };
+};
+
+export function marketingEventPayload(consent: boolean | null, pathname: string, detail: unknown): MarketingEventPayload | null {
+  if (consent !== true) return null;
+  const location = publicPageLocation(pathname);
+  if (!location) return null;
+  let name: unknown;
+  try {
+    name = typeof detail === "object" && detail !== null ? (detail as { event?: unknown }).event : undefined;
+  } catch { return null; }
+  if (typeof name !== "string" || !MARKETING_EVENTS.has(name)) return null;
+  return { name, params: { page_location: location, page_title: "TAVONEL" } };
+}
+
+/*
   The consent banner's own words, in the language of the page it appears on.
 
   Stage-A integration made `/ko` a measured public page, which is also what made it show this
@@ -219,10 +250,16 @@ export function referralOrigin(referrer: string): string {
   } catch { return ""; }
 }
 
+/*
+  `expires` has to be a finite number. `JSON.parse` reads `1e309` as `Infinity`, which is a number
+  and is never `<= now`, so a stored `{"allowed":true,"expires":1e309}` used to be a grant with no
+  end. A choice this component writes always carries a finite date, so only such a value is
+  refused; the 180-day expiry itself is unchanged.
+*/
 export function readConsent(storage: Pick<Storage, "getItem">, now = Date.now()): boolean | null {
   try {
     const value = JSON.parse(storage.getItem(CONSENT_KEY) ?? "null");
-    if (typeof value?.allowed !== "boolean" || typeof value?.expires !== "number" || value.expires <= now) return null;
+    if (typeof value?.allowed !== "boolean" || !Number.isFinite(value?.expires) || value.expires <= now) return null;
     return value.allowed;
   } catch { return null; }
 }

@@ -212,7 +212,7 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
   return (
     <PublicPageShell>
       <BreadcrumbJsonLd trail={trail} />
-      <section className="scene doc"><div className="shell"><div className={layout.layout}>
+      <section className="scene doc docs-reading-surface"><div className="shell"><div className={layout.layout}>
         <DocsToc current={section} />
         <div className="body">
           <div className="stack">
@@ -221,12 +221,18 @@ export default async function DocsSectionPage({ params }: { params: Promise<{ se
           </div>
 
           <div className="stack">
-            <div className="stack docs-body">
+            <div className={`stack docs-body ${layout.readingLayout}`}>
               <p className="lede">{entry.summary}</p>
-              <PageToc entries={toc} />
-              {entry.blocks.map((block, position) => (
-                <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
-              ))}
+              {toc.length >= 3 ? (
+                <aside className={layout.localIndex}>
+                  <PageToc entries={toc} />
+                </aside>
+              ) : null}
+              <div className={`stack ${layout.articleContent}`}>
+                {entry.blocks.map((block, position) => (
+                  <Block key={position} block={block} endpoints={endpoints} id={anchorIds.get(position)} />
+                ))}
+              </div>
             </div>
             {/*
               BQ-137 / BQ-134. The pager was two 10px mono links with an arrow glyph pasted into

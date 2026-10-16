@@ -24,7 +24,7 @@ test("entry stays visible while delayed hydration changes the World reading", as
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/explore", { waitUntil: "load" });
   await expect(page.getByRole("heading", { level: 1 })).toBeInViewport();
-  const enter = page.getByRole("button", { name: "ENTER WORLD", exact: true });
+  const enter = page.getByRole("button", { name: "Relations ↗", exact: true });
   await expect(enter).toBeInViewport();
   await page.waitForTimeout(1000);
   const measurement = await page.evaluate(() => {

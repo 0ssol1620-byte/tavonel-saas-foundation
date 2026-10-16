@@ -86,6 +86,7 @@ describe("evidence review route", () => {
   it("re-derives source geometry from the persisted World before writing", async () => {
     const response = await POST(request({ sourceId: "forged", pageNumber: 999, bbox1000: [0, 0, 1, 1] }));
     expect(response.status).toBe(201);
+    expect(loadWorld).toHaveBeenCalledWith("pilot-review", collectionId, manifestDigest);
     expect(recordDecision).toHaveBeenCalledWith(expect.objectContaining({
       workspaceKey: "pilot-review",
       evidenceId: evidence.id,

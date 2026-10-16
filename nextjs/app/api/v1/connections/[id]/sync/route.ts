@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { parseConnectionBatchInput } from "@/lib/developer-contracts";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "@/lib/intake-approval-rollout";
 import { applyFoundationConnectionBatch } from "@/lib/developer-store";
+import { applyConnectionInventoryRequest, isInventoryRequest, parseInventoryRequest } from "@/lib/connection-source-inventory";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +30,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch {
     return NextResponse.json({ code: "INVALID_JSON" }, { status: 400, headers: NO_STORE });
   }
-  const batch = await parseConnectionBatchInput(body, auth.principal.workspaceKey);
+  // Scan sessions share this route with the cursor batch. The batch body never has `operation`,
+  // so a source agent that only sends batches is unaffected.
+  if (isInventoryRequest(body)) {
+    const parsed = parseInventoryRequest(body);
+    if (!parsed.ok) return NextResponse.json({ code: parsed.code }, { status: 400, headers: NO_STORE });
+    const inventory = await applyConnectionInventoryRequest(auth.principal.workspaceKey, id, {
+      userId: auth.principal.userId,
+      keyId: auth.principal.keyId,
+    }, parsed.request);
+    if (!inventory.ok) {
+      const { code, headEpoch } = inventory;
+      return NextResponse.json(headEpoch === undefined ? { code } : { code, headEpoch }, { status: inventory.status, headers: NO_STORE });
+    }
+    return NextResponse.json({ code: "OK", ...inventory.result }, { headers: NO_STORE });
+  }
+  // Switch off (production): main's binding -- every documentId must be the one derived from
+  // (workspace, sourceIdempotencyKey), because the deployed apply_foundation_connection_batch
+  // (0012) checks only actor, cursor and idempotency. Switch on: migration 20261004100000's batch
+  // RPC validates source identity (a derived id or a confirmed approval member bound to this
+  // principal), so server-minted approval UUIDv4 ids must reach that transaction unparsed.
+  const batch = await parseConnectionBatchInput(body, INTAKE_APPROVAL_ROLLOUT_ENABLED ? undefined : auth.principal.workspaceKey);
   if (!batch) return NextResponse.json({ code: "CONNECTION_BATCH_INVALID" }, { status: 400, headers: NO_STORE });
   const result = await applyFoundationConnectionBatch(auth.principal.workspaceKey, id, {
     userId: auth.principal.userId,

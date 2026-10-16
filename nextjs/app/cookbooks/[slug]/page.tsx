@@ -194,9 +194,11 @@ export default async function CookbookPage({ params }: { params: Promise<{ slug:
             The primary control is the recipe carrier, built by `loginUrlForRecipe` rather than
             written out here: the parameter names, the version and the return path are one
             function in `lib/recipe-intent.ts`, and a URL typed into this file is a fourth copy
-            of a contract that already has one. A reader who signs in from here comes back to
-            this page, and the sign-in page's preflight is where the plan requirement and the
-            maximum cost of a run are stated before anything is spent.
+            of a contract that already has one. The sign-in page's preflight is where the plan
+            requirement and the maximum cost of a run are stated before anything is spent, and
+            after sign-in -- or straight away, for a reader already signed in -- the same page
+            shows the recipe's continuation: one link to where its first step lives, pressed by
+            the reader (X08). This page stays server-rendered text and knows none of that.
 
             The three routes the `next` section's prose names all stay, because the prose points
             at them; the recipe link is added in front of them, not in place of one.

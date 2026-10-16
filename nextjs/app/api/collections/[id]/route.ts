@@ -5,7 +5,7 @@ import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { collectionSourceDocumentIds } from "@/lib/collection-source-access";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import { listWorkspaceCompileJobs } from "@/lib/compile-job-store";
 import { listFoundationReviewDecisions } from "@/lib/review-store";
@@ -43,7 +43,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
   const documentIds = collectionSourceDocumentIds(artifact);
   if (!documentIds) return NextResponse.json({ code: "COLLECTION_SOURCE_BINDING_INVALID" }, { status: 422, headers: { "Cache-Control": "no-store" } });
-  const sourceAccess = await checkConnectorSourceAccess(auth.principal.workspaceKey, documentIds);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(auth.principal.workspaceKey, documentIds, auth.principal.userId);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
     status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503,
     headers: { "Cache-Control": "no-store" },

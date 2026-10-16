@@ -23,6 +23,7 @@ import {
   installWorkspaceRoutes,
   sseFrames,
 } from "./fixtures/workspace-fixture";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 
 const JOB_ID = `cjob-${"a".repeat(32)}`;
 
@@ -33,18 +34,34 @@ const pdfFixture = (name = "audit-fixture.pdf") => ({
   buffer: Buffer.from("%PDF-1.7\n% audit fixture\n"),
 });
 
-/** Drive the intake to a refusal issued by `/api/uploads/capability`. */
-async function refuseIntake(page: import("@playwright/test").Page, code: string) {
-  await installFixtureSession(page);
-  await installWorkspaceRoutes(page);
-  // The server enforces the byte and page ceilings, so the refusal is mocked at the boundary it
-  // is issued from rather than by pushing a 5 MiB fixture through the browser.
-  let capabilityCalls = 0;
-  await page.route("**/api/uploads/capability", route => {
-    capabilityCalls += 1;
-    return route.fulfill({ status: 400, json: { code } });
-  });
+type Page = import("@playwright/test").Page;
 
+/**
+ * Select the fixture and return the control that uploads it.
+ *
+ * With the approval lineage off (lib/intake-approval-rollout.ts) -- the production default -- that
+ * is main dbe22b1e's single "Upload & compile", which uploads file by file through
+ * /api/uploads/capability, and none of the source-review flow or its cost-approval wording renders
+ * (review 2, FE-B2: those words are founder-only). With the lineage on, the source review opens; the
+ * server's triage-disabled reply says whether the whole-set approval exists, and the panel falls back
+ * to "Approve maximum & upload".
+ */
+async function openFallbackApproval(page: Page, approvalLineage: boolean) {
+  if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) {
+    await page.goto("/workspace", { waitUntil: "domcontentloaded" });
+    await expect(page.locator(".workspace-intake")).toHaveAttribute("data-inventory-state", "ready");
+    await page.locator('input[type="file"][multiple]').first().setInputFiles(pdfFixture());
+    const preflight = page.getByRole("region", { name: "Compile preflight" });
+    await expect(preflight).toBeVisible();
+    // The dead end this file found at integration (see below), on main's control.
+    const upload = preflight.getByRole("button", { name: /Upload & compile/ });
+    await expect(upload, "an uncounted set must still be uploadable -- the quote is information, not authorisation").toBeEnabled();
+    return upload;
+  }
+  await page.route("**/api/v1/uploads/triage/stage", route => route.fulfill({
+    status: 404,
+    json: { code: "INTAKE_TRIAGE_DISABLED", intakeApproval: approvalLineage ? "enabled" : "disabled" },
+  }));
   await page.goto("/workspace", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".workspace-intake")).toHaveAttribute("data-inventory-state", "ready");
   await page.locator('input[type="file"][multiple]').first().setInputFiles(pdfFixture());
@@ -61,12 +78,47 @@ async function refuseIntake(page: import("@playwright/test").Page, code: string)
     above a control that could never be pressed. Enabled is the assertion; the refusal this file
     is about cannot even be reached without it.
   */
-  await expect(
-    preflight.getByRole("button", { name: /Upload & compile/ }),
-    "an uncounted set must still be uploadable -- the quote is information, not authorisation",
-  ).toBeEnabled();
-  await preflight.getByRole("button", { name: /Upload & compile/ }).click();
-  return () => capabilityCalls;
+  const review = preflight.getByRole("button", { name: "Review sources before processing", exact: true });
+  await expect(review, "an unknown-page set must still be reviewable").toBeEnabled();
+  await review.click();
+  const approve = preflight.getByRole("button", { name: "Approve maximum & upload", exact: true });
+  await expect(approve, "an unknown-page set must still be explicitly approved at its full maximum").toBeEnabled();
+  return approve;
+}
+
+/** Drive the intake to a refusal issued by `/api/uploads/capability` (approval lineage off). */
+async function refuseIntake(page: Page, code: string, status = 400, extra: Record<string, unknown> = {}) {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+  // The server enforces the byte and page ceilings, so the refusal is mocked at the boundary it
+  // is issued from rather than by pushing a 5 MiB fixture through the browser.
+  let capabilityCalls = 0;
+  await page.route("**/api/uploads/capability", route => {
+    capabilityCalls += 1;
+    return route.fulfill({ status, json: { code, ...extra } });
+  });
+  // With the lineage off nothing may ask for a whole-set approval.
+  let approvalCalls = 0;
+  await page.route("**/api/uploads/approval**", route => {
+    approvalCalls += 1;
+    return route.fulfill({ status: 404, json: { code: "INTAKE_APPROVAL_DISABLED" } });
+  });
+  await (await openFallbackApproval(page, false)).click();
+  return () => ({ capability: capabilityCalls, approval: approvalCalls });
+}
+
+/** Drive the intake to a refusal issued while approving the complete set (approval lineage on). */
+async function refuseApproval(page: Page, code: string, status = 400, extra: Record<string, unknown> = {}) {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+  // The server validates the full manifest and current quote before any capability or bytes move.
+  let approvalCalls = 0;
+  await page.route("**/api/uploads/approval", route => {
+    approvalCalls += 1;
+    return route.fulfill({ status, json: { code, ...extra } });
+  });
+  await (await openFallbackApproval(page, true)).click();
+  return () => approvalCalls;
 }
 
 test("a refused intake ends in a sentence and a usable control, not a spinner", async ({ page }) => {
@@ -75,12 +127,32 @@ test("a refused intake ends in a sentence and a usable control, not a spinner", 
   await expect(notice).toContainText("0 of 1 files uploaded");
   // Honest about state: nothing was retried behind the visitor's back.
   await expect(notice).toContainText("nothing was retried automatically");
-  expect(calls(), "the refusal was never requested").toBe(1);
+  expect(calls(), "the refusal was never requested").toEqual({ capability: 1, approval: 0 });
   // Not a spinner: the intake's own control is back, at every width. The header's Upload button
   // is not asserted here -- the topbar collapses below the desktop breakpoint and this check is
   // about the state the intake is left in, not about which chrome renders it.
   await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
   await expect(page.getByText("Uploading & compiling…")).toHaveCount(0);
+});
+
+test("production stages with main's single control and none of the cost-approval wording", async ({ page }) => {
+  /*
+    Review 2 (FE-B2). Merging deploys production with the approval lineage off; the source review,
+    "Approve maximum & upload" and the customer-charge / operator-cost paragraphs are founder-only
+    wording and must not reach it. main dbe22b1e's staged panel is what ships.
+  */
+  test.skip(INTAKE_APPROVAL_ROLLOUT_ENABLED, "asserts the switch-off posture");
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+  await openFallbackApproval(page, false);
+  const preflight = page.getByRole("region", { name: "Compile preflight" });
+  await expect(preflight.locator(".workspace-staged-summary")).toContainText("1 file staged. Nothing has been uploaded yet. Review the estimate, then upload and compile.");
+  await expect(page.locator("p.notice")).toContainText("1 supported file ready for preflight. Nothing has been uploaded or processed yet.");
+  await expect(preflight.getByRole("button", { name: "Review sources before processing" })).toHaveCount(0);
+  await expect(preflight.getByRole("button", { name: /Approve maximum/ })).toHaveCount(0);
+  for (const words of ["Customer page charge", "Operator infrastructure cost", "Full-scope legacy approval", "separate approvals"]) {
+    await expect(page.locator("body")).not.toContainText(words);
+  }
 });
 
 test("a refused intake says why", async ({ page }) => {
@@ -90,6 +162,149 @@ test("a refused intake says why", async ({ page }) => {
   */
   await refuseIntake(page, "INTAKE_FILE_TOO_LARGE");
   await expect(page.locator("p.notice")).toContainText("INTAKE_FILE_TOO_LARGE", { timeout: 10_000 });
+});
+
+test("a processing-ceiling refusal names the code and the limit", async ({ page }) => {
+  const limit = "TAVONEL processes sources up to 50 MB and 80 pages.";
+  const calls = await refuseIntake(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { maxBytes: 52_428_800, maxPages: 80, limit });
+  const notice = page.locator("p.notice");
+  await expect(notice).toContainText("0 of 1 files uploaded", { timeout: 10_000 });
+  await expect(notice).toContainText("SOURCE_EXCEEDS_PROCESSING_CEILING");
+  await expect(notice).toContainText(limit);
+  expect(calls()).toEqual({ capability: 1, approval: 0 });
+  await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
+});
+
+test("a refused whole-set approval ends in a sentence and a usable control, not a spinner", async ({ page }) => {
+  test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "whole-set approval UI ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
+  const calls = await refuseApproval(page, "INTAKE_PRICE_STALE", 409);
+  const notice = page.locator("p.notice");
+  await expect(notice).toContainText("Pricing changed since this estimate");
+  await expect(notice).toContainText("Nothing was uploaded");
+  expect(calls(), "the approval refusal was never requested").toBe(1);
+  await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
+  await expect(page.getByText("Uploading & compiling…")).toHaveCount(0);
+});
+
+test("a processing-ceiling refusal keeps the complete set out and leaves a retry", async ({ page }) => {
+  test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "whole-set approval UI ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
+  /*
+    The approval endpoint uses SOURCE_EXCEEDS_PROCESSING_CEILING (413) when a selected file is
+    above the processor's supported byte/page ceiling. Keep this distinct from stale pricing.
+  */
+  const limit = "TAVONEL processes sources up to 50 MB and 80 pages.";
+  const calls = await refuseApproval(page, "SOURCE_EXCEEDS_PROCESSING_CEILING", 413, { index: 0, maxBytes: 52_428_800, maxPages: 80, limit });
+  const notice = page.locator("p.notice");
+  await expect(notice).toContainText("This approval request for the complete set was rejected.", { timeout: 10_000 });
+  await expect(notice).toContainText("Nothing was uploaded.");
+  await expect(notice).toContainText("Review the reason and retry the complete set.");
+  await expect(notice).toContainText("SOURCE_EXCEEDS_PROCESSING_CEILING");
+  await expect(notice).toContainText(limit);
+  expect(calls(), "the ceiling refusal was never returned by approval").toBe(1);
+  await expect(page.getByRole("button", { name: "Choose files", exact: true })).toBeEnabled();
+});
+
+test("native fetch sends capability and reads approval state after a lost capability reply", async ({ page }) => {
+  test.skip(!INTAKE_APPROVAL_ROLLOUT_ENABLED, "whole-set approval UI ships only with INTAKE_APPROVAL_ROLLOUT_ENABLED (off in production)");
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page);
+
+  type IntakeBody = {
+    attemptKey: string;
+    clientManifestDigest: string;
+    pricingFingerprint: string;
+    files: Array<{ fileKey: string; contentSha256: string; byteLength: number; mimeType: string }>;
+  };
+  let intakeBody: IntakeBody | null = null;
+  let approvalPosts = 0;
+  let approvalReads = 0;
+  let reservationCommitted = false;
+  const statusAttemptKeys: string[] = [];
+  const idempotencyKeys: string[] = [];
+  let confirmCalls = 0;
+  let compilePosts = 0;
+
+  const approval = (reserved: boolean) => {
+    const body = intakeBody!;
+    const file = body.files[0]!;
+    const reservationExpiresAt = reserved ? new Date(Date.now() + 60_000).toISOString() : null;
+    return {
+      approvalId: "11111111-1111-4111-8111-111111111111",
+      attemptKey: body.attemptKey,
+      clientManifestDigest: body.clientManifestDigest,
+      scopeDigest: `sha256:${"b".repeat(64)}`,
+      pricingFingerprint: body.pricingFingerprint,
+      state: "approved",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      expired: false,
+      fileCount: 1,
+      aggregateMaximumPages: 80,
+      aggregateReservedCredits: 320,
+      aggregateMaximumCredits: 480,
+      compilable: false,
+      idempotentReplay: false,
+      files: [{
+        fileKey: file.fileKey,
+        documentId: "22222222-2222-4222-8222-222222222222",
+        fileState: reserved ? "reserved" : "approved",
+        contentSha256: file.contentSha256,
+        byteLength: file.byteLength,
+        mimeType: file.mimeType,
+        pageBasis: "unknown",
+        approvedMaxPages: 80,
+        approvedReservedCredits: 320,
+        approvedMaximumCredits: 480,
+        reservationId: reserved ? "33333333-3333-4333-8333-333333333333" : null,
+        reservationState: reserved ? "reserved" : null,
+        reservationExpiresAt,
+      }],
+    };
+  };
+
+  await page.route("**/api/uploads/approval**", async route => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      approvalPosts += 1;
+      intakeBody = request.postDataJSON() as IntakeBody;
+      return route.fulfill({ status: 200, json: { code: "INTAKE_APPROVAL_CREATED", approval: approval(false) } });
+    }
+    if (request.method() === "GET" && intakeBody) {
+      approvalReads += 1;
+      const attempt = new URL(request.url()).searchParams.get("attemptKey");
+      statusAttemptKeys.push(attempt ?? "");
+      return route.fulfill({ status: 200, json: { code: "OK", approval: approval(reservationCommitted) } });
+    }
+    return route.fulfill({ status: 400, json: { code: "UNEXPECTED_APPROVAL_REQUEST" } });
+  });
+  await page.route("**/api/uploads/capability", async route => {
+    idempotencyKeys.push(route.request().headers()["x-tavonel-source-idempotency-key"] ?? "");
+    // Model a committed reservation whose capability reply was lost in transit.
+    reservationCommitted = true;
+    await route.abort("failed");
+  });
+  await page.route("**/api/uploads/confirm", route => {
+    confirmCalls += 1;
+    return route.fulfill({ status: 500, json: { code: "UNEXPECTED_CONFIRM" } });
+  });
+  await page.route("**/api/compile-jobs", route => {
+    if (route.request().method() === "POST") {
+      compilePosts += 1;
+      return route.fulfill({ status: 500, json: { code: "UNEXPECTED_COMPILE" } });
+    }
+    return route.fallback();
+  });
+
+  await (await openFallbackApproval(page, true)).click();
+
+  await expect(page.locator("p.notice")).toContainText("Intake outcome is uncertain. Reselect the exact same files to recover status.", { timeout: 15_000 });
+  expect(approvalPosts).toBe(1);
+  expect(idempotencyKeys.length).toBeGreaterThan(0);
+  expect(idempotencyKeys.every(Boolean)).toBe(true);
+  expect(new Set(idempotencyKeys).size).toBe(1);
+  expect(approvalReads).toBe(1);
+  expect(statusAttemptKeys).toEqual([intakeBody!.attemptKey]);
+  expect(confirmCalls).toBe(0);
+  expect(compilePosts).toBe(0);
 });
 
 test.describe("a compile that cannot start", () => {
@@ -159,27 +374,23 @@ test("a compile that fails on the server names the failure and where to look", a
   await expect(hero.getByRole("button", { name: "Open activity" })).toBeEnabled();
 });
 
-test("the Explore stage has no free-text search, so it has no empty result to strand anyone in", async ({ page }) => {
+test("the prepared-question filter has an honest empty state and a usable reset", async ({ page }) => {
   // Release 2: the consent card appears 8 s after mount and could cover a target mid-test; this spec is
   // not about consent, so it starts with a stored refusal.
   await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
   await page.goto("/explore");
-  const dismiss = page.getByRole("button", { name: "No thanks", exact: true });
-  if (await dismiss.isVisible()) await dismiss.click();
-  await page.getByRole("button", { name: "ENTER WORLD", exact: true }).click();
-  await page.locator("button[aria-expanded]").filter({ hasText: /ask/i }).first().click();
-
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  // Three questions the sample can answer, and no box that accepts a fourth. If a text field
-  // ever appears here, it needs an empty-result state and this assertion is the reminder.
-  await expect(dialog.locator("input, textarea")).toHaveCount(0);
-  const questions = dialog.getByRole("group", { name: "Questions this sample answers" }).getByRole("button");
+  await expect(page.getByText("Free-form AI queries are not running", { exact: false })).toBeVisible();
+  await page.getByLabel("Find a sample question").fill("a question outside this prepared sample");
+  await expect(page.getByText("No sample question matches.", { exact: false })).toBeVisible();
+  const questions = page.getByRole("group", { name: "Sample questions" }).locator("button[aria-pressed]");
+  await expect(questions).toHaveCount(0);
+  await page.getByRole("button", { name: "Show all questions" }).click();
+  await expect(page.getByLabel("Find a sample question")).toHaveValue("");
   expect(await questions.count()).toBeGreaterThan(0);
-  // Every offered question returns an answer with at least one source region.
+  // Every offered answer retains a route to evidence; filtering cannot invent an AI answer.
   for (let index = 0; index < await questions.count(); index += 1) {
     await questions.nth(index).click();
-    await expect(dialog.locator("blockquote")).not.toBeEmpty();
-    await expect(dialog).toContainText(/SOURCE REGION/);
+    await expect(page.getByLabel("Selected sample answer")).not.toBeEmpty();
+    await expect(page.getByLabel("Selected sample answer").getByRole("link")).toHaveCount(1);
   }
 });

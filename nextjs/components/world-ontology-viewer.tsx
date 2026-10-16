@@ -1,6 +1,8 @@
 "use client";
 
 import type { WorldOntology } from "@/lib/world-read-model";
+import { ontologyPreviewSnapshotKey } from "@/lib/ontology-class-rename-preview";
+import WorldOntologyRenamePreview from "./world-ontology-rename-preview";
 import styles from "./world-ontology-viewer.module.css";
 
 /*
@@ -17,6 +19,10 @@ import styles from "./world-ontology-viewer.module.css";
   Domain and range here are observed rather than declared: the types this predicate was
   actually used between in this World. That is a weaker claim, it is labelled as one, and it
   is the only one the artifact supports.
+
+  Under the classes, a customer can draft a different name for one of them and preview what
+  that class covers. It is a local draft over these same numbers and changes nothing here; it
+  is keyed by the ontology's content so a draft never outlives the data it was written for.
 */
 
 export default function WorldOntologyViewer({ ontology }: { ontology: WorldOntology | null }) {
@@ -72,6 +78,8 @@ export default function WorldOntologyViewer({ ontology }: { ontology: WorldOntol
           </tbody>
         </table>
       </section>
+
+      <WorldOntologyRenamePreview key={ontologyPreviewSnapshotKey(ontology)} ontology={ontology} />
 
       <section aria-labelledby="ontology-hierarchy">
         <h3 id="ontology-hierarchy">Hierarchy</h3>

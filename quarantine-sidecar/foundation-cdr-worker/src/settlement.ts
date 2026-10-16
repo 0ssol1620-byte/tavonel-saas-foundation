@@ -2,8 +2,10 @@ import type { FailureClass } from "../../../shared/uskcEnums";
 import { RetryableError } from "./errors";
 import { cdrRequestSignature, hmacSecretIsConfigured, sha256DigestHeader } from "./hmac";
 import { parseQuarantineSourceKey } from "./keys";
+import { parseCompletedReadFacts } from "../../../shared/completedReadReceipt";
 
 export type SettlementEnv = {
+  FOUNDATION_COMPLETED_READ_ENABLED?: string;
   FOUNDATION_BILLING_SETTLEMENT_URL?: string;
   FOUNDATION_BILLING_SETTLEMENT_HMAC?: string;
 };
@@ -47,6 +49,7 @@ async function safeSettlementErrorCode(response: Response): Promise<string | nul
  * Every field is something the worker observed. None of it is a filename or document content.
  */
 export type SettlementFacts = {
+  completedRead?: import("../../../shared/completedReadReceipt").CompletedReadFacts;
   /** The refusal sentence, verbatim and bounded, so the customer reads a reason not a category. */
   terminalReason?: string;
   /** The frozen failure class the refusal receipt was written with. */
@@ -75,6 +78,12 @@ export async function dispatchComputeSettlement(
   if (!parts || !isFoundationSettlementUrl(url) || !hmacSecretIsConfigured(secret)) {
     throw new RetryableError("compute settlement is not configured");
   }
+  if (facts.completedRead) {
+    const proof = parseCompletedReadFacts(facts.completedRead);
+    if (env.FOUNDATION_COMPLETED_READ_ENABLED !== "true" || !proof || proof.originalKey !== sourceKey
+      || proof.originalSha256 !== facts.sourceSha256 || outcome !== "settled" || actualCredits !== 2
+      || reasonCode !== "OCR_COMPLETED") throw new RetryableError("completed read settlement facts are invalid");
+  }
   const body = JSON.stringify({
     workspaceKey: parts.workspaceId,
     documentId: parts.documentId,
@@ -84,10 +93,12 @@ export async function dispatchComputeSettlement(
     ...(facts.terminalReason ? { terminalReason: facts.terminalReason.slice(0, MAX_TERMINAL_REASON) } : {}),
     ...(facts.failureClass ? { failureClass: facts.failureClass } : {}),
     ...(facts.sourceSha256 ? { sourceSha256: facts.sourceSha256 } : {}),
+    ...(facts.completedRead ? { completedRead: facts.completedRead } : {}),
   });
   const timestamp = now().toISOString();
   const requestId = newRequestId();
   const bytes = new TextEncoder().encode(body);
+  if (bytes.byteLength > 2_048) throw new RetryableError("compute settlement facts exceed the body budget");
   const digest = await sha256DigestHeader(bytes);
   const signature = await cdrRequestSignature(secret, timestamp, requestId, digest);
   let response: Response;
@@ -110,5 +121,18 @@ export async function dispatchComputeSettlement(
   if (!response.ok) {
     const code = await safeSettlementErrorCode(response);
     throw new RetryableError(`compute settlement returned HTTP ${response.status}${code ? ` (${code})` : ""}`);
+  }
+  if (facts.completedRead) {
+    const body: unknown = await response.json().catch(() => null);
+    const receipt = body && typeof body === "object" ? (body as { result?: Record<string, unknown> }).result : null;
+    // A generic 200 or the legacy echo is not evidence that proof and settlement committed.
+    const parsed = parseCompletedReadFacts(receipt?.completedRead);
+    if (!receipt || receipt.state !== "settled" || receipt.settledCredits !== actualCredits
+      || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(String(receipt.reservationId))
+      || !["paid", "trial", "owner"].includes(String(receipt.billingSource))
+      || !["processed", "duplicate"].includes(String(receipt.status))
+      || !parsed || Object.keys(facts.completedRead).some(key => parsed[key as keyof typeof parsed] !== facts.completedRead![key as keyof typeof parsed])) {
+      throw new RetryableError("completed read settlement receipt is missing or conflicting");
+    }
   }
 }

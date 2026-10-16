@@ -85,7 +85,7 @@ test("Explore reaches the actual interactive instrument without a hero-length de
   await expect(node).toBeHidden();
   await testInfo.attach("explore-fold", { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
 
-  await page.getByRole("button", { name: "ENTER WORLD" }).click();
+  await page.getByRole("button", { name: "Relations ↗" }).click();
   await expect(stage).toHaveAttribute("data-world-act", "world");
   await expect(node).toBeVisible();
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
-import { checkConnectorSourceAccess } from "@/lib/connector-source-access";
+import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { foundationPilotAccess } from "@/lib/foundation-pilot";
@@ -101,7 +101,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // or suspended source refuses the rebuild exactly as it refuses a read of that World.
   const sources = await loadActiveWorldSourceIds(workspaceKey, id, active.world);
   if (!sources.ok) return NextResponse.json({ code: sources.code }, { status: 503, headers: NO_STORE });
-  const sourceAccess = await checkConnectorSourceAccess(workspaceKey, sources.documentIds);
+  const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, sources.documentIds, auth.principal.userId);
   if (!sourceAccess.ok) {
     return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,

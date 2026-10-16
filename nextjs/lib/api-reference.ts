@@ -167,7 +167,8 @@ let cached: { groups: ReferenceGroup[]; operationCount: number; server: string; 
 
 export async function readApiReference() {
   if (cached) return cached;
-  const document = await openApiRoute(new Request("https://tavonel.com/api/openapi")).json() as Document;
+  const response = await openApiRoute(new Request("https://tavonel.com/api/openapi"));
+  const document = await response.json() as Document;
   const defaultServer = document.servers[0]!.url;
 
   const endpoints: ReferenceEndpoint[] = [];

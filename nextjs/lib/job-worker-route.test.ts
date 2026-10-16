@@ -62,6 +62,7 @@ describe("worker authorization", () => {
     for (const request of [
       requestWith(),
       new Request("https://tavonel.com/api/internal/jobs/run", { method: "POST", headers: { authorization: SECRET } }),
+      new Request("https://tavonel.com/api/internal/jobs/run", { method: "POST", headers: { authorization: `Basic ${SECRET}` } }),
       requestWith("x".repeat(48)),
       requestWith(SECRET.slice(0, 47)),
       requestWith(`${SECRET}x`),
@@ -93,9 +94,29 @@ describe("worker authorization", () => {
   it("reads the secret from the environment rather than the source", async () => {
     const source = new URL("../app/api/internal/jobs/run/route.ts", import.meta.url);
     const text = await import("node:fs").then((fs) => fs.readFileSync(source, "utf8"));
-    expect(text).toContain("process.env.FOUNDATION_WORKER_SECRET");
-    expect(text).toContain("process.env.CRON_SECRET");
-    expect(text).not.toMatch(/["'`][A-Za-z0-9+/=_-]{32,}["'`]/);
+    expect(text).toContain('import { isInternalWorkerAuthorized } from "@/lib/internal-worker-auth"');
+    const handler = text.slice(text.indexOf("async function runOneBatch"));
+    expect(handler).toMatch(/if \(!isInternalWorkerAuthorized\(request\)\) \{\s*return NextResponse\.json\([\s\S]*?status: 401[\s\S]*?\}\);\s*\}/);
+    expect(handler.indexOf("isInternalWorkerAuthorized(request)")).toBeLessThan(handler.indexOf("await runCompileJobBatch()"));
+    const helper = await import("node:fs").then((fs) => fs.readFileSync(new URL("./internal-worker-auth.ts", import.meta.url), "utf8"));
+    expect(helper).toMatch(/env:[^=]+ = process\.env/);
+    expect(helper).toContain("env.FOUNDATION_WORKER_SECRET");
+    expect(helper).toContain("env.CRON_SECRET");
+    expect(helper).toContain('presented.startsWith("Bearer ")');
+    expect(helper).toContain("value.length >= 32");
+    for (const implementation of [text, helper]) {
+      expect(implementation).not.toMatch(/["'`][A-Za-z0-9+/=_-]{32,}["'`]/);
+    }
+  });
+
+  it("refuses a short cron secret and accepts the minimum configured length", async () => {
+    vi.stubEnv("FOUNDATION_WORKER_SECRET", "");
+    vi.stubEnv("CRON_SECRET", "c".repeat(31));
+    expect((await GET(requestWith("c".repeat(31)))).status).toBe(401);
+    expect(claimJob).not.toHaveBeenCalled();
+    vi.stubEnv("CRON_SECRET", "c".repeat(32));
+    expect((await GET(requestWith("c".repeat(32)))).status).toBe(200);
+    expect(claimJob).toHaveBeenCalledTimes(1);
   });
 });
 

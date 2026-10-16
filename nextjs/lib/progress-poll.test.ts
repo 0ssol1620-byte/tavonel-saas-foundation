@@ -3,6 +3,10 @@ import { advanceProgressPoll, MAX_STATIONARY_PROGRESS_POLLS, type ProgressPollSt
 import type { OcrProgress } from "./ocr-progress";
 
 const reading = (pagesRead = 1): OcrProgress => ({
+  documentId: "synthetic-progress-poll",
+  versionKey: "c".repeat(64),
+  sourceImmutableKey: `synthetic/progress-poll/synthetic-progress-poll/${"c".repeat(64)}/sanitized.pdf`,
+  sourceSha256: `sha256:${"c".repeat(64)}`,
   state: "reading",
   pagesRead,
   pageCount: 3,

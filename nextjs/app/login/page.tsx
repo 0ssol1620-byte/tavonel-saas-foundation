@@ -17,13 +17,14 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
-import { RecipePreflight } from "@/components/recipe-preflight";
+import { RecipeContinuation, RecipePreflight } from "@/components/recipe-preflight";
 import { readOfferParam, rememberCheckoutIntent, takeCheckoutIntent } from "@/lib/checkout-intent";
 import { trackFunnel } from "@/lib/funnel-events";
 import {
   readRecipeParams,
   rememberFirstTouch,
   rememberRecipeIntent,
+  resumeDestination,
   takeRecipeIntent,
   type RecipeIntent,
 } from "@/lib/recipe-intent";
@@ -67,6 +68,10 @@ export default function LoginPage() {
    * from the URL.
    */
   const [recipe, setRecipe] = useState<RecipeIntent | null>(null);
+  /** X08. A confirmed session arriving with a valid recipe: this page becomes its continuation. */
+  const [signedIn, setSignedIn] = useState(false);
+  /** False when this browser refused to hold the recipe across the Google round trip. */
+  const [recipeKept, setRecipeKept] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,28 +91,43 @@ export default function LoginPage() {
     const startedRecipe = readRecipeParams(window.location.search);
     if (startedRecipe) {
       setRecipe(startedRecipe);
-      rememberRecipeIntent(startedRecipe);
-      trackFunnel("login_reached_with_intent", { kind: "recipe" });
+      setRecipeKept(rememberRecipeIntent(startedRecipe));
     }
     void (async () => {
       // Already signed in? Do not make someone sign in twice.
       const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
       const client = getSupabaseBrowserClient();
+      let signedInWithRecipe = false;
       if (client) {
         const { data } = await client.auth.getSession();
         if (data.session && !cancelled) {
           const resume = takeCheckoutIntent();
           /*
-            Consumed and discarded on purpose. Somebody already signed in who lands here from a
-            cookbook CTA has not been interrupted by a sign-in, so there is nothing to resume --
-            and sending them back to the page they just clicked from is a loop, not a resume. The
-            intent is still taken so it cannot surface on a later, unrelated hop.
+            X08. The stored recipe is consumed here, once, on every signed-in arrival -- so an
+            abandoned one can never surface on a later, unrelated hop. What this page continues
+            is the recipe in its own URL, which `readRecipeParams` has already held to the slug
+            list, the current version and the return allow-list; a stale or tampered one parsed
+            to null above and falls through to the workspace like any other signed-in visit.
+
+            A signed-in recipe is not redirected anywhere -- not back to the cookbook it came
+            from, which would be a loop, and not to an empty workspace, which is where it used to
+            be dropped. It renders the continuation below and waits for a click. Checkout keeps
+            precedence, exactly as on the callback.
           */
           takeRecipeIntent();
-          window.location.replace(resume ? `/workspace?checkout=${resume}` : "/workspace");
-          return;
+          // The URL's own offer counts too, so a checkout still wins where storage is blocked.
+          const checkout = resume ?? offer;
+          if (checkout || !startedRecipe) {
+            window.location.replace(resumeDestination({ checkout, recipe: null }));
+            return;
+          }
+          signedInWithRecipe = true;
+          setSignedIn(true);
         }
       }
+      // Counted on the arrival that is headed for a sign-in, not on the continuation a sign-in
+      // returns to -- otherwise every resumed recipe would be counted as reaching the page twice.
+      if (startedRecipe && !signedInWithRecipe && !cancelled) trackFunnel("login_reached_with_intent", { kind: "recipe" });
       try {
         const response = await fetch("/api/status/v2", { cache: "no-store" });
         if (!response.ok) throw new Error("status unavailable");
@@ -169,6 +189,7 @@ export default function LoginPage() {
           */}
           <h1>
             {intent ? "One step before checkout."
+              : signedIn && recipe ? "Continue your recipe."
               : recipe ? "One step before you run this."
                 : "Sign in to TAVONEL."}
           </h1>
@@ -178,6 +199,17 @@ export default function LoginPage() {
             data and subprocessor policies.
           </p>
 
+          {/*
+            X08. Signed in with a valid recipe: the continuation replaces the sign-in controls.
+            `processing` stays null until /api/status answers, and a failed answer is false --
+            the same fail-closed reading the sign-in button gets.
+          */}
+          {signedIn && recipe ? (
+            <RecipeContinuation
+              intent={recipe}
+              processing={authState === "checking" ? null : customerProcessingEnabled}
+            />
+          ) : <>
           {intent ? (
             <p className="notice static" role="status">
               <strong>{BILLING_OFFERS[intent].label} is held for you.</strong> Checkout opens by
@@ -186,11 +218,25 @@ export default function LoginPage() {
             </p>
           ) : recipe ? (
             <>
+              {/*
+                No silent fallback: where site data is blocked the recipe cannot survive the
+                Google round trip, so the page says that rather than promising a resume.
+              */}
               <p className="notice static" role="status">
-                <strong>Your recipe is kept for you.</strong> Signing in brings you back to the same
-                page and the same recipe, with nothing running until you ask for it.
+                {recipeKept ? (
+                  <>
+                    <strong>Your recipe is kept for you.</strong> Signing in brings you straight to
+                    this recipe&rsquo;s first step, with nothing running until you ask for it.
+                  </>
+                ) : (
+                  <>
+                    <strong>This browser is not keeping site data.</strong> Sign-in still works,
+                    but it will open your workspace; start the recipe again from{" "}
+                    <a href={recipe.returnTo}>its page</a> once you are signed in.
+                  </>
+                )}
               </p>
-              <RecipePreflight intent={recipe} />
+              <RecipePreflight intent={recipe} omitLanding={!recipeKept} />
             </>
           ) : selfService && customerProcessingEnabled ? (
             <p className="notice static" role="status">
@@ -250,6 +296,7 @@ export default function LoginPage() {
             <li><b>Human review.</b> Review gates remain visible before a candidate World is activated.</li>
             {selfService && customerProcessingEnabled ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
           </ul>
+          </>}
         </div>
         {/*
           The way back, after BQ-113 cut the action row to one primary and one ghost.

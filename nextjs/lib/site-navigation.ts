@@ -55,16 +55,24 @@ export const HEADER_NAV: readonly SiteLink[] = CUSTOMER_NAV.filter((link) => lin
   /docs, /api and /knowledge-compiler are excluded on purpose: two of them are bar items in their
   own right (Docs owns /docs and everything under it), /explore is the product, and /api is a
   Developers page the bar does not carry.
+
+  `customerNavCurrent` (PR141) separates the exact page from a location inside a section, so the
+  header marks `aria-current="page"` only on the item's own URL.
 */
 const NAV_ALSO_OWNS: Readonly<Record<string, readonly string[]>> = {
   "/resources": ["/research", "/evidence", "/reproducibility", "/benchmarks", "/changelog"],
 };
 
-export function customerNavOwns(href: string, pathname: string): boolean {
+export function customerNavCurrent(href: string, pathname: string): "page" | "location" | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
   // A prefix is only a prefix at a segment boundary: /productivity is not under /product.
   const under = (prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
-  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href);
+  if (path === href) return "page";
+  return (NAV_ALSO_OWNS[href] ?? []).some(under) || under(href) ? "location" : undefined;
+}
+
+export function customerNavOwns(href: string, pathname: string): boolean {
+  return customerNavCurrent(href, pathname) !== undefined;
 }
 
 /* ==================================================================== BA-232 / BA-252: vocabulary
@@ -144,15 +152,7 @@ export const BRAND_LINE = {
 export const KO_CHROME = {
   cta: { [ACCESS_CTA.href]: "이용 문의", [SELF_SERVE_CTA.href]: "내 자료로 시작하기" } as Record<string, string>,
   signIn: "로그인",
-  /*
-    BQ-013 / D12. The three primary destinations, keyed by href for the same reason the two CTA
-    labels are: a label exists here only where `CUSTOMER_NAV` already points, so this table cannot
-    invent a sixth section. Literal translations of the English labels -- a translation is not a
-    new claim, and the primary nav vocabulary itself is the founder's. The spellings are the ones
-    `footerLinks` below already uses, with one deliberate difference: /knowledge-compiler carries
-    the bar's label ("How it works" / 작동 방식) rather than the page's name, because that is what
-    the English bar says there too.
-  */
+  /* Labels follow the same hrefs as the English primary navigation. */
   nav: {
     "/product": "제품",
     "/how-it-works": "작동 방식",

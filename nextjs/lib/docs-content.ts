@@ -27,6 +27,7 @@ import {
   refundablePageAllowance,
 } from "./billing-catalog";
 import { PROCESSING_UNIT_USD, STANDARD_UNITS_PER_PAGE, formatUsd } from "./usage-pricing";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
 
 /*
   The documentation, as data.
@@ -160,11 +161,41 @@ export const DOCS_SECTIONS: DocsSection[] = [
     blocks: [
       { kind: "note", text: `**Before you start.** ${activationPolicy.customerData.reason} So steps 1 to 5 below are the contract you will call once intake is arranged with us, not a request TAVONEL will accept from you today. Steps 6 and 7 read a World that already exists, and the completed public Compiled World is readable in full right now — including from the unauthenticated reads the API reference at /api will run for you.` },
       { kind: "prose", text: "Every request is tenant-scoped by the key it carries. There is no account switch and no impersonation header: a key belongs to one workspace and reaches nothing else." },
+      /*
+        Review 3 (CI-TI-1): the whole-set approval lineage is documented only while it is on
+        (lib/intake-approval-rollout.ts). Off -- production -- the quickstart is main bcba7173's per-file
+        flow, the same contract /api/openapi publishes then.
+      */
+      ...(INTAKE_APPROVAL_ROLLOUT_ENABLED ? [
+        { kind: "note", text: "Before requesting any upload capability, quote the complete manifest with POST /api/v1/uploads/quote and compare its maximumCredits with a caller-authorized budget. Approve that exact quote and whole manifest with POST /api/v1/uploads/approval; persist the attempt, scope and member identities before transfer. A changed or higher quote needs a new caller decision. If a member has a definitive storage refusal, POST /api/v1/uploads/approval/cancel with the attemptKey, scopeDigest and fileKey identifying that triggering member; the server revalidates those identities and cancels the complete approved set, releasing its remaining reserved members. Call once for the approval set, not once per member. A lost or uncertain PUT must be retried and confirmed, not cancelled. Settled work may require reconciliation." },
+        { kind: "note", text: "While whole-set intake approval is not enabled, GET and POST /api/v1/uploads/approval and POST /api/v1/uploads/approval/cancel answer 404 INTAKE_APPROVAL_DISABLED and approve nothing; uploads reserve and confirm one file at a time. Request an upload capability per file without an attempt identity (originalFilename, declaredMimeType and requestedBytes, with an optional stable x-tavonel-source-idempotency-key), PUT the file, then confirm it with documentId and sourceSha256. tavonel-source-agent.py falls back to this automatically and prints a line naming INTAKE_APPROVAL_DISABLED when it does." },
+        { kind: "heading", text: "Approved upload endpoints" },
+        {
+          kind: "table",
+          head: ["Operation", "Endpoint", "Purpose"],
+          rows: [
+            ["quoteApprovedUploadSet", "POST /api/v1/uploads/quote", "Quote the complete manifest without creating a hold; compare the maximum with the caller's own budget."],
+            ["getUploadApproval", "GET /api/v1/uploads/approval?attemptKey=…", "Recover the saved attempt and stable approval identities after reload or an uncertain reply."],
+            ["createUploadApproval", "POST /api/v1/uploads/approval", "Approve the exact manifest and unchanged quote; persist returned identities before transfer."],
+            ["cancelApprovedUploadSet", "POST /api/v1/uploads/approval/cancel", "Cancel the complete approved set after a definitive PUT refusal; fileKey identifies the triggering member."],
+            ["confirmApprovedUpload", "POST /api/v1/uploads/confirm", "Confirm stored bytes atomically after the direct PUT succeeds."],
+            ["releaseFailedApprovedUpload", "POST /api/v1/uploads/release", "Release a member only after a definitive PUT refusal and server verification that no object landed."],
+          ],
+        },
+        { kind: "endpoint", operationId: "quoteApprovedUploadSet" },
+        { kind: "endpoint", operationId: "getUploadApproval" },
+        { kind: "endpoint", operationId: "createUploadApproval" },
+        { kind: "endpoint", operationId: "cancelApprovedUploadSet" },
+        { kind: "endpoint", operationId: "confirmApprovedUpload" },
+        { kind: "endpoint", operationId: "releaseFailedApprovedUpload" },
+      ] satisfies DocsBlock[] : []),
       { kind: "heading", text: "The seven steps" },
       {
         kind: "steps",
         items: [
-          "Ask for an upload capability. The response is a short-lived direct URL; document bytes never pass through the application server.",
+          INTAKE_APPROVAL_ROLLOUT_ENABLED
+            ? "For a member of the explicitly approved manifest, ask for an upload capability. The response is a short-lived direct URL; document bytes never pass through the application server."
+            : "Ask for an upload capability. The response is a short-lived direct URL; document bytes never pass through the application server.",
           "PUT the file to that URL with the same content type you declared.",
           "Start a compile with the document ids you want in the World. It answers 202 with a job id, not a World.",
           "Poll GET /api/compile-jobs/{jobId} until state is ready, review_required, failed or cancelled. A settled job carries the collectionId the candidate was written to.",
@@ -184,7 +215,105 @@ export const DOCS_SECTIONS: DocsSection[] = [
       {
         kind: "snippets",
         label: "Steps 1 to 4",
-        items: [
+        items: INTAKE_APPROVAL_ROLLOUT_ENABLED ? [
+          { label: "cURL", language: "bash", body: `set -euo pipefail
+# For this one-file example, MANIFEST_JSON contains manual.pdf, with exact-byte hash and stable file key.
+MANIFEST_JSON="\${TAVONEL_INTAKE_MANIFEST_JSON:?prepare the complete one-file manifest first}"
+# Choose your maximum before quoting; do not copy a server ceiling into it.
+APPROVE_UP_TO_CREDITS=160
+case "$APPROVE_UP_TO_CREDITS" in (*[!0-9]*|"") exit 1;; esac
+test "$APPROVE_UP_TO_CREDITS" -ge 1 && test "$APPROVE_UP_TO_CREDITS" -le 10000000 || exit 1
+quote=$(curl -fsS https://tavonel.com/api/v1/uploads/quote -H "${KEY_HEADER}" -H "content-type: application/json" -d "$MANIFEST_JSON")
+maximum=$(printf '%s' "$quote" | jq -r .quote.maximumCredits)
+test "$maximum" -le "$APPROVE_UP_TO_CREDITS" || { echo 'Review quote; no approval made' >&2; exit 1; }
+attempt_key="att_$(openssl rand -hex 16)"
+# Persist attempt_key, manifest and exact quote privately before approval; reuse them after restart.
+pending=$(jq -cn --arg a "$attempt_key" --argjson m "$MANIFEST_JSON" --argjson q "$quote" '{attemptKey:$a,manifest:$m,quote:$q}')
+printf '%s' "$pending" > .tavonel-intake-pending.json; chmod 600 .tavonel-intake-pending.json
+files=$(printf '%s' "$MANIFEST_JSON" | jq -c .files)
+approval_body=$(jq -cn --arg a "$attempt_key" --arg d "$(printf '%s' "$quote" | jq -r .clientManifestDigest)" --arg p "$(printf '%s' "$quote" | jq -r .pricingFingerprint)" --argjson n "$maximum" --argjson f "$files" '{attemptKey:$a,clientManifestDigest:$d,pricingFingerprint:$p,aggregateMaximumCredits:$n,files:$f}')
+approved=$(curl -fsS https://tavonel.com/api/v1/uploads/approval -H "${KEY_HEADER}" -H "content-type: application/json" -d "$approval_body")
+printf '%s' "$approved" > .tavonel-intake-approval.json; chmod 600 .tavonel-intake-approval.json
+file=$(printf '%s' "$MANIFEST_JSON" | jq -c '.files[0]'); file_key=$(printf '%s' "$file" | jq -r .fileKey)
+document_id=$(printf '%s' "$approved" | jq -r '.approval.files[0].documentId'); scope=$(printf '%s' "$approved" | jq -r .approval.scopeDigest)
+source_key=$(printf 'tavonel-approved-source-v1\\037%s\\037%s' "$attempt_key" "$file_key" | sha256sum | cut -d' ' -f1)
+cap_body=$(jq -cn --argjson f "$file" --arg a "$attempt_key" --arg s "$scope" --arg p "$(printf '%s' "$quote" | jq -r .pricingFingerprint)" '{originalFilename:$f.originalFilename,declaredMimeType:$f.mimeType,requestedBytes:$f.byteLength,attemptKey:$a,scopeDigest:$s,pricingFingerprint:$p,fileKey:$f.fileKey,contentSha256:$f.contentSha256}')
+cap=$(curl -fsS https://tavonel.com/api/v1/uploads/capability -H "${KEY_HEADER}" -H "content-type: application/json" -H "x-tavonel-source-idempotency-key: $source_key" -d "$cap_body")
+# The signed URL is the only credential for PUT. Then confirm the stored object before compile.
+curl -fsS -X PUT "$(printf '%s' "$cap" | jq -r .uploadUrl)" -H 'content-type: application/pdf' --data-binary @manual.pdf
+confirm=$(jq -cn --arg d "$document_id" --arg h "$(printf '%s' "$file" | jq -r .contentSha256)" --arg a "$attempt_key" --arg s "$scope" --arg f "$file_key" '{documentId:$d,sourceSha256:$h,attemptKey:$a,scopeDigest:$s,fileKey:$f}')
+curl -fsS https://tavonel.com/api/v1/uploads/confirm -H "${KEY_HEADER}" -H "content-type: application/json" -d "$confirm"
+job_id=$(curl -fsS https://tavonel.com/api/compile-jobs -H "${KEY_HEADER}" -H "content-type: application/json" -d "{\"documentIds\":[\"$document_id\"]}" | jq -r .jobId)` },
+          { label: "Python", language: "python", body: `import hashlib, json, os, time, urllib.request
+
+BASE = "https://tavonel.com"
+KEY = os.environ["TAVONEL_API_KEY"]
+# This one-file manifest was built from exact bytes using the IntakeManifestEntry and digest rules.
+manifest = json.loads(os.environ["TAVONEL_INTAKE_MANIFEST_JSON"])
+budget = int(os.environ["TAVONEL_APPROVE_UP_TO_CREDITS"])  # caller-selected maximum
+if not 1 <= budget <= 10_000_000: raise ValueError("budget must be between 1 and 10000000 credits")
+
+def call(method, path, body=None, headers=None):
+    data = json.dumps(body, separators=(",", ":")).encode() if body is not None else None
+    request = urllib.request.Request(BASE + path, data=data, method=method, headers={"authorization": f"Bearer {KEY}", **({"content-type": "application/json"} if data else {}), **(headers or {})})
+    with urllib.request.urlopen(request) as response: return json.loads(response.read() or b"{}")
+
+quote = call("POST", "/api/v1/uploads/quote", manifest)
+if quote["quote"]["maximumCredits"] > budget: raise RuntimeError("review quote; no approval made")
+attempt = "att_" + os.urandom(16).hex()
+# Persist the exact attempt, manifest and quote privately before approval; reuse them on restart.
+journal = {"attemptKey": attempt, "manifest": manifest, "quote": quote}
+fd = os.open(".tavonel-intake-pending.json", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w", encoding="utf-8") as state: json.dump(journal, state)
+body = {"attemptKey": attempt, "clientManifestDigest": quote["clientManifestDigest"], "pricingFingerprint": quote["pricingFingerprint"], "aggregateMaximumCredits": quote["quote"]["maximumCredits"], "files": manifest["files"]}
+approved = call("POST", "/api/v1/uploads/approval", body)
+journal["approval"] = approved
+with open(".tavonel-intake-pending.json", "w", encoding="utf-8") as state: json.dump(journal, state)
+entry = manifest["files"][0]; file_key = entry["fileKey"]
+source_key = hashlib.sha256(f"tavonel-approved-source-v1\\x1f{attempt}\\x1f{file_key}".encode()).hexdigest()
+scope = approved["approval"]["scopeDigest"]
+cap = call("POST", "/api/v1/uploads/capability", {"originalFilename": entry["originalFilename"], "declaredMimeType": entry["mimeType"], "requestedBytes": entry["byteLength"], "attemptKey": attempt, "scopeDigest": scope, "pricingFingerprint": quote["pricingFingerprint"], "fileKey": file_key, "contentSha256": entry["contentSha256"]}, {"x-tavonel-source-idempotency-key": source_key})
+document_id = approved["approval"]["files"][0]["documentId"]
+with open("manual.pdf", "rb") as source:
+    put = urllib.request.Request(cap["uploadUrl"], data=source.read(), method="PUT", headers={"content-type": "application/pdf"})
+    urllib.request.urlopen(put).read()  # signed URL only; no bearer token
+call("POST", "/api/v1/uploads/confirm", {"documentId": document_id, "sourceSha256": entry["contentSha256"], "attemptKey": attempt, "scopeDigest": scope, "fileKey": file_key})
+accepted = call("POST", "/api/compile-jobs", {"documentIds": [document_id]})
+while True:
+    job = call("GET", f"/api/compile-jobs/{accepted['jobId']}")["job"]
+    print("state=", job["state"])
+    if job["state"] in {"ready", "review_required", "failed", "cancelled"}: break
+    time.sleep(5)` },
+          { label: "TypeScript", language: "typescript", body: `import { createHash, randomBytes } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
+
+const BASE = "https://tavonel.com"; const KEY = process.env.TAVONEL_API_KEY!;
+// This one-file manifest was built from exact bytes using the published manifest digest rules.
+const manifest = JSON.parse(process.env.TAVONEL_INTAKE_MANIFEST_JSON!) as any;
+const budget = Number(process.env.TAVONEL_APPROVE_UP_TO_CREDITS); // caller-selected maximum
+if (!Number.isSafeInteger(budget) || budget < 1 || budget > 10_000_000) throw new Error("budget must be 1..10000000 credits");
+async function call(method: string, path: string, body?: unknown, extra: Record<string, string> = {}) {
+  const response = await fetch(BASE + path, { method, headers: { authorization: \`Bearer \${KEY}\`, ...(body ? { "content-type": "application/json" } : {}), ...extra }, body: body ? JSON.stringify(body) : undefined });
+  if (!response.ok) throw new Error(\`\${method} \${path} -> \${response.status} \${await response.text()}\`);
+  return response.json() as Promise<any>;
+}
+const quote = await call("POST", "/api/v1/uploads/quote", manifest);
+if (budget < quote.quote.maximumCredits) throw new Error("review quote; no approval made");
+const attemptKey = "att_" + randomBytes(16).toString("hex");
+// Persist this attempt, manifest and exact quote privately before approval; reuse on restart.
+await writeFile(".tavonel-intake-pending.json", JSON.stringify({ attemptKey, manifest, quote }), { mode: 0o600 });
+const approval = await call("POST", "/api/v1/uploads/approval", { attemptKey, clientManifestDigest: quote.clientManifestDigest, pricingFingerprint: quote.pricingFingerprint, aggregateMaximumCredits: quote.quote.maximumCredits, files: manifest.files });
+await writeFile(".tavonel-intake-pending.json", JSON.stringify({ attemptKey, manifest, quote, approval }), { mode: 0o600 });
+const entry = manifest.files[0]; const fileKey = entry.fileKey; const scopeDigest = approval.approval.scopeDigest;
+const sourceKey = createHash("sha256").update(["tavonel-approved-source-v1", attemptKey, fileKey].join("\\x1f")).digest("hex");
+const capability = await call("POST", "/api/v1/uploads/capability", { originalFilename: entry.originalFilename, declaredMimeType: entry.mimeType, requestedBytes: entry.byteLength, attemptKey, scopeDigest, pricingFingerprint: quote.pricingFingerprint, fileKey, contentSha256: entry.contentSha256 }, { "x-tavonel-source-idempotency-key": sourceKey });
+const documentId = approval.approval.files[0].documentId;
+const put = await fetch(capability.uploadUrl, { method: "PUT", headers: { "content-type": "application/pdf" }, body: await readFile("manual.pdf") }); // no bearer on PUT
+if (!put.ok) throw new Error(\`storage PUT failed: \${put.status}; do not confirm\`);
+await call("POST", "/api/v1/uploads/confirm", { documentId, sourceSha256: entry.contentSha256, attemptKey, scopeDigest, fileKey });
+const accepted = await call("POST", "/api/compile-jobs", { documentIds: [documentId] });
+console.log("compile job:", accepted.jobId);` },
+        ] : [
           { label: "cURL", language: "bash", body: [
           `# Requires curl and jq. TAVONEL_API_KEY holds a key scoped documents:intake + collections:compile + collections:read.`,
           `capability=$(curl -fsS https://tavonel.com/api/v1/uploads/capability \\`,
@@ -1222,7 +1351,7 @@ export const DOCS_SECTIONS: DocsSection[] = [
           "",
           "node tavonel-recipe-smoke.mjs --base-url https://tavonel.com",
           "# ok  capabilities — 12 formats, defaultStatus UNSUPPORTED",
-          "# ok  contract — 33 operations, no promote or rollback path",
+          `# ok  contract — ${INTAKE_APPROVAL_ROLLOUT_ENABLED ? 39 : 33} operations, no promote or rollback path`,
           "# RECIPES OK",
         ].join("\n"),
       },

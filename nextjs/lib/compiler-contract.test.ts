@@ -312,7 +312,8 @@ describe("contract promises", () => {
     Clause 01's promise, against the code that would have to keep it.
 
     A region is optional twice over. `validateCollectionOcrInput` accepts `regions: undefined` as
-    a valid input, and the caller only ever passes regions for an OCR v2 read -- so a v1 document
+    a valid input, and the caller only ever passes regions for an OCR v2 or v3 read (v3 is the
+    region-scoped conflict contract, which carries regions as v2 does) -- so a v1 document
     compiles to zero region-bound retrieval units, and since gap-matrix row D7-02 made extraction
     per region, to zero Claim nodes as well. What is true of *every* promoted fact is the version
     it was read from: the Claim node's only evidence id is keyed by documentId + versionKey, and
@@ -331,7 +332,7 @@ describe("contract promises", () => {
     expect(compiler).toContain("if (input.regions !== undefined) {");
     expect(compiler).toContain("for (const region of regionsOrNone(input)) {");
     expect(read("./collection-compile-run.ts"))
-      .toContain('regions: json.schemaVersion === "tavonel.ocr_result.v2" ? json.regions : undefined');
+      .toContain('regions: json.schemaVersion === "tavonel.ocr_result.v2" || json.schemaVersion === "tavonel.ocr_result.v3" ? json.regions : undefined');
     // A claim's evidence is a whole document version; the page and box live on the region.
     expect(compiler).toContain('const evidenceId = stableId("evidence", input.documentId, input.versionKey)');
     expect(compiler).toContain('nodes.push({ id: claimId, kind: "Claim", label: claim, documentId: input.documentId, evidenceIds: [evidenceId] });');

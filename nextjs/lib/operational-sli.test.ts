@@ -5,11 +5,13 @@ import {
 } from "./model-provider-circuit";
 import { PROBE_RUN_SCHEMA, type ProbeCheck, type ProbeRun } from "./synthetic-probe";
 import type { ProbeHistory } from "./synthetic-probe-store";
+import type { OperationalJobObservation, OperationalJobRow } from "./operational-job-liveness";
 import {
   DEFAULT_FRESHNESS_TTL_MS,
   MAX_WINDOW_RUNS,
   OPERATIONAL_SLI_SCHEMA,
   evaluateOperationalSli,
+  evaluateOperationalSliWithJobLiveness,
 } from "./operational-sli";
 
 const NOW = new Date("2026-09-20T12:00:00.000Z");
@@ -214,5 +216,86 @@ describe("B35 operational SLI and freshness gate", () => {
     expect(() => evaluateOperationalSli(stored([]), { now: NOW, windowRuns: MAX_WINDOW_RUNS + 1 })).toThrow(RangeError);
     expect(() => evaluateOperationalSli(stored([]), { now: NOW, freshnessTtlMs: 0 })).toThrow(RangeError);
     expect(() => evaluateOperationalSli(stored([]), { now: NOW, requiredRequestChecks: [] })).toThrow(RangeError);
+  });
+});
+
+describe("K23 dependency health and job liveness stay separate", () => {
+  const queuedRow: OperationalJobRow = {
+    state: "queued",
+    available_at: "2026-09-20T11:59:00.000Z",
+    lease_expires_at: null,
+    updated_at: "2026-09-20T11:59:00.000Z",
+    items_seen: 0,
+    items_done: 0,
+  };
+  const activeQueue: OperationalJobObservation = {
+    ok: true,
+    observedAt: NOW.toISOString(),
+    rows: [queuedRow],
+    truncated: false,
+  };
+  const healthyHistory = stored([run("2026-09-20T11:59:00.000Z")]);
+
+  it("leaves the existing dependency DTO without a jobLiveness field", () => {
+    expect(evaluateOperationalSli(healthyHistory, { now: NOW })).not.toHaveProperty("jobLiveness");
+  });
+
+  it("reports a healthy queue only with an open gate, without touching dependency state or alerts", () => {
+    const result = evaluateOperationalSliWithJobLiveness(healthyHistory,
+      { observation: activeQueue, processingGate: "open" }, { now: NOW });
+    const { jobLiveness, ...dependency } = result;
+    expect(dependency).toEqual(evaluateOperationalSli(healthyHistory, { now: NOW }));
+    expect(jobLiveness).toMatchObject({ state: "healthy", healthy: true, reasons: ["queue_active"] });
+    expect(jobLiveness.counts).toMatchObject({ eligible: 1, overdue: 0, expiredLease: 0, stalled: 0 });
+  });
+
+  it("keeps an unknown gate unknown even when the queue and every dependency are healthy", () => {
+    const result = evaluateOperationalSliWithJobLiveness(healthyHistory,
+      { observation: activeQueue, processingGate: "unknown" }, { now: NOW });
+    expect(result.state).toBe("available");
+    expect(result.alerts).toEqual([]);
+    expect(result.jobLiveness).toMatchObject({
+      state: "unknown", healthy: false, reasons: ["processing_gate_unknown"], counts: null,
+    });
+  });
+
+  it("keeps a missing or unreadable observation unknown under an open gate", () => {
+    const unreadable: OperationalJobObservation[] = [
+      { ok: false, failure: "store_not_configured" },
+      { ok: false, failure: "store_http_error" },
+      undefined as unknown as OperationalJobObservation,
+    ];
+    for (const observation of unreadable) {
+      const result = evaluateOperationalSliWithJobLiveness(healthyHistory,
+        { observation, processingGate: "open" }, { now: NOW });
+      expect(result.state).toBe("available");
+      expect(result.alerts).toEqual([]);
+      expect(result.jobLiveness).toMatchObject({ state: "unknown", healthy: false, reasons: ["store_unavailable"] });
+      expect(JSON.stringify(result)).not.toMatch(/store_not_configured|store_http_error/);
+    }
+  });
+
+  it("reports a closed gate as paused, never healthy, with counts still visible", () => {
+    const result = evaluateOperationalSliWithJobLiveness(healthyHistory,
+      { observation: activeQueue, processingGate: "closed" }, { now: NOW });
+    expect(result.jobLiveness).toMatchObject({
+      state: "paused", healthy: false, reasons: ["processing_gate_closed", "queue_active"],
+    });
+    expect(result.jobLiveness.counts).toMatchObject({ eligible: 1 });
+    expect(result.state).toBe("available");
+  });
+
+  it("never lets a healthy queue turn a blocked dependency SLI green", () => {
+    const result = evaluateOperationalSliWithJobLiveness(stored([]),
+      { observation: activeQueue, processingGate: "open" }, { now: NOW });
+    expect(result.jobLiveness.healthy).toBe(true);
+    expect(result.state).toBe("blocked");
+    expect(result.alerts).toEqual([{ severity: "critical", reason: "observation_missing" }]);
+  });
+
+  it("does not echo job row values into the result", () => {
+    const result = evaluateOperationalSliWithJobLiveness(healthyHistory,
+      { observation: activeQueue, processingGate: "open" }, { now: NOW });
+    expect(JSON.stringify(result.jobLiveness)).not.toContain(String(queuedRow.available_at));
   });
 });

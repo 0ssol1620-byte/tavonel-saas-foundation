@@ -1,0 +1,44 @@
+.workbench { min-width:0; color:#171c20; }
+.intro { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:24px 0; }
+.eyebrow { font-size:13px; color:#53606a; margin:0 0 12px; }
+.intro h1 { font-size:clamp(28px,3.2vw,40px); line-height:1.15; letter-spacing:-.035em; font-weight:600; margin:0; }
+.intro h1 span { color:#53606a; }
+.scope { font-size:13px; line-height:1.8; color:#53606a; margin:0; }
+.workbench a { color:#2447b3; text-decoration:underline; text-underline-offset:3px; }
+.tabs { display:flex; flex-wrap:wrap; gap:8px; border-bottom:1px solid #d8ddd9; }
+.tabs button { color:#53606a; min-height:46px; padding:10px 16px; border:0; border-bottom:3px solid transparent; background:transparent; font:500 14px var(--f-sans); }
+.tabs button[aria-pressed=true] { border-bottom-color:#2447b3; color:#2447b3; }
+.questionArea { padding:20px 0; }
+.questionArea label { display:block; font-size:14px; font-weight:600; margin-bottom:8px; }
+.questionArea input { width:100%; max-width:600px; background:#fff; border:1px solid #88928d; border-radius:6px; color:#171c20; min-height:46px; font:15px var(--f-sans); padding:10px 14px; }
+.questionArea > p { font-size:13px; color:#53606a; margin:8px 0 12px; }
+.questions { display:flex; flex-wrap:wrap; gap:8px; }
+.questions button { min-height:44px; padding:10px 12px; color:#46545e; background:#fff; border:1px solid #88928d; border-radius:6px; text-align:left; font:14px/1.4 var(--f-sans); }
+.questions button[aria-pressed=true] { color:#2447b3; border-color:#2447b3; background:#eef2ff; }
+.reading { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; }
+.result, .source { background:#fff; border:1px solid #d8ddd9; border-radius:8px; min-width:0; overflow:hidden; }
+.result > header,.source > header { display:flex; gap:12px; flex-wrap:wrap; justify-content:space-between; border-bottom:1px solid #d8ddd9; padding:14px 18px; font-size:13px; }
+.candidate { color:#8a5a00; }
+.result h2 { font-size:22px; line-height:1.35; font-weight:600; margin:24px 24px 18px; }
+.result > blockquote { margin:0 24px 20px; border-left:3px solid #2447b3; padding:4px 0 4px 16px; font-size:16px; line-height:1.7; max-height:290px; overflow:auto; }
+.answerNote { font-size:13px; color:#53606a; margin:0 24px 20px; line-height:1.6; }
+.citations { margin:0 24px; display:grid; gap:8px; }
+.citations button { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; background:#f7f5ef; color:#171c20; padding:12px; border:1px solid #d8ddd9; border-radius:6px; text-align:left; font-size:13px; }
+.citations span { overflow-wrap:anywhere; }
+.citations strong { white-space:nowrap; font-weight:500; }
+.citations button[aria-pressed=true] { border-color:#2447b3; }
+.version { display:grid; gap:8px; margin:24px; padding-top:16px; border-top:1px solid #d8ddd9; font-size:13px; color:#53606a; }
+.version code { overflow-wrap:anywhere; color:#53606a; font-size:12px; }
+.version button { justify-self:start; border:0; padding:6px 0; min-height:44px; background:none; color:#2447b3; text-align:left; }
+.sourceExcerpt { padding:16px 20px; border-top:1px solid #d8ddd9; }
+.sourceExcerpt p { font-size:13px; color:#53606a; }
+.sourceExcerpt blockquote { font-size:14px; line-height:1.65; margin:8px 0; padding-left:12px; border-left:3px solid #8a5a00; max-height:170px; overflow:auto; }
+.boundary { font-size:15px; color:#53606a; line-height:1.7; margin:24px 0; max-width:100ch; }
+.documents { background:#fff; padding:24px; border:1px solid #d8ddd9; margin-top:24px; }
+.documents h2 { font-size:24px; }
+.documents p { font-size:14px; color:#53606a; }
+.documents article { display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; padding:20px 0; border-top:1px solid #d8ddd9; font-size:14px; }
+.documents strong { overflow-wrap:anywhere; }
+.mobileTabs { display:none; }
+.workbench :is(button,input,a):focus-visible { outline:3px solid #2447b3; outline-offset:3px; }
+@media(max-width:760px) { .intro { display:block; } .scope { margin-top:16px; } .reading { grid-template-columns:1fr; } .mobileTabs { display:flex; gap:8px; margin-bottom:12px; } .mobileTabs button { flex:1; min-height:44px; border:1px solid #88928d; background:white; color:#53606a; } .mobileTabs button[aria-pressed=true] { border-color:#2447b3; color:#2447b3; background:#eef2ff; } .reading[data-mobile-pane=result] .source, .reading[data-mobile-pane=source] .result { display:none; } .questions { display:grid; } .tabs button { padding-inline:8px; } }

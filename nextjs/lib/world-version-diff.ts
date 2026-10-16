@@ -51,15 +51,72 @@ export type WorldVersionDiff = {
   sourceRevisions: { added: string[]; removed: string[]; unchanged: number };
 };
 
-function changesBetween(
-  before: Record<string, string>,
-  after: Record<string, string>,
-): FieldChange[] {
+/*
+  A compared field is a plain value, or a reference list read as a set ("members") or as the size
+  of that set ("count"). Lists are kept as lists until they are known to differ: the sorted JSON a
+  change prints is built only for a field that changed. Building it for every object made the
+  sample's five-snapshot timeline sort and serialise 1.1M evidence ids per World, and a diff that
+  took about 40 ms took seconds.
+*/
+type FieldValue = string | { members: readonly string[] } | { count: readonly string[] };
+type Fields = Record<string, FieldValue>;
+
+function listOf(value: Exclude<FieldValue, string>) {
+  return "members" in value ? value.members : value.count;
+}
+
+// ponytail: cached by list identity, because a read model is never mutated once built; a caller
+// that edits a list in place after diffing it would read the stale canonical form.
+const canonicalByList = new WeakMap<readonly string[], { json: string; size: number }>();
+
+function canonical(ids: readonly string[]) {
+  let cached = canonicalByList.get(ids);
+  if (!cached) {
+    const sorted = membership(ids);
+    cached = { json: JSON.stringify(sorted), size: sorted.length };
+    canonicalByList.set(ids, cached);
+  }
+  return cached;
+}
+
+function render(value: FieldValue | undefined): string {
+  if (value === undefined) return "";
+  if (typeof value === "string") return value;
+  return "members" in value ? canonical(value.members).json : String(canonical(value.count).size);
+}
+
+function sameValue(before: FieldValue | undefined, after: FieldValue | undefined) {
+  if (before === undefined || after === undefined || typeof before === "string" || typeof after === "string") {
+    return before === after;
+  }
+  if (("members" in before) !== ("members" in after)) return false;
+  const left = listOf(before);
+  const right = listOf(after);
+  // An unchanged object holds the same ids in the same order: one pass, nothing allocated.
+  if (left.length === right.length && left.every((id, index) => id === right[index])) return true;
+  return render(before) === render(after);
+}
+
+function changesBetween(before: Fields, after: Fields): FieldChange[] {
   return Object.keys({ ...before, ...after })
     .sort()
-    .flatMap((field) => (before[field] === after[field]
+    .flatMap((field) => (sameValue(before[field], after[field])
       ? []
-      : [{ field, before: before[field] ?? "", after: after[field] ?? "" }]));
+      : [{ field, before: render(before[field]), after: render(after[field]) }]));
+}
+
+/*
+  Reference lists are sets, and are compared as sets.
+
+  Comparing only their length let a same-sized replacement through: an object whose one
+  evidence reference was swapped for another reported no change, and two objects that traded
+  source versions hid behind a global revision set that had not moved. The membership itself is
+  compared now, as JSON of the sorted unique ids, so before and after read unambiguously. Order
+  and repetition carry no meaning here and so cannot produce a change. The ids are copied before
+  sorting and are never trimmed or normalised: two ids that differ by a byte are two ids.
+*/
+function membership(ids: readonly string[]): string[] {
+  return [...new Set(ids)].sort();
 }
 
 /*
@@ -67,23 +124,30 @@ function changesBetween(
 
   Deliberately not "everything on the type". `status` flips from candidate to active when a
   version is promoted, which is a fact about the version and not a change to the object, and
-  reporting it would fill every diff with noise that hides the one line that matters.
+  reporting it would fill every diff with noise that hides the one line that matters. Aliases
+  and first-seen/last-changed history are read values the compiled artifact does not yet carry,
+  and stay out of the comparison for the same reason they are absent from the model.
 */
-function objectFields(object: WorldReadModel["objects"][number]): Record<string, string> {
+function objectFields(object: WorldReadModel["objects"][number]): Fields {
   return {
     label: object.label,
     type: object.type,
-    evidence: String(object.evidenceRefs.length),
-    relations: String(object.relations.length),
+    evidence: { count: object.evidenceRefs },
+    relations: { count: object.relations },
+    evidenceRefs: { members: object.evidenceRefs },
+    relationRefs: { members: object.relations },
+    claims: { members: object.claims },
+    sourceVersions: { members: object.sourceVersions },
   };
 }
 
-function relationFields(relation: WorldReadModel["relations"][number]): Record<string, string> {
+function relationFields(relation: WorldReadModel["relations"][number]): Fields {
   return {
     predicate: relation.predicate,
     subject: relation.subject,
     object: relation.object,
-    evidence: String(relation.evidenceRefs.length),
+    evidence: { count: relation.evidenceRefs },
+    evidenceRefs: { members: relation.evidenceRefs },
   };
 }
 
@@ -93,7 +157,7 @@ function relationFields(relation: WorldReadModel["relations"][number]): Record<s
   A page or a box that moved while the text stayed the same is the more dangerous change: the
   quote still reads correctly and no longer points at where it came from.
 */
-function evidenceFields(evidence: WorldReadModel["evidence"][number]): Record<string, string> {
+function evidenceFields(evidence: WorldReadModel["evidence"][number]): Fields {
   return {
     page: String(evidence.page),
     bbox: evidence.bbox.join(","),
@@ -106,7 +170,7 @@ function evidenceFields(evidence: WorldReadModel["evidence"][number]): Record<st
 function partition<T extends { id: string }>(
   left: readonly T[],
   right: readonly T[],
-  fields: (item: T) => Record<string, string>,
+  fields: (item: T) => Fields,
 ) {
   const byIdLeft = new Map(left.map((item) => [item.id, item] as const));
   const byIdRight = new Map(right.map((item) => [item.id, item] as const));

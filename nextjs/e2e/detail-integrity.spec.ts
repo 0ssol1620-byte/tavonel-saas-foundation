@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFrames } from "./fixtures/workspace-fixture";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "../lib/intake-approval-rollout";
 const evidenceDir = process.env.DETAIL_AUDIT_DIR;
 async function capture(page: Page, name: string) {
   if (!evidenceDir) return;
@@ -98,15 +99,29 @@ async function installObservedReading(page: Page) {
   } }));
 }
 
+/*
+  Re-pinned to an intended behaviour of 8d667edf ("fix: scope workspace and consent verification").
+
+  The stage no longer draws a progress object that is not bound to the selected immutable source
+  version (lib/ocr-progress.ts `qualifyProgress`; components/compile-stage.tsx passes an empty
+  reading to `deriveCompileStageView` and shows observed OCR only in the verified source panel).
+  `installObservedReading` answers the progress route with a bare readUrl and a v1 object with no
+  `sourceImmutableKey`/`inputSha256`, which is exactly the unbound case. Measured at 1aca28de
+  (Launch QA run 38835040264): data-visual "sources", the source beat (01 / 04), and no observed-
+  page summary. The canvas still paints the received source inventory and still resizes; the bound
+  observation is asserted in e2e/workspace-source-observation.spec.ts.
+*/
 test('the canvas paints received content and resizes when its container changes', async ({ page }) => {
   await installObservedReading(page);
   await page.goto('/workspace');
   const canvas = page.locator('.compile-stage-canvas');
-  await expect(page.locator('.compile-stage')).toHaveAttribute('data-visual', 'structure');
+  await expect(page.locator('.compile-stage')).toHaveAttribute('data-visual', 'sources');
   await expect(canvas).toBeVisible();
-  await expect(page.locator('.compile-stage-film-caption')).toContainText('Organize');
-  await expect(page.locator('.compile-stage-film-caption')).toContainText('03 / 04');
-  await expect(page.locator('.compile-stage-summary')).toContainText('1 observed page · 1 observed region');
+  await expect(page.locator('.compile-stage-film-caption')).toContainText('Source');
+  await expect(page.locator('.compile-stage-film-caption')).toContainText('01 / 04');
+  // An unbound observation is never drawn or summarized.
+  await expect(page.locator('.compile-stage')).not.toContainText('Received fixture source text');
+  await expect(page.locator('.compile-stage')).not.toContainText('observed page');
   expect(await canvas.evaluate(c => c.getBoundingClientRect().height)).toBeLessThan(300);
   const before = await canvas.evaluate(c => (c as HTMLCanvasElement).width);
   await page.locator('.workspace-compile-block').evaluate(element => { (element as HTMLElement).style.width = '80%'; });
@@ -124,7 +139,8 @@ test('unavailable canvas leaves visible text and accessible run information', as
   await page.addInitScript(() => { Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', { value: () => null }); });
   await installObservedReading(page);
   await page.goto('/workspace');
-  await expect(page.locator('.compile-stage')).toHaveAttribute('data-visual', 'structure');
+  // 'sources', not 'structure': the unbound observation is not drawn (see the note above).
+  await expect(page.locator('.compile-stage')).toHaveAttribute('data-visual', 'sources');
   await expect(page.locator('.compile-stage-canvas')).toBeHidden();
   await expect(page.locator('.compile-stage-summary')).toContainText('The visual is unavailable in this browser');
   await expect(page.locator('.compile-stage-status')).toBeVisible();
@@ -142,7 +158,9 @@ test('source endpoints stay attached after a width change, without a page reload
 test('API reference is scannable while endpoint contracts stay reachable by keyboard', async ({ page }) => {
   await page.goto('/api');
   const operations = page.locator('article[id]');
-  await expect(operations).toHaveCount(33);
+  // While the approval lineage is off the route publishes main's 33 operations (review 3, CI-TI-1); its six
+  // approved-upload operations join them only with the switch on.
+  await expect(operations).toHaveCount(INTAKE_APPROVAL_ROLLOUT_ENABLED ? 39 : 33);
   const operation = operations.first();
   const details = operation.locator('details').first();
   await expect(details).not.toHaveAttribute('open');

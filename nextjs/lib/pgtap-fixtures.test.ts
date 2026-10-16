@@ -49,7 +49,7 @@ function withoutComments(sql: string): string {
 }
 
 function assertionCount(sql: string): number {
-  return withoutComments(sql).match(new RegExp(`\\bselect\\s+(?:${ASSERTION_HELPERS})\\s*\\(`, "g"))?.length ?? 0;
+  return withoutComments(sql).match(new RegExp(`\\bselect\\s+(?:${ASSERTION_HELPERS})\\s*\\(`, "gi"))?.length ?? 0;
 }
 
 // A throws_ok call whose second argument is a description asserts that the database raises a
@@ -62,15 +62,15 @@ function assertionCount(sql: string): number {
 // "Actually raises" is not a prefix convention: the chain raises foundation_*, retrieval_*,
 // world_*, billing_*, enterprise_* and more. So the allowed set is read out of the migrations
 // rather than guessed, which also means a typo'd expectation fails here rather than at 2am.
-const THROWS_OK_CALL = /\bthrows_ok\s*\(/g;
-const THROWS_OK_PINNED = /\bthrows_ok\s*\(\s*\$\$[\s\S]*?\$\$\s*,\s*'([^']+)'\s*,/g;
+const THROWS_OK_CALL = /\bthrows_ok\s*\(/gi;
+const THROWS_OK_PINNED = /\bthrows_ok\s*\(\s*\$\$[\s\S]*?\$\$\s*,\s*'([^']+)'\s*,/gi;
 // Both cases, on purpose. The pattern used to be `[a-z][a-z0-9_]*`, which quietly collected only
 // the lowercase half of the chain: every SOURCE_DELETION_*, SOURCE_LEGAL_HOLD_* and CONNECTOR_*
 // error the deletion migrations raise is upper case, so a fixture covering the deletion sweeper
 // could not pin one of them and failed here rather than against the database. The allowed set has
 // to be what the migrations raise, not the half the pattern happened to match.
 const RAISED_BY_A_MIGRATION = new Set(
-  [...allMigrations.matchAll(/raise exception '([A-Za-z][A-Za-z0-9_]*)/g)].map((match) => match[1]),
+  [...allMigrations.matchAll(/raise\s+exception\s+'([A-Za-z][A-Za-z0-9_]*)/gi)].map((match) => match[1]),
 );
 
 // `raise exception 'x_mismatch: stored % vs query %'` is raised with its arguments interpolated,
@@ -86,7 +86,7 @@ describe("pgTAP fixtures", () => {
   });
 
   it.each(fixtures)("$name declares a plan matching its assertion count", ({ sql }) => {
-    const planned = Number(/select plan\((\d+)\)/.exec(sql)?.[1]);
+    const planned = Number(/select plan\((\d+)\)/i.exec(sql)?.[1]);
     const actual = assertionCount(sql);
     expect(Number.isFinite(planned), "fixture must declare a plan").toBe(true);
     expect(actual).toBeGreaterThan(0);

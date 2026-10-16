@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bindConsumerContext, releaseConsumerContext, resolveBoundSnapshot } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getManifestActivationStatus } from "@/lib/world-store";
@@ -32,10 +33,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!COLLECTION_ID_PATTERN.test(id)) {
     return NextResponse.json({ code: "WORLD_ID_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  // A consumer context is bound to the principal just verified, before anything is read.
+  const binding = bindConsumerContext(request.headers, auth.principal, { scope: "worlds:read", collectionId: id });
+  if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
   const digest = new URL(request.url).searchParams.get("digest") ?? "";
   if (!SHA256.test(digest)) {
     return NextResponse.json({ code: "MANIFEST_DIGEST_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  // Bound: the active World is resolved before the status is read. Legacy reads exactly as before.
+  const snapshot = binding.bound ? await resolveBoundSnapshot(binding, auth.principal.workspaceKey) : null;
+  if (snapshot && !snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
   const status = await getManifestActivationStatus(auth.principal.workspaceKey, id, digest);
   if (!status.ok) {
     return NextResponse.json(
@@ -43,5 +50,21 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       { status: status.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : status.code === "WORLD_STORE_READ_FAILED" || status.code === "WORLD_STORE_NOT_CONFIGURED" ? 503 : 400, headers: NO_STORE },
     );
   }
-  return NextResponse.json({ code: "MANIFEST_STATUS", manifestStatus: status.status }, { headers: NO_STORE });
+  const body = { code: "MANIFEST_STATUS", manifestStatus: status.status };
+  if (!binding.bound || !snapshot) return NextResponse.json(body, { headers: NO_STORE });
+  /*
+    The answer is measured against the active digest the status read itself saw. The payload names
+    no world_state_id, so that half is the resolved row's -- and only while the payload's active
+    digest is the resolved one. Any other digest means the World moved under the read, which is
+    refused rather than acknowledged as either World.
+  */
+  const servedDigest = status.status.activeManifestDigest;
+  const released = await releaseConsumerContext({
+    request, principal: auth.principal, scope: "worlds:read", bound: binding, snapshot,
+    served: servedDigest === snapshot.resolved.snapshot.manifestDigest
+      ? { worldStateId: snapshot.world.worldStateId, manifestDigest: servedDigest }
+      : null,
+  });
+  if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
+  return NextResponse.json(body, { headers: { ...released.headers } });
 }

@@ -1374,7 +1374,7 @@ describe("public copy", () => {
     at the demo rather than two pages away from it.
   */
   it("states what the Apple sample does not represent, next to the sample", () => {
-    const stage = read("components/explore/explore-stage.tsx");
+    const stage = read("components/explore/evidence-workbench.tsx");
     /*
       BA-037 rewrote the note this guards: six scoping clauses at 11px sitting under the page's
       central promise became three sentences at 15px, and "Apple&apos;s" became U+2019. The fact
@@ -1399,8 +1399,8 @@ describe("public copy", () => {
       stage,
       "and what the read does not recover is still one link away"
     ).toContain('href="/sources"');
-    expect(read("components/explore/explore-stage.module.css")).toMatch(
-      /\.entryNote \{[^}]*font-size: 1[5-9]px/
+    expect(read("components/explore/evidence-workbench.module.css")).toMatch(
+      /\.boundary \{[^}]*font-size:\s*1[5-9]px/
     );
   });
 });

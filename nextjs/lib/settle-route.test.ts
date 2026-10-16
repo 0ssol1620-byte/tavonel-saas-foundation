@@ -13,16 +13,18 @@
  * worker acknowledges a refusal nobody recorded, which is the bug all over again.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { settle, verify, adminConfig, adminRequest } = vi.hoisted(() => ({
+const { settle, settleProof, verify, adminConfig, adminRequest } = vi.hoisted(() => ({
   settle: vi.fn(),
+  settleProof: vi.fn(),
   verify: vi.fn(),
   adminConfig: vi.fn(),
   adminRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/compute-reservation", () => ({ settleFoundationCompute: settle }));
+vi.mock("@/lib/completed-read-proof", () => ({ settleCompletedRead: settleProof }));
 vi.mock("@/lib/compute-settlement-auth", () => ({ verifyComputeSettlementRequest: verify }));
 vi.mock("@/lib/supabase-admin", () => ({
   readSupabaseAdminConfig: adminConfig,
@@ -34,6 +36,21 @@ import { POST } from "../app/api/internal/billing/settle/route";
 const workspaceKey = "pilot-969dc192daa24119";
 const documentId = "969dc192-daa2-4119-a5d9-9a7621f171a1";
 const organizationId = "1b2f7a10-1111-4111-8111-111111111111";
+
+const sanitizedSha256 = `sha256:${"b".repeat(64)}`;
+const immutablePrefix = `immutable/${workspaceKey}/${workspaceKey}/${documentId}/${sanitizedSha256.slice(7)}`;
+const completedRead = {
+  schemaVersion: "tavonel.completed_read.v1",
+  workspaceKey, documentId,
+  originalKey: `quarantine/${workspaceKey}/${documentId}/source`,
+  originalSha256: `sha256:${"a".repeat(64)}`,
+  sanitizedKey: `${immutablePrefix}/sanitized.pdf`, sanitizedSha256,
+  ocrKey: `${immutablePrefix}/ocr.json`, ocrSha256: `sha256:${"c".repeat(64)}`,
+  observedPageCount: 3, readerRevision: `sha256:${"d".repeat(64)}`,
+  readerBindingSha256: `sha256:${"e".repeat(64)}`,
+};
+const successfulOcr = { workspaceKey, documentId, outcome: "settled", actualCredits: 2,
+  reasonCode: "OCR_COMPLETED", sourceSha256: completedRead.originalSha256 };
 
 type AdminCall = { path: string; method: string; body: unknown };
 
@@ -73,11 +90,14 @@ function healthyStore() {
 }
 
 beforeEach(() => {
+  vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "");
   verify.mockReset().mockReturnValue(true);
   settle.mockReset().mockResolvedValue({ ok: true, result: { status: "processed", reservationId: documentId } });
+  settleProof.mockReset();
   adminConfig.mockReset().mockReturnValue({ url: "https://project.supabase.co", serviceRoleKey: "x".repeat(40) });
   healthyStore();
 });
+afterEach(() => vi.unstubAllEnvs());
 
 describe("compute settlement endpoint", () => {
   it("records a terminal refusal as a document state and one audit row", async () => {
@@ -166,6 +186,9 @@ describe("compute settlement endpoint", () => {
       sourceSha256: `sha256:${"a".repeat(64)}`,
     });
     expect(calls()).toHaveLength(0);
+    expect(settle).toHaveBeenCalledExactlyOnceWith({ workspaceKey, documentId, outcome: "settled",
+      actualCredits: 2, reasonCode: "OCR_COMPLETED" });
+    expect(settleProof).not.toHaveBeenCalled();
   });
 
   it("refuses a digest that is not one, rather than passing it on", async () => {
@@ -185,6 +208,88 @@ describe("compute settlement endpoint", () => {
     settle.mockResolvedValue({ ok: false, code: "COMPUTE_SETTLEMENT_CONFLICT" });
     const response = await POST(request(refusal));
     expect(response.status).toBe(503);
+    expect(calls()).toHaveLength(0);
+  });
+
+  it("rejects completed-read facts while disabled without calling either settlement helper", async () => {
+    const response = await POST(request({ ...successfulOcr, completedRead }));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({ code: "COMPLETED_READ_INVALID_OR_DISABLED" });
+    expect(settle).not.toHaveBeenCalled();
+    expect(settleProof).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
+  });
+
+  it("requires persisted-read facts for enabled successful OCR settlement", async () => {
+    vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "true");
+    const response = await POST(request(successfulOcr));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "COMPLETED_READ_REQUIRED" });
+    expect(settle).not.toHaveBeenCalled();
+    expect(settleProof).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
+  });
+
+  it.each(["processed", "duplicate"])("returns the enabled proof helper's exact %s receipt", async status => {
+    vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "true");
+    const result = { status, reservationId: documentId, state: "settled", settledCredits: 2,
+      billingSource: "paid", completedRead };
+    settleProof.mockResolvedValue({ ok: true, result });
+    const response = await POST(request({ ...successfulOcr, completedRead }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ code: "SETTLEMENT_APPLIED", result,
+      sourceSha256: completedRead.originalSha256 });
+    expect(settleProof).toHaveBeenCalledExactlyOnceWith(completedRead);
+    expect(settle).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
+  });
+
+  it("rejects malformed or conflicting enabled proof scope and settlement facts", async () => {
+    vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "true");
+    for (const changed of [{ completedRead: null }, { completedRead: { ...completedRead, observedPageCount: 0 } },
+      { workspaceKey: "pilot-other" }, { documentId: "169dc192-daa2-4119-a5d9-9a7621f171a1" },
+      { sourceSha256: `sha256:${"f".repeat(64)}` }, { actualCredits: 0 },
+      { outcome: "operator_review" }, { reasonCode: "OTHER_COMPLETION" }]) {
+      const response = await POST(request({ ...successfulOcr, completedRead, ...changed }));
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code: "COMPLETED_READ_INVALID_OR_DISABLED" });
+    }
+    expect(settleProof).not.toHaveBeenCalled();
+    expect(settle).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
+  });
+
+  it.each(["COMPLETED_READ_DIRECT_UPLOAD_REQUIRED", "COMPLETED_READ_SETTLEMENT_FAILED"])(
+    "preserves the proof helper's %s failure without legacy fallback", async code => {
+      vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "true");
+      settleProof.mockResolvedValue({ ok: false, code });
+      const response = await POST(request({ ...successfulOcr, completedRead }));
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code });
+      expect(settle).not.toHaveBeenCalled();
+      expect(calls()).toHaveLength(0);
+    });
+
+  it("authenticates before considering an enabled proof", async () => {
+    vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "true");
+    verify.mockReturnValue(false);
+    const response = await POST(request({ ...successfulOcr, completedRead }));
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ code: "SETTLEMENT_AUTH_INVALID" });
+    expect(settleProof).not.toHaveBeenCalled();
+    expect(settle).not.toHaveBeenCalled();
+    expect(calls()).toHaveLength(0);
+  });
+
+  it("leaves enabled noncompletion releases on the existing settlement path", async () => {
+    vi.stubEnv("FOUNDATION_COMPLETED_READ_ENABLED", "true");
+    const response = await POST(request({ ...successfulOcr, outcome: "released", actualCredits: 0,
+      reasonCode: "GPU_NOT_DISPATCHED" }));
+    expect(response.status).toBe(200);
+    expect(settle).toHaveBeenCalledExactlyOnceWith({ workspaceKey, documentId, outcome: "released",
+      actualCredits: 0, reasonCode: "GPU_NOT_DISPATCHED" });
+    expect(settleProof).not.toHaveBeenCalled();
     expect(calls()).toHaveLength(0);
   });
 });

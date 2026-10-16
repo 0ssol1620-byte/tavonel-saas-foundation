@@ -17,7 +17,7 @@ describe("source-backed Explore entry", () => {
   });
   it("prefers an already-resolved answer citation over unrelated source text", () => {
     const a=region("source-a"), b=region("source-b");
-    const answers: ExploreAnswerView[] = [{ question: "Which source?", answer: b.excerpt,
+    const answers: ExploreAnswerView[] = [{ question: "Which source?", status: "grounded", answer: b.excerpt, reason: null,
       regions: [{ evidenceId:b.id,sourceId:b.sourceId,filename:b.filename,page:b.page,excerpt:b.excerpt,relevance:1 }] }];
     expect(chooseExploreEntryProof([a,b],answers)).toBe(b);
   });

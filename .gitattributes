@@ -23,6 +23,10 @@ nextjs/public/developer/*.md text eol=lf
 # assert on exact text; keep them stable across platforms for the same reason.
 supabase/migrations/*.sql text eol=lf
 supabase/tests/*.sql text eol=lf
+# Draft SQL is pinned by sha256 over the bytes on disk (lib/db-rehearsal-workflow.test.ts and
+# db-rehearsal.yml). A fresh Windows checkout under core.autocrlf gave CRLF drafts and five failures
+# there (review 3, CI-TI-5). The drafts README is pinned by git blob id, which line endings do not move.
+supabase/drafts/**/*.sql text eol=lf
 
 # The /explore sample PDFs are the source documents the public Explore page compiles, and
 # lib/explore-sample.test.ts asserts their bytes reproduce the generator's output exactly and

@@ -48,7 +48,7 @@ const { worldSourceIds, sourceAccess } = vi.hoisted(() => ({
   sourceAccess: vi.fn(async (): Promise<{ ok: boolean; code?: string }> => ({ ok: true })),
 }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: worldSourceIds }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 vi.mock("@/lib/foundation-pilot", () => ({ foundationPilotAccess: pilot, getRequestUser: vi.fn() }));
 vi.mock("@/lib/retrieval-index-status", () => ({
   ensureRetrievalIndexForActiveWorld: ensureIndex,
@@ -284,7 +284,7 @@ describe("POST /v1/collections/{id}/retrieval-index", () => {
     sourceAccess.mockResolvedValueOnce({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     const response = await recompileIndex(post(), { params });
     expect(response.status).toBe(403);
-    expect(sourceAccess).toHaveBeenCalledWith(WORKSPACE, ["doc-1"]);
+    expect(sourceAccess).toHaveBeenCalledWith(WORKSPACE, ["doc-1"], USER);
     expect(ensureIndex).not.toHaveBeenCalled();
   });
 

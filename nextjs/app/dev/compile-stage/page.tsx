@@ -54,6 +54,10 @@ const documents: DocumentListItem[] = [
 
 const reading: Record<string, OcrProgress> = {
   "d-scan": {
+    documentId: "d-scan",
+    versionKey: "a".repeat(64),
+    sourceImmutableKey: `synthetic/compile-stage/d-scan/${"a".repeat(64)}/sanitized.pdf`,
+    sourceSha256: `sha256:${"a".repeat(64)}`,
     state: "reading",
     pagesRead: 3,
     pageCount: 12,

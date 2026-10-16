@@ -13,7 +13,7 @@ const developerAsset = (name: string) => fileURLToPath(new URL(`../public/develo
 
 describe("developer distribution", () => {
   it("publishes a bounded API contract without decision endpoints", async () => {
-    const response = openApi(new Request("https://tavonel.com/api/openapi"));
+    const response = await openApi(new Request("https://tavonel.com/api/openapi"));
     const document = await response.json() as { paths: Record<string, unknown>; [key: string]: unknown };
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths["/documents"]).toBeTruthy();
@@ -31,7 +31,7 @@ describe("developer distribution", () => {
     const channel = JSON.parse(readFileSync(developerAsset("channel.json"), "utf8")) as { version: string; apiVersion: number; assets: Record<string, { sha256: string }> };
     const cli = readFileSync(developerAsset("tavonel-cli.mjs"), "utf8");
     const mcp = readFileSync(developerAsset("tavonel-mcp.mjs"), "utf8");
-    expect(channel.version).toBe("2026.9.20.1");
+    expect(channel.version).toBe("2026.10.2.1");
     expect(channel.apiVersion).toBe(1);
     expect(cli).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
     expect(mcp).toContain(`DISTRIBUTION_VERSION = "${channel.version}"`);
@@ -41,6 +41,7 @@ describe("developer distribution", () => {
     const assetFiles = {
       cli: "tavonel-cli.mjs",
       mcp: "tavonel-mcp.mjs",
+      consumerContext: "consumer-context.mjs",
       sourceAgent: "tavonel-source-agent.py",
       verifyExport: "tavonel-verify-export.mjs",
       verifyPackage: "tavonel-verify-package.mjs",
@@ -169,7 +170,20 @@ describe("developer distribution", () => {
     expect(source).not.toContain('add_argument("--api-key"');
     expect(source).toContain("/api/v1/uploads/capability");
     expect(source).toContain("/sync");
-    expect(source.indexOf("result = client.post(")).toBeLessThan(source.indexOf("write_state(args.state"));
+    const commitStart = source.indexOf("def commit_pending(");
+    expect(commitStart).toBeGreaterThanOrEqual(0);
+    const nextFunction = source.indexOf("\ndef ", commitStart + 1);
+    const nextDecorator = source.indexOf("\n@", commitStart + 1);
+    const boundaries = [nextFunction, nextDecorator].filter((position) => position >= 0);
+    const commitEnd = boundaries.length ? Math.min(...boundaries) : -1;
+    const commit = source.slice(commitStart, commitEnd === -1 ? undefined : commitEnd);
+    const remoteCommit = commit.indexOf("result = client.post(");
+    const acceptedCommit = commit.indexOf('if result.get("status") not in {"applied", "replayed"}:');
+    const cursorAdvance = commit.indexOf("write_state(args.state");
+    expect(remoteCommit).toBeGreaterThanOrEqual(0);
+    expect(acceptedCommit).toBeGreaterThan(remoteCommit);
+    expect(cursorAdvance).toBeGreaterThan(acceptedCommit);
+    expect(source).toContain("write_journal(pending_path, pending)");
     expect(source).toContain("os.replace(temp_name, path)");
     expect(source).toContain('parsed.hostname in {"localhost", "127.0.0.1", "::1"}');
   });
@@ -179,8 +193,8 @@ describe("developer distribution", () => {
 
     "Eight tools" stood on /developers, /docs/integration-recipes and the 3 September changelog
     entry while the server registers nine -- `list_worlds` shipped and was never announced, and
-    the number propagated outward from the entry. "Five published files" stood three times
-    against six in channel.json. Neither was a typo: both were a number typed once and copied,
+    the number propagated outward from the entry. A typed count of published files stood three
+    times against a longer list in channel.json. Neither was a typo: both were a number typed once and copied,
     with nothing comparing it to the artifact. `lib/mcp-tools.ts` is now the one list every
     surface renders, and this is what binds it to the artifacts.
   */

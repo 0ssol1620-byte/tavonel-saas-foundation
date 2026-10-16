@@ -144,6 +144,9 @@ async function rpc(name: string, body: Record<string, unknown>) {
   }
 }
 
+const validCount = (count: unknown): count is number => Number.isSafeInteger(count) && (count as number) >= 0;
+const validTimestamp = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
+
 function deletionStatus(value: unknown, workspaceKey: string, documentId: string): CustomerSourceDeletionStatus | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as CustomerSourceDeletionStatus;
@@ -154,14 +157,19 @@ function deletionStatus(value: unknown, workspaceKey: string, documentId: string
     || !Number.isFinite(Date.parse(row.requestedAt)) || !Number.isFinite(Date.parse(row.eligibleAt))
     || !SHA256.test(row.tombstoneReceiptId ?? "") || !optionalSha(row.requestManifestSha256)
     || !optionalSha(row.inventoryManifestSha256)
-    || (row.artifactCount !== null && !Number.isSafeInteger(row.artifactCount))
+    || (row.artifactCount !== null && !validCount(row.artifactCount))
     || !validDerived(row.derived)
     || !Array.isArray(row.objects)
     || !row.objects.every(o => o && typeof o.objectKey === "string" && SHA256.test(o.objectSha256)
       && optionalSha(o.receiptId) && (o.purgedAt === null) === (o.receiptId === null)
+      && (o.purgedAt === null || validTimestamp(o.purgedAt))
       && (o.purgeFailureCount === undefined || (Number.isSafeInteger(o.purgeFailureCount) && o.purgeFailureCount >= 0))
       && (o.lastPurgeFailureCode == null || /^[A-Z0-9_]{1,80}$/.test(o.lastPurgeFailureCode))
       && (o.lastPurgeFailureAt == null || Number.isFinite(Date.parse(o.lastPurgeFailureAt))))) return null;
+  // One row per attested object: a repeated key or more rows than the attested count is not a
+  // partial receipt but an inconsistent one. Fewer rows than the count is still purging.
+  if (new Set(row.objects.map(o => o.objectKey)).size !== row.objects.length
+    || (row.artifactCount !== null && row.objects.length > row.artifactCount)) return null;
   return row;
 }
 
@@ -309,11 +317,15 @@ export async function runRetentionTombstones(candidates: readonly RetentionCandi
  * serving, so `derivedArtifactsRetained` stays true and this never claims full document deletion.
  * An object whose last purge attempt R2 refused under an object lock is reported as retained
  * (`purge_blocked_by_storage_lock`), not as "purging": no retry can succeed before the lock ends.
+ * Purged means exactly `artifactCount` rows with distinct keys, each with a receipt and a
+ * parseable purge time. Attestation refuses an empty inventory, so a zero count never reads as purged.
  */
 export function customerDeletionReceipt(status: CustomerSourceDeletionStatus) {
   const attested = status.inventoryManifestSha256 !== null && status.artifactCount !== null;
-  const purged = attested && status.objects.length >= status.artifactCount!
-    && status.objects.every(object => object.receiptId !== null);
+  const purged = attested && validCount(status.artifactCount) && status.artifactCount > 0
+    && status.objects.length === status.artifactCount
+    && new Set(status.objects.map(object => object.objectKey)).size === status.artifactCount
+    && status.objects.every(object => object.receiptId !== null && validTimestamp(object.purgedAt));
   const lockRetained = status.objects.filter(object =>
     object.receiptId === null && object.lastPurgeFailureCode === OBJECT_LOCKED_CODE);
   const state = !attested ? "scheduled" as const

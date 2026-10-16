@@ -1,8 +1,18 @@
 name: CI
 on:
+  # Every PR event main runs on (opened, synchronize, reopened): the full suite runs on each push
+  # to a PR, not only when it leaves draft.
   pull_request:
   push:
-    branches: [main, "agent/**"]
+    branches:
+      - main
+      - "agent/**"
+      - codex/gate-acl-integration-20260927
+      - codex/gate-lifecycle-integration-20260927
+      - codex/operations-integration-20260830
+      - codex/site-truth-integration-20260924
+      - codex/tavonel-foundation-p0p2-integration
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -37,7 +47,11 @@ jobs:
       run:
         working-directory: nextjs
     steps:
+      # Full history: `pnpm test` runs scripts/db/native-world-race-ci.test.mjs, whose race and successor proofs read
+      # the bytes of their historical parent commits (c61fe1a5, 2bb). A depth-1 checkout cannot answer them.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with: { version: 10.34.4 }
       - uses: actions/setup-node@v4
@@ -50,4 +64,4 @@ jobs:
       - run: pnpm scan:secrets
       - run: pnpm check
       - run: pnpm test
-      - run: pnpm build
+      - run: pnpm exec next build

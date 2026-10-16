@@ -15,7 +15,10 @@ const DIGEST = "108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab
 */
 async function openEntrySheet(page: import("@playwright/test").Page) {
   await page.goto("/explore");
-  await page.getByRole("button", { name: "Open this source page" }).first().click();
+  // The annual-report prepared question selects the original PDF named below. The default
+  // question now selects a quarterly reference render, which must not stand in for this proof.
+  await page.getByRole("group", { name: "Sample questions" }).getByRole("button").nth(2).click();
+  await page.getByRole("button", { name: "Open full evidence inspector ↗" }).first().click();
   await expect(page.locator("[data-source-sheet]").first()).toBeVisible({ timeout: 20_000 });
 }
 
@@ -80,4 +83,51 @@ test("a mismatched source fails closed and still offers the committed PDF", asyn
   await expect(sheet).toContainText("does not match the recorded source");
   await expect(sheet.locator("[data-original-region]")).toHaveCount(0);
   await expect(sheet.getByRole("link", { name: "Open the original PDF" })).toBeVisible();
+});
+
+test("a failed source request can be retried without weakening the digest check", async ({ page }) => {
+  let requests = 0;
+  let recovered = false;
+  await page.route(`**/explore-sample/${FILE}`, route => {
+    requests += 1;
+    return !recovered ? route.fulfill({ status: 503, body: "temporary public fixture failure" }) : route.continue();
+  });
+  await openEntrySheet(page);
+  const sheet = page.locator("[data-source-sheet]").first();
+  const original = sheet.locator("[data-original-source]");
+  await expect(original).toHaveAttribute("data-render-state", "error");
+  await expect(original.locator("[data-original-region]")).toHaveCount(0);
+  const failedRequests = requests;
+  recovered = true;
+  await original.getByRole("button", { name: "Check again", exact: true }).click();
+  await expect(original).toHaveAttribute("data-render-state", "ready", { timeout: 20_000 });
+  await expect(original).toHaveAttribute("data-source-digest", `sha256:${DIGEST}`);
+  await expect(original.locator("[data-original-region]")).toHaveCount(1);
+  expect(requests).toBe(failedRequests + 1);
+});
+
+test("interrupted navigation and browser history restore the same source region", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  let interrupted = true;
+  await page.route(`**/explore-sample/${FILE}`, async route => {
+    if (interrupted) await new Promise(resolve => setTimeout(resolve, 800));
+    try { await route.continue(); } catch { /* Navigation can cancel this intercepted request. */ }
+  });
+  await openEntrySheet(page);
+  await expect(page.locator("[data-source-sheet] [data-original-source]").first()).toHaveAttribute("data-render-state", "loading");
+  const target = await page.locator("[data-active-region]").first().getAttribute("data-region-id");
+  expect(target).toBeTruthy();
+  await page.goto("/pricing");
+  interrupted = false;
+  await page.goBack();
+  const sheet = page.locator("[data-source-sheet]").first();
+  await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", target!);
+  await expect(sheet.locator("[data-original-source]")).toHaveAttribute("data-render-state", "ready", { timeout: 20_000 });
+  await page.goForward();
+  await expect(page).toHaveURL(/\/pricing$/);
+  await page.goBack();
+  await expect(sheet.locator("[data-active-region]")).toHaveAttribute("data-region-id", target!);
+  await expect(sheet.locator("[data-original-source]")).toHaveAttribute("data-source-digest", `sha256:${DIGEST}`);
+  expect(errors).toEqual([]);
 });

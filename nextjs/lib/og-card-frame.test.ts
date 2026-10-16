@@ -24,6 +24,17 @@ import { BRAND_LINE } from "./site-navigation";
 */
 const FRAME = resolve(import.meta.dirname, "../public/og/evidence-frame.png");
 
+describe("Korean pricing fallback", () => {
+  it("reuses the registered English card and renders a valid PNG", async () => {
+    const english = await import("../app/pricing/opengraph-image");
+    const korean = await import("../app/ko/pricing/opengraph-image");
+    expect(korean.default).toBe(english.default);
+    const bytes = Buffer.from(await korean.default().arrayBuffer());
+    expect(pngHeader(bytes)).toEqual({ width: 1200, height: 630 });
+    expect(bytes.length).toBeGreaterThan(1000);
+  });
+});
+
 /** width and height out of a PNG's IHDR, which is always the first chunk. */
 function pngHeader(bytes: Buffer) {
   expect(bytes.subarray(0, 8), "not a PNG").toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));

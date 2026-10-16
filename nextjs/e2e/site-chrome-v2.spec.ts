@@ -2,7 +2,7 @@
  * The V2 site chrome (blueprint 2026-09-19 §8, §29; contract D2, D9), measured in a browser.
  *
  * Everything here is a geometric or compositional fact that no unit test can see:
- * `lib/one-path-contract.test.ts` knows the bar declares five destinations, and
+ * `lib/one-path-contract.test.ts` knows the bar declares four destinations, and
  * `lib/site-nav-model.test.ts` knows each one is a published route with a Korean label, but
  * neither can tell whether the bar is 64px tall, whether its surface stays readable before the reader
  * scrolls, whether the access action is the only filled control in it, or whether five labels
@@ -45,7 +45,7 @@ test.describe("at 1440", () => {
     test.skip(testInfo.project.name !== "1440", "the desktop bar is measured at the width it is drawn for");
   });
 
-  test("is a 64px bar carrying the five destinations in order", async ({ page }) => {
+  test("is a 64px bar carrying the four section destinations in order", async ({ page }) => {
     await page.goto("/product");
     const box = await page.locator(HEADER).boundingBox();
     expect(box, "the header has no box").not.toBeNull();
@@ -150,6 +150,7 @@ test.describe("at 1440", () => {
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(header).toHaveAttribute("data-scrolled", "0");
+    await expect(header).toHaveCSS("background-color", "rgb(251, 250, 247)");
   });
 
   /*
@@ -162,7 +163,7 @@ test.describe("at 1440", () => {
   test("aligns the wordmark and footer on the shared fluid content edge", async ({ page }) => {
     await page.goto("/product");
     const width = page.viewportSize()!.width;
-    const edge = Math.max(Math.min(Math.max(width * .03, 20), 64), (width - 1600) / 2);
+    const edge = Math.max(Math.min(Math.max(width * .025, 20), 32), (width - 1280) / 2);
     const wordmark = await page.locator(`${HEADER} .wordmark`).first().boundingBox();
     expect(wordmark).not.toBeNull();
     expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);
@@ -194,7 +195,7 @@ test.describe("at 390", () => {
     test.skip(testInfo.project.name !== "390", "the phone sheet is measured at a phone width");
   });
 
-  test("opens a sheet of the five destinations plus Sign in, with the action still in the row", async ({ page }) => {
+  test("opens a sheet of four section destinations plus Sign in, with the action still in the row", async ({ page }) => {
     await page.goto("/product");
     // Brief 2026-10-15 move 6: the phone row is the wordmark and Menu; Pricing is a sheet row.
     await expect(page.locator(`${HEADER} .nav-actions`)).toBeHidden();
@@ -256,5 +257,66 @@ test.describe("at 390", () => {
     await page.locator(`${SHEET} > summary`).click();
     await expect(page.locator(`${SHEET} > nav`)).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+});
+
+/*
+  Review 2 (FE-B1). The paper chrome (app/chrome-v2.css) is for the public reading pages, not Home:
+  its rules are unlayered, so without the Home exclusion they beat Home's own header and footer
+  (source-first-home.module.css, @layer overrides) and Release 2's dark footer turned paper. The
+  expected values are main's: first dbe22b1e's, then bcba7173's (Home Release 3), whose 255° accent
+  moved the header action to #005bb3 (rgb(0, 91, 179)) and Home's --source to var(--action). They
+  were read off tavonel.com (deployment dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2) on 2026-10-16 at these
+  three widths, and the merged build matched all 160 measured Home header and footer properties.
+
+  Review 3 (FE-H1, FE-H2) found what that list left out: pseudo-elements and motion. The phone menu
+  icon's ::before/::after keep main's `transform .18s ease, box-shadow .18s ease` morph on Home (an
+  unscoped `transition: none` had stopped it at 400px and below), and Home's header keeps main's
+  min-height at 1440. Both read off the same deployment on 2026-10-16: "transform 0.18s, box-shadow
+  0.18s" on / and /ko at 390 and 360, header min-height "0px" at 1440. The paper pages keep the
+  instant swap, and their own 64px minimum.
+*/
+test.describe("Home keeps main's header and footer colours", () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
+  });
+
+  for (const path of ["/", "/ko"]) {
+    test(`on ${path}`, async ({ page }, testInfo) => {
+      await page.goto(path);
+      const footer = page.locator("footer.site");
+      await expect(footer).toHaveCSS("background-color", "rgb(9, 13, 20)");
+      await expect(footer.locator(".site-footer-groups a").first()).toHaveCSS("color", "rgb(183, 195, 210)");
+      const header = page.locator(HEADER);
+      await expect(header).toHaveCSS("color", "rgb(21, 25, 29)");
+      expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
+      await expect(header.locator(".nav-actions .btn")).toHaveCSS("background-color", "rgb(0, 91, 179)");
+      if (testInfo.project.name === "1440") {
+        await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");
+        await expect(header.locator(".nav-signin")).toHaveCSS("color", "rgb(21, 25, 29)");
+        await expect(header).toHaveCSS("min-height", "0px");
+      } else {
+        const summary = header.locator("details.mobile-primary-nav > summary");
+        for (const pseudo of ["::before", "::after"]) {
+          expect(await summary.evaluate((element, which) => getComputedStyle(element, which).transition, pseudo), `menu icon ${pseudo}`)
+            .toBe("transform 0.18s, box-shadow 0.18s");
+        }
+      }
+    });
+  }
+
+  test("while the reading pages keep the paper chrome", async ({ page }, testInfo) => {
+    await page.goto("/pricing");
+    await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(247, 245, 239)");
+    await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(83, 96, 106)");
+    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#2447b3");
+    if (testInfo.project.name === "1440") {
+      await expect(page.locator(HEADER)).toHaveCSS("min-height", "64px");
+    } else {
+      const summary = page.locator(`${HEADER} details.mobile-primary-nav > summary`);
+      for (const pseudo of ["::before", "::after"]) {
+        expect(await summary.evaluate((element, which) => getComputedStyle(element, which).transition, pseudo), `menu icon ${pseudo}`).toBe("none");
+      }
+    }
   });
 });

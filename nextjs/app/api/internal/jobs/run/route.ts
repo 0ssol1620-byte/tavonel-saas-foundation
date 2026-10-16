@@ -4,6 +4,7 @@ import { runCompileJobBatch } from "@/lib/compile-job-worker";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { claimJob } from "@/lib/job-store";
 import { runSourceImportBatch } from "@/lib/sync-worker";
+import { isInternalWorkerAuthorized } from "@/lib/internal-worker-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,28 +35,9 @@ const HEADERS = { "Cache-Control": "no-store" };
 // across tenants by design, claiming whichever job is due, so it must never be reachable with
 // a customer's credentials. When the secret is unset the endpoint is closed entirely rather
 // than open -- an unauthenticated cross-tenant executor is the worst possible default.
-function authorized(request: Request): boolean {
-  const presented = request.headers.get("authorization")?.trim() ?? "";
-  if (!presented.startsWith("Bearer ")) return false;
-  const token = presented.slice("Bearer ".length);
-
-  // Vercel Cron sends CRON_SECRET as a Bearer token. Keep a separately rotatable manual
-  // worker secret as well, and treat short values as absent rather than guessable gates.
-  const configured = [process.env.FOUNDATION_WORKER_SECRET, process.env.CRON_SECRET]
-    .map((value) => value?.trim() ?? "")
-    .filter((value) => value.length >= 32);
-  return configured.some((candidate) => {
-    if (token.length !== candidate.length) return false;
-    let difference = 0;
-    for (let index = 0; index < token.length; index += 1) {
-      difference |= token.charCodeAt(index) ^ candidate.charCodeAt(index);
-    }
-    return difference === 0;
-  });
-}
 
 async function runOneBatch(request: Request) {
-  if (!authorized(request)) {
+  if (!isInternalWorkerAuthorized(request)) {
     return NextResponse.json({ code: "WORKER_NOT_AUTHORIZED" }, { status: 401, headers: HEADERS });
   }
 

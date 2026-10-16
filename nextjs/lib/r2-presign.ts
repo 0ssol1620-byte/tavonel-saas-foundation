@@ -2,7 +2,12 @@ import { createHash, createHmac } from "node:crypto";
 import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
 /** Re-exported so a route reads one intake module instead of two. */
 export { PROCESSING_CEILING, PROCESSING_CEILING_SENTENCE } from "../../shared/intakeCeiling";
-import { FOUNDATION_R2_BUCKET, type R2SignerEnv } from "./r2-synthetic-canary";
+import {
+  FOUNDATION_R2_BUCKET,
+  FOUNDATION_TRIAGE_MAX_SOURCE_BYTES,
+  foundationTriageStagingKey,
+  type R2SignerEnv,
+} from "./r2-synthetic-canary";
 import { immutableWorkspacePrefix } from "./immutable-keys";
 
 export const QUARANTINE_PREFIX = "quarantine/";
@@ -112,7 +117,7 @@ export function presignWorkspaceProgressGet(
   return presignWorkspaceGet(env, { workspaceId, key, expiresInSeconds, now }, assertWorkspaceProgressKey);
 }
 
-export function presignFoundationQuarantinePut(
+function presignFoundationPutValidated(
   env: R2SignerEnv,
   {
     key,
@@ -127,8 +132,9 @@ export function presignFoundationQuarantinePut(
     expiresInSeconds: number;
     now?: Date;
   },
+  validateKey: (bucket: string, key: string) => string | null,
 ) {
-  const blocked = assertFoundationQuarantineKey(env.bucket, key);
+  const blocked = validateKey(env.bucket, key);
   if (blocked) return { ok: false as const, code: blocked };
   // The byte count is signed now, so an impossible one must not reach the signature at all.
   if (!Number.isSafeInteger(contentLength) || contentLength < 1 || contentLength > FOUNDATION_INTAKE_MAX_BYTES) {
@@ -190,4 +196,35 @@ export function presignFoundationQuarantinePut(
   const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
   const uploadUrl = `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
   return { ok: true as const, uploadUrl, contentLength };
+}
+
+export function presignFoundationQuarantinePut(
+  env: R2SignerEnv,
+  input: { key: string; contentType: string; contentLength: number; expiresInSeconds: number; now?: Date },
+) {
+  return presignFoundationPutValidated(env, input, assertFoundationQuarantineKey);
+}
+
+/** The only browser-writable triage object; sealed source keys never use this signer. */
+export function presignFoundationTriageStagingPut(
+  env: R2SignerEnv,
+  input: {
+    workspaceKey: string;
+    stageId: string;
+    contentType: string;
+    contentLength: number;
+    expiresInSeconds: number;
+    now?: Date;
+  },
+) {
+  if (!Number.isSafeInteger(input.contentLength) || input.contentLength < 1
+    || input.contentLength > FOUNDATION_TRIAGE_MAX_SOURCE_BYTES) {
+    return { ok: false as const, code: "TRIAGE_STAGE_SIZE_INVALID" };
+  }
+  const key = foundationTriageStagingKey(input.workspaceKey, input.stageId);
+  if (!key) return { ok: false as const, code: "TRIAGE_STAGE_KEY_INVALID" };
+  return presignFoundationPutValidated(env, { ...input, key }, (bucket, candidate) => {
+    if (bucket !== FOUNDATION_R2_BUCKET || candidate !== key) return "TRIAGE_STAGE_KEY_INVALID";
+    return null;
+  });
 }

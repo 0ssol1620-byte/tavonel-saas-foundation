@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { PublicPageShell } from "@/components/public-page-shell";
 import SolutionProofSample from "@/components/solution-proof-sample";
+import DesignPartners from "@/components/design-partners";
 import PublicPrimaryCta from "@/components/public-primary-cta";
 import { SOLUTIONS } from "./[slug]/page";
 import styles from "./solutions.module.css";
@@ -9,105 +10,58 @@ import { EXPLORE_CTA } from "@/lib/site-navigation";
 
 export const metadata: Metadata = {
   title: "Solutions — TAVONEL",
-  description:
-    "Five documented uses of the compiler: who each one is for, the workflow it follows, what it leaves behind and where it stops.",
+  description: "Choose a document workflow by its input, the action you need and the result you can inspect. Five uses, with sample evidence and published limits.",
   alternates: { canonical: "/solutions" },
   openGraph: { url: "/solutions" },
 };
 
-/*
-  The hub the top-level "Solutions" link was already promising.
-
-  It pointed at /solutions/ai-ready-knowledge -- one of five pages, wearing the label of the
-  whole section -- so a reader who wanted the graph page or the operations page landed on the
-  RAG page and had to guess. Nothing here is new content: every card is read from the same
-  `SOLUTIONS` record the detail pages render, so a solution cannot exist on one and be missing
-  from the other, and the audience line cannot drift from the page it summarises.
-
-  There is no sixth card. `technical-document-assistant` is named in the masterplan and has no
-  route, and a hub that lists a destination the router answers with a 404 is worse than a hub
-  that lists four.
-*/
-
+// One record owns the task choice, audience and destination on both hub and detail.
 const ENTRIES = Object.entries(SOLUTIONS);
 
 export default function SolutionsPage() {
   return (
     <PublicPageShell>
-      <section className="scene doc"><div className="shell"><div className="body">
-        <div className="stack">
-          {/*
-            BA-054: the descriptor slot says what this section is. It read "SOLUTIONS · TAVONEL",
-            which fills the slot with the brand and so says nothing -- the pattern everywhere else
-            on the site is the section plus what it holds.
-          */}
-          <h1 className="document-title">What people use the compiler for.</h1>
-        </div>
-        <div className="stack">
-          {/*
-            What a solution page is, said before a reader opens one. Each describes a use the
-            product is built for -- the workflow, the result and the limits -- written from the
-            product's own behaviour.
-
-            BA-040. The lede closed on "A described use is not a completed customer case, and none
-            of these five pages is written as one." A page whose job is to answer "who is this
-            for" opened by disqualifying its own five entries, and that second sentence was
-            written to protect us rather than to help the reader. It is still true and still
-            published: it is the last line of the page now, where a reader who wants to know
-            whether these are case studies will find it, and where it is not the first thing
-            anybody reads.
-          */}
+      <section className={`scene doc ${styles.surface}`}><div className="shell">
+        <div className={styles.hubIntro}>
+          <h1 className="document-title">Start with the work you need to do.</h1>
           <p className="lede">
-            Five ways teams put the compiler to work. Each page gives the audience, the path from
-            source to World, what the workflow leaves behind, and the limits that come with it.
+            Five ways teams put the compiler to work. Choose the input you have and the output
+            you need, then inspect the workflow, sample evidence and limits.
           </p>
-          <div className="tiles">
-            {/*
-              BA-040 in the cards: each one closed on its problem sentence under a hairline, so
-              five cards read as five complaints and the hub read as a disclaimer. The problem is
-              one sentence, it comes before what the workflow gives you, and the card ends on the
-              product rather than on the difficulty.
-
-              BA-052: a card-shaped surface with a border and a background has to be clickable.
-              It was a ~200px text target inside a 330px card with no hover state at all. The
-              title's anchor is expanded over the whole article by `styles.cardTitle`, which keeps
-              one link per card rather than nesting a second one around it.
-            */}
-            {ENTRIES.map(([slug, solution]) => (
-              <article className={`tile ${styles.card}`} key={slug}>
+        </div>
+        <div className={`tiles ${styles.hubList}`}>
+          {ENTRIES.map(([slug, solution]) => (
+            <article className={`tile ${styles.card}`} key={slug}>
+              <div className={styles.cardIntro}>
                 <p className="n">{solution.eyebrow}</p>
                 <h2 className={styles.cardTitle}>
                   <Link href={`/solutions/${slug}` as Route}>{solution.title}</Link>
                 </h2>
-                {/*
-                  Gap #11. Five cards, five different filings, cut from the page each one printed on.
-
-                  The hub was five text cards with no image on any of them, and the failure the
-                  audit warns against is five copies of one document -- G1-016 in a new place.
-                  Nothing new is selected here: each solution's `proof.match` already locates a
-                  region the compiler emitted in the filing that solution's own audience would be
-                  reading, and the thumbnail is the committed render of that page cropped to that
-                  region. Nothing drawn, nothing authored, no raster committed for this.
-                */}
-                <SolutionProofSample pick={solution.proof} variant="thumb" />
                 <p className={styles.audience}>For: {solution.audience}</p>
-                <p className={styles.problem}>{solution.problem}</p>
-                <p>{solution.lede}</p>
-              </article>
-            ))}
-          </div>
-          <div className="actions">
-            <PublicPrimaryCta className="btn" />
-            <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
-          </div>
-          <p className="fine">
-            Next: the guides, samples and research in the{" "}
-            <Link href="/resources">resources hub</Link>, or the exact product contract in the{" "}
-            <Link href="/docs">documentation</Link>. These five pages describe how the compiler
-            is used, not completed customer engagements.
-          </p>
+              </div>
+              <dl className={styles.task} aria-label="Input, action and output">
+                <div><dt>Input</dt><dd>{solution.task.input}</dd></div>
+                <div><dt>Action</dt><dd>{solution.task.action}</dd></div>
+                <div><dt>Output</dt><dd>{solution.task.output}</dd></div>
+              </dl>
+              <div className={styles.cardProof}>
+                <SolutionProofSample pick={solution.proof} variant="thumb" />
+                <p>Sample source · inspect the workflow →</p>
+              </div>
+            </article>
+          ))}
         </div>
-      </div></div></section>
+        <DesignPartners className={styles.partnership} />
+        <div className="actions">
+          <PublicPrimaryCta className="btn" />
+          <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
+        </div>
+        <p className="fine">
+          Next: the guides, samples and research in the <Link href="/resources">resources hub</Link>,
+          or the exact product contract in the <Link href="/docs">documentation</Link>.
+          These five pages describe how the compiler is used, not completed customer engagements.
+        </p>
+      </div></section>
     </PublicPageShell>
   );
 }

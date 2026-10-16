@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { markOAuthConnectionReauthorizationRequired } from "./connector-oauth-store";
+import { consumeOAuthAuthorization, createOAuthAuthorization, markOAuthConnectionReauthorizationRequired } from "./connector-oauth-store";
 
 // The withdrawn-grant flag is the only writer of `reauthorization_required`, and it is written
 // by a worker with no user watching. So the assertions here are about the two things that
@@ -139,5 +139,80 @@ describe("markOAuthConnectionReauthorizationRequired", () => {
       ok: false,
       code: "OAUTH_CONNECTION_STATUS_WRITE_FAILED",
     });
+  });
+});
+
+/*
+  DB-B1 (review 2). Production's foundation_oauth_authorizations has no authorization_purpose column
+  and its consume_foundation_oauth_authorization (20260920121000) returns no authorizationPurpose:
+  both exist only in supabase/drafts/google-viewer-principal-boundary.sql. This database is that
+  production schema: an insert naming an unknown column is refused as PostgREST does (PGRST204).
+*/
+describe("OAuth authorization against the production schema (viewer link off)", () => {
+  const PRODUCTION_COLUMNS = new Set([
+    "workspace_key", "provider", "display_name", "state_sha256", "pkce_verifier_reference", "redirect_uri",
+    "requested_scopes", "created_by", "authorization_revision", "expires_at",
+  ]);
+  const authorization = {
+    workspaceKey: "pilot-acme01", userId: INPUT.userId, provider: "google_drive" as const, displayName: "Research Drive",
+    stateSha256: "a".repeat(64), pkceVerifierReference: "vault://tavonel/oauth/pkce/state",
+    redirectUri: "https://tavonel.com/api/v1/oauth-connectors/callback/google_drive",
+    requestedScopes: ["https://www.googleapis.com/auth/drive.readonly"], authorizationRevision: 3,
+  };
+
+  function productionDatabase() {
+    const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/rest/v1/foundation_oauth_authorizations")) {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const unknown = Object.keys(body).find((key) => !PRODUCTION_COLUMNS.has(key));
+        if (unknown) return Response.json({ code: "PGRST204", message: `Could not find the '${unknown}' column` }, { status: 400 });
+        return Response.json([{ authorization_id: "49d42924-a3cc-4a09-b92d-9c86b58901a1" }], { status: 201 });
+      }
+      if (url.includes("/rest/v1/foundation_developer_audit_events")) return new Response(null, { status: 201 });
+      if (url.includes("/rest/v1/rpc/consume_foundation_oauth_authorization")) {
+        // 20260920121000's jsonb_build_object: no authorizationPurpose key.
+        return Response.json({
+          authorizationId: "49d42924-a3cc-4a09-b92d-9c86b58901a1", workspaceKey: "pilot-acme01", userId: INPUT.userId,
+          authorizationRevision: 3, displayName: "Research Drive", pkceVerifierReference: authorization.pkceVerifierReference,
+          redirectUri: authorization.redirectUri, requestedScopes: authorization.requestedScopes,
+        });
+      }
+      return Response.json({}, { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    return fetcher;
+  }
+
+  it("starts a connector authorization without the draft-only column", async () => {
+    configure();
+    const fetcher = productionDatabase();
+    await expect(createOAuthAuthorization({ ...authorization, authorizationPurpose: "connector_connection" }))
+      .resolves.toMatchObject({ ok: true, authorizationId: "49d42924-a3cc-4a09-b92d-9c86b58901a1" });
+    const insert = fetcher.mock.calls.find(([input]) => String(input).includes("foundation_oauth_authorizations"));
+    expect(JSON.parse(String((insert?.[1] as RequestInit).body))).not.toHaveProperty("authorization_purpose");
+  });
+
+  it("reads a production consume row with no purpose as a connector connection", async () => {
+    configure();
+    productionDatabase();
+    const consumed = await consumeOAuthAuthorization("a".repeat(64), "google_drive");
+    expect(consumed).toMatchObject({ ok: true, authorization: { authorizationPurpose: "connector_connection", authorizationRevision: 3 } });
+  });
+
+  it("names the column only for a viewer link, and refuses an unknown purpose", async () => {
+    configure();
+    const fetcher = productionDatabase();
+    // The draft schema is what a viewer link needs; against production it fails closed.
+    await expect(createOAuthAuthorization({ ...authorization, authorizationPurpose: "viewer_acl_link" }))
+      .resolves.toEqual({ ok: false, code: "OAUTH_AUTHORIZATION_CREATE_FAILED" });
+    const insert = fetcher.mock.calls.find(([input]) => String(input).includes("foundation_oauth_authorizations"));
+    expect(JSON.parse(String((insert?.[1] as RequestInit).body))).toMatchObject({ authorization_purpose: "viewer_acl_link" });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      authorizationId: "49d42924-a3cc-4a09-b92d-9c86b58901a1", workspaceKey: "pilot-acme01", userId: INPUT.userId,
+      authorizationRevision: 3, displayName: "Research Drive", pkceVerifierReference: "vault://p", redirectUri: "https://r",
+      requestedScopes: [], authorizationPurpose: "admin",
+    })));
+    await expect(consumeOAuthAuthorization("a".repeat(64), "google_drive")).resolves.toEqual({ ok: false, code: "OAUTH_AUTHORIZATION_INVALID" });
   });
 });

@@ -198,8 +198,13 @@ test("Changes reads the World's own history and derives every count from two art
   const record = surface.getByRole("button", { name: /world-revision-b.*world-revision-c/s });
   await expect(record).toHaveAttribute("aria-pressed", "true");
 
-  // Derived, not typed: one object changed, one evidence region changed, one package file changed.
-  await expect(surface.getByText(/1 object \(1 changed\)/)).toBeVisible();
+  // Derived, not typed: two objects changed, one evidence region changed, one package file changed.
+  // Re-pinned from "1 object (1 changed)" to the per-object source-version diff of 456b13fb
+  // ("fix: integrate reviewed blueprint lifecycle and bounded browser corrections"; pinned by
+  // lib/world-version-diff.test.ts "source versions exchanged between two objects are reported per
+  // object"): both fixture objects move from sourceVersions ["version-b"] to ["version-c"], so
+  // entity-1 changes as well as claim-1. Measured at 1aca28de: "2 objects (2 changed)".
+  await expect(surface.getByText(/2 objects \(2 changed\)/)).toBeVisible();
   await expect(surface.getByText(/1 evidence region \(1 changed\)/)).toBeVisible();
   await expect(surface.getByText(/2 source revisions/)).toBeVisible();
 
@@ -213,7 +218,11 @@ test("Changes reads the World's own history and derives every count from two art
   await expect(impact.getByText("Maintenance interval is 2,000 hours")).toBeVisible();
   // Compiled ids are resolved to labels; an internal key never becomes the primary line.
   await expect(impact.getByText("Feedwater Pump FP-200 has_maintenance_interval Maintenance interval is 2,000 hours")).toHaveCount(0);
-  await expect(impact.locator("li")).toHaveCount(1);
+  // Two rows, for the same reason as the count above (456b13fb): the entity changed its sourceVersions and the claim its
+  // label and sourceVersions. Measured locally on this head: "Entity · changed / Feedwater Pump FP-200 / sourceVersions" and
+  // "Claim · changed / Maintenance interval is 2,000 hours / Label, sourceVersions".
+  await expect(impact.locator("li")).toHaveCount(2);
+  await expect(impact.locator("li").filter({ hasText: "Feedwater Pump FP-200" })).toContainText("sourceVersions");
 
   // The existing version-diff panel, opened on this pair rather than on its own default.
   await expect(surface.getByRole("heading", { name: "FIELD-LEVEL COMPARISON" })).toBeVisible();

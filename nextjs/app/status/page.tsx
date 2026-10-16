@@ -9,6 +9,7 @@ import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { NOT_RUN, buildProbeSection } from "@/lib/status-probe";
 import { SUPPORT_ACKNOWLEDGEMENT } from "@/lib/support-targets";
 import { readProbeHistory } from "@/lib/synthetic-probe-store";
+import styles from "./status.module.css";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
@@ -115,10 +116,21 @@ export default async function StatusPage() {
     marketing index. The reporting route is the closing action.
   */
   return <PublicSitePage><PolicyDocument closing={<Link className="btn" href={"/contact" as Route}>Report an outage</Link>} title="TAVONEL service status" intro={<>The first group below is TAVONEL&rsquo;s live configuration and activation state, read {CHECKED_AT.format(new Date(status.generatedAt))} KST when this page rendered. &ldquo;Configured&rdquo; means the component is configured and its gate is open; it does not mean a request recently succeeded. Scheduled checks report request outcomes separately further down. Report an outage you are seeing rather than waiting for it to appear here.</>}>
+    {/*
+      The five sections in source order, laid out by status.module.css: the two status grids keep
+      the full width, the incident record and the subscription path share a row on desktop, and a
+      phone gets one stack in this order. Plain `div`s, so the headings, the "On this page" index
+      read from them, and the accessibility tree are what they were.
+    */}
+    <div className={styles.sections}>
+    <div className={`${styles.section} ${styles.wide}`}>
     <h2>Configuration and activation state</h2>
     <div className="status-list">{Object.entries(status.components).map(([key, value]) => <article key={key} data-state={value.state}><span>{value.state.replaceAll("_", " ")}</span><h3>{COMPONENT_LABEL[key] ?? key}</h3><p>{value.detail}</p></article>)}</div>
+    </div>
 
+    <div className={`${styles.section} ${styles.wide}`}>
     <h2>Scheduled dependency checks</h2>
+    <div className={styles.guidance}>
     <p>Request checks here run on a schedule without customer data and report what came back. Billing is a configuration-only check; it sends no request through a payment flow. A row marked &ldquo;not probed&rdquo; is neither a pass nor a failure: nothing was sent, and the reason is given.</p>
     <p>
       Last check that passed: <strong>{stamp(probe.lastSuccessfulAt)}</strong>. Most recent check
@@ -126,6 +138,7 @@ export default async function StatusPage() {
       {probe.lastRunOk === null ? null : probe.lastRunOk ? " (passed)" : " (did not pass)"}.{" "}
       {probe.window.sentence}
     </p>
+    </div>
     {/*
       The word in the badge is the state; `data-state` only picks a colour, and it is picked from
       the vocabulary `tavonel.css` already styles. `failed` now has its own rule there, so it is
@@ -138,6 +151,7 @@ export default async function StatusPage() {
       ? <p>Scheduled dependency checks begin reporting here with the next run: {DEPENDENCIES_SENTENCE}</p>
       : <div className="status-list">{probe.rows.map((row) => <article key={row.name} data-state={row.state === "operational" ? "operational" : row.state === "failed" ? "failed" : row.state === "configured" ? "configured" : "not_configured"}><span>{row.state}</span><h3>{row.label}</h3><p>{row.detail}</p></article>)}</div>}
     <p>Full pipeline check: {probe.fixtureE2E}</p>
+    </div>
 
     {/*
       G2-013. What a buyer expects from a status page and did not get: an incident record, and a
@@ -151,6 +165,7 @@ export default async function StatusPage() {
       The subscribe path is the feed that already exists and already resolves, plus the address a
       person reads. Neither is a new promise: an announcement list nobody has built would be.
     */}
+    <div className={styles.section}>
     <h2>Incident history</h2>
     <p>
       No incident has been recorded since {DAY.format(new Date(`${RECORD_STARTS}T00:00:00+09:00`))},
@@ -162,7 +177,9 @@ export default async function StatusPage() {
     <p>
       If this page is unavailable, report service impact to support@tavonel.com.
     </p>
+    </div>
 
+    <div className={styles.section}>
     <h2>Getting told without coming back</h2>
     <p>
       Releases and the changes that come with them are published on the{" "}
@@ -170,9 +187,16 @@ export default async function StatusPage() {
       <a href="/changelog/feed.xml">Atom feed</a> any reader can subscribe to. For an incident
       affecting your workspace, email support@tavonel.com for direct updates.
     </p>
+    </div>
 
-    <h2>Incident contact</h2><p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
+    <div className={`${styles.section} ${styles.wide}`}>
+    <h2>Incident contact</h2>
+    <div className={styles.guidance}>
+    <p>Report service impact to support@tavonel.com and security issues to security@tavonel.com. Do not include document contents in email.</p>
     {/* The support target, imported rather than written: /contact prints the same constant. */}
     <p>{SUPPORT_ACKNOWLEDGEMENT}</p>
+    </div>
+    </div>
+    </div>
   </PolicyDocument></PublicSitePage>;
 }

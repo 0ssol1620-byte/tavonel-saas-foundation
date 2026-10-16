@@ -7,7 +7,7 @@ import { createExportSigner } from "./export-signing";
 const mocks = vi.hoisted(() => ({
   authorize: vi.fn(), revalidate: vi.fn(), load: vi.fn(), release: vi.fn(), signer: vi.fn(), sourceAccess: vi.fn(),
 }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: mocks.sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: mocks.sourceAccess, checkConnectorSourceAccessForViewer: mocks.sourceAccess }));
 vi.mock("@/lib/developer-auth", () => ({
   authorizeFoundationRequest: mocks.authorize,
   revalidateFoundationAuthorization: mocks.revalidate,
@@ -62,15 +62,18 @@ describe.each([["direct", direct], ["v1", versioned]] as const)("%s export autho
     expect(response.headers.get("content-type")).toBe("application/zip");
     const files = unzipSync(new Uint8Array(await response.arrayBuffer()));
     expect(files["signatures/export-manifest.ed25519.json"]).toBeDefined();
+    expect(mocks.sourceAccess.mock.calls).toEqual(Array.from({ length: 2 }, () => [principal.workspaceKey, ["export-auth-fixture"], principal.userId]));
   });
   it.each([1, 2])("refuses source access denied at check %s without returning ZIP bytes", async check => {
     if (check === 2) mocks.sourceAccess.mockResolvedValueOnce({ ok: true });
+    // Both the initial check and the release check use the authenticated viewer.
     mocks.sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     const response = await run();
     expect(response.status).toBe(403);
     expect(response.headers.get("content-type")).not.toBe("application/zip");
     expect(await response.json()).toEqual({ code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
     expect(mocks.release).toHaveBeenCalled();
+    expect(mocks.sourceAccess.mock.calls).toEqual(Array.from({ length: check }, () => [principal.workspaceKey, ["export-auth-fixture"], principal.userId]));
   });
   it("does not let a tombstoned source reappear through a freshly signed export", async () => {
     mocks.sourceAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });

@@ -69,6 +69,13 @@ describe("per-provider isolation", () => {
     expect(calls).toEqual([{ url: expect.stringMatching(`^${ORIGIN[provider]}/`), auth: `Bearer ${provider}-token` }]);
   });
 
+  it("reads Dropbox version metadata only from its own API origin", async () => {
+    const { fetcher, calls } = recorder({});
+    const item = { nativeId: "id:file-1", name: "f", revision: "a1c10ce0dd78", mimeType: "application/pdf", sizeBytes: 1, modifiedAt: null, kind: "file" as const };
+    await expect(observeSourceVersion("dropbox", item, {}, "dropbox-token", fetcher)).rejects.toThrow();
+    expect(calls).toEqual([{ url: "https://api.dropboxapi.com/2/files/get_metadata", auth: "Bearer dropbox-token" }]);
+  });
+
   it("configures a provider only from its own credentials and token endpoint", () => {
     const env = { TAVONEL_PUBLIC_ORIGIN: "https://tavonel.com", TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_ID: "google-client",
       TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF: "vault://google/client" };

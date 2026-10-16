@@ -5,8 +5,8 @@
  *
  * `fetch` cannot report upload progress. A request body stream would be the modern answer, but it
  * is gated behind HTTP/2 and `duplex: "half"` and is not available everywhere, so a PUT made with
- * `fetch` is a black box from the moment it starts until the moment it ends. For a 40 MB scan on a
- * hotel connection that black box is the entire experience.
+ * `fetch` is a black box from the moment it starts until the moment it ends. For a source at the
+ * 5 MiB processing ceiling on a hotel connection, that black box is the entire experience.
  *
  * `XMLHttpRequest` still reports it, so this is the one place the older API is the correct one.
  * What it gives back is not an estimate: `loaded` and `total` are bytes acknowledged by the
@@ -28,10 +28,11 @@ export type TransferResult =
 /**
  * The digest of what was sent, computed where the bytes already are.
  *
- * Confirmation used to fingerprint the source by downloading it back through the application
- * server -- a full GET, capped at 5 MiB, of an object intake would admit at fifty. The browser
- * already holds these bytes, and `crypto.subtle` is a platform feature, so the digest is taken
- * here and the byte path disappears. No dependency, and nothing to re-download.
+ * Fingerprinting the source by downloading it back through the application server would mean a
+ * second full transfer, up to the shared 5 MiB processing ceiling, of the same admitted object the
+ * browser has only just sent. The browser already holds these bytes, and `crypto.subtle` is a
+ * platform feature, so the digest is taken here and the byte path disappears. No dependency, and
+ * nothing to re-download.
  *
  * It is a *declared* digest and is treated as one: it says what the client believes it sent, the
  * CDR worker computes the same digest over what actually arrived, and confirming the two agree is
@@ -48,6 +49,17 @@ export async function sourceDigest(file: Blob): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * How long one PUT may take, first byte to response, before it is abandoned as a network failure.
+ *
+ * Intake admits a source of up to 5 MiB (`PROCESSING_CEILING.maxSourceBytes` in
+ * `shared/intakeCeiling.ts`, because the worker and the rasterizer both cap there); two minutes
+ * carries that at about 43 KiB/s, a conservative bound for a slow link. Without a bound, a transfer
+ * that stalls outright never settles and the progress bar waits forever. This is a ceiling, not a
+ * measured value.
+ */
+export const UPLOAD_TIMEOUT_MS = 120 * 1000;
 
 export type TransferHandle = {
   /** Resolves once the transfer settles, in every outcome. It never rejects. */
@@ -102,6 +114,8 @@ export function putWithProgress(
     request.addEventListener("abort", () => settle({ ok: false, status: 0, reason: "aborted" }));
 
     request.open("PUT", url, true);
+    // A stalled PUT ends through the "timeout" listener above, as a network failure, instead of never.
+    request.timeout = UPLOAD_TIMEOUT_MS;
     request.setRequestHeader("content-type", contentType);
     request.send(file);
   });

@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({
 vi.mock("./customer-source-scope", () => ({ readCustomerSourceScope: h.scope }));
 vi.mock("./customer-data-admission", () => ({ readCustomerSourceAuthorization: h.authorization }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: h.sourceIds }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: h.sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: h.sourceAccess, checkConnectorSourceAccessForViewer: h.sourceAccess }));
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
   authorizeFoundationRequest: h.authorize,
@@ -136,6 +136,7 @@ describe("Ask under a revoked v2 permission", () => {
     expect(denied.status).toBe(403);
     expect(await denied.json()).toEqual({ code: DERIVED_DATA_REFUSED });
     expect(h.pipeline).toHaveBeenCalledTimes(1);
+    expect(h.sourceAccess).toHaveBeenCalledWith(WS, [DOC], "user-1");
   });
 
   it("refuses at release when revocation lands while answering", async () => {

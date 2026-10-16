@@ -79,7 +79,9 @@ export async function POST(request: Request) {
     || !ACTIONS.has(action) || reason.length < 8 || reason.length > 1_000) {
     return refuse("REVIEW_REQUEST_INVALID", 400);
   }
-  const loaded = await loadWorldReadModel(auth.principal.workspaceKey, collectionId);
+  // A reviewer submits the digest they inspected. Other revisions may already exist;
+  // storage listing order must not decide which revision this decision belongs to.
+  const loaded = await loadWorldReadModel(auth.principal.workspaceKey, collectionId, manifestDigest);
   if (!loaded.ok) return refuse(loaded.code, loaded.status);
   if (loaded.model.world.manifestDigest !== manifestDigest) {
     return refuse("REVIEW_WORLD_CHANGED", 409);

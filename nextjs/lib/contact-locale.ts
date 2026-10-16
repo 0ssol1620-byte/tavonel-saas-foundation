@@ -61,7 +61,68 @@ const KOREAN: Record<string, string> = {
   "We use this information to answer your inquiry.": "입력한 정보는 문의에 답변하는 데 사용합니다.",
   "Received. We will reply from an official TAVONEL address.": "문의가 접수됐습니다. TAVONEL 공식 이메일 주소에서 답변드립니다.",
   "We could not send your inquiry.": "문의를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  "Check the required fields and their lengths, then send again.": "필수 항목과 입력 길이를 확인해 주세요.",
+  "Your inquiry is larger than this form can send. Shorten the message or remove some optional answers, then send it again.": "문의 전체 크기가 이 양식으로 보낼 수 있는 한도를 넘었습니다. 문의 내용을 줄여 쓰거나 선택 항목의 답변 일부를 지운 뒤 다시 보내 주세요.",
+  "Too many inquiries were sent. Please try again in 10 minutes.": "문의 전송이 잠시 제한됐습니다. 10분 후 다시 시도해 주세요.",
+  "Your inquiry cannot be sent from this page, so sending it again will not help. Your answers are still in the form.": "이 화면에서는 문의를 보낼 수 없어 다시 보내도 해결되지 않습니다. 입력한 내용은 양식에 그대로 남아 있습니다.",
+  "Email us instead at": "대신 다음 주소로 메일을 보내 주세요:",
+  "We could not send your inquiry. Your answers are still in the form.": "문의를 보내지 못했습니다. 입력한 내용은 양식에 그대로 남아 있습니다.",
+  "Send it again, or email us at": "다시 보내거나 다음 주소로 메일을 보내 주세요:",
 };
+
+/** The address a visitor can write to when the form itself cannot deliver. */
+export const CONTACT_EMAIL = "hello@tavonel.com";
+
+/** A failed send's public copy. Both parts are English keys, translated where they are rendered. */
+export type ContactErrorCopy = {
+  message: string;
+  /** The lead-in to the fallback address, or null where no address is offered. */
+  fallback: string | null;
+  /**
+    Whether sending again can succeed. False is terminal: the form keeps Send disabled and moves
+    focus to the status, so the only action left on screen is the fixed address.
+  */
+  retry: boolean;
+};
+
+/**
+  Public copy for a failed send, keyed by HTTP status (none for a network failure).
+
+  Never the server's `error` string or the browser's exception text: those are written for
+  logs, not for a visitor, and a network abort reads "Failed to fetch". Where `fallback` is set,
+  the address follows it as a link to the bare address -- no answer from the form is ever
+  written into the mailto URI.
+
+  The recovery offered is the one a second attempt can reach. 400, 413 and 429 are fixed in the
+  form or by waiting, so the copy says what to change and offers nothing else. 403 (origin
+  refused) and 415 (not a JSON request) refuse the request rather than its answers, and an
+  unchanged retry is refused the same way, so the copy says so and offers the address alone.
+  Anything else -- a 5xx, an unexpected status, a network failure -- may pass on a second
+  attempt, so both are offered.
+
+  413 is the size of the whole request, not of the message: the message's 5,000-character cap
+  says nothing about bytes, and a Hangul syllable is three of them in UTF-8. So the copy names
+  both things a visitor can trim.
+*/
+export function contactErrorCopy(status?: number): ContactErrorCopy {
+  if (status === 400) return { message: "Check the required fields and their lengths, then send again.", fallback: null, retry: true };
+  if (status === 403 || status === 415) {
+    return {
+      message: "Your inquiry cannot be sent from this page, so sending it again will not help. Your answers are still in the form.",
+      fallback: "Email us instead at",
+      retry: false,
+    };
+  }
+  if (status === 413) {
+    return {
+      message: "Your inquiry is larger than this form can send. Shorten the message or remove some optional answers, then send it again.",
+      fallback: null,
+      retry: true,
+    };
+  }
+  if (status === 429) return { message: "Too many inquiries were sent. Please try again in 10 minutes.", fallback: null, retry: true };
+  return { message: "We could not send your inquiry. Your answers are still in the form.", fallback: "Send it again, or email us at", retry: true };
+}
 
 export function contactText(value: string, locale: ContactLocale): string {
   return locale === "ko" ? KOREAN[value] ?? value : value;
@@ -71,10 +132,15 @@ export function hasKoreanContactText(value: string): boolean {
   return value in KOREAN;
 }
 
+/**
+  The Korean failure text as the form renders it, the address included where one is offered.
+
+  Derived from `contactErrorCopy` rather than kept as a table of its own: a second table is how
+  this helper came to offer the address alone for 403 and 415 while the form still asked for a
+  retry.
+*/
 export function koreanContactError(status?: number): string {
-  if (status === 400) return "필수 항목과 입력 길이를 확인해 주세요.";
-  if (status === 413) return "문의 내용이 너무 깁니다. 내용을 줄여 다시 보내 주세요.";
-  if (status === 429) return "문의 전송이 잠시 제한됐습니다. 10분 후 다시 시도해 주세요.";
-  if (status === 403 || status === 415) return "이 화면에서 문의를 보낼 수 없습니다. hello@tavonel.com으로 연락해 주세요.";
-  return "지금 문의를 보내지 못했습니다. 잠시 후 다시 시도하거나 hello@tavonel.com으로 연락해 주세요.";
+  const { message, fallback } = contactErrorCopy(status);
+  const text = contactText(message, "ko");
+  return fallback ? `${text} ${contactText(fallback, "ko")} ${CONTACT_EMAIL}` : text;
 }

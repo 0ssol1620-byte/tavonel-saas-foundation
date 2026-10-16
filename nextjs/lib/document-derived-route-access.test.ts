@@ -12,7 +12,7 @@ const { getUser, pilotAccess, productAccess, listObjects, getOcr, sourceAccess, 
 
 vi.mock("@/lib/foundation-pilot", () => ({ getRequestUser: getUser, foundationPilotAccess: pilotAccess }));
 vi.mock("@/lib/billing-product-access", () => ({ authorizeFoundationProduct: productAccess }));
-vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess }));
+vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: sourceAccess, checkConnectorSourceAccessForViewer: sourceAccess }));
 vi.mock("@/lib/r2-objects", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./r2-objects")>()),
   listImmutableWorkspaceObjects: listObjects,

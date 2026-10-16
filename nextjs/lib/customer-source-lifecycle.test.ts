@@ -1,7 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { customerDeletionReceipt, inventoryCustomerSource } from "./customer-source-lifecycle";
+import { customerDeletionReceipt, inventoryCustomerSource, readCustomerSourceDeletionStatus } from "./customer-source-lifecycle";
+
+// Local RPC stand-in for the deletion-status read: no network, no database.
+const rpcState = vi.hoisted(() => ({ body: null as unknown, calls: [] as { path: string; body: unknown }[] }));
+vi.mock("./supabase-admin", () => ({
+  readSupabaseAdminConfig: () => ({ url: "https://rpc.invalid", serviceRoleKey: "local-rpc-mock".padEnd(32, "x") }),
+  supabaseAdminRequest: async (_config: unknown, path: string, init: RequestInit = {}) => {
+    rpcState.calls.push({ path, body: JSON.parse(String(init.body)) });
+    return new Response(JSON.stringify(rpcState.body), { status: 200, headers: { "content-type": "application/json" } });
+  },
+}));
 
 const OBJECTS = {
   "pilot-acme01": [
@@ -231,5 +241,134 @@ describe("source deletion derived closure migration", () => {
     expect(close).toMatch(/insert into public\.source_deletion_receipts[\s\S]+'derived_purged'/);
     expect(fn("customer_source_deletion_status")).toMatch(/'retrievalUnitsRemaining', \(select pg_catalog\.count/);
     expect(sql).not.toMatch(/grant [^;]+ to (anon|authenticated)/);
+  });
+});
+
+describe("customer deletion receipt completeness:", () => {
+  const WORKSPACE = "pilot-acme01";
+  const DOCUMENT = "0d000000-0000-4000-8000-000000000001";
+  const INVALID = { ok: false, code: "CUSTOMER_SOURCE_DELETE_STATUS_INVALID" };
+  const hex = (c: string) => `sha256:${c.repeat(64)}`;
+  const unattested = {
+    deletionId: hex("d"), workspaceKey: WORKSPACE, documentId: DOCUMENT, reason: "customer_requested",
+    requestedAt: "2026-09-27T00:00:00Z", eligibleAt: "2026-09-27T00:15:00Z", requestManifestSha256: hex("a"),
+    tombstoneReceiptId: hex("b"), inventoryManifestSha256: null, artifactCount: null, attestedAt: null, objects: [] as any[],
+  };
+  const attested = (artifactCount: unknown, objects: any[]) => ({ ...unattested,
+    inventoryManifestSha256: hex("c"), artifactCount, attestedAt: "2026-09-27T00:20:00Z", objects });
+  const purgedObject = (objectKey: string, purgedAt: unknown = "2026-09-27T01:02:00Z") => ({ objectKey,
+    objectSha256: hex("1"), purgedAt, receiptId: hex("2"), objectAlreadyAbsent: false });
+  const waiting = (objectKey: string) => ({ objectKey, objectSha256: hex("1"), purgedAt: null, receiptId: null,
+    objectAlreadyAbsent: null });
+  const read = (row: unknown, documentId = DOCUMENT) => {
+    rpcState.body = row;
+    return readCustomerSourceDeletionStatus(WORKSPACE, documentId);
+  };
+  const notPurged = (status: unknown) => {
+    const receipt = customerDeletionReceipt(status as any);
+    expect(receipt.state).not.toBe("source_objects_purged");
+    expect(receipt.payload.sourceObjectsPurgedAt).toBeNull();
+  };
+
+  beforeEach(() => { rpcState.body = null; rpcState.calls.length = 0; });
+
+  it("customer deletion receipt completeness: a negative, fractional, unsafe or non-numeric count is refused and never purged", async () => {
+    for (const artifactCount of [-1, 1.5, 2 ** 53, "1"]) {
+      await expect(read(attested(artifactCount, []))).resolves.toEqual(INVALID);
+      await expect(read(attested(artifactCount, [purgedObject("a")]))).resolves.toEqual(INVALID);
+    }
+    notPurged(attested(-1, []));
+    notPurged(attested(1.5, [purgedObject("a")]));
+    notPurged(attested(2 ** 53, [purgedObject("a")]));
+  });
+
+  it("customer deletion receipt completeness: repeated keys and rows beyond the attested count are refused, never coverage", async () => {
+    const twice = attested(2, [purgedObject("a"), purgedObject("a")]);
+    const extra = attested(1, [purgedObject("a"), purgedObject("b")]);
+    await expect(read(twice)).resolves.toEqual(INVALID);
+    await expect(read(extra)).resolves.toEqual(INVALID);
+    await expect(read(attested(2, [waiting("a"), waiting("a")]))).resolves.toEqual(INVALID);
+    await expect(read(attested(1, [waiting("a"), purgedObject("b")]))).resolves.toEqual(INVALID);
+    notPurged(twice);
+    notPurged(extra);
+    // The payload is reported as received, not deduplicated into coverage it does not have.
+    expect(customerDeletionReceipt(twice as any).payload.objects).toHaveLength(2);
+
+    // Keys differing only in case are distinct objects, each with its own receipt.
+    const cased = attested(2, [purgedObject("a"), purgedObject("A")]);
+    await expect(read(cased)).resolves.toEqual({ ok: true, status: cased });
+    expect(customerDeletionReceipt(cased as any).state).toBe("source_objects_purged");
+  });
+
+  it("customer deletion receipt completeness: an unparseable purge time or an unpaired receipt is refused and never purged", async () => {
+    const badTime = attested(1, [purgedObject("a", "not-a-date")]);
+    const numericTime = attested(1, [purgedObject("a", 0)]);
+    const receiptOnly = attested(1, [{ ...purgedObject("a"), purgedAt: null }]);
+    const timeOnly = attested(1, [{ ...purgedObject("a"), receiptId: null }]);
+    for (const status of [badTime, numericTime, receiptOnly, timeOnly]) {
+      await expect(read(status)).resolves.toEqual(INVALID);
+      notPurged(status);
+    }
+  });
+
+  it("customer deletion receipt completeness: an exact distinct receipt set is purged; unattested, underfilled and empty stay pending", async () => {
+    const complete = attested(2, [purgedObject("a", "2026-09-27T01:01:00Z"), purgedObject("b")]);
+    await expect(read(complete)).resolves.toEqual({ ok: true, status: complete });
+    expect(customerDeletionReceipt(complete as any)).toMatchObject({ state: "source_objects_purged",
+      payload: { artifactCount: 2, derivedArtifactsRetained: true, sourceObjectsPurgedAt: "2026-09-27T01:02:00Z" } });
+
+    for (const pending of [attested(2, [purgedObject("a")]), attested(2, [purgedObject("a"), waiting("b")]),
+      attested(2, [waiting("a"), waiting("b")])]) {
+      await expect(read(pending)).resolves.toEqual({ ok: true, status: pending });
+      expect(customerDeletionReceipt(pending as any)).toMatchObject({ state: "purging",
+        payload: { sourceObjectsPurgedAt: null } });
+    }
+
+    await expect(read(unattested)).resolves.toEqual({ ok: true, status: unattested });
+    expect(customerDeletionReceipt(unattested as any)).toMatchObject({ state: "scheduled",
+      payload: { sourceObjectsPurgedAt: null } });
+
+    // Attestation refuses an empty inventory: a zero count decodes but never claims a purge.
+    const empty = attested(0, []);
+    await expect(read(empty)).resolves.toEqual({ ok: true, status: empty });
+    notPurged(empty);
+  });
+
+  it("customer deletion receipt completeness: storage-lock retention and unproven derived retention are unchanged", async () => {
+    const locked = { ...waiting("b"), purgeFailureCount: 2, lastPurgeFailureCode: "SOURCE_DELETE_OBJECT_LOCKED",
+      lastPurgeFailureAt: "2026-09-27T02:00:00Z" };
+    const blocked = attested(2, [purgedObject("a"), locked]);
+    await expect(read(blocked)).resolves.toEqual({ ok: true, status: blocked });
+    expect(customerDeletionReceipt(blocked as any)).toMatchObject({ state: "purge_blocked_by_storage_lock",
+      payload: { objectsRetainedUnderStorageLock: 1, derivedArtifactsRetained: true, sourceObjectsPurgedAt: null } });
+
+    const derived = { receiptId: hex("e"), closedAt: "2026-09-27T00:30:00Z", retrievalUnitsErased: 3,
+      retrievalEmbeddingsErased: 1, expiredWorkspaceCacheRowsErased: 0, retrievalUnitsRetainedUnproven: 2,
+      indexedWorldVersionsRetained: 1, retrievalUnitsRemaining: 2 };
+    const closed = { ...attested(2, [purgedObject("a"), purgedObject("b")]), derived };
+    await expect(read(closed)).resolves.toEqual({ ok: true, status: closed });
+    expect(customerDeletionReceipt(closed as any)).toMatchObject({ state: "source_objects_purged", payload: {
+      scope: "document_r2_objects_and_exclusive_retrieval_rows", derivedArtifactsRetained: true,
+      derivedClosure: { retrievalUnitsRetainedUnproven: 2, indexedWorldVersionsRetained: 1,
+        worldVersionCountCoverage: "retrieval_index_only", retrievalUnitsRemaining: 2 },
+    } });
+  });
+
+  it("customer deletion receipt completeness: the read stays bound to the caller's workspace and document", async () => {
+    const row = attested(1, [purgedObject("a")]);
+    const upper = DOCUMENT.toUpperCase();
+    await expect(read(row, upper)).resolves.toEqual({ ok: true, status: row });
+    expect(rpcState.calls).toEqual([{ path: "/rest/v1/rpc/customer_source_deletion_status",
+      body: { p_workspace_key: WORKSPACE, p_document_id: upper } }]);
+
+    await expect(read({ ...row, workspaceKey: "pilot-other9" })).resolves.toEqual(INVALID);
+    await expect(read({ ...row, documentId: "0d000000-0000-4000-8000-000000000002" })).resolves.toEqual(INVALID);
+    await expect(read({ ...row, reason: "operator_requested" })).resolves.toEqual(INVALID);
+    await expect(read({ ...row, tombstoneReceiptId: "sha256:short" })).resolves.toEqual(INVALID);
+    await expect(read(null)).resolves.toEqual({ ok: true, status: null });
+
+    rpcState.calls.length = 0;
+    await expect(read(row, "doc-1")).resolves.toEqual({ ok: true, status: null });
+    expect(rpcState.calls).toEqual([]);
   });
 });

@@ -15,7 +15,7 @@ describe("public marketing analytics boundary", () => {
     expect(referralOrigin("")).toBe("");
   });
   it("fails closed on absent, invalid, expired or unavailable consent", () => {
-    for (const value of [null, "broken", '{}', '{"allowed":true,"expires":1}']) expect(readConsent({ getItem: () => value }, 2)).toBeNull();
+    for (const value of [null, "broken", '{}', '{"allowed":true,"expires":1}', '{"allowed":true,"expires":1e309}']) expect(readConsent({ getItem: () => value }, 2)).toBeNull();
     expect(readConsent({ getItem: () => { throw new Error("blocked"); } })).toBeNull();
     expect(readConsent({ getItem: () => '{"allowed":false,"expires":10}' }, 2)).toBe(false);
     expect(readConsent({ getItem: () => '{"allowed":true,"expires":10}' }, 2)).toBe(true);

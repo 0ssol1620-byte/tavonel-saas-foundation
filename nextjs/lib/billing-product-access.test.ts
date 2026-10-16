@@ -27,6 +27,33 @@ describe("paid product access matrix", () => {
   });
 });
 
+describe("scheduled cancellation", () => {
+  const now = new Date("2026-10-07T12:00:00.000Z");
+  const cancelling = (subscriptionCancelAt: string) =>
+    account({ accessPlan: "studio_access", subscriptionStatus: "active", subscriptionCancelAt });
+
+  it("refuses access exactly at the effective cancellation time", () => {
+    expect(billingProductDecision(cancelling("2026-10-07T12:00:00.000Z"), "studio", undefined, now))
+      .toEqual({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
+  });
+
+  it("refuses access after the effective cancellation time, before the final webhook", () => {
+    expect(billingProductDecision(cancelling("2026-10-07T11:59:59.999Z"), "studio", undefined, now))
+      .toEqual({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
+  });
+
+  it("compares a non-UTC offset timestamp as the same instant", () => {
+    // 08:00 at -04:00 is 12:00Z, exactly `now`.
+    expect(billingProductDecision(cancelling("2026-10-07T08:00:00.000-04:00"), "studio", undefined, now))
+      .toEqual({ ok: false, code: "SUBSCRIPTION_REQUIRED", status: 402 });
+  });
+
+  it("keeps access while the cancellation is still in the future", () => {
+    expect(billingProductDecision(cancelling("2026-10-07T12:00:00.001Z"), "studio", undefined, now))
+      .toEqual({ ok: true });
+  });
+});
+
 /*
   World activation, which is the one level that is a plan *and* a role question.
 

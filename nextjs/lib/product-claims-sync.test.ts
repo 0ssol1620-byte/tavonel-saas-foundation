@@ -306,6 +306,46 @@ describe("product claims sync", () => {
   });
 
   /*
+    UX01. The customer-data gate, disclosed on the page where a developer meets it.
+
+    /developers walks from "Compile and activate a World" to an authenticated read, and while the
+    gate is closed a reader cannot take that first step on their own. So the note sits between the
+    journey and the first example, in the policy's own words, beside the two actions a reader has
+    today. It is read off the conditional rather than found anywhere in the file, so a note that
+    outlived its gate fails.
+  */
+  it("discloses the closed customer-data gate on /developers before its authenticated examples", () => {
+    const page = read("app/developers/page.tsx");
+    expect(page, "the gate text comes from the object /api/status serves")
+      .toMatch(/import \{[^}]*\bactivationPolicy\b[^}]*\} from "@\/lib\/activation-policy"/);
+    expect(page, "the public World action is the site's one constant for it")
+      .toMatch(/import \{[^}]*\bEXPLORE_CTA\b[^}]*\} from "@\/lib\/site-navigation"/);
+
+    const source = strip(page);
+    const gate = source.match(
+      /\{activationPolicy\.customerData\.enabled \? null : \(\s*(<p [^>]*>[\s\S]*?<\/p>)\s*\)\}/,
+    );
+    expect(gate, "the note renders only while the gate is closed").not.toBeNull();
+    const [block, note] = gate!;
+    expect(note, "the paragraph carries the marker the browser test finds it by")
+      .toMatch(/^<p [^>]*data-capability-gate="customerData"/);
+    expect(note, "the reason as the policy wrote it, not a paraphrase or a transform of it")
+      .toContain("{activationPolicy.customerData.reason}");
+    expect(note, "the public World, by its constant")
+      .toMatch(/<Link [^>]*href=\{EXPLORE_CTA\.href as Route\}[^>]*>\{EXPLORE_CTA\.label\}<\/Link>/);
+    expect(note, "and the conversation about the reader's own sources")
+      .toMatch(/<Link [^>]*href="\/contact"[^>]*>Discuss your sources<\/Link>/);
+
+    const at = source.indexOf(block);
+    const journey = source.indexOf("{JOURNEY.map(");
+    const examples = source.indexOf("<DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]}");
+    expect(journey, "the journey is still rendered from JOURNEY").toBeGreaterThan(-1);
+    expect(examples, "the authenticated examples are still the first-call tabs").toBeGreaterThan(-1);
+    expect(at, "after the journey list closes").toBeGreaterThan(source.indexOf("</ol>", journey));
+    expect(at, "before the first authenticated example").toBeLessThan(examples);
+  });
+
+  /*
     Audit P05. The capability table's levels are the levels the routes enforce.
 
     The table is rendered from `billingProductDecision`, so the Yes/No cannot drift. What can

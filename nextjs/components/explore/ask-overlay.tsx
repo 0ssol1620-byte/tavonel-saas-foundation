@@ -9,9 +9,11 @@
   corpus to the browser or quietly fail on the fourth question. A control that only looks like it
   accepts anything is worse than one that says what it does.
 
-  The answer is the source text the retriever scored highest, shown as a quotation, and every
-  region under it opens Act 2 at that region -- Question → World → Knowledge → Evidence →
-  Original source, walked rather than described.
+  A grounded answer is the complete text of the regions the retriever selected, shown as a
+  quotation. When that text is too long for the answer limit the retriever abstains, and the
+  panel says so in words instead of quoting anything. Either way every region under it opens
+  Act 2 at that region -- Question → World → Knowledge → Evidence → Original source, walked
+  rather than described.
 */
 
 import { useEffect, useRef } from "react";
@@ -65,7 +67,7 @@ export default function AskOverlay({
         </button>
       </header>
 
-      <div className={styles.askQuestions} role="group" aria-label="Questions this sample answers">
+      <div className={styles.askQuestions} role="group" aria-label="Prepared questions">
         {answers.map((item, position) => (
           <button
             key={item.question}
@@ -79,20 +81,32 @@ export default function AskOverlay({
         ))}
       </div>
 
-      <blockquote className={styles.askAnswer}>{answer.answer}</blockquote>
+      {!answer ? (
+        <p className={styles.askNote}>No prepared answer is available in this artifact.</p>
+      ) : (
+        <>
+          {answer.status === "grounded" ? (
+            <blockquote className={styles.askAnswer}>{answer.answer}</blockquote>
+          ) : (
+            <p className={styles.askAnswer} role="status">
+              {EXPLORE_COPY.askAbstentions[answer.reason]}
+            </p>
+          )}
 
-      <div className={styles.askRegions}>
-        <p>
-          {answer.regions.length} SOURCE REGION{answer.regions.length === 1 ? "" : "S"}
-        </p>
-        {answer.regions.map((region) => (
-          <button key={region.evidenceId} type="button" onClick={() => onOpenRegion(region.evidenceId)}>
-            <Quote size={12} aria-hidden="true" />
-            <span>{region.filename}</span>
-            <b>PAGE {region.page}</b>
-          </button>
-        ))}
-      </div>
+          <div className={styles.askRegions}>
+            <p>
+              {answer.regions.length} SOURCE REGION{answer.regions.length === 1 ? "" : "S"}
+            </p>
+            {answer.regions.map((region) => (
+              <button key={region.evidenceId} type="button" onClick={() => onOpenRegion(region.evidenceId)}>
+                <Quote size={12} aria-hidden="true" />
+                <span>{region.filename}</span>
+                <b>PAGE {region.page}</b>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <p className={styles.askNote}>{EXPLORE_COPY.askNote}</p>
     </section>

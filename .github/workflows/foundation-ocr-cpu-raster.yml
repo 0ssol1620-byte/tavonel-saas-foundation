@@ -1,0 +1,67 @@
+name: foundation-ocr-cpu-raster
+
+# CPU raster OCR worker: unit/contract tests, bbox location tests and the real CPU OCR
+# qualification (pinned onnxruntime 1.20.1 CPU build, RapidOCR 3.9.2, digest-checked models).
+# The qualification suite skips when its runtime or models are missing; here that would be a
+# silent green, so any skipped test fails the job. No secrets: the HMAC in the tests is a fixture.
+
+on:
+  pull_request:
+    paths:
+      - "workers/foundation-ocr-cpu-raster/**"
+      # The unit suite reads the GPU worker statically (CUDA request, shared model digests).
+      - "workers/foundation-ocr-gpu/app.py"
+      - ".github/workflows/foundation-ocr-cpu-raster.yml"
+  push:
+    branches: [main, "agent/**"]
+    paths:
+      - "workers/foundation-ocr-cpu-raster/**"
+      - "workers/foundation-ocr-gpu/app.py"
+      - ".github/workflows/foundation-ocr-cpu-raster.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundation-ocr-cpu-raster-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: workers/foundation-ocr-cpu-raster
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The same shared libraries the Dockerfile installs for OpenCV and onnxruntime.
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1
+      - name: Install the pinned worker requirements
+        run: python -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt 'pytest==8.4.2'
+      # The approved build-time download: RapidOCR fetches its models, and this script refuses any
+      # accelerator build and any model whose SHA256 differs from the pinned digest.
+      - name: Materialize and verify the pinned models
+        run: python materialize_models.py
+      - name: Tests (zero skips)
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/cpu-raster-junit.xml"
+          python -m pytest tests -q -rs -p no:cacheprovider --junitxml="${report}"
+          python - "${report}" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          suite = next(ET.parse(sys.argv[1]).getroot().iter("testsuite"))
+          tests, skipped = int(suite.get("tests")), int(suite.get("skipped"))
+          print(f"cpu raster tests: {tests} collected, {skipped} skipped")
+          if tests == 0 or skipped:
+              sys.exit("CPU raster tests must run with zero skips")
+          PY

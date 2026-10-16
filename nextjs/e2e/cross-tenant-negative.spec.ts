@@ -64,6 +64,7 @@ const writePaths = (collectionId: string) => [
   { path: `/api/collections/${collectionId}/ask`, data: { question: "what changed" } },
   { path: `/api/collections/${collectionId}/search`, data: { query: "revenue" } },
   { path: `/api/collections/${collectionId}/promote`, data: {} },
+  { path: `/api/collections/${collectionId}/world/rollback`, data: {} },
   { path: `/api/v1/collections/${collectionId}/ask`, data: { question: "what changed" } },
   { path: `/api/v1/collections/${collectionId}/search`, data: { query: "revenue" } },
   { path: `/api/v1/world/${collectionId}/ask`, data: { question: "what changed" } },
