@@ -558,7 +558,8 @@ describe("CA E02/E05 the measured entries carry their figures and their receipts
   it("serves every cited receipt, and its bytes hash to the digest the page prints", () => {
     const record = read("lib/evidence-record.ts");
     const receipts = [...record.matchAll(/digest: "([0-9a-f]{64})",\s+file: "([^"]+)",\s+url: "([^"]+)",/g)];
-    expect(receipts.length, "both measured entries carry a published receipt").toBe(2);
+    // Release 3 added R-03 (the per-type olmOCR-Bench evaluation the Home band cites); it is hashed below like the other two.
+    expect(receipts.length, "all three measured entries carry a published receipt").toBe(3);
     for (const [, digest, file, url] of receipts) {
       expect(url, "a receipt is served from one directory").toMatch(/^\/research\/receipts\/[\w.-]+\.json$/);
       expect(url.toLowerCase(), "a retired campaign name may not reach a public URL").not.toContain("folynta");

@@ -118,6 +118,26 @@ export const EVIDENCE: readonly EvidenceEntry[] = [
       url: "/research/receipts/R-01-recovery-counterfactual-olmocr-2026-08-08.json",
     },
   },
+  /*
+    Release 3 (2026-10-15), move 7. The Home measurement band prints the weakest row of this
+    evaluation, and a figure on Home needs a receipt a reader can fetch. The bytes are the
+    with-recovery arm R-01 already names by `summary_sha256`; publishing them adds the per-type
+    counts R-01 carries only as rates.
+  */
+  {
+    state: "measured",
+    title: "Results by document type, weakest row included",
+    takeaway: "What this means for you: degraded scans are the hard case, so plan against the low-quality scan row rather than the average.",
+    body: "On olmOCR-Bench, scored by the benchmark's own evaluator at revision cfa88c1e over 1,403 documents and 8,413 checks, the pass rate runs from 99.0% on standard digital documents (1,380 of 1,394 checks) to 36.9% on low-quality scans (194 of 526). The overall 80.6 is an average over that spread. Measured 2026-08-04; this is the with-recovery arm of R-01, and like R-01 it is a research measurement on that corpus and that build, not this service's live rate.",
+    receipt: {
+      id: "R-03",
+      of: "official olmOCR-Bench evaluation, by document type",
+      date: "2026-08-04",
+      digest: "4d75ae96e70c7c1c425b991df0f1c356ec6393e73914aaed27f5f54b0048a559",
+      file: "folynta-mineru344-public-core-official-evaluations-r1-2026-08-04__olmocr-bench__evaluation-summary.json",
+      url: "/research/receipts/R-03-olmocr-bench-evaluation-2026-08-04.json",
+    },
+  },
   {
     state: "measured",
     title: "Compilation refuses more than it emits, sometimes",

@@ -23,12 +23,13 @@ import { BRAND_LINE } from "@/lib/site-navigation";
 
   Every other page on the site is "X — TAVONEL", which reads correctly when the section is the
   thing being named. The home tab has no section to name, so it names the product and what the
-  product is -- and both halves come from `BRAND_LINE`, the constant the footer tagline, the OG
-  card and the root metadata description already derive from, rather than from a fifth and sixth
-  positioning sentence typed here.
+  product does -- and both halves come from `BRAND_LINE`, the constant the H1, the footer tagline,
+  the OG card and the root metadata description already derive from, rather than from a fifth and
+  sixth positioning sentence typed here. Fix round 3 (2026-10-16): the tab, the OG title and the
+  Twitter title are the outcome sentence the H1 states (`BRAND_LINE.headline`).
 */
 export const metadata: Metadata = {
-  title: `TAVONEL — ${BRAND_LINE.descriptor}`,
+  title: `TAVONEL — ${BRAND_LINE.headline}`,
   description:
     "Inspect a finished public Compiled World, follow one result to its exact source region, compare what changed, and review accepted sources and deployment boundaries before discussing your own sources.",
   alternates: {

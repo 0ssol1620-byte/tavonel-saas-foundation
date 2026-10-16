@@ -64,7 +64,8 @@ export default function ResearchNotesPage() {
 
               <div className="tiles">
                 {EVIDENCE.map((entry) => (
-                  <article className="tile" key={entry.title} data-state={entry.state}>
+                  /* The receipt id is the anchor the Home measurement band links to (/research/notes#R-01). */
+                  <article className="tile" key={entry.title} data-state={entry.state} id={entry.receipt?.id}>
                     <span className="n">{EVIDENCE_STATE[entry.state]}</span>
                     <h3>{entry.title}</h3>
                     {/*

@@ -78,7 +78,8 @@ describe("film motion control", () => {
     expect(source).toContain("onClick={() => setMobileFilmFit(toggleMobileFilmFit)}");
     expect(toggleMobileFilmFit(true)).toBe(false);
     expect(toggleMobileFilmFit(false)).toBe(true);
-    expect(source).toContain('aria-pressed={!mobileFilmFit}');
+    // One toggle for every caller (R3 fix round 3, M1): pressed = the focused view is on screen.
+    expect(source).toContain("aria-pressed={!mobileFilmFit}");
     expect(source).toContain("if (!viewport || !narrow || mobileFilmFit) return;");
     expect(source).toContain('const NARROW_FRAME = "(max-width: 899px), (pointer: coarse) and (max-width: 1023px)";');
     // This setter belongs only to the explicit button: tabs and viewport changes preserve the choice.

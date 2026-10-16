@@ -3,10 +3,11 @@ import { test, expect, type Page } from "@playwright/test";
 const BENCH = "#s2 article[data-case-status]";
 const FILM = '#s1 figure[data-testid="landing-hero-film"]';
 const SECTIONS = ["s1", "s2", "s3", "s4", "s5", "s6"];
-/* While the server resolves access to /contact, the hero offers the document evaluation instead. */
+/* While the server resolves access to /contact, the hero offers the document evaluation instead,
+   named as the start path it is (fix round 3, judge gap 4). */
 const EVALUATION = {
-  "/": { href: "/evaluation", label: "Evaluate your documents" },
-  "/ko": { href: "/ko/evaluation", label: "내 문서 평가 상담" },
+  "/": { href: "/evaluation", label: "Bring your own documents" },
+  "/ko": { href: "/ko/evaluation", label: "내 문서 가져오기" },
 } as const;
 async function visibleFilm(page: Page) {
   await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /./);
@@ -142,7 +143,10 @@ for (const route of ["/", "/ko"]) {
 test("keeps the English brand line as the single H1", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
-  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Knowledge your AI can trust.");
+  // Fix round 3 (judge gap 1): the outcome sentence, with the category as the eyebrow above it.
+  expect((await page.locator("h1").innerText()).replace(/\s+/g, " ").trim()).toBe("Turn documents into context your AI can cite.");
+  await expect(page.locator("#s1 .lv2-hero-eyebrow + h1#lv2-hero-title")).toHaveCount(1);
+  await expect(page.locator("#s1 .lv2-hero-eyebrow")).toHaveText("The Knowledge Compiler for AI");
 });
 test("Korean close repeats the public-sample action and keeps Korean pricing", async ({ page }) => {
   await page.goto("/ko");
@@ -150,8 +154,9 @@ test("Korean close repeats the public-sample action and keeps Korean pricing", a
   await expect(close.getByRole("link", { name: "요금 보기" })).toHaveAttribute("href", "/ko/pricing");
   // Brief 2026-10-15 move 1: same words and destination as the hero and the header.
   await expect(action).toHaveAttribute("href", "/explore");
-  await expect(action).toHaveText("공개 샘플 살펴보기");
-  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveText("공개 샘플 살펴보기");
+  await expect(action).toHaveText("컴파일된 샘플 열기");
+  // The hero's arrow is aria-hidden, so the action's name is the same words.
+  await expect(page.locator('#s1 [data-testid="landing-hero-actions"] a[href="/explore"]')).toHaveAccessibleName("컴파일된 샘플 열기");
   await Promise.all([page.waitForURL(url => url.pathname === "/explore"), action.click()]);
 });
 test("the English close keeps its start action on an English destination", async ({ page }) => {
@@ -192,12 +197,19 @@ test("four-stage video stays static with reduced motion until explicit play and 
 test("server-renders the visible film poster as its priority image", async ({ request }) => {
   const response = await request.get("/"); expect(response.status()).toBe(200);
   const html = await response.text();
-  // Next transmits this early hint in the HTTP Link header before streaming the body.
+  // Release 3: the poster is a 1x/2x srcset (a phone in Fit takes the 1440px file). React does not put a
+  // srcset preload in the HTTP Link header, so the hint is the first-party <link rel=preload> in the
+  // streamed <head>, ahead of the body; the header must not point at a superseded poster either.
   const posterHint = response.headers()["link"] ?? "";
-  expect(posterHint).toContain("</film/poster-1-hero-2x.webp>");
-  expect(posterHint).toMatch(/rel=preload; as="image"; fetchpriority="high"/i);
+  expect(posterHint).not.toMatch(/\/film\/poster-/);
+  const head = html.slice(0, html.indexOf("</head>"));
+  const preloads = [...head.matchAll(/<link[^>]*rel="preload"[^>]*as="image"[^>]*>/g)].map(match => match[0]);
+  expect(preloads).toHaveLength(1);
+  expect(preloads[0]).toMatch(/fetchpriority="high"/i);
+  expect(preloads[0]).toMatch(/imagesrcset="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
   const high = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => /fetchpriority="high"/i.test(tag));
-  expect(high).toHaveLength(1); expect(high[0]).toContain("/film/poster-1-hero-2x.webp");
+  expect(high).toHaveLength(1); expect(high[0]).toContain('src="/film/poster-1-t3.00-2x.webp"');
+  expect(high[0]).toMatch(/srcset="\/film\/poster-1-t3\.00\.webp 1440w, \/film\/poster-1-t3\.00-2x\.webp 2880w"/i);
   expect(high[0]).toMatch(/loading="eager"/i); expect(high[0]).toMatch(/ width="[1-9]\d*"/); expect(high[0]).toMatch(/ height="[1-9]\d*"/);
   const sourceImages = [...html.matchAll(/<img[^>]*>/g)].map(match => match[0]).filter(tag => tag.includes("apple-2026-q1-10-q-reference-p004"));
   expect(sourceImages).toHaveLength(1);

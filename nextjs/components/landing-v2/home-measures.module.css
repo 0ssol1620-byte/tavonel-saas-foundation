@@ -1,0 +1,92 @@
+/* Release 3 move 7: the receipted measurement band. Paper, ink and one 1px rule like every Home
+   section; cobalt only on the receipt links (the band's one action). Figures are tabular. */
+.band {
+  padding-block: 56px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+}
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 12px 64px;
+  align-items: baseline;
+}
+.title {
+  margin: 0;
+  color: var(--ink);
+  font: 600 24px/1.25 var(--f-sans);
+  font-variation-settings: "wght" 600;
+  letter-spacing: -0.01em;
+}
+.scope {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--ink-muted);
+  font: 15px/1.6 var(--f-sans);
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 48px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--ink);
+}
+.statement { margin: 0; }
+.figure {
+  display: block;
+  color: var(--ink);
+  font: 600 clamp(40px, 4vw, 56px)/1 var(--f-sans);
+  font-variation-settings: "wght" 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+.label {
+  display: block;
+  margin-top: 12px;
+  color: var(--ink);
+  font: 500 17px/1.45 var(--f-sans);
+}
+.detail {
+  margin: 0;
+  color: var(--ink-muted);
+  font: 15px/1.6 var(--f-sans);
+}
+/* Pushed to the foot of the cell so the three receipts share one baseline at desktop width. */
+.receipt { margin: auto 0 0; }
+/* Block-level wrapping instead of Home's inline-flex links, still at least 44px tall. Hangul in
+   "영수증" falls through to the sans face instead of a wide system mono. */
+.receipt a {
+  display: inline-block;
+  min-height: 44px;
+  padding-block: 13px;
+  color: var(--action);
+  font: 13px/18px ui-monospace, Consolas, "Wanted Sans Variable", monospace;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--action) 40%, transparent);
+  text-underline-offset: 3px;
+}
+.receipt a span { white-space: nowrap; }
+.receipt a:hover { text-decoration-color: currentColor; }
+.receipt a:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.band :lang(ko) { word-break: keep-all; }
+/* Same measured WebKit weight hook as source-first-home.module.css (Release 2 font outline probe). */
+:global(html[data-static-wght="1"]) .title,
+:global(html[data-static-wght="1"]) .figure { -webkit-text-stroke: 0.038em currentColor; }
+
+@media (max-width: 899px) {
+  .band { padding-block: 48px; }
+  .head { grid-template-columns: minmax(0, 1fr); }
+  .facts { grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 24px; }
+  .fact { padding-block: 20px 24px; }
+  .figure { font-size: 40px; }
+}

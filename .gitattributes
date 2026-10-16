@@ -108,3 +108,7 @@ nextjs/scripts/**/*.mjs text eol=lf
 nextjs/public/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md text eol=lf
 nextjs/public/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md text eol=lf
 nextjs/public/policy/processing-terms-2026-09-30.json text eol=lf
+
+# The public claims pack, copied byte-for-byte from the evidence repository. lib/home-measures.test.ts
+# pins its sha256; like the research receipts it is evidence, so git rewrites it in neither direction.
+nextjs/content/evidence/*.json -text

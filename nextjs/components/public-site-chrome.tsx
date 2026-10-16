@@ -14,7 +14,8 @@ import chrome from "./public-site-chrome.module.css";
  * The public sample is the action every reader can take today, so the header's filled button,
  * the Home hero and the Home close all say this, in this colour. Read by `landing-page.tsx`.
  */
-export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Explore the public sample", ko: "공개 샘플 살펴보기" } as const;
+/* Fix round 3 (judge gap 4): a verb that does something today -- /explore opens the compiled public sample. */
+export const SAMPLE_CTA = { href: EXPLORE_CTA.href, label: "Open the compiled sample", ko: "컴파일된 샘플 열기" } as const;
 
 /**
  * The header, once, for every public surface including the three that used to hand-roll one.

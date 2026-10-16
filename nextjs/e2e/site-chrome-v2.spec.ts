@@ -98,7 +98,7 @@ test.describe("at 1440", () => {
     );
     // Brief 2026-10-15 move 1: the bar carries exactly one filled control, the public-sample action
     // the Home hero and close repeat. Pricing stays a plain link at link weight.
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual(["Explore the public sample".slice(0, 24)]);
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual(["Open the compiled sample".slice(0, 24)]);
     await expect(action).toHaveCSS("font-weight", "400");
 
     const signIn = page.locator(`${HEADER} .nav-signin`);

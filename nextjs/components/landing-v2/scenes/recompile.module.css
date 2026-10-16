@@ -51,8 +51,13 @@
 .fan path {
   stroke: var(--relation);
   stroke-width: 1;
-  /* Base state is the drawn line, so every engine and every motion setting ends here. */
-  stroke-dasharray: 1;
+  /*
+    Base state is the drawn line, so every engine and every motion setting ends here.
+    The path carries pathLength="1": one unit of dash covers the whole fan and two of gap hide it
+    whatever the subpath count. Without pathLength the "1" was one user unit, which drew the fan
+    as a dotted line at rest and made the draw a crawl of dots (Release 3).
+  */
+  stroke-dasharray: 1 2;
   stroke-dashoffset: 0;
 }
 
@@ -69,10 +74,15 @@
 */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
+    /*
+      Forwards only, from entry 0%: before the range the fan is the drawn base, so a page
+      captured at the top, or read with the fan still below the fold, shows the finished line;
+      the switch to undrawn happens when the fan's first pixel row meets the viewport edge.
+    */
     .fan path {
-      animation: draw linear both;
+      animation: draw linear forwards;
       animation-timeline: view();
-      animation-range: entry 20% cover 40%;
+      animation-range: entry 0% cover 40%;
     }
   }
 }

@@ -315,29 +315,39 @@ section.hero .intake {
   margin: 0.25rem 0 0;
 }
 
-.home a.quietLink,
-.home a.evidenceLink,
-.home a.diffLink {
+/*
+  Home's one content link (Release 3). These rules were scoped to this sheet's `.home`, which no
+  element carries (the Home root is source-first-home.module.css's), so the workbench and record
+  links drew as plain text with no underline. They now match the s5 "Read" links and the scene
+  text links: ink on a 1px underline. Cobalt stays with the filled action, the active film tab,
+  the Evidence Line and focus rings.
+*/
+a.quietLink,
+a.evidenceLink,
+a.diffLink {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
   min-height: 44px;
-  color: var(--home-cobalt);
-  /* Explicit: otherwise these inherit the shared 15px body size. */
-  font-size: 1rem;
-  font-weight: 600;
+  color: var(--home-ink);
+  font-weight: 500;
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+  text-decoration-color: var(--home-rule-strong);
+  text-underline-offset: 0.25em;
 }
 
-.home a.quietLink {
-  font-weight: 500;
+@media (hover: hover) and (pointer: fine) {
+  a.quietLink:hover,
+  a.evidenceLink:hover,
+  a.diffLink:hover {
+    text-decoration-color: currentColor;
+  }
 }
 
-.home a.quietLink:focus-visible,
-.home a.evidenceLink:focus-visible,
-.home a.diffLink:focus-visible {
+a.quietLink:focus-visible,
+a.evidenceLink:focus-visible,
+a.diffLink:focus-visible {
   outline: 2px solid var(--home-cobalt);
   outline-offset: 2px;
 }
@@ -467,7 +477,7 @@ section.hero .intake {
   line-height: 1.55;
 }
 
-.home a.evidenceLink {
+a.evidenceLink {
   margin-top: 0.25rem;
 }
 
@@ -778,32 +788,75 @@ section.difficulty {
   list-style: none;
 }
 
+/* One column on a phone; from 960px the difficulties stand side by side under one rule each. */
 .diffList > li {
-  display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr);
-  column-gap: 1rem;
-  padding-block: 1.25rem;
+  padding-block: 24px;
   border-top: 1px solid var(--home-rule);
 }
 
-
-.diffList > li > * {
-  grid-column: 2;
+@media (min-width: 960px) {
+  .diffList {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    column-gap: 48px;
+  }
 }
 
-.diffList h3 {
+/* The context sentence above the list keeps the body measure, not the 1200px container. */
+.contextDisclosure > p:not(.reserved) {
+  max-width: 64ch;
+  margin: 8px 0 32px;
+  color: var(--home-muted);
+}
+
+/* Home's one H3 and one body size (brief §4.4): 24/1.25 and 17/1.65; 20px under 768px. */
+.diffList h3,
+.noteList h3,
+.method h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 24px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 767px) {
+  .diffList h3,
+  .noteList h3,
+  .method h3 {
+    font-size: 20px;
+  }
+}
+
+.diffList p,
+.contextDisclosure > p:not(.reserved),
+.noteList p,
+.method ol,
+.rights,
+.readerGuide p {
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.diffList p:lang(ko),
+.contextDisclosure > p:not(.reserved):lang(ko),
+.noteList p:lang(ko),
+.method ol:lang(ko),
+.rights:lang(ko),
+.readerGuide p:lang(ko) {
+  line-height: 1.75;
+  word-break: keep-all;
+}
+
+:is(.diffList, .noteList, .method) h3:lang(ko) {
+  letter-spacing: 0;
+  word-break: keep-all;
 }
 
 .diffList p {
   max-width: 52ch;
-  margin: 0.375rem 0 0;
+  margin: 8px 0 0;
   color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.55;
 }
 
 .diffList b {
@@ -957,23 +1010,13 @@ section.receive {
 }
 
 .noteList li {
-  padding-top: 0.875rem;
+  padding-top: 16px;
   border-top: 1px solid var(--home-rule);
 }
 
-.noteList h3,
-.method h3 {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
 .noteList p {
-  margin: 0.25rem 0 0;
+  margin: 8px 0 0;
   color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.55;
 }
 
 .method {
@@ -984,12 +1027,10 @@ section.receive {
 
 .method ol {
   display: grid;
-  gap: 0.625rem;
-  margin: 0.75rem 0 0;
+  gap: 12px;
+  margin: 12px 0 0;
   padding-left: 1.25rem;
   color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.55;
 }
 
 .method b {
@@ -997,10 +1038,8 @@ section.receive {
 }
 
 .rights {
-  margin: 1.25rem 0 0;
+  margin: 24px 0 0;
   color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.55;
 }
 
 /* ---------------------------------------------- 04-06 keep their grounds; vary their scale */
@@ -1109,14 +1148,6 @@ section.receive {
     font-size: 0.875rem;
   }
 
-  .diffList > li {
-    grid-template-columns: 2.5rem minmax(0, 1fr);
-    column-gap: 0.75rem;
-  }
-
-  .diffList > li::before {
-    font-size: 1.25rem;
-  }
 }
 
 @media (max-width: 479.98px) {
@@ -1199,8 +1230,6 @@ section.receive {
   max-width: 60ch;
   margin: 0.625rem 0 0;
   color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
@@ -1235,12 +1264,25 @@ section.receive {
 
 .readerFaq summary {
   min-height: 44px;
-  padding-block: 0.875rem;
-  font-size: 1.0625rem;
+  padding-block: 20px;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
   cursor: pointer;
   overflow-wrap: anywhere;
+}
+
+.readerFaq summary:lang(ko) {
+  letter-spacing: 0;
+  word-break: keep-all;
+}
+
+@media (max-width: 767px) {
+  .readerFaq summary {
+    padding-block: 14px;
+    font-size: 18px;
+  }
 }
 
 .readerFaq summary:focus-visible {
@@ -1249,7 +1291,7 @@ section.receive {
 }
 
 .readerFaq details p {
-  margin-block: 0 1.25rem;
+  margin-block: 0 24px;
 }
 
 @media (min-width: 960px) {
@@ -1335,171 +1377,6 @@ section.receive {
 }
 
 @layer overrides {
-.home {
-  --home-paper: #fbfaf7 !important;
-  --home-stone: #f2f0eb !important;
-  --home-sheet: #ffffff !important;
-  --home-ink: #15191d !important;
-  --home-muted: #555b62 !important;
-  --home-cobalt: #2347b8 !important;
-  --home-rule: rgb(21 25 29 / 0.12) !important;
-  --home-rule-strong: rgb(21 25 29 / 0.24) !important;
-  --home-ko: "Wanted Sans Variable", var(--f-sans), system-ui, sans-serif !important;
-  font-family: "Wanted Sans Variable", var(--f-sans), sans-serif !important;
-}
-
-
-.home section.hero {
-  padding-block: calc(4rem + clamp(2rem, 6vw, 5rem)) clamp(3rem, 7vw, 5.5rem) !important;
-}
-.home section.hero .layout { gap: clamp(2.5rem, 6vw, 4.5rem) !important; }
-.home section.hero .intro { gap: 1.25rem 3rem !important; align-items: start !important; }
-
-@media (min-width: 960px) {
-  .home section.hero .intro {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr) !important;
-    grid-template-areas: "title title" "support actions" !important;
-    align-items: end !important;
-  }
-}
-
-.home section.hero .intro :global(.lv2-eyebrow) { display: none !important; }
-
-.home section.hero .intro :global(.lv2-hero-h1) {
-  max-width: none !important;
-  font-family: "Wanted Sans Variable", var(--f-sans), sans-serif !important;
-  font-size: clamp(2.5rem, 1.4rem + 4vw, 4.75rem) !important;
-  font-weight: 510 !important;
-  line-height: 0.98 !important;
-  letter-spacing: -0.02em !important;
-  text-wrap: balance !important;
-}
-
-.home section.hero .intro :global(.lv2-hero-h1):lang(ko) {
-  max-width: 20em !important;
-  font-family: var(--home-ko) !important;
-  font-size: clamp(1.875rem, 1.2rem + 3vw, 3.5rem) !important;
-  font-weight: 560 !important;
-  line-height: 1.24 !important;
-  letter-spacing: -0.025em !important;
-  word-break: keep-all !important;
-  overflow-wrap: anywhere !important;
-}
-
-
-.home section.hero .actionsBlock :global(.btn.lv2-cta) {
-  min-height: 48px !important;
-  padding-inline: 1.5rem !important;
-  border-radius: 6px !important;
-  font-weight: 560 !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
-}
-
-
-.home section.hero .bench { border-top: 1px solid var(--home-rule-strong) !important; }
-.home section.hero .benchHead { padding-block: 1rem !important; }
-.home section.hero .benchGrid { gap: 1.75rem !important; padding-top: 1.75rem !important; }
-@media (min-width: 960px) { .home section.hero .benchGrid { row-gap: 1.5rem !important; } }
-
-.home section.hero .step::before { content: none !important; display: none !important; }
-
-.home section.hero .pageWindow { border-color: var(--home-rule) !important; background: #fff !important; }
-.home section.hero .passagePane .quote { background: var(--home-paper) !important; font-size: 1.1875rem !important; line-height: 1.65 !important; }
-.home section.hero .passagePane .quote { border-inline-start: 0 !important; padding-inline-start: 0 !important; }
-.home section.hero .passagePane .quote:lang(ko) { line-height: 1.8 !important; word-break: keep-all !important; }
-
-.home section.hero .extracted,
-.home section.hero .metaField,
-.home section.hero .regionsLabel {
-  font-family: inherit !important;
-  font-size: 0.875rem !important;
-  font-weight: 560 !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
-}
-.home section.hero .extracted { border-color: var(--home-rule-strong) !important; }
-
-.home section.hero .regionPane .regionButton { min-height: 48px !important; border-color: var(--home-rule-strong) !important; }
-
-.home section.hero .record { padding-top: 1.5rem !important; border-top-color: var(--home-rule-strong) !important; }
-.home section.hero .record .recordList { gap: 1.5rem 2.5rem !important; }
-
-
-.home section.difficulty { background: var(--home-stone) !important; }
-.home section.difficulty .diffList > li { grid-template-columns: minmax(0, 1fr) !important; padding-block: 1.5rem !important; border-top-color: var(--home-rule) !important; }
-.home section.difficulty .diffList > li::before { content: none !important; display: none !important; }
-.home section.difficulty .diffList > li > * { grid-column: 1 !important; }
-
-
-.home .splitHead :global(.lv2-h2),
-.home .receiveHead :global(.lv2-h2),
-.home .readerGuide .readerHead h2,
-.home .readerGuide .readerFaq h2 {
-  font-family: "Wanted Sans Variable", var(--f-sans), sans-serif !important;
-  font-weight: 510 !important;
-  line-height: 1.04 !important;
-  letter-spacing: -0.015em !important;
-}
-.home .splitHead :global(.lv2-h2):lang(ko),
-.home .receiveHead :global(.lv2-h2):lang(ko),
-.home .readerGuide .readerHead h2:lang(ko),
-.home .readerGuide .readerFaq h2:lang(ko) {
-  font-family: var(--home-ko) !important;
-  font-weight: 560 !important;
-  line-height: 1.3 !important;
-  letter-spacing: -0.02em !important;
-  word-break: keep-all !important;
-}
-
-
-.home section.receive .recordSheet {
-  border-top: 1px solid var(--home-rule-strong) !important;
-  box-shadow: none !important;
-}
-.home section.receive .recordSheet .recordKind,
-.home section.receive .recordSheet .recordFields dt {
-  font-family: inherit !important;
-  font-size: 0.875rem !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
-}
-.home section.receive .noteList li { padding-top: 1.125rem !important; border-top-color: var(--home-rule) !important; }
-.home section.receive .method { padding: clamp(1.25rem, 3vw, 2rem) !important; background: var(--home-stone) !important; }
-
-.home .readerGuide { padding-block: clamp(3.5rem, 8vw, 6rem) !important; }
-.home .readerGuide .readerChecks li { border-top-color: var(--home-rule) !important; }
-.home .readerGuide p:lang(ko),
-.home .noteList p:lang(ko),
-.home .method ol:lang(ko) { line-height: 1.75 !important; word-break: keep-all !important; }
-
-@media (max-width: 639.98px) {
-  .home section.hero { padding-block: calc(4rem + 1rem) 2.5rem !important; }
-  .home section.hero .layout { gap: 1.5rem !important; }
-  .home section.hero .intro { gap: 0.75rem !important; }
-  .home section.hero .intro :global(.lv2-hero-h1) { max-width: none !important; font-size: clamp(2.25rem, 10vw, 2.75rem) !important; line-height: 1.02 !important; }
-  .home section.hero .intro :global(.lv2-hero-h1):lang(ko) { font-size: clamp(1.75rem, 7.6vw, 2rem) !important; line-height: 1.28 !important; }
-  .home section.hero .benchGrid { gap: 1.25rem !important; padding-top: 0.75rem !important; }
-  .home section.hero .actionsBlock :global(.btn.lv2-cta) { min-height: 44px !important; }
-}
-
-.home section.hero .runStatus { font-family: inherit !important; }
-.home section.hero .runStatus::before { content: none !important; }
-.home .receive .recordQuote { border-inline-start: 0 !important; padding-inline-start: 0 !important; }
-}
-
-@layer overrides {
-  .home section.hero .intro { display: block !important; text-align: center !important; }
-  .home section.hero .intro :global(.lv2-hero-text) { display: block !important; max-width: none !important; }
-  .home section.hero .intro :global(.lv2-hero-h1) { max-width: none !important; margin-inline: auto; font-size: clamp(36px, 4.2vw, 64px) !important; line-height: 1.1 !important; }
-  .home section.hero .intro :global(.lv2-h1-line) { display: inline !important; white-space: normal !important; }
-  .home section.hero .actionsBlock { margin: 20px auto 0; text-align: center !important; }
-  .home section.hero .actionsBlock :global(.lv2-hero-actions) { justify-content: center; }
-  .home .filmBody { margin: 0 !important; padding: 0 !important; }
-  .home .film figcaption { margin-top: 12px; font-size: 13px; line-height: 1.5; color: var(--home-muted); }
-  .home .proofLayout { display: grid; gap: 28px; }
-  .home .readerLayout { display: block !important; max-width: 900px; }
-  .home .readerFaq { width: 100%; }
   .measurement { padding-block: clamp(44px, 6vw, 80px); background: #fbfaf7; color: #15191d; border-top: 1px solid #d8d5ce; }
   .measurementLead { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: end; }
   .measurementLead p { margin: 0; max-width: 48ch; font: 17px/1.6 var(--f-sans); }
@@ -1513,21 +1390,7 @@ section.receive {
     .measurementResults { grid-template-columns: 1fr; gap: 24px; }
     .measurementResults > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
     .measurementResults dd { margin: 0; }
-    .home section.hero .intro :global(.lv2-hero-h1) { max-width: 15ch !important; }
-    .home .film { margin-top: 24px !important; }
   }
-  .home section.hero .film :global(.compile-film-stages button) { color: #4b5057 !important; border-color: #d8d5ce !important; }
-  .home section.hero .film :global(.compile-film-stages button[aria-selected="true"]) { color: #2347b8 !important; border-color: #2347b8 !important; }
-  .home section.hero .film :global(.compile-film-caption),
-  .home section.hero .film :global(.compile-film-mobile-tools) { color: #4b5057 !important; }
-  .home section.hero .film :global(.compile-film-focus-control) { color: #2347b8 !important; }
-}
-
-@layer overrides {
-  .home section.hero .intro :global(.lv2-hero-h1) { text-align: center !important; }
-  .home section.hero .film :global(.compile-film-caption p),
-  .home section.hero .film :global(.compile-film-progress),
-  .home section.hero .film :global(.compile-film-mobile-tools p) { color: #4b5057 !important; }
 }
 
 @layer overrides {

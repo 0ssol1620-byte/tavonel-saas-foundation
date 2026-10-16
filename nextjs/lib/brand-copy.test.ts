@@ -451,8 +451,9 @@ describe("public copy", () => {
     without repeating it.
   */
   it("keeps the brand line the hero is written from, and writes it in no second place", () => {
+    // Fix round 3 (2026-10-16, delegated authority, founder veto open): the outcome sentence.
     expect(BRAND_LINE.headline).toBe(
-      "Your documents. Knowledge you can verify."
+      "Turn documents into context your AI can cite."
     );
     expect(BRAND_LINE.descriptor).toBe(
       "Knowledge compiled with a traceable path back to every source."
@@ -527,7 +528,8 @@ describe("public copy", () => {
   */
   it("writes one tab-title pattern and names its one exception", () => {
     const home = read("app/page.tsx");
-    expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.descriptor}`");
+    // Fix round 3: the home tab names the outcome the H1 states.
+    expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.headline}`");
     expect(home).toContain("title: BRAND_LINE.headline");
     expect(
       home,

@@ -236,7 +236,8 @@ const EN: LandingV2Copy = {
     headline: BRAND_LINE.headline,
     headlineExperiment: {
       b: "Compile your knowledge.",
-      c: "Knowledge your AI can trust, traced to the source.",
+      /* Fix round 3: arm C in the outcome wording of arm A (no "trust" claim), not a copy of it. */
+      c: "Your documents, as context your AI can cite.",
     },
     /*
       C1, 2026-09-19. It read "Connect the files and systems you already have", and neither half
@@ -530,11 +531,11 @@ const KO: LandingV2Copy = {
     id: "hero",
     eyebrow: "얻게 되는 결과",
     /* A literal translation of `BRAND_LINE.headline`, not a second claim. */
-    headline: "흩어진 문서를, AI가 활용할 수 있는 지식으로.",
+    headline: "문서를 AI가 인용할 수 있는 맥락으로 바꿉니다.",
     /* D12: the literal translation of each arm. The subject is dropped, as the deck does. */
     headlineExperiment: {
       b: "지식을 컴파일하세요.",
-      c: "AI가 신뢰할 수 있는 지식, 원문까지 추적됩니다.",
+      c: "AI가 인용할 수 있는 맥락이 된 내 문서.",
     },
     support:
       "완성된 Compiled World에서 원문까지 확인할 수 있는 지식을 살펴보세요. 내 자료의 연결과 컴파일은 상담 후 함께 설정합니다.",

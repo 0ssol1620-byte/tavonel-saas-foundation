@@ -118,9 +118,15 @@ export const EXPLORE_CTA: SiteLink = { href: "/explore", label: "Explore a Compi
  * design master blueprint (§0, §10.1, §43), which puts the outcome before the category name so a
  * first-time reader is not asked to learn "Knowledge Compiler" in order to parse the first
  * sentence on the site. The descriptor is unchanged.
+ *
+ * Release 3 fix round 3 (2026-10-16): the headline is the Home H1 again, as one outcome sentence --
+ * input, verb, output -- because all four round-4 judges read the category H1 ("The Knowledge
+ * Compiler for AI.") as a noun, not an outcome. The category moved to the eyebrow above the H1,
+ * and the OG card, Twitter card and Home tab title read this constant. Taken under the founder's
+ * 2026-10-03 delegated authority with the founder veto open (RESUME-20261015-LEDGER.md).
  */
 export const BRAND_LINE = {
-  headline: "Your documents. Knowledge you can verify.",
+  headline: "Turn documents into context your AI can cite.",
   descriptor: "Knowledge compiled with a traceable path back to every source.",
 } as const;
 
