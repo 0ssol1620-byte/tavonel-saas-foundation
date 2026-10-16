@@ -4586,6 +4586,17 @@ test('affected source agent admission: the regular plan keeps every release debt
   assert.deepEqual(plan.pendingFullDebt,AFFECTED_HOME_FULL_DEBT);
   assert.deepEqual(planBrowserRuns(plan.browserFiles,plan.runDetailIntegrity),[]);
 });
+import { FIX_ROUND_3_AFFECTED_PATHS as ROUND_3_PATHS, FIX_ROUND_3_AFFECTED_UNIT_FILES as ROUND_3_UNITS, FIX_ROUND_3_AFFECTED_BROWSER_FILES as ROUND_3_BROWSERS } from './repair-scope.mjs';
+// Old-owner negative lists include two paths PR #141 fix round 3 registered deliberately (public/developer/README.md and
+// app/chrome-v2.css). Those assert the round's exact positive ownership instead; every other spelling still runs its rejection.
+function assertFixRound3Endpoint(path) {
+  if (!path.startsWith('nextjs/') || !ROUND_3_PATHS.includes(path.slice('nextjs/'.length))) return false;
+  const map=affectedMap([affectedRecord('M',[path])]);
+  assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],
+    [[],['pr141-fix-round-3'],[],[...ROUND_3_UNITS].sort(),[...ROUND_3_BROWSERS].sort()],path);
+  return true;
+}
+
 test('affected source agent admission: lookalikes, the shared distribution suite, other developer assets, spellings, modes and rename endpoints refuse; the canonical runbook stays repository docs only', () => {
   // '.' is escaped, the prefix is anchored, the wrapper is matched literally and the distribution suite is a check only, never an endpoint.
   for (const path of ['nextjs/public/developer/tavonel-source-agent.pyc','nextjs/public/developer/tavonel-source-agent.py.bak','nextjs/public/developer/tavonel-source-agentXpy',
@@ -4596,6 +4607,7 @@ test('affected source agent admission: lookalikes, the shared distribution suite
     'nextjs/nextjs/public/developer/channel.json','nextjs/public/developer/channel.json/x','nextjs/lib/source-agent-runtime.test.tsx','nextjs/lib/source-agent-runtime.ts',
     'nextjs/lib/source-agent-runtime.spec.ts','nextjs/lib/source-agent-runtimeXtest.ts','nextjs/lib/source-agent/runtime.test.ts','nextjs/lib/source-agent-runtime.test.ts.bak',
     'lib/source-agent-runtime.test.ts','nextjs/scripts/source-agent-runtime.test.ts']) {
+    if (assertFixRound3Endpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -5119,7 +5131,7 @@ test('affected sample analytics admission: adjacent lookalikes, new CSS, vendor,
     'nextjs/public/vendor/gtag.js','nextjs/lib/gtag.ts','nextjs/lib/google-analytics.ts','nextjs/lib/analytics-provider.ts','nextjs/app/api/analytics/route.ts',
     'nextjs/lib/oauth-google-analytics.ts','nextjs/lib/analytics-source-collector.ts','nextjs/package.json',
     'nextjs/nextjs/lib/marketing-analytics.ts','lib/marketing-analytics.ts','lib/sample-analytics-admission.test.ts','components/marketing-consent.tsx']) {
-    if (assertNewReviewedMarketingEndpoint(path)) continue;
+    if (assertNewReviewedMarketingEndpoint(path) || assertFixRound3Endpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[]],path);
