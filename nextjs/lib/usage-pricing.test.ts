@@ -195,10 +195,10 @@ describe("what an uncounted source reserves", () => {
   });
 
   /*
-    Both server call sites, asserted as call sites. The upload capability now reserves the
-    approved per-file quote, bound to the pricing fingerprint the customer approved; the connector
-    import has no approval and still reserves the ceiling. Neither may go back to the `?? 1` that
-    was once identical in both files.
+    Both server call sites, asserted as call sites. The upload capability reserves the approved
+    per-file quote, bound to the pricing fingerprint the customer approved; with the approval
+    lineage off (legacyCapability, main's path) it reserves the ceiling, as the connector import
+    does. Neither may go back to the `?? 1` that was once identical in both files.
   */
   it("is what the unapproved call site uses, the approved one reserves its quote, and neither falls back to one page", () => {
     const code = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8")
@@ -206,10 +206,17 @@ describe("what an uncounted source reserves", () => {
     const capability = code("../app/api/uploads/capability/route.ts");
     const sourceImport = code("./source-import.ts");
 
-    const approvedCall = capability.match(/\breserveFoundationIntakeApprovedFile\(\{([^}]*)\}\)/);
+    const legacyAt = capability.indexOf("async function legacyCapability(");
+    expect(legacyAt).toBeGreaterThan(0);
+    const approvedPath = capability.slice(0, legacyAt);
+    const legacyPath = capability.slice(legacyAt);
+
+    const approvedCall = approvedPath.match(/\breserveFoundationIntakeApprovedFile\(\{([^}]*)\}\)/);
     expect(approvedCall).not.toBeNull();
     expect(approvedCall![1]).toMatch(/\bpricingFingerprint\b/);
-    expect(capability).not.toContain("reservationPageCeiling(");
+    expect(approvedPath).not.toContain("reservationPageCeiling(");
+    expect(legacyPath).toContain("reservationPageCeiling(");
+    expect(legacyPath).not.toContain("reserveFoundationIntakeApprovedFile(");
 
     expect(sourceImport).toContain("reservationPageCeiling(");
 

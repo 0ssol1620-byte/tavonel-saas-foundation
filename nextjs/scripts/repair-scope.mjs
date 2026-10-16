@@ -1746,7 +1746,7 @@ export const WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES = Object.freeze([
 // Compile observations: exactly the authenticated route, compile implementation, durable worker and their new Node contract.
 // Product compile code, so never nativeReuse; the existing compile and worker suites remain direct owning checks.
 export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS = Object.freeze([
-  'app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts',
+  'app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts', 'lib/collection-compile-run.test.ts',
   'lib/compile-job-worker.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs',
 ]);
 export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES = Object.freeze([
@@ -1757,6 +1757,7 @@ export const COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES = Object.freeze([
 export const OCR_V3_CONTRACT_AFFECTED_PATHS = Object.freeze([
   'lib/collection-compiler.ts',
   'lib/collection-download.ts', 'lib/collection-download.test.ts',
+  'lib/compiler-contract.test.ts',
   'lib/core-runtime-v2.ts', 'lib/core-runtime-v2.test.ts',
 ]);
 export const OCR_V3_CONTRACT_AFFECTED_UNIT_FILES = Object.freeze([
@@ -1764,6 +1765,7 @@ export const OCR_V3_CONTRACT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/collection-compiler.test.ts',
   'lib/collection-compiler-fail-closed.test.ts',
   'lib/collection-download.test.ts',
+  'lib/compiler-contract.test.ts',
   'lib/core-runtime-v2.test.ts',
 ]);
 // Explorer navigation: exactly the existing explorer, its CSS, the navigation model and the direct navigation suite.
@@ -1808,6 +1810,25 @@ export const PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS = Object.freeze([
   'lib/pilot-evaluation-worksheet.test.ts',
 ]);
 export const PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES = Object.freeze(['components/evaluation-page.test.tsx', 'lib/pilot-evaluation-worksheet.test.ts']);
+// Intake approval rollout (PR #141 fix, 2026-10-16): the code-owned switch, its rollout-off suite, the shared error catalogue
+// and seven existing suites that pin the rollout-off upload path or the whole-set approval path. Product intake code, so never
+// nativeReuse. The switch and its suite also match intake-triage (lib/intake-*), whose selection joins this one in the union;
+// the suite is not an intake-triage selection because the historical intake fixtures predate it.
+export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS = Object.freeze([
+  'lib/api-error-codes.ts', 'lib/corpus-batching.test.ts', 'lib/intake-approval-rollout.ts', 'lib/intake-approval-rollout-off.test.ts',
+  'lib/openapi-response-shape.test.ts', 'lib/production-hardening.test.ts', 'lib/upload-confirm-route.test.ts',
+  'lib/upload-release-route.test.ts', 'lib/usage-pricing.test.ts', 'lib/workspace-compile-floor-and-ceiling.test.ts',
+]);
+export const INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES = Object.freeze([
+  'lib/api-error-codes.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/corpus-batching.test.ts', 'lib/intake-approval-rollout-off.test.ts',
+  'lib/openapi-response-shape.test.ts', 'lib/production-hardening.test.ts', 'lib/upload-confirm-route.test.ts',
+  'lib/upload-release-route.test.ts', 'lib/usage-pricing.test.ts', 'lib/workspace-compile-floor-and-ceiling.test.ts',
+]);
+// Solutions proof (PR #141 fix): the solution page's limitation sentence and its same-origin proof link. Two direct suites and
+// the solutions browser suite, which runs only in project 1440 of the shared map.
+export const SOLUTIONS_PROOF_AFFECTED_PATHS = Object.freeze(['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx']);
+export const SOLUTIONS_PROOF_AFFECTED_UNIT_FILES = Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts']);
+export const SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/solutions-workflows.spec.ts']);
 // Exact literal alternation: every regular-expression metacharacter is escaped, not only '.', because the cookbook route
 // carries a literal [slug] segment that would otherwise be read as a character class.
 const exactPathAlternation = paths => paths.map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
@@ -2083,6 +2104,12 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Pilot evaluation worksheet: the four exact paths above select the two direct suites only; no browser, database, worker or build lane.
   affectedGroup('pilot-evaluation-worksheet', new RegExp(`^nextjs/(?:${exactPathAlternation(PILOT_EVALUATION_WORKSHEET_AFFECTED_PATHS)})$`),
     { unitFiles: PILOT_EVALUATION_WORKSHEET_AFFECTED_UNIT_FILES }),
+  // Intake approval rollout: the ten exact paths above select ten direct suites; no browser, database, worker or build lane.
+  affectedGroup('intake-approval-rollout', new RegExp(`^nextjs/(?:${exactPathAlternation(INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS)})$`),
+    { unitFiles: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES }),
+  // Solutions proof: the two exact paths above select two direct suites and the 1440 solutions browser suite.
+  affectedGroup('solutions-proof', new RegExp(`^nextjs/(?:${exactPathAlternation(SOLUTIONS_PROOF_AFFECTED_PATHS)})$`),
+    { unitFiles: SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, browserFiles: SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES }),
   affectedGroup('ocr-worker', /^quarantine-sidecar\/foundation-cdr-worker\/(?:src\/[A-Za-z0-9_.-]+\.ts|package\.json|package-lock\.json|tsconfig\.json)$/, { worker: true }),
   // CPU OCR has its own exact-head pytest workflow. Admit only the four reviewed synthetic-binding paths;
   // Repair must not substitute the unrelated CDR worker check or claim the external CPU result.

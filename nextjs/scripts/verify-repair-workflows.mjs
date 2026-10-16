@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
-import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+import { AFFECTED_GROUPS, HOME_AFFECTED_BROWSER_FILE, HOME_AFFECTED_PATHS, HOME_AFFECTED_UNIT_FILES, HOME_READER_HEADING_CSS_AFFECTED_PATHS, HOME_READER_HEADING_CSS_AFFECTED_UNIT_FILES, REPAIR_NODE_EVIDENCE_CONTRACT_FILE, REPAIR_NODE_GATE_RECEIPT_CONTRACT_FILE, RECIPE_CONTINUATION_AFFECTED_BROWSER_FILES, RECIPE_CONTINUATION_AFFECTED_PATHS, RECIPE_CONTINUATION_AFFECTED_UNIT_FILES, VITEST_DISCOVERY_CONFIG_PATH, vitestDiscoveryConfigFailures, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES, WORLD_EXPLORER_NAVIGATION_AFFECTED_PATHS, WORLD_EXPLORER_NAVIGATION_AFFECTED_UNIT_FILES, WORLD_VERSION_DIFF_AFFECTED_PATHS, WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES, INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS, SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 
 const repo = resolve(process.cwd(), '..');
 const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -456,7 +456,7 @@ assert(REPAIR_NODE_EVIDENCE_CONTRACT_FILE===ciNodeSuites[0]&&REPAIR_NODE_GATE_RE
   'CI selector keeps exactly the registered Node evidence and Vitest gate receipt contracts, with finite endpoints and no product neighbor admission');
 // Current compile, navigation and version comparison ownership is finite and restated independently.
 const currentOwnerBindings = [
-  { group: 'compile-source-observations', paths: ['app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts', 'lib/compile-job-worker.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs'],
+  { group: 'compile-source-observations', paths: ['app/api/collections/compile/route.ts', 'lib/collection-compile-run.ts', 'lib/collection-compile-run.test.ts', 'lib/compile-job-worker.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs'],
     exportedPaths: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_PATHS, suites: ['lib/collection-compile-run.test.ts', 'lib/compile-job-worker.test.ts', 'lib/collection-compile-source-observations.test.mjs'], exportedSuites: COMPILE_SOURCE_OBSERVATIONS_AFFECTED_UNIT_FILES,
     neighbors: ['app/api/collections/compile-other/route.ts', 'lib/collection-compile-source-observations.ts', 'lib/compile-job-worker-other.ts'] },
   { group: 'world-explorer-navigation', paths: ['components/world-explorer.tsx', 'components/world-explorer.module.css', 'lib/world-explorer-navigation.ts', 'lib/world-explorer-navigation.test.ts'],
@@ -465,7 +465,32 @@ const currentOwnerBindings = [
   { group: 'world-version-diff', paths: ['lib/world-version-diff.ts', 'lib/world-version-diff.test.ts', 'components/world-version-diff.tsx', 'components/world-version-diff.module.css', 'lib/world-version-diff-view.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-comparison-binding.test.ts'],
     exportedPaths: WORLD_VERSION_DIFF_AFFECTED_PATHS, suites: ['lib/world-version-diff.test.ts', 'lib/world-version-diff-view.test.ts', 'lib/world-version-comparison-binding.test.ts'], exportedSuites: WORLD_VERSION_DIFF_AFFECTED_UNIT_FILES,
     neighbors: ['components/world-version-diff-other.tsx', 'lib/world-version-diff-view.test.mjs', 'lib/world-read-model.ts'] },
+  // PR #141 fix (2026-10-16): ten exact intake-approval-rollout paths, ten direct suites.
+  { group: 'intake-approval-rollout',
+    paths: ['lib/api-error-codes.ts', 'lib/corpus-batching.test.ts', 'lib/intake-approval-rollout.ts', 'lib/intake-approval-rollout-off.test.ts',
+      'lib/openapi-response-shape.test.ts', 'lib/production-hardening.test.ts', 'lib/upload-confirm-route.test.ts',
+      'lib/upload-release-route.test.ts', 'lib/usage-pricing.test.ts', 'lib/workspace-compile-floor-and-ceiling.test.ts'],
+    exportedPaths: INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS,
+    suites: ['lib/api-error-codes.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/corpus-batching.test.ts', 'lib/intake-approval-rollout-off.test.ts',
+      'lib/openapi-response-shape.test.ts', 'lib/production-hardening.test.ts', 'lib/upload-confirm-route.test.ts',
+      'lib/upload-release-route.test.ts', 'lib/usage-pricing.test.ts', 'lib/workspace-compile-floor-and-ceiling.test.ts'],
+    exportedSuites: INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES,
+    neighbors: ['lib/api-error-codes.test.ts', 'lib/intake-approval-rollout-on.test.ts', 'lib/upload-transfer.test.ts', 'lib/usage-pricing.ts'] },
 ];
+// Solutions proof: two exact paths, two direct suites and the one 1440 solutions browser suite.
+{
+  const owners = AFFECTED_GROUPS.filter(owner => owner.group === 'solutions-proof'), [owner] = owners;
+  const paths = ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx'];
+  const suites = ['lib/copy-trust-guard.test.ts', 'lib/output-escaping.test.ts'], browsers = ['e2e/solutions-workflows.spec.ts'];
+  assert(owners.length === 1 && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_PATHS) === JSON.stringify(paths)
+    && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_UNIT_FILES) === JSON.stringify(suites) && JSON.stringify(owner.unitFiles) === JSON.stringify(suites)
+    && JSON.stringify(SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES) === JSON.stringify(browsers) && JSON.stringify(owner.browserFiles) === JSON.stringify(browsers)
+    && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+    && paths.every(p => owner.match.test('nextjs/' + p))
+    && ['app/solutions/[slug]/layout.tsx', 'app/solutions/page.tsx', 'app/solutions/solution-workflow-proof.test.tsx'].every(p => !owner.match.test('nextjs/' + p))
+    && runner.includes("['e2e/solutions-workflows.spec.ts', ['1440']]"),
+    'Solutions proof owner must keep its two exact paths, two direct suites and the 1440 solutions browser suite');
+}
 for (const binding of currentOwnerBindings) {
   const owners = AFFECTED_GROUPS.filter(owner => owner.group === binding.group), [owner] = owners;
   assert(owners.length === 1 && JSON.stringify(binding.exportedPaths) === JSON.stringify(binding.paths)

@@ -2437,8 +2437,9 @@ test('mounted collector accepts the production file attachment after Playwright 
     const fixture = mountedCaptureFixture(root);
     const sourceBytes = readFileSync(new URL('../e2e/workspace-intake-triage.spec.ts', import.meta.url));
     const sourceBlob = createHash('sha1').update(`blob ${sourceBytes.length}\0`).update(sourceBytes).digest('hex');
-    // Preserve the historical mounted fix and bind only the reviewed copy follow-on.
-    assert.ok([WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate, 'd5f6e38f6c60f5b476014b90678680b5df0b6204', '72f68ba25ea4c01571d1752584638ade859115a7'].includes(sourceBlob));
+    // Preserve the historical mounted fix and bind only the reviewed copy follow-on, and the PR #141 fix follow-on whose
+    // two disabled-triage mocks state the approval-lineage signal (the mounted capture code below is unchanged).
+    assert.ok([WORKSPACE_INTAKE_LAYOUT_BLOBS[INTAKE_TRIAGE_BROWSER_FILE].candidate, 'd5f6e38f6c60f5b476014b90678680b5df0b6204', '72f68ba25ea4c01571d1752584638ade859115a7', 'eab6d2422d8d1a4b0e6eb5e8048b3a37b900d266'].includes(sourceBlob));
     const source = sourceBytes.toString('utf8');
     assert.match(source, /import \{ writeFile \} from "node:fs\/promises";/);
     const start = source.indexOf('        const name = `intake-mounted-${phase}-${viewport.width}x${viewport.height}`;');
@@ -7033,6 +7034,37 @@ test('affected pilot worksheet runner admits the exact registered component suit
   }
 });
 
+test('affected PR #141 fix owners: intake approval rollout, solutions proof and the compile-run suite are exact and finite', async () => {
+  const { INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS, INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_PATHS,
+    SOLUTIONS_PROOF_AFFECTED_UNIT_FILES, SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES } = await import('./repair-scope.mjs');
+  assert.equal(INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS.length, 10);
+  assert.equal(INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES.length, 10);
+  assert.ok(!INTAKE_TRIAGE_UNIT_TESTS.includes('lib/intake-approval-rollout-off.test.ts'));
+  for (const path of INTAKE_APPROVAL_ROLLOUT_AFFECTED_PATHS) {
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    // The switch and its suite are lib/intake-* paths, so intake-triage owns them as well and adds its own selection.
+    const intake = path.startsWith('lib/intake-');
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths], [[], intake ? ['intake-approval-rollout', 'intake-triage'] : ['intake-approval-rollout'], []], path);
+    for (const file of INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES) assert.ok(map.unitFiles.includes(file), `${path}: ${file}`);
+    if (!intake) assert.deepEqual([map.unitFiles, map.browserFiles], [[...INTAKE_APPROVAL_ROLLOUT_AFFECTED_UNIT_FILES].sort(), []], path);
+  }
+  assert.deepEqual(SOLUTIONS_PROOF_AFFECTED_PATHS, ['app/solutions/[slug]/page.tsx', 'app/solutions/solution-workflow-proof.tsx']);
+  for (const path of SOLUTIONS_PROOF_AFFECTED_PATHS) {
+    const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
+    assert.deepEqual([map.failures, map.groups, map.unmappedPaths], [[], ['solutions-proof'], []], path);
+    assert.deepEqual([map.unitFiles, map.browserFiles], [[...SOLUTIONS_PROOF_AFFECTED_UNIT_FILES], [...SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES]], path);
+  }
+  assert.deepEqual(planBrowserRuns([...SOLUTIONS_PROOF_AFFECTED_BROWSER_FILES], false), [
+    { kind: 'project', project: '1440', files: ['e2e/solutions-workflows.spec.ts'] },
+  ]);
+  const run = affectedMap([affectedRecord('M', ['nextjs/lib/collection-compile-run.test.ts'])]);
+  assert.deepEqual([run.failures, run.groups], [[], ['compile-source-observations']]);
+  for (const adjacent of ['nextjs/lib/api-error-codes.test.ts.bak', 'nextjs/app/solutions/[slug]/layout.tsx', 'nextjs/lib/upload-confirm-route-v2.test.ts']) {
+    const refused = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual(refused.failures, [`unmapped changed endpoint: ${adjacent}`], adjacent);
+  }
+});
+
 test('affected durable worker contract has one existing compile owner and keeps its three direct checks', () => {
   const path = 'nextjs/lib/compile-job-worker.test.ts';
   const map = affectedMap([affectedRecord('M', [path])]);
@@ -7118,7 +7150,7 @@ test('affected production-hardening admission uses only projects with actual gua
   assert.throws(()=>planBrowserRuns(['e2e/unreviewed.spec.ts'],false),/No reviewed Playwright project mapping/);
 });
 
-test('OCR v3 admission owns exactly the six newly encountered endpoints and selects direct contract checks', async () => {
+test('OCR v3 admission owns exactly the seven newly encountered endpoints and selects direct contract checks', async () => {
   const { OCR_V3_CONTRACT_AFFECTED_PATHS, OCR_V3_CONTRACT_AFFECTED_UNIT_FILES } = await import('./repair-scope.mjs');
   const contract = OCR_V3_CONTRACT_AFFECTED_PATHS.map(path => `nextjs/${path}`);
   const workers = [
@@ -7129,6 +7161,7 @@ test('OCR v3 admission owns exactly the six newly encountered endpoints and sele
     'nextjs/lib/collection-compiler.ts',
     'nextjs/lib/collection-download.ts',
     'nextjs/lib/collection-download.test.ts',
+    'nextjs/lib/compiler-contract.test.ts',
     'nextjs/lib/core-runtime-v2.ts',
     'nextjs/lib/core-runtime-v2.test.ts',
   ]);
@@ -7137,6 +7170,7 @@ test('OCR v3 admission owns exactly the six newly encountered endpoints and sele
     'lib/collection-compiler.test.ts',
     'lib/collection-compiler-fail-closed.test.ts',
     'lib/collection-download.test.ts',
+    'lib/compiler-contract.test.ts',
     'lib/core-runtime-v2.test.ts',
   ]);
   for (const path of [...contract, ...workers]) {

@@ -332,7 +332,7 @@ describe("where the corpus path is wired in", () => {
     expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok}");
     expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(");
     // The approved complete set is compiled only after the server returns every approved member.
-    expect(workspace).toContain("await uploadDocuments(files, counts);");
+    expect(workspace).toContain("await uploadDocuments(files, counts, undefined, approvalLineage);");
     expect(workspace).toContain("const expectedKeys = triageApproval.quote.files.map((entry) => entry.fileKey);");
     expect(workspace).toContain("processingManifest = manifest.filter((entry) => expected.has(entry.fileKey));");
     expect(workspace).toContain("if (processingManifest.length !== expectedKeys.length)");
