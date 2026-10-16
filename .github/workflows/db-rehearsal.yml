@@ -1029,7 +1029,12 @@ jobs:
           covered() { echo "$after" | tr ',' '\n' | awk -F- -v p="$1" 'NF { hi = ($2 == "" ? $1 : $2); if (p >= $1 && p <= hi) f = 1 } END { exit !f }'; }
           for port in $(seq 54320 54329) $(echo "$before" | tr ',-' '  '); do covered "$port"; done
           ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
+      # Full history: `pnpm test` below runs scripts/db/native-world-race-ci.test.mjs, which reads the
+      # race commits c61fe1a5 and 5dd95ed8 with `git show`. At the default depth of 1 those six tests
+      # failed in workflow_dispatch run 38858228268 ("exists on disk, but not in <sha>").
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: supabase/setup-cli@v1
         with:
           version: 2.116.0

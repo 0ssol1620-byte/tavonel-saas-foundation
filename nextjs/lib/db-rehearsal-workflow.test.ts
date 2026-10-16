@@ -52,6 +52,25 @@ describe("db-rehearsal local stack port reservation", () => {
     expect(contract).toContain('database.port, "54322"');
     expect(workflow).not.toMatch(/^\s*port\s*=/m);
   });
+
+  /*
+    A job that runs the repository's `pnpm test` needs the history its script suites read:
+    scripts/db/native-world-race-ci.test.mjs `git show`s the race commits c61fe1a5 and 5dd95ed8.
+    The real-Auth job checked out at the default depth of 1, and six of those tests failed in
+    workflow_dispatch run 38858228268 with "exists on disk, but not in <sha>".
+  */
+  it("checks out full history in every job that runs the repository test suite", () => {
+    const names = [...workflow.matchAll(/\n {2}([a-z][a-z-]*):\n/g)].map(match => match[1]!);
+    const testing = names.filter(name => /\n\s+pnpm test\n/.test(job(name)));
+    expect(testing).toContain("real-auth-journey");
+    for (const name of testing) {
+      const body = job(name);
+      const at = body.indexOf("- uses: actions/checkout@v4");
+      expect(at, `${name} checks out the repository`).toBeGreaterThan(-1);
+      const checkout = body.slice(at, body.indexOf("\n      - ", at + 1));
+      expect(checkout, `${name} checkout`).toContain("fetch-depth: 0");
+    }
+  });
 });
 
 describe("db-rehearsal native World SQL acceptance", () => {
